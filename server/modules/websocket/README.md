@@ -16,6 +16,12 @@ It is intentionally structured as **small services** plus a **barrel export** in
 Creates and wires the shared `ws` server.
 2. `connectedClients` and `WS_OPEN_STATE`  
 Shared chat client registry and open-state constant used by other modules.
+3. `chatRunRegistry`  
+Live-run registry; the providers module's `sessionsService` reads it for `listRunningSessions`.
+4. `broadcastSessionUpserted` and `broadcastSessionUpsertedBatch`  
+The `session_upserted` delta builders; the providers module's sessions watcher fans its re-indexed rows out through them.
+5. `runDetachedChatTurn` (and the `ProviderRuntimeGateway` type)  
+Runs one chat turn with no socket attached; the scheduled-messages module drives it from a timer.
 
 ## Why Dependency Injection Is Used
 
