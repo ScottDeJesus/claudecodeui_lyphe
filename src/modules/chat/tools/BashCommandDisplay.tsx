@@ -3,6 +3,8 @@ import { ChevronRight, Copy, Check } from 'lucide-react';
 
 import { cn,copyTextToClipboard } from '@/shared/utils';
 import { ToolStatusBadge } from '@/modules/chat/tools/ToolStatusBadge';
+import { ToolOutcomeBadge, ToolOutcomeGlyph } from '@/modules/chat/tools/ToolOutcomeBadge';
+import type { ToolOutcome } from '@/modules/chat/tools/toolOutcome';
 import { useIsExportingTranscript } from '@/modules/chat/context/TranscriptRenderContext';
 import type { ToolStatus } from '@/shared/types';
 
@@ -13,6 +15,8 @@ type BashCommandDisplayProps = {
   output?: string;
   isError?: boolean;
   status?: ToolStatus;
+  /** What the row can say happened to it, in words; null while there is nothing positive to say. */
+  outcome?: ToolOutcome | null;
   defaultOpen?: boolean;
 };
 
@@ -31,6 +35,7 @@ export const BashCommandDisplay: React.FC<BashCommandDisplayProps> = ({
   output,
   isError = false,
   status,
+  outcome = null,
   defaultOpen = false,
 }) => {
   const trimmedOutput = (output || '').replace(/\s+$/, '');
@@ -123,6 +128,12 @@ export const BashCommandDisplay: React.FC<BashCommandDisplayProps> = ({
           <span className="h-2.5 w-2.5 flex-shrink-0 animate-spin rounded-full border-[1.5px] border-muted-foreground/30 border-t-emerald-400" />
         )}
         {status && status !== 'running' && <ToolStatusBadge status={status} className="flex-shrink-0" />}
+        {outcome && (
+          <span className="inline-flex flex-shrink-0 items-center gap-1.5">
+            <ToolOutcomeGlyph outcome={outcome} />
+            <ToolOutcomeBadge outcome={outcome} />
+          </span>
+        )}
         {!open && hasOutput && !isRunning && (
           <span className="flex-shrink-0 text-[10px] tabular-nums text-muted-foreground/70 transition-opacity group-hover/cmd:opacity-0">
             {outputLineCount} {outputLineCount === 1 ? 'line' : 'lines'}

@@ -1,8 +1,14 @@
-import type { AgentCategory, AgentContextByProvider, AgentProvider, AgentSettingsProject, ClaudePermissionsState, CodexPermissionMode, CursorPermissionsState, McpProject, SkillsProject } from '@/shared/types';
+import type { AgentCategory, AgentContextByProvider, AgentProvider, AgentSettingsProject, ClaudePermissionsState, CodexPermissionMode, CursorPermissionsState, McpProject, PermissionMode, SkillsProject } from '@/shared/types';
 import { McpServers } from '@/modules/mcp';
 import { ProviderSkills } from '@/modules/skills';
 import AccountContent from '@/modules/settings/tabs/agents-settings/sections/content/AccountContent';
+import EditModeContent from '@/modules/settings/tabs/agents-settings/sections/content/EditModeContent';
 import PermissionsContent from '@/modules/settings/tabs/agents-settings/sections/content/PermissionsContent';
+
+/** The three modes Codex accepts, narrowed back out of the shared mode union before it is stored. */
+const toCodexPermissionMode = (mode: PermissionMode): CodexPermissionMode => (
+  mode === 'acceptEdits' || mode === 'bypassPermissions' ? mode : 'default'
+);
 
 type AgentCategoryContentSectionProps = {
   selectedAgent: AgentProvider;
@@ -40,6 +46,38 @@ export default function AgentCategoryContentSection({
         />
       )}
 
+      {/* Above the allow/deny lists on purpose: this one setting decides whether
+          those lists are ever consulted. */}
+      {selectedCategory === 'permissions' && selectedAgent === 'claude' && (
+        <div className="mb-6 max-w-md">
+          <EditModeContent
+            agent="claude"
+            value={claudePermissions.permissionMode}
+            onChange={(mode) => onClaudePermissionsChange({ ...claudePermissions, permissionMode: mode })}
+          />
+        </div>
+      )}
+
+      {selectedCategory === 'permissions' && selectedAgent === 'cursor' && (
+        <div className="mb-6 max-w-md">
+          <EditModeContent
+            agent="cursor"
+            value={cursorPermissions.permissionMode}
+            onChange={(mode) => onCursorPermissionsChange({ ...cursorPermissions, permissionMode: mode })}
+          />
+        </div>
+      )}
+
+      {selectedCategory === 'permissions' && selectedAgent === 'codex' && (
+        <div className="max-w-md">
+          <EditModeContent
+            agent="codex"
+            value={codexPermissionMode}
+            onChange={(mode) => onCodexPermissionModeChange(toCodexPermissionMode(mode))}
+          />
+        </div>
+      )}
+
       {selectedCategory === 'permissions' && selectedAgent === 'claude' && (
         <PermissionsContent
           agent="claude"
@@ -73,14 +111,6 @@ export default function AgentCategoryContentSection({
           onDisallowedCommandsChange={(value) => {
             onCursorPermissionsChange({ ...cursorPermissions, disallowedCommands: value });
           }}
-        />
-      )}
-
-      {selectedCategory === 'permissions' && selectedAgent === 'codex' && (
-        <PermissionsContent
-          agent="codex"
-          permissionMode={codexPermissionMode}
-          onPermissionModeChange={onCodexPermissionModeChange}
         />
       )}
 

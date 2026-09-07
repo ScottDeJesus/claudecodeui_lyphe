@@ -2,7 +2,9 @@ import { memo, useMemo, useState } from 'react';
 import { ChevronRight } from 'lucide-react';
 
 import type { ChatMessage, ClaudePermissionSuggestion, PermissionGrantResult, LLMProvider,DiffLine,DiffStats,Project,ToolGroupItem } from '@/shared/types';
-import { getToolConfig } from '@/modules/chat/tools';
+import { Card } from '@/shared/ui';
+import { ToolOutcomeBadge, ToolOutcomeGlyph, deriveToolOutcome, getToolConfig } from '@/modules/chat/tools';
+import type { ReadToolPermissionState } from '@/modules/chat/hooks/useToolPermissionState';
 import MessageComponent from '@/modules/chat/transcript/MessageComponent';
 import { useIsExportingTranscript } from '@/modules/chat/context/TranscriptRenderContext';
 import { DiffStatsBadge } from '@/modules/chat/tools/DiffStatsBadge';
@@ -20,6 +22,8 @@ type ToolGroupContainerProps = {
   showThinking?: boolean;
   selectedProject?: Project | null;
   provider: LLMProvider | string;
+  /** Asks whether a call in this run is blocked on a person, or was allowed by one. */
+  readToolPermissionState?: ReadToolPermissionState;
 };
 
 /**
@@ -85,6 +89,7 @@ function ToolGroupContainer({
   showThinking,
   selectedProject,
   provider,
+  readToolPermissionState,
 }: ToolGroupContainerProps) {
   const isExporting = useIsExportingTranscript();
   // Collapsed on screen, always open in an export: the whole point of the
@@ -101,53 +106,79 @@ function ToolGroupContainer({
   const preview = group.preview;
   const groupDiffStats = useGroupDiffStats(group.toolName, group.messages, createDiff);
 
+  // The collapsed row hides every call in the run, so the one thing it must not
+  // get wrong is whether the run is finished. A single blocked call makes the
+  // whole row say so; "done" needs every call to have come back.
+  const states = group.messages.map(
+    (message) => readToolPermissionState?.(message.toolName, message.toolInput) ?? 'idle',
+  );
+  const outcome = deriveToolOutcome({
+    permissionState: states.includes('waiting')
+      ? 'waiting'
+      : states.includes('prompted') ? 'prompted' : 'idle',
+    hasResult: group.messages.every((message) => Boolean(message.toolResult)),
+    isError: group.messages.some((message) => Boolean(message.toolResult?.isError)),
+    isShellCommand: group.toolName === 'Bash',
+  });
+
   return (
     <div className="chat-message tool px-3 sm:px-0" data-message-timestamp={group.timestamp || undefined}>
-      <button
-        type="button"
-        className={`group flex w-full items-center gap-2 border-l-2 ${borderClass} rounded-r-md bg-muted/25 px-3 py-2 text-left transition-colors hover:bg-muted/40 dark:bg-muted/10 dark:hover:bg-muted/20`}
-        onClick={() => setIsExpanded((current) => !current)}
-        aria-expanded={isExpanded}
-      >
-        <ChevronRight
-          className={`h-3.5 w-3.5 flex-shrink-0 text-muted-foreground transition-transform ${isExpanded ? 'rotate-90' : ''}`}
-          aria-hidden
-        />
-        <span className={`${iconClass} flex h-5 w-5 flex-shrink-0 items-center justify-center rounded bg-background/80 text-xs font-medium`}>
-          {icon}
-        </span>
-        <span className="min-w-0 flex-shrink-0 text-xs font-medium text-foreground">{label}</span>
-        <span className="flex-shrink-0 rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
-          x{group.messages.length}
-        </span>
-        {preview && (
-          <>
-            <span className="text-[10px] text-muted-foreground/40">/</span>
-            <span className="min-w-0 truncate font-mono text-xs text-muted-foreground">{preview}</span>
-          </>
-        )}
-        {groupDiffStats && <DiffStatsBadge stats={groupDiffStats} className="ml-auto pl-2" />}
-      </button>
+      <Card className="overflow-hidden">
+        <button
+          type="button"
+          className={`group flex w-full items-center gap-2 border-l-2 ${borderClass} px-3 py-2.5 text-left transition-colors hover:bg-secondary/60`}
+          onClick={() => setIsExpanded((current) => !current)}
+          aria-expanded={isExpanded}
+        >
+          {outcome && <ToolOutcomeGlyph outcome={outcome} />}
+          <ChevronRight
+            className={`h-3.5 w-3.5 flex-shrink-0 text-muted-foreground transition-transform ${isExpanded ? 'rotate-90' : ''}`}
+            aria-hidden
+          />
+          <span className={`${iconClass} flex h-5 w-5 flex-shrink-0 items-center justify-center rounded bg-background/80 text-xs font-medium`}>
+            {icon}
+          </span>
+          <span className="min-w-0 flex-shrink-0 text-xs font-medium text-foreground">{label}</span>
+          <span className="flex-shrink-0 rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+            x{group.messages.length}
+          </span>
+          {preview && (
+            <>
+              <span className="text-[10px] text-muted-foreground/40">/</span>
+              <span className="min-w-0 truncate font-mono text-xs text-muted-foreground">{preview}</span>
+            </>
+          )}
+          {groupDiffStats && <DiffStatsBadge stats={groupDiffStats} className="ml-auto pl-2" />}
+          {outcome && (
+            // `whitespace-nowrap` because the preview beside it is greedy: without it the two
+            // words of "✓ Finished" break onto separate lines and the row grows a second line.
+            <span className={`${groupDiffStats ? '' : 'ml-auto '}flex-shrink-0 whitespace-nowrap pl-2`}>
+              <ToolOutcomeBadge outcome={outcome} />
+            </span>
+          )}
+        </button>
 
-      {showChildren && (
-        <div className="mt-2 space-y-3 sm:space-y-4">
-          {group.messages.map((message, index) => (
-            <MessageComponent
-              key={getMessageKey(message)}
-              message={message}
-              prevMessage={index > 0 ? group.messages[index - 1] : prevMessage}
-              createDiff={createDiff}
-              onFileOpen={onFileOpen}
-              onShowSettings={onShowSettings}
-              onGrantToolPermission={onGrantToolPermission}
-              showRawParameters={showRawParameters}
-              showThinking={showThinking}
-              selectedProject={selectedProject}
-              provider={provider}
-            />
-          ))}
-        </div>
-      )}
+        {showChildren && (
+          <div className="space-y-3 border-t border-border px-3 py-3 sm:space-y-4">
+            {group.messages.map((message, index) => (
+              <MessageComponent
+                key={getMessageKey(message)}
+                message={message}
+                prevMessage={index > 0 ? group.messages[index - 1] : prevMessage}
+                createDiff={createDiff}
+                onFileOpen={onFileOpen}
+                onShowSettings={onShowSettings}
+                onGrantToolPermission={onGrantToolPermission}
+                showRawParameters={showRawParameters}
+                showThinking={showThinking}
+                selectedProject={selectedProject}
+                provider={provider}
+                readToolPermissionState={readToolPermissionState}
+              />
+            ))}
+          </div>
+        )}
+      </Card>
     </div>
   );
 }

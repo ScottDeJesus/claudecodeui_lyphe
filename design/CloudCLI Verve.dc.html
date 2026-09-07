@@ -1,0 +1,1533 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="_ds/verve-design-system-845c78a0-5042-416e-b31e-e608179402c3/tokens/fonts.css">
+  <link rel="stylesheet" href="_ds/verve-design-system-845c78a0-5042-416e-b31e-e608179402c3/tokens/colors.css">
+  <link rel="stylesheet" href="_ds/verve-design-system-845c78a0-5042-416e-b31e-e608179402c3/tokens/typography.css">
+  <link rel="stylesheet" href="_ds/verve-design-system-845c78a0-5042-416e-b31e-e608179402c3/tokens/spacing.css">
+  <link rel="stylesheet" href="_ds/verve-design-system-845c78a0-5042-416e-b31e-e608179402c3/tokens/motion.css">
+  <link rel="stylesheet" href="_ds/verve-design-system-845c78a0-5042-416e-b31e-e608179402c3/tokens/base.css">
+  <link rel="stylesheet" href="_ds/verve-design-system-845c78a0-5042-416e-b31e-e608179402c3/styles.css">
+  <script src="_ds/verve-design-system-845c78a0-5042-416e-b31e-e608179402c3/_ds_bundle.js"></script>
+  <style>
+    html, body { height: 100%; }
+    body { overflow: hidden; }
+    a { color: var(--accent); }
+    a:hover { color: var(--accent-ink); }
+    :root {
+      --dur-move: .45s;
+      --ease-spring: cubic-bezier(.25,.85,.3,1);
+      --ease-press: cubic-bezier(.25,.9,.3,1);
+    }
+    @keyframes vv-slide-right { from { transform: translateX(-100%); } to { transform: none; } }
+    @keyframes vv-grow-x { from { transform: scaleX(0); } to { transform: none; } }
+    @keyframes vv-caret { 0%, 45% { opacity: 1; } 55%, 100% { opacity: 0; } }
+  </style>
+</helmet>
+
+<div style="display:flex;flex-direction:column;height:100vh;background:var(--canvas);color:var(--ink);font-family:var(--font-body)">
+
+  <div style="flex:none;display:flex;align-items:center;gap:20px;padding:10px 20px;background:var(--surface);border-bottom:1px solid var(--border)">
+    <div style="display:flex;align-items:baseline;gap:10px;min-width:0">
+      <span style="font-family:var(--font-display);font-size:22px;line-height:1">CloudCLI UI</span>
+      <span style="font-family:var(--font-display);font-style:italic;font-size:18px;color:var(--accent-ink)">on Verve</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:14px;margin-left:auto">
+      <x-import component-from-global-scope="VerveDesignSystem_845c78.Tabs" tabs="{{ screenTabs }}" active="{{ screenIndex }}" on-change="{{ setScreen }}" hint-size="320px,44px"></x-import>
+      <span aria-hidden="true" style="width:1px;height:26px;background:var(--border)"></span>
+      <x-import component-from-global-scope="VerveDesignSystem_845c78.Tabs" tabs="{{ viewportTabs }}" active="{{ viewportIndex }}" on-change="{{ setViewport }}" hint-size="190px,44px"></x-import>
+      <div style="display:flex;align-items:center;gap:9px">
+        <span style="font-size:13.5px;color:var(--ink-muted)">Dark</span>
+        <div role="switch" aria-label="Dark mode" onClick="{{ toggleDarkSwitch }}" style="{{ trackDark }}"><div style="{{ knobDark }}"></div></div>
+      </div>
+    </div>
+  </div>
+
+  <sc-if value="{{ isWorkspace }}" hint-placeholder-val="{{ true }}">
+    <div style="flex:1;min-height:0;display:flex;align-items:stretch;justify-content:center;padding:16px">
+      <div style="{{ frameStyle }}">
+
+        <sc-if value="{{ drawerOpen }}">
+          <div onClick="{{ toggleDrawer }}" style="position:absolute;inset:0;z-index:20;background:rgba(16,17,22,.45);backdrop-filter:blur(6px);animation:vv-fade .4s ease both"></div>
+        </sc-if>
+
+        <sc-if value="{{ sidebarVisible }}" hint-placeholder-val="{{ true }}">
+          <div data-screen-label="Sidebar" style="{{ sidebarWrapStyle }}">
+
+            <div style="flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column">
+            <div style="flex:none;display:flex;flex-direction:column;gap:11px;padding:14px 14px 11px">
+              <div style="display:flex;align-items:center;gap:10px">
+                <div style="min-width:0">
+                  <div style="font-family:var(--font-display);font-size:21px;line-height:1.1">CloudCLI</div>
+                </div>
+                <div style="display:flex;align-items:center;gap:4px;margin-left:auto">
+                  <div onClick="{{ noop }}" title="New project" style="width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;color:var(--accent-ink);background:var(--accent-soft);cursor:pointer;font-size:15px;font-weight:500" style-hover="background:var(--accent-soft-hover)">+</div>
+                  <div onClick="{{ noop }}" title="Reload projects" style="width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;color:var(--ink-muted);cursor:pointer;font-size:13px" style-hover="background:var(--surface2);color:var(--ink)">↻</div>
+                  <div onClick="{{ toggleDrawer }}" title="Collapse" style="width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;color:var(--ink-muted);cursor:pointer;font-size:11px" style-hover="background:var(--surface2);color:var(--ink)">◀</div>
+                </div>
+              </div>
+
+              <x-import component-from-global-scope="VerveDesignSystem_845c78.Input" placeholder="Search projects and conversations" hint-size="100%,44px" dc-props="{{ inputSearch }}"></x-import>
+
+              <div style="display:flex;flex-wrap:nowrap;gap:6px;overflow-x:auto">
+                <x-import component-from-global-scope="VerveDesignSystem_845c78.Chip" selected="{{ true }}" hint-size="auto,32px" dc-props="{{ chipSmall }}">Projects</x-import>
+                <x-import component-from-global-scope="VerveDesignSystem_845c78.Chip" hint-size="auto,32px" dc-props="{{ chipSmall }}">Working · 2</x-import>
+                <x-import component-from-global-scope="VerveDesignSystem_845c78.Chip" hint-size="auto,32px" dc-props="{{ chipSmall }}">Recent</x-import>
+              </div>
+            </div>
+
+            <div style="flex:none;padding:4px 10px 10px">
+
+              <div style="display:flex;align-items:center;gap:8px;padding:10px 6px 6px">
+                <span style="font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-faint)">Projects</span>
+                <span style="font-size:12px;letter-spacing:.14em;color:var(--ink-faint)">· 4</span>
+              </div>
+
+              <div style="border-radius:10px;background:var(--accent-soft);padding:4px 4px 8px;margin-bottom:4px">
+                <div style="display:flex;align-items:center;gap:9px;padding:9px 10px;border-radius:8px;cursor:pointer">
+                  <span style="font-size:9px;color:var(--accent-ink)">▼</span>
+                  <div style="min-width:0;flex:1">
+                    <div style="font-size:14px;font-weight:500;color:var(--accent-ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">cloudcli-ui</div>
+                    <div style="font-size:12px;color:var(--ink-muted);margin-top:2px">~/code/cloudcli-ui · 12 conversations</div>
+                  </div>
+                  <span title="Starred" style="font-size:12px;color:var(--garnish)">✦</span>
+                </div>
+
+                <div style="display:flex;flex-direction:column;gap:2px;padding-left:26px;padding-right:4px">
+                  <div style="display:flex;align-items:flex-start;gap:9px;padding:8px 10px;border-radius:8px;background:var(--surface);box-shadow:var(--shadow-rest);cursor:pointer">
+                    <span aria-hidden="true" style="width:7px;height:7px;border-radius:50%;background:var(--accent);margin-top:6px;flex:none;animation:vv-pulse 2s infinite"></span>
+                    <div style="min-width:0;flex:1">
+                      <div style="font-size:13.5px;font-weight:500;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Reskin the sidebar on Verve tokens</div>
+                      <div style="font-size:12px;color:var(--ink-muted);margin-top:2px">Claude Sonnet · 34 messages · 4m ago</div>
+                      <sc-if value="{{ staleActive }}" hint-placeholder-val="{{ true }}">
+                        <div onClick="{{ restartActive }}" title="Stop this conversation and resume it on Claude CLI 2.1.4" style="margin-top:5px;display:inline-flex;align-items:center;gap:5px;padding:2px 9px;border-radius:999px;background:var(--warn-soft);color:var(--warn-ink);font-size:11.5px;font-weight:500;white-space:nowrap;cursor:pointer;transition:background var(--dur-quick) ease" style-hover="background:var(--warn-dot);color:var(--surface)">↻ On CLI 2.1.3 · restart</div>
+                      </sc-if>
+                    </div>
+                    <sc-if value="{{ showActivity }}" hint-placeholder-val="{{ true }}">
+                      <span style="flex:none;white-space:nowrap;display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:999px;background:var(--pos-soft);color:var(--pos-ink);font-size:11.5px;font-weight:500">● Working</span>
+                    </sc-if>
+                  </div>
+
+                  <div style="display:flex;align-items:flex-start;gap:9px;padding:8px 10px;border-radius:8px;cursor:pointer;transition:background var(--dur-quick) ease,transform var(--dur-move) var(--ease-enter)" style-hover="background:var(--surface);transform:translateX(3px)">
+                    <span aria-hidden="true" style="width:7px;height:7px;border-radius:50%;background:var(--info-dot);margin-top:6px;flex:none"></span>
+                    <div style="min-width:0;flex:1">
+                      <div style="animation:vv-rise .6s var(--ease-enter) 0.12s both;font-size:13.5px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Fix tab overflow on narrow screens</div>
+                      <div style="font-size:12px;color:var(--ink-muted);margin-top:2px">Codex · 18 messages · 2h ago</div>
+                    </div>
+                  </div>
+
+                  <div style="display:flex;align-items:flex-start;gap:9px;padding:8px 10px;border-radius:8px;cursor:pointer;transition:background var(--dur-quick) ease,transform var(--dur-move) var(--ease-enter)" style-hover="background:var(--surface);transform:translateX(3px)">
+                    <span aria-hidden="true" style="width:7px;height:7px;border-radius:50%;background:var(--neutral-dot);margin-top:6px;flex:none"></span>
+                    <div style="min-width:0;flex:1">
+                      <div style="animation:vv-rise .6s var(--ease-enter) 0.18s both;font-size:13.5px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Move message store to lazy loading</div>
+                      <div style="font-size:12px;color:var(--ink-muted);margin-top:2px">Claude Sonnet · 96 messages · yesterday</div>
+                      <sc-if value="{{ staleOlder }}" hint-placeholder-val="{{ true }}">
+                        <div onClick="{{ restartOlder }}" title="Stop this conversation and resume it on Claude CLI 2.1.4" style="margin-top:5px;display:inline-flex;align-items:center;gap:5px;padding:2px 9px;border-radius:999px;background:var(--warn-soft);color:var(--warn-ink);font-size:11.5px;font-weight:500;white-space:nowrap;cursor:pointer;transition:background var(--dur-quick) ease" style-hover="background:var(--warn-dot);color:var(--surface)">↻ On CLI 2.1.3 · restart</div>
+                      </sc-if>
+                    </div>
+                  </div>
+
+                  <div style="display:flex;align-items:center;gap:7px;padding:7px 10px;font-size:12.5px;color:var(--accent-ink);cursor:pointer">↳ Show 9 older conversations</div>
+                </div>
+              </div>
+
+              <div style="display:flex;align-items:center;gap:9px;padding:11px 10px;border-radius:10px;cursor:pointer;transition:background var(--dur-quick) ease,transform var(--dur-move) var(--ease-enter)" style-hover="background:var(--surface2);transform:translateX(3px)">
+                <span style="font-size:9px;color:var(--ink-faint)">▶</span>
+                <div style="min-width:0;flex:1">
+                  <div style="font-size:14px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">verve-design-system</div>
+                  <div style="font-size:12px;color:var(--ink-muted);margin-top:2px">~/code/verve · 6 conversations</div>
+                </div>
+                <sc-if value="{{ showActivity }}" hint-placeholder-val="{{ true }}">
+                  <span title="One conversation is working" style="width:7px;height:7px;border-radius:50%;background:var(--accent);flex:none;animation:vv-ring 1.9s infinite"></span>
+                </sc-if>
+              </div>
+
+              <div style="display:flex;align-items:center;gap:9px;padding:11px 10px;border-radius:10px;cursor:pointer;transition:background var(--dur-quick) ease,transform var(--dur-move) var(--ease-enter)" style-hover="background:var(--surface2);transform:translateX(3px)">
+                <span style="font-size:9px;color:var(--ink-faint)">▶</span>
+                <div style="min-width:0;flex:1">
+                  <div style="font-size:14px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">servpro-eis-app</div>
+                  <div style="font-size:12px;color:var(--ink-muted);margin-top:2px">~/code/eis-app · 21 conversations</div>
+                </div>
+                <span title="Starred" style="font-size:12px;color:var(--garnish)">✦</span>
+              </div>
+
+              <div style="display:flex;align-items:center;gap:9px;padding:11px 10px;border-radius:10px;cursor:pointer;transition:background var(--dur-quick) ease,transform var(--dur-move) var(--ease-enter)" style-hover="background:var(--surface2);transform:translateX(3px)">
+                <span style="font-size:9px;color:var(--ink-faint)">▶</span>
+                <div style="min-width:0;flex:1">
+                  <div style="font-size:14px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">notes-cli</div>
+                  <div style="font-size:12px;color:var(--ink-muted);margin-top:2px">~/code/notes-cli · no conversations yet</div>
+                </div>
+              </div>
+
+              <div style="display:flex;align-items:center;gap:8px;padding:18px 6px 6px">
+                <span style="font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-faint)">Also on file · 2</span>
+              </div>
+              <div style="display:flex;align-items:center;gap:9px;padding:10px;border-radius:10px;cursor:pointer;transition:background var(--dur-quick) ease,transform var(--dur-move) var(--ease-enter)" style-hover="background:var(--surface2);transform:translateX(3px)">
+                <span style="font-size:11px;color:var(--ink-faint)">≔</span>
+                <div style="font-size:13.5px;color:var(--ink-muted);flex:1">Archived projects</div>
+                <span style="font-size:12px;color:var(--ink-faint)">2</span>
+              </div>
+            </div>
+            </div>
+
+            <div ref="{{ footerRef }}" style="flex:0 1 auto;border-top:1px solid var(--border);padding:8px 12px 10px;display:flex;flex-direction:column;gap:4px">
+
+              <div>
+                <sc-if value="{{ accountMenuOpen }}">
+                  <div style="{{ accountPanelStyle }}">
+
+                    <div style="display:flex;flex-direction:column;gap:11px">
+                      <div style="font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-faint)">Usage on this account</div>
+
+                      <div style="display:flex;flex-direction:column;gap:5px">
+                        <div style="display:flex;align-items:baseline;gap:8px">
+                          <span style="font-size:13px;font-weight:500">Current 5-hour window</span>
+                          <span style="margin-left:auto;font-size:12.5px;color:var(--ink-muted);font-variant-numeric:tabular-nums">42% used</span>
+                        </div>
+                        <span style="height:6px;border-radius:999px;background:var(--surface2);overflow:hidden;display:block"><span style="display:block;width:42%;height:100%;background:linear-gradient(90deg,var(--accent),var(--accent-deep));transform-origin:left;animation:vv-grow-x 1.2s var(--ease-enter) both"></span></span>
+                        <div style="font-size:12px;color:var(--ink-faint)">Resets at 14:20 · about 3 hours left</div>
+                      </div>
+
+                      <div style="display:flex;flex-direction:column;gap:5px">
+                        <div style="display:flex;align-items:baseline;gap:8px">
+                          <span style="font-size:13px;font-weight:500">This week</span>
+                          <span style="margin-left:auto;font-size:12.5px;color:var(--warn-ink);font-variant-numeric:tabular-nums">▲ 81% used</span>
+                        </div>
+                        <span style="height:6px;border-radius:999px;background:var(--surface2);overflow:hidden;display:block"><span style="display:block;width:81%;height:100%;background:var(--warn-dot);transform-origin:left;animation:vv-grow-x 1.35s var(--ease-enter) both"></span></span>
+                        <div style="font-size:12px;color:var(--ink-faint)">Resets Monday 09:00 · heavier week than usual</div>
+                      </div>
+
+                      <div style="display:flex;flex-direction:column;gap:5px">
+                        <div style="display:flex;align-items:baseline;gap:8px">
+                          <span style="font-size:13px;font-weight:500">Flexible usage</span>
+                          <span style="margin-left:auto;font-size:12.5px;color:var(--ink-muted);font-variant-numeric:tabular-nums">$4.20 of $25.00</span>
+                        </div>
+                        <span style="height:6px;border-radius:999px;background:var(--surface2);overflow:hidden;display:block"><span style="display:block;width:17%;height:100%;background:linear-gradient(90deg,var(--accent),var(--accent-deep));transform-origin:left;animation:vv-grow-x 1.35s var(--ease-enter) both"></span></span>
+                        <div style="font-size:12px;color:var(--ink-faint)">Only used once a limit above is reached. Cap set by you.</div>
+                      </div>
+
+                      <div style="font-size:12px;color:var(--ink-faint);line-height:1.5">Figures come from the provider and can lag a few minutes. A blank reading means unknown, never zero.</div>
+                    </div>
+
+                    <div style="display:flex;flex-direction:column;gap:7px">
+                      <div style="font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-faint)">Switch account · 3</div>
+
+                      <div style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:9px;background:var(--accent-soft)">
+                        <span aria-hidden="true" style="width:24px;height:24px;border-radius:50%;background:linear-gradient(135deg,#2fa876,#6fd0a8);flex:none"></span>
+                        <div style="min-width:0;flex:1">
+                          <div style="font-size:13px;font-weight:500;color:var(--accent-ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">scott@lyphe.dev</div>
+                          <div style="font-size:12px;color:var(--ink-muted)">Claude Max · in use now · 12 conversations</div>
+                        </div>
+                        <span style="font-size:12px;color:var(--accent-ink);flex:none">✓</span>
+                      </div>
+
+                      <div onClick="{{ switchToWorkAccount }}" style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:9px;cursor:pointer;transition:background var(--dur-quick) ease,transform var(--dur-move) var(--ease-enter)" style-hover="background:var(--surface2);transform:translateX(3px)">
+                        <span aria-hidden="true" style="width:24px;height:24px;border-radius:50%;background:linear-gradient(135deg,#3aa6b9,#6fd0a8);flex:none"></span>
+                        <div style="min-width:0;flex:1">
+                          <div style="font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">scott@servpro.com</div>
+                          <div style="font-size:12px;color:var(--warn-ink)">▲ Signing in again is needed</div>
+                        </div>
+                        <x-import component-from-global-scope="VerveDesignSystem_845c78.Button" variant="tonal" size="sm" hint-size="auto,30px">Sign in</x-import>
+                      </div>
+
+                      <div onClick="{{ switchToCodexAccount }}" style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:9px;cursor:pointer;transition:background var(--dur-quick) ease,transform var(--dur-move) var(--ease-enter)" style-hover="background:var(--surface2);transform:translateX(3px)">
+                        <span aria-hidden="true" style="width:24px;height:24px;border-radius:50%;background:var(--surface2);flex:none"></span>
+                        <div style="min-width:0;flex:1">
+                          <div style="font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">codex · scott@lyphe.dev</div>
+                          <div style="font-size:12px;color:var(--ink-muted)">Signed out · usage —</div>
+                        </div>
+                        <span style="font-size:11px;color:var(--ink-faint);flex:none">▶</span>
+                      </div>
+
+                      <div onClick="{{ openSettings }}" style="display:flex;align-items:center;gap:9px;padding:8px 10px;border-radius:9px;cursor:pointer;font-size:13px;color:var(--accent-ink);transition:background var(--dur-quick) ease" style-hover="background:var(--accent-soft)">+ Add another account</div>
+
+                      <div style="font-size:12px;color:var(--ink-faint);line-height:1.5;padding:2px 10px 0">Switching changes only which account signs the requests. Your projects, conversations and running work stay exactly as they are — open conversations keep their history and resume on the new account.</div>
+                    </div>
+                  </div>
+                </sc-if>
+
+                <div onClick="{{ toggleAccountMenu }}" style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:10px;cursor:pointer;transition:background var(--dur-quick) ease" style-hover="background:var(--surface2)">
+                  <span aria-hidden="true" style="width:26px;height:26px;border-radius:50%;background:linear-gradient(135deg,#2fa876,#6fd0a8);flex:none"></span>
+                  <div style="min-width:0;flex:1">
+                    <div style="font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">scott@lyphe.dev</div>
+                    <div style="font-size:12px;color:var(--ink-muted);font-variant-numeric:tabular-nums">Claude Max · 42% of this 5-hour window</div>
+                  </div>
+                  <sc-if value="{{ reauthNeeded }}" hint-placeholder-val="{{ true }}">
+                    <span title="One other account needs signing in again" style="flex:none;font-size:11px;color:var(--warn-ink)">▲</span>
+                  </sc-if>
+                  <span style="flex:none;font-size:9px;color:var(--ink-faint)">▼</span>
+                </div>
+              </div>
+
+              <sc-if value="{{ anyStale }}" hint-placeholder-val="{{ true }}">
+                <div onClick="{{ restartAllStale }}" title="Stop and resume both conversations on Claude CLI 2.1.4" style="display:flex;align-items:center;gap:8px;padding:6px 10px;border-radius:9px;font-size:12.5px;color:var(--ink-muted);cursor:pointer;transition:background var(--dur-quick) ease" style-hover="background:var(--surface2);color:var(--ink)">
+                  <span style="font-size:11px;flex:none">↻</span>
+                  <span style="min-width:0;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ staleShortLabel }}</span>
+                </div>
+              </sc-if>
+              <div style="display:flex;align-items:center;gap:10px">
+                <div onClick="{{ openSettings }}" style="flex:1;display:flex;align-items:center;gap:9px;padding:8px 10px;border-radius:9px;cursor:pointer;font-size:13.5px;font-weight:500;color:var(--ink-mid)" style-hover="background:var(--surface2);color:var(--ink)">
+                  <span style="font-size:12px">✦</span> Settings
+                </div>
+                <span style="font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-faint)">v1.9.1</span>
+              </div>
+            </div>
+          </div>
+        </sc-if>
+
+        <div style="flex:1;min-width:0;display:flex;flex-direction:column;background:var(--canvas)">
+
+          <div style="{{ headerStyle }}">
+            <div style="{{ titleRowStyle }}">
+              <sc-if value="{{ isMobile }}">
+                <div onClick="{{ toggleDrawer }}" title="Open projects" style="flex:none;width:34px;height:34px;border-radius:9px;border:1.5px solid var(--border-strong);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:13px;color:var(--ink-mid)">≔</div>
+              </sc-if>
+              <div style="min-width:0;flex:1">
+                <div style="display:flex;align-items:center;gap:8px;min-width:0">
+                  <span style="font-size:15px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Reskin the sidebar on Verve tokens</span>
+                  <sc-if value="{{ showActivity }}" hint-placeholder-val="{{ true }}">
+                    <x-import component-from-global-scope="VerveDesignSystem_845c78.Badge" tone="positive" hint-size="auto,24px" dc-props="{{ badgeStatus }}">{{ elapsedLabel }}</x-import>
+                  </sc-if>
+                </div>
+                <div style="font-size:12px;color:var(--ink-muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">cloudcli-ui · Claude Sonnet · started 09:14</div>
+              </div>
+            </div>
+            <div style="{{ tabRowStyle }}">
+              <x-import component-from-global-scope="VerveDesignSystem_845c78.Tabs" tabs="{{ tabList }}" active="{{ tabIndex }}" on-change="{{ setTab }}" hint-size="420px,44px"></x-import>
+            </div>
+          </div>
+
+          <sc-if value="{{ isChat }}" hint-placeholder-val="{{ true }}">
+            <div data-screen-label="Chat" style="flex:1;min-height:0;display:flex;flex-direction:column;animation:vv-pagein .72s var(--ease-enter) both">
+              <div style="flex:1;min-height:0;overflow-y:auto;padding:26px 20px 8px">
+                <div style="max-width:780px;margin:0 auto;display:flex;flex-direction:column;gap:22px">
+
+                  <sc-if value="{{ staleActive }}" hint-placeholder-val="{{ true }}">
+                    <div style="display:flex;align-items:flex-start;gap:11px;background:var(--warn-soft);color:var(--warn-ink);border-radius:12px;padding:14px 16px;animation:vv-rise .7s var(--ease-enter) both">
+                      <span style="font-size:11px;font-weight:700;margin-top:3px">▲</span>
+                      <div style="min-width:0;flex:1;display:flex;flex-direction:column;gap:10px">
+                        <div style="font-size:13.5px;line-height:1.55">This conversation is running Claude CLI 2.1.3. Version 2.1.4 is installed on your machine, but a conversation keeps the version it started with. Restarting stops this one and resumes the same conversation on 2.1.4 — every message is kept.</div>
+                        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+                          <x-import component-from-global-scope="VerveDesignSystem_845c78.Button" size="sm" on-click="{{ restartActive }}" hint-size="auto,32px">Restart and resume</x-import>
+                          <x-import component-from-global-scope="VerveDesignSystem_845c78.Button" variant="outline" size="sm" hint-size="auto,32px">Stay on 2.1.3</x-import>
+                        </div>
+                      </div>
+                    </div>
+                  </sc-if>
+
+                  <div style="display:flex;align-items:center;gap:10px">
+                    <span aria-hidden="true" style="flex:1;height:1px;background:var(--border)"></span>
+                    <span style="font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-faint)">Today · 09:14 · plan mode</span>
+                    <span aria-hidden="true" style="flex:1;height:1px;background:var(--border)"></span>
+                  </div>
+
+                  <div style="align-self:flex-end;max-width:78%;background:var(--surface2);border-radius:14px;padding:14px 17px;animation:vv-rise .78s var(--ease-enter) .06s both">
+                    <div style="font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-faint);margin-bottom:6px">You · 09:14</div>
+                    <div style="font-size:15px;line-height:1.6;color:var(--ink)">Restyle the sidebar so project rows read at a glance. Keep the layout — only the tokens and controls change.</div>
+                  </div>
+
+                  <div style="display:flex;flex-direction:column;gap:14px">
+                    <div style="display:flex;align-items:center;gap:9px">
+                      <span aria-hidden="true" style="width:22px;height:22px;border-radius:50%;background:linear-gradient(135deg,#2fa876,#6fd0a8);flex:none"></span>
+                      <span style="font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-faint)">Claude Sonnet · 09:14</span>
+                    </div>
+
+                    <div style="border:1.5px dashed var(--border-strong);border-radius:12px;padding:14px 16px;animation:vv-rise .78s var(--ease-enter) .18s both">
+                      <div style="font-family:var(--font-display);font-style:italic;font-size:17px;color:var(--ink-faint);margin-bottom:6px">Thinking</div>
+                      <div style="font-size:13.5px;line-height:1.6;color:var(--ink-muted)">The sidebar reads three things at once: which project, which conversation, and which conversations are still running. The third one is currently the weakest signal.</div>
+                    </div>
+
+                    <div style="font-size:15px;line-height:1.65;color:var(--ink-mid);animation:vv-rise .78s var(--ease-enter) .3s both">I read the sidebar module and the token file, then drafted the changes. Here is what happened, and what still needs you.</div>
+
+                    <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;animation:vv-rise .82s var(--ease-enter) .42s both;transition:box-shadow var(--dur-move) ease,transform var(--dur-move) var(--ease-enter)" style-hover="transform:translateY(-4px);box-shadow:var(--shadow-hover)">
+                      <div style="display:flex;align-items:center;gap:10px;padding:12px 16px;border-bottom:1px solid var(--border)">
+                        <span style="font-size:11px;color:var(--ink-faint)">≔</span>
+                        <span style="font-size:13.5px;font-weight:500">Read 3 files</span>
+                        <span style="font-size:13px;color:var(--ink-muted)">· nothing changed</span>
+                        <x-import component-from-global-scope="VerveDesignSystem_845c78.Badge" hint-size="auto,24px" dc-props="{{ badgeAuto }}">Done automatically</x-import>
+                      </div>
+                      <div style="padding:12px 16px;display:flex;flex-direction:column;gap:7px;font-family:var(--font-mono);font-size:12.5px;color:var(--ink-muted)">
+                        <div>src/modules/sidebar/SidebarContent.tsx · 812 lines</div>
+                        <div>src/modules/sidebar/SidebarProjectItem.tsx · 431 lines</div>
+                        <div>src/index.css · 640 lines</div>
+                      </div>
+                    </div>
+
+                    <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;animation:vv-rise .82s var(--ease-enter) .42s both;transition:box-shadow var(--dur-move) ease,transform var(--dur-move) var(--ease-enter)" style-hover="transform:translateY(-4px);box-shadow:var(--shadow-hover)">
+                      <div style="animation:vv-rise .6s var(--ease-enter) 0.05s both;display:flex;align-items:center;gap:10px;padding:12px 16px;border-bottom:1px solid var(--border)">
+                        <span style="font-size:11px;color:var(--warn-ink)">▲</span>
+                        <span style="font-size:13.5px;font-weight:500">Edit · src/index.css</span>
+                        <x-import component-from-global-scope="VerveDesignSystem_845c78.Badge" tone="warn" hint-size="auto,24px" dc-props="{{ badgeAuto }}">▲ Waiting for you</x-import>
+                      </div>
+                      <div style="padding:0">
+                        <div style="font-family:var(--font-mono);font-size:12.5px;line-height:1.7">
+                          <div style="display:flex;gap:12px;padding:3px 16px;background:var(--danger-soft);color:var(--danger-ink)"><span style="width:10px;flex:none">−</span><span>--primary: 217 91% 60%;</span></div>
+                          <div style="display:flex;gap:12px;padding:3px 16px;background:var(--pos-soft);color:var(--pos-ink)"><span style="width:10px;flex:none">+</span><span>--primary: 157 56% 42%; /* Verve accent #2fa876 */</span></div>
+                          <div style="display:flex;gap:12px;padding:3px 16px;background:var(--pos-soft);color:var(--pos-ink)"><span style="width:10px;flex:none">+</span><span>--radius: 0.625rem; /* Verve --radius-input */</span></div>
+                        </div>
+                        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:13px 16px;border-top:1px solid var(--border)">
+                          <x-import component-from-global-scope="VerveDesignSystem_845c78.Button" size="sm" on-click="{{ notifyApplied }}" hint-size="auto,32px">Apply this edit</x-import>
+                          <x-import component-from-global-scope="VerveDesignSystem_845c78.Button" variant="outline" size="sm" hint-size="auto,32px">Leave the file as it is</x-import>
+                          <span style="font-size:12.5px;color:var(--ink-faint)">This file is outside the auto-apply list, so it waits for you.</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;animation:vv-rise .82s var(--ease-enter) .42s both;transition:box-shadow var(--dur-move) ease,transform var(--dur-move) var(--ease-enter)" style-hover="transform:translateY(-4px);box-shadow:var(--shadow-hover)">
+                      <div style="display:flex;align-items:center;gap:10px;padding:12px 16px;border-bottom:1px solid var(--border)">
+                        <span style="font-size:11px;color:var(--pos-ink)">✓</span>
+                        <span style="font-size:13.5px;font-weight:500">Ran a command · npm test -- sidebar</span>
+                        <x-import component-from-global-scope="VerveDesignSystem_845c78.Badge" tone="positive" hint-size="auto,24px" dc-props="{{ badgeAuto }}">✓ Finished</x-import>
+                      </div>
+                      <div style="padding:12px 16px;font-family:var(--font-mono);font-size:12.5px;line-height:1.75;color:var(--ink-muted)">
+                        <div>PASS src/modules/sidebar/tests/SidebarProjectItem.test.tsx</div>
+                        <div>PASS src/modules/sidebar/tests/SidebarContent.test.tsx</div>
+                        <div style="color:var(--pos-ink)">2 files · 31 tests passed · 4.2s</div>
+                      </div>
+                    </div>
+
+                    <div style="font-size:15px;line-height:1.65;color:var(--ink-mid);animation:vv-rise .78s var(--ease-enter) .62s both">Project rows now carry the conversation count and the working state as separate signals, so neither depends on colour alone. One edit still needs your decision above.<span style="display:inline-block;width:2px;height:15px;margin-left:4px;background:var(--accent);vertical-align:-2px;animation:vv-caret 1.1s steps(1,end) infinite"></span></div>
+                  </div>
+                </div>
+              </div>
+
+              <div style="flex:none;padding:11px 20px 13px;border-top:1px solid var(--border);background:var(--surface)">
+                <div style="max-width:780px;margin:0 auto;display:flex;flex-direction:column;gap:9px">
+                  <x-import component-from-global-scope="VerveDesignSystem_845c78.TextArea" placeholder="Ask for a change, or describe what you want next" hint-size="100%,62px" dc-props="{{ composerArea }}"></x-import>
+                  <div style="position:relative">
+                      <sc-if value="{{ modelMenuOpen }}">
+                        <div style="{{ menuPopStyle }}" >
+                          <div style="font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-faint);padding:5px 11px 6px">Model for this conversation</div>
+                          <div onClick="{{ pickSonnet }}" style="{{ itemSonnet }}">Claude Sonnet <span style="margin-left:auto;font-size:12px;color:var(--ink-faint)">balanced</span></div>
+                          <div onClick="{{ pickOpus }}" style="{{ itemOpus }}">Claude Opus <span style="margin-left:auto;font-size:12px;color:var(--ink-faint)">slower, deeper</span></div>
+                          <div onClick="{{ pickHaiku }}" style="{{ itemHaiku }}">Claude Haiku <span style="margin-left:auto;font-size:12px;color:var(--ink-faint)">quick jobs</span></div>
+                          <div style="font-size:12px;color:var(--ink-faint);padding:6px 11px 4px;line-height:1.45">Changing this starts the next message on the new model. Earlier messages stay as they are.</div>
+                        </div>
+                      </sc-if>
+                      <sc-if value="{{ modeMenuOpen }}">
+                        <div style="{{ menuPopStyle }}" >
+                          <div style="font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-faint);padding:5px 11px 6px">How edits happen</div>
+                          <div onClick="{{ pickPlan }}" style="{{ itemPlan }}">Plan first, then edit</div>
+                          <div onClick="{{ pickEdit }}" style="{{ itemEdit }}">Edit as you go</div>
+                          <div onClick="{{ pickAsk }}" style="{{ itemAsk }}">Ask before every edit</div>
+                        </div>
+                      </sc-if>
+                  </div>
+                  <sc-if value="{{ isMobile }}">
+                    <div style="display:flex;align-items:center;gap:8px">
+                      <x-import component-from-global-scope="VerveDesignSystem_845c78.Chip" selected="{{ true }}" on-click="{{ openModeMenu }}" hint-size="auto,32px" dc-props="{{ chipSmall }}">{{ modeShort }} ▲</x-import>
+                      <x-import component-from-global-scope="VerveDesignSystem_845c78.Chip" on-click="{{ openModelMenu }}" hint-size="auto,32px" dc-props="{{ chipSmall }}">{{ model }} ▲</x-import>
+                      <div style="margin-left:auto">
+                        <x-import component-from-global-scope="VerveDesignSystem_845c78.Button" size="sm" hint-size="auto,32px">Send</x-import>
+                      </div>
+                    </div>
+                  </sc-if>
+                  <sc-if value="{{ isDesktop }}" hint-placeholder-val="{{ true }}">
+                    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;position:relative">
+<x-import component-from-global-scope="VerveDesignSystem_845c78.Chip" on-click="{{ openModelMenu }}" hint-size="auto,32px" dc-props="{{ chipSmall }}">{{ model }} ▲</x-import>
+                      <x-import component-from-global-scope="VerveDesignSystem_845c78.Chip" selected="{{ true }}" on-click="{{ openModeMenu }}" hint-size="auto,32px" dc-props="{{ chipSmall }}">{{ mode }} ▲</x-import>
+                      <x-import component-from-global-scope="VerveDesignSystem_845c78.Button" variant="ghost" size="sm" hint-size="auto,32px">Attach a file</x-import>
+                      <div style="margin-left:auto;display:flex;align-items:center;gap:12px">
+                        <span style="font-size:12px;color:var(--ink-faint)">{{ modeHelp }}</span>
+                        <x-import component-from-global-scope="VerveDesignSystem_845c78.Button" size="sm" hint-size="auto,32px">Send</x-import>
+                      </div>
+                    </div>
+                  </sc-if>
+                </div>
+              </div>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ isShell }}">
+            <div data-screen-label="Shell" style="flex:1;min-height:0;display:flex;flex-direction:column;padding:16px 18px 18px;gap:12px;animation:vv-pagein .72s var(--ease-enter) both">
+              <div style="flex:none;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+                <x-import component-from-global-scope="VerveDesignSystem_845c78.Badge" tone="positive" hint-size="auto,26px" dc-props="{{ badgeRow }}">● Connected</x-import>
+                <span style="font-size:13.5px;color:var(--ink-muted)">zsh · ~/code/cloudcli-ui · started 4m ago</span>
+                <div style="margin-left:auto;display:flex;align-items:center;gap:8px">
+                  <x-import component-from-global-scope="VerveDesignSystem_845c78.Button" variant="outline" size="sm" hint-size="auto,32px">Keyboard shortcuts</x-import>
+                  <x-import component-from-global-scope="VerveDesignSystem_845c78.Button" variant="outline" size="sm" hint-size="auto,32px">Restart the session</x-import>
+                </div>
+              </div>
+              <div style="flex:1;min-height:0;overflow-y:auto;background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:16px 18px;font-family:var(--font-mono);font-size:13px;line-height:1.8;color:var(--ink-mid)">
+                <div><span style="color:var(--accent-ink)">~/code/cloudcli-ui</span> <span style="color:var(--ink-faint)">❯</span> npm run dev</div>
+                <div style="color:var(--ink-muted)">&gt; cloudcli-ui@1.9.1 dev</div>
+                <div style="color:var(--ink-muted)">&gt; vite --host</div>
+                <div style="height:10px"></div>
+                <div>VITE v5.4.8 ready in 412 ms</div>
+                <div style="color:var(--ink-muted)">Local: http://localhost:5173/</div>
+                <div style="color:var(--ink-muted)">Network: http://192.168.1.24:5173/</div>
+                <div style="height:10px"></div>
+                <div><span style="color:var(--accent-ink)">~/code/cloudcli-ui</span> <span style="color:var(--ink-faint)">❯</span> git status --short</div>
+                <div>M  src/index.css</div>
+                <div>M  src/modules/sidebar/SidebarContent.tsx</div>
+                <div>?? src/shared/ui/verve/</div>
+                <div style="height:10px"></div>
+                <div><span style="color:var(--accent-ink)">~/code/cloudcli-ui</span> <span style="color:var(--ink-faint)">❯</span> <span style="display:inline-block;width:8px;height:15px;background:var(--accent);vertical-align:-2px;animation:vv-caret 1.1s steps(1,end) infinite"></span></div>
+              </div>
+              <div style="flex:none;font-size:12.5px;color:var(--ink-faint)">This terminal runs on your machine. Nothing here is sent anywhere until you ask an agent to read it.</div>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ isFiles }}">
+            <div data-screen-label="Files" style="{{ filesLayout }}">
+              <div style="{{ treeStyle }}">
+                <div style="flex:none;display:flex;align-items:center;gap:8px;padding:14px 14px 10px">
+                  <span style="font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-faint)">Project files</span>
+                  <span style="margin-left:auto;font-size:12px;color:var(--ink-faint);cursor:pointer">↻</span>
+                </div>
+                <div style="flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;padding:0 8px 12px;font-size:13.5px">
+                  <div style="display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:8px;min-width:0;cursor:pointer;transition:background var(--dur-quick) ease" style-hover="background:var(--surface2)"><span style="font-size:9px;color:var(--ink-faint);flex:none">▼</span><span style="flex:1;min-width:0;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">src</span></div>
+                  <div style="padding-left:14px;min-width:0">
+                    <div style="display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:8px;min-width:0;cursor:pointer;transition:background var(--dur-quick) ease" style-hover="background:var(--surface2)"><span style="font-size:9px;color:var(--ink-faint);flex:none">▼</span><span style="flex:1;min-width:0;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">modules</span></div>
+                    <div style="padding-left:14px;min-width:0">
+                      <div style="display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:8px;min-width:0;cursor:pointer;transition:background var(--dur-quick) ease" style-hover="background:var(--surface2)"><span style="font-size:9px;color:var(--ink-faint);flex:none">▶</span><span style="flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">chat</span></div>
+                      <div style="display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:8px;min-width:0;cursor:pointer;transition:background var(--dur-quick) ease" style-hover="background:var(--surface2)"><span style="font-size:9px;color:var(--ink-faint);flex:none">▼</span><span style="flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">sidebar</span></div>
+                      <div style="padding-left:14px;min-width:0">
+                        <div style="display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:8px;min-width:0;background:var(--accent-soft);color:var(--accent-ink);cursor:pointer"><span style="font-size:10px;flex:none">·</span><span title="SidebarContent.tsx" style="flex:1;min-width:0;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">SidebarContent.tsx</span><span style="width:6px;height:6px;flex:none;border-radius:50%;background:var(--warn-dot)"></span></div>
+                        <div style="display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:8px;min-width:0;cursor:pointer;transition:background var(--dur-quick) ease" style-hover="background:var(--surface2)"><span style="font-size:10px;color:var(--ink-faint);flex:none">·</span><span title="SidebarProjectItem.tsx" style="flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">SidebarProjectItem.tsx</span></div>
+                        <div style="display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:8px;min-width:0;cursor:pointer;transition:background var(--dur-quick) ease" style-hover="background:var(--surface2)"><span style="font-size:10px;color:var(--ink-faint);flex:none">·</span><span title="SidebarSessionItem.tsx" style="flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">SidebarSessionItem.tsx</span></div>
+                      </div>
+                      <div style="display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:8px;min-width:0;cursor:pointer;transition:background var(--dur-quick) ease" style-hover="background:var(--surface2)"><span style="font-size:9px;color:var(--ink-faint);flex:none">▶</span><span style="flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">git-panel</span></div>
+                      <div style="display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:8px;min-width:0;cursor:pointer;transition:background var(--dur-quick) ease" style-hover="background:var(--surface2)"><span style="font-size:9px;color:var(--ink-faint);flex:none">▶</span><span style="flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">settings</span></div>
+                    </div>
+                    <div style="display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:8px;min-width:0;cursor:pointer;transition:background var(--dur-quick) ease" style-hover="background:var(--surface2)"><span style="font-size:10px;color:var(--ink-faint);flex:none">·</span><span style="flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">index.css</span><span style="width:6px;height:6px;flex:none;border-radius:50%;background:var(--warn-dot)"></span></div>
+                    <div style="display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:8px;min-width:0;cursor:pointer;transition:background var(--dur-quick) ease" style-hover="background:var(--surface2)"><span style="font-size:10px;color:var(--ink-faint);flex:none">·</span><span style="flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">App.tsx</span></div>
+                  </div>
+                  <div style="display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:8px;min-width:0;cursor:pointer;transition:background var(--dur-quick) ease" style-hover="background:var(--surface2)"><span style="font-size:9px;color:var(--ink-faint);flex:none">▶</span><span style="flex:1;min-width:0;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">server</span></div>
+                  <div style="display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:8px;min-width:0;cursor:pointer;transition:background var(--dur-quick) ease" style-hover="background:var(--surface2)"><span style="font-size:9px;color:var(--ink-faint);flex:none">▶</span><span style="flex:1;min-width:0;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">docs</span></div>
+                  <div style="display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:8px;min-width:0;cursor:pointer;transition:background var(--dur-quick) ease" style-hover="background:var(--surface2)"><span style="font-size:10px;color:var(--ink-faint);flex:none">·</span><span style="flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">package.json</span></div>
+                </div>
+              </div>
+
+              <div style="flex:1;min-width:0;min-height:0;display:flex;flex-direction:column;background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden">
+
+                <div style="flex:none;display:flex;align-items:center;gap:10px;padding:11px 14px;border-bottom:1px solid var(--border);flex-wrap:wrap">
+                  <div style="display:flex;align-items:center;gap:6px;min-width:0;font-size:13px">
+                    <span style="color:var(--accent-ink);cursor:pointer">cloudcli-ui</span>
+                    <span style="color:var(--ink-faint);font-size:10px">▶</span>
+                    <span style="color:var(--accent-ink);cursor:pointer">src</span>
+                    <span style="color:var(--ink-faint);font-size:10px">▶</span>
+                    <span style="color:var(--accent-ink);cursor:pointer">modules</span>
+                    <span style="color:var(--ink-faint);font-size:10px">▶</span>
+                    <span style="font-weight:500">sidebar</span>
+                  </div>
+                  <div style="margin-left:auto;display:flex;align-items:center;gap:8px">
+                    <x-import component-from-global-scope="VerveDesignSystem_845c78.Button" variant="outline" size="sm" hint-size="auto,32px">New folder</x-import>
+                    <x-import component-from-global-scope="VerveDesignSystem_845c78.Button" size="sm" on-click="{{ notifyUpload }}" hint-size="auto,32px">Upload files</x-import>
+                  </div>
+                </div>
+
+                <div style="{{ filesPaneLayout }}">
+
+                  <div style="{{ fileListStyle }}">
+                    <div style="display:flex;align-items:center;gap:12px;padding:8px 14px;border-bottom:1px solid var(--border);font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-faint)">
+                      <span style="flex:1;min-width:0">Name</span>
+                      <span style="width:74px;text-align:right">Size</span>
+                      <span style="width:96px;text-align:right">Changed</span>
+                    </div>
+
+                    <div style="animation:vv-rise .6s var(--ease-enter) 0.04s both;flex:1;min-height:0;overflow-y:auto">
+                      <div onClick="{{ goUp }}" style="display:flex;align-items:center;gap:12px;padding:10px 14px;border-bottom:1px solid var(--border);cursor:pointer;transition:background var(--dur-quick) ease" style-hover="background:var(--surface2)">
+                        <span style="font-size:11px;color:var(--ink-faint);width:16px;flex:none">◀</span>
+                        <span style="flex:1;min-width:0;font-size:13.5px;color:var(--ink-muted)">Up one level</span>
+                        <span style="width:74px;text-align:right;font-size:12.5px;color:var(--ink-faint)">—</span>
+                        <span style="width:96px;text-align:right;font-size:12.5px;color:var(--ink-faint)">—</span>
+                      </div>
+
+                      <div onClick="{{ noop }}" style="display:flex;align-items:center;gap:12px;padding:10px 14px;border-bottom:1px solid var(--border);cursor:pointer;transition:background var(--dur-quick) ease,transform var(--dur-move) var(--ease-enter)" style-hover="background:var(--surface2);transform:translateX(3px)">
+                        <span style="font-size:11px;color:var(--ink-faint);width:16px;flex:none">≔</span>
+                        <span style="flex:1;min-width:0;font-size:13.5px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">tests</span>
+                        <span style="width:74px;text-align:right;font-size:12.5px;color:var(--ink-faint)">4 files</span>
+                        <span style="width:96px;text-align:right;font-size:12.5px;color:var(--ink-muted)">2 days ago</span>
+                      </div>
+
+                      <div onClick="{{ selectCode }}" style="{{ rowCodeStyle }}">
+                        <span style="font-size:11px;color:var(--ink-faint);width:16px;flex:none">·</span>
+                        <div style="flex:1;min-width:0">
+                          <div style="font-size:13.5px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">SidebarContent.tsx</div>
+                          <div style="animation:vv-rise .6s var(--ease-enter) 0.14s both;font-size:12px;color:var(--warn-ink);margin-top:2px">▲ Changed, not committed</div>
+                        </div>
+                        <span style="width:74px;text-align:right;font-size:12.5px;color:var(--ink-muted);font-variant-numeric:tabular-nums">31.4 KB</span>
+                        <span style="width:96px;text-align:right;font-size:12.5px;color:var(--ink-muted)">4m ago</span>
+                      </div>
+
+                      <div onClick="{{ selectImage }}" style="{{ rowImageStyle }}">
+                        <span style="font-size:11px;color:var(--ink-faint);width:16px;flex:none">·</span>
+                        <span style="flex:1;min-width:0;font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">sidebar-mock.png</span>
+                        <span style="width:74px;text-align:right;font-size:12.5px;color:var(--ink-muted);font-variant-numeric:tabular-nums">248 KB</span>
+                        <span style="width:96px;text-align:right;font-size:12.5px;color:var(--ink-muted)">yesterday</span>
+                      </div>
+
+                      <div onClick="{{ selectBinary }}" style="{{ rowBinaryStyle }}">
+                        <span style="font-size:11px;color:var(--ink-faint);width:16px;flex:none">·</span>
+                        <span style="flex:1;min-width:0;font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">session-trace.bin</span>
+                        <span style="width:74px;text-align:right;font-size:12.5px;color:var(--ink-muted);font-variant-numeric:tabular-nums">1.8 MB</span>
+                        <span style="width:96px;text-align:right;font-size:12.5px;color:var(--ink-muted)">3 days ago</span>
+                      </div>
+
+                      <sc-if value="{{ uploading }}">
+                        <div style="display:flex;align-items:center;gap:12px;padding:10px 14px;border-bottom:1px solid var(--border);background:var(--accent-soft)">
+                          <span style="font-size:11px;color:var(--accent-ink);width:16px;flex:none">↑</span>
+                          <div style="flex:1;min-width:0">
+                            <div style="font-size:13.5px;font-weight:500;color:var(--accent-ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">verve-tokens.css</div>
+                            <span style="display:block;height:5px;margin-top:6px;border-radius:999px;background:var(--surface2);overflow:hidden"><span style="{{ uploadBarStyle }}"></span></span>
+                          </div>
+                          <span style="width:74px;text-align:right;font-size:12.5px;color:var(--accent-ink);font-variant-numeric:tabular-nums">{{ uploadPctLabel }}</span>
+                          <span style="width:96px;text-align:right;font-size:12.5px;color:var(--ink-muted)">Uploading</span>
+                        </div>
+                      </sc-if>
+                    </div>
+
+                    <div style="flex:none;display:flex;align-items:center;gap:10px;padding:10px 14px;border-top:1px dashed var(--border-strong);font-size:12.5px;color:var(--ink-faint)">
+                      <span style="font-size:11px">↑</span>
+                      <span style="min-width:0;flex:1">Drop files here to upload them into this folder</span>
+                    </div>
+                  </div>
+
+                  <div style="{{ previewStyle }}">
+                    <div style="flex:none;display:flex;align-items:center;gap:10px;padding:11px 14px;border-bottom:1px solid var(--border);flex-wrap:wrap">
+                      <span style="font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-faint)">Preview</span>
+                      <div style="margin-left:auto;display:flex;align-items:center;gap:8px">
+                        <x-import component-from-global-scope="VerveDesignSystem_845c78.Button" variant="ghost" size="sm" hint-size="auto,32px">Rename</x-import>
+                        <x-import component-from-global-scope="VerveDesignSystem_845c78.Button" variant="outline" size="sm" on-click="{{ notifyDownload }}" hint-size="auto,32px">Download</x-import>
+                      </div>
+                    </div>
+
+                    <div style="flex:1;min-height:0;overflow-y:auto">
+
+                      <sc-if value="{{ isSelCode }}" hint-placeholder-val="{{ true }}">
+                        <div style="display:flex;flex-direction:column;animation:vv-fade .44s ease both">
+                          <div style="padding:14px 16px 10px;display:flex;flex-direction:column;gap:4px;border-bottom:1px solid var(--border)">
+                            <div style="font-size:14px;font-weight:500">SidebarContent.tsx</div>
+                            <div style="font-size:12.5px;color:var(--ink-muted)">TypeScript · 31.4 KB · 812 lines · changed 4m ago</div>
+                          </div>
+                          <div style="padding:12px 0;font-family:var(--font-mono);font-size:12.5px;line-height:1.85">
+                            <div style="display:flex;gap:14px;padding:0 16px"><span style="width:22px;text-align:right;color:var(--ink-faint);flex:none">41</span><span style="color:var(--ink-muted)">&lt;div class="sidebar-project-row"&gt;</span></div>
+                            <div style="display:flex;gap:14px;padding:0 16px"><span style="width:22px;text-align:right;color:var(--ink-faint);flex:none">42</span><span style="color:var(--ink-muted)">&nbsp;&nbsp;&lt;span class="vv-project-name"&gt;{project.displayName}&lt;/span&gt;</span></div>
+                            <div style="display:flex;gap:14px;padding:0 16px"><span style="width:22px;text-align:right;color:var(--ink-faint);flex:none">43</span><span style="color:var(--ink-muted)">&nbsp;&nbsp;&lt;span class="vv-project-meta"&gt;{count} conversations&lt;/span&gt;</span></div>
+                            <div style="display:flex;gap:14px;padding:0 16px"><span style="width:22px;text-align:right;color:var(--ink-faint);flex:none">44</span><span style="color:var(--ink-muted)">&nbsp;&nbsp;{isRunning &amp;&amp; &lt;RunningMark label="Working" /&gt;}</span></div>
+                            <div style="display:flex;gap:14px;padding:0 16px"><span style="width:22px;text-align:right;color:var(--ink-faint);flex:none">45</span><span style="color:var(--ink-muted)">&lt;/div&gt;</span></div>
+                          </div>
+                          <div style="padding:0 16px 16px;font-size:12.5px;color:var(--ink-faint)">First 5 of 812 lines. Editing happens in your own editor — ask an agent here to change the file.</div>
+                        </div>
+                      </sc-if>
+
+                      <sc-if value="{{ isSelImage }}">
+                        <div style="display:flex;flex-direction:column;animation:vv-fade .44s ease both">
+                          <div style="padding:14px 16px 10px;display:flex;flex-direction:column;gap:4px;border-bottom:1px solid var(--border)">
+                            <div style="font-size:14px;font-weight:500">sidebar-mock.png</div>
+                            <div style="font-size:12.5px;color:var(--ink-muted)">PNG image · 248 KB · 1440 × 900 · yesterday</div>
+                          </div>
+                          <div style="padding:16px;display:flex;align-items:center;justify-content:center">
+                            <div style="width:100%;aspect-ratio:16 / 10;border-radius:10px;background:var(--surface2);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:12.5px;color:var(--ink-faint)">Image preview</div>
+                          </div>
+                        </div>
+                      </sc-if>
+
+                      <sc-if value="{{ isSelBinary }}">
+                        <div style="padding:26px 20px;display:flex;flex-direction:column;align-items:center;gap:12px;text-align:center;animation:vv-fade .44s ease both">
+                          <div style="width:100%;max-width:220px;aspect-ratio:4 / 3;border-radius:10px;border:1.5px dashed var(--border-strong);display:flex;align-items:center;justify-content:center;font-size:20px;color:var(--ink-faint)">—</div>
+                          <div style="font-family:var(--font-display);font-style:italic;font-size:19px;color:var(--ink-faint)">No preview for this file</div>
+                          <div style="font-size:13px;color:var(--ink-muted);line-height:1.55;max-width:280px">session-trace.bin · 1.8 MB. Download it to open it in a tool that understands the format.</div>
+                          <x-import component-from-global-scope="VerveDesignSystem_845c78.Button" variant="tonal" size="sm" on-click="{{ notifyDownload }}" hint-size="auto,32px">Download the file</x-import>
+                        </div>
+                      </sc-if>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ isGit }}">
+            <div data-screen-label="Git" style="flex:1;min-height:0;display:flex;flex-direction:column;padding:16px 18px 18px;gap:14px;overflow-y:auto;animation:vv-pagein .72s var(--ease-enter) both">
+              <div style="flex:none;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+                <x-import component-from-global-scope="VerveDesignSystem_845c78.Chip" selected="{{ true }}" hint-size="auto,34px" dc-props="{{ chipPlain }}">main</x-import>
+                <x-import component-from-global-scope="VerveDesignSystem_845c78.Badge" tone="{{ gitHeadTone }}" hint-size="auto,26px" dc-props="{{ badgeRow }}">{{ gitHeadLabel }}</x-import>
+                <span style="margin-left:auto;font-size:12.5px;color:var(--ink-faint)">Claude handles commits and pushes for this project</span>
+              </div>
+
+              <div style="flex:none">
+                <x-import component-from-global-scope="VerveDesignSystem_845c78.Tabs" tabs="{{ gitTabs }}" active="{{ gitView }}" on-change="{{ setGitView }}" hint-size="380px,44px"></x-import>
+              </div>
+
+              <div style="display:flex;flex-direction:column;gap:14px;max-width:900px">
+
+                <sc-if value="{{ gitDone }}">
+                  <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:26px 20px;display:flex;flex-direction:column;align-items:center;gap:9px;text-align:center;animation:vv-fade .46s ease both">
+                    <div style="font-family:var(--font-display);font-style:italic;font-size:20px;color:var(--ink-faint)">Nothing waiting to be pushed</div>
+                    <div style="font-size:13px;color:var(--ink-muted);max-width:340px;line-height:1.55">Your working tree matches origin/main. New changes will show up here as you or an agent make them.</div>
+                  </div>
+                </sc-if>
+
+                <sc-if value="{{ gitPending }}" hint-placeholder-val="{{ true }}">
+                <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden">
+                  <div style="display:flex;align-items:center;gap:9px;padding:11px 16px;border-bottom:1px solid var(--border)">
+                    <span style="font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-faint)">Already committed, not pushed · 2</span>
+                  </div>
+                  <div style="display:flex;align-items:center;gap:12px;padding:11px 16px;border-bottom:1px solid var(--border);transition:background var(--dur-quick) ease,transform var(--dur-move) var(--ease-enter)" style-hover="background:var(--surface2);transform:translateX(3px)">
+                    <span style="width:20px;height:20px;border-radius:6px;background:var(--warn-soft);color:var(--warn-ink);font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex:none">M</span>
+                    <span style="font-family:var(--font-mono);font-size:12.5px;min-width:0;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">src/index.css</span>
+                    <span style="font-size:12.5px;color:var(--pos-ink);font-variant-numeric:tabular-nums">+18</span>
+                    <span style="font-size:12.5px;color:var(--danger-ink);font-variant-numeric:tabular-nums">−6</span>
+                  </div>
+                  <div style="animation:vv-rise .6s var(--ease-enter) 0.10s both;display:flex;align-items:center;gap:12px;padding:11px 16px;transition:background var(--dur-quick) ease,transform var(--dur-move) var(--ease-enter)" style-hover="background:var(--surface2);transform:translateX(3px)">
+                    <span style="width:20px;height:20px;border-radius:6px;background:var(--pos-soft);color:var(--pos-ink);font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex:none">A</span>
+                    <span style="font-family:var(--font-mono);font-size:12.5px;min-width:0;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">src/shared/ui/verve/tokens.css</span>
+                    <span style="font-size:12.5px;color:var(--pos-ink);font-variant-numeric:tabular-nums">+64</span>
+                    <span style="font-size:12.5px;color:var(--ink-faint)">—</span>
+                  </div>
+                </div>
+
+                <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden">
+                  <div style="display:flex;align-items:center;gap:9px;padding:11px 16px;border-bottom:1px solid var(--border)">
+                    <span style="font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-faint)">Changed, not committed yet · 3</span>
+                  </div>
+                  <div style="animation:vv-rise .6s var(--ease-enter) 0.15s both;display:flex;align-items:center;gap:12px;padding:11px 16px;border-bottom:1px solid var(--border);transition:background var(--dur-quick) ease,transform var(--dur-move) var(--ease-enter)" style-hover="background:var(--surface2);transform:translateX(3px)">
+                    <span style="width:20px;height:20px;border-radius:6px;background:var(--warn-soft);color:var(--warn-ink);font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex:none">M</span>
+                    <span style="font-family:var(--font-mono);font-size:12.5px;min-width:0;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">src/modules/sidebar/SidebarContent.tsx</span>
+                    <span style="font-size:12.5px;color:var(--pos-ink);font-variant-numeric:tabular-nums">+41</span>
+                    <span style="font-size:12.5px;color:var(--danger-ink);font-variant-numeric:tabular-nums">−22</span>
+                  </div>
+                  <div style="animation:vv-rise .6s var(--ease-enter) 0.20s both;display:flex;align-items:center;gap:12px;padding:11px 16px;border-bottom:1px solid var(--border);transition:background var(--dur-quick) ease,transform var(--dur-move) var(--ease-enter)" style-hover="background:var(--surface2);transform:translateX(3px)">
+                    <span style="width:20px;height:20px;border-radius:6px;background:var(--warn-soft);color:var(--warn-ink);font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex:none">M</span>
+                    <span style="font-family:var(--font-mono);font-size:12.5px;min-width:0;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">tailwind.config.js</span>
+                    <span style="font-size:12.5px;color:var(--pos-ink);font-variant-numeric:tabular-nums">+9</span>
+                    <span style="font-size:12.5px;color:var(--danger-ink);font-variant-numeric:tabular-nums">−4</span>
+                  </div>
+                  <div style="animation:vv-rise .6s var(--ease-enter) 0.25s both;display:flex;align-items:center;gap:12px;padding:11px 16px;transition:background var(--dur-quick) ease,transform var(--dur-move) var(--ease-enter)" style-hover="background:var(--surface2);transform:translateX(3px)">
+                    <span style="width:20px;height:20px;border-radius:6px;border:1.5px dashed var(--border-strong);color:var(--ink-faint);font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex:none">?</span>
+                    <span style="font-family:var(--font-mono);font-size:12.5px;min-width:0;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">notes/verve-mapping.md</span>
+                    <span style="font-size:12.5px;color:var(--ink-faint)">New file · never committed</span>
+                  </div>
+                </div>
+                </sc-if>
+
+                <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:18px;display:flex;flex-direction:column;gap:14px">
+                  <div>
+                    <div style="font-family:var(--font-display);font-size:20px">Claude writes and <span style="font-style:italic;color:var(--accent-ink)">pushes</span> the commits</div>
+                    <div style="font-size:13px;color:var(--ink-muted);line-height:1.55;margin-top:5px;max-width:520px">One button starts a Sonnet conversation, runs <span style="font-family:var(--font-mono);font-size:12.5px">/git</span> over the changes above, and ends when the push finishes. You are told when it is done — there is nothing to fill in.</div>
+                  </div>
+
+                  <sc-if value="{{ gitIdle }}" hint-placeholder-val="{{ true }}">
+                    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+                      <x-import component-from-global-scope="VerveDesignSystem_845c78.Button" on-click="{{ runGitAgent }}" hint-size="auto,44px">Push my changes</x-import>
+                      <span style="font-size:12.5px;color:var(--ink-faint)">5 files · commits are grouped by intent, then pushed to main</span>
+                    </div>
+                  </sc-if>
+
+                  <sc-if value="{{ gitRunning }}">
+                    <div style="display:flex;flex-direction:column;gap:12px;animation:vv-fade .44s ease both">
+                      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+                        <x-import component-from-global-scope="VerveDesignSystem_845c78.Badge" tone="info" hint-size="auto,26px" dc-props="{{ badgeRow }}">● Claude is running /git</x-import>
+                        <span style="font-size:12.5px;color:var(--ink-muted)">Sonnet · conversation ends on its own when the push finishes</span>
+                      </div>
+                      <div style="display:flex;flex-direction:column;gap:7px;font-family:var(--font-mono);font-size:12.5px">
+                        <div style="{{ gitStep1 }}">{{ gitStep1Label }}</div>
+                        <div style="{{ gitStep2 }}">{{ gitStep2Label }}</div>
+                        <div style="{{ gitStep3 }}">{{ gitStep3Label }}</div>
+                        <div style="{{ gitStep4 }}">{{ gitStep4Label }}</div>
+                      </div>
+                    </div>
+                  </sc-if>
+
+                  <sc-if value="{{ gitDone }}">
+                    <div style="display:flex;flex-direction:column;gap:12px;animation:vv-rise .68s var(--ease-enter) both">
+                      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+                        <x-import component-from-global-scope="VerveDesignSystem_845c78.Badge" tone="positive" hint-size="auto,26px" dc-props="{{ badgeRow }}">✓ Pushed to main</x-import>
+                        <span style="font-size:12.5px;color:var(--ink-muted)">2 commits · 5 files · finished 9s ago · conversation ended</span>
+                      </div>
+                      <div style="display:flex;flex-direction:column;gap:6px;font-family:var(--font-mono);font-size:12.5px;color:var(--ink-muted)">
+                        <div><span style="color:var(--pos-ink)">a4f19c2</span> Point the theme layer at Verve tokens</div>
+                        <div><span style="color:var(--pos-ink)">7b02e5d</span> Rewrite the sidebar rows and add the mapping note</div>
+                      </div>
+                      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+                        <x-import component-from-global-scope="VerveDesignSystem_845c78.Button" variant="outline" size="sm" on-click="{{ openGitConversation }}" hint-size="auto,32px">Read the conversation</x-import>
+                        <x-import component-from-global-scope="VerveDesignSystem_845c78.Button" variant="ghost" size="sm" on-click="{{ resetGitAgent }}" hint-size="auto,32px">Dismiss</x-import>
+                        <span style="font-size:12.5px;color:var(--ink-faint)">Nothing else is waiting on you.</span>
+                      </div>
+                    </div>
+                  </sc-if>
+                </div>
+
+                <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden">
+                  <div style="display:flex;align-items:center;gap:10px;padding:11px 16px;border-bottom:1px solid var(--border)">
+                    <span style="font-family:var(--font-mono);font-size:12.5px">src/index.css</span>
+                    <span style="font-size:12.5px;color:var(--ink-muted)">· 3 changed lines</span>
+                    <span onClick="{{ showInFiles }}" style="margin-left:auto;font-size:12.5px;color:var(--accent-ink);cursor:pointer">Show in Files</span>
+                  </div>
+                  <div style="font-family:var(--font-mono);font-size:12.5px;line-height:1.8">
+                    <div style="display:flex;gap:14px;padding:2px 16px;color:var(--ink-faint)"><span style="width:34px;flex:none">88</span><span>:root {</span></div>
+                    <div style="display:flex;gap:14px;padding:2px 16px;background:var(--danger-soft);color:var(--danger-ink)"><span style="width:34px;flex:none">89</span><span>−&nbsp;&nbsp;--primary: 217 91% 60%;</span></div>
+                    <div style="display:flex;gap:14px;padding:2px 16px;background:var(--pos-soft);color:var(--pos-ink)"><span style="width:34px;flex:none">89</span><span>+&nbsp;&nbsp;--primary: 157 56% 42%;</span></div>
+                    <div style="display:flex;gap:14px;padding:2px 16px;background:var(--pos-soft);color:var(--pos-ink)"><span style="width:34px;flex:none">90</span><span>+&nbsp;&nbsp;--radius: 0.625rem;</span></div>
+                    <div style="display:flex;gap:14px;padding:2px 16px;color:var(--ink-faint)"><span style="width:34px;flex:none">91</span><span>}</span></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ isTasks }}">
+            <div data-screen-label="Tasks" style="flex:1;min-height:0;display:flex;flex-direction:column;padding:16px 18px 18px;gap:14px;animation:vv-pagein .72s var(--ease-enter) both">
+              <div style="flex:none;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+                <x-import component-from-global-scope="VerveDesignSystem_845c78.Chip" selected="{{ true }}" hint-size="auto,32px" dc-props="{{ chipSmall }}">All 24</x-import>
+                <x-import component-from-global-scope="VerveDesignSystem_845c78.Chip" hint-size="auto,32px" dc-props="{{ chipSmall }}">Mine</x-import>
+                <x-import component-from-global-scope="VerveDesignSystem_845c78.Chip" hint-size="auto,32px" dc-props="{{ chipSmall }}">High priority</x-import>
+                <x-import component-from-global-scope="VerveDesignSystem_845c78.Chip" hint-size="auto,32px" dc-props="{{ chipSmall }}">Blocked</x-import>
+                <div style="margin-left:auto;display:flex;align-items:center;gap:8px">
+                  <x-import component-from-global-scope="VerveDesignSystem_845c78.Button" variant="outline" size="sm" hint-size="auto,32px">Sort by priority</x-import>
+                  <x-import component-from-global-scope="VerveDesignSystem_845c78.Button" size="sm" hint-size="auto,32px">+ New task</x-import>
+                </div>
+              </div>
+
+              <div style="flex:1;min-height:0;overflow:auto;display:flex;gap:14px;align-items:flex-start">
+
+                <div style="flex:1;min-width:250px;display:flex;flex-direction:column;gap:10px">
+                  <div style="display:flex;align-items:center;gap:8px;padding:0 4px">
+                    <span style="width:7px;height:7px;border-radius:50%;background:var(--neutral-dot)"></span>
+                    <span style="font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-faint)">Not started · 9</span>
+                  </div>
+                  <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:9px;transition:box-shadow var(--dur-move) ease,transform var(--dur-move) var(--ease-enter);cursor:pointer" style-hover="transform:translateY(-5px);box-shadow:var(--shadow-lift)">
+                    <div style="display:flex;align-items:center;gap:8px"><span style="font-family:var(--font-mono);font-size:11.5px;color:var(--ink-faint);background:var(--surface2);padding:2px 7px;border-radius:5px">18</span><span style="margin-left:auto;font-size:11px;color:var(--danger-ink)">▲ High</span></div>
+                    <div style="animation:vv-rise .6s var(--ease-enter) 0.05s both;font-size:14px;font-weight:500;line-height:1.45">Map the shadcn token layer onto Verve variables</div>
+                    <div style="font-size:12.5px;color:var(--ink-faint)">↳ Waits on task 12</div>
+                  </div>
+                  <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:9px;transition:box-shadow var(--dur-move) ease,transform var(--dur-move) var(--ease-enter);cursor:pointer" style-hover="transform:translateY(-5px);box-shadow:var(--shadow-lift)">
+                    <div style="display:flex;align-items:center;gap:8px"><span style="font-family:var(--font-mono);font-size:11.5px;color:var(--ink-faint);background:var(--surface2);padding:2px 7px;border-radius:5px">21</span><span style="margin-left:auto;font-size:11px;color:var(--ink-faint)">Priority not set</span></div>
+                    <div style="animation:vv-rise .6s var(--ease-enter) 0.09s both;font-size:14px;font-weight:500;line-height:1.45">Replace Lucide tab icons with unicode marks</div>
+                  </div>
+                </div>
+
+                <div style="flex:1;min-width:250px;display:flex;flex-direction:column;gap:10px">
+                  <div style="display:flex;align-items:center;gap:8px;padding:0 4px">
+                    <span style="width:7px;height:7px;border-radius:50%;background:var(--info-dot)"></span>
+                    <span style="font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-faint)">Being worked on · 3</span>
+                  </div>
+                  <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:10px;box-shadow:var(--shadow-rest);transition:box-shadow var(--dur-move) ease,transform var(--dur-move) var(--ease-enter);cursor:pointer" style-hover="transform:translateY(-5px);box-shadow:var(--shadow-lift)">
+                    <div style="display:flex;align-items:center;gap:8px"><span style="font-family:var(--font-mono);font-size:11.5px;color:var(--ink-faint);background:var(--surface2);padding:2px 7px;border-radius:5px">12</span><x-import component-from-global-scope="VerveDesignSystem_845c78.Badge" tone="info" hint-size="auto,22px" dc-props="{{ badgeTask }}">● Claude is on it</x-import></div>
+                    <div style="animation:vv-rise .6s var(--ease-enter) 0.13s both;font-size:14px;font-weight:500;line-height:1.45">Reskin the sidebar and workspace chrome</div>
+                    <div>
+                      <div style="display:flex;align-items:center;gap:9px">
+                        <span style="font-size:12px;color:var(--ink-faint);flex:none">{{ progressLabel }}</span>
+                        <span style="flex:1;height:5px;border-radius:999px;background:var(--surface2);overflow:hidden;display:block"><span style="{{ progressStyle }}"></span></span>
+                        <span style="font-size:12px;color:var(--ink-faint);font-variant-numeric:tabular-nums">{{ progressPct }}</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:9px;transition:box-shadow var(--dur-move) ease,transform var(--dur-move) var(--ease-enter);cursor:pointer" style-hover="transform:translateY(-5px);box-shadow:var(--shadow-lift)">
+                    <div style="display:flex;align-items:center;gap:8px"><span style="font-family:var(--font-mono);font-size:11.5px;color:var(--ink-faint);background:var(--surface2);padding:2px 7px;border-radius:5px">15</span><span style="margin-left:auto;font-size:11px;color:var(--warn-ink)">▲ Medium</span></div>
+                    <div style="animation:vv-rise .6s var(--ease-enter) 0.17s both;font-size:14px;font-weight:500;line-height:1.45">Move the git panel onto Verve tones</div>
+                  </div>
+                </div>
+
+                <div style="flex:1;min-width:250px;display:flex;flex-direction:column;gap:10px">
+                  <div style="display:flex;align-items:center;gap:8px;padding:0 4px">
+                    <span style="width:7px;height:7px;border-radius:50%;background:var(--warn-dot)"></span>
+                    <span style="font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-faint)">Needs your review · 2</span>
+                  </div>
+                  <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:9px;transition:box-shadow var(--dur-move) ease,transform var(--dur-move) var(--ease-enter);cursor:pointer" style-hover="transform:translateY(-5px);box-shadow:var(--shadow-lift)">
+                    <div style="display:flex;align-items:center;gap:8px"><span style="font-family:var(--font-mono);font-size:11.5px;color:var(--ink-faint);background:var(--surface2);padding:2px 7px;border-radius:5px">9</span><x-import component-from-global-scope="VerveDesignSystem_845c78.Badge" tone="warn" hint-size="auto,22px" dc-props="{{ badgeTask }}">▲ Waiting for you</x-import></div>
+                    <div style="animation:vv-rise .6s var(--ease-enter) 0.21s both;font-size:14px;font-weight:500;line-height:1.45">Confirm the amber-for-errors rule across dialogs</div>
+                    <div style="font-size:12.5px;color:var(--ink-faint)">Drafted automatically — read it before it ships.</div>
+                  </div>
+                </div>
+
+                <div style="flex:1;min-width:250px;display:flex;flex-direction:column;gap:10px">
+                  <div style="display:flex;align-items:center;gap:8px;padding:0 4px">
+                    <span style="width:7px;height:7px;border-radius:50%;background:var(--pos-dot)"></span>
+                    <span style="font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-faint)">Done · 10</span>
+                  </div>
+                  <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:9px;opacity:.82">
+                    <div style="display:flex;align-items:center;gap:8px"><span style="font-family:var(--font-mono);font-size:11.5px;color:var(--ink-faint);background:var(--surface2);padding:2px 7px;border-radius:5px">7</span><span style="margin-left:auto;font-size:11px;color:var(--pos-ink)">✓ Done</span></div>
+                    <div style="animation:vv-rise .6s var(--ease-enter) 0.25s both;font-size:14px;font-weight:500;line-height:1.45;text-decoration:line-through;text-decoration-color:var(--border-strong)">Load Instrument Serif and Schibsted Grotesk</div>
+                  </div>
+                  <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:9px;opacity:.82">
+                    <div style="display:flex;align-items:center;gap:8px"><span style="font-family:var(--font-mono);font-size:11.5px;color:var(--ink-faint);background:var(--surface2);padding:2px 7px;border-radius:5px">4</span><span style="margin-left:auto;font-size:11px;color:var(--pos-ink)">✓ Done</span></div>
+                    <div style="animation:vv-rise .6s var(--ease-enter) 0.29s both;font-size:14px;font-weight:500;line-height:1.45;text-decoration:line-through;text-decoration-color:var(--border-strong)">Write the token mapping note</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </sc-if>
+        </div>
+
+        <sc-if value="{{ settingsOpen }}">
+          <div style="{{ settingsBackdropStyle }}">
+            <div data-screen-label="Settings" style="{{ settingsShellStyle }}">
+              <div style="flex:none;display:flex;align-items:center;gap:12px;padding:15px 20px;border-bottom:1px solid var(--border)">
+                <span style="font-family:var(--font-display);font-size:22px">Settings</span>
+                <span style="font-size:12.5px;color:var(--ink-faint)">Saved as you change them</span>
+                <div onClick="{{ closeSettings }}" style="margin-left:auto;width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--ink-muted);font-size:12px" style-hover="background:var(--surface2);color:var(--ink)">✕</div>
+              </div>
+              <div style="{{ settingsBodyStyle }}">
+                <div style="{{ settingsNavStyle }}">
+                  <div style="padding:9px 12px;border-radius:8px;background:var(--accent-soft);color:var(--accent-ink);font-size:13.5px;font-weight:500;white-space:nowrap;cursor:pointer">Agents</div>
+                  <div style="padding:9px 12px;border-radius:8px;font-size:13.5px;color:var(--ink-mid);white-space:nowrap;cursor:pointer;transition:background var(--dur-quick) ease,transform var(--dur-move) var(--ease-enter)" style-hover="background:var(--surface2);transform:translateX(3px)">Appearance</div>
+                  <div style="padding:9px 12px;border-radius:8px;font-size:13.5px;color:var(--ink-mid);white-space:nowrap;cursor:pointer;transition:background var(--dur-quick) ease,transform var(--dur-move) var(--ease-enter)" style-hover="background:var(--surface2);transform:translateX(3px)">Git</div>
+                  <div style="padding:9px 12px;border-radius:8px;font-size:13.5px;color:var(--ink-mid);white-space:nowrap;cursor:pointer;transition:background var(--dur-quick) ease,transform var(--dur-move) var(--ease-enter)" style-hover="background:var(--surface2);transform:translateX(3px)">Tasks</div>
+                  <div style="padding:9px 12px;border-radius:8px;font-size:13.5px;color:var(--ink-mid);white-space:nowrap;cursor:pointer;transition:background var(--dur-quick) ease,transform var(--dur-move) var(--ease-enter)" style-hover="background:var(--surface2);transform:translateX(3px)">Notifications</div>
+                  <div style="padding:9px 12px;border-radius:8px;font-size:13.5px;color:var(--ink-mid);white-space:nowrap;cursor:pointer;transition:background var(--dur-quick) ease,transform var(--dur-move) var(--ease-enter)" style-hover="background:var(--surface2);transform:translateX(3px)">Keys and credentials</div>
+                  <div style="padding:9px 12px;border-radius:8px;font-size:13.5px;color:var(--ink-mid);white-space:nowrap;cursor:pointer;transition:background var(--dur-quick) ease,transform var(--dur-move) var(--ease-enter)" style-hover="background:var(--surface2);transform:translateX(3px)">Voice</div>
+                  <div style="padding:9px 12px;border-radius:8px;font-size:13.5px;color:var(--ink-mid);white-space:nowrap;cursor:pointer;transition:background var(--dur-quick) ease,transform var(--dur-move) var(--ease-enter)" style-hover="background:var(--surface2);transform:translateX(3px)">Plugins</div>
+                  <div style="padding:9px 12px;border-radius:8px;font-size:13.5px;color:var(--ink-mid);white-space:nowrap;cursor:pointer;transition:background var(--dur-quick) ease,transform var(--dur-move) var(--ease-enter)" style-hover="background:var(--surface2);transform:translateX(3px)">About</div>
+                </div>
+                <div style="{{ settingsPaneStyle }}">
+                  <div>
+                    <div style="font-family:var(--font-display);font-size:26px;line-height:1.2">Agents and <span style="font-style:italic;color:var(--accent-ink)">permissions</span></div>
+                    <div style="font-size:13.5px;color:var(--ink-muted);margin-top:6px;max-width:520px">Decide how much each agent may do on its own. Anything not allowed here comes back to you as a question.</div>
+                  </div>
+
+                  <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden">
+                    <div style="display:flex;align-items:center;gap:12px;padding:14px 16px;border-bottom:1px solid var(--border)">
+                      <span aria-hidden="true" style="width:26px;height:26px;border-radius:50%;background:linear-gradient(135deg,#2fa876,#6fd0a8);flex:none"></span>
+                      <div style="min-width:0;flex:1"><div style="font-size:14px;font-weight:500">Claude</div><div style="font-size:12.5px;color:var(--ink-muted)">Signed in as scott@lyphe.dev</div></div>
+                      <x-import component-from-global-scope="VerveDesignSystem_845c78.Badge" tone="positive" hint-size="auto,24px" dc-props="{{ badgeSm }}">✓ Connected</x-import>
+                      <x-import component-from-global-scope="VerveDesignSystem_845c78.Button" variant="outline" size="sm" hint-size="auto,32px">Sign out</x-import>
+                    </div>
+                    <div style="display:flex;align-items:center;gap:12px;padding:14px 16px">
+                      <span aria-hidden="true" style="width:26px;height:26px;border-radius:50%;background:var(--surface2);flex:none"></span>
+                      <div style="min-width:0;flex:1"><div style="font-size:14px;font-weight:500">Codex</div><div style="font-size:12.5px;color:var(--ink-muted)">Not signed in</div></div>
+                      <span style="font-size:12.5px;color:var(--ink-faint)">—</span>
+                      <x-import component-from-global-scope="VerveDesignSystem_845c78.Button" variant="tonal" size="sm" hint-size="auto,32px">Sign in</x-import>
+                    </div>
+                  </div>
+
+                  <div style="display:flex;flex-direction:column;gap:2px">
+                    <div style="display:flex;align-items:flex-start;gap:16px;padding:15px 2px;border-bottom:1px solid var(--border)">
+                      <div style="min-width:0;flex:1">
+                        <div style="font-size:14px;font-weight:500">Ask before running a command</div>
+                        <div style="font-size:12.5px;color:var(--ink-faint);margin-top:3px">Every shell command waits for your yes. Turning this off lets the agent run commands on its own — you can still stop it mid-run.</div>
+                      </div>
+                      <div role="switch" aria-label="Ask before running a command" onClick="{{ toggleAsk }}" style="{{ trackAsk }}"><div style="{{ knobAsk }}"></div></div>
+                    </div>
+                    <div style="display:flex;align-items:flex-start;gap:16px;padding:15px 2px;border-bottom:1px solid var(--border)">
+                      <div style="min-width:0;flex:1">
+                        <div style="font-size:14px;font-weight:500">Apply edits automatically</div>
+                        <div style="font-size:12.5px;color:var(--ink-faint);margin-top:3px">Edits land in your files as they are made — you can undo any of them.</div>
+                      </div>
+                      <div role="switch" aria-label="Apply edits automatically" onClick="{{ toggleAuto }}" style="{{ trackAuto }}"><div style="{{ knobAuto }}"></div></div>
+                    </div>
+                    <div style="display:flex;align-items:flex-start;gap:16px;padding:15px 2px;border-bottom:1px solid var(--border)">
+                      <div style="min-width:0;flex:1">
+                        <div style="font-size:14px;font-weight:500">Tell me when a conversation finishes</div>
+                        <div style="font-size:12.5px;color:var(--ink-faint);margin-top:3px">A quiet notification when an agent stops or needs you.</div>
+                      </div>
+                      <div role="switch" aria-label="Tell me when a conversation finishes" onClick="{{ toggleNotify }}" style="{{ trackNotify }}"><div style="{{ knobNotify }}"></div></div>
+                    </div>
+                  </div>
+
+                  <div style="display:flex;flex-direction:column;gap:2px">
+                    <div style="font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-faint);padding-bottom:6px">Tabs in the workspace</div>
+                    <div style="display:flex;align-items:flex-start;gap:16px;padding:15px 2px;border-bottom:1px solid var(--border)">
+                      <div style="min-width:0;flex:1">
+                        <div style="font-size:14px;font-weight:500">Hide the Shell tab</div>
+                        <div style="font-size:12.5px;color:var(--ink-faint);margin-top:3px">Takes the terminal out of the workspace. Running sessions keep running — you just stop seeing the tab.</div>
+                      </div>
+                      <div role="switch" aria-label="Hide the Shell tab" onClick="{{ toggleHideShell }}" style="{{ trackShell }}"><div style="{{ knobShell }}"></div></div>
+                    </div>
+                    <div style="display:flex;align-items:flex-start;gap:16px;padding:15px 2px;border-bottom:1px solid var(--border)">
+                      <div style="min-width:0;flex:1">
+                        <div style="font-size:14px;font-weight:500">Hide the Tasks tab</div>
+                        <div style="font-size:12.5px;color:var(--ink-faint);margin-top:3px">Takes the task board out of the workspace. Your tasks stay where they are.</div>
+                      </div>
+                      <div role="switch" aria-label="Hide the Tasks tab" onClick="{{ toggleHideTasks }}" style="{{ trackTasks }}"><div style="{{ knobTasks }}"></div></div>
+                    </div>
+                  </div>
+
+                  <x-import component-from-global-scope="VerveDesignSystem_845c78.Field" label="Files an agent may edit without asking" helper="Leave blank if you would rather approve every edit — blank means nothing is pre-approved." hint-size="100%,110px">
+                    <x-import component-from-global-scope="VerveDesignSystem_845c78.Select" options="{{ scopeOptions }}" value="{{ scope }}" on-change="{{ setScope }}" hint-size="100%,46px" dc-props="{{ full }}"></x-import>
+                  </x-import>
+
+                  <x-import component-from-global-scope="VerveDesignSystem_845c78.Banner" tone="warn" hint-size="100%,56px">
+                    Two settings are capped by your workspace policy. They show as they stand and cannot be raised from here.
+                  </x-import>
+                </div>
+              </div>
+            </div>
+          </div>
+        </sc-if>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ isSignin }}">
+    <div data-screen-label="Sign in" style="flex:1;min-height:0;overflow-y:auto;display:flex;align-items:center;justify-content:center;padding:32px;animation:vv-fade .5s ease both">
+      <div style="width:100%;max-width:408px;display:flex;flex-direction:column;gap:22px">
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <div style="font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-faint)">CloudCLI</div>
+          <div style="font-family:var(--font-display);font-size:38px;line-height:1.1">Good morning, <span style="font-style:italic;color:var(--accent-ink)">Scott</span></div>
+          <div style="font-size:14px;color:var(--ink-muted);line-height:1.55">Sign in to reach the projects and conversations on this machine.</div>
+        </div>
+
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:24px;display:flex;flex-direction:column;gap:18px;box-shadow:var(--shadow-rest)">
+          <x-import component-from-global-scope="VerveDesignSystem_845c78.Field" label="User name" hint-size="100%,80px">
+            <x-import component-from-global-scope="VerveDesignSystem_845c78.Input" placeholder="scott" hint-size="100%,46px" dc-props="{{ full }}"></x-import>
+          </x-import>
+          <x-import component-from-global-scope="VerveDesignSystem_845c78.Field" label="Password" helper="Stored on this machine only." hint-size="100%,100px">
+            <x-import component-from-global-scope="VerveDesignSystem_845c78.Input" type="password" placeholder="••••••••" hint-size="100%,46px" dc-props="{{ full }}"></x-import>
+          </x-import>
+          <x-import component-from-global-scope="VerveDesignSystem_845c78.Button" hint-size="100%,46px" dc-props="{{ full }}">Sign in</x-import>
+          <div style="font-size:12.5px;color:var(--ink-faint);text-align:center">Nothing is sent to a server. This is the local console.</div>
+        </div>
+
+        <div style="font-size:12.5px;color:var(--ink-faint);text-align:center">First time here? <a href="#setup">Set up an account</a></div>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ isTokens }}">
+    <div data-screen-label="Token mapping" style="flex:1;min-height:0;overflow-y:auto;padding:34px 28px 80px;animation:vv-pagein .78s var(--ease-enter) both">
+      <div style="max-width:1000px;margin:0 auto;display:flex;flex-direction:column;gap:40px">
+
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <div style="font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-faint)">Handoff · Verve v1 · claudecodeui_lyphe</div>
+          <div style="font-family:var(--font-display);font-size:40px;line-height:1.1">What to change in <span style="font-style:italic;color:var(--accent-ink)">code</span></div>
+          <div style="font-size:15px;color:var(--ink-mid);line-height:1.6;max-width:640px">The app already themes itself through CSS variables in <span style="font-family:var(--font-mono);font-size:13.5px">src/index.css</span> and <span style="font-family:var(--font-mono);font-size:13.5px">tailwind.config.js</span>. Point those at Verve's tokens and most of the reskin lands without touching component markup.</div>
+        </div>
+
+        <div style="display:flex;flex-direction:column;gap:14px">
+          <div style="font-family:var(--font-display);font-size:26px">Palette</div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(148px,1fr));gap:12px">
+            <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;transition:box-shadow var(--dur-move) ease,transform var(--dur-move) var(--ease-enter)" style-hover="transform:translateY(-4px);box-shadow:var(--shadow-hover)"><div style="height:58px;background:var(--canvas)"></div><div style="padding:10px 12px"><div style="font-size:13px;font-weight:500">--canvas</div><div style="animation:vv-rise .6s var(--ease-enter) 0.040s both;font-family:var(--font-mono);font-size:11.5px;color:var(--ink-faint)">page background</div></div></div>
+            <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;transition:box-shadow var(--dur-move) ease,transform var(--dur-move) var(--ease-enter)" style-hover="transform:translateY(-4px);box-shadow:var(--shadow-hover)"><div style="height:58px;background:var(--surface)"></div><div style="padding:10px 12px"><div style="font-size:13px;font-weight:500">--surface</div><div style="animation:vv-rise .6s var(--ease-enter) 0.075s both;font-family:var(--font-mono);font-size:11.5px;color:var(--ink-faint)">cards, sidebar</div></div></div>
+            <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;transition:box-shadow var(--dur-move) ease,transform var(--dur-move) var(--ease-enter)" style-hover="transform:translateY(-4px);box-shadow:var(--shadow-hover)"><div style="height:58px;background:var(--surface2)"></div><div style="padding:10px 12px"><div style="font-size:13px;font-weight:500">--surface2</div><div style="animation:vv-rise .6s var(--ease-enter) 0.110s both;font-family:var(--font-mono);font-size:11.5px;color:var(--ink-faint)">hover, wells</div></div></div>
+            <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;transition:box-shadow var(--dur-move) ease,transform var(--dur-move) var(--ease-enter)" style-hover="transform:translateY(-4px);box-shadow:var(--shadow-hover)"><div style="height:58px;background:var(--accent)"></div><div style="padding:10px 12px"><div style="font-size:13px;font-weight:500">--accent</div><div style="animation:vv-rise .6s var(--ease-enter) 0.145s both;font-family:var(--font-mono);font-size:11.5px;color:var(--ink-faint)">#2fa876 · actions</div></div></div>
+            <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;transition:box-shadow var(--dur-move) ease,transform var(--dur-move) var(--ease-enter)" style-hover="transform:translateY(-4px);box-shadow:var(--shadow-hover)"><div style="height:58px;background:var(--garnish)"></div><div style="padding:10px 12px"><div style="font-size:13px;font-weight:500">--garnish</div><div style="animation:vv-rise .6s var(--ease-enter) 0.180s both;font-family:var(--font-mono);font-size:11.5px;color:var(--ink-faint)">#e0713a · garnish only</div></div></div>
+            <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;transition:box-shadow var(--dur-move) ease,transform var(--dur-move) var(--ease-enter)" style-hover="transform:translateY(-4px);box-shadow:var(--shadow-hover)"><div style="height:58px;background:var(--ink)"></div><div style="padding:10px 12px"><div style="font-size:13px;font-weight:500">--ink</div><div style="animation:vv-rise .6s var(--ease-enter) 0.215s both;font-family:var(--font-mono);font-size:11.5px;color:var(--ink-faint)">headings</div></div></div>
+            <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;transition:box-shadow var(--dur-move) ease,transform var(--dur-move) var(--ease-enter)" style-hover="transform:translateY(-4px);box-shadow:var(--shadow-hover)"><div style="height:58px;background:var(--warn-soft)"></div><div style="padding:10px 12px"><div style="font-size:13px;font-weight:500">--warn-soft</div><div style="animation:vv-rise .6s var(--ease-enter) 0.250s both;font-family:var(--font-mono);font-size:11.5px;color:var(--ink-faint)">errors live here</div></div></div>
+            <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;transition:box-shadow var(--dur-move) ease,transform var(--dur-move) var(--ease-enter)" style-hover="transform:translateY(-4px);box-shadow:var(--shadow-hover)"><div style="height:58px;background:var(--danger-soft)"></div><div style="padding:10px 12px"><div style="font-size:13px;font-weight:500">--danger-soft</div><div style="animation:vv-rise .6s var(--ease-enter) 0.285s both;font-family:var(--font-mono);font-size:11.5px;color:var(--ink-faint)">destructive only</div></div></div>
+          </div>
+        </div>
+
+        <div style="display:flex;flex-direction:column;gap:14px">
+          <div style="font-family:var(--font-display);font-size:26px">CSS variables</div>
+          <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden">
+            <div style="display:grid;grid-template-columns:1.1fr 1fr 1fr;gap:12px;padding:11px 16px;border-bottom:1px solid var(--border);font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-faint)">
+              <span>App variable</span><span>Verve token</span><span>Light value</span>
+            </div>
+            <div style="display:grid;grid-template-columns:1.1fr 1fr 1fr;gap:12px;padding:11px 16px;border-bottom:1px solid var(--border);font-family:var(--font-mono);font-size:12.5px"><span>--background</span><span style="color:var(--accent-ink)">--canvas</span><span style="color:var(--ink-muted)">#f7f7f9</span></div>
+            <div style="display:grid;grid-template-columns:1.1fr 1fr 1fr;gap:12px;padding:11px 16px;border-bottom:1px solid var(--border);font-family:var(--font-mono);font-size:12.5px"><span>--card / --popover</span><span style="color:var(--accent-ink)">--surface</span><span style="color:var(--ink-muted)">#ffffff</span></div>
+            <div style="display:grid;grid-template-columns:1.1fr 1fr 1fr;gap:12px;padding:11px 16px;border-bottom:1px solid var(--border);font-family:var(--font-mono);font-size:12.5px"><span>--muted / --accent (hover)</span><span style="color:var(--accent-ink)">--surface2</span><span style="color:var(--ink-muted)">#f0f0f4</span></div>
+            <div style="display:grid;grid-template-columns:1.1fr 1fr 1fr;gap:12px;padding:11px 16px;border-bottom:1px solid var(--border);font-family:var(--font-mono);font-size:12.5px"><span>--foreground</span><span style="color:var(--accent-ink)">--ink</span><span style="color:var(--ink-muted)">#17181d</span></div>
+            <div style="display:grid;grid-template-columns:1.1fr 1fr 1fr;gap:12px;padding:11px 16px;border-bottom:1px solid var(--border);font-family:var(--font-mono);font-size:12.5px"><span>--muted-foreground</span><span style="color:var(--accent-ink)">--ink-muted</span><span style="color:var(--ink-muted)">#6b6e7c</span></div>
+            <div style="display:grid;grid-template-columns:1.1fr 1fr 1fr;gap:12px;padding:11px 16px;border-bottom:1px solid var(--border);font-family:var(--font-mono);font-size:12.5px"><span>--border</span><span style="color:var(--accent-ink)">--border</span><span style="color:var(--ink-muted)">#e4e5ec</span></div>
+            <div style="display:grid;grid-template-columns:1.1fr 1fr 1fr;gap:12px;padding:11px 16px;border-bottom:1px solid var(--border);font-family:var(--font-mono);font-size:12.5px"><span>--input</span><span style="color:var(--accent-ink)">--border-strong</span><span style="color:var(--ink-muted)">#d8d9e2 · 1.5px</span></div>
+            <div style="display:grid;grid-template-columns:1.1fr 1fr 1fr;gap:12px;padding:11px 16px;border-bottom:1px solid var(--border);font-family:var(--font-mono);font-size:12.5px"><span>--primary / --ring</span><span style="color:var(--accent-ink)">--accent</span><span style="color:var(--ink-muted)">#2fa876</span></div>
+            <div style="display:grid;grid-template-columns:1.1fr 1fr 1fr;gap:12px;padding:11px 16px;border-bottom:1px solid var(--border);font-family:var(--font-mono);font-size:12.5px"><span>--destructive</span><span style="color:var(--accent-ink)">--danger</span><span style="color:var(--ink-muted)">#b3373c · destructive only</span></div>
+            <div style="display:grid;grid-template-columns:1.1fr 1fr 1fr;gap:12px;padding:11px 16px;font-family:var(--font-mono);font-size:12.5px"><span>--radius</span><span style="color:var(--accent-ink)">--radius-input</span><span style="color:var(--ink-muted)">10px · cards 12 · screens 16</span></div>
+          </div>
+          <div style="font-size:13.5px;color:var(--ink-faint)">Dark mode: the app already toggles a <span style="font-family:var(--font-mono);font-size:12.5px">.dark</span> class on <span style="font-family:var(--font-mono);font-size:12.5px">&lt;html&gt;</span>. Alias it to Verve's <span style="font-family:var(--font-mono);font-size:12.5px">.vv-dark</span> block rather than keeping a second set of values.</div>
+        </div>
+
+        <div style="display:flex;flex-direction:column;gap:14px">
+          <div style="font-family:var(--font-display);font-size:26px">Type and components</div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px">
+            <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px;display:flex;flex-direction:column;gap:10px">
+              <div style="font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-faint)">Type</div>
+              <div style="font-size:13.5px;color:var(--ink-mid);line-height:1.65">Encode Sans → <span style="font-weight:500">Schibsted Grotesk</span> for all UI · Merriweather → <span style="font-family:var(--font-display);font-size:16px">Instrument Serif</span> for display and panel headings, italic for emphasis, never bold · monospace stays for paths, diffs and terminal.</div>
+              <div style="font-size:13.5px;color:var(--ink-faint)">Body 15.5px/1.65 · small 13.5 · eyebrow 12 uppercase .14em · tabular numerals wherever counts stack.</div>
+            </div>
+            <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px;display:flex;flex-direction:column;gap:10px">
+              <div style="font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-faint)">Component swaps</div>
+              <div style="font-size:13.5px;color:var(--ink-mid);line-height:1.75">PillBar + Pill → Verve <span style="font-weight:500">Tabs</span><br>shadcn Button → <span style="font-weight:500">Button</span> primary · tonal · outline · ghost · danger<br>status pills → <span style="font-weight:500">Badge</span> in five tones<br>Dialog → <span style="font-weight:500">Modal</span> · bottom sheet → <span style="font-weight:500">Sheet</span> · toasts → <span style="font-weight:500">Toast</span><br>form rows → <span style="font-weight:500">Field</span> + Input / TextArea / Select / Switch<br>Lucide tab icons → unicode marks ✓ ✕ ▲ ● ↳ ✦</div>
+            </div>
+          </div>
+        </div>
+
+        <div style="display:flex;flex-direction:column;gap:14px">
+          <div style="font-family:var(--font-display);font-size:26px">Rules that change behaviour, not just colour</div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px">
+            <div style="background:var(--warn-soft);color:var(--warn-ink);border-radius:12px;padding:18px"><div style="font-size:14px;font-weight:500;margin-bottom:6px">▲ Errors are amber</div><div style="font-size:13.5px;line-height:1.6">Red is kept for destructive and denied. The task board's red "cancelled" and amber "review" swap sides accordingly.</div></div>
+            <div style="background:var(--neutral-soft);color:var(--neutral-ink);border-radius:12px;padding:18px"><div style="font-size:14px;font-weight:500;margin-bottom:6px">— Unknown is a dash</div><div style="font-size:13.5px;line-height:1.6">Missing counts, untracked line totals and absent progress render as a bare em-dash, never 0.</div></div>
+            <div style="background:var(--pos-soft);color:var(--pos-ink);border-radius:12px;padding:18px"><div style="font-size:14px;font-weight:500;margin-bottom:6px">✓ Colour never alone</div><div style="font-size:13.5px;line-height:1.6">Every state carries a mark or a word too: ● working, ✓ done, ▲ waiting for you.</div></div>
+            <div style="background:var(--info-soft);color:var(--info-ink);border-radius:12px;padding:18px"><div style="font-size:14px;font-weight:500;margin-bottom:6px">i Say what ran on its own</div><div style="font-size:13.5px;line-height:1.6">Tool cards state whether the software acted or is waiting: "Done automatically" versus "Waiting for you".</div></div>
+          </div>
+        </div>
+
+        <div style="display:flex;flex-direction:column;gap:12px">
+          <div style="font-family:var(--font-display);font-size:26px">Where each screen came from</div>
+          <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;font-size:13.5px">
+            <div style="display:grid;grid-template-columns:150px 1fr;gap:12px;padding:11px 16px;border-bottom:1px solid var(--border);font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-faint)"><span>Screen</span><span>Source</span></div>
+            <div style="display:grid;grid-template-columns:150px 1fr;gap:12px;padding:11px 16px;border-bottom:1px solid var(--border)"><span>Sidebar</span><span style="font-family:var(--font-mono);font-size:12.5px;color:var(--ink-muted)">src/modules/sidebar/*</span></div>
+            <div style="display:grid;grid-template-columns:150px 1fr;gap:12px;padding:11px 16px;border-bottom:1px solid var(--border)"><span>Header and tabs</span><span style="font-family:var(--font-mono);font-size:12.5px;color:var(--ink-muted)">src/modules/project-workspace/WorkspaceHeader.tsx · WorkspaceTabs.tsx</span></div>
+            <div style="display:grid;grid-template-columns:150px 1fr;gap:12px;padding:11px 16px;border-bottom:1px solid var(--border)"><span>Chat</span><span style="font-family:var(--font-mono);font-size:12.5px;color:var(--ink-muted)">src/modules/chat/*</span></div>
+            <div style="display:grid;grid-template-columns:150px 1fr;gap:12px;padding:11px 16px;border-bottom:1px solid var(--border)"><span>Files</span><span style="font-family:var(--font-mono);font-size:12.5px;color:var(--ink-muted)">src/modules/file-tree/* · new: browse, preview, upload, download (replaces code-editor)</span></div>
+            <div style="display:grid;grid-template-columns:150px 1fr;gap:12px;padding:11px 16px;border-bottom:1px solid var(--border)"><span>Git</span><span style="font-family:var(--font-mono);font-size:12.5px;color:var(--ink-muted)">src/modules/git-panel/*</span></div>
+            <div style="display:grid;grid-template-columns:150px 1fr;gap:12px;padding:11px 16px;border-bottom:1px solid var(--border)"><span>Shell</span><span style="font-family:var(--font-mono);font-size:12.5px;color:var(--ink-muted)">src/modules/shell/* · standalone-shell/*</span></div>
+            <div style="display:grid;grid-template-columns:150px 1fr;gap:12px;padding:11px 16px;border-bottom:1px solid var(--border)"><span>Tasks</span><span style="font-family:var(--font-mono);font-size:12.5px;color:var(--ink-muted)">src/modules/task-master/*</span></div>
+            <div style="display:grid;grid-template-columns:150px 1fr;gap:12px;padding:11px 16px;border-bottom:1px solid var(--border)"><span>Settings</span><span style="font-family:var(--font-mono);font-size:12.5px;color:var(--ink-muted)">src/modules/settings/*</span></div>
+            <div style="display:grid;grid-template-columns:150px 1fr;gap:12px;padding:11px 16px"><span>Sign in</span><span style="font-family:var(--font-mono);font-size:12.5px;color:var(--ink-muted)">src/modules/auth/LoginForm.tsx · AuthScreenLayout.tsx</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+  <x-import component-from-global-scope="VerveDesignSystem_845c78.ToastStack" toasts="{{ toasts }}" on-dismiss="{{ dismissToast }}" hint-size="1px,1px"></x-import>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;screen&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;workspace&quot;,&quot;signin&quot;,&quot;tokens&quot;],&quot;default&quot;:&quot;workspace&quot;,&quot;tsType&quot;:&quot;'workspace'|'signin'|'tokens'&quot;,&quot;section&quot;:&quot;Demo state&quot;},&quot;theme&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;light&quot;,&quot;dark&quot;],&quot;default&quot;:&quot;light&quot;,&quot;tsType&quot;:&quot;'light'|'dark'&quot;,&quot;section&quot;:&quot;Demo state&quot;},&quot;viewport&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;desktop&quot;,&quot;mobile&quot;],&quot;default&quot;:&quot;desktop&quot;,&quot;tsType&quot;:&quot;'desktop'|'mobile'&quot;,&quot;section&quot;:&quot;Demo state&quot;},&quot;showActivity&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Demo state&quot;},&quot;reauthNeeded&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Demo state&quot;},&quot;hideShell&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Workspace tabs&quot;},&quot;hideTasks&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Workspace tabs&quot;}}">
+class Component extends DCLogic {
+  state = {
+    screen: null, dark: null, mobile: null,
+    tab: 'chat', gitView: 0, drawer: false, settingsOpen: false,
+    askBeforeRun: true, autoApply: false, notify: true, scope: 'Only files I have opened',
+    elapsed: 12, pct: 0, toasts: [], accountMenu: false,
+    staleActive: true, staleOlder: true,
+    fileSel: 'code', uploading: false, uploadPct: 0,
+    gitPhase: 'idle', gitStep: 0,
+    hideShell: null, hideTasks: null,
+    model: 'Claude Sonnet', mode: 'Plan first, then edit', menu: null, footerH: 0,
+  };
+
+  toastId = 0;
+  footerRef = React.createRef();
+
+  measureFooter() {
+    const h = this.footerRef.current ? this.footerRef.current.offsetHeight : 0;
+    if (h && h !== this.state.footerH) this.setState({ footerH: h });
+  }
+
+  pushToast(toast) {
+    const id = ++this.toastId;
+    this.setState((s) => ({ toasts: [...s.toasts, { id, ...toast }] }));
+    setTimeout(() => this.setState((s) => ({
+      toasts: s.toasts.map((t) => (t.id === id ? { ...t, leaving: true } : t)),
+    })), 2600);
+    setTimeout(() => this.setState((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) })), 3250);
+  }
+
+  runGit() {
+    this.setState({ gitPhase: 'running', gitStep: 1 });
+    clearInterval(this.gitTick);
+    this.gitTick = setInterval(() => {
+      const next = this.state.gitStep + 1;
+      this.setState({ gitStep: next });
+      if (next >= 4) {
+        clearInterval(this.gitTick);
+        setTimeout(() => {
+          this.setState({ gitPhase: 'done' });
+          this.pushToast({ tone: 'positive', title: 'Pushed to main', message: '2 commits · 5 files. Claude ended the conversation on its own.' });
+        }, 700);
+      }
+    }, 1100);
+  }
+
+  runUpload() {
+    this.setState({ uploading: true, uploadPct: 0 });
+    clearInterval(this.upTick);
+    this.upTick = setInterval(() => {
+      const next = Math.min(100, this.state.uploadPct + 9 + Math.random() * 11);
+      this.setState({ uploadPct: next });
+      if (next >= 100) {
+        clearInterval(this.upTick);
+        setTimeout(() => {
+          this.setState({ uploading: false });
+          this.pushToast({ tone: 'positive', title: 'Uploaded verve-tokens.css', message: 'It landed in src/modules/sidebar — 18.2 KB.' });
+        }, 450);
+      }
+    }, 260);
+  }
+
+  countUp() {
+    const start = performance.now(), target = 67, dur = 2000;
+    const step = (now) => {
+      const p = Math.min(1, (now - start) / dur);
+      const eased = p < .5 ? 2 * p * p : 1 - Math.pow(-2 * p + 2, 2) / 2;
+      this.setState({ pct: Math.round(target * eased) });
+      if (p < 1) this.raf = requestAnimationFrame(step);
+    };
+    this.raf = requestAnimationFrame(step);
+  }
+
+  screenName() { return this.state.screen ?? (this.props.screen ?? 'workspace'); }
+  isDark() { return this.state.dark ?? ((this.props.theme ?? 'light') === 'dark'); }
+  isMobile() { return this.state.mobile ?? ((this.props.viewport ?? 'desktop') === 'mobile'); }
+
+  componentDidMount() {
+    this.syncTheme();
+    this.tick = setInterval(() => this.setState((s) => ({ elapsed: s.elapsed + 1 })), 1000);
+    this.countUp();
+    this.measureFooter();
+  }
+  componentDidUpdate() { this.syncTheme(); this.measureFooter(); }
+  componentWillUnmount() {
+    clearInterval(this.tick);
+    clearInterval(this.upTick);
+    clearInterval(this.gitTick);
+    if (this.raf) cancelAnimationFrame(this.raf);
+  }
+  syncTheme() {
+    if (typeof document === 'undefined') return;
+    const dark = this.isDark();
+    if (dark === this.lastDark) return;
+    if (this.lastDark !== undefined) {
+      document.body.classList.add('vv-anim');
+      clearTimeout(this.themeTimer);
+      this.themeTimer = setTimeout(() => document.body.classList.remove('vv-anim'), 500);
+    }
+    this.lastDark = dark;
+    document.body.classList.toggle('vv-dark', dark);
+  }
+
+  renderVals() {
+    const menuItem = (on) => ({
+      display: 'flex', alignItems: 'center', gap: 9, padding: '9px 11px', borderRadius: 9,
+      fontSize: 13.5, cursor: 'pointer', whiteSpace: 'nowrap',
+      background: on ? 'var(--accent-soft)' : 'transparent',
+      color: on ? 'var(--accent-ink)' : 'var(--ink-mid)',
+      fontWeight: on ? 500 : 400,
+      transition: 'background .3s var(--ease-enter), color .3s var(--ease-enter)',
+    });
+    const switchTrack = (on) => ({
+      width: 52, height: 30, borderRadius: 999, flex: 'none', position: 'relative', cursor: 'pointer',
+      background: on ? 'var(--accent)' : 'var(--border-strong)',
+      transition: 'background .4s var(--ease-enter)',
+    });
+    const switchKnob = (on) => ({
+      position: 'absolute', top: 3, left: 3, width: 24, height: 24, borderRadius: '50%',
+      background: '#fff', boxShadow: '0 1px 3px rgba(23,24,29,.2)',
+      transform: on ? 'translateX(22px)' : 'none',
+      transition: 'transform .42s cubic-bezier(.3,.85,.3,1)',
+    });
+    const gitStepStyle = (n, at) => ({
+      color: at > n ? 'var(--pos-ink)' : at === n ? 'var(--ink)' : 'var(--ink-faint)',
+      transition: 'color var(--dur-move) ease',
+    });
+    const gitStepLabel = (n, at, text) =>
+      (at > n ? '✓ ' : at === n ? '● ' : '· ') + text;
+    const fileRow = (sel) => ({
+      display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px',
+      borderBottom: '1px solid var(--border)', cursor: 'pointer',
+      background: sel ? 'var(--accent-soft)' : 'transparent',
+      color: sel ? 'var(--accent-ink)' : 'inherit',
+      transition: 'background var(--dur-quick) ease, transform var(--dur-move) var(--ease-enter)',
+    });
+    const screens = ['workspace', 'signin', 'tokens'];
+    const hideShell = this.state.hideShell ?? (this.props.hideShell ?? true);
+    const hideTasks = this.state.hideTasks ?? (this.props.hideTasks ?? true);
+    const tabs = ['Chat', 'Shell', 'Files', 'Git', 'Tasks']
+      .filter((t) => !(hideShell && t === 'Shell') && !(hideTasks && t === 'Tasks'));
+    const screen = this.screenName();
+    const mobile = this.isMobile();
+    const tab = tabs.some((t) => t.toLowerCase() === this.state.tab) ? this.state.tab : 'chat';
+
+    const frameBase = {
+      position: 'relative', display: 'flex', overflow: 'hidden',
+      background: 'var(--surface)', border: '1px solid var(--border)',
+      borderRadius: 16, boxShadow: 'var(--shadow-rest)',
+    };
+
+    return {
+      screenTabs: ['Workspace', 'Sign in', 'Handoff'],
+      screenIndex: screens.indexOf(screen),
+      setScreen: (i) => this.setState({ screen: screens[i] }),
+      isWorkspace: screen === 'workspace',
+      isSignin: screen === 'signin',
+      isTokens: screen === 'tokens',
+
+      viewportTabs: ['Desktop', 'Mobile'],
+      viewportIndex: mobile ? 1 : 0,
+      setViewport: (i) => this.setState({ mobile: i === 1, drawer: false }),
+      isMobile: mobile,
+      isDesktop: !mobile,
+
+      dark: this.isDark(),
+      setDark: (v) => this.setState({ dark: v }),
+
+      tabList: tabs,
+      tabIndex: Math.max(0, tabs.findIndex((t) => t.toLowerCase() === tab)),
+      setTab: (i) => this.setState({ tab: tabs[i].toLowerCase() }),
+      isChat: tab === 'chat',
+      isShell: tab === 'shell',
+      isFiles: tab === 'files',
+      isGit: tab === 'git',
+      isTasks: tab === 'tasks',
+
+      gitTabs: ['Changes', 'History', 'Branches', 'Worktrees'],
+      gitView: this.state.gitView,
+      setGitView: (i) => this.setState({ gitView: i }),
+
+      full: { style: { width: '100%' } },
+      chipSmall: { style: { fontSize: 12.5, padding: '6px 13px', whiteSpace: 'nowrap', transition: 'background .3s var(--ease-enter), color .3s var(--ease-enter), border-color .2s' } },
+      chipPlain: { style: { transition: 'background .3s var(--ease-enter), color .3s var(--ease-enter), border-color .2s' } },
+      trackDark: switchTrack(this.isDark()),
+      knobDark: switchKnob(this.isDark()),
+      trackAsk: switchTrack(this.state.askBeforeRun),
+      knobAsk: switchKnob(this.state.askBeforeRun),
+      trackAuto: switchTrack(this.state.autoApply),
+      knobAuto: switchKnob(this.state.autoApply),
+      trackNotify: switchTrack(this.state.notify),
+      knobNotify: switchKnob(this.state.notify),
+      toggleDarkSwitch: () => this.setState({ dark: !this.isDark() }),
+      toggleAsk: () => this.setState({ askBeforeRun: !this.state.askBeforeRun }),
+      toggleAuto: () => this.setState({ autoApply: !this.state.autoApply }),
+      toggleNotify: () => this.setState({ notify: !this.state.notify }),
+      badgeRow: { style: { flex: 'none', whiteSpace: 'nowrap' } },
+      badgeStatus: { style: { flex: 'none', whiteSpace: 'nowrap', fontSize: 11.5, padding: '3px 10px' } },
+      badgeAuto: { style: { marginLeft: 'auto', flex: 'none', whiteSpace: 'nowrap', fontSize: 11.5 } },
+      badgeSm: { style: { flex: 'none', whiteSpace: 'nowrap', fontSize: 11.5 } },
+      badgeTask: { style: { marginLeft: 'auto', flex: 'none', whiteSpace: 'nowrap', fontSize: 11, padding: '2px 9px' } },
+      inputSearch: { style: { width: '100%', fontSize: 14, padding: '10px 14px' } },
+      composerArea: { rows: 2, style: { width: '100%', minHeight: 54 } },
+      commitArea: { rows: 3, style: { width: '100%', minHeight: 76 } },
+
+      headerStyle: {
+        flex: 'none', display: 'flex', gap: mobile ? 10 : 14,
+        flexDirection: mobile ? 'column' : 'row',
+        alignItems: mobile ? 'stretch' : 'center',
+        padding: mobile ? '10px 14px 8px' : '12px 18px',
+        borderBottom: '1px solid var(--border)', background: 'var(--surface)',
+      },
+      titleRowStyle: mobile
+        ? { display: 'flex', alignItems: 'center', gap: 12, flex: '0 0 auto', width: '100%', minWidth: 0 }
+        : { display: 'flex', alignItems: 'center', gap: 12, flex: '0 1 auto', minWidth: 120 },
+      tabRowStyle: mobile
+        ? { minWidth: 0, width: '100%', overflowX: 'auto', paddingBottom: 2 }
+        : { flex: '0 0 auto', marginLeft: 'auto' },
+
+      frameStyle: mobile
+        ? { ...frameBase, width: 412, maxWidth: '100%', height: '100%', maxHeight: 880, flex: 'none' }
+        : { ...frameBase, flex: 1, minWidth: 0 },
+
+      sidebarVisible: !mobile || this.state.drawer,
+      sidebarWrapStyle: mobile
+        ? {
+            position: 'absolute', top: 0, bottom: 0, left: 0, width: 300, zIndex: 30,
+            display: 'flex', flexDirection: 'column', minHeight: 0,
+            background: 'var(--surface)', borderRight: '1px solid var(--border)',
+            boxShadow: 'var(--shadow-overlay)',
+            animation: 'vv-slide-right .34s var(--ease-enter) both',
+          }
+        : {
+            width: 300, flex: 'none', display: 'flex', flexDirection: 'column', minHeight: 0,
+            position: 'relative', background: 'var(--surface)', borderRight: '1px solid var(--border)',
+          },
+      drawerOpen: mobile && this.state.drawer,
+      toggleDrawer: () => this.setState({ drawer: !this.state.drawer }),
+
+      filesLayout: {
+        flex: 1, minHeight: 0, display: 'flex', gap: 14,
+        flexDirection: mobile ? 'column' : 'row', padding: mobile ? '14px' : '16px 18px 18px',
+      },
+      treeStyle: mobile
+        ? { flex: 'none', height: 210, display: 'flex', flexDirection: 'column', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden' }
+        : { flex: '0 1 190px', minWidth: 0, display: 'flex', flexDirection: 'column', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden' },
+
+      settingsBackdropStyle: {
+        position: 'absolute', inset: 0, zIndex: 40, display: 'flex',
+        alignItems: mobile ? 'stretch' : 'center', justifyContent: 'center',
+        background: 'rgba(16,17,22,.45)', backdropFilter: 'blur(6px)',
+        padding: mobile ? 0 : 20, animation: 'vv-fade .38s ease both',
+      },
+      settingsShellStyle: {
+        width: '100%', maxWidth: mobile ? 'none' : 880,
+        height: '100%', maxHeight: mobile ? 'none' : 620,
+        display: 'flex', flexDirection: 'column', minHeight: 0,
+        background: 'var(--surface)',
+        border: mobile ? 'none' : '1px solid var(--border)',
+        borderRadius: mobile ? 0 : 16,
+        boxShadow: 'var(--shadow-modal)', overflow: 'hidden',
+        animation: 'vv-pop .6s var(--ease-spring) both',
+      },
+      settingsBodyStyle: {
+        flex: 1, minHeight: 0, display: 'flex',
+        flexDirection: mobile ? 'column' : 'row',
+      },
+      settingsNavStyle: mobile
+        ? {
+            flex: 'none', display: 'flex', gap: 6, padding: '10px 12px',
+            overflowX: 'auto', borderBottom: '1px solid var(--border)',
+          }
+        : {
+            flex: 'none', width: 196, borderRight: '1px solid var(--border)',
+            padding: '12px 10px', overflowY: 'auto',
+            display: 'flex', flexDirection: 'column', gap: 2,
+          },
+      settingsPaneStyle: {
+        flex: 1, minWidth: 0, minHeight: 0, overflowY: 'auto',
+        padding: mobile ? '18px 16px 24px' : '22px 24px',
+        display: 'flex', flexDirection: 'column', gap: mobile ? 18 : 22,
+      },
+      settingsOpen: this.state.settingsOpen,
+      openSettings: () => this.setState({ settingsOpen: true, drawer: false }),
+      closeSettings: () => this.setState({ settingsOpen: false }),
+
+      showActivity: this.props.showActivity ?? true,
+
+      askBeforeRun: this.state.askBeforeRun,
+      setAskBeforeRun: (v) => this.setState({ askBeforeRun: v }),
+      autoApply: this.state.autoApply,
+      setAutoApply: (v) => this.setState({ autoApply: v }),
+      notify: this.state.notify,
+      setNotify: (v) => this.setState({ notify: v }),
+      scopeOptions: ['Only files I have opened', 'Anything inside the project folder', 'Nothing without asking'],
+      scope: this.state.scope,
+      setScope: (v) => this.setState({ scope: v }),
+
+      elapsedLabel: '● Working · ' + this.state.elapsed + 's',
+      progressPct: this.state.pct + '%',
+      progressLabel: Math.round((this.state.pct / 100) * 6) + ' of 6 steps',
+      progressStyle: { display: 'block', width: this.state.pct + '%', height: '100%', background: 'linear-gradient(90deg,var(--accent),var(--accent-deep))' },
+
+      toasts: this.state.toasts,
+      dismissToast: (id) => this.setState((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) })),
+      notifyApplied: () => this.pushToast({ tone: 'positive', title: 'Edit applied to src/index.css', message: 'Undo is available until you commit.' }),
+      notifySaved: () => this.pushToast({ tone: 'positive', title: 'Saved SidebarContent.tsx' }),
+      notifyCommitted: () => this.pushToast({ tone: 'info', title: 'Committed 2 files', message: 'Nothing is pushed yet.' }),
+
+      footerRef: this.footerRef,
+      accountPanelStyle: {
+        position: 'absolute', left: 12, right: 12, top: 12,
+        bottom: (this.state.footerH || 170) + 8, zIndex: 50, overflowY: 'auto',
+        background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12,
+        boxShadow: 'var(--shadow-overlay)', padding: 14,
+        display: 'flex', flexDirection: 'column', gap: 16,
+        animation: 'vv-pop .3s var(--ease-enter) both',
+      },
+      accountMenuOpen: this.state.accountMenu,
+      toggleAccountMenu: () => this.setState({ accountMenu: !this.state.accountMenu }),
+      reauthNeeded: this.props.reauthNeeded ?? true,
+      switchToWorkAccount: () => {
+        this.setState({ accountMenu: false });
+        this.pushToast({ tone: 'warn', title: 'scott@servpro.com needs signing in again', message: 'All 12 conversations stay open and keep their history — they resume on this account once sign-in succeeds.' });
+      },
+      switchToCodexAccount: () => {
+        this.setState({ accountMenu: false });
+        this.pushToast({ tone: 'info', title: 'Signing in to Codex', message: 'A browser window will ask for your approval. Nothing about your projects or conversations changes.' });
+      },
+
+      staleActive: this.state.staleActive,
+      staleOlder: this.state.staleOlder,
+      anyStale: this.state.staleActive || this.state.staleOlder,
+      staleShortLabel: (() => {
+        const n = (this.state.staleActive ? 1 : 0) + (this.state.staleOlder ? 1 : 0);
+        return n === 1
+          ? '1 conversation on CLI 2.1.3 · restart it'
+          : n + ' conversations on CLI 2.1.3 · restart them';
+      })(),
+      restartActive: () => {
+        this.setState({ staleActive: false });
+        this.pushToast({ tone: 'positive', title: 'Resumed on Claude CLI 2.1.4', message: 'The conversation was stopped and resumed — every message is still here.' });
+      },
+      restartOlder: () => {
+        this.setState({ staleOlder: false });
+        this.pushToast({ tone: 'positive', title: 'Resumed on Claude CLI 2.1.4', message: 'Move message store to lazy loading picked up where it stopped.' });
+      },
+      restartAllStale: () => {
+        this.setState({ staleActive: false, staleOlder: false });
+        this.pushToast({ tone: 'positive', title: 'Both conversations resumed on 2.1.4', message: 'Each one was stopped and resumed in place.' });
+      },
+
+      isSelCode: this.state.fileSel === 'code',
+      isSelImage: this.state.fileSel === 'image',
+      isSelBinary: this.state.fileSel === 'binary',
+      selectCode: () => this.setState({ fileSel: 'code' }),
+      selectImage: () => this.setState({ fileSel: 'image' }),
+      selectBinary: () => this.setState({ fileSel: 'binary' }),
+      rowCodeStyle: fileRow(this.state.fileSel === 'code'),
+      rowImageStyle: fileRow(this.state.fileSel === 'image'),
+      rowBinaryStyle: fileRow(this.state.fileSel === 'binary'),
+
+      filesPaneLayout: {
+        flex: 1, minHeight: 0, display: 'flex', flexWrap: 'wrap',
+        alignContent: 'flex-start', overflowY: 'auto', overflowX: 'hidden',
+      },
+      fileListStyle: {
+        flex: '1 1 260px', minWidth: 0, minHeight: 250, overflow: 'hidden',
+        display: 'flex', flexDirection: 'column',
+        borderRight: '1px solid var(--border)', borderBottom: '1px solid var(--border)',
+      },
+      previewStyle: {
+        flex: '1 1 260px', minWidth: 0, minHeight: 260, overflow: 'hidden',
+        display: 'flex', flexDirection: 'column',
+      },
+
+      uploading: this.state.uploading,
+      uploadPctLabel: Math.round(this.state.uploadPct) + '%',
+      uploadBarStyle: {
+        display: 'block', width: this.state.uploadPct + '%', height: '100%',
+        background: 'linear-gradient(90deg,var(--accent),var(--accent-deep))',
+        transition: 'width var(--dur-move) var(--ease-enter)',
+      },
+      notifyUpload: () => this.runUpload(),
+      notifyDownload: () => this.pushToast({ tone: 'info', title: 'Download started', message: 'Your browser is saving the file — nothing on the machine changes.' }),
+      goUp: () => this.pushToast({ tone: 'neutral', title: 'Moved up to src/modules' }),
+
+      gitPending: this.state.gitPhase !== 'done',
+      gitHeadTone: this.state.gitPhase === 'done' ? 'positive' : 'info',
+      gitHeadLabel: this.state.gitPhase === 'done' ? '✓ Everything is pushed' : '2 of yours are not pushed',
+      showInFiles: () => this.setState({ tab: 'files', fileSel: 'code' }),
+      trackShell: switchTrack(hideShell),
+      knobShell: switchKnob(hideShell),
+      toggleHideShell: () => this.setState({ hideShell: !hideShell }),
+      trackTasks: switchTrack(hideTasks),
+      knobTasks: switchKnob(hideTasks),
+      toggleHideTasks: () => this.setState({ hideTasks: !hideTasks }),
+
+      menuPopStyle: {
+        position: 'absolute', bottom: 8, left: 0, zIndex: 30,
+        right: mobile ? 0 : 'auto', minWidth: mobile ? 0 : 250, maxWidth: '100%',
+        background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12,
+        boxShadow: 'var(--shadow-overlay)', padding: 8,
+        display: 'flex', flexDirection: 'column', gap: 2,
+        animation: 'vv-pop .5s var(--ease-spring) both',
+      },
+      model: this.state.model,
+      mode: this.state.mode,
+      modeShort: this.state.mode.split(',')[0],
+      modelMenuOpen: this.state.menu === 'model',
+      modeMenuOpen: this.state.menu === 'mode',
+      openModelMenu: () => this.setState({ menu: this.state.menu === 'model' ? null : 'model' }),
+      openModeMenu: () => this.setState({ menu: this.state.menu === 'mode' ? null : 'mode' }),
+      pickSonnet: () => this.setState({ model: 'Claude Sonnet', menu: null }),
+      pickOpus: () => this.setState({ model: 'Claude Opus', menu: null }),
+      pickHaiku: () => this.setState({ model: 'Claude Haiku', menu: null }),
+      pickPlan: () => this.setState({ mode: 'Plan first, then edit', menu: null }),
+      pickEdit: () => this.setState({ mode: 'Edit as you go', menu: null }),
+      pickAsk: () => this.setState({ mode: 'Ask before every edit', menu: null }),
+      modeHelp: this.state.mode === 'Plan first, then edit'
+        ? 'Claude writes a plan and waits for your yes before touching files.'
+        : this.state.mode === 'Edit as you go'
+          ? 'Claude edits files as it works. Every edit can be undone.'
+          : 'Claude stops at each edit and asks you first.',
+      itemSonnet: menuItem(this.state.model === 'Claude Sonnet'),
+      itemOpus: menuItem(this.state.model === 'Claude Opus'),
+      itemHaiku: menuItem(this.state.model === 'Claude Haiku'),
+      itemPlan: menuItem(this.state.mode === 'Plan first, then edit'),
+      itemEdit: menuItem(this.state.mode === 'Edit as you go'),
+      itemAsk: menuItem(this.state.mode === 'Ask before every edit'),
+
+      gitIdle: this.state.gitPhase === 'idle',
+      gitRunning: this.state.gitPhase === 'running',
+      gitDone: this.state.gitPhase === 'done',
+      runGitAgent: () => this.runGit(),
+      openGitConversation: () => {
+        this.setState({ tab: 'chat' });
+        this.pushToast({ tone: 'info', title: 'Opened the /git conversation', message: 'It has ended — the transcript is read-only.' });
+      },
+      resetGitAgent: () => this.setState({ gitPhase: 'idle', gitStep: 0 }),
+      gitStep1: gitStepStyle(1, this.state.gitStep),
+      gitStep2: gitStepStyle(2, this.state.gitStep),
+      gitStep3: gitStepStyle(3, this.state.gitStep),
+      gitStep4: gitStepStyle(4, this.state.gitStep),
+      gitStep1Label: gitStepLabel(1, this.state.gitStep, 'Reading the changed files'),
+      gitStep2Label: gitStepLabel(2, this.state.gitStep, 'Grouping them into 2 commits'),
+      gitStep3Label: gitStepLabel(3, this.state.gitStep, 'Writing the commit messages'),
+      gitStep4Label: gitStepLabel(4, this.state.gitStep, 'Pushing to origin/main'),
+
+      noop: () => {},
+    };
+  }
+}
+</script>
+</body>
+</html>

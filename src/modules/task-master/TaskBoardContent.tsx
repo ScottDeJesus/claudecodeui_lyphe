@@ -1,9 +1,10 @@
-import { Search } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 import { cn } from '@/shared/utils';
+import { Badge, EmptyState } from '@/shared/ui';
 import type { TaskBoardView, TaskKanbanColumn, TaskMasterTask, TaskSelection } from '@/shared/types';
 import TaskCard from '@/modules/task-master/TaskCard';
+import { taskStatusTone } from '@/modules/task-master/utils/taskKanban';
 
 type TaskBoardContentProps = {
   viewMode: TaskBoardView;
@@ -13,6 +14,14 @@ type TaskBoardContentProps = {
   showParentTasks: boolean;
   onTaskClick: (task: TaskSelection) => void;
 };
+
+/** What an empty column says, phrased for the column it is standing in. */
+function emptyColumnMessage(status: string, t: ReturnType<typeof useTranslation<'tasks'>>['t']): string {
+  if (status === 'pending') return t('kanban.tasksWillAppear');
+  if (status === 'in-progress') return t('kanban.moveTasksHere');
+  if (status === 'done') return t('kanban.completedTasksHere');
+  return t('kanban.statusTasksHere');
+}
 
 function KanbanColumns({
   columns,
@@ -28,7 +37,7 @@ function KanbanColumns({
   return (
     <div
       className={cn(
-        'grid gap-6',
+        'grid gap-5 items-start',
         columns.length === 1 && 'grid-cols-1 max-w-md mx-auto',
         columns.length === 2 && 'grid-cols-1 md:grid-cols-2',
         columns.length === 3 && 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3',
@@ -38,33 +47,17 @@ function KanbanColumns({
       )}
     >
       {columns.map((column) => (
-        <div key={column.id} className={cn('rounded-xl border shadow-sm transition-shadow hover:shadow-md', column.color)}>
-          <div className={cn('px-4 py-3 rounded-t-xl border-b', column.headerColor)}>
-            <div className="flex items-center justify-between">
-              <h3 className="text-sm font-semibold">{column.title}</h3>
-              <span className="rounded-full bg-white/60 px-2 py-1 text-xs font-medium dark:bg-black/20">
-                {column.tasks.length}
-              </span>
-            </div>
+        <div key={column.id} className="flex min-w-0 flex-col gap-2.5">
+          {/* The heading IS the column's state, so it carries the tone and the count sits
+              beside it as the plain number it is. */}
+          <div className="flex items-center gap-2 px-1">
+            <Badge tone={taskStatusTone(column.status)}>{column.title}</Badge>
+            <span className="text-xs tabular-nums text-ink-faint">{column.tasks.length}</span>
           </div>
 
-          <div className="max-h-[calc(100vh-300px)] min-h-[200px] space-y-3 overflow-y-auto p-3">
+          <div className="max-h-[calc(100vh-300px)] space-y-2.5 overflow-y-auto">
             {column.tasks.length === 0 ? (
-              <div className="py-8 text-center text-gray-400 dark:text-gray-500">
-                <div className="mx-auto mb-2 flex h-8 w-8 items-center justify-center rounded-full bg-gray-200 dark:bg-gray-700">
-                  <div className="h-3 w-3 rounded-full bg-gray-300 dark:bg-gray-600" />
-                </div>
-                <div className="text-xs font-medium text-gray-500 dark:text-gray-400">{t('kanban.noTasksYet')}</div>
-                <div className="mt-1 text-xs text-gray-400 dark:text-gray-500">
-                  {column.status === 'pending'
-                    ? t('kanban.tasksWillAppear')
-                    : column.status === 'in-progress'
-                      ? t('kanban.moveTasksHere')
-                      : column.status === 'done'
-                        ? t('kanban.completedTasksHere')
-                        : t('kanban.statusTasksHere')}
-                </div>
-              </div>
+              <EmptyState title={t('kanban.noTasksYet')} message={emptyColumnMessage(column.status, t)} />
             ) : (
               column.tasks.map((task) => (
                 <TaskCard
@@ -72,7 +65,7 @@ function KanbanColumns({
                   task={task}
                   onClick={() => onTaskClick(task)}
                   showParent={showParentTasks}
-                  className="w-full shadow-sm hover:shadow-md"
+                  className="w-full"
                 />
               ))
             )}
@@ -96,12 +89,8 @@ export default function TaskBoardContent({
 
   if (filteredTaskCount === 0) {
     return (
-      <div className="py-12 text-center">
-        <div className="text-gray-500 dark:text-gray-400">
-          <Search className="mx-auto mb-4 h-12 w-12 opacity-50" />
-          <h3 className="mb-2 text-lg font-medium">{t('noMatchingTasks.title')}</h3>
-          <p className="text-sm">{t('noMatchingTasks.description')}</p>
-        </div>
+      <div className="flex justify-center py-12">
+        <EmptyState title={t('noMatchingTasks.title')} message={t('noMatchingTasks.description')} />
       </div>
     );
   }

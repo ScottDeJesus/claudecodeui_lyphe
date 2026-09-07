@@ -41,24 +41,29 @@ type TerminalShortcutsPanelProps = {
   wsRef: MutableRefObject<WebSocket | null>;
   terminalRef: MutableRefObject<Terminal | null>;
   isConnected: boolean;
-  bottomOffset?: string;
+  /**
+   * Show the strip at every width. Off, it stays what it has always been: a touch aid that
+   * appears below `md` and nowhere else. Shell's header button turns it on so a desktop
+   * reader can reach the same keys deliberately.
+   */
+  showOnDesktop?: boolean;
 };
 
 const preventFocusSteal = (e: React.PointerEvent) => e.preventDefault();
 
 const KEY_BTN =
-  'shrink-0 rounded-md border border-gray-600 bg-gray-700 px-2.5 py-1.5 text-xs font-medium text-gray-100 transition-colors select-none active:bg-blue-600 active:text-white active:border-blue-600 disabled:cursor-not-allowed disabled:opacity-40';
+  'shrink-0 rounded-md border border-border bg-card px-2.5 py-1.5 text-xs font-medium text-foreground transition-colors select-none active:bg-primary active:text-primary-foreground active:border-primary disabled:cursor-not-allowed disabled:opacity-40';
 const KEY_BTN_ACTIVE =
-  'shrink-0 rounded-md border border-blue-500 bg-blue-600 px-2.5 py-1.5 text-xs font-medium text-white transition-colors select-none disabled:cursor-not-allowed disabled:opacity-40';
+  'shrink-0 rounded-md border border-primary bg-primary px-2.5 py-1.5 text-xs font-medium text-primary-foreground transition-colors select-none disabled:cursor-not-allowed disabled:opacity-40';
 const ICON_BTN =
-  'shrink-0 rounded-md border border-gray-600 bg-gray-700 p-1.5 text-gray-100 transition-colors select-none active:bg-blue-600 active:text-white active:border-blue-600 disabled:cursor-not-allowed disabled:opacity-40';
+  'shrink-0 rounded-md border border-border bg-card p-1.5 text-foreground transition-colors select-none active:bg-primary active:text-primary-foreground active:border-primary disabled:cursor-not-allowed disabled:opacity-40';
 
 /** Rendered by Shell's full and minimal views to send keys a mobile keyboard cannot produce, such as Esc, Tab, Ctrl and the arrows. */
 export default function TerminalShortcutsPanel({
   wsRef,
   terminalRef,
   isConnected,
-  bottomOffset = 'bottom-0',
+  showOnDesktop = false,
 }: TerminalShortcutsPanelProps) {
   const { t } = useTranslation('settings');
   const [ctrlActive, setCtrlActive] = useState(false);
@@ -110,8 +115,14 @@ export default function TerminalShortcutsPanel({
   );
 
   return (
-    <div className={`pointer-events-none fixed inset-x-0 ${bottomOffset} z-20 px-2 md:hidden`}>
-      <div className="pointer-events-auto flex items-center gap-1 overflow-x-auto rounded-lg border border-gray-700/80 bg-gray-900/95 px-1.5 py-1.5 shadow-lg backdrop-blur-sm [-webkit-overflow-scrolling:touch] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+    /* Absolute inside the terminal pane, never `fixed` to the window. Fixed, this bar was
+       sized to the viewport: at a desktop width it ran under the sidebar and hid its footer,
+       and at every mobile width it sat on top of the Shell's own privacy note. It is also
+       what let the strip fall behind the setup modal's backdrop, since a `z-20` fixed to the
+       window loses to a `z-50` dialog. Positioned by the pane it serves, all three go away
+       (doctrine §4: a component may paint, but must not position itself). */
+    <div className={`pointer-events-none absolute inset-x-0 bottom-0 z-20 px-2 ${showOnDesktop ? '' : 'md:hidden'}`}>
+      <div className="pointer-events-auto flex items-center gap-1 overflow-x-auto rounded-lg border border-border bg-popover/95 px-1.5 py-1.5 shadow-lg backdrop-blur-sm [-webkit-overflow-scrolling:touch] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         <button
           type="button"
           onPointerDown={preventFocusSteal}

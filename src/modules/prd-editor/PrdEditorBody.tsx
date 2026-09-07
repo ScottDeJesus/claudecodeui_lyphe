@@ -4,7 +4,7 @@ import { oneDark } from '@codemirror/theme-one-dark';
 import { EditorView } from '@codemirror/view';
 import CodeMirror from '@uiw/react-codemirror';
 
-import { MarkdownPreview } from '@/modules/code-editor';
+import { MarkdownPreview } from '@/modules/markdown-preview';
 
 type PrdEditorBodyProps = {
   content: string;

@@ -1,7 +1,7 @@
 import { useCallback, useRef } from 'react';
 
 import { api } from '@/shared/api';
-import type { Project } from '@/shared/types';
+import type { FileOpenHandler, Project } from '@/shared/types';
 
 type FileNode = {
   type: 'file' | 'directory';
@@ -14,10 +14,6 @@ type FlatFile = {
   name: string;
   path: string;
 };
-
-// `diffInfo` is intentionally `any` so this resolver can wrap editor handlers
-// that expect a concrete diff payload type as well as generic callers.
-type OnFileOpen = (filePath: string, diffInfo?: any) => void;
 
 const normalize = (value: string): string => value.replace(/\\/g, '/');
 
@@ -55,12 +51,15 @@ const findBestMatch = (files: FlatFile[], ref: string): string | null => {
 /**
  * Wraps an `onFileOpen` handler so a possibly bare/partial file reference is
  * resolved against the project's file tree (cached per project) before the file
- * is opened in the in-app editor.
+ * is opened.
+ *
+ * The `diffInfo` a caller may still spell is carried through untouched, and the handler this
+ * wraps is free to ignore it — the file manager's preview is read-only.
  */
 export function useFileOpenResolver(
   selectedProject: Project | null | undefined,
-  onFileOpen: OnFileOpen,
-): OnFileOpen {
+  onFileOpen: FileOpenHandler,
+): FileOpenHandler {
   const projectId = selectedProject?.projectId;
   const cacheRef = useRef<{ projectId?: string; files: Promise<FlatFile[]> | null }>({
     projectId: undefined,
@@ -95,8 +94,8 @@ export function useFileOpenResolver(
     return filesPromise;
   }, [projectId]);
 
-  return useCallback(
-    (filePath: string, diffInfo?: any) => {
+  return useCallback<FileOpenHandler>(
+    (filePath, diffInfo) => {
       const ref = normalize(filePath).trim();
       void loadFiles().then((files) => {
         const match = findBestMatch(files, ref);

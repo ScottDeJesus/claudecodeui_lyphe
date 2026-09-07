@@ -329,6 +329,46 @@ export async function validateWorkspacePath(requestedPath: string): Promise<Work
   }
 }
 
+/**
+ * Resolves a caller-supplied path against a project root and refuses anything outside it.
+ *
+ * Consumed by both File Tree services — `file-tree.service.ts` (read, write, rename,
+ * delete, upload) and `file-tree-listing.service.ts` (listing and preview) — so every
+ * path a client names is contained by the same rule.
+ *
+ * A relative path is joined to the root; an absolute one is accepted only when it already
+ * resolves under the root. Containment is decided on the RESOLVED string, so `../` cannot
+ * climb out. The project root ITSELF is rejected — callers that legitimately address the
+ * root (uploading into it, listing it) special-case an empty path before calling this.
+ *
+ * ⚠ Symlinks are NOT followed: a link inside the project whose target lives elsewhere
+ * resolves to its own path and passes. For READS that is the reach the project's files
+ * already had (`…/file` and `…/files/content` follow such a link today). For LISTING it is
+ * WIDER reach than the module used to have — `listDirectory` will enumerate whatever
+ * directory an in-project link points at, where the recursive tree walker never descended
+ * one (it reads `Dirent.isDirectory()`, which is false for a link). So anyone who can write
+ * a symlink into a project can browse outside it. `validateWorkspacePath` is the
+ * symlink-aware check, and it guards workspace ROOTS, not these per-request paths.
+ *
+ * The thrown 403 deliberately names neither the requested nor the resolved path: the
+ * message reaches the browser, and an absolute server path is not the client's business.
+ */
+export function resolvePathInsideProject(projectRoot: string, targetPath: string): string {
+  const resolvedPath = path.isAbsolute(targetPath)
+    ? path.resolve(targetPath)
+    : path.resolve(projectRoot, targetPath);
+  const normalizedProjectRoot = path.resolve(projectRoot) + path.sep;
+
+  if (!resolvedPath.startsWith(normalizedProjectRoot)) {
+    throw new AppError('Path must be under project root', {
+      statusCode: 403,
+      code: 'PATH_OUTSIDE_PROJECT',
+    });
+  }
+
+  return resolvedPath;
+}
+
 // ---------------------------
 //----------------- NORMALIZED PROVIDER MESSAGE UTILITIES ------------
 /**

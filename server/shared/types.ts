@@ -281,6 +281,13 @@ export type NormalizedMessage = {
   role?: 'user' | 'assistant';
   content?: string;
   /**
+   * The model id that produced this assistant turn, when the provider records one
+   * per row (today: Claude). A conversation can change model mid-way, so this
+   * belongs to the turn and not to the session. Mirrored, with this same comment,
+   * on the client's own NormalizedMessage in src/shared/types.ts.
+   */
+  model?: string;
+  /**
    * Optional display-oriented metadata used by providers that need to expose
    * richer transcript artifacts without introducing a brand-new message kind.
    *
@@ -1039,6 +1046,84 @@ export type FileTreeNode = {
 };
 
 /**
+ * One row of a directory listing as the file manager renders it.
+ *
+ * NOT `FileTreeDirectoryEntry` below — that is the `Dirent` adapter used while
+ * walking the filesystem. This is the API shape the browser receives.
+ *
+ * `kind` is the entry's OWN kind, read without following symlinks: a link to a
+ * directory reports `file`, so nothing outside the project can present itself
+ * here as a folder to descend into.
+ *
+ * `bytes` and `mtime` are `null` — never `0`, never an invented timestamp —
+ * when the per-entry `lstat` fails (a permission wall, or a name that vanished
+ * between the directory read and the stat). The client renders that as "—".
+ */
+export type DirectoryEntry = {
+  name: string;
+  kind: 'file' | 'dir';
+  bytes: number | null;
+  mtime: string | null;
+};
+
+/**
+ * One directory the file manager is showing, and everything in it.
+ *
+ * `path` is the RESOLVED ABSOLUTE directory, matching every other File Tree
+ * response (`FileTreeNode.path`, the read/save/upload results); the client
+ * relativizes it against the project path it already holds. Entries arrive
+ * sorted directories-first and then by name, so the browser never re-sorts.
+ */
+export type DirectoryListing = {
+  path: string;
+  entries: DirectoryEntry[];
+};
+
+/**
+ * What the preview pane can show for one file.
+ *
+ * The three arms are a closed set and the client switches on `kind`:
+ * - `text`  — the first `lines.length` lines, already split. `totalLines` is
+ *   `null` when the file is too large to count without walking all of it, so a
+ *   client can never render an invented line count; `truncated` still says
+ *   truthfully whether more lines exist beyond the ones returned.
+ * - `image` — no pixels are read here. The browser loads the file through the
+ *   existing content stream and measures it with `naturalWidth`/`naturalHeight`.
+ * - `none`  — a binary this app will not guess at. Download is the only action.
+ *
+ * `bytes`/`mtime` are `null` only when the file's `stat` gave nothing.
+ */
+export type FilePreview =
+  | {
+      kind: 'text';
+      lines: string[];
+      totalLines: number | null;
+      truncated: boolean;
+      bytes: number | null;
+      mtime: string | null;
+      language: string | null;
+    }
+  | { kind: 'image'; mime: string; bytes: number | null; mtime: string | null }
+  | { kind: 'none'; bytes: number | null; mtime: string | null };
+
+/**
+ * One file as it was actually stored by an upload.
+ *
+ * `name` and `path` are the SAVED name and location, which is not always what
+ * the browser sent: an upload never overwrites, so a taken name becomes
+ * `report (1).pdf` and `renamedFrom` carries the original. `renamedFrom` is
+ * absent — not empty, not equal to `name` — when nothing was renamed, so its
+ * presence alone is the client's signal to say so.
+ */
+export type UploadedFileRecord = {
+  name: string;
+  path: string;
+  size: number;
+  mimeType: string;
+  renamedFrom?: string;
+};
+
+/**
  * Minimal directory-entry shape required during File Tree traversal.
  *
  * Production adapts Node `Dirent` objects to this structural contract. Tests
@@ -1062,6 +1147,11 @@ export type FileTreeStats = {
   mode: number;
   isDirectory(): boolean;
   isSymbolicLink(): boolean;
+  // Optional so that a stat shape written before this member still satisfies the contract.
+  // Production always supplies it (these are Node `fs.Stats`), so a caller ruling out a
+  // FIFO, socket, or device node tests for a definite `false` and treats a missing
+  // implementation as "not known" rather than as "not a regular file".
+  isFile?(): boolean;
 };
 
 /**
@@ -1085,7 +1175,10 @@ export type FileTreeFileSystem = {
   rename(oldPath: string, newPath: string): Promise<void>;
   removeDirectory(directoryPath: string): Promise<void>;
   unlink(filePath: string): Promise<void>;
-  copyFile(sourcePath: string, destinationPath: string): Promise<void>;
+  // `exclusive` maps to `COPYFILE_EXCL`: the copy fails with `EEXIST` instead of
+  // overwriting. Uploads pass it, which is the only thing that makes the "pick a
+  // free name" check hold when two of them race for the same free name.
+  copyFile(sourcePath: string, destinationPath: string, exclusive?: boolean): Promise<void>;
   createReadStream(filePath: string): Readable;
 };
 
@@ -1201,12 +1294,40 @@ export type FileTreeServices = {
     files: FileTreeUploadedFile[];
   }): Promise<{
     success: true;
-    files: Array<{ name: string; path: string; size: number; mimeType: string }>;
+    files: UploadedFileRecord[];
     uploadedCount: number;
     requestedFileCount: number;
     targetPath: string;
     message: string;
   }>;
+};
+
+/**
+ * Required production dependencies for the File Tree listing service.
+ *
+ * The project-root resolver is supplied by the composition root rather than the
+ * project gateway itself, so this service never decides what an unknown project
+ * id means; it receives a root or the resolver's own error.
+ */
+export type FileTreeListingServiceDependencies = {
+  resolveProjectRoot(projectId: string): Promise<string>;
+  resolveMimeType(filePath: string): string;
+  fileSystem: FileTreeFileSystem;
+};
+
+/**
+ * Directory-listing and file-preview surface consumed by the File Tree routes.
+ *
+ * Separate from `FileTreeServices` because these two read-only workflows share
+ * no state with browsing, editing, or uploads — the routes call whichever
+ * service owns the request.
+ *
+ * `maxLines` is already clamped by the route; the service treats it as a
+ * trusted positive count.
+ */
+export type FileTreeListingServices = {
+  listDirectory(projectId: string, directoryPath: string): Promise<DirectoryListing>;
+  previewFile(projectId: string, filePath: string, maxLines: number): Promise<FilePreview>;
 };
 
 // ---------------------------
@@ -1349,3 +1470,33 @@ export type CliApplication = {
 export type SandboxCommandService = {
   execute(argumentsList: string[]): Promise<number>;
 };
+
+// ---------------------------
+//----------------- DESCENT CONTRACTS ------------
+// Descent answers in snake_case and this proxy only camelCases it — no caching here, Descent caches.
+// Unknown is never zero, and an unreachable Descent is a calm 200 `{reachable:false, reason}` on reads, never a 5xx.
+/** One Claude account slot Descent holds. `expiresAt` is epoch MILLISECONDS, `null` when unread — never 0, so an unknown expiry cannot render as "expired". */
+export type DescentSlot = { slug: string; label: string; expiresAt: number | null; isActive: boolean };
+/** Descent's account picture, or the calm reason it is unknown. `liveExpiresAt` is epoch MILLISECONDS like `DescentSlot.expiresAt` — NOT seconds like `DescentUsage.checkedAt`. `liveSessions` and `drift` are facts a row states, never gates on switching.
+ *  `unreadable:true` is Descent's own account store failing to read: `slots` is `[]` and every label `null`. Say that in words — an empty switcher reads as "you have no accounts". */
+export type DescentAccounts =
+  | { reachable: true; active: string | null; activeLabel: string | null; slots: DescentSlot[]; liveLabel: string | null; liveExpiresAt: number | null; drift: boolean; liveSessions: number; unreadable: boolean }
+  | { reachable: false; reason: string };
+/** One usage window. A `null` `percent` is "no reading": draw an empty track, never 0 %. `rolled:true` is NOT that — the percent is a REAL but HISTORICAL figure whose window has since ended, so keep the bar at low opacity and label it "was"; draining it draws a full tank nobody measured (`~/.claude/descent/usage_windows.py:211-221`).
+ *  `severity` is present ONLY when the vendor flagged the window non-benign; it may ESCALATE a meter's tone, never soften it — a flagged window can read a comfortable 12 % and still mean an account lock (`usage_windows.py:93-97`). */
+export type DescentUsageWindow = { key: string; label: string; percent: number | null; resetsAt: string | null; rolled?: boolean; severity?: string };
+/** Usage as Descent last measured it. `checkedAt` (epoch SECONDS) and `staleSince` are Descent's own stamps, passed through untouched.
+ *  `reason` carries TWO vocabularies: with `reachable:false` it is this proxy's own `unreachable`|`timeout`|`bad-response`; with `reachable:true` it is Descent's — `''` healthy, `pending` (a poll in flight: reading, NOT broken), `shape`, `credentials`, `auth`, `network`, `throttled`, `upstream`. `windows:[]` with `pending` means "not yet"; `windows:[]` with `degraded:true` means "no numbers under this account". */
+export type DescentUsage =
+  | { reachable: true; windows: DescentUsageWindow[]; degraded: boolean; reason: string; staleSince: number | null; checkedAt: number }
+  | { reachable: false; reason: string };
+
+// ---------------------------
+//----------------- CLI VERSION CONTRACTS ------------
+// Two facts of the same shape, deliberately kept apart: `installed` is what the binary a run WOULD spawn answers
+// to `--version` right now; a run's `cliVersion` is what THAT run's own process announced at init.
+// Only the second is the truth about a turn already in flight — which is why nothing here copies one into the other.
+/** One live run and the CLI version its own process reported. `startedAt` is epoch MILLISECONDS (`Date.now()` at the moment the run was admitted) — read as seconds it renders in 1970. `cliVersion` is `null` while the run's init message has not arrived yet — "not heard yet", never a guess and never the installed version stood in for it. */
+export type CliVersionRun = { sessionId: string; startedAt: number; cliVersion: string | null };
+/** What `GET /api/cli-version` answers. `installed` is `null` when no version could be read, with `reason` saying so in plain words — never `0.0.0`, which would compare equal to nothing and stale to everything. `binaryPath` is the binary actually probed, resolved the same way the SDK spawn resolves it; `null` when the file is only chosen once a run starts (a bare or relative `CLAUDE_CLI_PATH`), which is a "we don't know", not a fault. */
+export type CliVersionReport = { installed: string | null; reason: string | null; binaryPath: string | null; running: CliVersionRun[] };

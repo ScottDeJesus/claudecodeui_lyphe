@@ -35,6 +35,9 @@ rendered messages is [the realtime stream](./02-realtime-stream.md).
    session is already running, which becomes `RUN_IN_PROGRESS`. The audience is the socket
    that sent `chat.send` plus every socket that sent `chat.subscribe` *while that run was
    running*. `runDetachedChatTurn` starts a run with no socket at all.
+   A run also carries `cliVersion`: the CLI version its own process announced in the SDK's
+   init message, stamped at the top of the runtime's message loop on every turn, resumed
+   ones included, and served by `GET /api/cli-version` ([cli-version.md](../cli-version.md)).
 5. **The persisted transcript wins; live rows are an overlay.** Every `complete` for the
    viewed session schedules a bounded REST tail refresh, and the overlay is pruned against
    whatever comes back. Predict from this: any live row that is also on disk disappears
@@ -477,6 +480,17 @@ Resuming needs no special path. Opening an old session and sending is an ordinar
 runtime resolves the native id through `resolveProviderSessionId`, and the SDK resumes. A
 `null` there means "start a new provider session", which is the same code path a brand-new
 conversation takes.
+
+The client drives one of those resumes itself. When a live run's `cliVersion` differs from the
+CLI installed on the machine, a banner above the transcript offers to restart it, and
+`useRestartOnInstalledCli` (chat module) sends `chat.abort`, waits for THAT run's terminal
+`complete` on the wire, then sends `Continue from where you stopped.` through the composer's
+ordinary submit. Nothing here is a handoff: same app session id, same row, no fork and no new
+transcript — only a new process, which stamps its own `cliVersion` at the top of its message
+loop. It waits for the `complete` rather than for the busy map because the map is rewritten
+every 5 s from the server's own list, and because a send made while the flag is up is not a
+send at all: `handleSubmit` persists it as a queued draft for the server's 30 s dispatcher to
+pick up. The client half is at [cli-version.md](../cli-version.md).
 
 ## Gotchas and why the code looks like this
 

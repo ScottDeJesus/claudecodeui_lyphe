@@ -57,8 +57,8 @@
 - **Responsives Design** – Funktioniert nahtlos auf Desktop, Tablet und Mobilgerät, sodass du Agents auch vom Smartphone aus nutzen kannst
 - **Interaktives Chat-Interface** – Eingebaute Chat-Oberfläche für die reibungslose Kommunikation mit den Agents
 - **Integriertes Shell-Terminal** – Direkter Zugriff auf die Agents CLI über die eingebaute Shell-Funktionalität
-- **Datei-Explorer** – Interaktiver Dateibaum mit Syntaxhervorhebung und Live-Bearbeitung
-- **Git-Explorer** – Änderungen anzeigen, stagen und committen. Branches wechseln ebenfalls möglich
+- **Datei-Explorer** – Interaktiver Dateibaum mit schreibgeschützter Vorschau für Text, Bilder und Downloads – Änderungen übernimmt ein Agent
+- **Git-Explorer** – Branch, ausstehende Commits und jede offene Änderung mit ihrem Diff ansehen – Committen und Pushen übernimmt ein Agent: Ein Klick startet die Unterhaltung und führt dein eigenes `/git` aus
 - **Sitzungsverwaltung** – Gespräche fortsetzen, mehrere Sitzungen verwalten und Verlauf nachverfolgen
 - **Plugin-System** – CloudCLI mit eigenen Plugins erweitern – neue Tabs, Backend-Dienste und Integrationen hinzufügen. [Eigenes Plugin erstellen →](https://github.com/cloudcli-ai/cloudcli-plugin-starter)
 - **TaskMaster AI Integration** *(Optional)* – Erweitertes Projektmanagement mit KI-gestützter Aufgabenplanung, PRD-Parsing und Workflow-Automatisierung
@@ -244,7 +244,7 @@ Dieses Projekt ist Open Source und kann unter der GPL v3-Lizenz kostenlos genutz
 - **[React](https://react.dev/)** - UI-Bibliothek
 - **[Vite](https://vitejs.dev/)** - Schnelles Build-Tool und Dev-Server
 - **[Tailwind CSS](https://tailwindcss.com/)** - Utility-first CSS-Framework
-- **[CodeMirror](https://codemirror.net/)** - Erweiterter Code-Editor
+- **[CodeMirror](https://codemirror.net/)** - Markdown-Editor hinter dem PRD-Editor
 - **[TaskMaster AI](https://github.com/eyaltoledano/claude-task-master)** *(Optional)* - KI-gestütztes Projektmanagement und Aufgabenplanung
 
 

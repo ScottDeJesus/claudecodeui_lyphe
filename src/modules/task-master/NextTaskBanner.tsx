@@ -1,21 +1,12 @@
 import { useState } from 'react';
-import {
-  CheckCircle,
-  Circle,
-  Eye,
-  Flag,
-  List,
-  Play,
-  Settings,
-  Target,
-  Terminal,
-  Zap,
-} from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 import { cn } from '@/shared/utils';
+import { Badge, Banner, Button } from '@/shared/ui';
 import { useTaskMaster } from '@/modules/task-master/context/TaskMasterContext';
 import TaskDetailModal from '@/modules/task-master/modals/TaskDetailModal';
 import TaskMasterSetupModal from '@/modules/task-master/modals/TaskMasterSetupModal';
+import { taskStatusLabel, taskStatusTone } from '@/modules/task-master/utils/taskKanban';
 
 type NextTaskBannerProps = {
   onShowAllTasks?: (() => void) | null;
@@ -23,32 +14,9 @@ type NextTaskBannerProps = {
   className?: string;
 };
 
-function PriorityIndicator({ priority }: { priority?: string }) {
-  if (priority === 'high') {
-    return (
-      <div className="flex h-4 w-4 items-center justify-center rounded bg-red-100 dark:bg-red-900/50" title="High Priority">
-        <Zap className="h-2.5 w-2.5 text-red-600 dark:text-red-400" />
-      </div>
-    );
-  }
-
-  if (priority === 'medium') {
-    return (
-      <div className="flex h-4 w-4 items-center justify-center rounded bg-amber-100 dark:bg-amber-900/50" title="Medium Priority">
-        <Flag className="h-2.5 w-2.5 text-amber-600 dark:text-amber-400" />
-      </div>
-    );
-  }
-
-  return (
-    <div className="flex h-4 w-4 items-center justify-center rounded bg-gray-100 dark:bg-gray-800" title="Low Priority">
-      <Circle className="h-2.5 w-2.5 text-gray-400 dark:text-gray-500" />
-    </div>
-  );
-}
-
 /** Exported through the task-master barrel; the chat module's empty state renders it to surface the next task and prefill a prompt that starts it. */
 export default function NextTaskBanner({ onShowAllTasks = null, onStartTask = null, className = '' }: NextTaskBannerProps) {
+  const { t } = useTranslation('tasks');
   const {
     nextTask,
     tasks,
@@ -59,9 +27,11 @@ export default function NextTaskBanner({ onShowAllTasks = null, onStartTask = nu
     setCurrentProject,
   } = useTaskMaster();
 
+  // Whether the reader has opened the next task in full. A disclosure they control, so it is
+  // not derivable from the task itself.
   const [showTaskDetail, setShowTaskDetail] = useState(false);
+  // Whether the TaskMaster setup shell is open, for the same reason.
   const [showSetupModal, setShowSetupModal] = useState(false);
-  const [showSetupDetails, setShowSetupDetails] = useState(false);
 
   if (!currentProject || isLoadingTasks) {
     return null;
@@ -80,37 +50,17 @@ export default function NextTaskBanner({ onShowAllTasks = null, onStartTask = nu
   if (!hasTasks && !hasTaskMaster) {
     return (
       <>
-        <div className={cn('bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-3 mb-4', className)}>
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex min-w-0 items-center gap-2">
-              <List className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-              <p className="text-sm font-medium text-gray-900 dark:text-white">TaskMaster AI is not configured</p>
-            </div>
-
-            <button
-              onClick={() => setShowSetupModal(true)}
-              className="flex items-center gap-1 rounded bg-blue-600 px-2 py-1 text-xs text-white transition-colors hover:bg-blue-700"
-            >
-              <Terminal className="h-3 w-3" />
-              Initialize
-            </button>
-          </div>
-
-          <button
-            onClick={() => setShowSetupDetails((current) => !current)}
-            className="mt-2 flex items-center gap-1 text-xs text-blue-700 hover:underline dark:text-blue-300"
+        <div className={cn('mb-4', className)}>
+          <Banner
+            tone="neutral"
+            action={
+              <Button variant="tonal" size="sm" onClick={() => setShowSetupModal(true)}>
+                {t('notConfigured.initializeButton')}
+              </Button>
+            }
           >
-            <Settings className="h-3 w-3" />
-            {showSetupDetails ? 'Hide details' : 'What is TaskMaster?'}
-          </button>
-
-          {showSetupDetails && (
-            <div className="mt-3 space-y-1 text-xs text-blue-900 dark:text-blue-100">
-              <p>- AI-powered task management with dependencies and subtasks.</p>
-              <p>- PRD-driven task generation for faster project bootstrapping.</p>
-              <p>- Kanban and list views for day-to-day execution.</p>
-            </div>
-          )}
+            {t('notConfigured.title')}
+          </Banner>
         </div>
 
         <TaskMasterSetupModal
@@ -126,44 +76,36 @@ export default function NextTaskBanner({ onShowAllTasks = null, onStartTask = nu
   if (nextTask) {
     return (
       <>
-        <div className={cn('bg-slate-50 dark:bg-slate-900/30 border border-slate-200 dark:border-slate-700 rounded-lg p-3 mb-4', className)}>
+        <div className={cn('mb-4 rounded-xl border border-border bg-card p-3', className)}>
           <div className="flex items-center justify-between gap-3">
             <div className="min-w-0 flex-1">
               <div className="mb-1 flex items-center gap-2">
-                <div className="flex h-5 w-5 items-center justify-center rounded-full bg-blue-100 dark:bg-blue-900/50">
-                  <Target className="h-3 w-3 text-blue-600 dark:text-blue-400" />
-                </div>
-                <span className="text-xs font-medium text-slate-600 dark:text-slate-400">Task {nextTask.id}</span>
-                <PriorityIndicator priority={nextTask.priority} />
+                <span className="rounded bg-secondary px-1.5 py-0.5 font-mono text-[11.5px] text-ink-faint">
+                  {nextTask.id}
+                </span>
+                {/* Two things, not one: "Up next" is a fixed word and would have been painted
+                    with the task's STATUS tone — an amber badge reading "Up next" for a task in
+                    review, colour saying one state and the word another. The badge carries the
+                    status in both, exactly as a card does. */}
+                <span className="text-xs text-ink-faint">{t('nextTask.label')}</span>
+                <Badge tone={taskStatusTone(nextTask.status)}>{taskStatusLabel(nextTask.status, t)}</Badge>
               </div>
-              <p className="line-clamp-1 text-sm font-medium text-slate-900 dark:text-slate-100">{nextTask.title}</p>
+              <p className="line-clamp-1 text-sm font-medium text-foreground">{nextTask.title}</p>
             </div>
 
-            <div className="flex flex-shrink-0 items-center gap-1">
-              <button
-                onClick={() => onStartTask?.()}
-                className="flex items-center gap-1 rounded-md bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700"
-              >
-                <Play className="h-3 w-3" />
-                Start Task
-              </button>
+            <div className="flex flex-shrink-0 items-center gap-2">
+              <Button size="sm" onClick={() => onStartTask?.()}>
+                {t('nextTask.start')}
+              </Button>
 
-              <button
-                onClick={() => setShowTaskDetail(true)}
-                className="rounded-md border border-slate-300 px-2 py-1.5 text-xs text-slate-600 hover:bg-slate-100 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-800"
-                title="View task details"
-              >
-                <Eye className="h-3 w-3" />
-              </button>
+              <Button variant="outline" size="sm" onClick={() => setShowTaskDetail(true)}>
+                {t('nextTask.open')}
+              </Button>
 
               {onShowAllTasks && (
-                <button
-                  onClick={onShowAllTasks}
-                  className="rounded-md border border-slate-300 px-2 py-1.5 text-xs text-slate-600 hover:bg-slate-100 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-800"
-                  title="View all tasks"
-                >
-                  <List className="h-3 w-3" />
-                </button>
+                <Button variant="outline" size="sm" onClick={onShowAllTasks}>
+                  {t('nextTask.showAll')}
+                </Button>
               )}
             </div>
           </div>
@@ -183,30 +125,23 @@ export default function NextTaskBanner({ onShowAllTasks = null, onStartTask = nu
 
   if (hasTasks) {
     const completedTasks = tasks.filter((task) => task.status === 'done').length;
+    const allDone = completedTasks === tasks.length;
 
     return (
-      <div className={cn('bg-purple-50 dark:bg-purple-950 border border-purple-200 dark:border-purple-800 rounded-lg p-3 mb-4', className)}>
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <CheckCircle className="h-4 w-4 text-purple-600 dark:text-purple-400" />
-            <span className="text-sm font-medium text-gray-900 dark:text-white">
-              {completedTasks === tasks.length ? 'All tasks complete' : 'No pending tasks'}
-            </span>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-gray-600 dark:text-gray-400">
-              {completedTasks}/{tasks.length}
-            </span>
-            {onShowAllTasks && (
-              <button
-                onClick={onShowAllTasks}
-                className="rounded bg-purple-600 px-2 py-1 text-xs text-white transition-colors hover:bg-purple-700"
-              >
-                Review
-              </button>
-            )}
-          </div>
-        </div>
+      <div className={cn('mb-4', className)}>
+        <Banner
+          tone={allDone ? 'positive' : 'neutral'}
+          action={
+            onShowAllTasks ? (
+              <Button variant="outline" size="sm" onClick={onShowAllTasks}>
+                {t('nextTask.showAll')}
+              </Button>
+            ) : undefined
+          }
+        >
+          {allDone ? t('nextTask.allDone') : t('nextTask.nonePending')}{' '}
+          <span className="tabular-nums">{t('nextTask.count', { completed: completedTasks, total: tasks.length })}</span>
+        </Banner>
       </div>
     );
   }

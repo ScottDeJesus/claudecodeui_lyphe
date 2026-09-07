@@ -8,8 +8,9 @@ import type {
   FileTreeServiceDependencies,
   FileTreeServices,
   FileTreeUploadedFile,
+  UploadedFileRecord,
 } from '@/shared/types.js';
-import { AppError, FORBIDDEN_WORKSPACE_PATHS, normalizeProjectPath } from '@/shared/utils.js';
+import { AppError, FORBIDDEN_WORKSPACE_PATHS, normalizeProjectPath, resolvePathInsideProject } from '@/shared/utils.js';
 
 const HARD_EXCLUDED_DIRECTORY_NAMES = new Set([
   'node_modules', '.git', '.svn', '.hg',
@@ -37,6 +38,8 @@ const COMMON_WORKSPACE_DIRECTORY_NAMES = [
 // broad workspace (for example, a user's home directory) cannot exhaust the
 // server heap before the browser has a chance to switch to a narrower project.
 const MAXIMUM_FILE_TREE_ENTRIES = 10_000;
+
+const MAXIMUM_UPLOAD_RENAME_ATTEMPTS = 999;
 
 type FileTreeEntryFilter = (entryPath: string, isDirectory: boolean) => boolean;
 
@@ -86,19 +89,6 @@ function validateFilename(name: string): void {
   if (/^\.+$/.test(name)) {
     throw createFileTreeError('Filename cannot be only dots', 400, 'INVALID_FILENAME');
   }
-}
-
-function resolvePathInsideProject(projectRoot: string, targetPath: string): string {
-  const resolvedPath = path.isAbsolute(targetPath)
-    ? path.resolve(targetPath)
-    : path.resolve(projectRoot, targetPath);
-  const normalizedProjectRoot = path.resolve(projectRoot) + path.sep;
-
-  if (!resolvedPath.startsWith(normalizedProjectRoot)) {
-    throw createFileTreeError('Path must be under project root', 403, 'PATH_OUTSIDE_PROJECT');
-  }
-
-  return resolvedPath;
 }
 
 function expandWorkspacePath(workspaceRoot: string, inputPath: string): string {
@@ -310,6 +300,24 @@ export function createFileTreeService(dependencies: FileTreeServiceDependencies)
       }
       return left.name.localeCompare(right.name);
     });
+  }
+
+  // Uploads never overwrite: a taken name becomes "name (1).ext", "name (2).ext", … The cap
+  // stops a directory already full of those from spinning here forever. Probed with `lstat`
+  // rather than `access` because `access` FOLLOWS a symlink: a dangling link would read as a
+  // free name here while the `O_EXCL` copy below — which does not follow — sees it as taken,
+  // and that name would then 409 forever behind a message about a race that never happened.
+  async function nextAvailableName(directory: string, fileName: string): Promise<{ name: string; renamedFrom?: string }> {
+    const extension = path.extname(fileName);
+    for (let suffix = 0; suffix <= MAXIMUM_UPLOAD_RENAME_ATTEMPTS; suffix += 1) {
+      const candidate = suffix === 0 ? fileName : `${path.basename(fileName, extension)} (${suffix})${extension}`;
+      try {
+        await fileSystem.lstat(path.join(directory, candidate));
+      } catch {
+        return suffix === 0 ? { name: fileName } : { name: candidate, renamedFrom: fileName };
+      }
+    }
+    throw createFileTreeError(`"${fileName}" is taken, and so are its first ${MAXIMUM_UPLOAD_RENAME_ATTEMPTS} alternatives`, 409, 'FILE_TREE_ENTRY_EXISTS');
   }
 
   async function cleanupTemporaryFiles(files: FileTreeUploadedFile[]): Promise<void> {
@@ -620,7 +628,7 @@ export function createFileTreeService(dependencies: FileTreeServiceDependencies)
           await fileSystem.makeDirectory(resolvedTargetDirectory, true);
         }
 
-        const uploadedFiles: Array<{ name: string; path: string; size: number; mimeType: string }> = [];
+        const uploadedFiles: UploadedFileRecord[] = [];
         for (let fileIndex = 0; fileIndex < input.files.length; fileIndex += 1) {
           const file = input.files[fileIndex];
           const fileName = input.relativePaths[fileIndex] || file.originalName;
@@ -643,14 +651,24 @@ export function createFileTreeService(dependencies: FileTreeServiceDependencies)
             await fileSystem.makeDirectory(parentDirectory, true);
           }
 
-          await fileSystem.copyFile(file.temporaryPath, destinationPath);
+          // The free name is claimed EXCLUSIVELY, so a racing upload loses with EEXIST instead
+          // of overwriting, and one re-check takes the next free name. A second EEXIST is a
+          // conflict to report as one — never a raw errno whose message names a server path.
+          let saved = await nextAvailableName(parentDirectory, path.basename(destinationPath));
+          try {
+            await fileSystem.copyFile(file.temporaryPath, path.join(parentDirectory, saved.name), true);
+          } catch (error) {
+            if (readErrorCode(error) !== 'EEXIST') throw error;
+            saved = await nextAvailableName(parentDirectory, path.basename(destinationPath));
+            try {
+              await fileSystem.copyFile(file.temporaryPath, path.join(parentDirectory, saved.name), true);
+            } catch (retryError) {
+              if (readErrorCode(retryError) !== 'EEXIST') throw retryError;
+              throw createFileTreeError(`"${saved.name}" was taken while it was being saved`, 409, 'FILE_TREE_ENTRY_EXISTS');
+            }
+          }
           await fileSystem.unlink(file.temporaryPath);
-          uploadedFiles.push({
-            name: fileName,
-            path: destinationPath,
-            size: file.size,
-            mimeType: file.mimeType,
-          });
+          uploadedFiles.push({ ...saved, path: path.join(parentDirectory, saved.name), size: file.size, mimeType: file.mimeType });
         }
 
         return {

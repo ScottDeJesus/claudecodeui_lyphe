@@ -8,6 +8,8 @@ type BuildTranscriptHtmlInput = {
   createDiff: (oldStr: string, newStr: string) => DiffLine[];
   provider: LLMProvider | string;
   selectedProject?: Project | null;
+  /** Turns a model id into the catalog's name for it, so the file agrees with the screen. */
+  resolveModelLabel?: (modelId: string) => string | null;
   sessionTitle: string;
   exportedAt: Date;
 };
@@ -69,6 +71,7 @@ export async function buildTranscriptHtml(input: BuildTranscriptHtmlInput): Prom
       createDiff: input.createDiff,
       provider: input.provider,
       selectedProject: input.selectedProject,
+      resolveModelLabel: input.resolveModelLabel,
     }),
   );
 
@@ -90,16 +93,16 @@ ${styles}
 <style>
   /* Export-only: the app styles above assume a fixed-height flex shell. */
   html, body { height: auto; overflow: visible; }
-  body { background: hsl(var(--background)); color: hsl(var(--foreground)); margin: 0; }
+  body { background: var(--canvas); color: var(--ink); margin: 0; }
   .chat-export-shell { max-width: 60rem; margin: 0 auto; padding: 2rem 1.25rem 4rem; }
   .chat-export-header {
     display: flex; align-items: center; justify-content: space-between; gap: 1rem;
-    border-bottom: 1px solid hsl(var(--border)); padding-bottom: 1rem; margin-bottom: 2rem;
+    border-bottom: 1px solid var(--border); padding-bottom: 1rem; margin-bottom: 2rem;
   }
   .chat-export-title { font-size: 1.25rem; font-weight: 600; margin: 0; }
-  .chat-export-meta { font-size: 0.75rem; color: hsl(var(--muted-foreground)); margin: 0.25rem 0 0; }
+  .chat-export-meta { font-size: 0.75rem; color: var(--ink-muted); margin: 0.25rem 0 0; }
   .chat-export-theme-toggle {
-    border: 1px solid hsl(var(--border)); background: transparent; color: inherit;
+    border: 1px solid var(--border); background: transparent; color: inherit;
     border-radius: 0.5rem; padding: 0.375rem 0.75rem; font-size: 0.75rem; cursor: pointer;
   }
   /* Off-screen skipping is a scrolling optimisation; in a printed document it

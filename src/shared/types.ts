@@ -212,6 +212,46 @@ export type ServerEvent = {
 
 // ---------------------------
 
+//----------------- VERVE DESIGN TOKENS ------------
+
+/**
+ * The closed set of Verve tone slots. A component sets `data-tone` to one of these and the
+ * tone's fill, ink, dot and glyph arrive as inherited custom properties from the
+ * `[data-tone]` rules in `src/shared/ui/verve/tokens.css` — a component never writes a tone
+ * rule of its own, and the set never grows, because two spellings for one state is exactly
+ * what the token swap exists to prevent. Note `warn` covers errors: red is reserved for
+ * destructive or denied.
+ */
+export type Tone = 'neutral' | 'info' | 'positive' | 'warn' | 'danger';
+
+// ---------------------------
+
+//----------------- TOASTS ------------
+
+/**
+ * What a caller hands `useToast()` to raise one toast. A toast is ADVISORY — it says what
+ * just happened and then leaves — so nothing may depend on the reader having seen it; the
+ * durable record of an outcome belongs on the screen that owns the outcome.
+ */
+export type ToastRequest = {
+  tone: Tone;
+  title: string;
+  message?: string;
+};
+
+/**
+ * One toast as the provider holds it: the request plus the two things only the stack knows.
+ * `id` is a monotonic counter (not an index — ids must stay unique after the oldest is
+ * dropped), and `leaving` is true for the 550 ms the leave animation runs, which is why a
+ * row is still in the list after its dismissal has begun.
+ */
+export type ToastRecord = ToastRequest & {
+  id: number;
+  leaving: boolean;
+};
+
+// ---------------------------
+
 //----------------- SHARED UI PRIMITIVES ------------
 
 /** Progress state of a single queue row, driving the indicator the Queue primitive renders. */
@@ -284,6 +324,8 @@ export type ChatMessage = {
   images?: ChatImage[];
   files?: ChatAttachment[];
   reasoning?: string;
+  /** The model id that produced this assistant turn, when the provider records one; the transcript resolves it to a catalog label so a raw id never reaches the screen. */
+  model?: string;
   /**
    * The provider's identifier for the transcript row behind this message, when
    * the provider has stable per-row identity. Present on user turns from
@@ -439,6 +481,13 @@ export type NormalizedMessage = {
   // kind-specific fields (flat for simplicity)
   role?: 'user' | 'assistant';
   content?: string;
+  /**
+   * The model id that produced this assistant turn, when the provider records one
+   * per row (today: Claude). A conversation can change model mid-way, so this
+   * belongs to the turn and not to the session. Mirrored, with this same comment,
+   * on the server's own NormalizedMessage in server/shared/types.ts.
+   */
+  model?: string;
   /**
    * Mirrors optional transcript metadata from the server.
    *
@@ -690,31 +739,6 @@ export type PermissionPanelProps = {
 
 // ---------------------------
 
-//----------------- CODE EDITOR ------------
-
-/** The before/after strings of a pending edit attached to a file opened in the code editor, used to drive the editor's inline merge/diff view; extra keys are tolerated because it comes straight from tool payloads. */
-export type CodeEditorDiffInfo = {
-  old_string?: string;
-  new_string?: string;
-  [key: string]: unknown;
-};
-
-/** A file handed to the code editor for viewing or editing, carrying its display name, workspace-relative path, owning DB projectId for read/save requests and any diff to highlight. */
-export type CodeEditorFile = {
-  name: string;
-  path: string;
-  // DB projectId; used by the editor to build `/api/file-tree/projects/:projectId/file`
-  // URLs for reading and saving content.
-  projectId?: string;
-  diffInfo?: CodeEditorDiffInfo | null;
-  [key: string]: unknown;
-};
-
-/** The category of browser-renderable media a file maps to, used by the code editor to decide whether to show an inline image, PDF, video or audio preview instead of a text buffer. */
-export type PreviewKind = 'image' | 'pdf' | 'video' | 'audio';
-
-// ---------------------------
-
 //----------------- FILE TREE ------------
 
 /** Progress, completion or failure state of one in-flight file-tree upload, produced by the upload hook and rendered by the file tree's progress banner. */
@@ -743,41 +767,99 @@ export type FileTreeNode = {
   [key: string]: unknown;
 };
 
-/** The image the file tree asked to preview, carrying the path plus the DB `projectId` the image viewer needs to build its raw content URL. */
-export type FileTreeImageSelection = {
-  name: string;
-  path: string;
-  projectPath?: string;
-  // DB projectId; used by ImageViewer to build the raw content URL.
-  projectId: string;
-};
-
-
 /** Whether a file tree entry is a file or a directory; use it instead of repeating the string union wherever `FileTreeNode`-shaped data is handled. */
 type FileTreeItemType = 'file' | 'directory';
 
 // ---------------------------
 
+//----------------- FILE MANAGER ------------
+// The four bodies the files API answers with, mirroring `server/shared/types.ts`'s group of
+// the same name field for field. Read the field-by-field rationale there; the rule that binds
+// every one of them is that `null` means the app never learned the value — never `0`, never an
+// invented timestamp, and never rendered as either.
+
+/**
+ * One row of a directory listing as the file manager renders it.
+ *
+ * `kind` is the entry's own kind, read without following symlinks, so a link to a directory
+ * reports `file` and cannot present itself as a folder to descend into. `bytes` and `mtime`
+ * are `null` when the server's per-entry `lstat` failed; both render as `—`.
+ */
+export type DirectoryEntry = {
+  name: string;
+  kind: 'file' | 'dir';
+  bytes: number | null;
+  mtime: string | null;
+};
+
+/**
+ * One directory the file manager is showing, and everything in it.
+ *
+ * `path` is the RESOLVED ABSOLUTE directory the server actually read — relativize it against
+ * the project path before showing it to a person. Entries arrive directories-first then by
+ * name, so nothing re-sorts them here.
+ */
+export type DirectoryListing = {
+  path: string;
+  entries: DirectoryEntry[];
+};
+
+/**
+ * What the preview pane can show for one file — a closed set of three, switched on `kind`.
+ *
+ * `text` carries the first `lines.length` lines already split, with `totalLines` `null` when
+ * the file was too big to count; `image` carries no pixels (the browser loads them through the
+ * content stream and measures them itself); `none` is a binary this app will not guess at, and
+ * download is the only action offered.
+ */
+export type FilePreview =
+  | {
+      kind: 'text';
+      lines: string[];
+      totalLines: number | null;
+      truncated: boolean;
+      bytes: number | null;
+      mtime: string | null;
+      language: string | null;
+    }
+  | { kind: 'image'; mime: string; bytes: number | null; mtime: string | null }
+  | { kind: 'none'; bytes: number | null; mtime: string | null };
+
+/**
+ * One file as an upload actually stored it.
+ *
+ * `name` is the SAVED name, which is not always the one the browser sent: an upload never
+ * overwrites, so a taken name becomes `report (1).pdf` and `renamedFrom` carries the original.
+ * `renamedFrom` is absent — not empty, not equal to `name` — when nothing was renamed, so its
+ * presence alone is what tells the reader it happened.
+ */
+export type UploadedFileRecord = {
+  name: string;
+  path: string;
+  size: number;
+  mimeType: string;
+  renamedFrom?: string;
+};
+
+// ---------------------------
+
 //----------------- GIT PANEL ------------
 
-/** The old/new text of a single edit, handed to the code editor so it can open a file focused on that change. */
+/** The old/new text of a single edit a caller may attach to an open request. Vestigial: nothing in `src/` supplies one, and nothing reads it. */
 type FileDiffInfo = {
   old_string: string;
   new_string: string;
 };
 
-/** Callback the git panel calls to open a file in the code editor, optionally focused on one edit. */
+/** Callback for "open this path", crossed by the chat's file cards and links, the git panel's changed-file rows and the file tree: the workspace brings the Files tab forward and the file manager previews the file. `diffInfo` is forwarded untouched by useFileOpenResolver and dropped by the handler at the end — the preview is read-only, so do not wire a diff view to it expecting one. */
 export type FileOpenHandler = (filePath: string, diffInfo?: FileDiffInfo) => void;
 
 
-/** Which tab the git panel is showing (changes, history, branches or worktrees), driving both the tab bar and which data its controller loads. */
-export type GitPanelView = 'changes' | 'history' | 'branches' | 'worktrees';
+/** Which of the git panel's two views is showing, driving both its tab strip and which list it renders. */
+export type GitPanelView = 'changes' | 'history';
 
-/** Single-letter git status of a changed file (M, A, D or U), used to pick its label, badge styling and change group. */
+/** Single-letter git status of a changed file (M, A, D or U), used to pick its label, chip tone and change group. */
 export type FileStatusCode = 'M' | 'A' | 'D' | 'U';
-
-/** The git action a confirmation dialog is guarding, selecting that dialog's title, action label and colour scheme. */
-export type ConfirmActionType = 'discard' | 'delete' | 'commit' | 'pull' | 'push' | 'publish' | 'revertLocalCommit' | 'deleteBranch';
 
 /** Payload of the git status endpoint: the current branch plus working-tree paths grouped by status, or the error and `notGitRepository` fields when the project has no usable repository. */
 export type GitStatusResponse = {
@@ -787,15 +869,22 @@ export type GitStatusResponse = {
   added?: string[];
   deleted?: string[];
   untracked?: string[];
-  /** Paths with index-side changes — mirrors the real git index. */
+  /**
+   * Paths with index-side changes — mirrors the real git index. Wire shape only: these are a
+   * subset flag over the four groups above, not extra paths, so the panel's changed-file list
+   * would double-count them.
+   */
   staged?: string[];
   error?: string;
   details?: string;
-  /** True when the project directory is not a git repository — the UI offers `git init`. */
+  /**
+   * True when the project directory is not a git repository, which the panel states plainly.
+   * It is not an invitation: initialising a repository is a write, and the panel only reads.
+   */
   notGitRepository?: boolean;
 };
 
-/** Upstream state of the current branch (remote name, ahead/behind counts, up-to-date flag) that the git panel header and branches view use to enable fetch, pull, push and publish. */
+/** Upstream state of the current branch (remote name, ahead/behind counts, up-to-date flag) that the git panel header reads to say how much of this branch the remote already has. */
 export type GitRemoteStatus = {
   hasRemote?: boolean;
   hasUpstream?: boolean;
@@ -808,6 +897,23 @@ export type GitRemoteStatus = {
   message?: string;
   error?: string;
 };
+
+/**
+ * Where the current branch stands against its upstream — ONE fact the git panel decides once
+ * (`describeUpstreamPosition`, from the server's own `hasUpstream` / `hasCommits` flags, never
+ * from the TYPE of `ahead`) and hands to its header and its Changes view together, so the two
+ * cannot disagree. Three of the four kinds are unknowns, and none of them may render as
+ * "everything is pushed" (design handoff §5: "we don't know" never looks like zero).
+ */
+export type UpstreamPosition =
+  /** The remote-status read failed: nothing about the upstream is known, not even whether there is one. */
+  | { kind: 'unread'; reason: string | null }
+  /** Nothing has been committed, so nothing could have been pushed — a known zero, not an unknown. */
+  | { kind: 'no-commits' }
+  /** Commits exist but the branch tracks nothing, so how many are unpushed cannot be counted. */
+  | { kind: 'no-upstream' }
+  /** The branch tracks `remoteBranch` and is `ahead` commits past it. */
+  | { kind: 'tracked'; ahead: number; remoteBranch: string | null };
 
 /** One commit in the history list, including the parent hashes and ref decorations the commit graph needs to lay out lanes. */
 export type GitCommitSummary = {
@@ -823,63 +929,13 @@ export type GitCommitSummary = {
   refs?: string[];
 };
 
-/** Unified diff text keyed by file path, used both for working-tree diffs and for the per-file diffs of an expanded commit. */
+/** Unified diff text keyed by commit hash, holding the diffs of commits the History view has opened. */
 export type GitDiffMap = Record<string, string>;
-
-/** A pending confirmation dialog — its message, confirm handler and optional escalated alternative — raised by git panel actions and rendered by the shared Confirmation UI. */
-export type ConfirmationRequest = {
-  type: ConfirmActionType;
-  message: string;
-  onConfirm: () => Promise<void> | void;
-  alternateConfirmation?: {
-    label: string;
-    description: string;
-    actionLabel: string;
-    onConfirm: () => Promise<void> | void;
-  };
-};
 
 /** The `error` and `details` fields any git API response may carry; intersect it with a route's own payload type instead of redeclaring them. */
 export type GitApiErrorResponse = {
   error?: string;
   details?: string;
-};
-
-/** Response of a git write endpoint such as commit, pull, push or revert: the shared error fields plus `success` and the raw git `output`. */
-export type GitOperationResponse = GitApiErrorResponse & {
-  success?: boolean;
-  output?: string;
-};
-
-/** One git worktree as reported by the worktrees API, including its branch, ahead/behind counts and the linked project used to open it. */
-export type WorktreeInfo = {
-  path: string;
-  branch: string | null;
-  headSha: string | null;
-  isMain: boolean;
-  isCurrent: boolean;
-  isLocked: boolean;
-  isDetached: boolean;
-  changedFileCount: number;
-  ahead: number;
-  behind: number;
-  lastCommitSubject: string | null;
-  lastCommitDate: string | null;
-  linkedProjectId: string | null;
-  linkedProjectArchived: boolean;
-};
-
-/** Choices made in the merge-worktree dialog (squash, commit message and whether to remove the worktree afterwards), passed straight to the merge request. */
-export type MergeWorktreeOptions = {
-  squash: boolean;
-  message: string;
-  removeAfterMerge: boolean;
-};
-
-/** Choices made in the remove-worktree dialog (force removal and whether to delete the worktree's branch), passed straight to the remove request. */
-export type RemoveWorktreeOptions = {
-  force: boolean;
-  deleteBranch: boolean;
 };
 
 /** Pre-computed lane geometry for one row of the history commit graph, telling the graph strip which rails to draw above, through and below that commit's dot. */
@@ -901,6 +957,98 @@ export type CommitGraphRow = {
   /** Every lane still active below this row — rails continue through expanded content. */
   bottomLanes: number[];
 };
+
+// ---------------------------
+
+//----------------- GIT DELEGATION ------------
+
+/**
+ * How far the delegated `/git` run has visibly got, read off the Bash commands the agent runs
+ * — never off its prose. `starting` is the conversation opening, before any command has been
+ * seen; the other four are named after the command that proved them, so the card can only
+ * claim a step git itself was asked to take.
+ */
+export type GitDelegationStage = 'starting' | 'read' | 'group' | 'write' | 'push';
+
+/**
+ * What the git panel found to be TRUE once the run ended, computed from the panel's own git
+ * reads rather than from anything the agent said. `not-pushed` is the one that carries a
+ * `GitDelegationReason`; `agent-error` means the run itself broke, so git was never asked.
+ */
+export type GitDelegationOutcome =
+  | 'pushed'
+  | 'not-committed'
+  | 'not-pushed'
+  | 'agent-error'
+  /**
+   * The socket carrying the run went quiet or dropped, so the panel stopped following it. It
+   * claims NOTHING about the push: the run may well have finished in its own conversation, and
+   * that is where the reader is sent.
+   */
+  | 'connection-lost';
+
+/**
+ * Why a commit that exists was not pushed, matched against the last tool result the run
+ * produced. `unknown` is the honest default — it says commits are waiting and sends the
+ * reader to the conversation rather than guessing at a cause.
+ */
+export type GitDelegationReason =
+  | 'rejected'
+  | 'protected'
+  | 'no-upstream'
+  | 'conflict'
+  | 'credentials'
+  | 'unknown';
+
+/**
+ * The whole of what the git panel's "Push my changes" card shows, as one value with three
+ * shapes so a finished run cannot be rendered without its receipt.
+ *
+ * Produced by `useGitDelegation` and consumed by `GitDelegationCard`. The finished shape is a
+ * RECEIPT: every number in it was read once, when the run ended, and it does not move
+ * afterwards — the live lists above the card are the live view, and the card says how long
+ * ago it stopped being one.
+ */
+export type GitDelegationState =
+  /**
+   * Nothing is running HERE. `startError` is a press that never became a conversation, and
+   * `blockedBySessionId` is the conversation that refused it — a checkpoint already running in
+   * another project — so the card can offer a way into it rather than only naming it.
+   */
+  | { phase: 'idle'; startError: string | null; blockedBySessionId: string | null }
+  | {
+      phase: 'running';
+      /** The repository the run was started from — the only panel that draws this run. */
+      projectId: string;
+      sessionId: string;
+      startedAt: number;
+      stage: GitDelegationStage;
+    }
+  | {
+      phase: 'finished';
+      projectId: string;
+      sessionId: string;
+      startedAt: number;
+      finishedAt: number;
+      outcome: GitDelegationOutcome;
+      /** Only `not-pushed` has one; every other outcome leaves it null. */
+      reason: GitDelegationReason | null;
+      /** Commits this branch gained during the run, newest first, at most five — the receipt lines. */
+      commits: GitCommitSummary[];
+      /**
+       * How many it gained in all, so a list cut at five can say that it was cut — or null when
+       * this branch's commits could not be told from the window's, which is not a zero.
+       */
+      commitCount: number | null;
+      /** Commits still waiting on the upstream when the run ended, or null when unknown. */
+      ahead: number | null;
+      /**
+       * How many were already waiting when the button was pressed, or null when that could not
+       * be read. It is what makes a receipt for a run that pushed work it did not write — a
+       * clean tree that was simply behind — say what it pushed instead of nothing at all.
+       */
+      aheadWhenStarted: number | null;
+    };
 
 // ---------------------------
 
@@ -1152,6 +1300,8 @@ export type ClaudePermissionsState = {
   allowedTools: string[];
   disallowedTools: string[];
   skipPermissions: boolean;
+  /** How edits happen. The ONE store the composer chip and this tab both read and write. */
+  permissionMode?: PermissionMode;
 };
 
 /** The user's notification settings, grouped into delivery channels (in-app, web push, desktop, sound) and the events that trigger them; mirrors the payload of the notification preferences API. */
@@ -1174,14 +1324,8 @@ export type CursorPermissionsState = {
   allowedCommands: string[];
   disallowedCommands: string[];
   skipPermissions: boolean;
-};
-
-/** The code editor display preferences shown in the appearance tab (word wrap, minimap, line numbers and font size), stored together as one server-backed `codeEditorSettings` preference. */
-export type CodeEditorSettingsState = {
-  wordWrap: boolean;
-  showMinimap: boolean;
-  lineNumbers: boolean;
-  fontSize: string;
+  /** How edits happen. The ONE store the composer chip and this tab both read and write. */
+  permissionMode?: PermissionMode;
 };
 
 // ---------------------------
@@ -1548,3 +1692,70 @@ type TaskStatus =
 
 /** A TaskMaster task's priority; high, medium and low are the known values and the string fallback tolerates anything else TaskMaster emits. */
 type TaskPriority = 'high' | 'medium' | 'low' | string;
+
+// ---------------------------
+
+//----------------- DESCENT ACCOUNTS AND USAGE ------------
+// The client mirror of the proxy's own contracts (`server/shared/types.ts` § DESCENT CONTRACTS),
+// which is where each field is documented against Descent's behaviour. The notes here are the
+// half a SCREEN has to get right: which unit a number is in, and what "unknown" looks like.
+
+/**
+ * One Claude account slot Descent holds.
+ * `expiresAt` is epoch MILLISECONDS — compare it to `Date.now()` with no conversion; `null`
+ * means the expiry was never read, which renders as an em-dash and never as a warning.
+ */
+export type DescentSlot = { slug: string; label: string; expiresAt: number | null; isActive: boolean };
+
+/**
+ * Descent's account picture, or the calm reason there is none.
+ * `drift` (the live login differs from its saved copy) and `liveSessions` are facts a row
+ * STATES; neither gates a switch. `unreadable: true` is reachable-with-no-slots — say that in
+ * words, because an empty switcher otherwise reads as "you have no accounts".
+ */
+export type DescentAccounts =
+  | { reachable: true; active: string | null; activeLabel: string | null; slots: DescentSlot[]; liveLabel: string | null; liveExpiresAt: number | null; drift: boolean; liveSessions: number; unreadable: boolean }
+  | { reachable: false; reason: string };
+
+/**
+ * One usage window as Descent measured it.
+ * `percent: null` is "no reading" (em-dash, empty track); `0` is a REAL reading and says
+ * "0% used". `rolled: true` keeps a real but HISTORICAL percent — show it dim and say "was",
+ * never drain it to zero. `severity` is present only when the vendor flagged the window, and
+ * may only ESCALATE a meter's tone: a flagged window can read a comfortable 12 % and still
+ * mean an account lock.
+ */
+export type DescentUsageWindow = { key: string; label: string; percent: number | null; resetsAt: string | null; rolled?: boolean; severity?: string };
+
+/**
+ * Usage as Descent last measured it.
+ * `checkedAt` and `staleSince` are epoch SECONDS — multiply by 1000 before `new Date`, unlike
+ * `DescentSlot.expiresAt`, which is already milliseconds. With `reachable: false` the `reason`
+ * is the proxy's own word (`unreachable` | `timeout` | `bad-response`); with `reachable: true`
+ * it is Descent's — `''` healthy, `pending` a poll in flight (reading, not broken), otherwise
+ * the cause of a degraded reading.
+ */
+export type DescentUsage =
+  | { reachable: true; windows: DescentUsageWindow[]; degraded: boolean; reason: string; staleSince: number | null; checkedAt: number }
+  | { reachable: false; reason: string };
+
+// ---------------------------
+
+//----------------- CLI VERSION ------------
+// The client mirror of `GET /api/cli-version` (`server/shared/types.ts` § CLI VERSION CONTRACTS,
+// where every field is documented against the server's behaviour). Kept here rather than in the
+// hook because three screens and one composer read it. `docs/cli-version.md` is the prose.
+
+/**
+ * One live run and the CLI version its own process announced at init.
+ * `startedAt` is epoch MILLISECONDS. `cliVersion` is `null` while that init message has not
+ * arrived yet — "not heard yet", which is never stale and never stood in for by `installed`.
+ */
+export type CliVersionRun = { sessionId: string; startedAt: number; cliVersion: string | null };
+
+/**
+ * What the route answers, and the ONLY input to the stale comparison (`useCliVersion`).
+ * `installed` is `null` when no version could be read — with `reason` saying so in plain words
+ * — and then NOTHING is stale: an invented `0.0.0` would compare stale to every run alive.
+ */
+export type CliVersionReport = { installed: string | null; reason: string | null; binaryPath: string | null; running: CliVersionRun[] };

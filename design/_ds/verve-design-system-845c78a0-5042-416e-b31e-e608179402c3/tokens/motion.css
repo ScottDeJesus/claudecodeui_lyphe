@@ -1,0 +1,25 @@
+/* Verve motion — the signature. Springs, not tweens. */
+:root{
+  --ease-enter:cubic-bezier(.22,1,.36,1); /* @kind other */ /* entries, lifts, page-ins */
+  --ease-spring:cubic-bezier(.34,1.8,.5,1); /* @kind other */ /* pops, knobs, checkmarks */
+  --ease-press:cubic-bezier(.3,2.4,.5,1); /* @kind other */ /* button press overshoot */
+  --dur-quick:.2s; /* @kind other */
+  --dur-move:.35s; /* @kind other */
+  --dur-theme:.45s; /* @kind other */
+}
+@keyframes vv-rise{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:none}}
+@keyframes vv-pop{from{opacity:0;transform:translateY(24px) scale(.96)}to{opacity:1;transform:none}}
+@keyframes vv-fade{from{opacity:0}to{opacity:1}}
+@keyframes vv-pagein{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+@keyframes vv-pulse{0%,100%{opacity:.5}50%{opacity:1}}
+@keyframes vv-spin{to{transform:rotate(360deg)}}
+@keyframes vv-spin-hue{0%,100%{border-top-color:var(--accent)}50%{border-top-color:#e0713a}}
+@keyframes vv-shimmer{0%{background-position:-200px 0}100%{background-position:200px 0}}
+@keyframes vv-swirl{from{transform:rotate(0)}to{transform:rotate(360deg)}}
+@keyframes vv-ring{0%{box-shadow:0 0 0 0 rgba(47,168,118,.35)}100%{box-shadow:0 0 0 9px rgba(47,168,118,0)}}
+@keyframes vv-toast-out{to{opacity:0;filter:blur(8px);transform:translateY(-16px) scale(1.06)}}
+@keyframes vv-drift{0%{transform:translate(0,0) scale(1)}33%{transform:translate(60px,-40px) scale(1.15)}66%{transform:translate(-40px,30px) scale(0.95)}100%{transform:translate(0,0) scale(1)}}
+@keyframes vv-drift2{0%{transform:translate(0,0) scale(1)}50%{transform:translate(-70px,50px) scale(1.2)}100%{transform:translate(0,0) scale(1)}}
+@keyframes vv-draw{from{stroke-dashoffset:1}to{stroke-dashoffset:0}}
+.vv-skeleton{border-radius:6px;background:linear-gradient(90deg,var(--surface2) 25%,var(--border) 50%,var(--surface2) 75%);background-size:400px 100%;animation:vv-shimmer 1.4s infinite linear}
+body.vv-anim,body.vv-anim *{transition:background-color var(--dur-theme) ease,color var(--dur-theme) ease,border-color var(--dur-theme) ease,box-shadow var(--dur-theme) ease !important}

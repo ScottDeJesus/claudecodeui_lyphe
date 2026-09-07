@@ -1,0 +1,202 @@
+/* Verve design tokens — the app's ONE colour, type, space and motion source.
+ *
+ * Copied BY VALUE from design/_ds/verve-design-system-845c78a0-5042-416e-b31e-e608179402c3/
+ * tokens/{colors,typography,spacing,motion,base}.css. Copied, not imported: `design/` is the
+ * design source of truth and nothing in it is ever loaded at runtime.
+ *
+ * Four deliberate changes from the source, and only four:
+ *   1. Verve's `.vv-dark, body.vv-dark` selector is written as `.dark` — the one dark selector
+ *      this app already has (ThemeContext puts it on <html>). No `vv-dark` class exists here.
+ *   2. `--on-accent` is added to both blocks. Verve has no token for the ink that sits ON the
+ *      accent, and the primary button needs one: #ffffff on the light accent (#2fa876) and
+ *      #101116 on the dark accent (#4cc493, where white would measure 2.18:1).
+ *   3. `--on-danger` is added to both blocks, the same shape of gap. Verve's `.dark` block
+ *      lightens almost everything but never redeclares `--danger`, so the destructive fill
+ *      stays #b3373c in dark; pairing it with `--on-accent` put #101116 on that red and
+ *      measured 3.17:1. `--on-danger` is #ffffff in BOTH modes — 5.95:1 on #b3373c either way —
+ *      because inventing a lighter dark `--danger` would be choosing a colour Verve did not,
+ *      which is the second palette D1 exists to forbid.
+ *   4. `border-radius: var(--radius-input)` is DROPPED from the `:focus-visible` rule below.
+ *      `border-radius` is a property of the ELEMENT, not of the ring, so the source rule
+ *      reshapes whatever it lands on: measured across 26 Tab stops on the chat screen, a
+ *      999px pill and an 8px button both snapped to 10px on focus and back on blur, and the
+ *      footer link went 0px → 10px. `outline` already follows the element's own radius, so
+ *      nothing is lost. It went unnoticed until Phase 2 removed `focus-visible:outline-none`
+ *      from Button's cva, which had been hiding the ring that makes the jump visible.
+ *
+ * `fonts.css` is NOT copied — its Google Fonts `@import` is served by the <link> in index.html,
+ * which preconnects and so lands the faces a round trip sooner.
+ *
+ * This file is imported by src/main.tsx BEFORE index.css, so index.css's `@tailwind base`
+ * (and every Tailwind utility mapped onto these tokens in tailwind.config.js) resolves against
+ * tokens that are already declared.
+ */
+
+/* ---------- colours ---------- */
+:root {
+  /* base — light */
+  --canvas:#f7f7f9;
+  --surface:#ffffff;
+  --surface2:#f0f0f4;
+  --ink:#17181d;
+  --ink-mid:#4a4c58;
+  --ink-muted:#6b6e7c;
+  --ink-faint:#8a8c99;
+  --border:#e4e5ec;
+  --border-strong:#d8d9e2;
+  /* accent — one green, used sparingly: actions and focus only */
+  --accent:#2fa876;
+  --accent-deep:#22855c;
+  --accent-ink:#1c7d54;
+  --accent-soft:#e3f4ec;
+  --accent-soft-hover:#d2ecdf;
+  /* the inks that sit ON a filled accent / danger surface (see the header note) */
+  --on-accent:#ffffff;
+  --on-danger:#ffffff;
+  /* garnish — orange accent, never a wall */
+  --garnish:#e0713a;
+  --garnish-soft:#fdeee4;
+  /* five tones — soft fill + deep ink. Errors are amber; red only for destructive or denied */
+  --neutral-dot:#8a8c99;--neutral-soft:#f0f0f4;--neutral-ink:#6b6e7c;
+  --info-dot:#3aa6b9;--info-soft:#e3f2f5;--info-ink:#22707f;
+  --pos-dot:#2fa876;--pos-soft:#e3f4ec;--pos-ink:#1c7d54;
+  --warn-dot:#d9a64a;--warn-soft:#faf1de;--warn-ink:#8a6620;
+  --danger-dot:#b3373c;--danger-soft:#fdecec;--danger-ink:#b3373c;
+  --danger:#b3373c;--danger-deep:#992f33;
+  --success-dot:#4ade80;
+  /* water — drying gauge fill */
+  --water:#3aa6b9;
+  /* charts — series order: accent first, then garnish, then cools */
+  --chart-1:#2fa876;
+  --chart-2:#e8a23a;
+  --chart-3:#3aa6b9;
+  --chart-4:#6fd0a8;
+  --chart-5:#8a94a8;
+  /* semantic aliases */
+  --text-heading:var(--ink);
+  --text-body-color:var(--ink-mid);
+  --text-muted:var(--ink-muted);
+  --text-faint:var(--ink-faint);
+  --surface-card:var(--surface);
+  --surface-page:var(--canvas);
+}
+.dark {
+  --canvas:#101116;
+  --surface:#1a1b22;
+  --surface2:#24252f;
+  --ink:#f0f0f4;
+  --ink-mid:#c8cad4;
+  --ink-muted:#a6a9b8;
+  --ink-faint:#7c7f8e;
+  --border:#2a2b35;
+  --border-strong:#3a3c4a;
+  --accent:#4cc493;
+  --accent-deep:#6fd0a8;
+  --accent-ink:#a9e8cb;
+  --accent-soft:#1b3a2d;
+  --accent-soft-hover:#234a39;
+  --on-accent:#101116;
+  --on-danger:#ffffff;
+  --garnish:#f2c076;
+  --garnish-soft:#3b2a18;
+  --neutral-soft:#24252f;--neutral-ink:#a6a9b8;
+  --info-soft:#152e35;--info-ink:#7ecbdc;
+  --pos-soft:#143026;--pos-ink:#6fd0a8;
+  --warn-soft:#3b2f16;--warn-ink:#e3b96b;
+  --danger-soft:#3a1c1e;--danger-ink:#e58a8e;
+}
+
+/* ---------- type ----------
+   Instrument Serif for display/headings (italic for emphasis, NEVER bold);
+   Schibsted Grotesk for everything else; tabular-nums wherever numbers stack. */
+:root {
+  --font-display:'Instrument Serif',serif;
+  --font-body:'Schibsted Grotesk',sans-serif;
+  --font-mono:ui-monospace,Menlo,monospace;
+  --text-display:56px;   /* hero display, serif */
+  --text-h1:34px;        /* section heading, serif */
+  --text-h2:20px;        /* card/panel titles, grotesk 700, -0.01em */
+  --text-body:15.5px;
+  --text-small:13.5px;
+  --text-caption:12px;   /* uppercase, .14em tracking, ink-faint */
+  --leading-body:1.65;
+  --leading-tight:1.1;
+}
+.vv-tabular{font-variant-numeric:tabular-nums}
+
+/* ---------- space & shape ----------
+   4px grid, airy by default. Shadows are whispers. */
+:root {
+  --space-1:8px;    /* inside controls */
+  --space-2:16px;   /* between related items */
+  --space-3:24px;   /* card padding */
+  --space-4:40px;   /* between groups */
+  --space-5:96px;   /* between page sections */
+  --radius-control:8px;   /* buttons ~10px in practice; inputs 10px */
+  --radius-input:10px;
+  --radius-card:12px;
+  --radius-screen:16px;
+  --radius-pill:999px;
+  --shadow-rest:0 1px 3px rgba(32,26,20,.06),0 1px 2px rgba(32,26,20,.04);
+  --shadow-hover:0 8px 24px rgba(32,26,20,.10);
+  --shadow-lift:0 18px 36px rgba(32,26,20,.13);
+  --shadow-overlay:0 16px 44px rgba(32,26,20,.15);
+  --shadow-modal:0 24px 64px rgba(23,24,29,.28);
+}
+
+/* ---------- motion ----------
+   Springs, not tweens. */
+:root {
+  --ease-enter:cubic-bezier(.22,1,.36,1); /* entries, lifts, page-ins */
+  --ease-spring:cubic-bezier(.34,1.8,.5,1); /* pops, knobs, checkmarks */
+  --ease-press:cubic-bezier(.3,2.4,.5,1); /* button press overshoot */
+  --dur-quick:.2s;
+  --dur-move:.35s;
+  --dur-theme:.45s;
+}
+@keyframes vv-rise{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:none}}
+@keyframes vv-pop{from{opacity:0;transform:translateY(24px) scale(.96)}to{opacity:1;transform:none}}
+@keyframes vv-fade{from{opacity:0}to{opacity:1}}
+@keyframes vv-pagein{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+@keyframes vv-pulse{0%,100%{opacity:.5}50%{opacity:1}}
+@keyframes vv-spin{to{transform:rotate(360deg)}}
+@keyframes vv-spin-hue{0%,100%{border-top-color:var(--accent)}50%{border-top-color:#e0713a}}
+@keyframes vv-shimmer{0%{background-position:-200px 0}100%{background-position:200px 0}}
+@keyframes vv-swirl{from{transform:rotate(0)}to{transform:rotate(360deg)}}
+@keyframes vv-ring{0%{box-shadow:0 0 0 0 rgba(47,168,118,.35)}100%{box-shadow:0 0 0 9px rgba(47,168,118,0)}}
+@keyframes vv-toast-out{to{opacity:0;filter:blur(8px);transform:translateY(-16px) scale(1.06)}}
+@keyframes vv-drift{0%{transform:translate(0,0) scale(1)}33%{transform:translate(60px,-40px) scale(1.15)}66%{transform:translate(-40px,30px) scale(0.95)}100%{transform:translate(0,0) scale(1)}}
+@keyframes vv-drift2{0%{transform:translate(0,0) scale(1)}50%{transform:translate(-70px,50px) scale(1.2)}100%{transform:translate(0,0) scale(1)}}
+@keyframes vv-draw{from{stroke-dashoffset:1}to{stroke-dashoffset:0}}
+.vv-skeleton{border-radius:6px;background:linear-gradient(90deg,var(--surface2) 25%,var(--border) 50%,var(--surface2) 75%);background-size:400px 100%;animation:vv-shimmer 1.4s infinite linear}
+/* The one keyframe a screen names directly: a live status mark breathing. Verve spends it on a
+   conversation that is working right now (prototype :101). It carries NO colour — the element
+   keeps its own ink — so this stays a motion utility beside vv-skeleton, not a second palette. */
+.vv-pulse{animation:vv-pulse 2s infinite}
+/* ⚠ This sets `transition … !important` on EVERY element. It is added for the half second
+   around a light/dark switch (ThemeContext.toggleDarkMode) and never left on. */
+body.vv-anim,body.vv-anim *{transition:background-color var(--dur-theme) ease,color var(--dur-theme) ease,border-color var(--dur-theme) ease,box-shadow var(--dur-theme) ease !important}
+
+/* ---------- base ----------
+   body reset, links, focus ring, scrollbars */
+body{margin:0;background:var(--canvas);color:var(--ink);font-family:var(--font-body);font-size:var(--text-body);line-height:var(--leading-body)}
+a{color:var(--accent);text-decoration:none}
+a:hover{color:var(--accent-ink)}
+button:focus-visible,input:focus-visible,a:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+*{scrollbar-width:thin;scrollbar-color:var(--border-strong) transparent}
+*::-webkit-scrollbar{width:8px;height:8px}
+*::-webkit-scrollbar-track{background:transparent}
+*::-webkit-scrollbar-thumb{background:var(--border-strong);border-radius:999px;border:2px solid transparent;background-clip:padding-box}
+*::-webkit-scrollbar-thumb:hover{background:var(--accent);background-clip:padding-box}
+::selection{background:var(--accent-soft);color:var(--accent-ink)}
+
+/* ---------- tone ----------
+   Doctrine §5: tone is a token swap, never a rule. Setting `data-tone` on a container tones
+   everything inside it, because custom properties inherit. §6: every tone also carries a glyph,
+   so the state survives greyscale — colour is never the whole signal. No component may add a
+   tone rule; these five ARE the vocabulary. */
+[data-tone="neutral"]{--tone-soft:var(--neutral-soft);--tone-ink:var(--neutral-ink);--tone-dot:var(--neutral-dot);--tone-glyph:"·"}
+[data-tone="info"]{--tone-soft:var(--info-soft);--tone-ink:var(--info-ink);--tone-dot:var(--info-dot);--tone-glyph:"i"}
+[data-tone="positive"]{--tone-soft:var(--pos-soft);--tone-ink:var(--pos-ink);--tone-dot:var(--pos-dot);--tone-glyph:"✓"}
+[data-tone="warn"]{--tone-soft:var(--warn-soft);--tone-ink:var(--warn-ink);--tone-dot:var(--warn-dot);--tone-glyph:"▲"}
+[data-tone="danger"]{--tone-soft:var(--danger-soft);--tone-ink:var(--danger-ink);--tone-dot:var(--danger-dot);--tone-glyph:"✕"}

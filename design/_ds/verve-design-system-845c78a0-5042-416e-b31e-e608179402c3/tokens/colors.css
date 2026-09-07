@@ -1,0 +1,68 @@
+/* Verve color tokens · light is default, add .vv-dark to <body> for dark mode */
+:root{
+  /* base — light */
+  --canvas:#f7f7f9;
+  --surface:#ffffff;
+  --surface2:#f0f0f4;
+  --ink:#17181d;
+  --ink-mid:#4a4c58;
+  --ink-muted:#6b6e7c;
+  --ink-faint:#8a8c99;
+  --border:#e4e5ec;
+  --border-strong:#d8d9e2;
+  /* accent — one green, used sparingly: actions and focus only */
+  --accent:#2fa876;
+  --accent-deep:#22855c;
+  --accent-ink:#1c7d54;
+  --accent-soft:#e3f4ec;
+  --accent-soft-hover:#d2ecdf;
+  /* garnish — orange accent, never a wall */
+  --garnish:#e0713a;
+  --garnish-soft:#fdeee4;
+  /* five tones — soft fill + deep ink. Errors are amber; red only for destructive or denied */
+  --neutral-dot:#8a8c99;--neutral-soft:#f0f0f4;--neutral-ink:#6b6e7c;
+  --info-dot:#3aa6b9;--info-soft:#e3f2f5;--info-ink:#22707f;
+  --pos-dot:#2fa876;--pos-soft:#e3f4ec;--pos-ink:#1c7d54;
+  --warn-dot:#d9a64a;--warn-soft:#faf1de;--warn-ink:#8a6620;
+  --danger-dot:#b3373c;--danger-soft:#fdecec;--danger-ink:#b3373c;
+  --danger:#b3373c;--danger-deep:#992f33;
+  --success-dot:#4ade80;
+  /* water — drying gauge fill */
+  --water:#3aa6b9;
+  /* charts — series order: accent first, then garnish, then cools */
+  --chart-1:#2fa876;
+  --chart-2:#e8a23a;
+  --chart-3:#3aa6b9;
+  --chart-4:#6fd0a8;
+  --chart-5:#8a94a8;
+  /* semantic aliases */
+  --text-heading:var(--ink);
+  --text-body-color:var(--ink-mid);
+  --text-muted:var(--ink-muted);
+  --text-faint:var(--ink-faint);
+  --surface-card:var(--surface);
+  --surface-page:var(--canvas);
+}
+.vv-dark,body.vv-dark{
+  --canvas:#101116;
+  --surface:#1a1b22;
+  --surface2:#24252f;
+  --ink:#f0f0f4;
+  --ink-mid:#c8cad4;
+  --ink-muted:#a6a9b8;
+  --ink-faint:#7c7f8e;
+  --border:#2a2b35;
+  --border-strong:#3a3c4a;
+  --accent:#4cc493;
+  --accent-deep:#6fd0a8;
+  --accent-ink:#a9e8cb;
+  --accent-soft:#1b3a2d;
+  --accent-soft-hover:#234a39;
+  --garnish:#f2c076;
+  --garnish-soft:#3b2a18;
+  --neutral-soft:#24252f;--neutral-ink:#a6a9b8;
+  --info-soft:#152e35;--info-ink:#7ecbdc;
+  --pos-soft:#143026;--pos-ink:#6fd0a8;
+  --warn-soft:#3b2f16;--warn-ink:#e3b96b;
+  --danger-soft:#3a1c1e;--danger-ink:#e58a8e;
+}

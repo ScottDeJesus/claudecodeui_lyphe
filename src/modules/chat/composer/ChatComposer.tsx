@@ -12,6 +12,7 @@ import type {
 } from 'react';
 import { PaperclipIcon, MessageSquareIcon, XIcon, Loader2, ArrowUpIcon, PencilIcon } from 'lucide-react';
 
+import { Button } from '@/shared/ui';
 import { useVoiceInput } from '@/modules/chat/hooks/useVoiceInput';
 import { useVoiceAvailable } from '@/modules/chat/hooks/useVoiceAvailable';
 import type { QueuedDraft, ScheduledMessage, SlashCommand,SessionActivity,PendingPermissionRequest,PermissionMode,ProviderModelOption } from '@/shared/types';
@@ -55,7 +56,6 @@ type ChatComposerProps = {
   permissionMode: PermissionMode;
   availablePermissionModes: PermissionMode[];
   onSelectPermissionMode: (mode: PermissionMode) => void;
-  providerLabel: string;
   effort: string;
   availableEffortOptions: NonNullable<ProviderModelOption['effort']>['values'];
   onSelectEffort: (effort: string) => void;
@@ -130,7 +130,6 @@ export default function ChatComposer({
   permissionMode,
   availablePermissionModes,
   onSelectPermissionMode,
-  providerLabel,
   effort,
   availableEffortOptions,
   onSelectEffort,
@@ -292,8 +291,8 @@ export default function ChatComposer({
       />
 
       {isEditingSentMessage && (
-        <div className="mx-auto mb-2 flex max-w-[54.25rem] items-center gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-foreground">
-          <PencilIcon className="h-3.5 w-3.5 shrink-0 text-amber-600 dark:text-amber-400" />
+        <div className="mx-auto mb-2 flex max-w-[54.25rem] items-center gap-2 rounded-xl border border-warn-ink/30 bg-warn-ink/10 px-3 py-2 text-xs text-foreground">
+          <PencilIcon className="h-3.5 w-3.5 shrink-0 text-warn-ink" />
           <span className="min-w-0 flex-1">
             {t('composer.editing.title')}
             {' — '}
@@ -431,10 +430,20 @@ export default function ChatComposer({
 
         <PromptInputFooter className="flex-wrap gap-y-1">
           <PromptInputTools className="min-w-0">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={openAttachmentPicker}
+              className="hidden sm:inline-flex"
+            >
+              {t('input.attachFiles')}
+            </Button>
             <PromptInputButton
               tooltip={{ content: t('input.attachFiles') }}
               onClick={openAttachmentPicker}
               aria-label={t('input.attachFiles')}
+              className="sm:hidden"
             >
               <PaperclipIcon />
             </PromptInputButton>
@@ -488,11 +497,14 @@ export default function ChatComposer({
               modelsLoading={modelsLoading}
             />
 
+            <span className="hidden max-w-64 text-xs leading-4 text-ink-faint lg:inline">
+              {t(`composer.editMode.help.${permissionMode}`, { defaultValue: '' })}
+            </span>
+
             <ComposerPermissionMenu
               permissionMode={permissionMode}
               permissionModes={availablePermissionModes}
               onSelectPermissionMode={onSelectPermissionMode}
-              providerLabel={providerLabel}
             />
 
             <PromptInputSubmit

@@ -57,8 +57,8 @@
 - **Duyarlı Tasarım** — Masaüstü, tablet ve mobilde sorunsuz çalışır; böylece ajanlarını telefondan da kullanabilirsin
 - **Etkileşimli Sohbet Arayüzü** — Ajanlarla akıcı iletişim için dahili sohbet arayüzü
 - **Entegre Shell Terminali** — Yerleşik shell özelliği üzerinden ajan CLI'larına doğrudan erişim
-- **Dosya Gezgini** — Sözdizimi vurgulama ve canlı düzenleme ile etkileşimli dosya ağacı
-- **Git Gezgini** — Değişikliklerini görüntüle, staging'e ekle ve commit'le. Dallar arası geçiş de yapabilirsin
+- **Dosya Gezgini** — Metin, görsel ve indirmeler için salt okunur önizlemeye sahip etkileşimli dosya ağacı; değişikliği bir ajan yapar
+- **Git Gezgini** — Dalını, henüz gönderilmemiş commit'leri ve bekleyen her değişikliği diff'iyle görüntüle; commit ve push'u ajan yapar: tek bir düğme sohbeti başlatır ve senin kendi `/git` komutunu çalıştırır
 - **Oturum Yönetimi** — Konuşmalara devam et, birden fazla oturumu yönet ve geçmişi takip et
 - **Eklenti Sistemi** — CloudCLI'ı özel eklentilerle genişlet: yeni sekmeler, arka uç servisleri ve entegrasyonlar ekle. [Kendi eklentini yaz →](https://github.com/cloudcli-ai/cloudcli-plugin-starter)
 - **TaskMaster AI Entegrasyonu** *(İsteğe Bağlı)* — AI destekli görev planlama, PRD ayrıştırma ve iş akışı otomasyonu ile gelişmiş proje yönetimi
@@ -245,7 +245,7 @@ CloudCLI UI — (https://cloudcli.ai).
 - **[React](https://react.dev/)** — Kullanıcı arayüzü kütüphanesi
 - **[Vite](https://vitejs.dev/)** — Hızlı derleme aracı ve geliştirme sunucusu
 - **[Tailwind CSS](https://tailwindcss.com/)** — Utility-first CSS framework
-- **[CodeMirror](https://codemirror.net/)** — Gelişmiş kod editörü
+- **[CodeMirror](https://codemirror.net/)** — PRD editörünün Markdown editörü
 - **[TaskMaster AI](https://github.com/eyaltoledano/claude-task-master)** *(İsteğe Bağlı)* — AI destekli proje yönetimi ve görev planlama
 
 

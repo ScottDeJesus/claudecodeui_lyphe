@@ -4,10 +4,13 @@ import type { TFunction } from 'i18next';
 
 import { ActionMenu, Badge, Dialog, DialogContent, DialogTitle, LLMProviderLogo, Tooltip, buttonVariants } from '@/shared/ui';
 import { cn,copyTextToClipboard } from '@/shared/utils';
+import { LLM_PROVIDER_LABELS } from '@/shared/constants';
 import type { LLMProvider, Project, ProjectSession, SessionWithProvider } from '@/shared/types';
 import { api } from '@/shared/api';
 import { useSessionForkingProviders } from '@/shared/hooks/useProviderCapabilities';
+import { useCliVersion } from '@/shared/hooks/useCliVersion';
 import { createSessionViewModel, formatCompactAge } from '@/modules/sidebar/utils/sidebarProjectFormatting';
+import SidebarSessionMeta from '@/modules/sidebar/SidebarSessionMeta';
 import { useCompactSidebar } from '@/modules/sidebar/hooks/useCompactSidebar';
 
 type SidebarSessionItemProps = {
@@ -32,13 +35,6 @@ type SidebarSessionItemProps = {
   t: TFunction;
 };
 
-const PROVIDER_LABELS: Record<LLMProvider, string> = {
-  claude: 'Claude',
-  codex: 'Codex',
-  cursor: 'Cursor',
-  opencode: 'OpenCode',
-};
-
 type CopyState = 'loading' | 'idle' | 'copying' | 'copied' | 'error';
 /** Rendered by SidebarProjectSessions for one session row, including its rename, copy and delete controls. */
 function SidebarSessionItem({
@@ -61,6 +57,7 @@ function SidebarSessionItem({
   t,
 }: SidebarSessionItemProps) {
   const isCompact = useCompactSidebar();
+  const { installed: installedCliVersion, staleSessionIds, staleVersionOf } = useCliVersion();
   const sessionView = createSessionViewModel(session, currentTime, t);
   const isSelected = selectedSession?.id === session.id;
   const compactSessionAge = formatCompactAge(sessionView.sessionTime, currentTime);
@@ -71,7 +68,7 @@ function SidebarSessionItem({
   const providerIdRequestRef = useRef(0);
   const showAttentionIndicator = needsAttention && !isSelected;
   const showRecentIndicator = !showAttentionIndicator && !isProcessing && sessionView.isActive;
-  const providerLabel = PROVIDER_LABELS[session.__provider];
+  const providerLabel = LLM_PROVIDER_LABELS[session.__provider];
 
   // While editing, dismiss only when the user clicks outside the inline rename panel
   // (matches Escape / cancel-button behaviour). The mobile rename lives inside the
@@ -207,16 +204,20 @@ function SidebarSessionItem({
               : t('tooltips.activeSessionIndicator')}
             position="right"
           >
+            {/* A ● rather than a bare disc: the state has to survive greyscale and a reader who
+                does not separate amber from green, so the mark carries it as well as the ink. */}
             <div
               role="status"
               aria-label={showAttentionIndicator
                 ? t('tooltips.attentionRequiredIndicator', { defaultValue: 'Session needs attention' })
                 : t('tooltips.activeSessionIndicator')}
               className={cn(
-                'h-2 w-2 animate-pulse rounded-full',
-                showAttentionIndicator ? 'bg-amber-500' : 'bg-green-500',
+                'vv-pulse flex h-2.5 w-2.5 items-center justify-center text-[9px] leading-none',
+                showAttentionIndicator ? 'text-warn-ink' : 'text-primary',
               )}
-            />
+            >
+              <span aria-hidden="true">●</span>
+            </div>
           </Tooltip>
         </div>
       )}
@@ -230,7 +231,7 @@ function SidebarSessionItem({
             !isSelected && isProcessing
               ? 'border-border/60 bg-muted/20'
               : !isSelected && sessionView.isActive
-              ? 'border-green-500/30 bg-green-50/5 dark:bg-green-900/5'
+              ? 'border-primary/30 bg-primary/5'
               : 'border-border/30',
           )}
           onClick={selectMobileSession}
@@ -261,17 +262,14 @@ function SidebarSessionItem({
                       </span>
                     </Tooltip>
                   </span>
-                ) : compactSessionAge && (
-                  <span className="ml-auto flex-shrink-0 text-[11px] text-muted-foreground">{compactSessionAge}</span>
-                )}
+                ) : null}
               </div>
-              <div className="mt-0.5 flex items-center">
-                {sessionView.messageCount > 0 && (
-                  <Badge variant="secondary" className="px-1 py-0 text-xs">
-                    {sessionView.messageCount}
-                  </Badge>
-                )}
-              </div>
+              <SidebarSessionMeta
+                provider={session.__provider}
+                messageCount={sessionView.messageCount}
+                age={compactSessionAge}
+                t={t}
+              />
             </div>
 
             <button
@@ -372,9 +370,9 @@ function SidebarSessionItem({
                   className={cn(
                     'flex min-h-12 w-full items-center gap-3 rounded-xl border px-4 py-3 text-left transition-colors',
                     copyState === 'copied'
-                      ? 'border-green-500/30 bg-green-500/10 text-green-700 dark:text-green-300'
+                      ? 'border-primary/30 bg-primary/5 text-accent-ink'
                       : copyState === 'error'
-                        ? 'border-red-500/30 bg-red-500/10 text-red-700 dark:text-red-300'
+                        ? 'border-warn-ink/30 bg-warn-ink/10 text-warn-ink'
                         : 'border-border bg-muted/35 text-foreground active:bg-muted',
                   )}
                 >
@@ -398,7 +396,7 @@ function SidebarSessionItem({
                       setMobileOptionsOpen(false);
                       requestDeleteSession();
                     }}
-                    className="flex min-h-12 w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-red-600 transition-colors active:bg-red-500/10 dark:text-red-400"
+                    className="flex min-h-12 w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-destructive transition-colors active:bg-destructive/10"
                   >
                     <Trash2 className="h-5 w-5 flex-shrink-0" />
                     <span className="text-sm font-medium">Archive or delete session</span>
@@ -432,7 +430,7 @@ function SidebarSessionItem({
             !isSelected && isProcessing
               ? 'border-border/60 bg-muted/20 hover:bg-muted/25'
               : !isSelected && sessionView.isActive
-                ? 'border-green-500/30 bg-green-50/5 hover:bg-green-50/10 dark:bg-green-900/5 dark:hover:bg-green-900/10'
+                ? 'border-primary/30 bg-primary/5 hover:bg-primary/10'
                 : 'hover:bg-accent/50',
           )}
           // Left-click keeps in-app navigation; Ctrl/Cmd/middle-click and the
@@ -473,20 +471,18 @@ function SidebarSessionItem({
                       </span>
                     </Tooltip>
                   </span>
-                ) : compactSessionAge && (
-                  <span
-                    className={cn(
-                      'ml-auto flex-shrink-0 text-[11px] text-muted-foreground transition-opacity duration-200',
-                      isEditing ? 'opacity-0' : 'group-hover:opacity-0',
-                    )}
-                  >
-                    {compactSessionAge}
-                  </span>
-                )}
+                ) : null}
               </div>
-              <div className="mt-0.5 flex items-center">
-                {sessionView.messageCount > 0 && <Badge variant="secondary" className="px-1 py-0 text-xs">{sessionView.messageCount}</Badge>}
-              </div>
+              <SidebarSessionMeta
+                provider={session.__provider}
+                messageCount={sessionView.messageCount}
+                age={compactSessionAge}
+                t={t}
+              />
+              {staleSessionIds.has(session.id) && (
+                // Inert on purpose: the restart lives in this conversation's own banner, beside the sentence that explains what it does.
+                <Badge tone="warn" className="mt-1 text-[11px]" title={`Open the conversation to restart it on Claude CLI ${installedCliVersion}`}>↻ On CLI {staleVersionOf(session.id)}</Badge>
+              )}
             </div>
           </div>
         </a>
@@ -514,24 +510,24 @@ function SidebarSessionItem({
                   autoFocus
                 />
                 <button
-                  className="flex h-6 w-6 items-center justify-center rounded bg-green-50 hover:bg-green-100 dark:bg-green-900/20 dark:hover:bg-green-900/40"
+                  className="flex h-6 w-6 items-center justify-center rounded bg-primary/10 hover:bg-primary/20"
                   onClick={(event) => {
                     event.stopPropagation();
                     saveEditedSession();
                   }}
                   title={t('tooltips.save')}
                 >
-                  <Check className="h-3 w-3 text-green-600 dark:text-green-400" />
+                  <Check className="h-3 w-3 text-primary" />
                 </button>
                 <button
-                  className="flex h-6 w-6 items-center justify-center rounded bg-gray-50 hover:bg-gray-100 dark:bg-gray-900/20 dark:hover:bg-gray-900/40"
+                  className="flex h-6 w-6 items-center justify-center rounded bg-muted hover:bg-muted/70"
                   onClick={(event) => {
                     event.stopPropagation();
                     onCancelEditingSession();
                   }}
                   title={t('tooltips.cancel')}
                 >
-                  <X className="h-3 w-3 text-gray-600 dark:text-gray-400" />
+                  <X className="h-3 w-3 text-muted-foreground" />
                 </button>
               </>
             ) : (

@@ -195,6 +195,11 @@ export function normalizedToChatMessages(messages: NormalizedMessage[]): ChatMes
       // Carried through so a rendered user bubble can address its own
       // transcript row when the user edits or forks from it.
       transcriptAnchorId: msg.transcriptAnchorId,
+      // Which model produced the row. Shared rather than picked per branch
+      // because a turn reaches the screen as a RUN of rows — thinking, tool
+      // calls, then the reply — and the caption is drawn by whichever comes
+      // first. Naming only the reply captions every working turn "Claude".
+      model: msg.model,
     };
 
     switch (msg.kind) {

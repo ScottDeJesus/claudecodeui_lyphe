@@ -1,0 +1,244 @@
+/* Verve feedback + overlay paint — every colour, border, radius, shadow and motion rule for
+ * the five components Phase 3 adds (Banner, Toast, Tabs, EmptyState, Menu) and the three it
+ * restyles (Dialog, Tooltip, ActionMenu).
+ *
+ * Same contract as controls.css, which is full: a library class string carries `vv-<name>`
+ * plus layout/size utilities and nothing else, colour comes from tokens.css, and no rule here
+ * declares a `--tone-*` property — tone is a token swap (doctrine §5), so `.vv-banner` reads
+ * `var(--tone-soft)` and tokens.css decides what that is. `vv-pop`, `vv-toast-out`, `vv-fade`
+ * and `vv-pulse` are tokens.css keyframes; nothing here defines one.
+ *
+ * Values are _ds_bundle.js's at the lines plan §4 cites, with three deliberate departures:
+ *   1. Tabs has NO sliding pill. The bundle measures the active tab and animates an absolute
+ *      indicator's `left` and `width` (:2521-2532); the handoff forbids animating either, and
+ *      an indicator that has to be measured also reads a stale box for one frame after a
+ *      relabel. The active tab paints its own background instead, so nothing moves.
+ *   2. The Toast dot is `var(--tone-dot)` for every tone. The bundle swaps in `--success-dot`
+ *      for `positive` alone (:2902), which is a sixth colour for a tone that already has one —
+ *      the tone rule doctrine §5 forbids a component from writing.
+ *   3. `.vv-tooltip` keeps the app's four arrow positions. Verve's tooltip draws one position
+ *      and no arrow at all, so there is nothing to copy; the arrow borrows the bubble's own
+ *      ink token, which is what stops the two drifting apart.
+ *
+ * Imported once, for side effect, from src/shared/ui/index.ts.
+ */
+
+/* ---------------------------------------------------------------- Banner */
+.vv-banner {
+  gap: 10px;
+  padding: 11px 14px;
+  border-radius: 10px;
+  background: var(--tone-soft);
+  color: var(--tone-ink);
+  font-size: 13.5px;
+  line-height: 1.55;
+}
+/* Doctrine §6: the tone's own mark, straight out of tokens.css. A banner that said "warn" in
+ * amber alone would say nothing at all with the colour drained out. */
+.vv-banner__mark { margin-top: 2px; font-size: 11px; font-weight: 700; }
+.vv-banner__mark::before { content: var(--tone-glyph); }
+.vv-banner__close {
+  padding: 2px;
+  border: none;
+  border-radius: 6px;
+  background: none;
+  color: inherit;
+  font-size: 11px;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0.7;
+  transition: opacity 0.2s;
+}
+.vv-banner__close:hover { opacity: 1; }
+
+/* ---------------------------------------------------------------- Toast */
+/* The stack is the ONE element in this file that positions rather than paints. It is a fixed
+ * overlay with no parent to place it — doctrine §4's "a component must not position itself"
+ * is about a component inside a caller's layout, and this one has no caller's layout.
+ *
+ * `z-index: 10001` is ONE ABOVE the app's ceiling, and the number is measured rather than
+ * chosen: the highest z-index anywhere in `src/` is 10000, at McpServerFormModal.tsx:107 and
+ * ProviderSkills.tsx:577, with six more surfaces at 9999 (Settings, the file-tree menu and
+ * tree, the provider login, the quick-settings panel, the shared Tooltip) and its scrim at 9998. Verve's own bundle says 120, which is right for a page that owns no
+ * 9999-class modal; in THIS app 120 puts a toast UNDERNEATH every modal there is — measured
+ * with a real toast node in the live stack under an open Settings, where `elementFromPoint` at
+ * the toast's centre returned `div.modal-backdrop`. The stack is the app's topmost surface by
+ * definition, and the toasts Phase 4 onward raises fire from inside exactly those modals.
+ *
+ * `pointer-events: none` because a toast has nothing to click: it covers the bottom-right
+ * 340px of the viewport for 3.8s, and at 1440x900 that rect sits directly over the composer's
+ * model picker, which it silently swallowed. If a toast ever gains an action, `.vv-toast` takes
+ * `pointer-events: auto` back at that moment — not before. */
+.vv-toast-stack { position: fixed; right: 24px; bottom: 24px; z-index: 10001; gap: 10px; pointer-events: none; }
+.vv-toast {
+  gap: 12px;
+  min-width: 260px;
+  max-width: 340px;
+  padding: 13px 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  box-shadow: var(--shadow-overlay);
+  box-sizing: border-box;
+  animation: vv-pop 0.35s var(--ease-enter) both;
+}
+.vv-toast--leaving { animation: vv-toast-out 0.55s ease both; }
+.vv-toast__dot {
+  width: 8px;
+  height: 8px;
+  margin-top: 5px;
+  border-radius: 50%;
+  background: var(--tone-dot);
+  animation: vv-pulse 2s infinite;
+}
+/* The dot carries the colour and the title carries the mark, so which of the five this is
+ * survives greyscale (doctrine §6) — a pulsing grey dot on its own does not. */
+.vv-toast__title { font-size: 14px; font-weight: 700; color: var(--ink); }
+.vv-toast__title::before { content: var(--tone-glyph) ' '; color: var(--tone-ink); }
+.vv-toast__message { margin-top: 2px; font-size: 13px; line-height: 1.5; color: var(--ink-muted); }
+
+/* ---------------------------------------------------------------- Tabs */
+.vv-tabs { gap: 4px; padding: 4px; border-radius: 11px; background: var(--surface2); }
+.vv-tabs__tab {
+  padding: 8px 18px;
+  border: none;
+  border-radius: 8px;
+  background: none;
+  box-shadow: none;
+  color: var(--ink-muted);
+  font-family: var(--font-body);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  /* Only `background-color` and `color` are animated, so no tab's BOX ever moves — which is
+   * the whole reason there is no pill to slide (see the header note). */
+  transition: background-color 0.35s var(--ease-spring), color 0.3s;
+}
+.vv-tabs__tab:hover { color: var(--ink-mid); }
+/* Filled AND lifted, not merely a different grey: the chosen tab differs in elevation too. */
+.vv-tabs__tab[aria-selected='true'] {
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: var(--shadow-rest);
+}
+
+/* ---------------------------------------------------------------- EmptyState */
+/* Dashed, because a solid card says "here is a thing" and the point is that there is not one. */
+.vv-empty {
+  gap: 8px;
+  padding: 34px 24px;
+  border: 1.5px dashed var(--border-strong);
+  border-radius: var(--radius-card);
+  text-align: center;
+}
+.vv-empty__title { font-family: var(--font-display); font-size: 24px; font-style: italic; color: var(--ink-faint); }
+.vv-empty__message { max-width: 260px; margin: 0; font-size: 13.5px; line-height: 1.5; color: var(--ink-faint); }
+
+/* ---------------------------------------------------------------- Menu */
+.vv-menu { position: relative; }
+/* The trigger is whatever the caller handed in, so the button around it paints nothing. */
+.vv-menu__trigger {
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-input);
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.vv-menu__panel {
+  position: absolute;
+  top: calc(100% + 6px);
+  z-index: 20;
+  min-width: 200px;
+  margin: 0;
+  padding: 6px;
+  list-style: none;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  box-shadow: var(--shadow-overlay);
+  animation: vv-pop 0.3s var(--ease-enter) both;
+}
+.vv-menu__panel--left { left: 0; }
+.vv-menu__panel--right { right: 0; }
+.vv-menu__item {
+  padding: 9px 12px;
+  border-radius: 8px;
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.15s;
+}
+.vv-menu__item:hover { background: var(--surface2); }
+/* Filled and ticked, the same pair Select uses — the choice survives greyscale. */
+.vv-menu__item[aria-current='true'] { background: var(--accent-soft); color: var(--accent-ink); }
+.vv-menu__item[aria-current='true']::after { content: '✓'; font-size: 12px; color: var(--accent); }
+.vv-menu__description { margin-top: 2px; font-size: 12.5px; font-weight: 400; line-height: 1.45; color: var(--ink-muted); }
+
+/* ---------------------------------------------------------------- Dialog */
+/* The scrim is a literal, not a token, and deliberately: it is the SAME near-black behind the
+ * panel in both modes. `--canvas` is that colour in dark and near-white in light, so a token
+ * here would erase the scrim exactly where the panel needs it most. */
+.vv-dialog__backdrop {
+  background: rgba(16, 17, 22, 0.45);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+.vv-dialog__panel {
+  border: none;
+  border-radius: var(--radius-screen);
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: var(--shadow-modal);
+}
+
+/* ---------------------------------------------------------------- Tooltip */
+/* Inverted on purpose: ink ground, canvas text. A tooltip that matched the surface under it
+ * would need a border to be seen at all, and Verve draws it as a solid dark chip. */
+.vv-tooltip {
+  padding: 7px 12px;
+  border-radius: 8px;
+  background: var(--ink);
+  color: var(--canvas);
+  font-size: 13px;
+  font-weight: 500;
+  animation: vv-pop 0.25s var(--ease-enter) both;
+}
+.vv-tooltip__arrow { border: 4px solid transparent; }
+.vv-tooltip__arrow--top { border-top-color: var(--ink); }
+.vv-tooltip__arrow--bottom { border-bottom-color: var(--ink); }
+.vv-tooltip__arrow--left { border-left-color: var(--ink); }
+.vv-tooltip__arrow--right { border-right-color: var(--ink); }
+
+/* ---------------------------------------------------------------- ActionMenu */
+.vv-action-menu {
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: var(--shadow-overlay);
+  animation: vv-pop 0.3s var(--ease-enter) both;
+}
+.vv-action-menu__item {
+  border: none;
+  border-radius: 8px;
+  background: none;
+  color: var(--ink);
+  font-family: var(--font-body);
+  cursor: pointer;
+  transition: background-color 0.15s;
+}
+.vv-action-menu__item:hover:not(:disabled),
+.vv-action-menu__item:focus-visible { background: var(--surface2); }
+.vv-action-menu__item:disabled { opacity: 0.5; cursor: not-allowed; }
+/* Red, and only here: tokens.css reserves it for destructive or denied, which is exactly what
+ * an `isDanger` row is. An error would be amber (doctrine §5). */
+.vv-action-menu__item--danger { color: var(--danger-ink); }
+.vv-action-menu__item--danger:hover:not(:disabled),
+.vv-action-menu__item--danger:focus-visible { background: var(--danger-soft); }
+.vv-action-menu__description { color: var(--ink-muted); }
+.vv-action-menu__divider { background: var(--border); }

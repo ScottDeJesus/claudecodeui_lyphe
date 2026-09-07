@@ -1,16 +1,17 @@
-import { RotateCcw, Shield, ShieldOff, X } from 'lucide-react';
+import { Badge, Button, Switch } from '@/shared/ui';
+import type { Tone } from '@/shared/types';
 
 type ShellHeaderProps = {
-  isConnected: boolean;
-  isInitialized: boolean;
-  isRestarting: boolean;
-  hasSession: boolean;
-  sessionDisplayNameShort: string | null;
+  connectionTone: Tone;
+  connectionLabel: string;
+  /** What the app actually knows about this session, already assembled. Empty when it knows nothing. */
+  meta: string;
+  shortcutsLabel: string;
+  shortcutsShown: boolean;
+  onToggleShortcuts: () => void;
+  showDisconnect: boolean;
   onDisconnect: () => void;
   onRestart: () => void;
-  statusNewSessionText: string;
-  statusInitializingText: string;
-  statusRestartingText: string;
   disconnectLabel: string;
   disconnectTitle: string;
   restartLabel: string;
@@ -23,18 +24,17 @@ type ShellHeaderProps = {
   bypassTitle: string;
 };
 
-/** Rendered by Shell above the terminal to show connection status and the restart/disconnect actions. */
+/** Rendered by Shell above the terminal to say whether the session is live and to carry the actions that change it. */
 export default function ShellHeader({
-  isConnected,
-  isInitialized,
-  isRestarting,
-  hasSession,
-  sessionDisplayNameShort,
+  connectionTone,
+  connectionLabel,
+  meta,
+  shortcutsLabel,
+  shortcutsShown,
+  onToggleShortcuts,
+  showDisconnect,
   onDisconnect,
   onRestart,
-  statusNewSessionText,
-  statusInitializingText,
-  statusRestartingText,
   disconnectLabel,
   disconnectTitle,
   restartLabel,
@@ -47,67 +47,43 @@ export default function ShellHeader({
   bypassTitle,
 }: ShellHeaderProps) {
   return (
-    <div className="flex-shrink-0 border-b border-gray-700 bg-gray-800 px-4 py-2">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-2">
-          <div className={`h-2 w-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`} />
+    <div className="flex flex-shrink-0 flex-wrap items-center gap-x-3 gap-y-2 border-b border-border px-4 py-2.5">
+      <Badge tone={connectionTone}>{connectionLabel}</Badge>
 
-          {hasSession && sessionDisplayNameShort && (
-            <span className="text-xs text-blue-300">({sessionDisplayNameShort}...)</span>
-          )}
+      {meta && <span className="min-w-0 flex-1 truncate text-[13.5px] text-muted-foreground">{meta}</span>}
 
-          {!hasSession && <span className="text-xs text-gray-400">{statusNewSessionText}</span>}
+      {/* Wrapping is not decoration: this row carries three buttons and a switch, and at a
+          phone width the group runs past the right edge with no scroll to reach what is off
+          it. Breaking to a second line is what keeps the last action reachable by a finger. */}
+      <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
+        {showBypassToggle && (
+          <span className="mr-1 flex items-center gap-2" title={bypassTitle}>
+            <span className="text-xs text-muted-foreground">{bypassLabel}</span>
+            <Switch checked={bypassEnabled} onChange={() => onToggleBypass()} label={bypassLabel} />
+          </span>
+        )}
 
-          {!isInitialized && <span className="text-xs text-yellow-400">{statusInitializingText}</span>}
+        {/* Desktop only: below `md` the shortcut keys are already on screen, so a button that
+            reveals them would be offering something the reader can see. */}
+        <Button
+          variant="outline"
+          size="sm"
+          className="hidden md:inline-flex"
+          aria-pressed={shortcutsShown}
+          onClick={onToggleShortcuts}
+        >
+          {shortcutsLabel}
+        </Button>
 
-          {isRestarting && <span className="text-xs text-blue-400">{statusRestartingText}</span>}
-        </div>
+        <Button variant="outline" size="sm" onClick={onRestart} disabled={disableRestart} title={restartTitle}>
+          {restartLabel}
+        </Button>
 
-        <div className="flex items-center gap-2">
-          {showBypassToggle && (
-            <button
-              type="button"
-              onClick={onToggleBypass}
-              aria-pressed={bypassEnabled}
-              className={`inline-flex h-8 items-center gap-1.5 rounded-md border px-3 text-xs font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-800 ${
-                bypassEnabled
-                  ? 'border-orange-500/70 bg-orange-600/80 text-white hover:bg-orange-700 focus:ring-orange-400/70'
-                  : 'border-gray-600/80 bg-gray-700/70 text-gray-100 hover:border-orange-400/70 hover:bg-orange-600/60 hover:text-white focus:ring-orange-400/70'
-              }`}
-              title={bypassTitle}
-            >
-              {bypassEnabled ? (
-                <ShieldOff className="h-3.5 w-3.5" aria-hidden="true" />
-              ) : (
-                <Shield className="h-3.5 w-3.5" aria-hidden="true" />
-              )}
-              <span>{bypassLabel}</span>
-            </button>
-          )}
-
-          {isConnected && (
-            <button
-              type="button"
-              onClick={onDisconnect}
-              className="inline-flex h-8 items-center gap-1.5 rounded-md bg-red-600 px-3 text-xs font-medium text-white transition-colors hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-400/70 focus:ring-offset-2 focus:ring-offset-gray-800"
-              title={disconnectTitle}
-            >
-              <X className="h-3.5 w-3.5" aria-hidden="true" />
-              <span>{disconnectLabel}</span>
-            </button>
-          )}
-
-          <button
-            type="button"
-            onClick={onRestart}
-            disabled={disableRestart}
-            className="inline-flex h-8 items-center gap-1.5 rounded-md border border-gray-600/80 bg-gray-700/70 px-3 text-xs font-medium text-gray-100 transition-colors hover:border-blue-400/70 hover:bg-blue-600/80 hover:text-white focus:outline-none focus:ring-2 focus:ring-blue-400/70 focus:ring-offset-2 focus:ring-offset-gray-800 disabled:cursor-not-allowed disabled:border-transparent disabled:bg-transparent disabled:text-gray-500 disabled:opacity-60"
-            title={restartTitle}
-          >
-            <RotateCcw className={`h-3.5 w-3.5 ${isRestarting ? 'animate-spin' : ''}`} aria-hidden="true" />
-            <span>{restartLabel}</span>
-          </button>
-        </div>
+        {showDisconnect && (
+          <Button variant="outline" size="sm" onClick={onDisconnect} title={disconnectTitle}>
+            {disconnectLabel}
+          </Button>
+        )}
       </div>
     </div>
   );

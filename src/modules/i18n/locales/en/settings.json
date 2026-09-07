@@ -1,5 +1,6 @@
 {
   "title": "Settings",
+  "savedAsYouChange": "Saved as you change them",
   "tabs": {
     "account": "Account",
     "permissions": "Permissions",
@@ -38,12 +39,18 @@
   "appearance": {
     "title": "Appearance",
     "theme": "Theme",
-    "codeEditor": "Code Editor",
-    "editorTheme": "Editor Theme",
-    "wordWrap": "Word Wrap",
-    "showMinimap": "Show Minimap",
-    "lineNumbers": "Line Numbers",
-    "fontSize": "Font Size"
+    "workspaceTabs": {
+      "title": "Tabs in the workspace",
+      "hideShell": {
+        "label": "Hide the Shell tab",
+        "description": "Takes the terminal out of the workspace. A running session isn't stopped — it keeps going the same way it does while you're on another tab, and the server ends it half an hour after nothing is connected."
+      },
+      "hideTasks": {
+        "label": "Hide the Tasks tab",
+        "description": "Takes the task board out of the workspace. Your tasks stay where they are.",
+        "unavailable": "TaskMaster isn't installed here, so there is no Tasks tab to hide."
+      }
+    }
   },
   "actions": {
     "saveChanges": "Save Changes",
@@ -156,29 +163,6 @@
       "description": "How projects are ordered in the sidebar",
       "alphabetical": "Alphabetical",
       "recentActivity": "Recent Activity"
-    },
-    "codeEditor": {
-      "title": "Code Editor",
-      "theme": {
-        "label": "Editor Theme",
-        "description": "Default theme for the code editor"
-      },
-      "wordWrap": {
-        "label": "Word Wrap",
-        "description": "Enable word wrapping by default in the editor"
-      },
-      "showMinimap": {
-        "label": "Show Minimap",
-        "description": "Display a minimap for easier navigation in diff view"
-      },
-      "lineNumbers": {
-        "label": "Show Line Numbers",
-        "description": "Display line numbers in the editor"
-      },
-      "fontSize": {
-        "label": "Font Size",
-        "description": "Editor font size in pixels"
-      }
     }
   },
   "mcpForm": {
@@ -334,10 +318,10 @@
       "checking": "Checking...",
       "connected": "Connected",
       "notConnected": "Not connected",
-      "disconnected": "Disconnected",
       "checkingAuth": "Checking authentication status...",
       "loggedInAs": "Logged in as {{email}}",
-      "authenticatedUser": "authenticated user"
+      "authenticatedUser": "authenticated user",
+      "notSignedIn": "Not signed in"
     },
     "account": {
       "claude": {

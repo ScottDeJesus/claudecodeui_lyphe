@@ -23,38 +23,17 @@
 
 @layer base {
   :root {
-    --background: 44 22% 96%;
-    --foreground: 36 25% 4%;
-    --card: 0 0% 100%;
-    --card-foreground: 36 25% 4%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 36 25% 4%;
-    --primary: 221.2 83.2% 53.3%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 44 15% 91%;
-    --secondary-foreground: 36 15% 18%;
-    --muted: 44 15% 91%;
-    --muted-foreground: 40 5% 44%;
-    --accent: 44 15% 91%;
-    --accent-foreground: 36 15% 18%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 44 14% 87%;
-    --input: 44 14% 87%;
-    --ring: 221.2 83.2% 53.3%;
-    --radius: 0.5rem;
-
-    /* Nav design tokens */
-    --nav-glass-bg: 44 22% 96% / 0.7;
+    /* Nav design tokens. The nav's glass, glow and ring are app-specific SHAPES, so they keep
+       their app-specific names — but each one is now derived from a Verve token in
+       src/shared/ui/verve/tokens.css, which is the only place a colour is chosen. */
+    --nav-glass-bg: color-mix(in srgb, var(--canvas) 70%, transparent);
     --nav-glass-blur: 20px;
     --nav-glass-saturate: 1.8;
-    --nav-tab-glow: 221.2 83.2% 53.3% / 0.18;
-    --nav-tab-ring: 221.2 83.2% 53.3% / 0.10;
-    --nav-float-shadow: 0 0% 0% / 0.06;
-    --nav-float-ring: 44 14% 87% / 0.5;
-    --nav-divider-color: 44 14% 87% / 0.5;
-    --nav-input-bg: 44 15% 91% / 0.5;
-    --nav-input-focus-ring: 221.2 83.2% 53.3% / 0.22;
+    --nav-tab-glow: color-mix(in srgb, var(--accent) 18%, transparent);
+    --nav-tab-ring: color-mix(in srgb, var(--accent) 10%, transparent);
+    --nav-float-shadow: rgba(0, 0, 0, .06);
+    --nav-float-ring: color-mix(in srgb, var(--border) 50%, transparent);
+    --nav-divider-color: color-mix(in srgb, var(--border) 50%, transparent);
 
     /* Safe area CSS variables */
     --safe-area-inset-top: env(safe-area-inset-top);
@@ -85,37 +64,17 @@
   }
 
   .dark {
-    --background: 0 0% 8%;
-    --foreground: 40 8% 93%;
-    --card: 0 0% 12%;
-    --card-foreground: 40 8% 93%;
-    --popover: 0 0% 12%;
-    --popover-foreground: 40 8% 93%;
-    --primary: 217.2 91.2% 59.8%;
-    --primary-foreground: 0 0% 8%;
-    --secondary: 0 0% 17%;
-    --secondary-foreground: 40 8% 93%;
-    --muted: 0 0% 17%;
-    --muted-foreground: 0 0% 60%;
-    --accent: 0 0% 17%;
-    --accent-foreground: 40 8% 93%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 40 8% 93%;
-    --border: 0 0% 17%;
-    --input: 0 0% 23%;
-    --ring: 217.2 91.2% 59.8%;
-
-    /* Nav design tokens — dark overrides */
-    --nav-glass-bg: 0 0% 12% / 0.55;
+    /* Nav design tokens — dark overrides. Restated in full rather than left to inherit the
+       :root expressions: this block is what keeps the derivation correct if `dark` ever moves
+       off <html> onto a descendant, where :root's --border would still be the light one. */
+    --nav-glass-bg: color-mix(in srgb, var(--surface) 55%, transparent);
     --nav-glass-blur: 24px;
     --nav-glass-saturate: 1.6;
-    --nav-tab-glow: 217.2 91.2% 59.8% / 0.25;
-    --nav-tab-ring: 217.2 91.2% 59.8% / 0.15;
-    --nav-float-shadow: 0 0% 0% / 0.35;
-    --nav-float-ring: 0 0% 17% / 0.3;
-    --nav-divider-color: 0 0% 17% / 0.5;
-    --nav-input-bg: 0 0% 17% / 0.5;
-    --nav-input-focus-ring: 217.2 91.2% 59.8% / 0.25;
+    --nav-tab-glow: color-mix(in srgb, var(--accent) 25%, transparent);
+    --nav-tab-ring: color-mix(in srgb, var(--accent) 15%, transparent);
+    --nav-float-shadow: rgba(0, 0, 0, .35);
+    --nav-float-ring: color-mix(in srgb, var(--border) 30%, transparent);
+    --nav-divider-color: color-mix(in srgb, var(--border) 50%, transparent);
   }
 }
 
@@ -129,7 +88,6 @@
   body {
     @apply bg-background text-foreground;
 
-    font-family: "Encode Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     margin: 0;
@@ -192,17 +150,6 @@
   [role="button"],
   .transition-all {
     transition: all 150ms cubic-bezier(0.4, 0, 0.2, 1);
-  }
-  
-  /* Color transitions for theme switching - exclude interactive elements */
-  body, div, section, article, aside, header, footer, nav, main,
-  h1, h2, h3, h4, h5, h6, p, span, blockquote,
-  ul, ol, li, dl, dt, dd,
-  table, thead, tbody, tfoot, tr, td, th,
-  form, fieldset, legend, label {
-    transition: background-color 200ms ease-in-out, 
-                border-color 200ms ease-in-out,
-                color 200ms ease-in-out;
   }
   
   /* Transform transitions */
@@ -270,40 +217,29 @@
 
   /* Nav glass surface — uses theme tokens */
   .nav-glass {
-    background: hsl(var(--nav-glass-bg));
+    background: var(--nav-glass-bg);
     backdrop-filter: blur(var(--nav-glass-blur)) saturate(var(--nav-glass-saturate));
     -webkit-backdrop-filter: blur(var(--nav-glass-blur)) saturate(var(--nav-glass-saturate));
   }
 
   /* Nav tab active pill glow — uses theme tokens */
   .nav-tab-active {
-    box-shadow: 0 1px 8px hsl(var(--nav-tab-glow)),
-                0 0 0 1px hsl(var(--nav-tab-ring));
+    box-shadow: 0 1px 8px var(--nav-tab-glow),
+                0 0 0 1px var(--nav-tab-ring);
   }
 
   /* Floating mobile nav bar — uses theme tokens */
   .mobile-nav-float {
-    box-shadow: 0 -1px 20px hsl(var(--nav-float-shadow)),
-                0 0 0 1px hsl(var(--nav-float-ring));
+    box-shadow: 0 -1px 20px var(--nav-float-shadow),
+                0 0 0 1px var(--nav-float-ring);
   }
 
   /* Subtle sidebar divider — uses theme tokens */
   .nav-divider {
     height: 1px;
-    background: linear-gradient(90deg, transparent, hsl(var(--nav-divider-color)) 20%, hsl(var(--nav-divider-color)) 80%, transparent);
+    background: linear-gradient(90deg, transparent, var(--nav-divider-color) 20%, var(--nav-divider-color) 80%, transparent);
   }
 
-  /* Nav search input surface — uses theme tokens */
-  .nav-search-input {
-    background: hsl(var(--nav-input-bg));
-    border: none;
-  }
-
-  .nav-search-input:focus-within {
-    background: hsl(var(--background));
-    box-shadow: 0 0 0 2px hsl(var(--nav-input-focus-ring));
-  }
-  
   /* Modal and dropdown transitions */
   .modal-transition {
     transition: opacity 200ms ease-in-out,
@@ -324,7 +260,7 @@
   
   .scrollbar-thin {
     scrollbar-width: thin;
-    scrollbar-color: hsl(var(--muted-foreground)) transparent;
+    scrollbar-color: var(--ink-muted) transparent;
   }
   
   .scrollbar-thin::-webkit-scrollbar {
@@ -337,103 +273,40 @@
   }
   
   .scrollbar-thin::-webkit-scrollbar-thumb {
-    background-color: hsl(var(--muted-foreground));
+    background-color: var(--ink-muted);
     border-radius: 3px;
   }
   
   .scrollbar-thin::-webkit-scrollbar-thumb:hover {
-    background-color: hsl(var(--muted-foreground) / 0.8);
+    background-color: color-mix(in srgb, var(--ink-muted) 80%, transparent);
   }
-  
-  /* Dark mode scrollbar styles */
-  .dark .scrollbar-thin {
-    scrollbar-color: rgba(156, 163, 175, 0.5) transparent;
+
+  /* Native checkboxes and radios paint from the accent token, and the UA draws the rest for
+     the current colour scheme.
+     ⚠ These are ELEMENT selectors, specificity (0,1,1), so they beat any class — which is why
+     the colours here must be the token and never a literal: the old blue-600/gray-800 set
+     silently defeated every `accent-primary` call site, and would defeat a `.vv-*` control the
+     same way. Keep this block colour-free apart from `accent-color`. */
+  input[type="checkbox"],
+  input[type="radio"] {
+    accent-color: var(--accent);
   }
-  
-  .dark .scrollbar-thin::-webkit-scrollbar-track {
-    background: rgba(38, 38, 38, 0.3);
-  }
-  
-  .dark .scrollbar-thin::-webkit-scrollbar-thumb {
-    background-color: rgba(156, 163, 175, 0.5);
-    border-radius: 3px;
-  }
-  
-  .dark .scrollbar-thin::-webkit-scrollbar-thumb:hover {
-    background-color: rgba(156, 163, 175, 0.7);
-  }
-  
-  /* Global scrollbar styles for main content areas */
-  .dark::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
-  }
-  
-  .dark::-webkit-scrollbar-track {
-    background: rgba(38, 38, 38, 0.5);
-  }
-  
-  .dark::-webkit-scrollbar-thumb {
-    background-color: rgba(107, 114, 128, 0.5);
-    border-radius: 4px;
-  }
-  
-  .dark::-webkit-scrollbar-thumb:hover {
-    background-color: rgba(107, 114, 128, 0.7);
-  }
-  
-  /* Firefox scrollbar styles */
-  .dark {
-    scrollbar-width: thin;
-    scrollbar-color: rgba(115, 115, 115, 0.5) rgba(38, 38, 38, 0.5);
-  }
-  
-  /* Ensure checkbox styling is preserved */
+
   input[type="checkbox"] {
-    @apply accent-blue-600;
     opacity: 1;
   }
-  
+
   input[type="checkbox"]:focus {
     opacity: 1;
-    outline: 2px solid hsl(var(--ring));
+    outline: 2px solid var(--accent);
     outline-offset: 2px;
   }
-  
-  /* Fix checkbox appearance in dark mode */
-  .dark input[type="checkbox"] {
-    background-color: rgb(31 41 55); /* gray-800 */
-    border-color: rgb(75 85 99); /* gray-600 */
-    color: rgb(37 99 235); /* blue-600 */
-    color-scheme: dark;
-  }
-  
-  .dark input[type="checkbox"]:checked {
-    background-color: rgb(37 99 235); /* blue-600 */
-    border-color: rgb(37 99 235); /* blue-600 */
-  }
-  
-  .dark input[type="checkbox"]:focus {
-    --tw-ring-color: rgb(59 130 246); /* blue-500 */
-    --tw-ring-offset-color: rgb(31 41 55); /* gray-800 */
-  }
-  
-  /* Fix radio button appearance in dark mode */
+
+  /* `color-scheme` is what makes a native control render itself for the dark canvas; without
+     it the UA draws a light control on dark. It is a scheme hint, not a colour. */
+  .dark input[type="checkbox"],
   .dark input[type="radio"] {
-    background-color: rgb(31 41 55); /* gray-800 */
-    border-color: rgb(75 85 99); /* gray-600 */
-    color: rgb(37 99 235); /* blue-600 */
     color-scheme: dark;
-  }
-  
-  .dark input[type="radio"]:checked {
-    background-color: rgb(37 99 235); /* blue-600 */
-    border-color: rgb(37 99 235); /* blue-600 */
-  }
-  
-  .dark input[type="radio"]:focus {
-    --tw-ring-color: rgb(59 130 246); /* blue-500 */
-    --tw-ring-offset-color: rgb(31 41 55); /* gray-800 */
   }
   
   /* Ensure textarea text is always visible in dark mode */
@@ -933,13 +806,8 @@
   select option {
     font-size: 16px !important;
     padding: 8px !important;
-    background-color: var(--background) !important;
-    color: var(--foreground) !important;
-  }
-  
-  .dark select option {
-    background-color: rgb(31 31 31) !important;
-    color: rgb(237 235 230) !important;
+    background-color: var(--canvas) !important;
+    color: var(--ink) !important;
   }
 
   /* Tool details chevron animation */
@@ -1002,10 +870,10 @@
 
   @keyframes search-flash {
     0%, 50% {
-      outline: 3px solid hsl(var(--primary));
+      outline: 3px solid var(--accent);
       outline-offset: 4px;
       border-radius: 8px;
-      background-color: hsl(var(--primary) / 0.06);
+      background-color: color-mix(in srgb, var(--accent) 6%, transparent);
     }
     100% {
       outline: 3px solid transparent;

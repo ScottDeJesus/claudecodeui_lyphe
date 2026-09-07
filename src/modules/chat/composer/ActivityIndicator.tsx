@@ -78,8 +78,8 @@ export default function ActivityIndicator({ activity, onAbort, isInputFocused = 
   const tabSurfaceClassName = [
     'chat-activity-tab inline-flex h-8 items-center rounded-b-none rounded-t-lg border border-b-0 bg-card px-3 text-xs transition-all duration-200',
     isInputFocused
-      ? 'border-primary/30 shadow-[0_-1px_2px_hsl(var(--foreground)/0.08),1px_0_2px_hsl(var(--foreground)/0.06),-1px_0_2px_hsl(var(--foreground)/0.06)]'
-      : 'border-border/50 shadow-[0_-1px_1px_hsl(var(--foreground)/0.04),1px_0_1px_hsl(var(--foreground)/0.03),-1px_0_1px_hsl(var(--foreground)/0.03)]',
+      ? 'border-primary/30 shadow-[0_-1px_2px_color-mix(in_srgb,var(--ink)_8%,transparent),1px_0_2px_color-mix(in_srgb,var(--ink)_6%,transparent),-1px_0_2px_color-mix(in_srgb,var(--ink)_6%,transparent)]'
+      : 'border-border/50 shadow-[0_-1px_1px_color-mix(in_srgb,var(--ink)_4%,transparent),1px_0_1px_color-mix(in_srgb,var(--ink)_3%,transparent),-1px_0_1px_color-mix(in_srgb,var(--ink)_3%,transparent)]',
   ].join(' ');
 
   return (

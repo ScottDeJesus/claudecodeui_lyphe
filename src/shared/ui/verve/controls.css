@@ -1,0 +1,296 @@
+/* Verve control paint — every colour, border, radius, shadow and motion rule for the twelve
+ * controls the library carries after Phase 2 (Button, Badge, Input, Card, Skeleton restyled;
+ * Chip, Switch, Avatar, Meter, Spinner, Field, Select new).
+ *
+ * The ONE place those components paint: a library class string carries `vv-<name>` plus
+ * layout/size utilities and nothing else. Colour comes from tokens.css and nowhere else, and
+ * no rule here declares a `--tone-*` property — tone is a token swap (doctrine §5), so
+ * `.vv-badge` reads `var(--tone-soft)` and tokens.css decides what that is.
+ *
+ * Values are _ds_bundle.js's at the lines plan §4 cites, EXCEPT: knobs and fills animate with
+ * `transform`, never `left`/`width` (the bundle animates `left` at :1959-1969; the handoff's
+ * rule wins); and the app's own sizing utilities stay on the components, because Verve's
+ * padding would resize every button and input in the app — a layout change, not a restyle.
+ *
+ * Imported once, for side effect, from src/shared/ui/index.ts.
+ */
+
+/* ---------------------------------------------------------------- Button */
+.vv-button {
+  /* No border on the base. A transparent one on every variant is tidier CSS but grows every
+   * button that sizes itself by padding — measured at +2px a row down the sidebar's project
+   * list, which is positioning (doctrine §4). Only `outline` draws a border. */
+  border: none;
+  border-radius: var(--radius-input);
+  background: none;
+  color: var(--ink);
+  font-family: var(--font-body);
+  cursor: pointer;
+  transition:
+    transform var(--dur-quick) var(--ease-press),
+    background-color 0.2s,
+    border-color 0.2s,
+    color 0.2s,
+    box-shadow var(--dur-move);
+}
+.vv-button:hover:not(:disabled) { transform: translateY(-1px); }
+.vv-button:active:not(:disabled) { transform: scale(0.96); }
+.vv-button:disabled {
+  background: var(--surface2);
+  color: var(--ink-faint);
+  border-color: transparent;
+  box-shadow: none;
+  opacity: 0.7;
+  transform: none;
+}
+.vv-button--default { background: var(--accent); color: var(--on-accent); }
+.vv-button--default:hover:not(:disabled) { background: var(--accent-deep); box-shadow: var(--shadow-hover); }
+
+.vv-button--destructive { background: var(--danger); color: var(--on-danger); }
+.vv-button--destructive:hover:not(:disabled) { background: var(--danger-deep); box-shadow: var(--shadow-hover); }
+
+/* Every size in Button.tsx is an explicit height, so this ring comes out of its own box. */
+.vv-button--outline { border: 1.5px solid var(--border-strong); color: var(--ink); }
+.vv-button--outline:hover:not(:disabled) { border-color: var(--accent); box-shadow: var(--shadow-hover); }
+
+/* One appearance under two names: the app spells it `secondary`, Verve spells it `tonal`, and
+ * a second colour for the second name would be a fork of the same idea. */
+.vv-button--secondary,
+.vv-button--tonal { background: var(--accent-soft); color: var(--accent-ink); }
+.vv-button--secondary:hover:not(:disabled),
+.vv-button--tonal:hover:not(:disabled) { background: var(--accent-soft-hover); box-shadow: var(--shadow-hover); }
+
+.vv-button--ghost { color: var(--accent); }
+.vv-button--ghost:hover:not(:disabled) { background: var(--accent-soft); }
+
+/* Link is text, so it neither lifts nor presses — a moving line of text reads as a glitch. */
+.vv-button--link { color: var(--accent); text-underline-offset: 4px; }
+.vv-button--link:hover:not(:disabled) { text-decoration: underline; transform: none; }
+.vv-button--link:active:not(:disabled) { transform: none; }
+
+/* ---------------------------------------------------------------- Badge */
+.vv-badge {
+  padding: 4px 12px;
+  /* A real border, transparent by default: eleven call sites colour a badge's edge with a
+   * `border-*` utility and never its width, so `border: none` deleted half of six scope codes
+   * in ProviderSkills and both runtime states in BrowserUsePanel. This IS the 2px the Button
+   * block refuses, paid knowingly and only here: a badge is laid out BY its row instead of
+   * sizing one — measured 88×27 → 90×29, centre line unmoved. A button's 2px moved the sidebar. */
+  border: 1px solid transparent;
+  border-radius: var(--radius-pill);
+  background: var(--tone-soft);
+  color: var(--tone-ink);
+  font-size: 12.5px;
+  font-weight: 500;
+}
+/* `default` is the filled MARKER — the "Custom" pill that must stand out from the neutral
+ * counts beside it in the same panel. The primary button's own accent, not a sixth badge
+ * colour; the one fill that outranks the tone, so Badge.tsx drops this class when a caller
+ * names a tone. (--on-accent on --accent is 3.01:1 light; D1 accepted it, plan §13.) */
+.vv-badge--default { background: var(--accent); color: var(--on-accent); }
+/* `outline` is a SHAPE, so it composes with any tone: no fill, a visible edge, tone ink. */
+.vv-badge--outline { background: none; border-color: var(--border); }
+/* `--secondary` and `--destructive` are emitted too, as contract markers a later phase's verify
+ * script can query. They have no rule on purpose: their paint is entirely the tone. */
+
+/* ------------------------------------------------------- Skeleton (Shimmer) */
+/* `.vv-skeleton` (tokens.css) is Verve's waiting SURFACE, standing in for absent content.
+ * Shimmer's four call sites are the opposite — live text arriving, which a band behind it only
+ * highlights, and which measured 4.02:1 at the trough on --ink-muted in light, under AA. So the
+ * sweep is clipped to the glyphs. Two classes deep, to win wherever tokens.css lands. */
+.vv-skeleton.vv-skeleton--text {
+  background-image:
+    linear-gradient(90deg, transparent 33%, var(--ink) 50%, transparent 67%),
+    linear-gradient(var(--ink-muted), var(--ink-muted));
+  background-size: 250% 100%;
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+}
+
+/* ---------------------------------------------------------------- Input */
+.vv-input {
+  border: 1.5px solid var(--border-strong);
+  border-radius: var(--radius-input);
+  background: var(--surface);
+  color: var(--ink);
+  font-family: var(--font-body);
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.vv-input::placeholder { color: var(--ink-muted); }
+.vv-input:focus { border-color: var(--accent); box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 15%, transparent); }
+.vv-input:disabled { background: var(--surface2); color: var(--ink-faint); border-color: var(--border); cursor: not-allowed; }
+.vv-input::file-selector-button {
+  border: none;
+  background: none;
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-weight: 500;
+}
+/* Amber, never red (doctrine §5); Field renders the ▲ and the sentence that go with it. */
+.vv-input--invalid { border-color: var(--warn-dot); }
+.vv-input--invalid:focus { border-color: var(--warn-dot); box-shadow: 0 0 0 4px color-mix(in srgb, var(--warn-dot) 18%, transparent); }
+
+/* ---------------------------------------------------------------- Card */
+.vv-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  color: var(--ink);
+  box-shadow: var(--shadow-rest);
+  transition: transform 0.4s var(--ease-enter), box-shadow 0.4s;
+}
+/* The lift is opt-in. One of the two call sites IS clickable
+ * (ProviderSelectionEmptyState.tsx:175, role="button") but already spells its own hover;
+ * converting it to `interactive` is a screen edit, so Phase 4's. */
+.vv-card--interactive { cursor: pointer; }
+.vv-card--interactive:hover { transform: translateY(-5px); box-shadow: var(--shadow-lift); }
+
+/* ---------------------------------------------------------------- Chip */
+.vv-chip {
+  padding: 7px 15px;
+  border: 1.5px solid var(--border-strong);
+  border-radius: var(--radius-pill);
+  background: none;
+  color: var(--ink-mid);
+  font-family: var(--font-body);
+  font-size: 13.5px;
+  font-weight: 500;
+  transition: border-color 0.2s, background-color 0.2s, color 0.2s;
+}
+.vv-chip:hover { border-color: var(--accent); }
+/* Not colour alone: the outline goes and a fill arrives, so the states differ in greyscale. */
+.vv-chip[data-selected='true'] { background: var(--accent-soft); color: var(--accent-ink); border-color: transparent; }
+.vv-chip--sm { padding: 5px 12px; font-size: 12.5px; }
+
+/* ---------------------------------------------------------------- Switch */
+.vv-switch {
+  position: relative;
+  width: 52px;
+  height: 30px;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-pill);
+  background: var(--border-strong);
+  cursor: pointer;
+  transition: background-color var(--dur-move);
+}
+.vv-switch[aria-checked='true'] { background: var(--accent); }
+.vv-switch:disabled { opacity: 0.6; cursor: not-allowed; }
+.vv-switch__knob {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  /* White in BOTH modes, as Verve draws it. There is no token for "white in both modes":
+   * `--on-accent` flips to near-black in dark and would vanish into the off track. */
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(23, 24, 29, 0.2);
+  transition: transform 0.55s var(--ease-spring);
+}
+.vv-switch[aria-checked='true'] .vv-switch__knob { transform: translateX(22px); }
+
+/* ---------------------------------------------------------------- Avatar */
+.vv-avatar {
+  border-radius: 50%;
+  border: 2px solid var(--surface);
+  /* Identity colour: a person's avatar keeps its hue in both modes, so these three gradients
+   * (verbatim from _ds_bundle.js:13, hue0 here and hue1/hue2 below) do not flip with theme. */
+  background: linear-gradient(135deg, #2fa876, #6fd0a8);
+  color: #fff;
+  font-weight: 700;
+  box-sizing: border-box;
+  flex: none;
+  overflow: hidden;
+}
+.vv-avatar--hue1 { background: linear-gradient(135deg, #e0713a, #f0a172); }
+.vv-avatar--hue2 { background: linear-gradient(135deg, #3aa6b9, #6fd0a8); }
+.vv-avatar--muted { background: var(--surface2); color: var(--ink-muted); }
+
+/* ---------------------------------------------------------------- Meter */
+.vv-meter__row { align-items: baseline; }
+.vv-meter__label { font-size: 13px; font-weight: 500; color: var(--ink); }
+.vv-meter__value { margin-left: auto; font-size: 12.5px; color: var(--ink-muted); font-variant-numeric: tabular-nums; }
+.vv-meter__track { height: 6px; border-radius: var(--radius-pill); background: var(--surface2); overflow: hidden; }
+.vv-meter__fill {
+  height: 100%;
+  width: 100%;
+  transform-origin: left;
+  background: linear-gradient(90deg, var(--accent), var(--accent-deep));
+  transition: transform var(--dur-move) var(--ease-enter);
+}
+/* `warn` is the two-state FILL the plan names, not the five-tone vocabulary — no `--tone-*`
+ * is declared here. The ▲ is doctrine §6: the heavy bar is not readable by colour alone. */
+.vv-meter--warn .vv-meter__fill { background: var(--warn-dot); }
+.vv-meter--warn .vv-meter__value { color: var(--warn-ink); }
+.vv-meter--warn .vv-meter__value::before { content: '▲ '; }
+.vv-meter__sub { font-size: 12px; color: var(--ink-faint); }
+
+/* ---------------------------------------------------------------- Spinner */
+.vv-spinner__ring {
+  border-radius: 50%;
+  border: 4px solid var(--surface2);
+  border-top-color: var(--accent);
+  box-sizing: border-box;
+  animation: vv-spin 1s linear infinite, vv-spin-hue 2.4s ease-in-out infinite;
+}
+.vv-spinner__label { font-size: 13.5px; color: var(--ink-faint); }
+
+/* ---------------------------------------------------------------- Field */
+.vv-field__label { font-size: 13.5px; font-weight: 500; color: var(--ink); }
+.vv-field--locked .vv-field__label { color: var(--ink-faint); }
+.vv-field__helper { font-size: 12.5px; color: var(--ink-faint); }
+/* Amber, and with a mark of its own (doctrine §5, §6). */
+.vv-field__error { font-size: 12.5px; font-weight: 500; color: var(--warn-ink); }
+.vv-field__error::before { content: '▲'; font-size: 11px; }
+
+/* ---------------------------------------------------------------- Select */
+.vv-select { position: relative; }
+.vv-select__trigger {
+  padding: 11px 16px;
+  border: 1.5px solid var(--border-strong);
+  border-radius: var(--radius-input);
+  background: var(--surface);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 15px;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.2s;
+}
+.vv-select__trigger:hover,
+.vv-select__trigger[aria-expanded='true'] { border-color: var(--accent); }
+.vv-select__placeholder { color: var(--ink-faint); }
+.vv-select__chevron { font-size: 11px; color: var(--ink-faint); transition: transform 0.3s var(--ease-enter); }
+.vv-select__trigger[aria-expanded='true'] .vv-select__chevron { transform: rotate(180deg); }
+.vv-select__panel {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  z-index: 20;
+  margin: 0;
+  padding: 6px;
+  list-style: none;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-overlay);
+  animation: vv-pop 0.3s var(--ease-enter) both;
+}
+.vv-select__option {
+  padding: 9px 12px;
+  border-radius: 8px;
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.15s;
+}
+.vv-select__option:hover { background: var(--surface2); }
+/* The chosen row is filled AND ticked, so the choice survives greyscale. */
+.vv-select__option[aria-selected='true'] { background: var(--accent-soft); color: var(--accent-ink); }
+.vv-select__option[aria-selected='true']::after { content: '✓'; font-size: 12px; color: var(--accent); }

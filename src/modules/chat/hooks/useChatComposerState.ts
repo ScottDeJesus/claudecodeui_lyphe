@@ -28,6 +28,7 @@ import {
 import { escapeRegExp } from '@/modules/chat/utils/chatFormatting';
 import { useFileMentions } from '@/modules/chat/hooks/useFileMentions';
 import { useSlashCommands } from '@/modules/chat/hooks/useSlashCommands';
+import { useRestartOnInstalledCli } from '@/modules/chat/hooks/useRestartOnInstalledCli';
 
 type UseChatComposerStateArgs = {
   selectedProject: Project | null;
@@ -163,6 +164,7 @@ export function useChatComposerState({
   currentProviderModel,
   currentProviderEffort,
   isLoading,
+  processingSessions,
   canAbortSession,
   tokenBudget,
   sendMessage,
@@ -1124,6 +1126,20 @@ export function useChatComposerState({
     });
   }, [canAbortSession, currentSessionId, selectedSession?.id, sendMessage]);
 
+  const submitResume = useCallback((content: string) => {
+    handleSubmitRef.current?.(createFakeSubmitEvent(), { content, attachments: [] });
+  }, []);
+  // The restart's whole state machine lives in its own hook: it needs the abort, the submit and the
+  // per-session processing flag, which are this hook's, and it needs to bind a pending restart to
+  // ONE conversation and ONE run — which is more state than this file should grow.
+  const { handleRestartOnInstalledCli, restartPending, restartingSessionId, restartedSessionId } = useRestartOnInstalledCli({
+    sessionId: selectedSession?.id || currentSessionId || null,
+    canAbort: canAbortSession,
+    processingSessions,
+    abort: handleAbortSession,
+    submit: submitResume,
+  });
+
   const handleGrantToolPermission = useCallback(
     (suggestion: { entry: string; toolName: string }) => {
       if (!suggestion || provider !== 'claude') {
@@ -1230,6 +1246,7 @@ export function useChatComposerState({
     syncInputOverlayScroll,
     handleClearInput,
     handleAbortSession,
+    handleRestartOnInstalledCli, restartPending, restartingSessionId, restartedSessionId,
     handlePermissionDecision,
     handleGrantToolPermission,
     handleInputFocusChange,

@@ -18,7 +18,8 @@
     "claude": "Claude",
     "cursor": "Cursor",
     "codex": "Codex",
-    "opencode": "OpenCode"
+    "opencode": "OpenCode",
+    "you": "You"
   },
   "tools": {
     "settings": "Tool Settings",
@@ -33,7 +34,11 @@
     "readFile": "Read file",
     "updateTodo": "Update todo list",
     "readTodo": "Read todo list",
-    "searchResults": "results"
+    "searchResults": "results",
+    "doneAutomatically": "Done automatically",
+    "waitingForYou": "Waiting for you",
+    "finished": "Finished",
+    "allowedByYou": "Allowed by you"
   },
   "search": {
     "found": "Found {{count}} {{type}}",
@@ -54,7 +59,8 @@
   },
   "thinking": {
     "title": "Thinking...",
-    "emoji": "💭 Thinking..."
+    "emoji": "💭 Thinking...",
+    "card": "Thinking"
   },
   "json": {
     "response": "JSON Response"
@@ -65,7 +71,15 @@
     "addTo": "Adds {{entry}} to Allowed Tools.",
     "retry": "Permission saved. Retry the request to use the tool.",
     "error": "Unable to update permissions. Please try again.",
-    "openSettings": "Open settings"
+    "openSettings": "Open settings",
+    "waitingTitle": "Waiting for you",
+    "toolLabel": "Tool",
+    "ruleLabel": "Allow rule",
+    "viewInput": "View tool input",
+    "allowOnce": "Allow this time",
+    "allowAndRemember": "Allow and remember",
+    "leaveAsIs": "Leave it as it is",
+    "allowAlreadyRemembered": "Allow, already remembered"
   },
   "todo": {
     "updated": "Todo list has been updated successfully",
@@ -105,10 +119,10 @@
     "loading": "Loading…"
   },
   "input": {
-    "placeholder": "Type / for commands, @ for files, or ask {{provider}} anything...",
+    "placeholder": "Ask for a change, or describe what you want next",
     "placeholderDefault": "Type your message...",
     "disabled": "Input disabled",
-    "attachFiles": "Attach files",
+    "attachFiles": "Attach a file",
     "attachImages": "Attach images",
     "send": "Send",
     "stop": "Stop",
@@ -142,6 +156,25 @@
       "title": "Replacing an earlier message",
       "filesNotReverted": "files the agent already changed are not reverted",
       "cancel": "Cancel"
+    },
+    "modelHeading": "Model for this conversation",
+    "modelNote": "Changing this starts the next message on the new model. Earlier messages stay as they are.",
+    "editMode": {
+      "heading": "How edits happen",
+      "labels": {
+        "plan": "Plan first, then edit",
+        "acceptEdits": "Edit as you go",
+        "default": "Ask before every edit",
+        "auto": "Decide automatically",
+        "bypassPermissions": "Never ask"
+      },
+      "help": {
+        "plan": "Claude writes a plan and waits for your yes before touching files.",
+        "acceptEdits": "Claude edits files as it works. Every edit can be undone.",
+        "default": "Claude stops at each edit and asks you first.",
+        "auto": "Claude decides per edit.",
+        "bypassPermissions": "Claude never asks."
+      }
     }
   },
   "providerSelection": {
@@ -185,32 +218,38 @@
   },
   "shell": {
     "selectProject": {
-      "title": "Select a Project",
-      "description": "Choose a project to open an interactive shell in that directory"
+      "title": "No project chosen",
+      "description": "Pick a project and the terminal opens in its folder."
     },
     "status": {
-      "newSession": "New Session",
-      "initializing": "Initializing...",
-      "restarting": "Restarting..."
+      "connected": "● Connected",
+      "notConnected": "· Not connected",
+      "starting": "● Starting up",
+      "restarting": "● Restarting"
     },
     "actions": {
       "disconnect": "Disconnect",
-      "disconnectTitle": "Disconnect from shell",
-      "restart": "Restart",
-      "restartTitle": "Restart Shell",
-      "connect": "Continue in Shell",
-      "connectTitle": "Connect to shell",
-      "bypass": "Bypass",
-      "bypassOnTitle": "Bypass permissions on — click to disable (restarts the CLI)",
-      "bypassOffTitle": "Bypass permissions off — click to enable (restarts the CLI)"
+      "disconnectTitle": "Close this shell session",
+      "restart": "Restart the session",
+      "restartTitle": "Stop what is running and start the session again",
+      "shortcuts": "Keyboard shortcuts",
+      "connect": "Start the session",
+      "connectTitle": "Open a shell in this project",
+      "bypass": "Skip permission prompts",
+      "bypassOnTitle": "Permission prompts are being skipped — switch off to ask again (restarts the session)",
+      "bypassOffTitle": "Permission prompts are on — switch off to skip them (restarts the session)"
     },
-    "loading": "Loading terminal...",
-    "connecting": "Connecting to shell...",
-    "startSession": "Start a new Claude session",
-    "resumeSession": "Resume session: {{displayName}}...",
+    "loading": "Getting the terminal ready",
+    "connecting": "Starting the session",
+    "startSession": "Start a new session in this project",
+    "resumeSession": "Pick up where {{displayName}} left off",
     "runCommand": "Run {{command}} in {{projectName}}",
-    "startCli": "Starting Claude CLI in {{projectName}}",
-    "defaultCommand": "command"
+    "startCli": "Starting a session in {{projectName}}",
+    "defaultCommand": "command",
+    "meta": {
+      "started": "started {{time}}"
+    },
+    "privacyNote": "This terminal runs on your machine. Nothing here is sent anywhere until you ask an agent to read it."
   },
   "claudeStatus": {
     "actions": {

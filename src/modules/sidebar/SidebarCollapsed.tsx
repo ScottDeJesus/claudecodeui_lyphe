@@ -1,6 +1,8 @@
 import { Settings, Sparkles, PanelLeftOpen, Bug, AlertTriangle } from 'lucide-react';
 import type { TFunction } from 'i18next';
 
+import { AccountFooterRow } from '@/modules/accounts';
+
 const DISCORD_INVITE_URL = 'https://discord.gg/buxwujPNRE';
 const GITHUB_ISSUES_URL = 'https://github.com/siteboon/claudecodeui/issues/new';
 
@@ -85,8 +87,8 @@ export default function SidebarCollapsed({
           aria-label={t('version.restartRequired')}
           title={t('version.restartRequired')}
         >
-          <AlertTriangle className="h-4 w-4 text-amber-500" />
-          <span className="absolute right-1.5 top-1.5 h-1.5 w-1.5 animate-pulse rounded-full bg-amber-500" />
+          <AlertTriangle className="h-4 w-4 text-warn-ink" />
+          <span className="vv-pulse absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-warn-ink" />
         </div>
       )}
 
@@ -98,10 +100,17 @@ export default function SidebarCollapsed({
           aria-label={t('common:versionUpdate.ariaLabels.updateAvailable')}
           title={t('common:versionUpdate.ariaLabels.updateAvailable')}
         >
-          <Sparkles className="h-4 w-4 text-blue-500" />
-          <span className="absolute right-1.5 top-1.5 h-1.5 w-1.5 animate-pulse rounded-full bg-blue-500" />
+          <Sparkles className="h-4 w-4 text-primary" />
+          <span className="vv-pulse absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-primary" />
         </button>
       )}
+
+      {/* The signed-in account, at the foot of the rail as it is at the foot of the sidebar.
+          Avatar only — the rail has no room for a label, so a click opens the sidebar where
+          the full row and its panel live. */}
+      <div className="mt-auto">
+        <AccountFooterRow collapsed onExpand={onExpand} />
+      </div>
     </div>
   );
 }

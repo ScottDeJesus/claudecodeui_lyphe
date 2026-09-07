@@ -7,11 +7,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content" />
     <title>CloudCLI UI</title>
 
-    <!-- Fonts: Encode Sans (UI) + Merriweather (chat) -->
+    <!-- Fonts: Schibsted Grotesk (everything) + Instrument Serif (display/headings).
+         Loaded here rather than through an @import in tokens.css so the preconnects above
+         can do their job — an @import inside CSS is discovered a round trip later. -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Encode+Sans:wght@400;500;600;700&family=Merriweather:ital,wght@0,400;0,700;1,400;1,700&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Schibsted+Grotesk:wght@400;500;700&display=swap"
       rel="stylesheet"
     />
 
@@ -28,7 +30,7 @@
     <link rel="apple-touch-icon" sizes="180x180" href="/icons/icon-192x192.png" />
     
     <!-- Theme Color -->
-    <meta name="theme-color" content="#ffffff" />
+    <meta name="theme-color" content="#f7f7f9" />
     <meta name="msapplication-TileColor" content="#ffffff" />
     
     <!-- Prevent zoom on iOS -->

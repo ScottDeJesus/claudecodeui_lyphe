@@ -185,9 +185,9 @@ export function ActionMenu({
       role="menu"
       tabIndex={-1}
       className={cn(
+        'vv-action-menu',
         portal ? 'fixed z-[70]' : 'absolute top-full z-50 mt-2',
-        'min-w-[220px] rounded-lg border border-border bg-popover p-1 text-popover-foreground shadow-lg',
-        'animate-in fade-in-0 zoom-in-95',
+        'min-w-[220px]',
         !portal && (align === 'right' ? 'right-0' : 'left-0'),
         menuClassName,
       )}
@@ -198,20 +198,18 @@ export function ActionMenu({
         const Icon = item.icon;
         return (
           <React.Fragment key={item.key}>
-            {item.showDividerBefore && <div className="mx-2 my-1 h-px bg-border" />}
+            {item.showDividerBefore && <div className="vv-action-menu__divider mx-2 my-1 h-px" />}
             <button
               type="button"
               role="menuitem"
               disabled={item.disabled || item.loading}
               onClick={() => runItem(item)}
+              // `focus:outline-none` is gone with the colour utilities: tokens.css draws the
+              // focus ring on every button, and this was suppressing it on the one control in
+              // the app a keyboard user reaches ONLY by tabbing.
               className={cn(
-                'flex w-full items-start gap-3 rounded-md px-3 py-2 text-left text-sm transition-colors',
-                'focus:outline-none focus-visible:bg-accent',
-                item.disabled || item.loading
-                  ? 'cursor-not-allowed opacity-50'
-                  : item.isDanger
-                    ? 'text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950'
-                    : 'hover:bg-accent',
+                'vv-action-menu__item flex w-full items-start gap-3 px-3 py-2 text-left text-sm',
+                item.isDanger && 'vv-action-menu__item--danger',
               )}
             >
               {item.loading ? (
@@ -222,7 +220,7 @@ export function ActionMenu({
               <span className="min-w-0 flex-1">
                 <span className="block font-medium leading-5">{item.label}</span>
                 {item.description && (
-                  <span className="mt-0.5 block text-xs leading-4 text-muted-foreground">
+                  <span className="vv-action-menu__description mt-0.5 block text-xs leading-4">
                     {item.description}
                   </span>
                 )}

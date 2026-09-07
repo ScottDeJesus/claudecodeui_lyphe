@@ -179,7 +179,7 @@ export const DialogContent = React.forwardRef<HTMLDivElement, DialogContentProps
       <div className={cn('fixed inset-0 z-50', wrapperClassName)}>
         {/* Overlay */}
         <div
-          className="fixed inset-0 animate-dialog-overlay-show bg-black/50 backdrop-blur-sm"
+          className="vv-dialog__backdrop fixed inset-0 animate-dialog-overlay-show"
           onClick={() => {
             onPointerDownOutside?.();
             onOpenChange(false);
@@ -196,8 +196,13 @@ export const DialogContent = React.forwardRef<HTMLDivElement, DialogContentProps
           role="dialog"
           aria-modal="true"
           className={cn(
-            'fixed left-1/2 top-1/2 z-50 w-full max-w-lg -translate-x-1/2 -translate-y-1/2',
-            'rounded-xl border bg-popover text-popover-foreground shadow-lg',
+            'vv-dialog__panel fixed left-1/2 top-1/2 z-50 w-full max-w-lg -translate-x-1/2 -translate-y-1/2',
+            // Verve's own panel motion is `vv-pop .45s var(--ease-enter)`, and this keyframe is
+            // that motion adapted to a centred box: vv-pop animates `transform` outright, which
+            // would overwrite the two translate utilities above and drop the dialog into the
+            // top-left corner for the length of the animation. `dialog-content-show` carries the
+            // same rise and the same 96% scale-in with the centring folded in, and Phase 3
+            // retuned its easing and duration to match (tailwind.config.js).
             animationClassName ?? 'animate-dialog-content-show',
             className
           )}

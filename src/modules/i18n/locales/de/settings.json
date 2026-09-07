@@ -36,13 +36,7 @@
   },
   "appearance": {
     "title": "Darstellung",
-    "theme": "Design",
-    "codeEditor": "Code-Editor",
-    "editorTheme": "Editor-Design",
-    "wordWrap": "Zeilenumbruch",
-    "showMinimap": "Minimap anzeigen",
-    "lineNumbers": "Zeilennummern",
-    "fontSize": "Schriftgröße"
+    "theme": "Design"
   },
   "actions": {
     "saveChanges": "Änderungen speichern",
@@ -130,29 +124,6 @@
       "description": "Wie Projekte in der Seitenleiste angeordnet werden",
       "alphabetical": "Alphabetisch",
       "recentActivity": "Letzte Aktivität"
-    },
-    "codeEditor": {
-      "title": "Code-Editor",
-      "theme": {
-        "label": "Editor-Design",
-        "description": "Standarddesign für den Code-Editor"
-      },
-      "wordWrap": {
-        "label": "Zeilenumbruch",
-        "description": "Zeilenumbruch standardmäßig im Editor aktivieren"
-      },
-      "showMinimap": {
-        "label": "Minimap anzeigen",
-        "description": "Minimap zur einfacheren Navigation in der Diff-Ansicht anzeigen"
-      },
-      "lineNumbers": {
-        "label": "Zeilennummern anzeigen",
-        "description": "Zeilennummern im Editor anzeigen"
-      },
-      "fontSize": {
-        "label": "Schriftgröße",
-        "description": "Editor-Schriftgröße in Pixeln"
-      }
     }
   },
   "mcpForm": {
@@ -308,7 +279,6 @@
       "checking": "Wird überprüft...",
       "connected": "Verbunden",
       "notConnected": "Nicht verbunden",
-      "disconnected": "Getrennt",
       "checkingAuth": "Authentifizierungsstatus wird überprüft...",
       "loggedInAs": "Angemeldet als {{email}}",
       "authenticatedUser": "authentifizierte:r Benutzer:in"

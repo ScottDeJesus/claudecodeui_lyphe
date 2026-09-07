@@ -1,110 +1,88 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 
-import { useGitPanelController } from '@/modules/git-panel/hooks/useGitPanelController';
-import { useRevertLocalCommit } from '@/modules/git-panel/hooks/useRevertLocalCommit';
-import type { ConfirmationRequest, FileOpenHandler, GitPanelView, Project } from '@/shared/types';
-import { getChangedFileCount } from '@/modules/git-panel/utils/gitPanelUtils';
-import ChangesView from '@/modules/git-panel/changes/ChangesView';
-import HistoryView from '@/modules/git-panel/history/HistoryView';
-import BranchesView from '@/modules/git-panel/branches/BranchesView';
-import WorktreesView from '@/modules/git-panel/worktrees/WorktreesView';
-import GitPanelHeader from '@/modules/git-panel/GitPanelHeader';
+import { Spinner, Tabs } from '@/shared/ui';
+import type { FileOpenHandler, GitPanelView, Project } from '@/shared/types';
+import { useGitReadController } from '@/modules/git-panel/hooks/useGitReadController';
+import { useGitDelegation } from '@/modules/git-panel/hooks/git-delegation';
+import { describeUpstreamPosition } from '@/modules/git-panel/utils/gitPanelUtils';
+import ChangesReadOnlyView from '@/modules/git-panel/changes/ChangesReadOnlyView';
+import GitDelegationCard from '@/modules/git-panel/GitDelegationCard';
 import GitRepositoryErrorState from '@/modules/git-panel/GitRepositoryErrorState';
-import GitViewTabs from '@/modules/git-panel/GitViewTabs';
-import ConfirmActionModal from '@/modules/git-panel/modals/ConfirmActionModal';
+import GitStatusHeader from '@/modules/git-panel/GitStatusHeader';
+import HistoryView from '@/modules/git-panel/history/HistoryView';
+
+const GIT_TABS: { id: GitPanelView; label: string }[] = [
+  { id: 'changes', label: 'Changes' },
+  { id: 'history', label: 'History' },
+];
+
+const DEFAULT_BRANCH = 'main';
 
 type GitPanelProps = {
   selectedProject: Project | null;
   isMobile?: boolean;
   onFileOpen?: FileOpenHandler;
-  /** Switches the app to another project — used by the Worktrees view to jump into a worktree. */
-  onProjectSelect?: (project: Project) => void;
-  /** Silently re-syncs the sidebar project list after worktree projects are created/archived. */
-  onProjectsRefresh?: () => void;
 };
 
-/** Exported through the git-panel barrel; the project-workspace module renders it as the source-control sidebar tab. */
-export default function GitPanel({
-  selectedProject,
-  isMobile = false,
-  onFileOpen,
-  onProjectSelect,
-  onProjectsRefresh,
-}: GitPanelProps) {
+/**
+ * Exported through the git-panel barrel; the project-workspace module renders it as the
+ * source-control tab.
+ *
+ * The panel READS. It shows which branch this is, how it stands against the upstream, what
+ * is waiting to be pushed and what each change looks like — and it has no verb for any of
+ * it. Committing and pushing happen in the agent run this panel delegates to, so the one
+ * place a person can start a git write is a conversation, not a button here.
+ */
+export default function GitPanel({ selectedProject, isMobile = false, onFileOpen }: GitPanelProps) {
+  // Which of the two views is on screen. Nothing else depends on it — both read the same
+  // controller — so it lives here rather than in the controller.
   const [activeView, setActiveView] = useState<GitPanelView>('changes');
-  const [wrapText, setWrapText] = useState(true);
-  const [hasExpandedFiles, setHasExpandedFiles] = useState(false);
-  const [confirmAction, setConfirmAction] = useState<ConfirmationRequest | null>(null);
 
-  const {
-    gitStatus,
-    gitDiff,
-    isLoading,
-    isLoadingCommits,
-    currentBranch,
-    branches,
-    localBranches,
-    remoteBranches,
-    recentCommits,
-    commitDiffs,
-    remoteStatus,
-    isCreatingBranch,
-    isFetching,
-    isPulling,
-    isPushing,
-    isPublishing,
-    isCreatingInitialCommit,
-    isInitializingRepository,
-    operationError,
-    clearOperationError,
-    refreshAll,
-    switchBranch,
-    createBranch,
-    deleteBranch,
-    handleFetch,
-    handlePull,
-    handlePush,
-    handlePublish,
-    discardChanges,
-    deleteUntrackedFile,
-    stageFiles,
-    unstageFiles,
-    fetchCommitDiff,
-    commitChanges,
-    createInitialCommit,
-    initRepository,
-    openFile,
-  } = useGitPanelController({
-    selectedProject,
-    activeView,
-    onFileOpen,
-  });
+  const navigate = useNavigate();
 
-  const { isRevertingLocalCommit, revertLatestLocalCommit } = useRevertLocalCommit({
-    // `projectId` (DB primary key) is forwarded to the revert API which uses it
-    // as the `project` body param.
-    projectId: selectedProject?.projectId ?? null,
-    onSuccess: refreshAll,
-  });
+  // ONE controller for the whole panel. The lists read its payloads and the delegation card
+  // takes the controller itself, so the answer a finished run reports and the rows on screen
+  // come from the same refreshed read and cannot contradict each other.
+  const controller = useGitReadController(selectedProject);
+  const { status, remoteStatus, commits, loading, error, diffFor, refresh } = controller;
 
-  const executeConfirmedAction = useCallback(async (useAlternateConfirmation = false) => {
-    if (!confirmAction) return;
-    const actionToExecute = confirmAction;
-    setConfirmAction(null);
-    try {
-      const confirmationHandler = useAlternateConfirmation
-        ? actionToExecute.alternateConfirmation?.onConfirm ?? actionToExecute.onConfirm
-        : actionToExecute.onConfirm;
-      await confirmationHandler();
-    } catch (error) {
-      console.error('Error executing confirmation action:', error);
-    }
-  }, [confirmAction]);
+  // Decided ONCE, here, from the server's own flags, and handed to the header and the Changes
+  // view together: the one shape in which the badge and the body cannot disagree about
+  // whether there is an upstream to be ahead of.
+  const upstream = describeUpstreamPosition(remoteStatus, status);
 
-  const changeCount = getChangedFileCount(gitStatus);
-  // Without a repository the branch/fetch/refresh header controls are all
-  // meaningless — hide the whole header and let the init state own the panel.
-  const isMissingRepository = Boolean(gitStatus?.notGitRepository);
+  // The delegation's whole view of the project: the id it belongs to, and the directory the
+  // conversation is started in. Keyed on the two STRINGS rather than the project object, which
+  // arrives with a new identity on renders that changed nothing about either — and null rather
+  // than an empty path, because a conversation cannot be started in a directory we cannot name.
+  const projectPath = selectedProject?.fullPath || selectedProject?.path || null;
+  const projectId = selectedProject?.projectId ?? null;
+  const delegationProject = useMemo(
+    () => (projectId && projectPath ? { id: projectId, path: projectPath } : null),
+    [projectId, projectPath],
+  );
+  const delegation = useGitDelegation(delegationProject, controller);
+
+  const openConversation = useCallback(
+    (sessionId: string) => navigate(`/session/${sessionId}`),
+    [navigate],
+  );
+
+  // Built once and rendered from two places: below the lists, and below the repository error
+  // state, where it is the only thing that still knows a run happened.
+  const delegationSlot = (
+    <GitDelegationCard
+      state={delegation.state}
+      status={status}
+      upstream={upstream}
+      starting={delegation.starting}
+      notice={delegation.notice}
+      onStart={() => void delegation.start()}
+      onDismiss={delegation.dismiss}
+      onOpenConversation={openConversation}
+    />
+  );
 
   if (!selectedProject) {
     return (
@@ -114,129 +92,94 @@ export default function GitPanel({
     );
   }
 
-  return (
-    <div className="flex h-full flex-col bg-background">
-      {!isMissingRepository && (
-        <GitPanelHeader
-          isMobile={isMobile}
-          currentBranch={currentBranch}
-          branches={branches}
-          remoteStatus={remoteStatus}
-          isLoading={isLoading}
-          isCreatingBranch={isCreatingBranch}
-          isFetching={isFetching}
-          isPulling={isPulling}
-          isPushing={isPushing}
-          isPublishing={isPublishing}
-          isRevertingLocalCommit={isRevertingLocalCommit}
-          operationError={operationError}
-          onRefresh={refreshAll}
-          onRevertLocalCommit={revertLatestLocalCommit}
-          onSwitchBranch={switchBranch}
-          onCreateBranch={createBranch}
-          onFetch={handleFetch}
-          onPull={handlePull}
-          onPush={handlePush}
-          onPublish={handlePublish}
-          onClearError={clearOperationError}
-          onRequestConfirmation={setConfirmAction}
-        />
-      )}
+  // Nothing is drawn until the first read lands. The header would otherwise have to name a
+  // branch it has not been told yet, and the only name available to guess with is "main" —
+  // which would be a value standing in for an unknown, on the one screen whose whole job is
+  // to report what git actually says.
+  if (loading && !status) {
+    return (
+      <section aria-label="Source control" className="flex h-full flex-col bg-background">
+        <div className="flex flex-1 items-center justify-center">
+          <Spinner label="Reading this project's git state" />
+        </div>
+        {/* A run in flight is not waiting on this read, and coming back to its project starts one:
+            the card keeps narrating through it rather than being replaced by a spinner. */}
+        {delegation.state.phase !== 'idle' && (
+          <div className="flex-none border-t border-border p-4">{delegationSlot}</div>
+        )}
+      </section>
+    );
+  }
 
-      {gitStatus?.error ? (
+  // Without a repository there is no branch and no upstream, so the header would be three
+  // empty tokens above an explanation. The empty state owns the panel instead — but not the run:
+  // a read that fails AFTER a press is exactly when the outcome is worth having, and the card
+  // holds the only link to the conversation it happened in. It joins an idle card's silence.
+  if (error) {
+    return (
+      <section aria-label="Source control" className="flex h-full flex-col bg-background">
         <GitRepositoryErrorState
-          error={gitStatus.error}
-          details={gitStatus.details}
-          canInitRepository={isMissingRepository}
-          isInitializingRepository={isInitializingRepository}
-          initError={isMissingRepository ? operationError : null}
-          onInitRepository={() => {
-            clearOperationError();
-            void initRepository();
-          }}
+          error={error}
+          details={status?.details}
+          notGitRepository={status?.notGitRepository}
         />
-      ) : (
-        <>
-          <GitViewTabs
-            activeView={activeView}
-            isHidden={hasExpandedFiles}
-            changeCount={changeCount}
-            onChange={setActiveView}
-          />
+        {delegation.state.phase !== 'idle' && (
+          <div className="flex-none border-t border-border p-4">{delegationSlot}</div>
+        )}
+      </section>
+    );
+  }
 
-          {activeView === 'changes' && (
-            <ChangesView
-              key={selectedProject.fullPath}
-              isMobile={isMobile}
-              projectPath={selectedProject.fullPath}
-              gitStatus={gitStatus}
-              gitDiff={gitDiff}
-              isLoading={isLoading}
-              wrapText={wrapText}
-              isCreatingInitialCommit={isCreatingInitialCommit}
-              onWrapTextChange={setWrapText}
-              onCreateInitialCommit={createInitialCommit}
-              onOpenFile={openFile}
-              onDiscardFile={discardChanges}
-              onDeleteFile={deleteUntrackedFile}
-              onStageFiles={stageFiles}
-              onUnstageFiles={unstageFiles}
-              onCommitChanges={commitChanges}
-              onRequestConfirmation={setConfirmAction}
-              onExpandedFilesChange={setHasExpandedFiles}
-            />
-          )}
+  return (
+    // A labelled region: the panel is a landmark of its own inside the workspace, and it is
+    // also the exact subtree a verification run scans for a write control that grew back.
+    <section aria-label="Source control" className="flex h-full flex-col bg-background">
+      <GitStatusHeader
+        branch={status?.branch || DEFAULT_BRANCH}
+        upstream={upstream}
+        loading={loading}
+        onRefresh={() => void refresh()}
+      />
 
-          {activeView === 'history' && (
-            <HistoryView
-              isMobile={isMobile}
-              // Treat an in-flight commits request as loading only while the
-              // list is empty, so "No commits found" never flashes before the
-              // first response and refetches don't blank an existing list.
-              isLoading={isLoading || (recentCommits.length === 0 && isLoadingCommits)}
-              recentCommits={recentCommits}
-              commitDiffs={commitDiffs}
-              wrapText={wrapText}
-              onFetchCommitDiff={fetchCommitDiff}
-            />
-          )}
+      <div className="flex-none px-4 pb-3">
+        <Tabs
+          tabs={GIT_TABS}
+          active={activeView}
+          // Narrowed rather than cast: Tabs hands back a plain string, and the two ids this
+          // panel has are the only two it can mean.
+          onChange={(id) => setActiveView(id === 'history' ? 'history' : 'changes')}
+          ariaLabel="Source control views"
+        />
+      </div>
 
-          {activeView === 'worktrees' && (
-            <WorktreesView
-              key={selectedProject.fullPath}
-              isMobile={isMobile}
-              selectedProject={selectedProject}
-              localBranches={localBranches}
-              onProjectSelect={onProjectSelect}
-              onProjectsRefresh={onProjectsRefresh}
-            />
-          )}
-
-          {activeView === 'branches' && (
-            <BranchesView
-              isMobile={isMobile}
-              isLoading={isLoading}
-              currentBranch={currentBranch}
-              localBranches={localBranches}
-              remoteBranches={remoteBranches}
-              remoteStatus={remoteStatus}
-              isCreatingBranch={isCreatingBranch}
-              onSwitchBranch={switchBranch}
-              onCreateBranch={createBranch}
-              onDeleteBranch={deleteBranch}
-              onRequestConfirmation={setConfirmAction}
-            />
-          )}
-        </>
+      {activeView === 'changes' && (
+        <ChangesReadOnlyView
+          key={selectedProject.fullPath}
+          status={status}
+          commits={commits}
+          upstream={upstream}
+          isMobile={isMobile}
+          diffFor={diffFor}
+          onFileOpen={onFileOpen}
+        />
       )}
 
-      <ConfirmActionModal
-        action={confirmAction}
-        onCancel={() => setConfirmAction(null)}
-        onConfirm={(useAlternateConfirmation) => {
-          void executeConfirmedAction(useAlternateConfirmation);
-        }}
-      />
-    </div>
+      {activeView === 'history' && (
+        <HistoryView
+          // Keyed for the same reason the sibling above is: the per-row diffs this view opens
+          // belong to ONE repository, and without a key they would outlive a project change —
+          // an in-flight read for the old project resolving into the new one's map.
+          key={selectedProject.projectId}
+          isMobile={isMobile}
+          commits={commits}
+          projectId={selectedProject.projectId}
+        />
+      )}
+
+      {/* The delegation slot, and the panel's only verb. It sits outside the tabs because it
+          speaks for the repository rather than for either list, and it POSITIONS the card here
+          rather than the card positioning itself. */}
+      <div className="flex-none border-t border-border p-4">{delegationSlot}</div>
+    </section>
   );
 }

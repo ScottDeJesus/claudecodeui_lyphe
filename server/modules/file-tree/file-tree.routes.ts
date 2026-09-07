@@ -2,6 +2,7 @@ import express from 'express';
 import type { NextFunction, Request, RequestHandler, Response } from 'express';
 
 import type {
+  FileTreeListingServices,
   FileTreeLogger,
   FileTreeServices,
   FileTreeUploadedFile,
@@ -12,6 +13,12 @@ type FileTreeUploadLimits = {
   maximumFileSizeMegabytes: number;
   maximumFileCount: number;
 };
+
+/** How many lines a preview returns when the client does not ask for a number. */
+const DEFAULT_PREVIEW_LINES = 200;
+
+/** The most lines one preview will ever return, however many the client asks for. */
+const MAXIMUM_PREVIEW_LINES = 400;
 
 type UploadedRequest = Request & {
   files?: Express.Multer.File[];
@@ -64,6 +71,20 @@ function readRelativePaths(value: unknown): string[] {
   } catch {
     return [];
   }
+}
+
+/**
+ * Reads `lines` for a preview request.
+ *
+ * Out-of-range values are CLAMPED rather than rejected: a client asking for
+ * 9999 lines wants as much as it can get, and a 400 would tell it nothing it
+ * could act on. A missing or unparseable value takes the default.
+ */
+function readPreviewLineCount(value: unknown): number {
+  const parsedCount = typeof value === 'string' ? Number.parseInt(value, 10) : Number.NaN;
+  return Number.isFinite(parsedCount)
+    ? Math.min(Math.max(parsedCount, 1), MAXIMUM_PREVIEW_LINES)
+    : DEFAULT_PREVIEW_LINES;
 }
 
 function readRequestedFileCount(value: unknown, fallbackCount: number): number {
@@ -253,6 +274,43 @@ export function createFileTreeRouter(
       });
     },
   );
+
+  return router;
+}
+
+/**
+ * Builds the File Tree directory-listing and file-preview router.
+ *
+ * Mounted beside `createFileTreeRouter` on the same `/api/file-tree` namespace by
+ * `file-tree.module.ts`. It is a router of its own because these two routes are
+ * served by a different service; keeping them out of the browsing router leaves
+ * that router's signature — and every existing caller of it — untouched.
+ *
+ * Both handlers only parse the query and hand it on: containment, binary
+ * detection, and line counting all live in the listing service.
+ */
+export function createFileTreeListingRouter(
+  listingServices: FileTreeListingServices,
+  logger: FileTreeLogger,
+): express.Router {
+  const router = express.Router();
+
+  // An absent `path` is the project root, not a bad request — that is where the
+  // file manager opens.
+  router.get('/projects/:projectId/list', createRouteHandler(async (request, response) => {
+    response.json(await listingServices.listDirectory(
+      readProjectId(request),
+      readOptionalString(request.query.path) ?? '',
+    ));
+  }, logger));
+
+  router.get('/projects/:projectId/preview', createRouteHandler(async (request, response) => {
+    response.json(await listingServices.previewFile(
+      readProjectId(request),
+      readRequiredString(request.query.path, 'path', 'Invalid file path'),
+      readPreviewLineCount(request.query.lines),
+    ));
+  }, logger));
 
   return router;
 }

@@ -919,6 +919,8 @@ async function queryClaudeSDK(command, options = {}, ws, context) {
     // Process streaming messages
     console.log('Starting async generator loop for session:', capturedSessionId || 'NEW');
     for await (const message of queryInstance) {
+      // Unguarded on purpose: only the SDK's init message carries this field, and it arrives after the hook events that claim the session-id capture below — and on every turn, resumed ones included.
+      if (typeof ws.setCliVersion === 'function' && typeof message.claude_code_version === 'string') ws.setCliVersion(message.claude_code_version);
       // Capture session ID from first message
       if (message.session_id && !capturedSessionId) {
 

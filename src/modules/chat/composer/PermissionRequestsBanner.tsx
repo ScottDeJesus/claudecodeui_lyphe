@@ -1,18 +1,12 @@
 import React from 'react';
-import { ShieldAlertIcon } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 import type { PendingPermissionRequest } from '@/shared/types';
+import { Banner, Button } from '@/shared/ui';
 import { buildClaudeToolPermissionEntry, formatToolInputForDisplay } from '@/modules/chat/utils/chatPermissions';
 import { getClaudeSettings } from '@/modules/chat/utils/chatStorage';
 import { getPermissionPanel, registerPermissionPanel } from '@/modules/chat/tools/configs/permissionPanelRegistry';
 import { AskUserQuestionPanel } from '@/modules/chat/tools/InteractiveRenderers/AskUserQuestionPanel';
-import {
-  Confirmation,
-  ConfirmationAction,
-  ConfirmationActions,
-  ConfirmationRequest,
-  ConfirmationTitle,
-} from '@/modules/chat/composer/Confirmation';
 
 registerPermissionPanel('AskUserQuestion', AskUserQuestionPanel);
 
@@ -27,13 +21,20 @@ type PermissionRequestsBannerProps = {
 
 /**
  * Rendered by chat's ChatComposer above the input to surface pending tool
- * permission requests and their allow/deny/remember actions.
+ * permission requests and their allow / allow-and-remember / decline actions.
+ *
+ * All three actions are the contract, not a menu of niceties: the run is
+ * blocked on `handlePermissionDecision` and every one of them answers it.
+ * The middle one additionally writes an allow rule — the only one of the three
+ * that changes anything beyond this single request.
  */
 export default function PermissionRequestsBanner({
   pendingPermissionRequests,
   handlePermissionDecision,
   handleGrantToolPermission,
 }: PermissionRequestsBannerProps) {
+  const { t } = useTranslation('chat');
+
   // Filter out plan tool requests — they are handled inline by PlanDisplay
   const filteredRequests = pendingPermissionRequests.filter(
     (r) => r.toolName !== 'ExitPlanMode' && r.toolName !== 'exit_plan_mode'
@@ -61,7 +62,6 @@ export default function PermissionRequestsBanner({
         const permissionEntry = buildClaudeToolPermissionEntry(request.toolName, rawInput);
         const settings = getClaudeSettings();
         const alreadyAllowed = permissionEntry ? settings.allowedTools.includes(permissionEntry) : false;
-        const rememberLabel = alreadyAllowed ? 'Allow (saved)' : 'Allow & remember';
         const matchingRequestIds = permissionEntry
           ? pendingPermissionRequests
               .filter(
@@ -72,62 +72,74 @@ export default function PermissionRequestsBanner({
           : [request.requestId];
 
         return (
-          <Confirmation key={request.requestId} approval="pending">
-            <ConfirmationTitle className="flex items-start gap-3">
-              <ShieldAlertIcon className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
-              <ConfirmationRequest>
-                <div>
-                  <span className="font-medium text-foreground">Permission required</span>
-                  <span className="ml-2 text-muted-foreground">
-                    Tool: <code className="rounded bg-muted px-1.5 py-0.5 text-xs">{request.toolName}</code>
-                  </span>
+          // `warn`, not `danger`: nothing has gone wrong and nothing has run.
+          // The banner's own ▲ mark comes from the tone, so the state reads
+          // without the colour.
+          <Banner key={request.requestId} tone="warn">
+            <div className="flex flex-col gap-2.5">
+              <div>
+                <span className="font-medium">
+                  {t('permissions.waitingTitle', { defaultValue: 'Waiting for you' })}
+                </span>
+                <span className="ml-2 opacity-80">
+                  {t('permissions.toolLabel', { defaultValue: 'Tool' })}:{' '}
+                  <code className="rounded bg-background/40 px-1.5 py-0.5 text-xs">{request.toolName}</code>
+                </span>
+              </div>
+
+              {permissionEntry && (
+                <div className="text-xs opacity-80">
+                  {t('permissions.ruleLabel', { defaultValue: 'Allow rule' })}:{' '}
+                  <code className="rounded bg-background/40 px-1 py-0.5 text-xs">{permissionEntry}</code>
                 </div>
-                {permissionEntry && (
-                  <div className="mt-1 text-xs text-muted-foreground">
-                    Allow rule: <code className="rounded bg-muted px-1 py-0.5 text-xs">{permissionEntry}</code>
-                  </div>
-                )}
-              </ConfirmationRequest>
-            </ConfirmationTitle>
+              )}
 
-            {rawInput && (
-              <details className="mt-2">
-                <summary className="cursor-pointer text-xs text-muted-foreground hover:text-foreground">
-                  View tool input
-                </summary>
-                <pre className="mt-2 max-h-40 overflow-auto whitespace-pre-wrap rounded-md border bg-muted/50 p-2 text-xs text-muted-foreground">
-                  {rawInput}
-                </pre>
-              </details>
-            )}
+              {rawInput && (
+                <details>
+                  <summary className="cursor-pointer text-xs opacity-80 hover:opacity-100">
+                    {t('permissions.viewInput', { defaultValue: 'View tool input' })}
+                  </summary>
+                  <pre className="mt-2 max-h-40 overflow-auto whitespace-pre-wrap rounded-md bg-background/40 p-2 text-xs">
+                    {rawInput}
+                  </pre>
+                </details>
+              )}
 
-            <ConfirmationActions>
-              <ConfirmationAction
-                variant="outline"
-                onClick={() => handlePermissionDecision(request.requestId, { allow: false, message: 'User denied tool use' })}
-              >
-                Deny
-              </ConfirmationAction>
-              <ConfirmationAction
-                variant="outline"
-                onClick={() => {
-                  if (permissionEntry && !alreadyAllowed) {
-                    handleGrantToolPermission({ entry: permissionEntry, toolName: request.toolName });
-                  }
-                  handlePermissionDecision(matchingRequestIds, { allow: true, rememberEntry: permissionEntry });
-                }}
-                disabled={!permissionEntry}
-              >
-                {rememberLabel}
-              </ConfirmationAction>
-              <ConfirmationAction
-                variant="default"
-                onClick={() => handlePermissionDecision(request.requestId, { allow: true })}
-              >
-                Allow once
-              </ConfirmationAction>
-            </ConfirmationActions>
-          </Confirmation>
+              <div className="flex flex-wrap items-center gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={() => handlePermissionDecision(request.requestId, { allow: true })}
+                >
+                  {t('permissions.allowOnce', { defaultValue: 'Allow this time' })}
+                </Button>
+                <Button
+                  type="button"
+                  variant="tonal"
+                  size="sm"
+                  disabled={!permissionEntry}
+                  onClick={() => {
+                    if (permissionEntry && !alreadyAllowed) {
+                      handleGrantToolPermission({ entry: permissionEntry, toolName: request.toolName });
+                    }
+                    handlePermissionDecision(matchingRequestIds, { allow: true, rememberEntry: permissionEntry });
+                  }}
+                >
+                  {alreadyAllowed
+                    ? t('permissions.allowAlreadyRemembered', { defaultValue: 'Allow, already remembered' })
+                    : t('permissions.allowAndRemember', { defaultValue: 'Allow and remember' })}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handlePermissionDecision(request.requestId, { allow: false, message: 'User denied tool use' })}
+                >
+                  {t('permissions.leaveAsIs', { defaultValue: 'Leave it as it is' })}
+                </Button>
+              </div>
+            </div>
+          </Banner>
         );
       })}
     </div>

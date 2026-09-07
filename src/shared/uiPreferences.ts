@@ -15,6 +15,12 @@ export type UiPreferences = {
   sendByCtrlEnter: boolean;
   sidebarVisible: boolean;
   voiceEnabled: boolean;
+  /**
+   * Keeps the Shell tab out of the workspace tab bar. Default ON, because the terminal is
+   * the one tab most people never open — and hiding it only stops it being shown: a running
+   * shell session is untouched, exactly as it is whenever another tab is active.
+   */
+  hideShellTab: boolean;
 };
 
 export type UiPreferenceKey = keyof UiPreferences;
@@ -29,6 +35,7 @@ const DEFAULTS: UiPreferences = {
   sendByCtrlEnter: false,
   sidebarVisible: true,
   voiceEnabled: false,
+  hideShellTab: true,
 };
 
 const PREFERENCE_KEYS = Object.keys(DEFAULTS) as UiPreferenceKey[];

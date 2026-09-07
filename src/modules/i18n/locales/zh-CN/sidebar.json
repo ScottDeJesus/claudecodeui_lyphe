@@ -17,7 +17,9 @@
     "projects": "项目",
     "noMatchingProjects": "未找到匹配的项目",
     "tryDifferentSearch": "尝试调整您的搜索词",
-    "runClaudeCli": "在项目目录中运行 Claude CLI 以开始使用"
+    "runClaudeCli": "在项目目录中运行 Claude CLI 以开始使用",
+    "noConversations": "暂无对话",
+    "conversationCount_other": "{{count}} 个对话"
   },
   "app": {
     "title": "CloudCLI",
@@ -32,7 +34,10 @@
     "loadingSessions": "加载会话中...",
     "unnamed": "未命名",
     "loading": "加载中...",
-    "showMore": "显示更多会话"
+    "showMore": "显示更多会话",
+    "showOlderUnknown": "↳ 显示更早的对话",
+    "messageCount_other": "{{count}} 条消息",
+    "showOlder_other": "↳ 显示 {{count}} 个更早的对话"
   },
   "tooltips": {
     "viewEnvironments": "查看环境",
@@ -132,7 +137,11 @@
     "matches_one": "{{count}} 个匹配",
     "matches_other": "{{count}} 个匹配",
     "projectsScanned_one": "{{count}} 个项目已扫描",
-    "projectsScanned_other": "{{count}} 个项目已扫描"
+    "projectsScanned_other": "{{count}} 个项目已扫描",
+    "modeRunning": "运行中",
+    "modeArchived": "已归档",
+    "runningPlaceholder": "搜索运行中的会话...",
+    "archivedPlaceholder": "搜索已归档的会话..."
   },
   "deleteConfirmation": {
     "deleteProject": "移除项目",

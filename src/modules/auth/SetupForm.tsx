@@ -1,7 +1,9 @@
 import { useCallback, useState } from 'react';
 import type { FormEvent } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Loader2, Lock, ShieldCheck, User } from 'lucide-react';
 
+import { Button } from '@/shared/ui';
 import { useAuth } from '@/modules/auth/context/AuthContext';
 import AuthErrorAlert from '@/modules/auth/AuthErrorAlert';
 import AuthInputField from '@/modules/auth/AuthInputField';
@@ -52,6 +54,7 @@ function validateSetupForm(formState: SetupFormState): string | null {
  * credentials after submission.
  */
 export default function SetupForm() {
+  const { t } = useTranslation('auth');
   const { register } = useAuth();
 
   const [formState, setFormState] = useState<SetupFormState>(initialState);
@@ -85,18 +88,19 @@ export default function SetupForm() {
 
   return (
     <AuthScreenLayout
-      title="Welcome to CloudCLI"
-      description="Set up your account to get started"
-      footerText="This is a single-user system. Only one account can be created."
+      title={t('register.screenTitle')}
+      description={t('register.screenDescription')}
+      footerText={t('login.privacyNote')}
     >
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form onSubmit={handleSubmit} className="flex flex-col gap-[18px]">
         <AuthInputField
           id="username"
           name="username"
-          label="Username"
+          label={t('register.username')}
           value={formState.username}
           onChange={(value) => updateField('username', value)}
           placeholder="Choose a username"
+          helper={t('register.helpers.username')}
           isDisabled={isSubmitting}
           autoComplete="username"
           icon={User}
@@ -105,10 +109,11 @@ export default function SetupForm() {
         <AuthInputField
           id="password"
           name="password"
-          label="Password"
+          label={t('register.password')}
           value={formState.password}
           onChange={(value) => updateField('password', value)}
           placeholder="Create a password"
+          helper={t('register.helpers.password')}
           isDisabled={isSubmitting}
           type="password"
           autoComplete="new-password"
@@ -118,7 +123,7 @@ export default function SetupForm() {
         <AuthInputField
           id="confirmPassword"
           name="confirmPassword"
-          label="Confirm Password"
+          label={t('register.confirmPassword')}
           value={formState.confirmPassword}
           onChange={(value) => updateField('confirmPassword', value)}
           placeholder="Re-enter your password"
@@ -128,27 +133,18 @@ export default function SetupForm() {
           icon={ShieldCheck}
         />
 
-        <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
-          <ShieldCheck className="h-3.5 w-3.5" />
-          At least 3 characters for username, 6 for password.
-        </p>
-
         <AuthErrorAlert errorMessage={errorMessage} />
 
-        <button
-          type="submit"
-          disabled={isSubmitting}
-          className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2.5 font-medium text-primary-foreground shadow-lg shadow-primary/25 transition-all duration-200 hover:shadow-primary/30 hover:brightness-110 focus:outline-none focus:ring-2 focus:ring-primary/40 focus:ring-offset-2 focus:ring-offset-card active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60"
-        >
+        <Button type="submit" disabled={isSubmitting} className="h-[46px] w-full">
           {isSubmitting ? (
             <>
               <Loader2 className="h-4 w-4 animate-spin" />
-              Setting up...
+              {t('register.loading')}
             </>
           ) : (
-            'Create Account'
+            t('register.submit')
           )}
-        </button>
+        </Button>
       </form>
     </AuthScreenLayout>
   );

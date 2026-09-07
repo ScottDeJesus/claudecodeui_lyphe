@@ -17,7 +17,10 @@
     "projects": "proje",
     "noMatchingProjects": "Eşleşen proje yok",
     "tryDifferentSearch": "Arama terimini değiştirmeyi dene",
-    "runClaudeCli": "Başlamak için bir proje dizininde Claude CLI çalıştır"
+    "runClaudeCli": "Başlamak için bir proje dizininde Claude CLI çalıştır",
+    "noConversations": "henüz konuşma yok",
+    "conversationCount_one": "{{count}} konuşma",
+    "conversationCount_other": "{{count}} konuşma"
   },
   "app": {
     "title": "CloudCLI",
@@ -32,7 +35,12 @@
     "loadingSessions": "Oturumlar yükleniyor...",
     "unnamed": "Adsız",
     "loading": "Yükleniyor...",
-    "showMore": "Daha fazla oturum göster"
+    "showMore": "Daha fazla oturum göster",
+    "showOlderUnknown": "↳ Daha eski konuşmaları göster",
+    "messageCount_one": "{{count}} mesaj",
+    "messageCount_other": "{{count}} mesaj",
+    "showOlder_one": "↳ {{count}} eski konuşmayı göster",
+    "showOlder_other": "↳ {{count}} eski konuşmayı göster"
   },
   "tooltips": {
     "viewEnvironments": "Ortamları Görüntüle",
@@ -132,7 +140,11 @@
     "matches_one": "{{count}} eşleşme",
     "matches_other": "{{count}} eşleşme",
     "projectsScanned_one": "{{count}} proje tarandı",
-    "projectsScanned_other": "{{count}} proje tarandı"
+    "projectsScanned_other": "{{count}} proje tarandı",
+    "modeRunning": "Çalışıyor",
+    "modeArchived": "Arşiv",
+    "runningPlaceholder": "Çalışan oturumlarda ara...",
+    "archivedPlaceholder": "Arşivlenmiş oturumlarda ara..."
   },
   "deleteConfirmation": {
     "deleteProject": "Projeyi Kaldır",

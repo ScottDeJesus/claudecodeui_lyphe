@@ -2,18 +2,26 @@ import * as React from 'react';
 
 import { cn } from '@/shared/utils';
 
-type InputProps = React.InputHTMLAttributes<HTMLInputElement>;
+type InputProps = React.InputHTMLAttributes<HTMLInputElement> & {
+  /** The value is rejected. Paints the amber border; the sentence belongs to the Field around it. */
+  invalid?: boolean;
+};
 
-/** The application-wide text input, used by the chat, file-tree, mcp, project-creation-wizard, settings, sidebar and skills modules. */
+/**
+ * The application-wide text input, used by the chat, file-tree, mcp, project-creation-wizard,
+ * settings, sidebar and skills modules.
+ *
+ * Paint is `.vv-input` in verve/controls.css. The sizing utilities stay because they are the
+ * app's own scale — Verve's padding would resize every input in the app. `invalid` is amber,
+ * never red (doctrine §5), and never the only signal: Field draws the ▲ and the message.
+ */
 export const Input = React.forwardRef<HTMLInputElement, InputProps>(
-  ({ className, type, ...props }, ref) => {
+  ({ className, type, invalid = false, ...props }, ref) => {
     return (
       <input
         type={type}
-        className={cn(
-          'flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50',
-          className
-        )}
+        aria-invalid={invalid || undefined}
+        className={cn('vv-input flex h-9 w-full px-3 py-1 text-sm', invalid && 'vv-input--invalid', className)}
         ref={ref}
         {...props}
       />

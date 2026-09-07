@@ -12,6 +12,12 @@ type TranscriptExportDocumentProps = {
   createDiff: (oldStr: string, newStr: string) => DiffLine[];
   provider: LLMProvider | string;
   selectedProject?: Project | null;
+  /**
+   * Turns a model id into the catalog's name for it. The export is the copy that
+   * LEAVES the app, so a turn captioned "Haiku" on screen must not read "Claude"
+   * in the saved file.
+   */
+  resolveModelLabel?: (modelId: string) => string | null;
 };
 
 /**
@@ -33,6 +39,7 @@ export function TranscriptExportDocument({
   createDiff,
   provider,
   selectedProject,
+  resolveModelLabel,
 }: TranscriptExportDocumentProps) {
   // Thinking blocks are included: an export is a record of what happened, and
   // the on-screen toggle is about noise in a live conversation.
@@ -76,6 +83,7 @@ export function TranscriptExportDocument({
                 showThinking
                 selectedProject={selectedProject}
                 provider={provider}
+                resolveModelLabel={resolveModelLabel}
               />
             );
           })}

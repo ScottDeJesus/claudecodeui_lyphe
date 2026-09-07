@@ -5,6 +5,7 @@ import {
   Info,
   KeyRound,
   ListChecks,
+  Mic,
   MonitorPlay,
   Palette,
   Plug,
@@ -58,11 +59,12 @@ export const SETTINGS_MAIN_TABS: SettingsMainTabMeta[] = [
   { id: 'agents', label: 'Agents', keywords: 'agents subagents claude code', icon: Bot },
   { id: 'appearance', label: 'Appearance', keywords: 'appearance theme dark light language', icon: Palette },
   { id: 'git', label: 'Git', keywords: 'git github commits', icon: GitBranch },
-  { id: 'api', label: 'API Tokens', keywords: 'api tokens auth keys', icon: KeyRound },
   { id: 'tasks', label: 'Tasks', keywords: 'tasks taskmaster', icon: ListChecks },
-  { id: 'browser', label: 'Browser', keywords: 'browser playwright chromium automation', icon: MonitorPlay },
   { id: 'notifications', label: 'Notifications', keywords: 'notifications alerts push', icon: Bell },
+  { id: 'api', label: 'API Tokens', keywords: 'api tokens auth keys', icon: KeyRound },
+  { id: 'voice', label: 'Voice', keywords: 'voice speech dictation transcription', icon: Mic },
   { id: 'plugins', label: 'Plugins', keywords: 'plugins extensions integrations', icon: Plug },
+  { id: 'browser', label: 'Browser', keywords: 'browser playwright chromium automation', icon: MonitorPlay },
   { id: 'about', label: 'About', keywords: 'about version info', icon: Info },
 ];
 
@@ -109,6 +111,33 @@ export const FILE_STATUS_GROUPS: GitStatusGroupEntry[] = [
   { key: 'deleted', status: 'D' },
   { key: 'untracked', status: 'U' },
 ];
+
+// ---------------------------
+
+//----------------- GIT DELEGATION ------------
+
+/**
+ * The prompt the git panel's "Push my changes" button sends — the WHOLE first message of the
+ * conversation it starts, byte for byte.
+ *
+ * It must stay a bare command name. The estate's push guard
+ * (`~/.claude/hooks/enforce_push_via_git_command.py`) authorises a push only for a session
+ * whose prompt BEGINS with `/git` — leading whitespace allowed, nothing else — so in production
+ * this literal has to start with `/git` or the run reads the changes, writes the commits, and is
+ * then refused the one thing the button exists for. Sending the command's expanded text instead
+ * of its name fails the same way, and a trailing space or newline is the same class of mistake.
+ *
+ * An operator knob (`VITE_GIT_DELEGATION_COMMAND`, documented in `.env.example`): pointing it
+ * at a command that only reads is how this button is exercised without moving a remote.
+ *
+ * ⚠ The guard's test is `/git` followed by a word boundary, and a hyphen IS one — so a value
+ * like `/git-rehearsal` also mints the 30-minute push grant, inside a session this button starts
+ * with `permissionMode: 'bypassPermissions'`. A read-only stand-in is therefore not a read-only
+ * SESSION: resuming that conversation inside the window can push without the operator having
+ * said `/git`. Keep such a value in place only as long as the run that needs it.
+ */
+export const GIT_DELEGATION_COMMAND: string =
+  import.meta.env?.VITE_GIT_DELEGATION_COMMAND ?? '/git';
 
 // ---------------------------
 
@@ -172,36 +201,6 @@ export const TERMINAL_INIT_DELAY_MS = 100;
 
 // ---------------------------
 
-//----------------- CODE EDITOR DISPLAY SETTINGS ------------
-
-/**
- * The four localStorage keys the code-editor display settings used to live
- * under, kept only so `userSettings` can migrate an existing install onto the
- * stored `codeEditorSettings` preference. Nothing writes them any more.
- */
-export const CODE_EDITOR_STORAGE_KEYS = {
-  wordWrap: 'codeEditorWordWrap',
-  showMinimap: 'codeEditorShowMinimap',
-  lineNumbers: 'codeEditorLineNumbers',
-  fontSize: 'codeEditorFontSize',
-} as const;
-
-/**
- * Values applied when a code-editor setting has never been written. These are
- * the editor's own historical defaults; the settings dialog used to carry its
- * own copy with a different fontSize, so merely opening it rewrote the user's
- * editor font.
- */
-export const CODE_EDITOR_DEFAULTS = {
-  wordWrap: false,
-  showMinimap: true,
-  lineNumbers: true,
-  fontSize: '12',
-} as const;
-
-
-// ---------------------------
-
 //----------------- PROVIDER TOOL SETTINGS STORAGE ------------
 
 /**
@@ -217,4 +216,19 @@ export const PROVIDER_PERMISSION_PREFERENCE_KEYS: Record<LLMProvider, UserPrefer
   cursor: 'cursorPermissions',
   codex: 'codexPermissions',
   opencode: 'opencodePermissions',
+};
+
+/**
+ * The name a person reads for each provider, wherever a session is described in prose —
+ * the sidebar's session meta line and the workspace header's sub-line.
+ *
+ * Deliberately separate from `MCP_PROVIDER_NAMES` above, which happens to spell the same four
+ * words today but answers a different question (which providers can host an MCP server) and is
+ * keyed by `McpProvider`. Merging them would tie a change in one surface to the other.
+ */
+export const LLM_PROVIDER_LABELS: Record<LLMProvider, string> = {
+  claude: 'Claude',
+  cursor: 'Cursor',
+  codex: 'Codex',
+  opencode: 'OpenCode',
 };

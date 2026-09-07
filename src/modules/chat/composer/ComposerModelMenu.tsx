@@ -5,10 +5,13 @@ import { ChevronDown, ChevronRight } from 'lucide-react';
 
 import type { ProviderModelOption } from '@/shared/types';
 import { DEFAULT_EFFORT_VALUE } from '@/shared/constants';
+import { Chip } from '@/shared/ui';
+import { resolveModelLabel } from '@/modules/chat/utils/modelLabels';
 import { useComposerMenuAnchor } from '@/modules/chat/hooks/useComposerMenuAnchor';
 import {
   ComposerMenuHeading,
   ComposerMenuItem,
+  ComposerMenuNote,
   ComposerMenuSeparator,
   ComposerMenuSurface,
 } from '@/modules/chat/composer/ComposerMenuPrimitives';
@@ -65,7 +68,12 @@ function ComposerModelMenu({
     () => modelOptions.find((option) => option.value === model) ?? null,
     [model, modelOptions],
   );
-  const modelLabel = selectedModelOption?.label || model;
+  // A conversation resumed from disk carries the id the SDK ran
+  // (`claude-haiku-4-5-…`), not the alias this catalog is keyed by, so the chip
+  // resolves it the same way the transcript caption does. The id itself is the
+  // last resort and only a custom model reaches it — there, the id IS the name
+  // the user gave it.
+  const modelLabel = selectedModelOption?.label || resolveModelLabel(modelOptions, model) || model;
 
   const hasEffortSection = resolvedEffortOptions.length > 0;
   const hasModelSection = modelOptions.length > 0 || modelsLoading;
@@ -80,6 +88,10 @@ function ComposerModelMenu({
 
   return (
     <>
+      {/* The Chip is the paint; this button is the menu. Chip renders a <button>
+          of its own when it is given an onClick, and that one announces a pressed
+          state rather than a popup — so the chip stays a static span and the
+          element around it carries the trigger semantics and the anchor ref. */}
       <button
         ref={triggerRef}
         type="button"
@@ -87,16 +99,19 @@ function ComposerModelMenu({
           updateAnchor();
           setIsOpen((current) => !current);
         }}
-        className="flex h-8 max-w-20 shrink-0 items-center gap-1 rounded-lg border border-border/60 bg-muted/40 px-2 text-xs font-medium text-foreground transition-colors hover:bg-muted sm:max-w-56"
+        className="shrink-0"
         aria-haspopup="menu"
         aria-expanded={isOpen}
         aria-label={ariaLabel}
         title={ariaLabel}
       >
-        <span className="truncate">{triggerLabel}</span>
-        {hasModelSection && hasEffortSection && effort !== DEFAULT_EFFORT_VALUE && (
-          <span className="hidden shrink-0 capitalize text-muted-foreground sm:inline">· {effortLabel}</span>
-        )}
+        <Chip size="sm">
+          <span className="max-w-20 truncate sm:max-w-56">{triggerLabel}</span>
+          {hasModelSection && hasEffortSection && effort !== DEFAULT_EFFORT_VALUE && (
+            <span className="hidden shrink-0 capitalize sm:inline">· {effortLabel}</span>
+          )}
+          <span aria-hidden="true">▲</span>
+        </Chip>
       </button>
 
       {isOpen && anchor && createPortal(
@@ -141,7 +156,7 @@ function ComposerModelMenu({
               {isModelSectionOpen && (
                 <>
                   <ComposerMenuHeading>
-                    {t('composer.model', { defaultValue: 'Model' })}
+                    {t('composer.modelHeading', { defaultValue: 'Model for this conversation' })}
                   </ComposerMenuHeading>
                   {modelOptions.length === 0 && modelsLoading && (
                     <p className="px-2.5 py-1.5 text-sm text-muted-foreground">
@@ -159,6 +174,11 @@ function ComposerModelMenu({
                       }}
                     />
                   ))}
+                  <ComposerMenuNote>
+                    {t('composer.modelNote', {
+                      defaultValue: 'Changing this starts the next message on the new model. Earlier messages stay as they are.',
+                    })}
+                  </ComposerMenuNote>
                 </>
               )}
             </>

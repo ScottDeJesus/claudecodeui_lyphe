@@ -917,6 +917,16 @@ export class ClaudeSessionsProvider implements IProviderSessions {
     }
 
     if (raw.message?.role === 'assistant' && raw.message?.content) {
+      // Which model actually answered this turn, as the row records it. Read here
+      // rather than from the session's current selection because a conversation
+      // can change model mid-way and the earlier turns keep the model they ran on.
+      //
+      // Stamped on EVERY part, not only the text: a turn reaches the transcript as
+      // a run of rows (thinking, then tool calls, then the reply) and the caption
+      // is drawn by whichever of them comes first. Naming only the last one leaves
+      // every turn that thought or used a tool captioned "Claude".
+      const model = typeof raw.message.model === 'string' ? raw.message.model : undefined;
+
       if (Array.isArray(raw.message.content)) {
         let partIndex = 0;
         for (const part of raw.message.content) {
@@ -929,6 +939,7 @@ export class ClaudeSessionsProvider implements IProviderSessions {
               kind: 'text',
               role: 'assistant',
               content: part.text,
+              model,
             }));
           } else if (part.type === 'tool_use') {
             messages.push(createNormalizedMessage({
@@ -940,6 +951,7 @@ export class ClaudeSessionsProvider implements IProviderSessions {
               toolName: part.name,
               toolInput: part.input,
               toolId: part.id,
+              model,
             }));
           } else if (part.type === 'thinking' && part.thinking) {
             messages.push(createNormalizedMessage({
@@ -949,6 +961,7 @@ export class ClaudeSessionsProvider implements IProviderSessions {
               provider: PROVIDER,
               kind: 'thinking',
               content: part.thinking,
+              model,
             }));
           }
           partIndex++;
@@ -962,6 +975,7 @@ export class ClaudeSessionsProvider implements IProviderSessions {
           kind: 'text',
           role: 'assistant',
           content: raw.message.content,
+          model,
         }));
       }
       return messages;

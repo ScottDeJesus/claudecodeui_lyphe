@@ -36,13 +36,7 @@
   },
   "appearance": {
     "title": "外観",
-    "theme": "テーマ",
-    "codeEditor": "コードエディタ",
-    "editorTheme": "エディタのテーマ",
-    "wordWrap": "折り返し",
-    "showMinimap": "ミニマップを表示",
-    "lineNumbers": "行番号",
-    "fontSize": "フォントサイズ"
+    "theme": "テーマ"
   },
   "actions": {
     "saveChanges": "変更を保存",
@@ -130,29 +124,6 @@
       "description": "サイドバーでのプロジェクトの並び順を設定します",
       "alphabetical": "アルファベット順",
       "recentActivity": "最近のアクティビティ順"
-    },
-    "codeEditor": {
-      "title": "コードエディタ",
-      "theme": {
-        "label": "エディタのテーマ",
-        "description": "コードエディタのデフォルトテーマ"
-      },
-      "wordWrap": {
-        "label": "折り返し",
-        "description": "エディタでデフォルトで折り返しを有効にします"
-      },
-      "showMinimap": {
-        "label": "ミニマップを表示",
-        "description": "差分ビューでナビゲーション用のミニマップを表示します"
-      },
-      "lineNumbers": {
-        "label": "行番号を表示",
-        "description": "エディタに行番号を表示します"
-      },
-      "fontSize": {
-        "label": "フォントサイズ",
-        "description": "エディタのフォントサイズ（ピクセル）"
-      }
     }
   },
   "mcpForm": {
@@ -308,7 +279,6 @@
       "checking": "確認中...",
       "connected": "接続済み",
       "notConnected": "未接続",
-      "disconnected": "切断",
       "checkingAuth": "認証状態を確認しています...",
       "loggedInAs": "{{email}}でログイン中",
       "authenticatedUser": "認証済みユーザー"

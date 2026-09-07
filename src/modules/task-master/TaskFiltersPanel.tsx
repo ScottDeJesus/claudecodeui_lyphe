@@ -1,5 +1,6 @@
 import { useTranslation } from 'react-i18next';
 
+import { Button, Field, Select } from '@/shared/ui';
 import type { TaskBoardSortField, TaskBoardSortOrder } from '@/shared/types';
 
 type TaskFiltersPanelProps = {
@@ -17,6 +18,23 @@ type TaskFiltersPanelProps = {
   totalTaskCount: number;
   onClearFilters: () => void;
 };
+
+const SORT_CHOICES: `${TaskBoardSortField}-${TaskBoardSortOrder}`[] = [
+  'id-asc',
+  'id-desc',
+  'title-asc',
+  'title-desc',
+  'status-asc',
+  'status-desc',
+  'priority-asc',
+  'priority-desc',
+];
+
+/** The i18n key for one sort choice: `id-asc` is spelled `sort.idAsc`. */
+function sortChoiceKey(choice: string): string {
+  const [field, order] = choice.split('-');
+  return `sort.${field}${order === 'asc' ? 'Asc' : 'Desc'}`;
+}
 
 /** Rendered by TaskBoardToolbar as the expandable status/priority filter and sort panel. */
 export default function TaskFiltersPanel({
@@ -41,69 +59,53 @@ export default function TaskFiltersPanel({
   }
 
   return (
-    <div className="space-y-4 rounded-lg bg-gray-50 p-4 dark:bg-gray-800">
+    <div className="space-y-4 rounded-xl border border-border bg-secondary p-4">
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">{t('filters.status')}</label>
-          <select
+        <Field label={t('filters.status')}>
+          <Select
+            ariaLabel={t('filters.status')}
             value={statusFilter}
-            onChange={(event) => onStatusFilterChange(event.target.value)}
-            className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 dark:border-gray-600 dark:bg-gray-800"
-          >
-            <option value="all">{t('filters.allStatuses')}</option>
-            {statuses.map((status) => (
-              <option key={status} value={status}>
-                {t(`statuses.${status}`, status)}
-              </option>
-            ))}
-          </select>
-        </div>
+            onChange={onStatusFilterChange}
+            options={[
+              { value: 'all', label: t('filters.allStatuses') },
+              ...statuses.map((status) => ({ value: status, label: t(`statuses.${status}`, status) })),
+            ]}
+          />
+        </Field>
 
-        <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">{t('filters.priority')}</label>
-          <select
+        <Field label={t('filters.priority')}>
+          <Select
+            ariaLabel={t('filters.priority')}
             value={priorityFilter}
-            onChange={(event) => onPriorityFilterChange(event.target.value)}
-            className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 dark:border-gray-600 dark:bg-gray-800"
-          >
-            <option value="all">{t('filters.allPriorities')}</option>
-            {priorities.map((priority) => (
-              <option key={priority} value={priority}>
-                {t(`priorities.${priority}`, priority)}
-              </option>
-            ))}
-          </select>
-        </div>
+            onChange={onPriorityFilterChange}
+            options={[
+              { value: 'all', label: t('filters.allPriorities') },
+              ...priorities.map((priority) => ({ value: priority, label: t(`priorities.${priority}`, priority) })),
+            ]}
+          />
+        </Field>
 
-        <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">{t('filters.sortBy')}</label>
-          <select
+        <Field label={t('filters.sortBy')}>
+          <Select
+            ariaLabel={t('filters.sortBy')}
             value={`${sortField}-${sortOrder}`}
-            onChange={(event) => {
-              const [field, order] = event.target.value.split('-') as [TaskBoardSortField, TaskBoardSortOrder];
+            onChange={(choice) => {
+              const [field, order] = choice.split('-') as [TaskBoardSortField, TaskBoardSortOrder];
               onSortConfigChange(field, order);
             }}
-            className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 dark:border-gray-600 dark:bg-gray-800"
-          >
-            <option value="id-asc">{t('sort.idAsc')}</option>
-            <option value="id-desc">{t('sort.idDesc')}</option>
-            <option value="title-asc">{t('sort.titleAsc')}</option>
-            <option value="title-desc">{t('sort.titleDesc')}</option>
-            <option value="status-asc">{t('sort.statusAsc')}</option>
-            <option value="status-desc">{t('sort.statusDesc')}</option>
-            <option value="priority-asc">{t('sort.priorityAsc')}</option>
-            <option value="priority-desc">{t('sort.priorityDesc')}</option>
-          </select>
-        </div>
+            options={SORT_CHOICES.map((choice) => ({ value: choice, label: t(sortChoiceKey(choice)) }))}
+          />
+        </Field>
       </div>
 
-      <div className="flex items-center justify-between">
-        <div className="text-sm text-gray-600 dark:text-gray-400">
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-sm text-muted-foreground">
           {t('filters.showing', { filtered: filteredTaskCount, total: totalTaskCount })}
-        </div>
-        <button onClick={onClearFilters} className="text-sm font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300">
+        </span>
+
+        <Button variant="link" size="sm" onClick={onClearFilters}>
           {t('filters.clearFilters')}
-        </button>
+        </Button>
       </div>
     </div>
   );

@@ -1,6 +1,9 @@
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
+import { createRequire } from 'node:module';
 import path from 'node:path';
+
+const moduleRequire = createRequire(import.meta.url);
 
 const DEFAULT_CLAUDE_COMMAND = 'claude';
 const CLAUDE_SCRIPT_EXTENSIONS = new Set(['.cjs', '.js', '.jsx', '.mjs', '.ts', '.tsx']);
@@ -154,4 +157,72 @@ export function resolveClaudeCodeExecutablePath(
   }
 
   return resolveWindowsClaudeExecutablePath(normalizedPath, configuredExplicitly, deps);
+}
+
+/**
+ * Resolves the Claude CLI binary the SDK ships for this host, or null.
+ *
+ * The SDK installs its native binary as an optional per-platform package; this
+ * mirrors that candidate list — the glibc build first, then the musl one —
+ * rather than guessing at a path.
+ *
+ * ONLY meaningful where the SDK actually reaches for that binary, which is
+ * narrower than it sounds: `resolveClaudeCodeExecutablePath` above returns
+ * `stripWrappingQuotes(configuredPath || DEFAULT_CLAUDE_COMMAND)` on every
+ * non-Windows host, so `pathToClaudeCodeExecutable` is always set there and the
+ * SDK's own fallback is unreachable. Only the Windows branch returns
+ * `undefined`, and only then does a run use what the SDK ships. Treat this as a
+ * general "the binary a run will use" answer and you report a version belonging
+ * to a process this machine never starts.
+ *
+ * Returns null when neither package is installed.
+ */
+export function resolveSdkBundledClaudePath(
+  platform: string = process.platform,
+  architecture: string = process.arch,
+): string | null {
+  for (const libcSuffix of ['', '-musl']) {
+    try {
+      return moduleRequire.resolve(
+        `@anthropic-ai/claude-agent-sdk-${platform}-${architecture}${libcSuffix}/claude`,
+      );
+    } catch {
+      // Not installed for this host/libc pair. The next candidate, or null.
+    }
+  }
+
+  return null;
+}
+
+/**
+ * The exact file a provider run will spawn, or null when this process cannot
+ * name it before the run starts.
+ *
+ * Anything that wants to say something ABOUT the CLI a run uses — its version,
+ * most of all — has to ask this rather than invent a second resolution rule.
+ * Two rules drift, and a reader who is told a real version belonging to a
+ * binary nothing runs is worse off than one who is told nothing.
+ *
+ * Null is a "we don't know", never a fault, and it has two shapes:
+ *
+ * - The SDK resolver returned `undefined` (Windows only, nothing configured and
+ *   nothing found). That is the one case where the SDK really does run the
+ *   binary it ships, so that binary is the answer.
+ * - The resolved path is not absolute. A bare `claude` is looked up on the
+ *   spawn's PATH and a relative path against the run's own project cwd; a
+ *   caller shares neither, so any file it found under that name would be a
+ *   different binary wearing the right one.
+ */
+export function resolveSpawnedClaudeBinaryPath(
+  configuredPath: string | undefined = process.env.CLAUDE_CLI_PATH,
+  dependencies: ResolveClaudeCodeExecutablePathDependencies = {},
+): string | null {
+  const spawnPath = resolveClaudeCodeExecutablePath(configuredPath, dependencies);
+
+  if (spawnPath === undefined) {
+    return resolveSdkBundledClaudePath(dependencies.platform ?? process.platform);
+  }
+
+  const pathApi = getPathApi(dependencies.platform ?? process.platform);
+  return pathApi.isAbsolute(spawnPath) ? spawnPath : null;
 }

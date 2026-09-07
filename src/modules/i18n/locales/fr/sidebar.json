@@ -17,7 +17,11 @@
     "projects": "projets",
     "noMatchingProjects": "Aucun projet correspondant",
     "tryDifferentSearch": "Essayez d'ajuster votre terme de recherche",
-    "runClaudeCli": "Exécutez le CLI Claude dans un répertoire de projet pour commencer"
+    "runClaudeCli": "Exécutez le CLI Claude dans un répertoire de projet pour commencer",
+    "noConversations": "aucune conversation",
+    "conversationCount_one": "{{count}} conversation",
+    "conversationCount_many": "{{count}} conversations",
+    "conversationCount_other": "{{count}} conversations"
   },
   "app": {
     "title": "CloudCLI",
@@ -32,7 +36,14 @@
     "loadingSessions": "Chargement des sessions...",
     "unnamed": "Sans nom",
     "loading": "Chargement...",
-    "showMore": "Afficher plus de sessions"
+    "showMore": "Afficher plus de sessions",
+    "showOlderUnknown": "↳ Afficher les conversations précédentes",
+    "messageCount_one": "{{count}} message",
+    "messageCount_many": "{{count}} messages",
+    "messageCount_other": "{{count}} messages",
+    "showOlder_one": "↳ Afficher {{count}} conversation précédente",
+    "showOlder_many": "↳ Afficher {{count}} conversations précédentes",
+    "showOlder_other": "↳ Afficher {{count}} conversations précédentes"
   },
   "tooltips": {
     "viewEnvironments": "Voir les environnements",
@@ -132,7 +143,11 @@
     "matches_one": "{{count}} résultat",
     "matches_other": "{{count}} résultats",
     "projectsScanned_one": "{{count}} projet analysé",
-    "projectsScanned_other": "{{count}} projets analysés"
+    "projectsScanned_other": "{{count}} projets analysés",
+    "modeRunning": "En cours",
+    "modeArchived": "Archivé",
+    "runningPlaceholder": "Rechercher les sessions en cours...",
+    "archivedPlaceholder": "Rechercher les sessions archivées..."
   },
   "deleteConfirmation": {
     "deleteProject": "Supprimer le projet",

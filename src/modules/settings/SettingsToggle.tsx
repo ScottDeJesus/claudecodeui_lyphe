@@ -1,4 +1,4 @@
-import { cn } from '@/shared/utils';
+import { Switch } from '@/shared/ui';
 
 type SettingsToggleProps = {
   checked: boolean;
@@ -7,29 +7,14 @@ type SettingsToggleProps = {
   disabled?: boolean;
 };
 
-/** Used by the settings module's appearance, browser-use, tasks and voice tabs to render a boolean setting switch. */
+/**
+ * Used by the settings module's appearance, browser-use, tasks and voice tabs to render a
+ * boolean setting switch.
+ *
+ * It is the library `Switch` under a settings-shaped prop name (`ariaLabel`, which four tabs
+ * already pass) — kept rather than replaced at every call site so the settings tabs keep one
+ * spelling, and so the paint stays the library's rather than a second track-and-knob here.
+ */
 export default function SettingsToggle({ checked, onChange, ariaLabel, disabled }: SettingsToggleProps) {
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={checked}
-      aria-label={ariaLabel}
-      disabled={disabled}
-      onClick={() => onChange(!checked)}
-      className={cn(
-        'relative inline-flex h-7 w-12 flex-shrink-0 touch-manipulation cursor-pointer items-center rounded-full border-2 transition-colors duration-200',
-        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background',
-        checked ? 'border-primary bg-primary' : 'border-border bg-muted',
-        disabled && 'cursor-not-allowed opacity-50',
-      )}
-    >
-      <span
-        className={cn(
-          'pointer-events-none inline-block h-5 w-5 rounded-full shadow-sm transition-transform duration-200',
-          checked ? 'translate-x-[22px] bg-white' : 'translate-x-[2px] bg-foreground/60 dark:bg-foreground/80',
-        )}
-      />
-    </button>
-  );
+  return <Switch checked={checked} onChange={onChange} label={ariaLabel} disabled={disabled} />;
 }

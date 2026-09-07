@@ -26,12 +26,20 @@ export function ComposerMenuSurface({
       ref={menuRef}
       role="menu"
       aria-label={ariaLabel}
-      className="fixed z-[100] min-w-48 overflow-y-auto overscroll-contain rounded-xl border border-border bg-popover p-1 text-popover-foreground shadow-xl"
+      className="fixed z-[100] min-w-48 overflow-y-auto overscroll-contain border border-border bg-popover p-1.5 text-popover-foreground"
+      // The anchor is this menu's own business — it is a portalled overlay with
+      // no parent box to sit in. The three token reads beside it are the
+      // library's overlay surface, the same radius, shadow and entrance
+      // `.vv-menu__panel` paints; they are spelled here because that rule also
+      // POSITIONS, and a portalled popover cannot take its `position: absolute`.
       style={{
         right: anchor.right,
         bottom: anchor.bottom,
         maxHeight: anchor.maxHeight,
         maxWidth: anchor.maxWidth,
+        borderRadius: 'var(--radius-card)',
+        boxShadow: 'var(--shadow-overlay)',
+        animation: 'vv-pop 0.3s var(--ease-enter) both',
       }}
     >
       {children}
@@ -42,7 +50,20 @@ export function ComposerMenuSurface({
 /** Used by chat's ComposerModelMenu and ComposerPermissionMenu to label a section of the popover. */
 export function ComposerMenuHeading({ children }: { children: ReactNode }) {
   return (
-    <p className="px-2.5 pb-1 pt-1.5 text-[11px] font-medium text-muted-foreground">{children}</p>
+    <p className="px-2.5 pb-1.5 pt-1.5 text-xs uppercase tracking-[0.14em] text-ink-faint">{children}</p>
+  );
+}
+
+/**
+ * A closing sentence under a popover's rows — what choosing one of them will and
+ * will not do. Used by chat's ComposerModelMenu.
+ *
+ * Separate from ComposerMenuHeading because it reads as prose, not as a label:
+ * sentence case, no tracking, and it wraps.
+ */
+export function ComposerMenuNote({ children }: { children: ReactNode }) {
+  return (
+    <p className="px-2.5 pb-1 pt-1.5 text-xs leading-snug text-ink-faint">{children}</p>
   );
 }
 

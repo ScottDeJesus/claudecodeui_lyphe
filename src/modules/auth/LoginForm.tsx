@@ -3,6 +3,7 @@ import type { FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Loader2, Lock, User } from 'lucide-react';
 
+import { Button } from '@/shared/ui';
 import { useAuth } from '@/modules/auth/context/AuthContext';
 import AuthErrorAlert from '@/modules/auth/AuthErrorAlert';
 import AuthInputField from '@/modules/auth/AuthInputField';
@@ -61,9 +62,11 @@ export default function LoginForm() {
     <AuthScreenLayout
       title={t('login.title')}
       description={t('login.description')}
-      footerText="Enter your credentials to access CloudCLI"
+      // True as written: auth.service.ts holds one account in the local database on this
+      // machine and no credential leaves it.
+      footerText={t('login.privacyNote')}
     >
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form onSubmit={handleSubmit} className="flex flex-col gap-[18px]">
         <AuthInputField
           id="username"
           label={t('login.username')}
@@ -89,11 +92,7 @@ export default function LoginForm() {
 
         <AuthErrorAlert errorMessage={errorMessage || sessionError || ''} />
 
-        <button
-          type="submit"
-          disabled={isSubmitting}
-          className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2.5 font-medium text-primary-foreground shadow-lg shadow-primary/25 transition-all duration-200 hover:shadow-primary/30 hover:brightness-110 focus:outline-none focus:ring-2 focus:ring-primary/40 focus:ring-offset-2 focus:ring-offset-card active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60"
-        >
+        <Button type="submit" disabled={isSubmitting} className="h-[46px] w-full">
           {isSubmitting ? (
             <>
               <Loader2 className="h-4 w-4 animate-spin" />
@@ -102,7 +101,7 @@ export default function LoginForm() {
           ) : (
             t('login.submit')
           )}
-        </button>
+        </Button>
       </form>
     </AuthScreenLayout>
   );

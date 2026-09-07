@@ -57,8 +57,8 @@
 - **レスポンシブデザイン** - デスクトップ／タブレット／モバイルでシームレスに動作し、モバイルからも Agents を利用可能
 - **インタラクティブチャット UI** - Agents とスムーズにやり取りできる内蔵チャット UI
 - **統合シェルターミナル** - 内蔵シェル機能で Agents の CLI に直接アクセス
-- **ファイルエクスプローラー** - シンタックスハイライトとライブ編集に対応したインタラクティブなファイルツリー
-- **Git エクスプローラー** - 変更の表示、ステージ、コミット。ブランチ切り替えも可能
+- **ファイルエクスプローラー** - テキスト・画像・ダウンロードを読み取り専用でプレビューできるインタラクティブなファイルツリー（変更は Agents に依頼）
+- **Git エクスプローラー** - ブランチ、未プッシュのコミット、保留中の変更とその差分を閲覧（コミットとプッシュは Agents に依頼 — ボタン 1 つで会話が始まり、あなた自身の `/git` が実行されます）
 - **セッション管理** - 会話の再開、複数セッションの管理、履歴の追跡
 - **プラグインシステム** - カスタムプラグインで CloudCLI を拡張 — 新しいタブ、バックエンドサービス、連携を追加できます。[自分で構築する →](https://github.com/cloudcli-ai/cloudcli-plugin-starter)
 
@@ -237,7 +237,7 @@ GNU General Public License v3.0 - 詳細は [LICENSE](../LICENSE) ファイル�
 - **[React](https://react.dev/)** - ユーザーインターフェースライブラリ
 - **[Vite](https://vitejs.dev/)** - 高速ビルドツールと開発サーバー
 - **[Tailwind CSS](https://tailwindcss.com/)** - ユーティリティファーストの CSS フレームワーク
-- **[CodeMirror](https://codemirror.net/)** - 高度なコードエディタ
+- **[CodeMirror](https://codemirror.net/)** - PRD エディタの Markdown エディタ
 - **[TaskMaster AI](https://github.com/eyaltoledano/claude-task-master)** *(オプション)* - AI を活用したプロジェクト管理とタスク計画
 
 ## スポンサー

@@ -2,12 +2,26 @@ import * as React from 'react';
 
 import { cn } from '@/shared/utils';
 
-/** Used by the chat module to frame the provider picker and plan tool output. */
-export const Card = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
-  ({ className, ...props }, ref) => (
+type CardProps = React.HTMLAttributes<HTMLDivElement> & {
+  /** The whole card is a control. Opts into the hover lift, which promises a click. */
+  interactive?: boolean;
+};
+
+/**
+ * Used by the chat module to frame the provider picker and plan tool output.
+ *
+ * Paint is `.vv-card` in verve/controls.css. Padding is deliberately NOT part of it: this
+ * card's inset belongs to CardHeader/CardContent/CardFooter, and a padded shell around padded
+ * slots insets its content twice. The lift is opt-in and no call site opts in yet: of the two,
+ * PlanDisplay's card is not clickable at all, and ProviderSelectionEmptyState's IS
+ * (`role="button"`) but spells its own hover today — converting it is a screen edit, so it
+ * belongs to Phase 4 rather than here.
+ */
+export const Card = React.forwardRef<HTMLDivElement, CardProps>(
+  ({ className, interactive = false, ...props }, ref) => (
     <div
       ref={ref}
-      className={cn('rounded-xl border bg-card text-card-foreground shadow-sm', className)}
+      className={cn('vv-card', interactive && 'vv-card--interactive', className)}
       {...props}
     />
   )

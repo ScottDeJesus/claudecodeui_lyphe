@@ -11,3 +11,5 @@ export { ToolRenderer } from '@/modules/chat/tools/ToolRenderer';
 export { SubagentPanel } from '@/modules/chat/tools/SubagentPanel';
 export { ToolErrorDisplay } from '@/modules/chat/tools/ToolErrorDisplay';
 export { getToolConfig, shouldHideToolResult } from '@/modules/chat/tools/configs/toolConfigs';
+export { ToolOutcomeBadge, ToolOutcomeGlyph } from '@/modules/chat/tools/ToolOutcomeBadge';
+export { deriveToolOutcome, permissionKey } from '@/modules/chat/tools/toolOutcome';

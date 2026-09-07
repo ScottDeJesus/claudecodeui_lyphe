@@ -50,9 +50,19 @@ type SidebarProjectItemProps = {
   t: TFunction;
 };
 
-const getSessionCountDisplay = (project: Project, sessions: SessionWithProvider[]): string => {
-  const total = Number(project.sessionMeta?.total ?? sessions.length);
-  return String(total);
+/**
+ * The row's second line: `~/code/thing · 12 conversations`.
+ *
+ * The path is shortened from the END, because the tail is what tells two sibling checkouts
+ * apart; the head is the part every project on the machine shares. A project with no
+ * conversations yet says so in words rather than showing a bare `0`.
+ */
+const getProjectMetaLine = (project: Project, sessionCount: number, t: TFunction): string => {
+  const path = project.fullPath.length > 28 ? `…${project.fullPath.slice(-27)}` : project.fullPath;
+  const conversations = sessionCount === 0
+    ? t('projects.noConversations')
+    : t('projects.conversationCount', { count: sessionCount });
+  return `${path} · ${conversations}`;
 };
 
 /** Rendered by SidebarProjectList for one project row, including its expand, rename, star and delete controls. */
@@ -97,8 +107,7 @@ function SidebarProjectItem({
   // after the projectName → projectId migration.
   const isSelected = selectedProject?.projectId === project.projectId;
   const totalSessionCount = Number(project.sessionMeta?.total ?? sessions.length);
-  const sessionCountDisplay = getSessionCountDisplay(project, sessions);
-  const sessionCountLabel = `${sessionCountDisplay} session${totalSessionCount === 1 ? '' : 's'}`;
+  const projectMetaLine = getProjectMetaLine(project, totalSessionCount, t);
   const taskStatus = getTaskIndicatorStatus(project, mcpServerStatus);
   const mobileRenameInputRef = useRef<HTMLInputElement>(null);
 
@@ -149,10 +158,8 @@ function SidebarProjectItem({
           <div
             className={cn(
               'p-3 mx-3 my-1 rounded-lg bg-card border border-border/50 active:scale-[0.98] transition-all duration-150',
-              isSelected && 'bg-primary/5 border-primary/20',
-              isStarred &&
-                !isSelected &&
-                'bg-yellow-50/50 dark:bg-yellow-900/5 border-yellow-200/30 dark:border-yellow-800/30',
+              isSelected && 'bg-primary/10 border-primary/20',
+              isStarred && !isSelected && 'bg-secondary/50 border-border',
             )}
             onClick={toggleProject}
           >
@@ -161,9 +168,7 @@ function SidebarProjectItem({
                 <button
                   className={cn(
                     'w-8 h-8 rounded-lg flex items-center justify-center active:scale-90 transition-all duration-150 border',
-                    isStarred
-                      ? 'bg-yellow-500/10 dark:bg-yellow-900/30 border-yellow-200 dark:border-yellow-800'
-                      : 'bg-gray-500/10 dark:bg-gray-900/30 border-gray-200 dark:border-gray-800',
+                    isStarred ? 'bg-primary/10 border-primary/20' : 'bg-muted border-border',
                   )}
                   onClick={(event) => {
                     event.stopPropagation();
@@ -174,9 +179,7 @@ function SidebarProjectItem({
                   <Star
                     className={cn(
                       'w-4 h-4 transition-colors',
-                      isStarred
-                        ? 'text-yellow-600 dark:text-yellow-400 fill-current'
-                        : 'text-gray-600 dark:text-gray-400',
+                      isStarred ? 'text-primary fill-current' : 'text-muted-foreground',
                     )}
                   />
                 </button>
@@ -220,7 +223,9 @@ function SidebarProjectItem({
                           />
                         )}
                       </div>
-                      <p className="text-xs text-muted-foreground">{sessionCountLabel}</p>
+                      <p className="truncate text-xs text-muted-foreground" title={project.fullPath}>
+                        {projectMetaLine}
+                      </p>
                     </>
                   )}
                 </div>
@@ -230,34 +235,34 @@ function SidebarProjectItem({
                 {isEditing ? (
                   <>
                     <button
-                      className="flex h-8 w-8 items-center justify-center rounded-lg bg-green-500 shadow-sm transition-all duration-150 active:scale-90 active:shadow-none dark:bg-green-600"
+                      className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary shadow-sm transition-all duration-150 active:scale-90 active:shadow-none"
                       onClick={(event) => {
                         event.stopPropagation();
                         saveProjectName();
                       }}
                     >
-                      <Check className="h-4 w-4 text-white" />
+                      <Check className="h-4 w-4 text-primary-foreground" />
                     </button>
                     <button
-                      className="flex h-8 w-8 items-center justify-center rounded-lg bg-gray-500 shadow-sm transition-all duration-150 active:scale-90 active:shadow-none dark:bg-gray-600"
+                      className="flex h-8 w-8 items-center justify-center rounded-lg bg-secondary shadow-sm transition-all duration-150 active:scale-90 active:shadow-none"
                       onClick={(event) => {
                         event.stopPropagation();
                         onCancelEditingProject();
                       }}
                     >
-                      <X className="h-4 w-4 text-white" />
+                      <X className="h-4 w-4 text-secondary-foreground" />
                     </button>
                   </>
                 ) : (
                   <>
                     <button
-                      className="flex h-8 w-8 items-center justify-center rounded-lg border border-red-200 bg-red-500/10 active:scale-90 dark:border-red-800 dark:bg-red-900/30"
+                      className="flex h-8 w-8 items-center justify-center rounded-lg border border-destructive/30 bg-destructive/10 active:scale-90"
                       onClick={(event) => {
                         event.stopPropagation();
                         onDeleteProject(project);
                       }}
                     >
-                      <Trash2 className="h-4 w-4 text-red-600 dark:text-red-400" />
+                      <Trash2 className="h-4 w-4 text-destructive" />
                     </button>
 
                     <button
@@ -289,11 +294,18 @@ function SidebarProjectItem({
         <Button
           variant="ghost"
           className={cn(
-            'flex w-full justify-between p-2 h-auto font-normal hover:bg-accent/50',
-            isSelected && 'bg-accent text-accent-foreground',
-            isStarred &&
-              !isSelected &&
-              'bg-yellow-50/50 dark:bg-yellow-900/10 hover:bg-yellow-100/50 dark:hover:bg-yellow-900/20',
+            'flex w-full justify-between p-2 h-auto font-normal rounded-[10px] hover:bg-accent/50',
+            // The prototype's active project sits on an accent wash, not on the neutral surface
+            // a hover leaves behind: the card the sessions hang off has to read as chosen even
+            // while the pointer is somewhere else in the list. The hover repeats the same fill,
+            // so the ratio measured here is the one a person actually gets, pointer or no.
+            //
+            // 5%, not the prototype's full `--accent-soft`: accent INK on accent SOFT measures
+            // 4.34:1 and this row carries the sidebar's most important word. Verve owns one half
+            // of that pair and this app owns the other, so the wash is the half that moves. The
+            // border carries the "chosen" reading the thinner fill gives up.
+            isSelected && 'bg-primary/5 hover:bg-primary/5 border border-primary/25',
+            isStarred && !isSelected && 'bg-secondary/50 hover:bg-secondary/70',
           )}
           onClick={selectAndToggleProject}
         >
@@ -301,9 +313,7 @@ function SidebarProjectItem({
             <div
               className={cn(
                 'w-6 h-6 flex items-center justify-center rounded cursor-pointer transition-all duration-200',
-                isStarred
-                  ? 'hover:bg-yellow-50 dark:hover:bg-yellow-900/20'
-                  : 'opacity-40 hover:opacity-100 hover:bg-accent',
+                isStarred ? 'hover:bg-primary/10' : 'opacity-40 hover:opacity-100 hover:bg-accent',
               )}
               onClick={(event) => {
                 event.stopPropagation();
@@ -314,9 +324,7 @@ function SidebarProjectItem({
               <Star
                 className={cn(
                   'w-3 h-3 transition-colors',
-                  isStarred
-                    ? 'text-yellow-600 dark:text-yellow-400 fill-current'
-                    : 'text-muted-foreground',
+                  isStarred ? 'text-primary fill-current' : 'text-muted-foreground',
                 )}
               />
             </div>
@@ -345,17 +353,14 @@ function SidebarProjectItem({
                 </div>
               ) : (
                 <div>
-                  <div className="truncate text-sm font-normal text-foreground" title={project.displayName}>
+                  <div
+                    className={cn('truncate text-sm font-normal', isSelected ? 'text-accent-ink' : 'text-foreground')}
+                    title={project.displayName}
+                  >
                     {project.displayName}
                   </div>
-                  <div className="text-xs text-muted-foreground">
-                    {sessionCountDisplay}
-                    {project.fullPath !== project.displayName && (
-                      <span className="ml-1 opacity-60" title={project.fullPath}>
-                        {' - '}
-                        {project.fullPath.length > 25 ? `...${project.fullPath.slice(-22)}` : project.fullPath}
-                      </span>
-                    )}
+                  <div className="mt-0.5 truncate text-xs text-muted-foreground" title={project.fullPath}>
+                    {projectMetaLine}
                   </div>
                 </div>
               )}
@@ -366,7 +371,7 @@ function SidebarProjectItem({
             {isEditing ? (
               <>
                 <div
-                  className="flex h-6 w-6 cursor-pointer items-center justify-center rounded text-green-600 transition-colors hover:bg-green-50 hover:text-green-700 dark:hover:bg-green-900/20"
+                  className="flex h-6 w-6 cursor-pointer items-center justify-center rounded text-primary transition-colors hover:bg-primary/10"
                   onClick={(event) => {
                     event.stopPropagation();
                     saveProjectName();
@@ -375,7 +380,7 @@ function SidebarProjectItem({
                   <Check className="h-3 w-3" />
                 </div>
                 <div
-                  className="flex h-6 w-6 cursor-pointer items-center justify-center rounded text-gray-500 transition-colors hover:bg-gray-50 hover:text-gray-700 dark:hover:bg-gray-800"
+                  className="flex h-6 w-6 cursor-pointer items-center justify-center rounded text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
                   onClick={(event) => {
                     event.stopPropagation();
                     onCancelEditingProject();
@@ -397,14 +402,14 @@ function SidebarProjectItem({
                   <Edit3 className="h-3 w-3" />
                 </div>
                 <div
-                  className="touch:opacity-100 flex h-6 w-6 cursor-pointer items-center justify-center rounded opacity-0 transition-all duration-200 hover:bg-red-50 group-hover:opacity-100 dark:hover:bg-red-900/20"
+                  className="touch:opacity-100 flex h-6 w-6 cursor-pointer items-center justify-center rounded opacity-0 transition-all duration-200 hover:bg-destructive/10 group-hover:opacity-100"
                   onClick={(event) => {
                     event.stopPropagation();
                     onDeleteProject(project);
                   }}
                   title={t('tooltips.deleteProject')}
                 >
-                  <Trash2 className="h-3 w-3 text-red-600 dark:text-red-400" />
+                  <Trash2 className="h-3 w-3 text-destructive" />
                 </div>
                 {isExpanded ? (
                   <ChevronDown className="h-4 w-4 text-muted-foreground transition-colors group-hover:text-foreground" />

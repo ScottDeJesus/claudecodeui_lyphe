@@ -2,7 +2,9 @@ import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
 import { I18nextProvider } from 'react-i18next';
 
 import { ThemeProvider } from '@/shared/context/ThemeContext';
+import { ToastProvider } from '@/shared/context/ToastContext';
 import { UiPreferencesProvider } from '@/shared/context/UiPreferencesContext';
+import { ToastStack } from '@/shared/ui';
 import { AuthProvider, ProtectedRoute } from '@/modules/auth';
 import { TaskMasterProvider,TasksSettingsProvider } from '@/modules/task-master';
 import { WebSocketProvider } from '@/shared/context/WebSocketContext';
@@ -112,6 +114,10 @@ export default function App() {
   return (
     <I18nextProvider i18n={i18n}>
       <ThemeProvider>
+        {/* Inside ThemeProvider so a toast is painted in the theme the app is actually in, and
+            outside everything else so any screen can raise one. ToastStack is its LAST child:
+            the stack is a fixed overlay that must sit above the routes, not inside them. */}
+        <ToastProvider>
         <UiPreferencesProvider>
         <AuthProvider>
           <WebSocketProvider>
@@ -132,6 +138,8 @@ export default function App() {
           </WebSocketProvider>
         </AuthProvider>
         </UiPreferencesProvider>
+        <ToastStack />
+        </ToastProvider>
       </ThemeProvider>
     </I18nextProvider>
   );

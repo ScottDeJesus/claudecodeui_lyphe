@@ -13,7 +13,7 @@ export default function SettingsCard({ children, className, divided }: SettingsC
   return (
     <div
       className={cn(
-        'rounded-xl border border-border bg-card/50',
+        'overflow-hidden rounded-xl border border-border bg-card',
         divided && 'divide-y divide-border',
         className,
       )}

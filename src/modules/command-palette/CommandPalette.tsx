@@ -1,15 +1,12 @@
 import * as React from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  ArrowDownToLine,
-  ArrowUpFromLine,
   ChevronRight,
   FileText,
   GitCommit,
   GitMerge,
   MessageSquare,
   MessageSquarePlus,
-  RefreshCw,
   Settings,
   SunMoon,
   X,
@@ -35,7 +32,6 @@ import { useFilesSource } from '@/modules/command-palette/hooks/useFilesSource';
 import { useCommitsSource } from '@/modules/command-palette/hooks/useCommitsSource';
 import { useSessionMessageSearch } from '@/modules/command-palette/hooks/useSessionMessageSearch';
 import { useBranchesSource } from '@/modules/command-palette/hooks/useBranchesSource';
-import { useGitActions } from '@/modules/command-palette/hooks/useGitActions';
 
 type Page = 'actions' | 'files' | 'sessions' | 'commits' | 'branches';
 
@@ -52,8 +48,19 @@ type CommandPaletteProps = {
   onStartNewChat: (project: Project) => void;
   onOpenSettings: (tab?: string) => void;
   onShowTab?: (tab: AppTab) => void;
+  /**
+   * The built-in tabs currently on the workspace tab bar. The Navigate group offers exactly the
+   * NAV_TABS rows this list names, so a row added below without a matching gate never appears.
+   */
+  visibleTabs: AppTab[];
 };
 
+/**
+ * Every workspace tab the palette knows how to reach. Deliberately static: which of them a
+ * given workspace is showing is the `visibleTabs` prop's answer, resolved by the one component
+ * that already reads the gates, and the Navigate group filters this list through it. A new row
+ * here needs its tab named in that prop too, or it is filtered out and never shows.
+ */
 const NAV_TABS: Array<{ id: AppTab; label: string; keywords: string }> = [
   { id: 'chat', label: 'Go to Chat', keywords: 'chat messages conversation' },
   { id: 'files', label: 'Go to Files', keywords: 'files file tree explorer' },
@@ -68,6 +75,7 @@ function CommandPalette({
   onStartNewChat,
   onOpenSettings,
   onShowTab,
+  visibleTabs,
 }: CommandPaletteProps) {
   const [open, setOpen] = React.useState(false);
   const [search, setSearch] = React.useState('');
@@ -109,7 +117,6 @@ function CommandPalette({
   const files = useFilesSource(projectId, open && showFiles);
   const commits = useCommitsSource(projectId, open && showCommits);
   const branches = useBranchesSource(projectId, open && showBranches);
-  const git = useGitActions(projectId);
 
   const sessionRows = React.useMemo(() => {
     if (!showSessions) return [];
@@ -221,7 +228,7 @@ function CommandPalette({
 
             {showActions && (
               <CommandGroup heading="Navigate">
-                {NAV_TABS.map((tab) => (
+                {NAV_TABS.filter((tab) => visibleTabs.includes(tab.id)).map((tab) => (
                   <CommandItem
                     key={tab.id as string}
                     value={`${tab.label} ${tab.keywords}`}
@@ -230,32 +237,6 @@ function CommandPalette({
                     <span className="flex-1">{tab.label}</span>
                   </CommandItem>
                 ))}
-              </CommandGroup>
-            )}
-
-            {showActions && projectId && (
-              <CommandGroup heading="Git">
-                <CommandItem
-                  value="Git Fetch remote"
-                  onSelect={() => run(() => { void git.fetch(); onShowTab?.('git'); })}
-                >
-                  <RefreshCw className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
-                  <span className="flex-1">Git: Fetch</span>
-                </CommandItem>
-                <CommandItem
-                  value="Git Pull merge upstream"
-                  onSelect={() => run(() => { void git.pull(); onShowTab?.('git'); })}
-                >
-                  <ArrowDownToLine className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
-                  <span className="flex-1">Git: Pull</span>
-                </CommandItem>
-                <CommandItem
-                  value="Git Push origin remote"
-                  onSelect={() => run(() => { void git.push(); onShowTab?.('git'); })}
-                >
-                  <ArrowUpFromLine className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
-                  <span className="flex-1">Git: Push</span>
-                </CommandItem>
               </CommandGroup>
             )}
 
@@ -345,10 +326,10 @@ function CommandPalette({
                   <CommandItem
                     key={`branch-${b.name}`}
                     value={b.name}
-                    onSelect={() => run(() => { void git.checkout(b.name); onShowTab?.('git'); })}
+                    onSelect={() => run(() => onShowTab?.('git'))}
                   >
                     <GitMerge className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
-                    <span className="flex-1 truncate">Switch to: {b.name}</span>
+                    <span className="flex-1 truncate">{b.name}</span>
                   </CommandItem>
                 ))}
                 {!page && branches.length > browseLimit && (

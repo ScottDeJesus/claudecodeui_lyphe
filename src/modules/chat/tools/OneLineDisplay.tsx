@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 
 import { copyTextToClipboard } from '@/shared/utils';
 import { ToolStatusBadge } from '@/modules/chat/tools/ToolStatusBadge';
+import { ToolOutcomeBadge, ToolOutcomeGlyph } from '@/modules/chat/tools/ToolOutcomeBadge';
+import type { ToolOutcome } from '@/modules/chat/tools/toolOutcome';
 import type { ToolStatus } from '@/shared/types';
 
 type ActionType = 'copy' | 'open-file' | 'jump-to-results' | 'none';
@@ -27,6 +29,8 @@ type OneLineDisplayProps = {
   toolResult?: any;
   toolId?: string;
   status?: ToolStatus;
+  /** What the row can say happened to it, in words; null while there is nothing positive to say. */
+  outcome?: ToolOutcome | null;
 };
 
 /**
@@ -55,8 +59,17 @@ export const OneLineDisplay: React.FC<OneLineDisplayProps> = ({
   toolResult,
   toolId,
   status,
+  outcome = null,
 }) => {
   const [copied, setCopied] = useState(false);
+  // One node so the four layouts below each spell the outcome once. The glyph
+  // travels with the words: colour alone must never be the state (doctrine §6).
+  const outcomeMark = outcome && (
+    <span className="inline-flex flex-shrink-0 items-center gap-1.5">
+      <ToolOutcomeGlyph outcome={outcome} />
+      <ToolOutcomeBadge outcome={outcome} />
+    </span>
+  );
   const isTerminal = style === 'terminal';
 
   const handleAction = async () => {
@@ -106,6 +119,7 @@ export const OneLineDisplay: React.FC<OneLineDisplayProps> = ({
               </code>
             </div>
             {status && <ToolStatusBadge status={status} className="mt-0.5" />}
+            {outcomeMark}
             {action === 'copy' && renderCopyButton()}
           </div>
         </div>
@@ -135,6 +149,7 @@ export const OneLineDisplay: React.FC<OneLineDisplayProps> = ({
           {displayName}
         </button>
         {status && <ToolStatusBadge status={status} className="ml-auto" />}
+        {outcomeMark && <span className="ml-auto">{outcomeMark}</span>}
       </div>
     );
   }
@@ -154,6 +169,7 @@ export const OneLineDisplay: React.FC<OneLineDisplayProps> = ({
           </span>
         )}
         {status && <ToolStatusBadge status={status} />}
+        {outcomeMark}
         {toolResult && (
           <a
             href={`#tool-result-${toolId}`}
@@ -189,6 +205,7 @@ export const OneLineDisplay: React.FC<OneLineDisplayProps> = ({
         </span>
       )}
       {status && <ToolStatusBadge status={status} />}
+      {outcomeMark}
       {action === 'copy' && renderCopyButton()}
     </div>
   );

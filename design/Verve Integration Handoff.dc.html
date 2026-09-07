@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="_ds/verve-design-system-845c78a0-5042-416e-b31e-e608179402c3/tokens/fonts.css">
+  <link rel="stylesheet" href="_ds/verve-design-system-845c78a0-5042-416e-b31e-e608179402c3/tokens/colors.css">
+  <link rel="stylesheet" href="_ds/verve-design-system-845c78a0-5042-416e-b31e-e608179402c3/tokens/typography.css">
+  <link rel="stylesheet" href="_ds/verve-design-system-845c78a0-5042-416e-b31e-e608179402c3/tokens/spacing.css">
+  <link rel="stylesheet" href="_ds/verve-design-system-845c78a0-5042-416e-b31e-e608179402c3/tokens/motion.css">
+  <link rel="stylesheet" href="_ds/verve-design-system-845c78a0-5042-416e-b31e-e608179402c3/tokens/base.css">
+  <link rel="stylesheet" href="_ds/verve-design-system-845c78a0-5042-416e-b31e-e608179402c3/styles.css">
+  <script src="./doc-page.js"></script>
+  <style>
+    doc-page:not(:defined) { visibility: hidden; }
+    a { color: var(--accent); }
+    a:hover { color: var(--accent-ink); }
+    h1, h2, h3 { font-family: var(--font-display); font-weight: 400; }
+    code, .m { font-family: var(--font-mono); font-size: .84em; }
+    th, td { text-align: left; vertical-align: top; }
+  </style>
+</helmet>
+
+<doc-page margin="0.7in">
+
+  <div slot="header" style="display:flex;align-items:baseline;gap:10px;padding-bottom:8px;border-bottom:1px solid var(--border);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-faint)">
+    <span>CloudCLI UI · Verve integration handoff</span>
+    <span style="margin-left:auto">ScottDeJesus/claudecodeui_lyphe</span>
+  </div>
+
+  <div slot="footer" style="padding-top:8px;border-top:1px solid var(--border);font-size:11px;color:var(--ink-faint)">Prototype: CloudCLI Verve.dc.html · every behaviour below is a stub in the prototype and needs real wiring.</div>
+
+  <div style="font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-faint)">Developer handoff · September 2026</div>
+  <h1 style="font-size:34px;line-height:1.12;margin:6px 0 10px">Wiring the Verve console into <span style="font-style:italic;color:var(--accent-ink)">your fork</span></h1>
+  <p style="font-size:14.5px;line-height:1.65;color:var(--ink-mid);margin:0 0 6px">This document lists everything the design prototype fakes, where each piece belongs in the repository, and what has to exist on the server before the screen can tell the truth. Work top to bottom: the theme layer first, then the stubs in priority order. Anything marked <strong>confirm</strong> is a guess about your setup that a five-minute look at the code will settle.</p>
+  <p style="font-size:13.5px;line-height:1.6;color:var(--ink-muted);margin:0">The prototype is a single design file. It is a reference for appearance and behaviour, not code to copy — it holds no API calls, no routing, and no state that survives a reload.</p>
+
+  <h2 style="font-size:23px;margin:30px 0 10px">1 · Before you start</h2>
+  <table style="width:100%;border-collapse:collapse;font-size:13px">
+    <tbody>
+      <tr><td style="width:150px;padding:8px 10px 8px 0;border-bottom:1px solid var(--border);font-weight:500">Clone</td><td style="padding:8px 0;border-bottom:1px solid var(--border);color:var(--ink-mid)">Fork, clone, <code>npm install</code> at the root, then run the dev server the repo's README names. The web app and the CLI bridge are one project — start both.</td></tr>
+      <tr><td style="padding:8px 10px 8px 0;border-bottom:1px solid var(--border);font-weight:500">Fonts</td><td style="padding:8px 0;border-bottom:1px solid var(--border);color:var(--ink-mid)">Instrument Serif and Schibsted Grotesk load from Google Fonts. Self-host both if the console must run offline.</td></tr>
+      <tr><td style="padding:8px 10px 8px 0;border-bottom:1px solid var(--border);font-weight:500">Branch</td><td style="padding:8px 0;border-bottom:1px solid var(--border);color:var(--ink-mid)">Work straight on <code>main</code> in the fork. Land the theme layer first — every stub below inherits its tokens.</td></tr>
+      <tr><td style="padding:8px 10px 8px 0;font-weight:500">Order</td><td style="padding:8px 0;color:var(--ink-mid)">Theme → tab visibility → file manager → git delegation → accounts and usage → CLI version awareness. Each step is shippable alone.</td></tr>
+    </tbody>
+  </table>
+
+  <h2 style="font-size:23px;margin:30px 0 10px">2 · Theme layer (no stubs, do this first)</h2>
+  <p style="font-size:13.5px;line-height:1.6;color:var(--ink-mid);margin:0 0 12px">The app already themes through CSS variables, so most of the reskin lands without touching component markup. Point the existing variables at Verve's tokens in <code>src/index.css</code> and <code>tailwind.config.js</code>, and alias the app's <code>.dark</code> class to Verve's <code>.vv-dark</code> block instead of maintaining a second palette.</p>
+  <table style="width:100%;border-collapse:collapse;font-size:12.5px">
+    <thead><tr style="font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-faint)"><th style="padding:6px 10px 6px 0;border-bottom:1px solid var(--border)">App variable</th><th style="padding:6px 10px;border-bottom:1px solid var(--border)">Verve token</th><th style="padding:6px 0;border-bottom:1px solid var(--border)">Note</th></tr></thead>
+    <tbody>
+      <tr><td class="m" style="padding:6px 10px 6px 0;border-bottom:1px solid var(--border)">--background</td><td class="m" style="padding:6px 10px;border-bottom:1px solid var(--border);color:var(--accent-ink)">--canvas</td><td style="padding:6px 0;border-bottom:1px solid var(--border);color:var(--ink-muted)">Page behind cards</td></tr>
+      <tr><td class="m" style="padding:6px 10px 6px 0;border-bottom:1px solid var(--border)">--card / --popover</td><td class="m" style="padding:6px 10px;border-bottom:1px solid var(--border);color:var(--accent-ink)">--surface</td><td style="padding:6px 0;border-bottom:1px solid var(--border);color:var(--ink-muted)">Sidebar, panels, menus</td></tr>
+      <tr><td class="m" style="padding:6px 10px 6px 0;border-bottom:1px solid var(--border)">--muted / --accent</td><td class="m" style="padding:6px 10px;border-bottom:1px solid var(--border);color:var(--accent-ink)">--surface2</td><td style="padding:6px 0;border-bottom:1px solid var(--border);color:var(--ink-muted)">Hover, wells, terminal ground</td></tr>
+      <tr><td class="m" style="padding:6px 10px 6px 0;border-bottom:1px solid var(--border)">--foreground / --muted-foreground</td><td class="m" style="padding:6px 10px;border-bottom:1px solid var(--border);color:var(--accent-ink)">--ink / --ink-muted</td><td style="padding:6px 0;border-bottom:1px solid var(--border);color:var(--ink-muted)">Plus --ink-mid, --ink-faint</td></tr>
+      <tr><td class="m" style="padding:6px 10px 6px 0;border-bottom:1px solid var(--border)">--border / --input</td><td class="m" style="padding:6px 10px;border-bottom:1px solid var(--border);color:var(--accent-ink)">--border / --border-strong</td><td style="padding:6px 0;border-bottom:1px solid var(--border);color:var(--ink-muted)">Inputs take 1.5px</td></tr>
+      <tr><td class="m" style="padding:6px 10px 6px 0;border-bottom:1px solid var(--border)">--primary / --ring</td><td class="m" style="padding:6px 10px;border-bottom:1px solid var(--border);color:var(--accent-ink)">--accent</td><td style="padding:6px 0;border-bottom:1px solid var(--border);color:var(--ink-muted)">#2fa876 · actions and focus only</td></tr>
+      <tr><td class="m" style="padding:6px 10px 6px 0;border-bottom:1px solid var(--border)">--destructive</td><td class="m" style="padding:6px 10px;border-bottom:1px solid var(--border);color:var(--accent-ink)">--danger</td><td style="padding:6px 0;border-bottom:1px solid var(--border);color:var(--ink-muted)">Destructive and denied only — errors are amber</td></tr>
+      <tr><td class="m" style="padding:6px 10px 6px 0">--radius</td><td class="m" style="padding:6px 10px;color:var(--accent-ink)">--radius-input</td><td style="padding:6px 0;color:var(--ink-muted)">10px controls · 12 cards · 16 screens</td></tr>
+    </tbody>
+  </table>
+  <p style="font-size:13px;line-height:1.6;color:var(--ink-muted);margin:12px 0 0">Motion matters as much as colour. Verve's springs come from long durations on spring curves — copy <code>tokens/motion.css</code> and use <code>--ease-enter</code> for entries and hovers, <code>--dur-move</code> (0.45s) for transforms. Two traps we hit: the <code>vv-anim</code> helper sets <code>transition … !important</code> on every element, so apply it only for the half second around a light/dark switch, or it silently kills every transform transition in the app; and animate knobs and bars with <code>transform</code>, never <code>left</code> or <code>width</code>.</p>
+
+  <h2 style="font-size:23px;margin:30px 0 10px">3 · Stub inventory</h2>
+  <p style="font-size:13.5px;line-height:1.6;color:var(--ink-mid);margin:0 0 14px">Six features are drawn but not real. Each entry names what the user sees, where it belongs, and what must exist behind it.</p>
+
+  <div style="break-inside:avoid;border:1px solid var(--border);border-radius:12px;padding:16px 18px;margin:0 0 12px">
+    <div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap"><h3 style="font-size:18px;margin:0">3.1 Workspace tab visibility</h3><span style="font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--pos-ink)">Smallest job</span></div>
+    <p style="font-size:13px;line-height:1.6;color:var(--ink-mid);margin:8px 0 8px"><strong>In the prototype:</strong> Settings → Tabs in the workspace → “Hide the Shell tab” and “Hide the Tasks tab”, both on by default; hidden tabs vanish from the workspace bar and a hidden active tab falls back to Chat.</p>
+    <p style="font-size:13px;line-height:1.6;color:var(--ink-mid);margin:0 0 8px"><strong>To wire:</strong> two booleans in the existing settings store, read by the tab list in <code>src/modules/project-workspace/WorkspaceTabs.tsx</code> and by whatever guards tab content in <code>WorkspaceMain.tsx</code>. Persist with the other client settings (<strong>confirm</strong> whether that is localStorage or the server settings record).</p>
+    <p style="font-size:13px;line-height:1.6;color:var(--ink-faint);margin:0"><strong>Done when:</strong> hiding a tab never stops a running shell session or task sync — it only removes the tab.</p>
+  </div>
+
+  <div style="break-inside:avoid;border:1px solid var(--border);border-radius:12px;padding:16px 18px;margin:0 0 12px">
+    <h3 style="font-size:18px;margin:0">3.2 Files: browse, preview, upload, download</h3>
+    <p style="font-size:13px;line-height:1.6;color:var(--ink-mid);margin:8px 0 8px"><strong>In the prototype:</strong> the Files tab is no longer a code editor. It is a breadcrumb path, a listing with size and changed columns, “Up one level”, a drop zone, and a preview pane with three states — text excerpt, image with dimensions, and a dashed “No preview for this file” with Download. Upload shows a live progress row and confirms with a toast.</p>
+    <p style="font-size:13px;line-height:1.6;color:var(--ink-mid);margin:0 0 8px"><strong>To wire:</strong> keep the tree from <code>src/modules/file-tree/</code>; replace the editor panel in <code>src/modules/code-editor/</code> with the listing and preview. Server work: a directory listing that returns name, kind, byte size and mtime; a ranged read for text previews (first ~200 lines is enough); a thumbnail or direct read for images; a streaming download; and a multipart upload writing into the current directory. All paths must resolve inside the project root — reject traversal server-side, not in the UI.</p>
+    <p style="font-size:13px;line-height:1.6;color:var(--ink-faint);margin:0"><strong>Done when:</strong> unknown values render as an em-dash rather than 0, unpreviewable files offer download instead of an error, and an upload that fails says which file and why.</p>
+  </div>
+
+  <div style="break-inside:avoid;border:1px solid var(--border);border-radius:12px;padding:16px 18px;margin:0 0 12px">
+    <h3 style="font-size:18px;margin:0">3.3 Git: agent-only commit and push</h3>
+    <p style="font-size:13px;line-height:1.6;color:var(--ink-mid);margin:8px 0 8px"><strong>In the prototype:</strong> the panel is read-only — no commit box, no staging links, no pull. One button, “Push my changes”, starts a Sonnet conversation that runs <code>/git</code>, ticks four steps (read files → group into commits → write messages → push), ends itself, and lands on “✓ Pushed to main” with the commit hashes. The header badge and both file lists then collapse to a settled “Nothing waiting to be pushed”.</p>
+    <p style="font-size:13px;line-height:1.6;color:var(--ink-mid);margin:0 0 8px"><strong>To wire:</strong> strip the write controls from <code>src/modules/git-panel/GitPanel.tsx</code> and keep its status read. The button spawns a session with the <code>/git</code> slash command, streams tool events into the four steps, and terminates on end-turn. The completion state must come from a real <code>git status</code> and <code>rev-list @{u}..HEAD</code> after the push, not from the agent's word. Failure cases the prototype does not draw and you will need: rejected push behind the remote, protected branch, no upstream, merge conflict, and credentials missing — each an amber banner naming the fix, with the receipt preserved.</p>
+    <p style="font-size:13px;line-height:1.6;color:var(--ink-faint);margin:0"><strong>Done when:</strong> the panel above the button can never contradict the result below it.</p>
+  </div>
+
+  <div style="break-inside:avoid;border:1px solid var(--border);border-radius:12px;padding:16px 18px;margin:0 0 12px">
+    <h3 style="font-size:18px;margin:0">3.4 Account switcher and re-authentication</h3>
+    <p style="font-size:13px;line-height:1.6;color:var(--ink-mid);margin:8px 0 8px"><strong>In the prototype:</strong> the sidebar footer opens a popover listing accounts — the active one with a ✓ and its conversation count, one flagged “▲ Signing in again is needed” with an inline Sign in, a signed-out Codex account with usage “—”, and “Add another account”. A small ▲ sits on the footer row whenever any account needs re-auth.</p>
+    <p style="font-size:13px;line-height:1.6;color:var(--ink-mid);margin:0 0 8px"><strong>To wire:</strong> account records (id, provider, label, plan, credential state, last verified) plus a switch action. The contract the copy promises is the important part: <strong>switching changes only which account signs the requests</strong> — projects, conversations and running work stay put, and open conversations keep their history. Implement that by keeping session records account-agnostic, swapping the credential, and resuming each live session rather than re-creating it. Re-auth opens the provider flow and reports back per account; other accounts stay usable while one is broken.</p>
+    <p style="font-size:13px;line-height:1.6;color:var(--ink-faint);margin:0"><strong>Done when:</strong> a switch mid-conversation loses no messages, and a failed sign-in leaves the previous account active.</p>
+  </div>
+
+  <div style="break-inside:avoid;border:1px solid var(--border);border-radius:12px;padding:16px 18px;margin:0 0 12px">
+    <h3 style="font-size:18px;margin:0">3.5 Usage meters</h3>
+    <p style="font-size:13px;line-height:1.6;color:var(--ink-mid);margin:8px 0 8px"><strong>In the prototype:</strong> three bars in the account popover — the current five-hour window with its reset time, the week (amber past ~80%), and flexible spend as dollars against a cap, with a line explaining it is only drawn on once a limit is reached. The footer row shows the five-hour figure inline.</p>
+    <p style="font-size:13px;line-height:1.6;color:var(--ink-mid);margin:0 0 8px"><strong>To wire:</strong> a per-account usage read, cached and refreshed on a timer, exposing fraction used, reset timestamp and — for flexible spend — amount and cap. Provider figures lag, so cache with the fetch time and say so, as the copy does. Amber is the near-limit state, not an error; red stays for denied. If a figure is unavailable the bar renders empty and the number is an em-dash — never 0%, and never a full bar.</p>
+    <p style="font-size:13px;line-height:1.6;color:var(--ink-faint);margin:0"><strong>Done when:</strong> a stale or missing reading is visibly unknown rather than quietly wrong.</p>
+  </div>
+
+  <div style="break-inside:avoid;border:1px solid var(--border);border-radius:12px;padding:16px 18px;margin:0 0 16px">
+    <div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap"><h3 style="font-size:18px;margin:0">3.6 CLI version awareness and session restart</h3><span style="font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--warn-ink)">New capability</span></div>
+    <p style="font-size:13px;line-height:1.6;color:var(--ink-mid);margin:8px 0 8px"><strong>In the prototype:</strong> conversations started on an older CLI carry an amber chip “↻ On CLI 2.1.3 · restart”; the sidebar footer summarises “Claude CLI 2.1.4 is installed · N conversations still run 2.1.3” with a restart-all action; and the chat shows a banner explaining that a conversation keeps the version it started with. Restarting stops the process and resumes the same conversation, history intact.</p>
+    <p style="font-size:13px;line-height:1.6;color:var(--ink-mid);margin:0 0 8px"><strong>To wire — nothing like this exists today.</strong> The app's <code>useVersionCheck</code> only polls the console's own releases. You need: a <code>claude --version</code> probe at spawn, stored on the session record; the same probe for the installed binary, cached and re-read on a watch or interval; a comparison to mark sessions stale; and a restart that kills the process and re-spawns with <code>--resume &lt;session id&gt;</code> on the current binary. Restart mid-turn must be refused or queued, not silently dropped, and a resume that fails must leave the old transcript reachable.</p>
+    <p style="font-size:13px;line-height:1.6;color:var(--ink-faint);margin:0"><strong>Done when:</strong> the count in the footer, the chips, and the chat banner all derive from one comparison, and the notice disappears once no session is stale.</p>
+  </div>
+
+  <h2 style="font-size:23px;margin:26px 0 10px">4 · Smaller pieces already drawn</h2>
+  <table style="width:100%;border-collapse:collapse;font-size:12.5px">
+    <thead><tr style="font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-faint)"><th style="padding:6px 10px 6px 0;border-bottom:1px solid var(--border)">Piece</th><th style="padding:6px 0;border-bottom:1px solid var(--border)">What it needs</th></tr></thead>
+    <tbody>
+      <tr><td style="padding:7px 10px 7px 0;border-bottom:1px solid var(--border);font-weight:500;width:170px">Model picker</td><td style="padding:7px 0;border-bottom:1px solid var(--border);color:var(--ink-mid)">Composer chip lists Sonnet, Opus, Haiku. Applies from the next message; earlier messages keep the model they ran on. Record the model per message so the transcript stays honest.</td></tr>
+      <tr><td style="padding:7px 10px 7px 0;border-bottom:1px solid var(--border);font-weight:500">Edit mode picker</td><td style="padding:7px 0;border-bottom:1px solid var(--border);color:var(--ink-mid)">Plan first / Edit as you go / Ask before every edit. Must agree with the Settings permission rows — one source of truth, two places to change it.</td></tr>
+      <tr><td style="padding:7px 10px 7px 0;border-bottom:1px solid var(--border);font-weight:500">Tool cards in chat</td><td style="padding:7px 0;border-bottom:1px solid var(--border);color:var(--ink-mid)">Each states whether the software acted or is waiting: “Done automatically” versus “▲ Waiting for you”, with Apply / Leave as it is on pending edits.</td></tr>
+      <tr><td style="padding:7px 10px 7px 0;border-bottom:1px solid var(--border);font-weight:500">Toasts</td><td style="padding:7px 0;border-bottom:1px solid var(--border);color:var(--ink-mid)">Upload complete, download started, push finished, account switch, restart resumed. Verve's Toast dissolves upward; keep them advisory — never the only record of an outcome.</td></tr>
+      <tr><td style="padding:7px 10px 7px 0;border-bottom:1px solid var(--border);font-weight:500">Settings switches</td><td style="padding:7px 0;border-bottom:1px solid var(--border);color:var(--ink-mid)">Ask before running a command, apply edits automatically, notify on finish. Locked-by-policy rows render muted neutral — a settled decision, not a warning.</td></tr>
+      <tr><td style="padding:7px 10px 7px 0;font-weight:500">Sign in</td><td style="padding:7px 0;color:var(--ink-mid)">Local console only; the copy promises nothing leaves the machine. Keep that true or change the copy.</td></tr>
+    </tbody>
+  </table>
+
+  <h2 style="font-size:23px;margin:28px 0 10px">5 · Rules to preserve</h2>
+  <p style="font-size:13.5px;line-height:1.65;color:var(--ink-mid);margin:0 0 10px">These are not decoration — they are why the console reads as trustworthy, and they are easy to lose in implementation.</p>
+  <ol style="font-size:13.5px;line-height:1.7;color:var(--ink-mid);margin:0;padding-left:20px">
+    <li><strong>Errors are amber.</strong> Red is reserved for destructive and denied.</li>
+    <li><strong>Colour never carries a signal alone.</strong> Every state also has a mark or a word: ● working, ✓ done, ▲ waiting for you.</li>
+    <li><strong>“We don't know” never looks like zero.</strong> A missing size, count or reading is a bare em-dash.</li>
+    <li><strong>Only positive evidence renders.</strong> Nothing is inferred from absence.</li>
+    <li><strong>Say what ran on its own.</strong> Anything automatic is labelled automatic; anything waiting says it is waiting for you.</li>
+    <li><strong>Plain English on screen.</strong> No token, flag or identifier reaches a label.</li>
+  </ol>
+
+  <h2 style="font-size:23px;margin:28px 0 10px">6 · Open questions</h2>
+  <ol style="font-size:13.5px;line-height:1.7;color:var(--ink-mid);margin:0;padding-left:20px">
+    <li>Does the <code>/git</code> command already exist on your side, or does it need writing as part of this work?</li>
+    <li>Should “Push my changes” be available per project only, or also across all projects with pending commits?</li>
+    <li>Are multiple accounts per provider in scope, or one account each for Claude and Codex?</li>
+    <li>Upload limits: maximum size, allowed types, and behaviour when a file already exists — overwrite, rename, or refuse?</li>
+    <li>Should a stale-CLI conversation refuse to accept new messages until it is restarted, or keep running on the old version?</li>
+  </ol>
+
+</doc-page>
+</x-dc>
+</body>
+</html>

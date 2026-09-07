@@ -37,13 +37,7 @@
   },
   "appearance": {
     "title": "Apariencia",
-    "theme": "Tema",
-    "codeEditor": "Editor de código",
-    "editorTheme": "Tema del editor",
-    "wordWrap": "Ajuste de línea",
-    "showMinimap": "Mostrar minimapa",
-    "lineNumbers": "Números de línea",
-    "fontSize": "Tamaño de fuente"
+    "theme": "Tema"
   },
   "actions": {
     "saveChanges": "Guardar cambios",
@@ -156,29 +150,6 @@
       "description": "Cómo se ordenan los proyectos en la barra lateral",
       "alphabetical": "Alfabético",
       "recentActivity": "Actividad reciente"
-    },
-    "codeEditor": {
-      "title": "Editor de código",
-      "theme": {
-        "label": "Tema del editor",
-        "description": "Tema por defecto del editor de código"
-      },
-      "wordWrap": {
-        "label": "Ajuste de línea",
-        "description": "Activa el ajuste de línea por defecto en el editor"
-      },
-      "showMinimap": {
-        "label": "Mostrar minimapa",
-        "description": "Muestra un minimapa para navegar más fácil en la vista de diff"
-      },
-      "lineNumbers": {
-        "label": "Mostrar números de línea",
-        "description": "Muestra los números de línea en el editor"
-      },
-      "fontSize": {
-        "label": "Tamaño de fuente",
-        "description": "Tamaño de fuente del editor en píxeles"
-      }
     }
   },
   "mcpForm": {
@@ -334,7 +305,6 @@
       "checking": "Comprobando...",
       "connected": "Conectado",
       "notConnected": "No conectado",
-      "disconnected": "Desconectado",
       "checkingAuth": "Comprobando el estado de autenticación...",
       "loggedInAs": "Sesión iniciada como {{email}}",
       "authenticatedUser": "usuario autenticado"

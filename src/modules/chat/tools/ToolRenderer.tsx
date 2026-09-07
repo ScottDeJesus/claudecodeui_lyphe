@@ -15,6 +15,9 @@ import { QuestionAnswerContent } from '@/modules/chat/tools/ContentRenderers/Que
 import { PlanDisplay } from '@/modules/chat/tools/PlanDisplay';
 import { ToolStatusBadge } from '@/modules/chat/tools/ToolStatusBadge';
 import { DiffStatsBadge } from '@/modules/chat/tools/DiffStatsBadge';
+import { ToolOutcomeBadge, ToolOutcomeGlyph } from '@/modules/chat/tools/ToolOutcomeBadge';
+import { deriveToolOutcome, type ToolPermissionState } from '@/modules/chat/tools/toolOutcome';
+import { Card } from '@/shared/ui';
 import { parseToolPayload, summarizeDiff } from '@/modules/chat/utils/messageTransforms';
 
 type ToolRendererProps = {
@@ -30,6 +33,8 @@ type ToolRendererProps = {
   rawToolInput?: string;
   /** Lifecycle the provider reported, when it reports one. Overrides the result-based inference. */
   toolStatus?: string;
+  /** What the permission layer knows about this call: blocked, allowed by a person, or neither. */
+  permissionState?: ToolPermissionState;
 };
 
 function getToolCategory(toolName: string): string {
@@ -87,6 +92,7 @@ export const ToolRenderer: React.FC<ToolRendererProps> = memo(({
   showRawParameters = false,
   rawToolInput,
   toolStatus: reportedStatus,
+  permissionState = 'idle',
 }) => {
   const config = getToolConfig(toolName);
   const displayConfig: any = mode === 'input' ? config.input : config.result;
@@ -104,6 +110,17 @@ export const ToolRenderer: React.FC<ToolRendererProps> = memo(({
     () => mode === 'input' ? deriveToolStatus(toolResult, reportedStatus) : undefined,
     [mode, toolResult, reportedStatus],
   );
+
+  // What the row can say about itself in words. Only the input render carries it:
+  // a result block is the outcome, it does not also need to announce one.
+  const outcome = mode === 'input'
+    ? deriveToolOutcome({
+        permissionState,
+        hasResult: Boolean(toolResult),
+        isError: Boolean(toolResult?.isError),
+        isShellCommand: toolName === 'Bash',
+      })
+    : null;
 
   const handleAction = useCallback(() => {
     if (displayConfig?.action === 'open-file' && onFileOpen) {
@@ -139,7 +156,8 @@ export const ToolRenderer: React.FC<ToolRendererProps> = memo(({
         description={description}
         output={output}
         isError={Boolean(toolResult?.isError)}
-        status={toolStatus !== 'completed' ? toolStatus : undefined}
+        status={outcome === 'waiting' || toolStatus === 'completed' ? undefined : toolStatus}
+        outcome={outcome}
         // Commands stay collapsed by default — including failures; the status
         // badge marks errors and the output expands via the chevron.
         defaultOpen={false}
@@ -166,7 +184,8 @@ export const ToolRenderer: React.FC<ToolRendererProps> = memo(({
         wrapText={displayConfig.wrapText}
         colorScheme={displayConfig.colorScheme}
         resultId={mode === 'input' ? `tool-result-${toolId}` : undefined}
-        status={toolStatus !== 'completed' ? toolStatus : undefined}
+        status={outcome === 'waiting' || toolStatus === 'completed' ? undefined : toolStatus}
+        outcome={outcome}
       />
     );
   }
@@ -278,7 +297,7 @@ export const ToolRenderer: React.FC<ToolRendererProps> = memo(({
       case 'success-message': {
         const msg = displayConfig.getMessage?.(parsedData) || 'Success';
         contentComponent = (
-          <div className="flex items-center gap-1.5 text-xs text-green-600 dark:text-green-400">
+          <div className="flex items-center gap-1.5 text-xs text-accent-ink">
             <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
             </svg>
@@ -305,22 +324,30 @@ export const ToolRenderer: React.FC<ToolRendererProps> = memo(({
       ? summarizeDiff(createDiff(contentProps.oldContent, contentProps.newContent))
       : null;
 
-    const statusBadge = toolStatus && toolStatus !== 'completed'
+    // `outcome` supersedes the lifecycle badge whenever it has something to say:
+    // two badges on one header would be two vocabularies for one state.
+    const statusBadge = toolStatus && toolStatus !== 'completed' && !outcome
       ? <ToolStatusBadge status={toolStatus} />
       : null;
     const statsBadge = diffStats ? <DiffStatsBadge stats={diffStats} /> : null;
     // The header is sticky while the section is open, so the counts stay
     // visible over a long diff rather than scrolling away with it.
-    const badgeElement = statusBadge || statsBadge
+    //
+    // The outcome glyph rides here rather than at the far left because the left
+    // of this header is the expander, and moving that would cost the row its
+    // one affordance.
+    const badgeElement = statusBadge || statsBadge || outcome
       ? (
         <span className="inline-flex items-center gap-1.5">
           {statsBadge}
           {statusBadge}
+          {outcome && <ToolOutcomeGlyph outcome={outcome} />}
+          {outcome && <ToolOutcomeBadge outcome={outcome} />}
         </span>
       )
       : undefined;
 
-    return (
+    const section = (
       <CollapsibleDisplay
         toolName={displayName}
         toolId={toolId}
@@ -335,6 +362,10 @@ export const ToolRenderer: React.FC<ToolRendererProps> = memo(({
         {contentComponent}
       </CollapsibleDisplay>
     );
+
+    // The call gets the card; its result block stays a plain continuation of it,
+    // so one tool reads as one object rather than two stacked panels.
+    return mode === 'input' ? <Card className="px-3 py-1.5">{section}</Card> : section;
   }
 
   return null;

@@ -5,7 +5,7 @@ import { GitBranchIcon, PencilIcon } from 'lucide-react';
 import type { ChatMessage, ClaudePermissionSuggestion, PermissionGrantResult, LLMProvider,DiffLine,Project } from '@/shared/types';
 import { formatUsageLimitText, stripProposedPlanEnvelope } from '@/modules/chat/utils/chatFormatting';
 import { ToolRenderer, ToolErrorDisplay, SubagentPanel, shouldHideToolResult } from '@/modules/chat/tools';
-import { LLMProviderLogo } from '@/shared/ui';
+import type { ReadToolPermissionState } from '@/modules/chat/hooks/useToolPermissionState';
 import { Reasoning, ReasoningContent, ReasoningTrigger } from '@/modules/chat/transcript/Reasoning';
 import ChatMessageImages from '@/modules/chat/transcript/ChatMessageImages';
 import ChatMessageFiles from '@/modules/chat/transcript/ChatMessageFiles';
@@ -38,6 +38,17 @@ type MessageComponentProps = {
    * Absent when the provider cannot copy a transcript prefix.
    */
   onForkFromMessage?: (message: ChatMessage) => void;
+  /**
+   * Turns a model id into the name the catalog shows for it, or null when the
+   * catalog has never heard of it. A raw id is never a label, so a null here
+   * falls back to the provider's own name rather than printing the id.
+   */
+  resolveModelLabel?: (modelId: string) => string | null;
+  /**
+   * Asks whether this tool call is blocked on a person, or was allowed by one.
+   * Absent in an export, where the answer is unknowable and the row says nothing.
+   */
+  readToolPermissionState?: ReadToolPermissionState;
 };
 
 const COPY_HIDDEN_TOOL_NAMES = new Set(['Bash', 'Edit', 'Write', 'ApplyPatch']);
@@ -46,7 +57,7 @@ const COPY_HIDDEN_TOOL_NAMES = new Set(['Bash', 'Edit', 'Write', 'ApplyPatch']);
  * Rendered by chat's ChatMessagesPane and ToolGroupContainer to draw one
  * transcript entry — user turn, assistant turn, or a tool call and its result.
  */
-const MessageComponent = memo(({ message, prevMessage, createDiff, onFileOpen, showRawParameters, showThinking, selectedProject, provider, onEditMessage, onForkFromMessage }: MessageComponentProps) => {
+const MessageComponent = memo(({ message, prevMessage, createDiff, onFileOpen, showRawParameters, showThinking, selectedProject, provider, onEditMessage, onForkFromMessage, resolveModelLabel, readToolPermissionState }: MessageComponentProps) => {
   const { t } = useTranslation('chat');
   const isGrouped = prevMessage && prevMessage.type === message.type &&
     ((prevMessage.type === 'assistant') ||
@@ -83,8 +94,31 @@ const MessageComponent = memo(({ message, prevMessage, createDiff, onFileOpen, s
     !message.isThinking;
 
 
-  const formattedTime = useMemo(() => new Date(message.timestamp).toLocaleTimeString(), [message.timestamp]);
+  // Hours and minutes only: seconds are noise in a transcript nobody times.
+  const formattedTime = useMemo(
+    () => new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    [message.timestamp],
+  );
   const shouldHideThinkingMessage = Boolean(message.isThinking && !showThinking);
+
+  const providerName = provider === 'cursor'
+    ? t('messageTypes.cursor')
+    : provider === 'codex'
+      ? t('messageTypes.codex')
+      : provider === 'opencode'
+        ? t('messageTypes.opencode', { defaultValue: 'OpenCode' })
+        : t('messageTypes.claude');
+
+  // Which model answered, in the catalog's own words. An id the catalog does not
+  // know resolves to nothing and the provider's name stands in — a raw
+  // `claude-haiku-…` is an identifier, and identifiers are not labels.
+  const speakerName = message.type === 'error'
+    ? t('messageTypes.error')
+    : message.type === 'tool'
+      ? t('messageTypes.tool')
+      : (message.model && resolveModelLabel?.(message.model)) || providerName;
+
+  const permissionState = readToolPermissionState?.(message.toolName, message.toolInput) ?? 'idle';
 
   if (shouldHideThinkingMessage) {
     return null;
@@ -110,7 +144,10 @@ const MessageComponent = memo(({ message, prevMessage, createDiff, onFileOpen, s
               <ChatMessageFiles files={message.files} />
             )}
             {userCopyContent.trim().length > 0 || (!message.images?.length && !message.files?.length) ? (
-              <div className="group max-w-full rounded-2xl rounded-br-md border border-border/60 bg-muted/60 px-3 py-2 text-foreground shadow-sm dark:bg-gray-800/60 sm:px-4">
+              <div className="group max-w-full bg-secondary px-4 py-3 text-foreground" style={{ borderRadius: 'var(--radius-card)' }}>
+                <div className="mb-1.5 text-xs uppercase tracking-[0.14em] text-ink-faint">
+                  {t('messageTypes.you', { defaultValue: 'You' })} · {formattedTime}
+                </div>
                 <div dir="auto" className="break-words font-serif text-sm">
                   <Markdown
                     breaks
@@ -145,61 +182,46 @@ const MessageComponent = memo(({ message, prevMessage, createDiff, onFileOpen, s
                   {shouldShowUserCopyControl && (
                     <MessageCopyControl content={userCopyContent} messageType="user" />
                   )}
-                  <span>{formattedTime}</span>
                 </div>
               </div>
             ) : (
-              /* Attachment-only turn: no text bubble, but the timestamp still shows */
-              <div className="flex items-center justify-end gap-1 text-xs text-muted-foreground">
-                <span>{formattedTime}</span>
+              /* Attachment-only turn: no text bubble, but the caption still shows */
+              <div className="flex items-center justify-end gap-1 text-xs uppercase tracking-[0.14em] text-ink-faint">
+                {t('messageTypes.you', { defaultValue: 'You' })} · {formattedTime}
               </div>
             )}
           </div>
-          {!isGrouped && (
-            <div className="hidden h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-blue-600 text-sm text-white sm:flex">
-              U
-            </div>
-          )}
         </div>
       ) : message.isTaskNotification ? (
         /* Compact task notification on the left */
         <div className="w-full">
           <div className="flex items-center gap-2 py-0.5">
-            <span className={`inline-block h-1.5 w-1.5 flex-shrink-0 rounded-full ${message.taskStatus === 'completed' ? 'bg-green-400 dark:bg-green-500' : 'bg-amber-400 dark:bg-amber-500'}`} />
-            <span className="text-xs text-gray-500 dark:text-gray-400">{message.content}</span>
+            <span className={`inline-block h-1.5 w-1.5 flex-shrink-0 rounded-full ${message.taskStatus === 'completed' ? 'bg-primary' : 'bg-warn-ink'}`} />
+            <span className="text-xs text-muted-foreground">{message.content}</span>
           </div>
         </div>
       ) : (
         /* Claude/Error/Tool messages on the left */
         <div className="w-full">
           {!isGrouped && (
-            <div className="mb-2 flex items-center space-x-3">
-              {message.type === 'error' ? (
-                <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-red-600 text-sm text-white">
-                  !
-                </div>
-              ) : message.type === 'tool' ? (
-                <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-gray-600 text-sm text-white dark:bg-gray-700">
-                  🔧
-                </div>
-              ) : (
-                <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full p-1 text-sm text-foreground">
-                  <LLMProviderLogo provider={provider} className="h-full w-full" />
-                </div>
-              )}
-              <div className="text-sm font-medium text-gray-900 dark:text-white">
-                {message.type === 'error'
-                  ? t('messageTypes.error')
-                  : message.type === 'tool'
-                    ? t('messageTypes.tool')
-                    : (provider === 'cursor'
-                        ? t('messageTypes.cursor')
-                        : provider === 'codex'
-                          ? t('messageTypes.codex')
-                          : provider === 'opencode'
-                              ? t('messageTypes.opencode', { defaultValue: 'OpenCode' })
-                              : t('messageTypes.claude'))}
-              </div>
+            /* One dot and one caption, whoever is speaking. An error turn is
+               amber rather than red — nothing here is destructive, something
+               went wrong — and it says so in the word beside the dot, so the
+               state survives a screen with no colour at all. */
+            <div className="mb-2.5 flex items-center gap-2.5">
+              <span
+                aria-hidden="true"
+                className={`h-5 w-5 flex-none rounded-full ${
+                  message.type === 'error'
+                    ? 'bg-warn-ink'
+                    : message.type === 'tool'
+                      ? 'bg-border'
+                      : 'bg-primary'
+                }`}
+              />
+              <span className="text-xs uppercase tracking-[0.14em] text-ink-faint">
+                {speakerName} · {formattedTime}
+              </span>
             </div>
           )}
 
@@ -240,6 +262,7 @@ const MessageComponent = memo(({ message, prevMessage, createDiff, onFileOpen, s
                     showRawParameters={showRawParameters}
                     rawToolInput={typeof message.toolInput === 'string' ? message.toolInput : undefined}
                     toolStatus={message.toolStatus}
+                    permissionState={permissionState}
                   />
                 )}
 
@@ -271,9 +294,21 @@ const MessageComponent = memo(({ message, prevMessage, createDiff, onFileOpen, s
                 )}
               </>
             ) : message.isThinking ? (
-              /* Thinking messages — Reasoning component (ai-elements pattern) */
-              <Reasoning defaultOpen={isExporting}>
-                <ReasoningTrigger />
+              /* Thinking: a dashed card, because it is a note to itself rather
+                 than part of the answer. The border says so before the words do. */
+              <Reasoning
+                defaultOpen={isExporting}
+                className="border-[1.5px] border-dashed border-input px-4 py-3.5"
+                style={{ borderRadius: 'var(--radius-card)' }}
+              >
+                <ReasoningTrigger
+                  getThinkingMessage={(_isStreaming, duration) => (
+                    <span className="font-serif text-[17px] italic text-ink-faint">
+                      {t('thinking.card', { defaultValue: 'Thinking' })}
+                      {typeof duration === 'number' && duration > 0 ? ` · ${duration}s` : ''}
+                    </span>
+                  )}
+                />
                 <ReasoningContent>
                   <Markdown className="prose prose-sm prose-gray max-w-none font-serif dark:prose-invert">
                     {message.content}
@@ -286,7 +321,7 @@ const MessageComponent = memo(({ message, prevMessage, createDiff, onFileOpen, s
                 </ReasoningContent>
               </Reasoning>
             ) : (
-              <div dir="auto" className="text-sm text-gray-700 dark:text-gray-300">
+              <div dir="auto" className="text-[15px] leading-relaxed text-foreground">
                 {/* Reasoning accordion */}
                 {showThinking && message.reasoning && (
                   <Reasoning className="mb-3" defaultOpen={false}>
@@ -356,15 +391,14 @@ const MessageComponent = memo(({ message, prevMessage, createDiff, onFileOpen, s
               <MemoryCitations citations={message.memoryCitations} />
             )}
 
-            {(shouldShowAssistantCopyControl || !isGrouped) && (
-              <div className="mt-1 flex w-full items-center gap-2 text-[11px] text-gray-400 dark:text-gray-500">
+            {shouldShowAssistantCopyControl && (
+              <div className="mt-1 flex w-full items-center gap-2 text-[11px] text-ink-faint">
                 {shouldShowAssistantCopyControl && (
                   <MessageCopyControl content={assistantCopyContent} messageType="assistant" />
                 )}
                 {shouldShowAssistantCopyControl && (
                   <MessageSpeakControl content={assistantCopyContent} />
                 )}
-                {!isGrouped && <span>{formattedTime}</span>}
               </div>
             )}
           </div>

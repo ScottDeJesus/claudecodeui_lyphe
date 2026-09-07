@@ -1,3 +1,7 @@
+import { X } from 'lucide-react';
+
+import { Badge, Button } from '@/shared/ui';
+
 type StandaloneShellHeaderProps = {
   title: string;
   isCompleted: boolean;
@@ -11,21 +15,15 @@ export default function StandaloneShellHeader({
   onClose = null,
 }: StandaloneShellHeaderProps) {
   return (
-    <div className="flex-shrink-0 border-b border-gray-700 bg-gray-800 px-4 py-2">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-2">
-          <h3 className="text-sm font-medium text-gray-200">{title}</h3>
-          {isCompleted && <span className="text-xs text-green-400">(Completed)</span>}
-        </div>
+    <div className="flex flex-shrink-0 items-center gap-3 border-b border-border px-4 py-2.5">
+      <h3 className="min-w-0 truncate text-sm font-medium text-foreground">{title}</h3>
+      {isCompleted && <Badge tone="positive">✓ Finished</Badge>}
 
-        {onClose && (
-          <button onClick={onClose} className="text-gray-400 hover:text-white" title="Close">
-            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        )}
-      </div>
+      {onClose && (
+        <Button variant="ghost" size="icon" className="ml-auto" onClick={onClose} aria-label="Close">
+          <X />
+        </Button>
+      )}
     </div>
   );
 }

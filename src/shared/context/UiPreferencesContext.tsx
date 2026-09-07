@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useMemo, useReducer, useRef } from 'react';
+import { createContext, useContext, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 
 import {
@@ -6,13 +6,24 @@ import {
   uiPreferencesReducer,
 } from '@/shared/uiPreferences';
 import type { UiPreferenceKey, UiPreferences } from '@/shared/uiPreferences';
-import { subscribeToUserPreferences, writeUserPreference } from '@/shared/userSettings';
+import { hasHydratedUserPreferences, subscribeToUserPreferences, writeUserPreference } from '@/shared/userSettings';
 
 type UiPreferenceActions = {
   setPreference: (key: UiPreferenceKey, value: boolean) => void;
 };
 
-const UiPreferencesStateContext = createContext<UiPreferences | null>(null);
+/**
+ * What a reader gets: the stored values, plus whether they have SETTLED — the server's copy
+ * read, or the read attempted and failed so the mirror is all there will be.
+ *
+ * `settled` rides here rather than in `UiPreferences` because that type is the blob written to
+ * the server, and a runtime flag has no business being persisted. It rides here rather than in
+ * a store of its own because a reader that sees "settled" while the preference it qualifies is
+ * still a default has been told a lie in two halves: both must arrive in the same render.
+ */
+type UiPreferencesView = UiPreferences & { settled: boolean };
+
+const UiPreferencesStateContext = createContext<UiPreferencesView | null>(null);
 const UiPreferencesActionsContext = createContext<UiPreferenceActions | null>(null);
 
 /**
@@ -44,6 +55,12 @@ export function UiPreferencesProvider({ children }: { children: ReactNode }) {
   // object for an incoming change, so an identity check would not catch it.
   const lastPersistedRef = useRef<string>(JSON.stringify(preferences));
 
+  // Read synchronously off the localStorage mirror, the first paint's values are the DEFAULTS
+  // whenever that mirror is cold — a second browser, a private window, cleared site data. This
+  // says when they stop being placeholders, so anything that acts DESTRUCTIVELY on a preference
+  // can wait for the user's own value instead of throwing state away on a stand-in.
+  const [settled, setSettled] = useState(hasHydratedUserPreferences);
+
   useEffect(() => {
     const serialized = JSON.stringify(preferences);
     if (lastPersistedRef.current === serialized) {
@@ -53,19 +70,26 @@ export function UiPreferencesProvider({ children }: { children: ReactNode }) {
     writeUserPreference('uiPreferences', preferences);
   }, [preferences]);
 
+  // Both updates in the one callback, so React flushes them in a single render and `settled`
+  // can never overtake the values it speaks for.
   useEffect(() => subscribeToUserPreferences(() => {
     const stored = readStoredUiPreferences();
     lastPersistedRef.current = JSON.stringify(stored);
     dispatch({ type: 'set_many', value: stored });
+    setSettled(hasHydratedUserPreferences());
   }), []);
 
   const actions = useMemo<UiPreferenceActions>(() => ({
     setPreference: (key, value) => dispatch({ type: 'set', key, value }),
   }), []);
 
+  // Persisting stays on the reducer state above, never on this view: `settled` is a fact about
+  // this session and must not reach the stored blob.
+  const view = useMemo<UiPreferencesView>(() => ({ ...preferences, settled }), [preferences, settled]);
+
   return (
     <UiPreferencesActionsContext.Provider value={actions}>
-      <UiPreferencesStateContext.Provider value={preferences}>
+      <UiPreferencesStateContext.Provider value={view}>
         {children}
       </UiPreferencesStateContext.Provider>
     </UiPreferencesActionsContext.Provider>
@@ -76,7 +100,7 @@ export function UiPreferencesProvider({ children }: { children: ReactNode }) {
  * Reads the UI preferences. Components that only write should use
  * useSetUiPreference instead, so a toggle does not re-render them.
  */
-export function useUiPreferences(): UiPreferences {
+export function useUiPreferences(): UiPreferencesView {
   const preferences = useContext(UiPreferencesStateContext);
   if (!preferences) {
     throw new Error('useUiPreferences must be used within a UiPreferencesProvider');

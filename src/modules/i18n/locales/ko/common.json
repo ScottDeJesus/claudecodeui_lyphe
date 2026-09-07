@@ -95,7 +95,8 @@
     "createProjectDesktop": "사이드바의 폴더 아이콘을 클릭하여 새 프로젝트를 생성하세요",
     "newSession": "새 세션",
     "untitledSession": "제목 없는 세션",
-    "projectFiles": "프로젝트 파일"
+    "projectFiles": "프로젝트 파일",
+    "lastActiveAt": "마지막 활동 {{time}}"
   },
   "fileTree": {
     "loading": "파일 로딩 중...",

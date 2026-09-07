@@ -2,17 +2,6 @@ import type { TFunction } from 'i18next';
 
 import type { FileTreeNode } from '@/shared/types';
 
-const IMAGE_FILE_EXTENSIONS = new Set([
-  'png',
-  'jpg',
-  'jpeg',
-  'gif',
-  'svg',
-  'webp',
-  'ico',
-  'bmp',
-]);
-
 export function filterFileTree(items: FileTreeNode[], query: string): FileTreeNode[] {
   return items.reduce<FileTreeNode[]>((filteredItems, item) => {
     const matchesName = item.name.toLowerCase().includes(query);
@@ -47,21 +36,11 @@ export function collectExpandedDirectoryPaths(items: FileTreeNode[]): string[] {
   return paths;
 }
 
-export function formatFileSize(bytes?: number): string {
-  if (!bytes || bytes === 0) {
-    return '0 B';
-  }
-
-  const base = 1024;
-  const sizes = ['B', 'KB', 'MB', 'GB'];
-  const index = Math.floor(Math.log(bytes) / Math.log(base));
-
-  return `${(bytes / Math.pow(base, index)).toFixed(1).replace(/\.0$/, '')} ${sizes[index]}`;
-}
-
 export function formatRelativeTime(date: string | undefined, t: TFunction): string {
   if (!date) {
-    return '-';
+    // The same em-dash the listing beside this tree uses for a time it never learned, so one
+    // screen does not spell "we don't know" two ways.
+    return '—';
   }
 
   const now = new Date();
@@ -85,10 +64,5 @@ export function formatRelativeTime(date: string | undefined, t: TFunction): stri
   }
 
   return past.toLocaleDateString();
-}
-
-export function isImageFile(filename: string): boolean {
-  const extension = filename.split('.').pop()?.toLowerCase();
-  return Boolean(extension && IMAGE_FILE_EXTENSIONS.has(extension));
 }
 

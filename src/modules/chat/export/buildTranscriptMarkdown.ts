@@ -8,6 +8,12 @@ type BuildTranscriptMarkdownInput = {
   provider: LLMProvider | string;
   exportedAt: Date;
   createDiff: (oldStr: string, newStr: string) => DiffLine[];
+  /**
+   * Turns a model id into the catalog's name for it. Markdown is the format
+   * someone pastes into a doc or a ticket, so it has to agree with the screen
+   * and with the HTML export rather than naming the provider for every turn.
+   */
+  resolveModelLabel?: (modelId: string) => string | null;
 };
 
 const PROVIDER_LABELS: Record<string, string> = {
@@ -92,6 +98,11 @@ function renderToolCall(
  */
 export function buildTranscriptMarkdown(input: BuildTranscriptMarkdownInput): string {
   const providerLabel = PROVIDER_LABELS[String(input.provider)] ?? 'Assistant';
+  // The same expression MessageComponent uses for its caption, so the file and
+  // the screen cannot drift apart again. `PROVIDER_LABELS` stays the fallback for
+  // a turn with no model on it, and for a provider that records none.
+  const speakerFor = (message: ChatMessage): string =>
+    (message.model && input.resolveModelLabel?.(message.model)) || providerLabel;
   const sections: string[] = [
     `# ${input.sessionTitle}`,
     '',
@@ -126,11 +137,11 @@ export function buildTranscriptMarkdown(input: BuildTranscriptMarkdownInput): st
     }
 
     if (message.isThinking) {
-      sections.push(`### ${providerLabel} — thinking`, '', readString(message.content));
+      sections.push(`### ${speakerFor(message)} — thinking`, '', readString(message.content));
       continue;
     }
 
-    sections.push(`### ${providerLabel}`);
+    sections.push(`### ${speakerFor(message)}`);
     if (message.reasoning) {
       sections.push('', '<details><summary>Reasoning</summary>', '', readString(message.reasoning), '', '</details>');
     }

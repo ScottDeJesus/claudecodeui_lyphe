@@ -1,22 +1,12 @@
-import { useEffect, useMemo, useState } from 'react';
-import {
-  AlertCircle,
-  ArrowRight,
-  CheckCircle,
-  ChevronDown,
-  ChevronRight,
-  Circle,
-  Clock,
-  Copy,
-  Edit,
-  Pause,
-  Save,
-  X,
-} from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { ChevronDown, ChevronRight, Copy, Edit, Save, X } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
-import { cn,copyTextToClipboard } from '@/shared/utils';
+import { cn, copyTextToClipboard } from '@/shared/utils';
 import { api } from '@/shared/api';
+import { Badge, Button, Field, Input, Select } from '@/shared/ui';
 import { useTaskMaster } from '@/modules/task-master/context/TaskMasterContext';
+import { taskStatusLabel, taskStatusTone } from '@/modules/task-master/utils/taskKanban';
 import type { TaskId, TaskMasterTask, TaskReference } from '@/shared/types';
 
 type TaskDetailModalProps = {
@@ -29,29 +19,14 @@ type TaskDetailModalProps = {
   onTaskClick?: ((task: TaskReference) => void) | null;
 };
 
-const STATUS_OPTIONS = [
-  { value: 'pending', label: 'Pending' },
-  { value: 'in-progress', label: 'In Progress' },
-  { value: 'review', label: 'Review' },
-  { value: 'done', label: 'Done' },
-  { value: 'deferred', label: 'Deferred' },
-  { value: 'cancelled', label: 'Cancelled' },
-];
+/** The statuses a reader may move a task to, in workflow order. `blocked` is not among them: TaskMaster sets it, nobody picks it. */
+const STATUS_VALUES = ['pending', 'in-progress', 'review', 'done', 'deferred', 'cancelled'];
 
-function getStatusIcon(status?: string) {
-  if (status === 'done') return CheckCircle;
-  if (status === 'in-progress') return Clock;
-  if (status === 'review') return AlertCircle;
-  if (status === 'deferred') return Pause;
-  if (status === 'cancelled') return X;
-  return Circle;
-}
-
-function getPriorityBadgeClass(priority?: string): string {
-  if (priority === 'high') return 'text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950';
-  if (priority === 'medium') return 'text-yellow-600 dark:text-yellow-400 bg-yellow-50 dark:bg-yellow-950';
-  if (priority === 'low') return 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950';
-  return 'text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-800';
+/** The same three-step ink ladder the board's cards use. High is amber, never red (doctrine §5). */
+function priorityInk(priority?: string): string {
+  if (priority === 'high') return 'text-warn-ink';
+  if (priority === 'medium') return 'text-muted-foreground';
+  return 'text-ink-faint';
 }
 
 /** Rendered by TaskMasterPanel and NextTaskBanner to show and edit one task's full details and subtasks. */
@@ -64,6 +39,7 @@ export default function TaskDetailModal({
   onStatusChange = null,
   onTaskClick = null,
 }: TaskDetailModalProps) {
+  const { t } = useTranslation('tasks');
   const { currentProject, refreshTasks } = useTaskMaster();
 
   const [isEditMode, setIsEditMode] = useState(false);
@@ -76,8 +52,6 @@ export default function TaskDetailModal({
     setEditableTask(task);
     setIsEditMode(false);
   }, [task]);
-
-  const StatusIcon = useMemo(() => getStatusIcon(task?.status), [task?.status]);
 
   if (!isOpen || !task || !editableTask) {
     return null;
@@ -147,167 +121,171 @@ export default function TaskDetailModal({
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 md:p-4">
-      <div
-        className={cn(
-          'w-full md:max-w-4xl h-full md:h-[90vh] bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 md:rounded-lg shadow-xl flex flex-col',
-          className,
-        )}
-      >
-        <div className="flex items-center justify-between border-b border-gray-200 p-4 dark:border-gray-700 md:p-6">
-          <div className="flex min-w-0 flex-1 items-center gap-3">
-            <StatusIcon className="h-6 w-6 text-blue-600 dark:text-blue-400" />
-            <div className="min-w-0 flex-1">
+    <div className={cn('fixed inset-0 z-[100] flex items-center justify-center md:p-4', className)}>
+      <div className="vv-dialog__backdrop absolute inset-0" onClick={onClose} aria-hidden />
+
+      <div className="vv-dialog__panel relative flex h-full w-full flex-col max-md:rounded-none md:h-[90vh] md:max-w-4xl">
+        <div className="flex items-start justify-between gap-3 border-b border-border p-4 md:p-6">
+          <div className="min-w-0 flex-1">
+            <div className="mb-2 flex items-center gap-2">
               <button
+                type="button"
                 onClick={() => copyTextToClipboard(String(task.id))}
-                className="mb-2 inline-flex items-center gap-1 rounded bg-gray-100 px-2 py-1 text-xs text-gray-600 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
-                title="Copy task ID"
+                className="inline-flex items-center gap-1 rounded bg-secondary px-2 py-0.5 font-mono text-xs text-ink-faint"
+                title={t('detail.copyId')}
               >
-                <span>Task {task.id}</span>
+                <span>{task.id}</span>
                 <Copy className="h-3 w-3" />
               </button>
 
-              {isEditMode ? (
-                <input
-                  type="text"
-                  value={editableTask.title}
-                  onChange={(event) => setEditableTask({ ...editableTask, title: event.target.value })}
-                  className="w-full border-b-2 border-blue-500 bg-transparent text-lg font-semibold text-gray-900 focus:outline-none dark:text-white"
-                />
-              ) : (
-                <h1 className="line-clamp-2 text-lg font-semibold text-gray-900 dark:text-white md:text-xl">{task.title}</h1>
-              )}
+              <Badge tone={taskStatusTone(task.status)}>{taskStatusLabel(task.status, t)}</Badge>
             </div>
+
+            {isEditMode ? (
+              <Input
+                type="text"
+                value={editableTask.title}
+                aria-label={t('detail.titleField')}
+                onChange={(event) => setEditableTask({ ...editableTask, title: event.target.value })}
+                className="h-10 text-lg font-semibold"
+              />
+            ) : (
+              <h1 className="line-clamp-2 text-lg font-semibold text-foreground md:text-xl">{task.title}</h1>
+            )}
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-none items-center gap-1">
             {isEditMode ? (
               <>
-                <button
+                <Button
+                  variant="ghost"
+                  size="icon"
                   onClick={handleSaveChanges}
                   disabled={isSaving}
-                  className="rounded-md p-2 text-green-600 hover:bg-green-50 disabled:opacity-50 dark:hover:bg-green-950"
-                  title="Save"
+                  title={t('detail.save')}
+                  aria-label={t('detail.save')}
                 >
-                  <Save className={cn('w-5 h-5', isSaving && 'animate-spin')} />
-                </button>
-                <button
+                  <Save className={cn(isSaving && 'animate-spin')} />
+                </Button>
+
+                <Button
+                  variant="ghost"
+                  size="icon"
                   onClick={() => {
                     setEditableTask(task);
                     setIsEditMode(false);
                   }}
                   disabled={isSaving}
-                  className="rounded-md p-2 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800"
-                  title="Cancel editing"
+                  title={t('detail.cancelEdit')}
+                  aria-label={t('detail.cancelEdit')}
                 >
-                  <X className="h-5 w-5" />
-                </button>
+                  <X />
+                </Button>
               </>
             ) : (
-              <button
+              <Button
+                variant="ghost"
+                size="icon"
                 onClick={() => setIsEditMode(true)}
-                className="rounded-md p-2 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800"
-                title="Edit task"
+                title={t('detail.edit')}
+                aria-label={t('detail.edit')}
               >
-                <Edit className="h-5 w-5" />
-              </button>
+                <Edit />
+              </Button>
             )}
-            <button onClick={onClose} className="rounded-md p-2 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800" title="Close">
-              <X className="h-5 w-5" />
-            </button>
+
+            <Button variant="ghost" size="icon" onClick={onClose} title={t('createTask.close')} aria-label={t('createTask.close')}>
+              <X />
+            </Button>
           </div>
         </div>
 
         <div className="flex-1 space-y-6 overflow-y-auto p-4 md:p-6">
           <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Status</label>
-              <select
+            <Field label={t('filters.status')}>
+              <Select
+                ariaLabel={t('filters.status')}
                 value={task.status ?? 'pending'}
-                onChange={(event) => {
-                  void handleStatusSelect(event.target.value);
+                onChange={(nextStatus) => {
+                  void handleStatusSelect(nextStatus);
                 }}
-                className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
-              >
-                {STATUS_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </div>
+                options={STATUS_VALUES.map((value) => ({ value, label: t(`statuses.${value}`, value) }))}
+              />
+            </Field>
 
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Priority</label>
-              <div className={cn('px-3 py-2 rounded-md text-sm font-medium capitalize', getPriorityBadgeClass(task.priority))}>
-                {task.priority ?? 'Not set'}
-              </div>
-            </div>
+            <Field label={t('filters.priority')}>
+              <span className={cn('text-sm font-medium', priorityInk(task.priority))}>
+                {task.priority ? t(`priorities.${task.priority}`, task.priority) : t('priorities.unset')}
+              </span>
+            </Field>
 
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Dependencies</label>
+            <Field label={t('detail.dependencies')}>
               {Array.isArray(task.dependencies) && task.dependencies.length > 0 ? (
-                <div className="flex flex-wrap gap-1">
+                <div className="flex flex-wrap gap-1.5">
                   {task.dependencies.map((dependency) => (
-                    <button
+                    <Button
                       key={String(dependency)}
+                      variant="outline"
+                      size="sm"
                       onClick={() => onTaskClick?.({ id: dependency })}
-                      className="rounded bg-blue-100 px-2 py-1 text-sm text-blue-700 hover:bg-blue-200 dark:bg-blue-900 dark:text-blue-300 dark:hover:bg-blue-800"
                     >
-                      <ArrowRight className="mr-1 inline h-3 w-3" />
                       {dependency}
-                    </button>
+                    </Button>
                   ))}
                 </div>
               ) : (
-                <span className="text-sm text-gray-500 dark:text-gray-400">No dependencies</span>
+                <span className="text-sm text-ink-faint">{t('detail.noDependencies')}</span>
               )}
-            </div>
+            </Field>
           </div>
 
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Description</label>
+          <Field label={t('detail.description')}>
             {isEditMode ? (
               <textarea
                 rows={4}
                 value={editableTask.description ?? ''}
+                aria-label={t('detail.description')}
                 onChange={(event) => setEditableTask({ ...editableTask, description: event.target.value })}
-                className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 dark:border-gray-600 dark:bg-gray-800"
+                className="w-full rounded-lg border-[1.5px] border-input bg-card px-3 py-2 text-sm text-foreground"
               />
             ) : (
-              <p className="whitespace-pre-wrap text-gray-700 dark:text-gray-300">{task.description || 'No description provided'}</p>
+              <p className="whitespace-pre-wrap text-sm text-secondary-foreground">
+                {task.description || t('detail.noDescription')}
+              </p>
             )}
-          </div>
+          </Field>
 
           {task.details && (
-            <div className="rounded-lg border border-gray-200 dark:border-gray-700">
+            <div className="rounded-xl border border-border">
               <button
+                type="button"
                 onClick={() => setShowDetails((current) => !current)}
-                className="flex w-full items-center justify-between p-4 text-left hover:bg-gray-50 dark:hover:bg-gray-800"
+                className="flex w-full items-center justify-between p-4 text-left text-sm font-medium text-foreground"
               >
-                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Implementation Details</span>
+                <span>{t('detail.implementation')}</span>
                 {showDetails ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
               </button>
               {showDetails && (
-                <div className="border-t border-gray-200 p-4 dark:border-gray-700">
-                  <p className="whitespace-pre-wrap text-gray-700 dark:text-gray-300">{task.details}</p>
+                <div className="border-t border-border p-4">
+                  <p className="whitespace-pre-wrap text-sm text-secondary-foreground">{task.details}</p>
                 </div>
               )}
             </div>
           )}
 
           {task.testStrategy && (
-            <div className="rounded-lg border border-gray-200 dark:border-gray-700">
+            <div className="rounded-xl border border-border">
               <button
+                type="button"
                 onClick={() => setShowTestStrategy((current) => !current)}
-                className="flex w-full items-center justify-between p-4 text-left hover:bg-gray-50 dark:hover:bg-gray-800"
+                className="flex w-full items-center justify-between p-4 text-left text-sm font-medium text-foreground"
               >
-                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Test Strategy</span>
+                <span>{t('detail.howItIsChecked')}</span>
                 {showTestStrategy ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
               </button>
               {showTestStrategy && (
-                <div className="border-t border-gray-200 bg-blue-50 p-4 dark:border-gray-700 dark:bg-blue-950/30">
-                  <p className="whitespace-pre-wrap text-gray-700 dark:text-gray-300">{task.testStrategy}</p>
+                <div className="border-t border-border bg-secondary p-4">
+                  <p className="whitespace-pre-wrap text-sm text-secondary-foreground">{task.testStrategy}</p>
                 </div>
               )}
             </div>

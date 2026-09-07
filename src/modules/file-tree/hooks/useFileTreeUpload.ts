@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { DragEvent } from 'react';
 
 import { IS_PLATFORM } from '@/shared/utils';
-import type { FileTreeUploadProgressState, Project } from '@/shared/types';
+import type { FileTreeUploadProgressState, Project, UploadedFileRecord } from '@/shared/types';
 import { api } from '@/shared/api';
 import { expireAuthSession, getStoredAuthToken, storeAuthToken } from '@/shared/authToken';
 import { MAX_FILE_UPLOAD_SIZE_BYTES, MAX_FILE_UPLOAD_SIZE_LABEL } from '@/shared/constants';
@@ -17,7 +17,7 @@ type UseFileTreeUploadOptions = {
 type UploadResponse = {
   error?: string;
   message?: string;
-  files?: unknown[];
+  files?: UploadedFileRecord[];
   uploadedCount?: number;
   requestedFileCount?: number;
 };
@@ -282,11 +282,14 @@ export const useFileTreeUpload = ({
     [scheduleProgressClear],
   );
 
+  // Resolves with what the server actually SAVED — the file manager reads the saved name and
+  // `renamedFrom` off these records to say so — and with `null` when nothing was written. The
+  // file tree ignores the value; its own toast is the count the hook already raised.
   const uploadFiles = useCallback(
-    async (files: File[], targetPath = '') => {
+    async (files: File[], targetPath = ''): Promise<UploadedFileRecord[] | null> => {
       if (files.length === 0) {
         setDropTarget(null);
-        return;
+        return null;
       }
 
       const fileName = files.length === 1 ? getFileDisplayName(files[0]) : undefined;
@@ -295,14 +298,14 @@ export const useFileTreeUpload = ({
         const message = 'Select a project before uploading files.';
         showToast(message, 'error');
         setUploadError(message, files.length, targetPath, fileName);
-        return;
+        return null;
       }
 
       const validationError = validateFilesForUpload(files);
       if (validationError) {
         showToast(validationError, 'error');
         setUploadError(validationError, files.length, targetPath, fileName);
-        return;
+        return null;
       }
 
       clearProgressTimer();
@@ -348,11 +351,13 @@ export const useFileTreeUpload = ({
         showToast(formatUploadSuccessMessage(uploadedCount, requestedFileCount), 'success');
         scheduleProgressClear(COMPLETE_PROGRESS_CLEAR_DELAY_MS);
         onRefresh();
+        return response.files ?? [];
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Upload failed';
         console.error('Upload error:', err);
         showToast(message, 'error');
         setUploadError(message, files.length, targetPath, fileName, latestProgress);
+        return null;
       } finally {
         setOperationLoading(false);
         setDropTarget(null);

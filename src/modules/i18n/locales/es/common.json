@@ -95,7 +95,8 @@
     "createProjectDesktop": "Crea un proyecto nuevo haciendo clic en el icono de carpeta de la barra lateral",
     "newSession": "Nueva sesión",
     "untitledSession": "Sesión sin título",
-    "projectFiles": "Archivos del proyecto"
+    "projectFiles": "Archivos del proyecto",
+    "lastActiveAt": "última actividad {{time}}"
   },
   "fileTree": {
     "loading": "Cargando archivos...",

@@ -7,7 +7,7 @@ import rehypeKatex from 'rehype-katex';
 import { oneDark, oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { useTranslation } from 'react-i18next';
 
-import { MermaidDiagram } from '@/modules/code-editor';
+import { MermaidDiagram } from '@/modules/markdown-preview';
 import { normalizeInlineCodeFences } from '@/modules/chat/utils/chatFormatting';
 import { copyTextToClipboard } from '@/shared/utils';
 import { SyntaxHighlighter } from '@/shared/syntaxHighlighter';
@@ -266,7 +266,7 @@ function MarkdownBodyRenderer({ children, breaks = false }: Omit<MarkdownProps, 
     [breaks, hasMath],
   );
   const rehypePlugins = useMemo(() => (hasMath ? [rehypeKatex] : EMPTY_PLUGINS), [hasMath]);
-  const { openFileInEditor } = usePaletteOps();
+  const { openFileReference } = usePaletteOps();
 
   const components = useMemo(
     () => ({
@@ -284,7 +284,7 @@ function MarkdownBodyRenderer({ children, breaks = false }: Omit<MarkdownProps, 
               className="cursor-pointer text-blue-600 hover:underline dark:text-blue-400"
               onClick={(event) => {
                 event.preventDefault();
-                openFileInEditor(stripLineSuffix(fileRef));
+                openFileReference(stripLineSuffix(fileRef));
               }}
             >
               {linkChildren}
@@ -304,7 +304,7 @@ function MarkdownBodyRenderer({ children, breaks = false }: Omit<MarkdownProps, 
         );
       },
     }),
-    [openFileInEditor],
+    [openFileReference],
   );
 
   return (

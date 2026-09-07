@@ -15,6 +15,8 @@ type ChatExportMenuProps = {
   provider: LLMProvider | string;
   selectedProject?: Project | null;
   createDiff: (oldStr: string, newStr: string) => DiffLine[];
+  /** Turns a model id into the catalog's name for it, so a saved file agrees with the screen. */
+  resolveModelLabel?: (modelId: string) => string | null;
   /**
    * Loads the rest of the conversation before exporting.
    *
@@ -41,6 +43,7 @@ export default function ChatExportMenu({
   provider,
   selectedProject,
   createDiff,
+  resolveModelLabel,
   onLoadFullTranscript,
 }: ChatExportMenuProps) {
   const { t } = useTranslation('chat');
@@ -62,6 +65,7 @@ export default function ChatExportMenu({
         provider,
         selectedProject,
         createDiff,
+        resolveModelLabel,
       });
     } catch (error) {
       console.error('Failed to export conversation:', error);

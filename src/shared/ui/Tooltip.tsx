@@ -13,18 +13,24 @@ type TooltipProps = {
   delay?: number;
 };
 
+/**
+ * Where the arrow sits, and which of its four borders is inked.
+ *
+ * The side classes place it; the `vv-tooltip__arrow--*` marker is what colours it, out of the
+ * same `--ink` the bubble is filled with — so the arrow can no longer drift to a different
+ * dark than the chip it points out of, which is what two independent grey literals allowed.
+ */
 function getArrowClasses(position: TooltipPosition): string {
   switch (position) {
-    case 'top':
-      return 'top-full left-1/2 transform -translate-x-1/2 border-t-gray-900 dark:border-t-gray-100';
     case 'bottom':
-      return 'bottom-full left-1/2 transform -translate-x-1/2 border-b-gray-900 dark:border-b-gray-100';
+      return 'bottom-full left-1/2 transform -translate-x-1/2 vv-tooltip__arrow--bottom';
     case 'left':
-      return 'left-full top-1/2 transform -translate-y-1/2 border-l-gray-900 dark:border-l-gray-100';
+      return 'left-full top-1/2 transform -translate-y-1/2 vv-tooltip__arrow--left';
     case 'right':
-      return 'right-full top-1/2 transform -translate-y-1/2 border-r-gray-900 dark:border-r-gray-100';
+      return 'right-full top-1/2 transform -translate-y-1/2 vv-tooltip__arrow--right';
+    case 'top':
     default:
-      return 'top-full left-1/2 transform -translate-x-1/2 border-t-gray-900 dark:border-t-gray-100';
+      return 'top-full left-1/2 transform -translate-x-1/2 vv-tooltip__arrow--top';
   }
 }
 
@@ -179,18 +185,20 @@ export function Tooltip({
     >
       {children}
       {isVisible && typeof document !== 'undefined' && createPortal(
+        // Two elements, because one cannot do both jobs: `tooltipStyle` places the bubble with
+        // a `transform`, and `vv-pop` animates `transform` — on a single element the keyframe
+        // wins for its quarter second and the tooltip flies in from the viewport's top-left.
+        // The outer box positions, the inner box paints and pops (doctrine §4).
         <div
           ref={tooltipRef}
           style={tooltipStyle || { position: 'fixed', top: '-9999px', left: '-9999px', opacity: 0 }}
-          className={cn(
-            'px-2 py-1 text-xs font-medium text-white bg-gray-900 dark:bg-gray-100 dark:text-gray-900 rounded shadow-lg whitespace-nowrap pointer-events-none',
-            'animate-in fade-in-0 zoom-in-95 duration-200',
-            className
-          )}
+          className="pointer-events-none"
         >
-          {content}
-          {/* Arrow */}
-          <div className={cn('absolute w-0 h-0 border-4 border-transparent', getArrowClasses(position))} />
+          <div className={cn('vv-tooltip relative whitespace-nowrap', className)}>
+            {content}
+            {/* Arrow */}
+            <div className={cn('vv-tooltip__arrow absolute h-0 w-0', getArrowClasses(position))} />
+          </div>
         </div>,
         document.body
       )}

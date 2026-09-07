@@ -55,8 +55,8 @@
 - **響應式設計** — 在桌面、平板和行動裝置上無縫運作，讓您隨時隨地使用 Agents
 - **互動聊天介面** — 內建聊天 UI，輕鬆與 Agents 交流
 - **整合 Shell 終端機** — 透過內建 shell 功能直接存取 Agents CLI
-- **檔案瀏覽器** — 互動式檔案樹，支援語法醒目提示與即時編輯
-- **Git 瀏覽器** — 檢視、暫存並提交變更，還可切換分支
+- **檔案瀏覽器** — 互動式檔案樹，支援文字、圖片與下載的唯讀預覽；修改交給 Agents
+- **Git 瀏覽器** — 檢視目前分支、尚未推送的提交，以及每個待處理變更及其 diff；提交與推送交給 Agents：一個按鈕即可開啟對話並執行你自己的 `/git`
 - **工作階段管理** — 恢復對話、管理多個工作階段並追蹤歷史紀錄
 - **外掛系統** — 透過自訂分頁、後端服務與整合來擴充 CloudCLI。[開始建構 →](https://github.com/cloudcli-ai/cloudcli-plugin-starter)
 - **TaskMaster AI 整合** *(選用)* — 結合 AI 任務規劃、PRD 分析與工作流程自動化，實現進階專案管理
@@ -237,7 +237,7 @@ GNU Affero 通用公共授權條款 v3.0 或更高版本 (AGPL-3.0-or-later) —
 - **[React](https://react.dev/)** — 使用者介面函式庫
 - **[Vite](https://vitejs.dev/)** — 快速建構工具與開發伺服器
 - **[Tailwind CSS](https://tailwindcss.com/)** — 實用優先 CSS 框架
-- **[CodeMirror](https://codemirror.net/)** — 進階程式碼編輯器
+- **[CodeMirror](https://codemirror.net/)** — PRD 編輯器背後的 Markdown 編輯器
 - **[TaskMaster AI](https://github.com/eyaltoledano/claude-task-master)** *(選用)* — AI 驅動的專案管理與任務規劃
 
 ### 贊助商

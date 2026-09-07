@@ -37,13 +37,7 @@
   },
   "appearance": {
     "title": "外观",
-    "theme": "主题",
-    "codeEditor": "代码编辑器",
-    "editorTheme": "编辑器主题",
-    "wordWrap": "自动换行",
-    "showMinimap": "显示缩略图",
-    "lineNumbers": "行号",
-    "fontSize": "字体大小"
+    "theme": "主题"
   },
   "actions": {
     "saveChanges": "保存更改",
@@ -156,29 +150,6 @@
       "description": "项目在侧边栏中的排列方式",
       "alphabetical": "按字母顺序",
       "recentActivity": "最近活动"
-    },
-    "codeEditor": {
-      "title": "代码编辑器",
-      "theme": {
-        "label": "编辑器主题",
-        "description": "代码编辑器的默认主题"
-      },
-      "wordWrap": {
-        "label": "自动换行",
-        "description": "在编辑器中默认启用自动换行"
-      },
-      "showMinimap": {
-        "label": "显示缩略图",
-        "description": "在差异视图中显示缩略图以便于导航"
-      },
-      "lineNumbers": {
-        "label": "显示行号",
-        "description": "在编辑器中显示行号"
-      },
-      "fontSize": {
-        "label": "字体大小",
-        "description": "编辑器字体大小（px）"
-      }
     }
   },
   "mcpForm": {
@@ -334,7 +305,6 @@
       "checking": "检查中...",
       "connected": "已连接",
       "notConnected": "未连接",
-      "disconnected": "已断开",
       "checkingAuth": "正在检查认证状态...",
       "loggedInAs": "登录为 {{email}}",
       "authenticatedUser": "已认证用户"

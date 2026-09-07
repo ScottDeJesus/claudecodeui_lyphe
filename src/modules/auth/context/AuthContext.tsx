@@ -28,7 +28,8 @@ type AuthActionResult = { success: true } | { success: false; error: string };
 type AuthSessionPayload = {
   token?: string;
   user?: AuthUser;
-  error?: string;
+  // Same two shapes ApiErrorPayload describes: a failed login answers with the object form.
+  error?: ApiErrorPayload['error'];
   message?: string;
 };
 
@@ -44,8 +45,15 @@ type OnboardingStatusPayload = {
   hasCompletedOnboarding?: boolean;
 };
 
+/**
+ * What a failed auth route actually answers with.
+ *
+ * `error` is a STRING on some routes and a `{ code, message }` object on others — POST
+ * /api/auth/login and /api/auth/register both send the object. The narrower `error?: string`
+ * this used to declare was a claim about the wire, not a reading of it.
+ */
 type ApiErrorPayload = {
-  error?: string;
+  error?: string | { code?: string; message?: string };
   message?: string;
 };
 
@@ -74,12 +82,27 @@ async function parseJsonSafely<T>(response: Response): Promise<T | null> {
   }
 }
 
+/**
+ * The one sentence to show a person, out of whichever shape the route answered with.
+ *
+ * It must return a STRING and nothing else: every caller hands the result straight to
+ * `setErrorMessage`, and React throws on an object child — which is how a wrong password used
+ * to take the whole login screen down instead of saying "Invalid username or password".
+ */
 function resolveApiErrorMessage(payload: ApiErrorPayload | null, fallback: string): string {
   if (!payload) {
     return fallback;
   }
 
-  return payload.error ?? payload.message ?? fallback;
+  if (typeof payload.error === 'string') {
+    return payload.error;
+  }
+
+  if (payload.error && typeof payload.error.message === 'string') {
+    return payload.error.message;
+  }
+
+  return payload.message ?? fallback;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);

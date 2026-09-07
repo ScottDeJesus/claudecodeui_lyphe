@@ -1,19 +1,10 @@
 import { memo } from 'react';
-import {
-  AlertCircle,
-  ArrowRight,
-  CheckCircle,
-  ChevronUp,
-  Circle,
-  Clock,
-  Minus,
-  Pause,
-  X,
-} from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 import { cn } from '@/shared/utils';
-import { Tooltip } from '@/shared/ui';
+import { Badge, Meter, Tooltip } from '@/shared/ui';
 import type { TaskMasterTask } from '@/shared/types';
+import { taskStatusLabel, taskStatusTone } from '@/modules/task-master/utils/taskKanban';
 
 type TaskCardProps = {
   task: TaskMasterTask;
@@ -22,105 +13,18 @@ type TaskCardProps = {
   className?: string;
 };
 
-type TaskStatusStyle = {
-  icon: typeof Circle;
-  statusText: string;
-  iconColor: string;
-  textColor: string;
-};
-
-function getStatusStyle(status?: string): TaskStatusStyle {
-  if (status === 'done') {
-    return {
-      icon: CheckCircle,
-      statusText: 'Done',
-      iconColor: 'text-green-600 dark:text-green-400',
-      textColor: 'text-green-900 dark:text-green-100',
-    };
-  }
-
-  if (status === 'in-progress') {
-    return {
-      icon: Clock,
-      statusText: 'In Progress',
-      iconColor: 'text-blue-600 dark:text-blue-400',
-      textColor: 'text-blue-900 dark:text-blue-100',
-    };
-  }
-
-  if (status === 'review') {
-    return {
-      icon: AlertCircle,
-      statusText: 'Review',
-      iconColor: 'text-amber-600 dark:text-amber-400',
-      textColor: 'text-amber-900 dark:text-amber-100',
-    };
-  }
-
-  if (status === 'deferred') {
-    return {
-      icon: Pause,
-      statusText: 'Deferred',
-      iconColor: 'text-gray-500 dark:text-gray-400',
-      textColor: 'text-gray-700 dark:text-gray-300',
-    };
-  }
-
-  if (status === 'cancelled') {
-    return {
-      icon: X,
-      statusText: 'Cancelled',
-      iconColor: 'text-red-600 dark:text-red-400',
-      textColor: 'text-red-900 dark:text-red-100',
-    };
-  }
-
-  return {
-    icon: Circle,
-    statusText: 'Pending',
-    iconColor: 'text-slate-500 dark:text-slate-400',
-    textColor: 'text-slate-900 dark:text-slate-100',
-  };
-}
-
-function renderPriorityIcon(priority?: string) {
-  if (priority === 'high') {
-    return (
-      <Tooltip content="High priority">
-        <div className="flex h-4 w-4 items-center justify-center rounded bg-red-100 dark:bg-red-900/30">
-          <ChevronUp className="h-2.5 w-2.5 text-red-600 dark:text-red-400" />
-        </div>
-      </Tooltip>
-    );
-  }
-
-  if (priority === 'medium') {
-    return (
-      <Tooltip content="Medium priority">
-        <div className="flex h-4 w-4 items-center justify-center rounded bg-amber-100 dark:bg-amber-900/30">
-          <Minus className="h-2.5 w-2.5 text-amber-600 dark:text-amber-400" />
-        </div>
-      </Tooltip>
-    );
-  }
-
-  if (priority === 'low') {
-    return (
-      <Tooltip content="Low priority">
-        <div className="flex h-4 w-4 items-center justify-center rounded bg-blue-100 dark:bg-blue-900/30">
-          <Circle className="h-1.5 w-1.5 fill-current text-blue-600 dark:text-blue-400" />
-        </div>
-      </Tooltip>
-    );
-  }
-
-  return (
-    <Tooltip content="No priority set">
-      <div className="flex h-4 w-4 items-center justify-center rounded bg-gray-100 dark:bg-gray-800">
-        <Circle className="h-1.5 w-1.5 text-gray-400 dark:text-gray-500" />
-      </div>
-    </Tooltip>
-  );
+/**
+ * How urgent a task is, as a line of text rather than a pill: three steps of ink weight, so
+ * the row reads as a ladder instead of four badges competing with the status badge beside it.
+ *
+ * High is amber, never red. Red is for something destroyed or refused, and a task nobody has
+ * started is neither (doctrine §5, plan D9).
+ */
+function priorityLine(priority: string | undefined, t: ReturnType<typeof useTranslation<'tasks'>>['t']) {
+  if (priority === 'high') return { text: `▲ ${t('priorities.high')}`, className: 'text-warn-ink' };
+  if (priority === 'medium') return { text: `▲ ${t('priorities.medium')}`, className: 'text-muted-foreground' };
+  if (priority === 'low') return { text: t('priorities.low'), className: 'text-ink-faint' };
+  return { text: t('priorities.unset'), className: 'text-ink-faint' };
 }
 
 function getSubtaskProgress(task: TaskMasterTask): { completed: number; total: number; percentage: number } {
@@ -134,77 +38,51 @@ function getSubtaskProgress(task: TaskMasterTask): { completed: number; total: n
 
 /** Rendered by TaskBoardContent for one task tile, showing its status, priority and subtask progress. */
 function TaskCard({ task, onClick = null, showParent = false, className = '' }: TaskCardProps) {
-  const statusStyle = getStatusStyle(task.status);
+  const { t } = useTranslation('tasks');
   const progress = getSubtaskProgress(task);
+  const priority = priorityLine(task.priority, t);
 
   return (
     <div
       className={cn(
-        'bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-3 space-y-3',
-        'hover:shadow-md hover:border-blue-300 dark:hover:border-blue-600 transition-all duration-200',
-        onClick ? 'cursor-pointer hover:-translate-y-0.5' : 'cursor-default',
+        'rounded-xl border border-border bg-card p-3.5 space-y-2.5',
+        'transition-[transform,box-shadow] duration-move ease-enter',
+        onClick ? 'cursor-pointer hover:-translate-y-1 hover:shadow-md' : 'cursor-default',
+        // A finished task steps back rather than shouting; the board is about what is left.
+        task.status === 'done' && 'opacity-80',
         className,
       )}
       onClick={onClick ?? undefined}
     >
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0 flex-1">
-          <div className="mb-1 flex items-center gap-2">
-            <Tooltip content={`Task ID: ${task.id}`}>
-              <span className="rounded bg-gray-100 px-2 py-0.5 font-mono text-xs text-gray-500 dark:bg-gray-700 dark:text-gray-400">
-                {task.id}
-              </span>
-            </Tooltip>
-          </div>
-
-          <h3 className="line-clamp-2 text-sm font-medium leading-tight text-gray-900 dark:text-white">
-            {task.title}
-          </h3>
-
-          {showParent && task.parentId && (
-            <span className="text-xs font-medium text-gray-500 dark:text-gray-400">Task {task.parentId}</span>
-          )}
-        </div>
-
-        <div className="flex-shrink-0">{renderPriorityIcon(task.priority)}</div>
-      </div>
-
-      <div className="flex items-center justify-between">
-        <div className="flex items-center">
-          {Array.isArray(task.dependencies) && task.dependencies.length > 0 && (
-            <Tooltip content={`Depends on: ${task.dependencies.map((dependency) => `Task ${dependency}`).join(', ')}`}>
-              <div className="flex items-center gap-1 text-xs text-amber-600 dark:text-amber-400">
-                <ArrowRight className="h-3 w-3" />
-                <span>Depends on: {task.dependencies.join(', ')}</span>
-              </div>
-            </Tooltip>
-          )}
-        </div>
-
-        <Tooltip content={`Status: ${statusStyle.statusText}`}>
-          <div className="flex items-center gap-1">
-            <div className={cn('w-2 h-2 rounded-full', statusStyle.iconColor.replace('text-', 'bg-'))} />
-            <span className={cn('text-xs font-medium', statusStyle.textColor)}>{statusStyle.statusText}</span>
-          </div>
+      <div className="flex items-center gap-2">
+        <Tooltip content={t('card.taskId', { id: task.id })}>
+          <span className="rounded bg-secondary px-1.5 py-0.5 font-mono text-[11.5px] text-ink-faint">{task.id}</span>
         </Tooltip>
+
+        <span className={cn('ml-auto text-[11px]', priority.className)}>{priority.text}</span>
       </div>
+
+      <h3 className="line-clamp-2 text-sm font-medium leading-snug text-foreground">{task.title}</h3>
+
+      {showParent && task.parentId && (
+        <p className="text-xs text-ink-faint">{t('card.partOf', { id: task.parentId })}</p>
+      )}
+
+      {Array.isArray(task.dependencies) && task.dependencies.length > 0 && (
+        <p className="text-xs text-ink-faint">{t('card.waitsOn', { ids: task.dependencies.join(', ') })}</p>
+      )}
 
       {progress.total > 0 && (
-        <div className="ml-3">
-          <div className="mb-1 flex items-center gap-2">
-            <span className="text-xs text-gray-500 dark:text-gray-400">Progress:</span>
-            <div className="h-1.5 flex-1 rounded-full bg-gray-200 dark:bg-gray-700" title={`${progress.completed} of ${progress.total} subtasks completed`}>
-              <div
-                className={cn('h-full rounded-full transition-all duration-300', task.status === 'done' ? 'bg-green-500' : 'bg-blue-500')}
-                style={{ width: `${progress.percentage}%` }}
-              />
-            </div>
-            <span className="text-xs text-gray-500 dark:text-gray-400">
-              {progress.completed}/{progress.total}
-            </span>
-          </div>
-        </div>
+        <Meter
+          percent={progress.percentage}
+          label={t('card.subtasks')}
+          value={t('card.subtaskCount', { completed: progress.completed, total: progress.total })}
+        />
       )}
+
+      <div className="flex">
+        <Badge tone={taskStatusTone(task.status)}>{taskStatusLabel(task.status, t)}</Badge>
+      </div>
     </div>
   );
 }

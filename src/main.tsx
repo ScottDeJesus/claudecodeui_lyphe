@@ -3,6 +3,9 @@ import ReactDOM from 'react-dom/client'
 import { scan } from 'react-scan'
 
 import App from '@/App'
+// Before index.css, deliberately: index.css's `@tailwind base` and every Tailwind utility
+// mapped onto a Verve token must resolve against tokens that are already declared.
+import '@/shared/ui/verve/tokens.css'
 import '@/index.css'
 import 'katex/dist/katex.min.css'
 

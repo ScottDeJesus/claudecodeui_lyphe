@@ -1,130 +1,126 @@
 {
   "notConfigured": {
-    "title": "TaskMaster AI is not configured",
-    "description": "TaskMaster helps break down complex projects into manageable tasks with AI-powered assistance",
-    "whatIsTitle": "🎯 What is TaskMaster?",
+    "title": "TaskMaster is not set up here",
+    "description": "TaskMaster breaks a project into tasks an agent can pick up one at a time.",
+    "whatIsTitle": "What TaskMaster does",
     "features": {
-      "aiPowered": "AI-Powered Task Management: Break complex projects into manageable subtasks",
-      "prdTemplates": "PRD Templates: Generate tasks from Product Requirements Documents",
-      "dependencyTracking": "Dependency Tracking: Understand task relationships and execution order",
-      "progressVisualization": "Progress Visualization: Kanban boards and detailed task analytics",
-      "cliIntegration": "CLI Integration: Use taskmaster commands for advanced workflows"
+      "aiPowered": "Breaks a large piece of work into tasks small enough to finish.",
+      "prdTemplates": "Turns a written brief into that list of tasks.",
+      "dependencyTracking": "Keeps track of which task waits on which.",
+      "progressVisualization": "Shows the whole board and how far along each task is.",
+      "cliIntegration": "Runs from the terminal too, with the same tasks."
     },
-    "initializeButton": "Initialize TaskMaster AI"
+    "initializeButton": "Set up TaskMaster"
   },
   "gettingStarted": {
-    "title": "Getting Started with TaskMaster",
-    "subtitle": "TaskMaster is initialized! Here's what to do next:",
+    "title": "Getting started with TaskMaster",
+    "subtitle": "TaskMaster is set up. Here is what to do next.",
     "steps": {
       "createPRD": {
-        "title": "Create a Product Requirements Document (PRD)",
-        "description": "Discuss your project idea and create a PRD that describes what you want to build.",
-        "addButton": "Add PRD",
-        "existingPRDs": "Existing PRDs:"
+        "title": "Write a brief",
+        "description": "Describe what you want built. This is the document TaskMaster reads.",
+        "addButton": "Write one",
+        "existingPRDs": "Briefs already in this project"
       },
       "generateTasks": {
-        "title": "Generate Tasks from PRD",
-        "description": "Once you have a PRD, ask your AI assistant to parse it and TaskMaster will automatically break it down into manageable tasks with implementation details."
+        "title": "Turn the brief into tasks",
+        "description": "Ask your agent to read the brief. TaskMaster breaks it into tasks with the detail needed to build each one."
       },
       "analyzeTasks": {
-        "title": "Analyze & Expand Tasks",
-        "description": "Ask your AI assistant to analyze task complexity and expand them into detailed subtasks for easier implementation."
+        "title": "Break the big ones down",
+        "description": "Ask your agent which tasks look large, and to split those into subtasks."
       },
       "startBuilding": {
-        "title": "Start Building",
-        "description": "Ask your AI assistant to begin working on tasks, update their status, and add new tasks as your project evolves."
+        "title": "Start building",
+        "description": "Ask your agent to pick up a task, and to keep the board up to date as the work goes."
       }
     },
-    "tip": "💡 Tip: Start with a PRD to get the most out of TaskMaster's AI-powered task generation"
+    "tip": "Start with a brief — it is what everything else is generated from."
   },
   "setupModal": {
-    "title": "TaskMaster Setup",
-    "subtitle": "Interactive CLI for {{projectName}}",
-    "willStart": "TaskMaster initialization will start automatically",
-    "completed": "TaskMaster setup completed! You can now close this window.",
+    "title": "Setting up TaskMaster",
+    "subtitle": "Running in {{projectName}}",
+    "willStart": "Setup starts on its own in a moment.",
+    "completed": "Setup finished — this window can be closed.",
     "closeButton": "Close",
-    "closeContinueButton": "Close & Continue"
+    "closeContinueButton": "Close and continue"
   },
   "helpGuide": {
-    "title": "Getting Started with TaskMaster",
-    "subtitle": "Your guide to productive task management",
-    "examples": {
-      "parsePRD": "💬 Example:\n\"I've just initialized a new project with Claude Task Master. I have a PRD at .taskmaster/docs/prd.txt. Can you help me parse it and set up the initial tasks?\"",
-      "expandTask": "💬 Example:\n\"Task 5 seems complex. Can you break it down into subtasks?\"",
-      "addTask": "💬 Example:\n\"Please add a new task to implement user profile image uploads using Cloudinary, research the best approach.\""
-    },
-    "moreExamples": "View more examples and usage patterns →",
+    "title": "Getting started with TaskMaster",
+    "subtitle": "How a brief becomes a board",
     "proTips": {
-      "title": "💡 Pro Tips",
-      "search": "Use the search bar to quickly find specific tasks",
-      "views": "Switch between Kanban, List, and Grid views using the view toggles",
-      "filters": "Use filters to focus on specific task statuses or priorities",
-      "details": "Click on any task to view detailed information and manage subtasks"
+      "title": "Worth knowing",
+      "search": "The search box finds a task by anything written on it.",
+      "views": "The board, list and grid show the same tasks three ways.",
+      "filters": "Filters narrow the board to one status or one priority.",
+      "details": "Clicking a task opens it in full, subtasks and all."
     },
     "learnMore": {
-      "title": "📚 Learn More",
-      "description": "TaskMaster AI is an advanced task management system built for developers. Get documentation, examples, and contribute to the project.",
-      "githubButton": "View on GitHub"
+      "title": "Learn more",
+      "description": "TaskMaster is an open project. Its documentation, examples and source are on GitHub.",
+      "githubButton": "Open it on GitHub"
     }
   },
   "search": {
-    "placeholder": "Search tasks..."
+    "placeholder": "Search tasks"
   },
   "filters": {
     "button": "Filters",
     "status": "Status",
     "priority": "Priority",
-    "sortBy": "Sort By",
-    "allStatuses": "All Statuses",
-    "allPriorities": "All Priorities",
+    "sortBy": "Order",
+    "allStatuses": "Any status",
+    "allPriorities": "Any priority",
     "showing": "Showing {{filtered}} of {{total}} tasks",
-    "clearFilters": "Clear Filters"
+    "clearFilters": "Clear the filters"
   },
   "sort": {
-    "id": "ID",
+    "id": "Number",
     "status": "Status",
     "priority": "Priority",
-    "idAsc": "ID (Ascending)",
-    "idDesc": "ID (Descending)",
-    "titleAsc": "Title (A-Z)",
-    "titleDesc": "Title (Z-A)",
-    "statusAsc": "Status (Pending First)",
-    "statusDesc": "Status (Done First)",
-    "priorityAsc": "Priority (High First)",
-    "priorityDesc": "Priority (Low First)"
+    "idAsc": "Lowest number first",
+    "idDesc": "Highest number first",
+    "titleAsc": "Title, A to Z",
+    "titleDesc": "Title, Z to A",
+    "statusAsc": "Not started first",
+    "statusDesc": "Done first",
+    "priorityAsc": "High priority first",
+    "priorityDesc": "Low priority first"
   },
   "views": {
-    "kanban": "Kanban view",
-    "list": "List view",
-    "grid": "Grid view"
+    "kanban": "Board",
+    "list": "List",
+    "grid": "Grid"
   },
   "kanban": {
-    "pending": "📋 To Do",
-    "inProgress": "🚀 In Progress",
-    "done": "✅ Done",
-    "blocked": "🚫 Blocked",
-    "deferred": "⏳ Deferred",
-    "cancelled": "❌ Cancelled",
-    "noTasksYet": "No tasks yet",
-    "tasksWillAppear": "Tasks will appear here",
-    "moveTasksHere": "Move tasks here when started",
-    "completedTasksHere": "Completed tasks appear here",
-    "statusTasksHere": "Tasks with this status will appear here"
+    "pending": "Not started",
+    "inProgress": "Being worked on",
+    "review": "Needs your review",
+    "done": "Done",
+    "blocked": "Blocked",
+    "deferred": "Deferred",
+    "cancelled": "Cancelled",
+    "noTasksYet": "Nothing here",
+    "tasksWillAppear": "New tasks land here.",
+    "moveTasksHere": "A task moves here once it is started.",
+    "completedTasksHere": "Finished tasks end up here.",
+    "statusTasksHere": "Tasks with this status appear here."
   },
   "buttons": {
-    "help": "TaskMaster Getting Started Guide",
-    "prds": "PRDs",
-    "addPRD": "Add PRD",
-    "addTask": "Add Task",
-    "createNewPRD": "Create New PRD",
-    "prdsAvailable": "{{count}} PRD(s) available"
+    "help": "How this works",
+    "addPRD": "Add a brief",
+    "addTask": "Add a task",
+    "createNewPRD": "Write a new brief",
+    "prdsAvailable": "Briefs ({{count}})"
   },
   "prd": {
-    "modified": "Modified: {{date}}"
+    "modified": "Changed {{date}}",
+    "saved": "Brief saved"
   },
   "statuses": {
-    "pending": "Pending",
-    "in-progress": "In Progress",
+    "pending": "Not started",
+    "in-progress": "Being worked on",
+    "review": "Needs your review",
     "done": "Done",
     "blocked": "Blocked",
     "deferred": "Deferred",
@@ -133,10 +129,50 @@
   "priorities": {
     "high": "High",
     "medium": "Medium",
-    "low": "Low"
+    "low": "Low",
+    "unset": "Priority not set"
   },
   "noMatchingTasks": {
-    "title": "No tasks match your filters",
-    "description": "Try adjusting your search or filter criteria."
+    "title": "No tasks match",
+    "description": "Try a different search, or clear the filters."
+  },
+  "card": {
+    "taskId": "Task {{id}}",
+    "partOf": "Part of task {{id}}",
+    "waitsOn": "Waits on {{ids}}",
+    "subtasks": "Subtasks",
+    "subtaskCount": "{{completed}} of {{total}} done"
+  },
+  "detail": {
+    "copyId": "Copy this number",
+    "titleField": "Task title",
+    "save": "Save the changes",
+    "cancelEdit": "Discard the changes",
+    "edit": "Edit this task",
+    "dependencies": "Waits on",
+    "noDependencies": "Nothing",
+    "description": "Description",
+    "noDescription": "No description was written for this task.",
+    "implementation": "How to build it",
+    "howItIsChecked": "How it is checked"
+  },
+  "createTask": {
+    "title": "Adding a task",
+    "close": "Close",
+    "askTitle": "Ask in chat",
+    "askDescription": "Describe the task with its context and what it has to do, and TaskMaster writes it out in full.",
+    "exampleLabel": "For example",
+    "example": "Add a task for profile image uploads, and look up the best way to do it first.",
+    "docsLink": "Read the TaskMaster documentation",
+    "dismiss": "Got it"
+  },
+  "nextTask": {
+    "label": "Up next",
+    "start": "Start it",
+    "open": "Open it",
+    "showAll": "Show every task",
+    "allDone": "Every task is done.",
+    "nonePending": "Nothing is waiting to be started.",
+    "count": "{{completed}} of {{total}}"
   }
 }

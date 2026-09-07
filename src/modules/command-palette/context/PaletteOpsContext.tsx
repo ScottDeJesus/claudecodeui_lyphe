@@ -3,9 +3,9 @@ import type { MutableRefObject, ReactNode } from 'react';
 
 export type PaletteOps = {
   openFile: (path: string) => void;
-  // Opens a file in the editor side panel without changing the active tab
-  // (used by in-chat file links so they behave like the inline edit view).
-  openFileInEditor: (path: string) => void;
+  // Opens a bare or partial file reference — the text of an in-chat file link —
+  // which is resolved against the project before the file manager previews it.
+  openFileReference: (path: string) => void;
   openSettings: (tab?: string) => void;
   refreshProjects: () => Promise<void> | void;
 };
@@ -16,12 +16,12 @@ const PaletteOpsContext = createContext<Registry | null>(null);
 
 const defaultOps: PaletteOps = {
   openFile: () => undefined,
-  openFileInEditor: () => undefined,
+  openFileReference: () => undefined,
   openSettings: () => undefined,
   refreshProjects: () => undefined,
 };
 
-/** Mounted by the project-workspace module so CommandPalette and the chat, code-editor and sidebar modules share one set of palette operations. */
+/** Mounted by the project-workspace module so CommandPalette and the chat and sidebar modules share one set of palette operations. */
 export function PaletteOpsProvider({ children }: { children: ReactNode }) {
   const ref = useRef<Partial<PaletteOps>>({});
   return <PaletteOpsContext.Provider value={ref}>{children}</PaletteOpsContext.Provider>;
@@ -32,8 +32,8 @@ export function usePaletteOps(): PaletteOps {
   return useMemo<PaletteOps>(
     () => ({
       openFile: (path) => (ref?.current.openFile ?? defaultOps.openFile)(path),
-      openFileInEditor: (path) =>
-        (ref?.current.openFileInEditor ?? defaultOps.openFileInEditor)(path),
+      openFileReference: (path) =>
+        (ref?.current.openFileReference ?? defaultOps.openFileReference)(path),
       openSettings: (tab) => (ref?.current.openSettings ?? defaultOps.openSettings)(tab),
       refreshProjects: () => (ref?.current.refreshProjects ?? defaultOps.refreshProjects)(),
     }),
@@ -43,7 +43,7 @@ export function usePaletteOps(): PaletteOps {
 
 export function usePaletteOpsRegister(partial: Partial<PaletteOps>) {
   const ref = useContext(PaletteOpsContext);
-  const { openFile, openFileInEditor, openSettings, refreshProjects } = partial;
+  const { openFile, openFileReference, openSettings, refreshProjects } = partial;
 
   useEffect(() => {
     if (!ref) return undefined;
@@ -53,14 +53,14 @@ export function usePaletteOpsRegister(partial: Partial<PaletteOps>) {
     const registry = ref.current;
     const prev = { ...registry };
     if (openFile) registry.openFile = openFile;
-    if (openFileInEditor) registry.openFileInEditor = openFileInEditor;
+    if (openFileReference) registry.openFileReference = openFileReference;
     if (openSettings) registry.openSettings = openSettings;
     if (refreshProjects) registry.refreshProjects = refreshProjects;
     return () => {
       if (openFile && registry.openFile === openFile) registry.openFile = prev.openFile;
-      if (openFileInEditor && registry.openFileInEditor === openFileInEditor) registry.openFileInEditor = prev.openFileInEditor;
+      if (openFileReference && registry.openFileReference === openFileReference) registry.openFileReference = prev.openFileReference;
       if (openSettings && registry.openSettings === openSettings) registry.openSettings = prev.openSettings;
       if (refreshProjects && registry.refreshProjects === refreshProjects) registry.refreshProjects = prev.refreshProjects;
     };
-  }, [ref, openFile, openFileInEditor, openSettings, refreshProjects]);
+  }, [ref, openFile, openFileReference, openSettings, refreshProjects]);
 }

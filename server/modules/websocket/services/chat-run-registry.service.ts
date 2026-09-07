@@ -22,11 +22,16 @@ type ChatRunStatus = 'running' | 'completed';
  * - `lastSeq` / `events`: the per-run event log. Every live event gets a
  *   monotonically increasing `seq` and is buffered so a reconnecting client
  *   can replay exactly the events it missed via `chat.subscribe`.
+ * - `cliVersion`: the CLI version this run's process reported at init — the
+ *   stale comparison's only input. `null` until the init message arrives, and
+ *   `null` for a provider that reports none; it is never filled in from the
+ *   installed binary, which is a different process and may be a newer build.
  */
 type ChatRun = {
   appSessionId: string;
   provider: LLMProvider;
   providerSessionId: string | null;
+  cliVersion: string | null;
   status: ChatRunStatus;
   lastSeq: number;
   events: NormalizedMessage[];
@@ -186,6 +191,7 @@ export const chatRunRegistry = {
       appSessionId: input.appSessionId,
       provider: input.provider,
       providerSessionId: input.providerSessionId,
+      cliVersion: null,
       status: 'running',
       lastSeq: 0,
       events: [],
@@ -201,6 +207,9 @@ export const chatRunRegistry = {
       providerSessionId: input.providerSessionId,
       onProviderSessionId: (providerSessionId) => {
         recordProviderSessionId(run, providerSessionId);
+      },
+      onCliVersion: (cliVersion) => {
+        run.cliVersion = cliVersion;
       },
       decorateOutboundEvent: (message) => decorateAndRecordEvent(run, message),
     });
@@ -222,6 +231,7 @@ export const chatRunRegistry = {
     provider: LLMProvider;
     startedAt: number;
     lastSeq: number;
+    cliVersion: string | null;
   }> {
     return Array.from(runs.values())
       .filter((run) => run.status === 'running')
@@ -230,6 +240,7 @@ export const chatRunRegistry = {
         provider: run.provider,
         startedAt: run.startedAt,
         lastSeq: run.lastSeq,
+        cliVersion: run.cliVersion,
       }));
   },
 

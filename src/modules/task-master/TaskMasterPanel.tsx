@@ -1,5 +1,7 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
+import { useToast } from '@/shared/context/ToastContext';
 import { PRDEditor } from '@/modules/prd-editor';
 import { useTaskMaster } from '@/modules/task-master/context/TaskMasterContext';
 import { useProjectPrdFiles } from '@/modules/task-master/hooks/useProjectPrdFiles';
@@ -11,11 +13,11 @@ type TaskMasterPanelProps = {
   isVisible: boolean;
 };
 
-const PRD_SAVE_MESSAGE = 'PRD saved successfully!';
-
 /** Exported through the task-master barrel; the project-workspace module renders it as the workspace's Tasks tab. */
 export default function TaskMasterPanel({ isVisible }: TaskMasterPanelProps) {
+  const { t } = useTranslation('tasks');
   const { tasks, currentProject, refreshTasks } = useTaskMaster();
+  const pushToast = useToast();
 
   const [selectedTask, setSelectedTask] = useState<TaskMasterTask | null>(null);
   const [isTaskDetailOpen, setIsTaskDetailOpen] = useState(false);
@@ -23,41 +25,19 @@ export default function TaskMasterPanel({ isVisible }: TaskMasterPanelProps) {
   const [isPrdEditorOpen, setIsPrdEditorOpen] = useState(false);
   const [selectedPrd, setSelectedPrd] = useState<PrdFile | null>(null);
 
-  const [prdNotification, setPrdNotification] = useState<string | null>(null);
-  const notificationTimeoutRef = useRef<number | null>(null);
-
   const { prdFiles, refreshPrdFiles } = useProjectPrdFiles({ projectId: currentProject?.projectId });
 
-  const showPrdNotification = useCallback((message: string) => {
-    if (notificationTimeoutRef.current) {
-      window.clearTimeout(notificationTimeoutRef.current);
-    }
-
-    setPrdNotification(message);
-
-    notificationTimeoutRef.current = window.setTimeout(() => {
-      setPrdNotification(null);
-      notificationTimeoutRef.current = null;
-    }, 3000);
-  }, []);
-
+  // The save is advisory: the document itself is the record that it happened, so this says so
+  // once and leaves, instead of the panel holding its own timer and a fixed banner to say it.
   const refreshPrdData = useCallback(
     async (showNotification = false) => {
       await refreshPrdFiles();
       if (showNotification) {
-        showPrdNotification(PRD_SAVE_MESSAGE);
+        pushToast({ tone: 'positive', title: t('prd.saved') });
       }
     },
-    [refreshPrdFiles, showPrdNotification],
+    [pushToast, refreshPrdFiles, t],
   );
-
-  useEffect(() => {
-    return () => {
-      if (notificationTimeoutRef.current) {
-        window.clearTimeout(notificationTimeoutRef.current);
-      }
-    };
-  }, []);
 
   const handleTaskClick = useCallback(
     (taskSelection: TaskSelection) => {
@@ -135,17 +115,6 @@ export default function TaskMasterPanel({ isVisible }: TaskMasterPanelProps) {
             await refreshTasks();
           }}
         />
-      )}
-
-      {prdNotification && (
-        <div className="animate-in slide-in-from-bottom-2 fixed bottom-4 right-4 z-50 duration-300">
-          <div className="flex items-center gap-3 rounded-lg bg-green-600 px-4 py-3 text-white shadow-lg">
-            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-            </svg>
-            <span className="font-medium">{prdNotification}</span>
-          </div>
-        </div>
       )}
     </>
   );

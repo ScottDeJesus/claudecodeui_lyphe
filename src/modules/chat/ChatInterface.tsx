@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ArrowDownIcon } from 'lucide-react';
 
@@ -14,6 +14,7 @@ import type {
   SessionNavigationOptions,
 } from '@/shared/types';
 import { useChatProviderState } from '@/modules/chat/hooks/useChatProviderState';
+import { useToolPermissionState } from '@/modules/chat/hooks/useToolPermissionState';
 import { useScheduledMessages } from '@/modules/chat/composer/useScheduledMessages';
 import { useChatSessionState } from '@/modules/chat/hooks/useChatSessionState';
 import { useChatRealtimeHandlers } from '@/modules/chat/hooks/useChatRealtimeHandlers';
@@ -23,6 +24,8 @@ import {
   useProcessingSessions,
   useSessionProtectionActions,
 } from '@/shared/context/SessionProtectionContext';
+import { useCliVersion } from '@/shared/hooks/useCliVersion';
+import { Banner, Button } from '@/shared/ui';
 import ChatMessagesPane from '@/modules/chat/transcript/ChatMessagesPane';
 import ChatComposer from '@/modules/chat/composer/ChatComposer';
 import CommandResultModal from '@/modules/chat/modals/CommandResultModal';
@@ -230,6 +233,10 @@ function ChatInterface({
     editingAnchorId,
     beginEditMessage,
     cancelEditMessage,
+    handleRestartOnInstalledCli,
+    restartPending,
+    restartingSessionId,
+    restartedSessionId,
   } = useChatComposerState({
     selectedProject,
     selectedSession,
@@ -390,6 +397,27 @@ function ChatInterface({
   // overlapping the last message.
   const hasActivityIndicator = Boolean(sessionActivity && pendingPermissionRequests.length === 0);
 
+  const readToolPermissionState = useToolPermissionState(pendingPermissionRequests, currentSessionId);
+
+  // Which conversation this screen is showing, spelled the way the composer's own send spells it
+  // (`selectedSession?.id || currentSessionId`), so the banner can never describe a different one.
+  const openSessionId = selectedSession?.id || currentSessionId || null;
+  const { installed: installedCliVersion, staleSessionIds, staleVersionOf } = useCliVersion();
+  const openSessionCliVersion = openSessionId && staleSessionIds.has(openSessionId)
+    ? staleVersionOf(openSessionId)
+    : null;
+  // "Stay on <v>" hides the banner for THIS run only, so what is stored is the run it was pressed
+  // for — session and version. A new run, or a different version, is a different fact and asks
+  // again; nothing is persisted, so a reload asks again too.
+  const [stayedOn, setStayedOn] = useState<string | null>(null);
+  const cliBannerSignature = openSessionId && openSessionCliVersion ? `${openSessionId}:${openSessionCliVersion}` : null;
+  // A restart that has already sent its resume takes the banner down with it. The report is up to
+  // a minute behind, so leaving the banner up would keep offering to stop the turn the press just
+  // started — one more click, and the resume is aborted and re-sent.
+  const showCliVersionBanner = cliBannerSignature !== null
+    && cliBannerSignature !== stayedOn
+    && restartedSessionId !== openSessionId;
+
   const selectedProviderLabel =
     provider === 'cursor'
       ? t('messageTypes.cursor')
@@ -418,6 +446,42 @@ function ChatInterface({
   return (
     <PermissionContext.Provider value={permissionContextValue}>
       <div className="flex h-full min-h-0 flex-col">
+        {/* The one place the CLI-version fact carries an ACTION. It stands above the transcript
+            because it describes the turn being read, and it leaves on its own when that run ends
+            — the stale set empties and this goes with it, dismissed or not. */}
+        {showCliVersionBanner && (
+          <div className="flex-none px-3 pt-3" data-cli-version-banner>
+            <Banner
+              tone="warn"
+              action={(
+                <div className="flex flex-none items-center gap-2">
+                  <Button
+                    size="sm"
+                    disabled={restartPending}
+                    // One restart runs at a time. When the one in flight belongs to a DIFFERENT
+                    // conversation this button is refused, so it says why rather than looking live.
+                    title={restartPending && restartingSessionId !== openSessionId
+                      ? 'Another conversation is being restarted. Wait for it to finish.'
+                      : undefined}
+                    onClick={handleRestartOnInstalledCli}
+                  >
+                    Restart and resume
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={() => setStayedOn(cliBannerSignature)}>
+                    Stay on {openSessionCliVersion}
+                  </Button>
+                </div>
+              )}
+            >
+              <span className="text-sm leading-relaxed">
+                This conversation is running Claude CLI {openSessionCliVersion}. Version {installedCliVersion} is
+                installed on your machine, but a conversation keeps the version it started with while a turn is in
+                progress. Restarting stops this one and resumes the same conversation on {installedCliVersion} — every
+                message is kept.
+              </span>
+            </Banner>
+          </div>
+        )}
         <ChatMessagesPane
           scrollContainerRef={scrollContainerRef}
           // Not redundant with the `scroll` listener. A first page is 20 rows,
@@ -430,6 +494,10 @@ function ChatInterface({
           isLoadingSessionMessages={isLoadingSessionMessages}
           isProcessing={isProcessing}
           hasActivityIndicator={hasActivityIndicator}
+          // The transcript asks the same permission layer the banner draws from:
+          // a row blocked on one of those prompts must not read as done, and one
+          // the person allowed by hand must not read as automatic.
+          readToolPermissionState={readToolPermissionState}
           chatMessages={chatMessages}
           selectedSession={selectedSession}
           currentSessionId={currentSessionId}
@@ -497,7 +565,6 @@ function ChatInterface({
           permissionMode={permissionMode}
           availablePermissionModes={availablePermissionModes}
           onSelectPermissionMode={selectPermissionMode}
-          providerLabel={selectedProviderLabel}
           effort={currentProviderEffort}
           availableEffortOptions={currentProviderEffortOptions}
           onSelectEffort={handleSelectComposerEffort}

@@ -1,8 +1,10 @@
 import { useTranslation } from 'react-i18next';
 
 import { DarkModeToggle } from '@/shared/ui';
-import type { CodeEditorSettingsState, ProjectSortOrder } from '@/shared/types';
+import type { ProjectSortOrder } from '@/shared/types';
 import { LanguageSelector } from '@/modules/i18n';
+import { useTasksSettings } from '@/modules/task-master';
+import { useSetUiPreference, useUiPreferences } from '@/shared/context/UiPreferencesContext';
 import SettingsCard from '@/modules/settings/SettingsCard';
 import SettingsRow from '@/modules/settings/SettingsRow';
 import SettingsSection from '@/modules/settings/SettingsSection';
@@ -11,24 +13,26 @@ import SettingsToggle from '@/modules/settings/SettingsToggle';
 type AppearanceSettingsTabProps = {
   projectSortOrder: ProjectSortOrder;
   onProjectSortOrderChange: (value: ProjectSortOrder) => void;
-  codeEditorSettings: CodeEditorSettingsState;
-  onCodeEditorWordWrapChange: (value: boolean) => void;
-  onCodeEditorShowMinimapChange: (value: boolean) => void;
-  onCodeEditorLineNumbersChange: (value: boolean) => void;
-  onCodeEditorFontSizeChange: (value: string) => void;
 };
 
-/** Rendered by Settings for the "appearance" tab, covering theme, project sorting and code editor preferences. */
+/** Rendered by Settings for the "appearance" tab, covering theme, language, which tabs the workspace shows and project sorting. */
 export default function AppearanceSettingsTab({
   projectSortOrder,
   onProjectSortOrderChange,
-  codeEditorSettings,
-  onCodeEditorWordWrapChange,
-  onCodeEditorShowMinimapChange,
-  onCodeEditorLineNumbersChange,
-  onCodeEditorFontSizeChange,
 }: AppearanceSettingsTabProps) {
   const { t } = useTranslation('settings');
+  const { hideShellTab } = useUiPreferences();
+  const setPreference = useSetUiPreference();
+  // "Hide the Tasks tab" is the Tasks tab's own enable switch, read from the one store that
+  // already owns it. A second boolean here would let the two controls disagree.
+  const { tasksEnabled, setTasksEnabled, isTaskMasterInstalled } = useTasksSettings();
+
+  // The Tasks tab needs TaskMaster installed before it can exist at all, so without it this
+  // switch cannot do the thing it names. It says so and stops taking clicks rather than moving
+  // and changing nothing — the same honesty the Tasks settings tab gives the same store, which
+  // hides its switch behind that check and explains itself instead. `null` is the check still
+  // in flight, and reads as "not yet known" rather than "no", so the row does not flicker.
+  const tasksTabUnavailable = isTaskMasterInstalled === false;
 
   return (
     <div className="space-y-8">
@@ -49,6 +53,37 @@ export default function AppearanceSettingsTab({
         </SettingsCard>
       </SettingsSection>
 
+      <SettingsSection title={t('appearance.workspaceTabs.title')}>
+        <SettingsCard divided>
+          <SettingsRow
+            label={t('appearance.workspaceTabs.hideShell.label')}
+            description={t('appearance.workspaceTabs.hideShell.description')}
+          >
+            <SettingsToggle
+              checked={hideShellTab}
+              onChange={(value) => setPreference('hideShellTab', value)}
+              ariaLabel={t('appearance.workspaceTabs.hideShell.label')}
+            />
+          </SettingsRow>
+
+          <SettingsRow
+            label={t('appearance.workspaceTabs.hideTasks.label')}
+            description={t(
+              tasksTabUnavailable
+                ? 'appearance.workspaceTabs.hideTasks.unavailable'
+                : 'appearance.workspaceTabs.hideTasks.description',
+            )}
+          >
+            <SettingsToggle
+              checked={!tasksEnabled}
+              onChange={(value) => setTasksEnabled(!value)}
+              ariaLabel={t('appearance.workspaceTabs.hideTasks.label')}
+              disabled={tasksTabUnavailable}
+            />
+          </SettingsRow>
+        </SettingsCard>
+      </SettingsSection>
+
       <SettingsSection title={t('appearanceSettings.projectSorting.label')}>
         <SettingsCard>
           <SettingsRow
@@ -62,64 +97,6 @@ export default function AppearanceSettingsTab({
             >
               <option value="name">{t('appearanceSettings.projectSorting.alphabetical')}</option>
               <option value="date">{t('appearanceSettings.projectSorting.recentActivity')}</option>
-            </select>
-          </SettingsRow>
-        </SettingsCard>
-      </SettingsSection>
-
-      <SettingsSection title={t('appearanceSettings.codeEditor.title')}>
-        <SettingsCard divided>
-          <SettingsRow
-            label={t('appearanceSettings.codeEditor.wordWrap.label')}
-            description={t('appearanceSettings.codeEditor.wordWrap.description')}
-          >
-            <SettingsToggle
-              checked={codeEditorSettings.wordWrap}
-              onChange={onCodeEditorWordWrapChange}
-              ariaLabel={t('appearanceSettings.codeEditor.wordWrap.label')}
-            />
-          </SettingsRow>
-
-          <SettingsRow
-            label={t('appearanceSettings.codeEditor.showMinimap.label')}
-            description={t('appearanceSettings.codeEditor.showMinimap.description')}
-          >
-            <SettingsToggle
-              checked={codeEditorSettings.showMinimap}
-              onChange={onCodeEditorShowMinimapChange}
-              ariaLabel={t('appearanceSettings.codeEditor.showMinimap.label')}
-            />
-          </SettingsRow>
-
-          <SettingsRow
-            label={t('appearanceSettings.codeEditor.lineNumbers.label')}
-            description={t('appearanceSettings.codeEditor.lineNumbers.description')}
-          >
-            <SettingsToggle
-              checked={codeEditorSettings.lineNumbers}
-              onChange={onCodeEditorLineNumbersChange}
-              ariaLabel={t('appearanceSettings.codeEditor.lineNumbers.label')}
-            />
-          </SettingsRow>
-
-          <SettingsRow
-            label={t('appearanceSettings.codeEditor.fontSize.label')}
-            description={t('appearanceSettings.codeEditor.fontSize.description')}
-          >
-            <select
-              value={codeEditorSettings.fontSize}
-              onChange={(event) => onCodeEditorFontSizeChange(event.target.value)}
-              className="w-full touch-manipulation rounded-lg border border-input bg-card p-2.5 text-sm text-foreground focus:border-primary focus:ring-1 focus:ring-primary sm:w-28"
-            >
-              <option value="10">10px</option>
-              <option value="11">11px</option>
-              <option value="12">12px</option>
-              <option value="13">13px</option>
-              <option value="14">14px</option>
-              <option value="15">15px</option>
-              <option value="16">16px</option>
-              <option value="18">18px</option>
-              <option value="20">20px</option>
             </select>
           </SettingsRow>
         </SettingsCard>

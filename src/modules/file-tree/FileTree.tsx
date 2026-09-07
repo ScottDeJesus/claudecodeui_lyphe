@@ -1,9 +1,9 @@
-import { useCallback, useState, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import type { ChangeEvent } from 'react';
 import { useTranslation } from 'react-i18next';
-import { AlertTriangle, Check, X, Loader2, Folder, Upload } from 'lucide-react';
+import { AlertTriangle, Loader2, Folder, Upload } from 'lucide-react';
 
-import { cn } from '@/shared/utils';
+import { cn, formatBytes } from '@/shared/utils';
 import { ICON_SIZE_CLASS, getFileIconData } from '@/modules/file-tree/utils/fileIcons';
 import { useExpandedDirectories } from '@/modules/file-tree/hooks/useExpandedDirectories';
 import { useFileTreeData } from '@/modules/file-tree/hooks/useFileTreeData';
@@ -11,15 +11,15 @@ import { useFileTreeOperations } from '@/modules/file-tree/hooks/useFileTreeOper
 import { useFileTreeSearch } from '@/modules/file-tree/hooks/useFileTreeSearch';
 import { useFileTreeViewMode } from '@/modules/file-tree/hooks/useFileTreeViewMode';
 import { useFileTreeUpload } from '@/modules/file-tree/hooks/useFileTreeUpload';
-import type { FileTreeImageSelection, FileTreeNode,Project } from '@/shared/types';
-import { formatFileSize, formatRelativeTime, isImageFile } from '@/modules/file-tree/utils/fileTreeUtils';
+import type { FileTreeNode,Project } from '@/shared/types';
+import { formatRelativeTime } from '@/modules/file-tree/utils/fileTreeUtils';
+import { useToast } from '@/shared/context/ToastContext';
 import { ScrollArea, Input } from '@/shared/ui';
 import FileTreeBody from '@/modules/file-tree/FileTreeBody';
 import FileTreeDetailedColumns from '@/modules/file-tree/FileTreeDetailedColumns';
 import FileTreeHeader from '@/modules/file-tree/FileTreeHeader';
 import FileTreeLoadingState from '@/modules/file-tree/FileTreeLoadingState';
 import FileTreeUploadProgress from '@/modules/file-tree/FileTreeUploadProgress';
-import ImageViewer from '@/modules/file-tree/ImageViewer';
 
 
 type FileTreeProps = {
@@ -30,23 +30,15 @@ type FileTreeProps = {
 /** Exported through the file-tree barrel; the project-workspace module renders it as the Files sidebar tab. */
 export default function FileTree({ selectedProject, onFileOpen }: FileTreeProps) {
   const { t } = useTranslation();
-  const [selectedImage, setSelectedImage] = useState<FileTreeImageSelection | null>(null);
-  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+  const push = useToast();
   const newItemInputRef = useRef<HTMLInputElement>(null);
   const renameInputRef = useRef<HTMLInputElement>(null);
 
-  // Show toast notification
+  // The tree's operations and its upload both report in one line of text; the app's toast stack
+  // is what shows it. A failure is `warn`, not `danger`: nothing here is destructive or denied.
   const showToast = useCallback((message: string, type: 'success' | 'error') => {
-    setToast({ message, type });
-  }, []);
-
-  // Auto-hide toast
-  useEffect(() => {
-    if (toast) {
-      const timer = setTimeout(() => setToast(null), 3000);
-      return () => clearTimeout(timer);
-    }
-  }, [toast]);
+    push({ tone: type === 'success' ? 'positive' : 'warn', title: message });
+  }, [push]);
 
   const { files, loading, error, refreshFiles } = useFileTreeData(selectedProject);
   const { viewMode, changeViewMode } = useFileTreeViewMode();
@@ -116,6 +108,7 @@ export default function FileTree({ selectedProject, onFileOpen }: FileTreeProps)
   }, []);
 
   // Centralized click behavior keeps file actions identical across all presentation modes.
+  // Every file goes the same way out, images included: the workspace decides where a path opens.
   const handleItemClick = useCallback(
     (item: FileTreeNode) => {
       if (item.type === 'directory') {
@@ -123,21 +116,9 @@ export default function FileTree({ selectedProject, onFileOpen }: FileTreeProps)
         return;
       }
 
-      if (isImageFile(item.name) && selectedProject) {
-        setSelectedImage({
-          name: item.name,
-          path: item.path,
-          projectPath: selectedProject.path,
-          // Image URL uses the DB projectId so ImageViewer can hit the
-          // /api/file-tree/projects/:projectId/files/content endpoint directly.
-          projectId: selectedProject.projectId,
-        });
-        return;
-      }
-
       onFileOpen?.(item.path);
     },
-    [onFileOpen, selectedProject, toggleDirectory],
+    [onFileOpen, toggleDirectory],
   );
 
   const formatRelativeTimeLabel = useCallback(
@@ -247,7 +228,7 @@ export default function FileTree({ selectedProject, onFileOpen }: FileTreeProps)
           expandedDirs={expandedDirs}
           onItemClick={handleItemClick}
           renderFileIcon={renderFileIcon}
-          formatFileSize={formatFileSize}
+          formatFileSize={formatBytes}
           formatRelativeTime={formatRelativeTimeLabel}
           onRename={operations.handleStartRename}
           onDelete={operations.handleStartDelete}
@@ -269,13 +250,6 @@ export default function FileTree({ selectedProject, onFileOpen }: FileTreeProps)
           operationLoading={operationLoading}
         />
       </ScrollArea>
-
-      {selectedImage && (
-        <ImageViewer
-          file={selectedImage}
-          onClose={() => setSelectedImage(null)}
-        />
-      )}
 
       {/* Delete Confirmation Dialog */}
       {operations.deleteConfirmation.isOpen && operations.deleteConfirmation.item && (
@@ -319,25 +293,6 @@ export default function FileTree({ selectedProject, onFileOpen }: FileTreeProps)
               </button>
             </div>
           </div>
-        </div>
-      )}
-
-      {/* Toast Notification */}
-      {toast && (
-        <div
-          className={cn(
-            'fixed bottom-4 right-4 z-[9999] px-4 py-2 rounded-lg shadow-lg flex items-center gap-2 animate-in slide-in-from-bottom-2',
-            toast.type === 'success'
-              ? 'bg-green-600 text-white'
-              : 'bg-red-600 text-white'
-          )}
-        >
-          {toast.type === 'success' ? (
-            <Check className="h-4 w-4" />
-          ) : (
-            <X className="h-4 w-4" />
-          )}
-          <span className="text-sm">{toast.message}</span>
         </div>
       )}
     </div>

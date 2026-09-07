@@ -1,9 +1,11 @@
 import { ChevronDown, ChevronRight, GitBranch, Tag } from 'lucide-react';
 import { useMemo } from 'react';
 
+import { Badge, Spinner } from '@/shared/ui';
 import type { GitCommitSummary,CommitGraphRow } from '@/shared/types';
 import { laneColor } from '@/modules/git-panel/utils/commitGraph';
-import { getStatusBadgeClass, parseCommitFiles } from '@/modules/git-panel/utils/gitPanelUtils';
+import GitFailureBanner from '@/modules/git-panel/GitFailureBanner';
+import { getStatusLabel, getStatusTone, parseCommitFiles } from '@/modules/git-panel/utils/gitPanelUtils';
 import GitDiffViewer from '@/modules/git-panel/GitDiffViewer';
 import CommitGraphStrip from '@/modules/git-panel/history/CommitGraphStrip';
 
@@ -42,8 +44,9 @@ type CommitHistoryItemProps = {
   commit: GitCommitSummary;
   isExpanded: boolean;
   diff?: string;
+  /** Why the diff could not be read; drawn under the row in place of it. */
+  diffError?: string;
   isMobile: boolean;
-  wrapText: boolean;
   graphRow?: CommitGraphRow;
   onToggle: () => void;
 };
@@ -53,8 +56,8 @@ export default function CommitHistoryItem({
   commit,
   isExpanded,
   diff,
+  diffError,
   isMobile,
-  wrapText,
   graphRow,
   onToggle,
 }: CommitHistoryItemProps) {
@@ -104,7 +107,23 @@ export default function CommitHistoryItem({
         </div>
       </button>
 
-      {isExpanded && diff && (
+      {/* An open row has three answers and blank is none of them: a read that FAILED is unknown
+          and amber; a read still in flight turns the ring; a read that LANDED draws its card,
+          empty or not. Gating the card on a TRUTHY diff would leave the other two rendering
+          nothing at all. */}
+      {isExpanded && diffError && (
+        <div className="bg-muted/50 p-3">
+          <GitFailureBanner error={diffError} />
+        </div>
+      )}
+
+      {isExpanded && !diffError && diff === undefined && (
+        <div className="flex items-center justify-center bg-muted/50 p-6">
+          <Spinner size={28} label="Reading the diff" />
+        </div>
+      )}
+
+      {isExpanded && !diffError && diff !== undefined && (
         <div className="bg-muted/50">
           <div className="max-h-[32rem] overflow-y-auto p-3">
             {/* Full hash */}
@@ -133,11 +152,11 @@ export default function CommitHistoryItem({
                 </div>
                 <div>
                   <div className="text-muted-foreground/60">Added</div>
-                  <div className="font-semibold text-green-600 dark:text-green-400">+{fileSummary.totalInsertions}</div>
+                  <div className="font-semibold text-accent-ink">+{fileSummary.totalInsertions}</div>
                 </div>
                 <div>
                   <div className="text-muted-foreground/60">Removed</div>
-                  <div className="font-semibold text-red-600 dark:text-red-400">-{fileSummary.totalDeletions}</div>
+                  <div className="font-semibold text-destructive">-{fileSummary.totalDeletions}</div>
                 </div>
               </div>
             )}
@@ -156,11 +175,15 @@ export default function CommitHistoryItem({
                         idx < fileSummary.files.length - 1 ? 'border-b border-border/40' : ''
                       }`}
                     >
-                      <span
-                        className={`inline-flex h-4 w-4 flex-shrink-0 items-center justify-center rounded border text-[9px] font-bold ${getStatusBadgeClass(file.status)}`}
+                      {/* Same tone map as the changed-file rows, so one status never reads
+                          two ways inside one panel. */}
+                      <Badge
+                        tone={getStatusTone(file.status)}
+                        className="w-6 shrink-0 justify-center px-0 py-0 text-[9px] font-bold"
+                        title={getStatusLabel(file.status)}
                       >
                         {file.status}
-                      </span>
+                      </Badge>
                       <span className="min-w-0 flex-1 truncate">
                         {file.directory && (
                           <span className="text-muted-foreground/60">{file.directory}</span>
@@ -169,11 +192,11 @@ export default function CommitHistoryItem({
                       </span>
                       <span className="flex-shrink-0 font-mono text-muted-foreground/60">
                         {file.insertions > 0 && (
-                          <span className="text-green-600 dark:text-green-400">+{file.insertions}</span>
+                          <span className="text-accent-ink">+{file.insertions}</span>
                         )}
                         {file.insertions > 0 && file.deletions > 0 && '/'}
                         {file.deletions > 0 && (
-                          <span className="text-red-600 dark:text-red-400">-{file.deletions}</span>
+                          <span className="text-destructive">-{file.deletions}</span>
                         )}
                       </span>
                     </div>
@@ -183,7 +206,7 @@ export default function CommitHistoryItem({
             )}
 
             {/* Diff viewer */}
-            <GitDiffViewer diff={diff} isMobile={isMobile} wrapText={wrapText} />
+            <GitDiffViewer diff={diff} isMobile={isMobile} />
           </div>
         </div>
       )}

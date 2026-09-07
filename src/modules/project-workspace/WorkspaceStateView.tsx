@@ -49,7 +49,9 @@ export default function WorkspaceStateView({ mode, isMobile, onMenuClick }: Work
             <h2 className="mb-2 text-xl font-semibold text-foreground">{t('mainContent.chooseProject')}</h2>
             <p className="mb-5 text-sm leading-relaxed text-muted-foreground">{t('mainContent.selectProjectDescription')}</p>
             <div className="rounded-xl border border-primary/10 bg-primary/5 p-3.5">
-              <p className="text-sm text-primary">
+              {/* A green WORD takes the readable ink: `text-primary` is the accent FILL and
+                  measures 2.5:1 on this wash. The pair is explained at tailwind.config.js:69. */}
+              <p className="text-sm text-accent-ink">
                 <strong>{t('mainContent.tip')}:</strong> {isMobile ? t('mainContent.createProjectMobile') : t('mainContent.createProjectDesktop')}
               </p>
             </div>

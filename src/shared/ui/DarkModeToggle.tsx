@@ -1,7 +1,5 @@
-import { Moon, Sun } from 'lucide-react';
-
+import { Switch } from '@/shared/ui/Switch';
 import { useTheme } from '@/shared/context/ThemeContext';
-import { cn } from '@/shared/utils';
 
 type DarkModeToggleProps = {
   checked?: boolean;
@@ -9,7 +7,19 @@ type DarkModeToggleProps = {
   ariaLabel?: string;
 };
 
-/** Used by the settings and quick-settings-panel modules to switch the shared theme. */
+/**
+ * Used by the settings and quick-settings-panel modules to switch the shared theme.
+ *
+ * The track, the knob and its spring are the library `Switch` now; what stays here is the only
+ * thing this component ever really owned — deciding whether the state comes from a controlling
+ * parent or straight from ThemeContext. The sun/moon glyphs the hand-rolled track carried go
+ * with it: both consumers already name the row in words beside the control, so the glyph was
+ * decoration, and one switch shape across the app beats two that drift.
+ *
+ * `ariaLabel` is passed through rather than fixed here. Settings names this control
+ * "Dark Mode" and that string is what addresses it, so a hard-coded name would silently rename
+ * a control two screens depend on.
+ */
 export function DarkModeToggle({
   checked,
   onToggle,
@@ -28,31 +38,5 @@ export function DarkModeToggle({
     toggleDarkMode();
   };
 
-  return (
-    <button
-      onClick={handleToggle}
-      className={cn(
-        'relative inline-flex h-7 w-12 flex-shrink-0 touch-manipulation cursor-pointer items-center rounded-full border-2 transition-colors duration-200',
-        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background',
-        isEnabled ? 'border-primary bg-primary' : 'border-border bg-muted',
-      )}
-      role="switch"
-      aria-checked={isEnabled}
-      aria-label={ariaLabel}
-    >
-      <span className="sr-only">{ariaLabel}</span>
-      <span
-        className={cn(
-          'flex h-5 w-5 transform items-center justify-center rounded-full shadow-sm transition-transform duration-200',
-          isEnabled ? 'translate-x-[22px] bg-white' : 'translate-x-[2px] bg-foreground/60 dark:bg-foreground/80',
-        )}
-      >
-        {isEnabled ? (
-          <Moon className="h-3 w-3 text-primary" />
-        ) : (
-          <Sun className="h-3 w-3 text-white dark:text-background" />
-        )}
-      </span>
-    </button>
-  );
+  return <Switch checked={isEnabled} onChange={handleToggle} label={ariaLabel} />;
 }

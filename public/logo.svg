@@ -5,13 +5,18 @@
   viewBox="0 0 32 32"
   fill="none"
 >
-  <rect width="32" height="32" rx="8" fill="hsl(221.2 83.2% 53.3%)"/>
+  <!-- Verve's accent, the CSS custom property `accent` in src/shared/ui/verve/tokens.css,
+       spelled here as a literal because a static SVG served from /public has no stylesheet to
+       read a custom property from. It is the ONE place in this app allowed to repeat a token's
+       value; change it only with that token. Note for whoever edits this comment: XML forbids a
+       double hyphen inside one, and Chromium rejects the whole document over it. -->
+  <rect width="32" height="32" rx="8" fill="#2fa876"/>
   <path
     d="M8 9C8 8.44772 8.44772 8 9 8H23C23.5523 8 24 8.44772 24 9V18C24 18.5523 23.5523 19 23 19H12L8 23V9Z"
     stroke="white"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
+    stroke-width="2"
+    stroke-linecap="round"
+    stroke-linejoin="round"
     fill="none"
   />
 </svg>

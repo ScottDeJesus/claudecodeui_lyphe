@@ -1,0 +1,16 @@
+/* Verve type — Instrument Serif for display/headings (italic for emphasis, NEVER bold);
+   Schibsted Grotesk for everything else; tabular-nums wherever numbers stack. */
+:root{
+  --font-display:'Instrument Serif',serif;
+  --font-body:'Schibsted Grotesk',sans-serif;
+  --font-mono:ui-monospace,Menlo,monospace;
+  --text-display:56px;   /* hero display, serif */
+  --text-h1:34px;        /* section heading, serif */
+  --text-h2:20px;        /* card/panel titles, grotesk 700, -0.01em */
+  --text-body:15.5px;
+  --text-small:13.5px;
+  --text-caption:12px;   /* uppercase, .14em tracking, ink-faint */
+  --leading-body:1.65;
+  --leading-tight:1.1;
+}
+.vv-tabular{font-variant-numeric:tabular-nums}

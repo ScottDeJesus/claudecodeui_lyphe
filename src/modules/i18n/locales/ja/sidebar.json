@@ -17,7 +17,9 @@
     "projects": "プロジェクト",
     "noMatchingProjects": "一致するプロジェクトがありません",
     "tryDifferentSearch": "検索語を変えてお試しください",
-    "runClaudeCli": "プロジェクトディレクトリでClaude CLIを実行して始めましょう"
+    "runClaudeCli": "プロジェクトディレクトリでClaude CLIを実行して始めましょう",
+    "noConversations": "まだ会話はありません",
+    "conversationCount_other": "{{count}} 件の会話"
   },
   "app": {
     "title": "CloudCLI",
@@ -32,7 +34,10 @@
     "loadingSessions": "セッションを読み込んでいます...",
     "unnamed": "名称未設定",
     "loading": "読み込み中...",
-    "showMore": "さらにセッションを表示"
+    "showMore": "さらにセッションを表示",
+    "showOlderUnknown": "↳ 以前の会話を表示",
+    "messageCount_other": "{{count}} 件のメッセージ",
+    "showOlder_other": "↳ 以前の会話を {{count}} 件表示"
   },
   "tooltips": {
     "viewEnvironments": "環境を表示",
@@ -128,5 +133,21 @@
     "deleteAllData": "すべてのデータを完全に削除",
     "allConversationsDeleted": "プロジェクトはサイドバーから除去されます。ファイル、メモリ、セッションデータは保持されます。",
     "cannotUndo": "後からプロジェクトを再追加できます。"
+  },
+  "search": {
+    "modeRunning": "実行中",
+    "modeArchived": "アーカイブ",
+    "runningPlaceholder": "実行中のセッションを検索...",
+    "archivedPlaceholder": "アーカイブ済みセッションを検索...",
+    "modeProjects": "プロジェクト",
+    "modeConversations": "会話",
+    "conversationsPlaceholder": "会話内を検索...",
+    "searching": "検索中...",
+    "sessionTitles": "セッション",
+    "conversationContents": "会話の内容",
+    "noResults": "結果が見つかりません",
+    "tryDifferentQuery": "別のキーワードで検索してください",
+    "matches_other": "{{count}} 件の一致",
+    "projectsScanned_other": "{{count}} 件のプロジェクトを検索済み"
   }
 }

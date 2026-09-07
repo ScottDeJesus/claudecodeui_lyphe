@@ -14,11 +14,11 @@ export default function SettingsSection({ title, description, children, classNam
   return (
     <div className={cn('space-y-3', className)}>
       <div>
-        <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+        <h3 className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">
           {title}
         </h3>
         {description && (
-          <p className="mt-1 text-sm text-muted-foreground">{description}</p>
+          <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">{description}</p>
         )}
       </div>
       {children}

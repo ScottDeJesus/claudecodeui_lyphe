@@ -8,6 +8,7 @@ import { sendSocketMessage } from '@/modules/shell/utils/socket';
 import { getSessionTitle } from '@/shared/utils';
 import { readSelectedProvider } from '@/shared/selectedProvider';
 import { getClaudeSettings } from '@/modules/chat';
+import { readShellConnection, readShellMeta } from '@/modules/shell/shellHeaderFacts';
 import ShellConnectionOverlay from '@/modules/shell/ShellConnectionOverlay';
 import ShellEmptyState from '@/modules/shell/ShellEmptyState';
 import ShellHeader from '@/modules/shell/ShellHeader';
@@ -55,6 +56,14 @@ export default function Shell({
     () => getClaudeSettings().skipPermissions,
   );
   const [cliPromptOptions, setCliPromptOptions] = useState<CliPromptOption[] | null>(null);
+  // When this session actually came up. Nothing in the socket protocol carries a start time,
+  // so the moment the connection opened is the only honest one the header can state — and it
+  // is cleared on disconnect, so the header never dates a session that has ended.
+  const [connectedAt, setConnectedAt] = useState<Date | null>(null);
+  // Whether the reader has asked for the shortcut key strip on a desktop width, where it is
+  // otherwise hidden. It is a request, not a fact about the terminal, so it lives here rather
+  // than being derived from the connection.
+  const [showShortcutsOnDesktop, setShowShortcutsOnDesktop] = useState(false);
   const promptCheckTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const restartTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const restartAfterInitRef = useRef(false);
@@ -152,6 +161,10 @@ export default function Shell({
       if (restartTimerRef.current) clearTimeout(restartTimerRef.current);
     };
   }, []);
+
+  useEffect(() => {
+    setConnectedAt(isConnected ? new Date() : null);
+  }, [isConnected]);
 
   // Clear stale prompt options and cancel pending timer on disconnect
   useEffect(() => {
@@ -263,15 +276,9 @@ export default function Shell({
 
   if (minimal) {
     return (
-      <>
-        <ShellMinimalView terminalContainerRef={terminalContainerRef} />
-        <TerminalShortcutsPanel
-          wsRef={wsRef}
-          terminalRef={terminalRef}
-          isConnected={isConnected}
-          bottomOffset="bottom-0"
-        />
-      </>
+      <ShellMinimalView terminalContainerRef={terminalContainerRef}>
+        <TerminalShortcutsPanel wsRef={wsRef} terminalRef={terminalRef} isConnected={isConnected} />
+      </ShellMinimalView>
     );
   }
 
@@ -294,19 +301,30 @@ export default function Shell({
   const overlayMode = !isInitialized ? 'loading' : isConnecting ? 'connecting' : !isConnected ? 'connect' : null;
   const overlayDescription = overlayMode === 'connecting' ? connectingDescription : readyDescription;
 
+  const connection = readShellConnection({ isRestarting, isInitialized, isConnected }, t);
+  const meta = readShellMeta(
+    {
+      project: selectedProject,
+      isPlainShell,
+      initialCommand,
+      sessionName: sessionDisplayNameShort,
+      connectedAt,
+    },
+    t,
+  );
+
   return (
-    <div className="flex h-full w-full flex-col bg-gray-900">
+    <div className="flex h-full w-full flex-col bg-background">
       <ShellHeader
-        isConnected={isConnected}
-        isInitialized={isInitialized}
-        isRestarting={isRestarting}
-        hasSession={Boolean(selectedSession)}
-        sessionDisplayNameShort={sessionDisplayNameShort}
+        connectionTone={connection.tone}
+        connectionLabel={connection.label}
+        meta={meta}
+        shortcutsLabel={t('shell.actions.shortcuts')}
+        shortcutsShown={showShortcutsOnDesktop}
+        onToggleShortcuts={() => setShowShortcutsOnDesktop((shown) => !shown)}
+        showDisconnect={isConnected}
         onDisconnect={handleDisconnectShell}
         onRestart={handleRestartShell}
-        statusNewSessionText={t('shell.status.newSession')}
-        statusInitializingText={t('shell.status.initializing')}
-        statusRestartingText={t('shell.status.restarting')}
         disconnectLabel={t('shell.actions.disconnect')}
         disconnectTitle={t('shell.actions.disconnectTitle')}
         restartLabel={t('shell.actions.restart')}
@@ -321,7 +339,7 @@ export default function Shell({
         )}
       />
 
-      <div className="relative flex-1 overflow-hidden p-2">
+      <div className="relative mx-3 mt-3 flex-1 overflow-hidden rounded-xl border border-border bg-secondary p-3">
         <div
           ref={terminalContainerRef}
           className="h-full w-full focus:outline-none"
@@ -342,7 +360,7 @@ export default function Shell({
 
         {cliPromptOptions && isConnected && (
           <div
-            className="absolute inset-x-0 bottom-0 z-10 border-t border-gray-700/80 bg-gray-800/95 px-3 py-2 backdrop-blur-sm md:hidden"
+            className="absolute inset-x-0 bottom-0 z-10 border-t border-border bg-popover/95 px-3 py-2 backdrop-blur-sm md:hidden"
             onMouseDown={(e) => e.preventDefault()}
           >
             <div className="flex flex-wrap items-center gap-2">
@@ -354,7 +372,7 @@ export default function Shell({
                     sendInput(opt.number);
                     setCliPromptOptions(null);
                   }}
-                  className="max-w-36 truncate rounded bg-blue-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-blue-700"
+                  className="max-w-36 truncate rounded bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground transition-colors"
                   title={`${opt.number}. ${opt.label}`}
                 >
                   {opt.number}. {opt.label}
@@ -366,21 +384,23 @@ export default function Shell({
                   sendInput('\x1b');
                   setCliPromptOptions(null);
                 }}
-                className="rounded bg-gray-700 px-3 py-1.5 text-xs font-medium text-gray-200 transition-colors hover:bg-gray-600"
+                className="rounded border border-border bg-card px-3 py-1.5 text-xs font-medium text-foreground transition-colors"
               >
                 Esc
               </button>
             </div>
           </div>
         )}
+
+        <TerminalShortcutsPanel
+          wsRef={wsRef}
+          terminalRef={terminalRef}
+          isConnected={isConnected}
+          showOnDesktop={showShortcutsOnDesktop}
+        />
       </div>
 
-      <TerminalShortcutsPanel
-        wsRef={wsRef}
-        terminalRef={terminalRef}
-        isConnected={isConnected}
-      />
-
+      <p className="flex-none px-4 py-2.5 text-xs text-ink-faint">{t('shell.privacyNote')}</p>
     </div>
   );
 }

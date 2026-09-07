@@ -95,7 +95,8 @@
     "createProjectDesktop": "Kenar çubuğundaki klasör simgesine tıklayarak yeni bir proje oluştur",
     "newSession": "Yeni Oturum",
     "untitledSession": "Adsız Oturum",
-    "projectFiles": "Proje Dosyaları"
+    "projectFiles": "Proje Dosyaları",
+    "lastActiveAt": "son etkinlik {{time}}"
   },
   "fileTree": {
     "loading": "Dosyalar yükleniyor...",

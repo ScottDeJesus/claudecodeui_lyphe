@@ -10,9 +10,11 @@ import type { ITerminalOptions } from '@xterm/xterm';
 import type { MobileTerminalSelectionManager, Project } from '@/shared/types';
 import { copyTextToClipboard } from '@/shared/utils';
 import { TERMINAL_INIT_DELAY_MS } from '@/shared/constants';
+import { useTerminalGround } from '@/modules/shell/hooks/useTerminalGround';
 import { installMobileTerminalSelection } from '@/modules/shell/utils/mobileTerminalSelection';
 import { sendSocketMessage } from '@/modules/shell/utils/socket';
 import { ensureXtermFocusStyles } from '@/modules/shell/utils/terminalStyles';
+import { readTerminalGround } from '@/modules/shell/utils/terminalTheme';
 
 const TERMINAL_RESIZE_DELAY_MS = 50;
 
@@ -28,14 +30,10 @@ const TERMINAL_OPTIONS: ITerminalOptions = {
   windowsMode: false,
   macOptionIsMeta: true,
   macOptionClickForcesSelection: true,
-  // Keep the runtime theme keys used by the previous JSX implementation.
+  // The sixteen ANSI colours a CLI addresses by name. The GROUND the app owns — background,
+  // ink, cursor and selection — is not here: `readTerminalGround` lays it under these at
+  // mount, and `useTerminalGround` lays it again after every theme flip.
   theme: {
-    background: '#1e1e1e',
-    foreground: '#d4d4d4',
-    cursor: '#ffffff',
-    cursorAccent: '#1e1e1e',
-    selectionBackground: '#264f78',
-    selectionForeground: '#ffffff',
     black: '#000000',
     red: '#cd3131',
     green: '#0dbc79',
@@ -177,7 +175,10 @@ export function useShellTerminal({
       return;
     }
 
-    const nextTerminal = new Terminal(TERMINAL_OPTIONS);
+    const nextTerminal = new Terminal({
+      ...TERMINAL_OPTIONS,
+      theme: { ...TERMINAL_OPTIONS.theme, ...readTerminalGround() },
+    });
     terminalRef.current = nextTerminal;
 
     const nextFitAddon = new FitAddon();
@@ -361,6 +362,8 @@ export function useShellTerminal({
     terminalRef,
     wsRef,
   ]);
+
+  useTerminalGround({ terminalRef, isInitialized, baseTheme: TERMINAL_OPTIONS.theme });
 
   return {
     isInitialized,

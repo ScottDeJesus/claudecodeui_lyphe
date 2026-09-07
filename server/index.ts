@@ -49,6 +49,8 @@ import {
 } from './modules/scheduled-messages/index.js';
 import browserUseRoutes from './modules/browser-use/browser-use.routes.js';
 import { assetsRoutes } from './modules/assets/index.js';
+import { createCliVersionModule } from './modules/cli-version/index.js';
+import { createDescentModule } from './modules/descent/index.js';
 import { fileTreeRoutes } from './modules/file-tree/index.js';
 import { worktreesRoutes } from './modules/worktrees/index.js';
 import browserUseMcpRoutes from './modules/browser-use/browser-use-mcp.routes.js';
@@ -175,6 +177,12 @@ app.use('/api/commands', authenticateToken, commandsRoutes);
 app.use('/api/settings', authenticateToken, settingsRoutes);
 
 app.use('/api/system', authenticateToken, systemRoutes);
+
+// Descent account/usage proxy (protected)
+app.use('/api/descent', authenticateToken, createDescentModule());
+
+// Installed CLI version + what the live runs are on (protected)
+app.use('/api/cli-version', authenticateToken, createCliVersionModule());
 
 app.use('/api/notifications', authenticateToken, notificationRoutes);
 

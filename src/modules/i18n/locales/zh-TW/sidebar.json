@@ -17,7 +17,9 @@
     "projects": "專案",
     "noMatchingProjects": "找不到符合的專案",
     "tryDifferentSearch": "嘗試調整您的搜尋詞",
-    "runClaudeCli": "在專案目錄中執行 Claude CLI 以開始使用"
+    "runClaudeCli": "在專案目錄中執行 Claude CLI 以開始使用",
+    "noConversations": "尚無對話",
+    "conversationCount_other": "{{count}} 個對話"
   },
   "app": {
     "title": "CloudCLI",
@@ -32,7 +34,10 @@
     "loadingSessions": "載入工作階段中...",
     "unnamed": "未命名",
     "loading": "載入中...",
-    "showMore": "顯示更多工作階段"
+    "showMore": "顯示更多工作階段",
+    "showOlderUnknown": "↳ 顯示更早的對話",
+    "messageCount_other": "{{count}} 則訊息",
+    "showOlder_other": "↳ 顯示 {{count}} 個更早的對話"
   },
   "tooltips": {
     "viewEnvironments": "查看環境",
@@ -131,7 +136,11 @@
     "matches_one": "{{count}} 個符合",
     "matches_other": "{{count}} 個符合",
     "projectsScanned_one": "{{count}} 個專案已掃描",
-    "projectsScanned_other": "{{count}} 個專案已掃描"
+    "projectsScanned_other": "{{count}} 個專案已掃描",
+    "modeRunning": "執行中",
+    "modeArchived": "已封存",
+    "runningPlaceholder": "搜尋執行中的工作階段...",
+    "archivedPlaceholder": "搜尋已封存的工作階段..."
   },
   "deleteConfirmation": {
     "deleteProject": "移除專案",

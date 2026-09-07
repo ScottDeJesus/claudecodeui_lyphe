@@ -154,21 +154,6 @@ test('hydrate splits the legacy claude-settings blob into permissions and sort o
   assert.equal(store.readUserPreference('projectSortOrder', 'name'), 'date');
 });
 
-test('hydrate reassembles the four separate code-editor keys into one preference', async () => {
-  localStorage.setItem('codeEditorWordWrap', 'true');
-  localStorage.setItem('codeEditorShowMinimap', 'false');
-  localStorage.setItem('codeEditorFontSize', '16');
-
-  const store = await loadStore();
-  await store.hydrateUserPreferences();
-
-  assert.deepEqual(store.readUserPreference('codeEditorSettings', null), {
-    wordWrap: true,
-    showMinimap: false,
-    fontSize: '16',
-  });
-});
-
 test('a legacy value is never allowed to overwrite what the server already holds', async () => {
   localStorage.setItem('theme', 'dark');
   serverPreferences = { theme: 'light' };

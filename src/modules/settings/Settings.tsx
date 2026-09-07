@@ -49,8 +49,6 @@ function Settings({ isOpen, onClose, projects = [], initialTab = 'agents' }: Set
     saveStatus,
     projectSortOrder,
     setProjectSortOrder,
-    codeEditorSettings,
-    updateCodeEditorSetting,
     claudePermissions,
     setClaudePermissions,
     notificationPreferences,
@@ -141,13 +139,18 @@ function Settings({ isOpen, onClose, projects = [], initialTab = 'agents' }: Set
 
   const isAuthenticated = Boolean(loginProvider && providerAuthStatus[loginProvider].authenticated);
 
+  // The scrim and the panel take the Verve dialog's own two classes rather than a second set of
+  // colour utilities. Settings is not a `Dialog` — it is a bare full-screen overlay with no
+  // portal — but "one overlay treatment" is about the paint, and this is where that paint lives.
+  // Below `md` the panel is a full-bleed sheet, so it gives the radius back.
   return (
-    <div className="modal-backdrop fixed inset-0 z-[9999] flex items-center justify-center bg-background/80 backdrop-blur-sm md:p-4">
-      <div className="flex h-full w-full flex-col overflow-hidden border border-border bg-background shadow-2xl md:h-[90vh] md:max-w-4xl md:rounded-xl">
+    <div className="vv-dialog__backdrop modal-backdrop fixed inset-0 z-[9999] flex items-center justify-center md:p-4">
+      <div className="vv-dialog__panel flex h-full w-full flex-col overflow-hidden max-md:rounded-none md:h-[90vh] md:max-w-4xl">
         {/* Header */}
-        <div className="flex flex-shrink-0 items-center justify-between border-b border-border px-4 py-3 md:px-5">
-          <h2 className="text-base font-semibold text-foreground">{t('title')}</h2>
-          <div className="flex items-center gap-2">
+        <div className="flex flex-shrink-0 items-center gap-3 border-b border-border px-4 py-3.5 md:px-5">
+          <h2 className="font-serif text-[22px] font-normal leading-none text-foreground">{t('title')}</h2>
+          <span className="hidden text-xs text-muted-foreground sm:inline">{t('savedAsYouChange')}</span>
+          <div className="ml-auto flex items-center gap-2">
             {saveStatus === 'success' && (
               <span className="animate-in fade-in text-xs text-muted-foreground">{t('saveStatus.success')}</span>
             )}
@@ -173,11 +176,6 @@ function Settings({ isOpen, onClose, projects = [], initialTab = 'agents' }: Set
                 <AppearanceSettingsTab
                   projectSortOrder={projectSortOrder}
                   onProjectSortOrderChange={setProjectSortOrder}
-                  codeEditorSettings={codeEditorSettings}
-                  onCodeEditorWordWrapChange={(value) => updateCodeEditorSetting('wordWrap', value)}
-                  onCodeEditorShowMinimapChange={(value) => updateCodeEditorSetting('showMinimap', value)}
-                  onCodeEditorLineNumbersChange={(value) => updateCodeEditorSetting('lineNumbers', value)}
-                  onCodeEditorFontSizeChange={(value) => updateCodeEditorSetting('fontSize', value)}
                 />
               )}
 

@@ -445,7 +445,7 @@ export function useProjectsState({
   /**
    * Generation of the newest `/api/projects` request. Several independent
    * triggers call refreshProjectsSilently (a rename, a service-worker
-   * notification, the worktrees view), and the server re-synchronizes sessions
+   * notification), and the server re-synchronizes sessions
    * before responding, so an older response can land last. Applying it would
    * revert the project list and — since the selected copy is derived from the
    * same payload — the workspace header and document title.

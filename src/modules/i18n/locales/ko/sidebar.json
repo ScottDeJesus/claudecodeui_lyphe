@@ -17,7 +17,9 @@
     "projects": "프로젝트",
     "noMatchingProjects": "일치하는 프로젝트 없음",
     "tryDifferentSearch": "검색어를 변경해보세요",
-    "runClaudeCli": "프로젝트 디렉토리에서 Claude CLI를 실행하여 시작하세요"
+    "runClaudeCli": "프로젝트 디렉토리에서 Claude CLI를 실행하여 시작하세요",
+    "noConversations": "아직 대화 없음",
+    "conversationCount_other": "대화 {{count}}개"
   },
   "app": {
     "title": "CloudCLI",
@@ -32,7 +34,10 @@
     "loadingSessions": "세션 로딩 중...",
     "unnamed": "이름 없음",
     "loading": "로딩 중...",
-    "showMore": "더 많은 세션 보기"
+    "showMore": "더 많은 세션 보기",
+    "showOlderUnknown": "↳ 이전 대화 보기",
+    "messageCount_other": "메시지 {{count}}개",
+    "showOlder_other": "↳ 이전 대화 {{count}}개 보기"
   },
   "tooltips": {
     "viewEnvironments": "환경 보기",
@@ -132,7 +137,11 @@
     "matches_one": "{{count}}개 일치",
     "matches_other": "{{count}}개 일치",
     "projectsScanned_one": "프로젝트 {{count}}개 검색됨",
-    "projectsScanned_other": "프로젝트 {{count}}개 검색됨"
+    "projectsScanned_other": "프로젝트 {{count}}개 검색됨",
+    "modeRunning": "실행 중",
+    "modeArchived": "보관됨",
+    "runningPlaceholder": "실행 중인 세션 검색...",
+    "archivedPlaceholder": "보관된 세션 검색..."
   },
   "deleteConfirmation": {
     "deleteProject": "프로젝트 제거",

@@ -316,7 +316,7 @@ export default function BrowserUsePanel({ isVisible, onShowSettings }: BrowserUs
           />
           {cursorStyle && (
             <div
-              className="pointer-events-none absolute h-5 w-5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white/90 bg-primary/80 shadow-[0_0_0_6px_hsl(var(--primary)/0.18)]"
+              className="pointer-events-none absolute h-5 w-5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white/90 bg-primary/80 shadow-[0_0_0_6px_color-mix(in_srgb,var(--accent)_18%,transparent)]"
               style={cursorStyle}
             >
               <div className="absolute left-1/2 top-1/2 h-2 w-2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white" />

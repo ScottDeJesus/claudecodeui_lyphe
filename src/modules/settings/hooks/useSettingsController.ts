@@ -4,15 +4,11 @@ import { useTheme } from '@/shared/context/ThemeContext';
 import { api } from '@/shared/api';
 import { setNotificationSoundEnabled } from '@/shared/utils';
 import {
-  readCodeEditorSettings,
-  writeCodeEditorSettings,
-} from '@/shared/codeEditorSettings';
-import {
   readUserPreference,
   writeUserPreferences,
 } from '@/shared/userSettings';
 import { useProviderAuthStatus } from '@/modules/provider-auth';
-import type { AgentProvider, ClaudePermissionsState, CodeEditorSettingsState, CodexPermissionMode, CursorPermissionsState, NotificationPreferencesState, ProjectSortOrder, SettingsMainTab } from '@/shared/types';
+import type { AgentProvider, ClaudePermissionsState, CodexPermissionMode, CursorPermissionsState, NotificationPreferencesState, PermissionMode, ProjectSortOrder, SettingsMainTab } from '@/shared/types';
 
 const DEFAULT_CURSOR_PERMISSIONS: CursorPermissionsState = {
   allowedCommands: [],
@@ -30,17 +26,22 @@ type UseSettingsControllerArgs = {
   initialTab: string;
 };
 
+// `permissionMode` is the edit mode, and it is the ONE store the chat composer
+// writes to as well (useChatProviderState). It is declared on all three so a save
+// from this dialog carries the composer's choice back out instead of dropping it.
 type ClaudeSettingsStorage = {
   allowedTools?: string[];
   disallowedTools?: string[];
   skipPermissions?: boolean;
   projectSortOrder?: ProjectSortOrder;
+  permissionMode?: PermissionMode;
 };
 
 type CursorSettingsStorage = {
   allowedCommands?: string[];
   disallowedCommands?: string[];
   skipPermissions?: boolean;
+  permissionMode?: PermissionMode;
 };
 
 type CodexSettingsStorage = {
@@ -54,7 +55,9 @@ type NotificationPreferencesResponse = {
 
 type ActiveLoginProvider = AgentProvider | '';
 
-const KNOWN_MAIN_TABS: SettingsMainTab[] = ['agents', 'appearance', 'git', 'api', 'tasks', 'browser', 'notifications', 'plugins', 'about'];
+// Every tab the sidebar can land on. A tab missing from here is silently rewritten to
+// "agents" when a caller deep-links to it, which is how Voice became unreachable by name.
+const KNOWN_MAIN_TABS: SettingsMainTab[] = ['agents', 'appearance', 'git', 'tasks', 'notifications', 'api', 'voice', 'plugins', 'browser', 'about'];
 
 const normalizeMainTab = (tab: string): SettingsMainTab => {
   // Keep backwards compatibility with older callers that still pass "tools".
@@ -126,10 +129,6 @@ export function useSettingsController({ isOpen, initialTab }: UseSettingsControl
   const [activeTab, setActiveTab] = useState<SettingsMainTab>(() => normalizeMainTab(initialTab));
   const [saveStatus, setSaveStatus] = useState<'success' | 'error' | null>(null);
   const [projectSortOrder, setProjectSortOrder] = useState<ProjectSortOrder>('name');
-  const [codeEditorSettings, setCodeEditorSettings] = useState<CodeEditorSettingsState>(() => (
-    readCodeEditorSettings()
-  ));
-
   const [claudePermissions, setClaudePermissions] = useState<ClaudePermissionsState>(() => (
     createEmptyClaudePermissions()
   ));
@@ -156,6 +155,7 @@ export function useSettingsController({ isOpen, initialTab }: UseSettingsControl
         allowedTools: savedClaudeSettings.allowedTools || [],
         disallowedTools: savedClaudeSettings.disallowedTools || [],
         skipPermissions: Boolean(savedClaudeSettings.skipPermissions),
+        permissionMode: savedClaudeSettings.permissionMode,
       });
       setProjectSortOrder(readUserPreference<ProjectSortOrder>('projectSortOrder', 'name') === 'date' ? 'date' : 'name');
 
@@ -164,6 +164,7 @@ export function useSettingsController({ isOpen, initialTab }: UseSettingsControl
         allowedCommands: savedCursorSettings.allowedCommands || [],
         disallowedCommands: savedCursorSettings.disallowedCommands || [],
         skipPermissions: Boolean(savedCursorSettings.skipPermissions),
+        permissionMode: savedCursorSettings.permissionMode,
       });
 
       const savedCodexSettings = readUserPreference<CodexSettingsStorage>('codexPermissions', {});
@@ -222,17 +223,22 @@ export function useSettingsController({ isOpen, initialTab }: UseSettingsControl
     try {
       // One call so the whole dialog's state reaches the server as a single
       // merge-patch rather than four racing requests.
+      // `permissionMode` is spread in only when it has a value: this dialog
+      // auto-saves the moment it opens, and writing the key as undefined would
+      // erase an edit mode the composer had just set.
       writeUserPreferences({
         claudePermissions: {
           allowedTools: claudePermissions.allowedTools,
           disallowedTools: claudePermissions.disallowedTools,
           skipPermissions: claudePermissions.skipPermissions,
+          ...(claudePermissions.permissionMode ? { permissionMode: claudePermissions.permissionMode } : {}),
         },
         projectSortOrder,
         cursorPermissions: {
           allowedCommands: cursorPermissions.allowedCommands,
           disallowedCommands: cursorPermissions.disallowedCommands,
           skipPermissions: cursorPermissions.skipPermissions,
+          ...(cursorPermissions.permissionMode ? { permissionMode: cursorPermissions.permissionMode } : {}),
         },
         codexPermissions: {
           permissionMode: codexPermissionMode,
@@ -251,36 +257,23 @@ export function useSettingsController({ isOpen, initialTab }: UseSettingsControl
       console.error('Error saving settings:', error);
       setSaveStatus('error');
     }
+    // Field-by-field, not the whole state object — but then EVERY field this
+    // function writes has to be listed, or the auto-save effect keyed on
+    // `[saveSettings]` never re-runs for the one that was missed and the control
+    // that changed it is silently inert.
   }, [
     claudePermissions.allowedTools,
     claudePermissions.disallowedTools,
+    claudePermissions.permissionMode,
     claudePermissions.skipPermissions,
     codexPermissionMode,
     cursorPermissions.allowedCommands,
     cursorPermissions.disallowedCommands,
+    cursorPermissions.permissionMode,
     cursorPermissions.skipPermissions,
     notificationPreferences,
     projectSortOrder,
   ]);
-
-  // Persist on the user's edit rather than in an effect keyed on the settings
-  // object. The effect form also ran on mount, so merely opening this dialog
-  // rewrote all four keys — which reset the editor's font size for anyone who
-  // had never changed it.
-  //
-  // The other three keys are merged from storage rather than from the rendered
-  // state, so two edits landing in one React batch cannot write the second one
-  // on top of a pre-first-edit snapshot. Storage is the newest value because
-  // this is the only writer that can be behind — the editor's own wordWrap
-  // mirror in useCodeEditorSettings only ever writes back what it just read.
-  const updateCodeEditorSetting = useCallback(
-    <K extends keyof CodeEditorSettingsState>(key: K, value: CodeEditorSettingsState[K]) => {
-      const next = { ...readCodeEditorSettings(), [key]: value };
-      setCodeEditorSettings(next);
-      writeCodeEditorSettings(next);
-    },
-    [],
-  );
 
   useEffect(() => {
     if (!isOpen) {
@@ -300,6 +293,13 @@ export function useSettingsController({ isOpen, initialTab }: UseSettingsControl
   const autoSaveTimerRef = useRef<number | null>(null);
   const isInitialLoadRef = useRef(true);
 
+  // Read by the unmount flush below, which must call the NEWEST saver rather than
+  // the one that happened to be current when the dialog opened.
+  const saveSettingsRef = useRef(saveSettings);
+  useEffect(() => {
+    saveSettingsRef.current = saveSettings;
+  }, [saveSettings]);
+
   useEffect(() => {
     // Skip auto-save on initial load (settings are being loaded from the store)
     if (isInitialLoadRef.current) {
@@ -311,7 +311,11 @@ export function useSettingsController({ isOpen, initialTab }: UseSettingsControl
       window.clearTimeout(autoSaveTimerRef.current);
     }
 
+    // Nulled when it fires, so `autoSaveTimerRef.current !== null` means exactly
+    // "a change is still waiting to be written" — which is what the flush below
+    // has to be able to ask.
     autoSaveTimerRef.current = window.setTimeout(() => {
+      autoSaveTimerRef.current = null;
       saveSettings();
     }, 500);
 
@@ -321,6 +325,20 @@ export function useSettingsController({ isOpen, initialTab }: UseSettingsControl
       }
     };
   }, [saveSettings]);
+
+  // A pending write must not die with the dialog. Changing something and closing
+  // within half a second is the ordinary way to use this screen, and the cleanup
+  // above cancels the timer on unmount — so that write was simply lost, and the
+  // control that made it looked inert. Declared AFTER the debounce effect so its
+  // cleanup runs second, when the timer has been cancelled but the ref still says
+  // a change was waiting.
+  useEffect(() => () => {
+    if (autoSaveTimerRef.current === null) {
+      return;
+    }
+    autoSaveTimerRef.current = null;
+    void saveSettingsRef.current();
+  }, []);
 
   // Clear save status after 2 seconds
   useEffect(() => {
@@ -358,8 +376,6 @@ export function useSettingsController({ isOpen, initialTab }: UseSettingsControl
     saveStatus,
     projectSortOrder,
     setProjectSortOrder,
-    codeEditorSettings,
-    updateCodeEditorSetting,
     claudePermissions,
     setClaudePermissions,
     cursorPermissions,

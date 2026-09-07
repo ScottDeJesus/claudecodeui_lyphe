@@ -234,6 +234,14 @@ export const api = {
   getFiles: (projectId: string, options: ApiRequestOptions = {}) =>
     get(`/api/file-tree/projects/${projectId}/files${query({ respectGitignore: true })}`, options),
 
+  // The file manager's two reads. `path` is relative to the project root; empty means the root
+  // itself, which is why it goes through `query()` (it drops the empty value) rather than being
+  // interpolated. Both answer `DirectoryListing` / `FilePreview`; the server clamps `lines`.
+  listDirectory: (projectId: string, path: string, options: ApiRequestOptions = {}) =>
+    get(`/api/file-tree/projects/${projectId}/list${query({ path })}`, options),
+  previewFile: (projectId: string, path: string, lines = 200, options: ApiRequestOptions = {}) =>
+    get(`/api/file-tree/projects/${projectId}/preview${query({ path, lines })}`, options),
+
   // File operations
   createFile: (
     projectId: string,
@@ -256,7 +264,10 @@ export const api = {
 
   createFolder: (folderPath: string) => post('/api/file-tree/create-folder', { path: folderPath }),
 
-  // Git endpoints. The `project` param carries the DB projectId post-migration.
+  // Git READ endpoints. The `project` param carries the DB projectId post-migration.
+  // There is no write helper here on purpose: the source-control panel reads, and every
+  // commit or push goes through the agent run it delegates to. The server's own write
+  // routes still exist and are untouched — nothing in the client calls them.
   git: {
     status: (projectId: string, options: ApiRequestOptions = {}) =>
       get(`/api/git/status${query({ project: projectId })}`, options),
@@ -264,8 +275,6 @@ export const api = {
       get(`/api/git/diff${query({ project: projectId, file: filePath })}`, options),
     commitDiff: (projectId: string, commit: string) =>
       get(`/api/git/commit-diff${query({ project: projectId, commit })}`),
-    fileWithDiff: (projectId: string, filePath: string) =>
-      get(`/api/git/file-with-diff${query({ project: projectId, file: filePath })}`),
     branches: (projectId: string, options: ApiRequestOptions = {}) =>
       get(`/api/git/branches${query({ project: projectId })}`, options),
     remoteStatus: (projectId: string) =>
@@ -275,53 +284,6 @@ export const api = {
       { limit }: { limit?: number } = {},
       options: ApiRequestOptions = {},
     ) => get(`/api/git/commits${query({ project: projectId, limit })}`, options),
-    checkout: (projectId: string, branch: string) =>
-      post('/api/git/checkout', { project: projectId, branch }),
-    createBranch: (projectId: string, branch: string) =>
-      post('/api/git/create-branch', { project: projectId, branch }),
-    deleteBranch: (projectId: string, branch: string, force = false) =>
-      post('/api/git/delete-branch', { project: projectId, branch, force }),
-    fetch: (projectId: string) => post('/api/git/fetch', { project: projectId }),
-    pull: (projectId: string) => post('/api/git/pull', { project: projectId }),
-    push: (projectId: string) => post('/api/git/push', { project: projectId }),
-    publish: (projectId: string, branch: string) =>
-      post('/api/git/publish', { project: projectId, branch }),
-    discard: (projectId: string, file: string) =>
-      post('/api/git/discard', { project: projectId, file }),
-    deleteUntracked: (projectId: string, file: string) =>
-      post('/api/git/delete-untracked', { project: projectId, file }),
-    stage: (projectId: string, files: string[]) =>
-      post('/api/git/stage', { project: projectId, files }),
-    unstage: (projectId: string, files: string[]) =>
-      post('/api/git/unstage', { project: projectId, files }),
-    commit: (projectId: string, message: string, files: string[]) =>
-      post('/api/git/commit', { project: projectId, message, files }),
-    initialCommit: (projectId: string) => post('/api/git/initial-commit', { project: projectId }),
-    init: (projectId: string) => post('/api/git/init', { project: projectId }),
-    revertLocalCommit: (projectId: string) =>
-      post('/api/git/revert-local-commit', { project: projectId }),
-    generateCommitMessage: (projectId: string, files: string[], provider: string) =>
-      post('/api/git/generate-commit-message', { project: projectId, files, provider }),
-  },
-
-  worktrees: {
-    list: (projectId: string) => get(`/api/worktrees${query({ project: projectId })}`),
-    create: (
-      projectId: string,
-      { branch, baseBranch }: { branch: string; baseBranch: string | null },
-    ) => post('/api/worktrees/create', { project: projectId, branch, baseBranch }),
-    open: (projectId: string, worktreePath: string) =>
-      post('/api/worktrees/open', { project: projectId, worktreePath }),
-    merge: (
-      projectId: string,
-      worktreePath: string,
-      options: { squash?: boolean; message?: string; removeAfterMerge?: boolean },
-    ) => post('/api/worktrees/merge', { project: projectId, worktreePath, ...options }),
-    remove: (
-      projectId: string,
-      worktreePath: string,
-      options: { force?: boolean; deleteBranch?: boolean },
-    ) => post('/api/worktrees/remove', { project: projectId, worktreePath, ...options }),
   },
 
   // Provider (coding agent) endpoints — models, capabilities, sessions, MCP, skills.
@@ -518,6 +480,22 @@ export const api = {
   system: {
     update: () => post('/api/system/update'),
   },
+
+  // The Descent proxy (docs/descent-proxy.md). Both reads answer 200 even when Descent is
+  // down — the calm `{reachable:false, reason}` picture — so a caller reads the BODY rather
+  // than the status. Both writes carry Descent's OWN status and body through, which is why
+  // they are read from the raw response and never through `readApiJson`.
+  descent: {
+    accounts: () => get('/api/descent/accounts'),
+    usage: () => get('/api/descent/usage'),
+    switchAccount: (slug: string) => post('/api/descent/accounts/switch', { slug }),
+    capture: () => post('/api/descent/accounts/capture', {}),
+  },
+
+  // The installed Claude CLI and the version each LIVE run is on (docs/cli-version.md). It
+  // answers 200 even when no version could be read — an unreadable binary is a fact in words,
+  // so the caller reads the body's `installed`/`reason` rather than the status.
+  cliVersion: () => get('/api/cli-version'),
 };
 
 // ---------------------------

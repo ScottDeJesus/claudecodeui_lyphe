@@ -7,7 +7,11 @@ type PillBarProps = ComponentPropsWithoutRef<'div'> & {
   children: ReactNode;
 };
 
-/** Used by the project-workspace and settings modules as the horizontal tab strip. */
+/**
+ * Used by the settings module's agent selector as its horizontal strip. The workspace tab bar
+ * that was its other consumer is the library `Tabs` now, so this is the last one; when the
+ * agent selector follows, the file goes with it.
+ */
 export function PillBar({ children, className, ...props }: PillBarProps) {
   return (
     <div
@@ -26,7 +30,7 @@ type PillProps = Omit<ComponentPropsWithoutRef<'button'>, 'onClick'> & {
   children: ReactNode;
 };
 
-/** A single tab inside PillBar, used by the project-workspace and settings modules. */
+/** A single row inside PillBar, used by the settings module's agent selector. */
 export function Pill({ isActive, onClick, children, className, ...props }: PillProps) {
   return (
     <button

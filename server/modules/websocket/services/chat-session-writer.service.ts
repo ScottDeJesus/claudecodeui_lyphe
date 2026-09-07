@@ -19,6 +19,13 @@ type ChatSessionWriterOptions = {
    */
   onProviderSessionId: (providerSessionId: string) => void;
   /**
+   * Invoked when the provider runtime reports the CLI version its own process
+   * is running — the SDK's init message, which arrives on the first message of
+   * every turn. The registry holds it on the run; nothing persists it, because
+   * the fact expires with the process that stated it.
+   */
+  onCliVersion?: (cliVersion: string) => void;
+  /**
    * Remaps/sequences/buffers one outbound live event. Implemented by the chat
    * run registry; the writer never forwards a provider event untouched.
    * Returns `null` when the event must be dropped (duplicate terminal
@@ -142,6 +149,17 @@ export class ChatSessionWriter {
 
   setSessionId(sessionId: string): void {
     this.captureProviderSessionId(sessionId);
+  }
+
+  /**
+   * Records the CLI version the provider runtime reported for THIS run.
+   *
+   * Named for the runtime adapters' duck-typed writer surface, exactly as
+   * `setSessionId` is: an adapter that has never heard of a version simply
+   * never calls it, and the run keeps its `null`.
+   */
+  setCliVersion(cliVersion: string): void {
+    this.options.onCliVersion?.(cliVersion);
   }
 
   getSessionId(): string | null {

@@ -19,6 +19,13 @@ export type TranscriptExportInput = {
   provider: LLMProvider | string;
   selectedProject?: Project | null;
   createDiff: (oldStr: string, newStr: string) => DiffLine[];
+  /**
+   * Turns a model id into the catalog's name for it. Optional because the
+   * markdown and JSON formats carry the id itself; the HTML export mounts the
+   * on-screen components, so without this the file it saves captions every turn
+   * with the provider's name while the screen said the model's.
+   */
+  resolveModelLabel?: (modelId: string) => string | null;
 };
 
 const EXTENSIONS: Record<TranscriptExportFormat, string> = {
@@ -90,6 +97,7 @@ export async function buildTranscriptExport(
       provider: input.provider,
       exportedAt,
       createDiff: input.createDiff,
+      resolveModelLabel: input.resolveModelLabel,
     });
   }
 
@@ -98,6 +106,7 @@ export async function buildTranscriptExport(
     createDiff: input.createDiff,
     provider: input.provider,
     selectedProject: input.selectedProject,
+    resolveModelLabel: input.resolveModelLabel,
     sessionTitle: input.sessionTitle,
     exportedAt,
   });

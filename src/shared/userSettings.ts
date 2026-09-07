@@ -1,5 +1,4 @@
 import { api } from '@/shared/api';
-import { CODE_EDITOR_STORAGE_KEYS } from '@/shared/constants';
 
 /**
  * The one reader and writer for the settings that used to live in browser
@@ -25,7 +24,6 @@ export type UserPreferences = {
   cursorPermissions: unknown;
   codexPermissions: unknown;
   opencodePermissions: unknown;
-  codeEditorSettings: unknown;
   uiPreferences: unknown;
   selectedProvider: string;
 };
@@ -62,9 +60,6 @@ const LEGACY_STORAGE_KEYS: Record<UserPreferenceKey, string> = {
   cursorPermissions: 'cursor-tools-settings',
   codexPermissions: 'codex-settings',
   opencodePermissions: 'opencode-settings',
-  // Unused: the four code-editor settings never shared one key, so they are
-  // read by readLegacyCodeEditorSettings instead.
-  codeEditorSettings: '',
   uiPreferences: 'uiPreferences',
   selectedProvider: 'selected-provider',
 };
@@ -243,31 +238,22 @@ function readLegacyPreference(key: UserPreferenceKey): unknown {
 }
 
 /**
- * Reads the four code-editor settings, which never shared a single key.
+ * The read is over and brought back nothing usable, so the mirror is all there will be.
  *
- * They were stored as four separate strings, so unlike every other legacy
- * value there is nothing to `JSON.parse` — hence the dedicated reader.
+ * Two things follow from that, and they are the same thing said twice. The mirror is left
+ * EXACTLY as it stands — writing an empty server copy over it would throw away the theme,
+ * language, sort order and permission blobs this device already had, for the rest of the
+ * session. And readers are released: a read that failed is still a read that is over, so
+ * anything waiting for a real preference before acting gets to act on the best value there is
+ * rather than waiting forever.
+ *
+ * A fetch that THROWS and a response that FAILS are the same event to every caller, so they
+ * land here together — the distinction is the network's, not the reader's.
  */
-function readLegacyCodeEditorSettings(): unknown {
-  try {
-    const wordWrap = localStorage.getItem(CODE_EDITOR_STORAGE_KEYS.wordWrap);
-    const showMinimap = localStorage.getItem(CODE_EDITOR_STORAGE_KEYS.showMinimap);
-    const lineNumbers = localStorage.getItem(CODE_EDITOR_STORAGE_KEYS.lineNumbers);
-    const fontSize = localStorage.getItem(CODE_EDITOR_STORAGE_KEYS.fontSize);
-
-    if (wordWrap === null && showMinimap === null && lineNumbers === null && fontSize === null) {
-      return undefined;
-    }
-
-    const settings: Record<string, unknown> = {};
-    if (wordWrap !== null) settings.wordWrap = wordWrap !== 'false';
-    if (showMinimap !== null) settings.showMinimap = showMinimap !== 'false';
-    if (lineNumbers !== null) settings.lineNumbers = lineNumbers !== 'false';
-    if (fontSize !== null) settings.fontSize = fontSize;
-    return settings;
-  } catch {
-    return undefined;
-  }
+function settleOnTheMirrorAlone(reason: unknown): void {
+  console.error('Failed to load user preferences:', reason);
+  hasHydrated = true;
+  notifyListeners();
 }
 
 /**
@@ -276,22 +262,26 @@ function readLegacyCodeEditorSettings(): unknown {
  * Called once the user is authenticated. Any key the server has never seen is
  * seeded from wherever it used to live in localStorage and pushed up, so the
  * settings an existing install already had survive the move.
+ *
+ * A 200 carrying no preferences is NOT a failure and does not come back here: a brand-new
+ * account genuinely has none, and adopting that empty copy is how it gets its defaults.
  */
 export async function hydrateUserPreferences(): Promise<void> {
   let serverPreferences: PreferenceRecord = {};
 
   try {
     const response = await api.user.preferences();
-    if (response.ok) {
-      const payload = (await response.json()) as { preferences?: unknown };
-      if (isRecord(payload.preferences)) {
-        serverPreferences = payload.preferences as PreferenceRecord;
-      }
+    if (!response.ok) {
+      settleOnTheMirrorAlone(`HTTP ${response.status}`);
+      return;
+    }
+
+    const payload = (await response.json()) as { preferences?: unknown };
+    if (isRecord(payload.preferences)) {
+      serverPreferences = payload.preferences as PreferenceRecord;
     }
   } catch (error) {
-    // Keep whatever the mirror holds; an offline load must still render the
-    // user's own theme and language rather than snapping back to defaults.
-    console.error('Failed to load user preferences:', error);
+    settleOnTheMirrorAlone(error);
     return;
   }
 
@@ -301,9 +291,7 @@ export async function hydrateUserPreferences(): Promise<void> {
       continue;
     }
 
-    const legacyValue = key === 'codeEditorSettings'
-      ? readLegacyCodeEditorSettings()
-      : readLegacyPreference(key);
+    const legacyValue = readLegacyPreference(key);
 
     if (legacyValue !== undefined) {
       migrated[key] = legacyValue;
@@ -329,7 +317,14 @@ export async function hydrateUserPreferences(): Promise<void> {
   notifyListeners();
 }
 
-/** True once the server's copy has been read at least one time this session. */
+/**
+ * True once the preferences have SETTLED — the server's copy read, or the read attempted and
+ * failed, leaving the mirror as all there will be. Either way the values are no longer
+ * placeholders, so a reader may act on them.
+ *
+ * The distinction matters to anything DESTRUCTIVE: before this is true, a preference read
+ * synchronously off a cold mirror is the DEFAULT standing in for a value still on its way.
+ */
 export function hasHydratedUserPreferences(): boolean {
   return hasHydrated;
 }

@@ -3,7 +3,6 @@ import { useMemo } from 'react';
 type GitDiffViewerProps = {
   diff: string | null;
   isMobile: boolean;
-  wrapText: boolean;
 };
 
 const PREVIEW_CHARACTER_LIMIT = 200_000;
@@ -29,7 +28,7 @@ function buildDiffPreview(diff: string): DiffPreview {
 }
 
 /** Rendered by the git panel's changes and history views to display one file's diff. */
-export default function GitDiffViewer({ diff, isMobile, wrapText }: GitDiffViewerProps) {
+export default function GitDiffViewer({ diff, isMobile }: GitDiffViewerProps) {
   // Render a bounded preview to keep huge commit diffs from freezing the UI thread.
   const preview = useMemo(() => buildDiffPreview(diff || ''), [diff]);
   const isPreviewTruncated = preview.isCharacterTruncated || preview.isLineTruncated;
@@ -50,7 +49,7 @@ export default function GitDiffViewer({ diff, isMobile, wrapText }: GitDiffViewe
     return (
       <div
         key={index}
-        className={`px-3 py-0.5 font-mono text-xs ${isMobile && wrapText ? 'whitespace-pre-wrap break-all' : 'overflow-x-auto whitespace-pre'
+        className={`px-3 py-0.5 font-mono text-xs ${isMobile ? 'whitespace-pre-wrap break-all' : 'overflow-x-auto whitespace-pre'
           } ${isAddition ? 'bg-green-50 text-green-700 dark:bg-green-950/50 dark:text-green-300' :
             isDeletion ? 'bg-red-50 text-red-700 dark:bg-red-950/50 dark:text-red-300' :
               isHeader ? 'bg-primary/5 text-primary' :

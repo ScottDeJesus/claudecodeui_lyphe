@@ -84,6 +84,13 @@ export default function SidebarProjectSessions({
   }
 
   const hasSessions = sessions.length > 0;
+  // How many conversations the server still holds beyond the page on screen. The total can be
+  // absent or stale, so a non-positive remainder falls back to the unnumbered wording rather
+  // than offering to show "0 older" of something the server just said there is more of.
+  const olderCount = Number(project.sessionMeta?.total ?? 0) - sessions.length;
+  const olderConversationsLabel = olderCount > 0
+    ? t('sessions.showOlder', { count: olderCount })
+    : t('sessions.showOlderUnknown');
 
   return (
     <div className="ml-3 space-y-1 border-l border-border pl-3">
@@ -145,13 +152,16 @@ export default function SidebarProjectSessions({
 
           {hasMoreSessions && (
             <Button
-              variant="ghost"
+              variant="link"
               size="sm"
-              className="h-8 w-full justify-center text-xs text-muted-foreground hover:text-foreground"
+              // `.vv-button--link` paints the accent FILL as its ink, which measures 2.81:1 as
+              // text. The caller's class wins over the library rule by design, so this row
+              // takes the readable ink without changing every link button in the app.
+              className="h-8 w-full justify-start px-2.5 text-xs text-accent-ink"
               onClick={() => onLoadMoreSessions(project.projectId)}
               disabled={isLoadingMoreSessions}
             >
-              {isLoadingMoreSessions ? t('sessions.loadingSessions') : 'Load more sessions'}
+              {isLoadingMoreSessions ? t('sessions.loadingSessions') : olderConversationsLabel}
             </Button>
           )}
         </>

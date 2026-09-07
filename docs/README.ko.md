@@ -55,8 +55,8 @@
 - **반응형 디자인** - 데스크톱, 태블릿, 모바일을 아우르는 매끄러운 경험으로 어디서든 Agents를 사용할 수 있습니다
 - **대화형 채팅 인터페이스** - 내장된 채팅 UI를 통해 에이전트와 자연스럽게 소통
 - **통합 셸 터미널** - 셸 기능을 통해 Agents CLI에 직접 접근
-- **파일 탐색기** - 구문 강조 및 실시간 편집을 갖춘 인터랙티브 파일 트리
-- **Git 탐색기** - 변경 사항 보기, 스테이징 및 커밋. 브랜치 전환 기능 포함
+- **파일 탐색기** - 텍스트·이미지·다운로드를 읽기 전용으로 미리 보는 인터랙티브 파일 트리 (변경은 Agents에 요청)
+- **Git 탐색기** - 브랜치, 아직 푸시되지 않은 커밋, 변경된 파일과 그 diff를 확인 (커밋과 푸시는 Agents에 요청 — 버튼 하나로 대화가 시작되고 사용자의 `/git`이 실행됩니다)
 - **세션 관리** - 대화를 재개하고, 여러 세션을 관리하며 기록을 추적
 - **플러그인 시스템** - 커스텀 탭, 백엔드 서비스, 통합을 추가하여 CloudCLI 확장. [직접 빌드 →](https://github.com/cloudcli-ai/cloudcli-plugin-starter)
 - **TaskMaster AI 통합** *(선택사항)* - AI 중심의 작업 계획, PRD 파싱, 워크플로 자동화를 통한 고급 프로젝트 관리
@@ -237,7 +237,7 @@ GNU General Public License v3.0 - 자세한 내용은 [LICENSE](../LICENSE) 파�
 - **[React](https://react.dev/)** - 사용자 인터페이스 라이브러리
 - **[Vite](https://vitejs.dev/)** - 빠른 빌드 도구 및 개발 서버
 - **[Tailwind CSS](https://tailwindcss.com/)** - 유틸리티 우선 CSS 프레임워크
-- **[CodeMirror](https://codemirror.net/)** - 고급 코드 에디터
+- **[CodeMirror](https://codemirror.net/)** - PRD 에디터의 마크다운 에디터
 - **[TaskMaster AI](https://github.com/eyaltoledano/claude-task-master)** *(선택사항)* - AI 기반 프로젝트 관리 및 작업 계획
 
 ### 스폰서
