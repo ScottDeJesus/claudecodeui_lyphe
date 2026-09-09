@@ -177,12 +177,29 @@
 /* `min-width: 100%` so the rule spans the whole column when the tabs are short, and grows with
  * them when they overflow their scroller — the divider is never a stub under three words. */
 .vv-tabs--underline {
+  position: relative;
   min-width: 100%;
   gap: 2px;
   padding: 0;
   border-radius: 0;
   background: none;
   box-shadow: inset 0 -1px 0 var(--border);
+}
+/* The one bar that travels. `transform` and `width` only — both compositor-friendly — and it
+ * rides the strip's own coordinate space, so a scrolled strip carries it along instead of
+ * leaving it behind. */
+.vv-tabs__indicator {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--accent);
+  transition: transform 0.28s var(--ease-spring), width 0.28s var(--ease-spring);
+  pointer-events: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .vv-tabs__indicator { transition: none; }
 }
 /* The tabs share the row rather than packing against its left edge: five 36px glyphs in a
  * 264px sidebar left a third of the rule bare, which reads as a row that failed to fill
@@ -204,7 +221,6 @@
 .vv-tabs--underline .vv-tabs__tab[aria-selected='true'] {
   background: none;
   box-shadow: none;
-  border-bottom-color: var(--accent);
   color: var(--ink);
   font-weight: 700;
 }

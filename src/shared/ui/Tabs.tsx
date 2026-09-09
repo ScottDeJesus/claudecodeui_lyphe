@@ -1,3 +1,4 @@
+import { useCallback, useLayoutEffect, useRef, useState } from 'react';
 import type { ComponentType, KeyboardEvent } from 'react';
 
 import { cn } from '@/shared/utils';
@@ -68,10 +69,14 @@ type TabsProps = {
  * sits in the sidebar under the wordmark — and by the git-panel module for its own two views.
  * The same shape twice, so neither hand-rolls it.
  *
- * There is no sliding indicator. The active tab paints its own background, which means the
- * only animated properties are colours: nothing measures a box, and nothing moves. An
- * indicator that animates `left`/`width` also reads a stale width for a frame whenever a
- * label changes, which is precisely when a tab strip is being looked at.
+ * The `underline` register slides ONE indicator between tabs; the `segmented` one still paints
+ * its own background and moves nothing. The objection this file used to record — that an
+ * indicator reads a stale width for a frame whenever a label changes — is answered rather than
+ * avoided: the measurement runs in a layout effect (before paint, never a stale frame) and a
+ * ResizeObserver on the strip re-runs it whenever a tab's box changes, which is exactly the
+ * label-change case. Cross-fading each tab's own border was the alternative, and with a row of
+ * icons it read as no animation at all: nothing moves, and there is no weight change to carry
+ * it the way a word's does.
  *
  * A tab's optional `count` is a capability of the strip: a word tab draws Verve's own count
  * pill, an icon tab a single accent dot on the glyph's shoulder. The accessible name stays
@@ -86,12 +91,57 @@ export function Tabs({ tabs, active, onChange, ariaLabel, variant = 'segmented' 
   const activeIndex = tabs.findIndex((tab) => tab.id === active);
   const stopIndex = activeIndex === -1 ? 0 : activeIndex;
 
+  const listRef = useRef<HTMLDivElement | null>(null);
+  // Null until the first measurement, and the indicator is not drawn until then — a bar that
+  // starts at 0 and slides into place on mount would animate a choice nobody made.
+  const [indicator, setIndicator] = useState<{ left: number; width: number } | null>(null);
+  const isUnderline = variant === 'underline';
+
+  const measure = useCallback(() => {
+    const list = listRef.current;
+    if (!list) return;
+
+    const selected = list.querySelector<HTMLButtonElement>('[role="tab"][aria-selected="true"]');
+    if (!selected) {
+      setIndicator(null);
+      return;
+    }
+
+    // `offsetLeft` against the strip, not a viewport rect: the strip lives in a horizontal
+    // scroller, and a rect-based left would jump by the scroll offset the moment it scrolled.
+    setIndicator({ left: selected.offsetLeft, width: selected.offsetWidth });
+  }, []);
+
+  useLayoutEffect(() => {
+    if (!isUnderline) return undefined;
+
+    measure();
+
+    const list = listRef.current;
+    if (!list || typeof ResizeObserver === 'undefined') return undefined;
+
+    // Every tab, not just the strip: a label that grows changes ITS box, and the strip's own
+    // width may not move at all when the row has room to absorb it.
+    const observer = new ResizeObserver(measure);
+    observer.observe(list);
+    for (const tab of list.querySelectorAll('[role="tab"]')) observer.observe(tab);
+    return () => observer.disconnect();
+  }, [isUnderline, measure, active, tabs]);
+
   return (
     <div
-      className={cn('vv-tabs inline-flex items-center', variant === 'underline' && 'vv-tabs--underline')}
+      ref={listRef}
+      className={cn('vv-tabs inline-flex items-center', isUnderline && 'vv-tabs--underline')}
       role="tablist"
       aria-label={ariaLabel}
     >
+      {isUnderline && indicator && (
+        <span
+          className="vv-tabs__indicator"
+          aria-hidden="true"
+          style={{ transform: `translateX(${indicator.left}px)`, width: indicator.width }}
+        />
+      )}
       {tabs.map((tab, index) => {
         const hasCount = typeof tab.count === 'number' && tab.count > 0;
 
