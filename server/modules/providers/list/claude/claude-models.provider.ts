@@ -23,12 +23,14 @@ const ULTRACODE_EFFORT_OPTION = {
 };
 
 /**
- * Only models whose context window is the 1M one, plus the two that have no such variant.
+ * One entry per model anyone here actually picks.
  *
  * `default` and `best` are POLICY selectors — "whatever your deployment recommends", "the
- * latest and greatest" — and both resolve to a 200K model, as do the bare `sonnet` and `opus`
- * aliases beside their `[1m]` twins. Offering them here put four entries in the picker that
- * this operator would never choose and that read as duplicates of the ones they would.
+ * latest and greatest" — and the bare `sonnet`/`opus` aliases sat beside their `[1m]` twins.
+ * All four were duplicates of an entry already in this list: the CLI's own baked catalog
+ * resolves `opus` to claude-opus-5 and `sonnet` to claude-sonnet-5, and BOTH are natively 1M
+ * (`context.window: 1e6, native_1m: true`), so the `[1m]` suffix changes nothing for this
+ * generation. Four rows, no fifth choice.
  */
 export const CLAUDE_PREDEFINED_MODELS: ProviderModelsDefinition = {
   OPTIONS: [
