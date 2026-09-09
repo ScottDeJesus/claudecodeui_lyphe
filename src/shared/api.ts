@@ -10,6 +10,57 @@ import { readVoiceConfig, voiceConfigHeaders } from '@/shared/voiceConfig';
 // defaults below can be merged with a caller's headers by spreading.
 export type ApiRequestOptions = Omit<RequestInit, 'headers'> & {
   headers?: Record<string, string>;
+  /** Overrides `REQUEST_TIMEOUT_MS`. `0` waits forever, for a caller that means to. */
+  timeoutMs?: number;
+};
+
+/**
+ * The ceiling on a whole request — headers AND body, because `AbortSignal.timeout` is a
+ * wall-clock deadline on the entire exchange, not a first-byte one.
+ *
+ * A browser does NOT time these out on its own: when the API restarts under a keep-alive
+ * socket — a dev-supervisor bounce, a tab woken after sleep — the request the page sends is
+ * written into a connection nobody will ever answer, and `fetch` waits on it forever. That is
+ * what left the app sitting on "Loading authentication state…" with no way out but a manual
+ * reload, since the boot gate awaits exactly such a request.
+ *
+ * Since it covers the body, anything whose length belongs to the WORK rather than to the
+ * network opts out with `NO_REQUEST_TIMEOUT` — an install that shells out to npm, a
+ * self-update, a file whose bytes take longer than this to arrive over a slow link.
+ */
+export const REQUEST_TIMEOUT_MS = 30_000;
+
+/** Opt-out for a request whose length is the work's, not the network's. */
+export const NO_REQUEST_TIMEOUT = 0;
+
+/**
+ * The gate's own, much shorter deadline: nothing is on screen but a spinner until these two
+ * answer, and AuthContext retries them — with a LONGER deadline each attempt, so a cold or
+ * loaded server gets waited out rather than declared unreachable at four seconds while six
+ * abandoned requests pile onto it.
+ */
+export const BOOT_REQUEST_TIMEOUTS_MS = [4_000, 8_000, 12_000] as const;
+
+/**
+ * A signal that aborts on the deadline — unless the caller brought its own (it owns
+ * cancellation then) or the body is an upload, whose duration belongs to the file.
+ *
+ * `AbortSignal.timeout` is absent on older WebKit (iOS 15), which this app can be installed on
+ * as a PWA. Its absence has to cost the DEADLINE, not the request: calling it there throws
+ * synchronously inside the auth boot, and the user was then told the server could not be
+ * reached while it was answering perfectly.
+ */
+const supportsTimeoutSignal = () => typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function';
+
+export const requestTimeoutSignal = (timeoutMs: number): AbortSignal | undefined => (
+  supportsTimeoutSignal() ? AbortSignal.timeout(timeoutMs) : undefined
+);
+
+const timeoutSignal = ({ signal, body, timeoutMs = REQUEST_TIMEOUT_MS }: ApiRequestOptions) => {
+  if (signal || body instanceof FormData || timeoutMs <= 0) {
+    return signal;
+  }
+  return requestTimeoutSignal(timeoutMs);
 };
 
 // Utility function for authenticated API calls
@@ -30,8 +81,11 @@ export const authenticatedFetch = (
     defaultHeaders['Authorization'] = `Bearer ${token}`;
   }
 
+  const { timeoutMs: _timeoutMs, ...requestInit } = options;
+
   return fetch(url, {
-    ...options,
+    ...requestInit,
+    signal: timeoutSignal(options),
     headers: {
       ...defaultHeaders,
       ...options.headers,
@@ -133,7 +187,10 @@ const pluginAssetPath = (pluginName: string, assetFile: string) =>
 export const api = {
   // Auth endpoints (no token required)
   auth: {
-    status: () => fetch('/api/auth/status'),
+    // The boot gate awaits this one, so it gets a SHORTER deadline than the rest: the app is
+    // showing nothing but a spinner until it answers, and AuthContext retries with a longer one.
+    status: (timeoutMs: number = BOOT_REQUEST_TIMEOUTS_MS[0]) =>
+      fetch('/api/auth/status', { signal: requestTimeoutSignal(timeoutMs) }),
     login: (username: string, password: string) => fetch('/api/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -145,7 +202,7 @@ export const api = {
       body: JSON.stringify({ username, password }),
     }),
     refresh: () => post('/api/auth/refresh'),
-    user: () => get('/api/auth/user'),
+    user: (timeoutMs: number = BOOT_REQUEST_TIMEOUTS_MS[0]) => get('/api/auth/user', { timeoutMs }),
   },
 
   // Protected endpoints
@@ -228,8 +285,10 @@ export const api = {
     get(`/api/file-tree/projects/${projectId}/file${query({ filePath })}`),
   // Raw bytes for a workspace file. The endpoint requires the auth header, so
   // media call sites fetch a blob through here instead of using a bare `src`.
+  // No deadline by default: these are raw bytes, and a large file over a slow link (Tailscale,
+  // mobile) would otherwise be aborted mid-body and read as a broken file.
   readFileBlob: (projectId: string, filePath: string, options: ApiRequestOptions = {}) =>
-    get(fileContentPath(projectId, filePath), options),
+    get(fileContentPath(projectId, filePath), { timeoutMs: NO_REQUEST_TIMEOUT, ...options }),
   saveFile: (projectId: string, filePath: string, content: string) =>
     put(`/api/file-tree/projects/${projectId}/file`, { filePath, content }),
   getFiles: (projectId: string, options: ApiRequestOptions = {}) =>
@@ -465,7 +524,9 @@ export const api = {
     sessions: () => get('/api/browser-use/sessions'),
     stopSession: (sessionId: string) => post(`/api/browser-use/sessions/${sessionId}/stop`),
     deleteSession: (sessionId: string) => del(`/api/browser-use/sessions/${sessionId}`),
-    installRuntime: () => post('/api/browser-use/runtime/install'),
+    // npm install plus `playwright install chromium` behind one response: minutes of work and
+    // a ~150MB download. The ceiling reported a failure over an install that was still running.
+    installRuntime: () => post('/api/browser-use/runtime/install', undefined, { timeoutMs: NO_REQUEST_TIMEOUT }),
   },
 
   voice: {
@@ -480,7 +541,9 @@ export const api = {
   },
 
   system: {
-    update: () => post('/api/system/update'),
+    // `git pull && npm install`, answered on completion. Aborting the WAIT never aborted the
+    // update — it only told the user it had failed, inviting a second one onto the same tree.
+    update: () => post('/api/system/update', undefined, { timeoutMs: NO_REQUEST_TIMEOUT }),
   },
 
   // The Descent proxy (docs/descent-proxy.md). Both reads answer 200 even when Descent is

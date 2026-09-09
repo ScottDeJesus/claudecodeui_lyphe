@@ -2,8 +2,13 @@ import { CLOUDCLI_WORDMARK_FONT_FAMILY } from '@/shared/constants';
 
 const loadingDotAnimationDelays = ['0s', '0.15s', '0.3s'];
 
-/** Rendered by the auth module's ProtectedRoute while the initial auth status check is in flight. */
-export default function AuthLoadingScreen() {
+/**
+ * Rendered by the auth module's ProtectedRoute while the initial auth status check is in flight.
+ *
+ * `reconnecting` is the second face of the same screen: the check retries a server on its way
+ * back up for as long as ~25s, and a spinner that says nothing for that long reads as a hang.
+ */
+export default function AuthLoadingScreen({ reconnecting = false }: { reconnecting?: boolean }) {
   return (
     <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-background p-4">
       <div aria-hidden className="pointer-events-none absolute inset-0">
@@ -23,7 +28,13 @@ export default function AuthLoadingScreen() {
         >
           CloudCLI
         </h1>
-        <p className="sr-only">Loading authentication state…</p>
+        {/* One line, not two: the visible message IS the announcement once there is one, and
+          * rendering both had a reader hear "Reconnecting to the server" twice. */}
+        {reconnecting ? (
+          <p className="mb-3 text-sm text-muted-foreground">Reconnecting to the server…</p>
+        ) : (
+          <p className="sr-only">Loading authentication state…</p>
+        )}
         <div aria-hidden className="flex items-center justify-center gap-2">
           {loadingDotAnimationDelays.map((delay) => (
             <div

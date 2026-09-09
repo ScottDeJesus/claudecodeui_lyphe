@@ -51,6 +51,16 @@
         "unavailable": "TaskMaster isn't installed here, so there is no Tasks tab to hide."
       }
     },
+    "text": {
+      "title": "Text",
+      "chatFontSize": {
+        "label": "Chat text size",
+        "description": "How large messages are set in the transcript. Tool cards and the rest of the app keep their own size.",
+        "decrease": "Smaller chat text",
+        "increase": "Larger chat text",
+        "value": "{{size}}px"
+      }
+    },
     "sidebar": {
       "title": "Sidebar",
       "simpleChatList": {

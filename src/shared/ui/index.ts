@@ -45,6 +45,7 @@ export { ScrollArea } from '@/shared/ui/ScrollArea';
 export { Select } from '@/shared/ui/Select';
 export { Shimmer } from '@/shared/ui/Shimmer';
 export { Spinner } from '@/shared/ui/Spinner';
+export { Stepper } from '@/shared/ui/Stepper';
 export { Switch } from '@/shared/ui/Switch';
 export { Tabs } from '@/shared/ui/Tabs';
 export { Toast } from '@/shared/ui/Toast';

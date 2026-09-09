@@ -37,6 +37,12 @@ type TokenUsageResult = {
   cacheReadTokens?: number;
   cacheCreationTokens?: number;
   cacheTokens?: number;
+  /**
+   * Every token this conversation has GENERATED, not just the newest turn's.
+   * Absent when the transcript was only read as a tail, since a partial file
+   * can only undercount and a number that is quietly low is worse than none.
+   */
+  sessionOutputTokens?: number;
   breakdown: {
     input: number;
     output: number;
@@ -197,6 +203,7 @@ function emptyCodexTokenUsage(): TokenUsageResult {
 export function summarizeClaudeTokenUsage(
   entries: AnyRecord[],
   configuredContextWindow: string | undefined = process.env.CONTEXT_WINDOW,
+  { transcriptIsComplete = true }: { transcriptIsComplete?: boolean } = {},
 ): TokenUsageResult {
   let inputTokens = 0;
   let outputTokens = 0;
@@ -256,8 +263,59 @@ export function summarizeClaudeTokenUsage(
     cacheReadTokens,
     cacheCreationTokens,
     cacheTokens,
+    ...(transcriptIsComplete
+      ? { sessionOutputTokens: sumClaudeSessionOutput(entries) }
+      : {}),
     breakdown: { input: inputTokens, output: outputTokens },
   };
+}
+
+/**
+ * Everything the assistant has generated in this conversation, keyed by MESSAGE id.
+ *
+ * One assistant message is written to the transcript as several rows — one per content block —
+ * and every one of them repeats that message's usage. Adding the rows up therefore counts the
+ * same generation two or three times: measured on a live 365-row transcript, a raw sum read
+ * 255,738 against a true 131,339. Keeping the largest figure seen per message id is what makes
+ * the total the conversation's own.
+ *
+ * A subagent's rows (`isSidechain`) are its own conversation's spend, not this one's, and are
+ * skipped for the same reason the context reader skips them.
+ */
+function sumClaudeSessionOutput(entries: AnyRecord[]): number {
+  const outputByMessageId = new Map<string, number>();
+  let unkeyedOutput = 0;
+
+  for (const entry of entries) {
+    if (entry?.isSidechain === true || entry?.type !== 'assistant') {
+      continue;
+    }
+
+    const usage = entry.message?.usage;
+    if (!usage) {
+      continue;
+    }
+
+    const rowOutput = readUsageNumber(usage.output_tokens ?? usage.outputTokens);
+    if (rowOutput === 0) {
+      continue;
+    }
+
+    const messageId = typeof entry.message?.id === 'string' ? entry.message.id : null;
+    if (!messageId) {
+      // No id to deduplicate against — count it once and move on rather than drop it.
+      unkeyedOutput += rowOutput;
+      continue;
+    }
+
+    outputByMessageId.set(messageId, Math.max(outputByMessageId.get(messageId) ?? 0, rowOutput));
+  }
+
+  let total = unkeyedOutput;
+  for (const value of outputByMessageId.values()) {
+    total += value;
+  }
+  return total;
 }
 
 function parseClaudeUsageEntries(fileContent: string): AnyRecord[] {
@@ -352,7 +410,17 @@ export function createProviderTokenUsageService(
      * Resolves all provider-specific storage details from one app-facing
      * session id, then returns the latest usage snapshot for that provider.
      */
-    async getSessionTokenUsage(sessionId: string): Promise<TokenUsageResult> {
+    /**
+     * `includeSessionTotal` is what buys the conversation's whole generated total, and it costs
+     * a full transcript read — the tail this function is otherwise built around cannot see the
+     * older messages the total is made of, and a 5.5MB transcript (measured, this repo) is well
+     * past the 4MB window. Only the `/cost` panel asks for it: a click, once, not the read that
+     * happens every time a session is opened.
+     */
+    async getSessionTokenUsage(
+      sessionId: string,
+      { includeSessionTotal = false }: { includeSessionTotal?: boolean } = {},
+    ): Promise<TokenUsageResult> {
       const session = dependencies.getSessionById(sessionId);
       if (!session) {
         throw new AppError(`Session "${sessionId}" was not found.`, {
@@ -468,12 +536,26 @@ export function createProviderTokenUsageService(
         });
       }
 
-      const tail = await dependencies.readTextFileTail(sessionFilePath, TOKEN_USAGE_TAIL_BYTES);
-      let entries = parseClaudeUsageEntries(tail.content);
-      if (!claudeEntriesHaveUsage(entries) && !tail.isComplete) {
+      let entries: AnyRecord[];
+      // Whether what we hold is the WHOLE transcript — not what the first read happened to be,
+      // since both branches below can end up reading the entire file.
+      let holdsWholeTranscript: boolean;
+
+      if (includeSessionTotal) {
         entries = parseClaudeUsageEntries(await dependencies.readTextFile(sessionFilePath));
+        holdsWholeTranscript = true;
+      } else {
+        const tail = await dependencies.readTextFileTail(sessionFilePath, TOKEN_USAGE_TAIL_BYTES);
+        entries = parseClaudeUsageEntries(tail.content);
+        holdsWholeTranscript = tail.isComplete;
+        if (!claudeEntriesHaveUsage(entries) && !tail.isComplete) {
+          entries = parseClaudeUsageEntries(await dependencies.readTextFile(sessionFilePath));
+          holdsWholeTranscript = true;
+        }
       }
-      return summarizeClaudeTokenUsage(entries, dependencies.getClaudeContextWindow());
+      return summarizeClaudeTokenUsage(entries, dependencies.getClaudeContextWindow(), {
+        transcriptIsComplete: holdsWholeTranscript,
+      });
     },
   };
 }

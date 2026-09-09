@@ -146,12 +146,37 @@ function getPlaywright(): any | null {
   }
 }
 
+/**
+ * How an agent's MCP client should launch the Browser stdio server.
+ *
+ * Three installs, three answers. A packaged install has the compiled sibling next to this
+ * module and runs it on the node already executing. A dev checkout has neither that sibling
+ * NOR a global `cloudcli` on PATH — the server there runs from TypeScript through tsx — so
+ * registering the bare binary wrote an entry whose only possible outcome was
+ * `ENOENT: Executable not found in $PATH: cloudcli`; it runs the TS entry through the repo's
+ * own tsx instead. The bare binary stays as the last resort, for an install that has the
+ * global on PATH and no sources to run.
+ */
 function getMcpCommand(): { command: string; args: string[] } {
   const mcpScriptPath = path.join(__dirname, 'browser-use-mcp.js');
   if (fs.existsSync(mcpScriptPath)) {
     return {
       command: process.execPath,
       args: [mcpScriptPath],
+    };
+  }
+
+  // server/modules/browser-use → the repo root three levels up, in the dev layout this branch
+  // is the only one that fires from.
+  const repoRoot = path.resolve(__dirname, '..', '..', '..');
+  const tsxPath = path.join(repoRoot, 'node_modules', '.bin', 'tsx');
+  const mcpSourcePath = path.join(__dirname, 'browser-use-mcp.ts');
+  if (fs.existsSync(tsxPath) && fs.existsSync(mcpSourcePath)) {
+    return {
+      // The server tsconfig, not the root one: the entry imports through the same NodeNext
+      // resolution and `@/` paths the rest of server/ is built with.
+      command: tsxPath,
+      args: ['--tsconfig', path.join(repoRoot, 'server', 'tsconfig.json'), mcpSourcePath],
     };
   }
 

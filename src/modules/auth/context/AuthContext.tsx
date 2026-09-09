@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import type { ReactNode } from 'react';
 
 import { IS_PLATFORM } from '@/shared/utils';
-import { api } from '@/shared/api';
+import { api, BOOT_REQUEST_TIMEOUTS_MS } from '@/shared/api';
 import { AUTH_SESSION_EXPIRED_EVENT, AUTH_TOKEN_REFRESHED_EVENT, getAuthTokenRefreshDelay, isValidRefreshedToken, storeAuthToken } from '@/shared/authToken';
 import { hydrateChatDrafts, resetChatDrafts } from '@/shared/chatDrafts';
 import { hydrateUserPreferences, resetUserPreferences } from '@/shared/userSettings';
@@ -64,6 +64,11 @@ type AuthContextValue = {
   needsSetup: boolean;
   hasCompletedOnboarding: boolean;
   error: string | null;
+  /** The server never answered the boot check, and a token is still held — not a logout. */
+  serverUnreachable: boolean;
+  /** A boot request has already failed once and is being retried. */
+  isReconnecting: boolean;
+  retryAuthStatus: () => void;
   login: (username: string, password: string) => Promise<AuthActionResult>;
   register: (username: string, password: string) => Promise<AuthActionResult>;
   logout: () => void;
@@ -126,11 +131,58 @@ export function useAuth(): AuthContextValue {
   return context;
 }
 
+/**
+ * The boot gate's two requests, each retried past a server that is on its way up.
+ *
+ * The dev supervisor bounces the API on a code change and a laptop wakes with sockets pointed
+ * at a process that no longer exists; both land as a timeout or a 5xx on the very request the
+ * whole UI is waiting behind.
+ *
+ * Each attempt waits LONGER than the last (4s, 8s, 12s). A flat short deadline turned a merely
+ * slow server into six abandoned requests arriving while it was least able to serve them, and
+ * then told the user it could not be reached — which was false, it was answering, just not in
+ * four seconds. A 4xx comes back untouched: that is an ANSWER, and repeating it would only ask
+ * the same question again.
+ */
+async function requestWithRetry(
+  run: (timeoutMs: number) => Promise<Response>,
+  onAttemptFailed?: () => void,
+): Promise<Response | null> {
+  for (let attempt = 0; attempt < BOOT_REQUEST_TIMEOUTS_MS.length; attempt += 1) {
+    try {
+      const response = await run(BOOT_REQUEST_TIMEOUTS_MS[attempt]);
+      if (response.status < 500) {
+        return response;
+      }
+      // Nothing will read a 5xx body, and an unread one holds its connection open across every
+      // retry of a server that is already struggling.
+      void response.body?.cancel().catch(() => {});
+    } catch (caughtError) {
+      console.warn('[Auth] Boot request failed, retrying:', caughtError);
+    }
+
+    onAttemptFailed?.();
+
+    if (attempt < BOOT_REQUEST_TIMEOUTS_MS.length - 1) {
+      await new Promise((resolve) => { setTimeout(resolve, 250 * (attempt + 1)); });
+    }
+  }
+
+  return null;
+}
+
 /** Used by App to expose the session, and its login/logout actions, to every module through useAuth. */
 export function AuthProvider({ children }: AuthProviderProps) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [token, setToken] = useState<string | null>(() => readStoredToken());
   const [isLoading, setIsLoading] = useState(true);
+  // Set when the boot check got no answer at all — distinct from `error`, which also covers a
+  // server that answered "no". Only this one means "your session may well be fine, I could not
+  // ask", and only this one is worth a Retry button rather than a password field.
+  const [serverUnreachable, setServerUnreachable] = useState(false);
+  // The retry ladder waits up to ~25s before it gives up, and a bare spinner for that long
+  // reads as a hang. This is what lets the gate say it is still trying.
+  const [isReconnecting, setIsReconnecting] = useState(false);
   const [needsSetup, setNeedsSetup] = useState(false);
   const [hasCompletedOnboarding, setHasCompletedOnboarding] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -230,8 +282,19 @@ export function AuthProvider({ children }: AuthProviderProps) {
     try {
       setIsLoading(true);
       setError(null);
+      setServerUnreachable(false);
+      setIsReconnecting(false);
 
-      const statusResponse = await api.auth.status();
+      const statusResponse = await requestWithRetry(
+        (timeoutMs) => api.auth.status(timeoutMs),
+        () => setIsReconnecting(true),
+      );
+      if (!statusResponse) {
+        setServerUnreachable(true);
+        setError(AUTH_ERROR_MESSAGES.authStatusCheckFailed);
+        return;
+      }
+
       const statusPayload = await parseJsonSafely<AuthStatusPayload>(statusResponse);
 
       if (statusPayload?.needsSetup) {
@@ -245,9 +308,30 @@ export function AuthProvider({ children }: AuthProviderProps) {
         return;
       }
 
-      const userResponse = await api.auth.user();
-      if (!userResponse.ok) {
+      const userResponse = await requestWithRetry(
+        (timeoutMs) => api.auth.user(timeoutMs),
+        () => setIsReconnecting(true),
+      );
+      // No answer at all after the retries: the server is down or unreachable, which says
+      // nothing about whether the session is still good. Keeping the token means the next
+      // reload signs the user straight back in instead of asking for a password the server
+      // could not have checked anyway.
+      if (!userResponse) {
+        setServerUnreachable(true);
+        setError(AUTH_ERROR_MESSAGES.authStatusCheckFailed);
+        return;
+      }
+
+      // Only the server's own verdict on the SESSION ends it. A 500 from a half-started
+      // process used to land here and sign the user out mid-restart.
+      if (userResponse.status === 401 || userResponse.status === 403) {
         clearSession();
+        return;
+      }
+
+      if (!userResponse.ok) {
+        setServerUnreachable(true);
+        setError(AUTH_ERROR_MESSAGES.authStatusCheckFailed);
         return;
       }
 
@@ -261,8 +345,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
       await checkOnboardingStatus();
     } catch (caughtError) {
       console.error('[Auth] Auth status check failed:', caughtError);
+      setServerUnreachable(true);
       setError(AUTH_ERROR_MESSAGES.authStatusCheckFailed);
     } finally {
+      setIsReconnecting(false);
       setIsLoading(false);
     }
   }, [checkOnboardingStatus, clearSession, token]);
@@ -384,8 +470,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
       register,
       logout,
       refreshOnboardingStatus,
+      serverUnreachable,
+      isReconnecting,
+      retryAuthStatus: checkAuthStatus,
     }),
     [
+      checkAuthStatus,
       error,
       hasCompletedOnboarding,
       isLoading,
@@ -393,7 +483,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
       logout,
       needsSetup,
       refreshOnboardingStatus,
+      isReconnecting,
       register,
+      serverUnreachable,
       token,
       user,
     ],

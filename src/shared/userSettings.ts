@@ -29,6 +29,8 @@ export type UserPreferences = {
   simpleChatList: boolean;
   simpleChatProjectId: string | null;
   themeFollowsSun: boolean;
+  /** The transcript's reading size in px. See `useChatFontSize`. */
+  chatFontSize: number;
 };
 
 export type UserPreferenceKey = keyof UserPreferences;
@@ -71,6 +73,7 @@ const LEGACY_STORAGE_KEYS: Record<UserPreferenceKey, string | null> = {
   simpleChatList: null,
   themeFollowsSun: null,
   simpleChatProjectId: null,
+  chatFontSize: null,
 };
 
 const PREFERENCE_KEYS = Object.keys(LEGACY_STORAGE_KEYS) as UserPreferenceKey[];

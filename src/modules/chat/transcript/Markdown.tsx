@@ -1,4 +1,4 @@
-import React, { memo, useMemo, useState } from 'react';
+import React, { createContext, memo, useContext, useMemo, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkBreaks from 'remark-breaks';
 import remarkGfm from 'remark-gfm';
@@ -8,6 +8,7 @@ import { oneDark, oneLight } from 'react-syntax-highlighter/dist/esm/styles/pris
 import { useTranslation } from 'react-i18next';
 
 import { MermaidDiagram } from '@/modules/markdown-preview';
+import { WidgetFrame } from '@/modules/widgets';
 import { normalizeInlineCodeFences } from '@/modules/chat/utils/chatFormatting';
 import { copyTextToClipboard } from '@/shared/utils';
 import { SyntaxHighlighter } from '@/shared/syntaxHighlighter';
@@ -62,6 +63,10 @@ const MATH_DELIMITER = /\$\$|\\\(|\\\[/;
 
 const EMPTY_PLUGINS: never[] = [];
 
+// True while this markdown is the still-growing half of a streamed reply. File-private: it
+// exists so CodeBlock can keep an unfinished widget fence as source instead of mounting it.
+const MarkdownStreamingContext = createContext(false);
+
 type CodeBlockProps = {
   node?: any;
   className?: string;
@@ -74,6 +79,7 @@ type CodeBlockProps = {
 const CodeBlock = ({ node: _node, className, children, forceBlock, ...props }: CodeBlockProps) => {
   const { t } = useTranslation('chat');
   const [copied, setCopied] = useState(false);
+  const streaming = useContext(MarkdownStreamingContext);
   // Fenced blocks carry a trailing newline in the tree; trim it so the
   // highlighter doesn't render an empty final line.
   const raw = (Array.isArray(children) ? children.join('') : String(children ?? '')).replace(/\n$/, '');
@@ -99,6 +105,10 @@ const CodeBlock = ({ node: _node, className, children, forceBlock, ...props }: C
 
   if (language === 'mermaid') {
     return <MermaidDiagram code={raw} />;
+  }
+
+  if (language === 'widget') {
+    return <WidgetFrame code={raw} streaming={streaming} />;
   }
 
   return (
@@ -243,7 +253,7 @@ const markdownComponents = {
  * render model-authored markdown with this module's shared prose styling,
  * code highlighting and table rules.
  */
-function MarkdownBodyRenderer({ children, breaks = false }: Omit<MarkdownProps, 'className'>) {
+function MarkdownBodyRenderer({ children, breaks = false, streaming = false }: Omit<MarkdownProps, 'className'> & { streaming?: boolean }) {
   const content = useMemo(
     () => normalizeInlineCodeFences(String(children ?? '')),
     [children],
@@ -308,9 +318,11 @@ function MarkdownBodyRenderer({ children, breaks = false }: Omit<MarkdownProps, 
   );
 
   return (
-    <ReactMarkdown remarkPlugins={remarkPlugins} rehypePlugins={rehypePlugins} components={components as any}>
-      {content}
-    </ReactMarkdown>
+    <MarkdownStreamingContext.Provider value={streaming}>
+      <ReactMarkdown remarkPlugins={remarkPlugins} rehypePlugins={rehypePlugins} components={components as any}>
+        {content}
+      </ReactMarkdown>
+    </MarkdownStreamingContext.Provider>
   );
 }
 
@@ -325,6 +337,25 @@ function MarkdownBodyRenderer({ children, breaks = false }: Omit<MarkdownProps, 
  * text that has not changed.
  */
 export const MarkdownBody = memo(MarkdownBodyRenderer);
+
+/**
+ * The reading size of the transcript itself — every message body, user and assistant, in one
+ * string so the size is decided once rather than in four class attributes that drift apart.
+ *
+ * The size is the reader's own, carried in `--chat-font-size` (see `useChatFontSize`), which
+ * ChatMessagesPane sets on the scroller around every message. It used to read
+ * `prose-base sm:prose-sm`, which shrank the body to 14px from 640px UP — the wide screen,
+ * where the measure is longest and a display serif (Instrument Serif) sits optically smallest,
+ * got the smallest type in the app, and nobody could say otherwise.
+ *
+ * The size lands as a Tailwind arbitrary utility rather than a rule of our own: `.prose` sets
+ * its root font-size in the components layer, and a utility is emitted after that layer, so
+ * this wins on order without an `!important` or a specificity contest. Everything inside a
+ * prose container is sized in `em`, so the whole block scales from this one number.
+ *
+ * Callers that need a tone (`prose-gray`) append it; nobody re-states the size.
+ */
+export const TRANSCRIPT_PROSE = 'prose prose-base max-w-none font-serif text-[length:var(--chat-font-size,1rem)] dark:prose-invert';
 
 /** Markdown in its own prose container. The form every non-streaming caller uses. */
 export const Markdown = memo(function Markdown({ children, className, breaks }: MarkdownProps) {

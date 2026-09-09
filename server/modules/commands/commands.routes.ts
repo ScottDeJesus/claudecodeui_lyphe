@@ -10,6 +10,12 @@ type CommandsRouterDependencies = {
   homeDirectory(): string;
   appRoot: string;
   models: typeof import('../providers/index.js').providerModelsService;
+  /**
+   * Reads a session's transcript for the totals a live turn cannot know (see `/cost`).
+   * Optional: without it the panel simply loses one row, so a caller that only wants the
+   * command list — the existing router test does — need not build a filesystem for it.
+   */
+  tokenUsage?: typeof import('../providers/index.js').providerTokenUsageService;
   runtime: {
     uptime(): number;
     memoryUsage(): NodeJS.MemoryUsage;
@@ -25,6 +31,7 @@ const fs = dependencies.fileSystem;
 const os = { homedir: dependencies.homeDirectory };
 const APP_ROOT = dependencies.appRoot;
 const providerModelsService = dependencies.models;
+const providerTokenUsageService = dependencies.tokenUsage;
 const process = dependencies.runtime;
 const router = express.Router();
 
@@ -262,6 +269,26 @@ Custom commands can be created in:
 
   "/cost": async (args, context) => {
     const tokenUsage = context?.tokenUsage || {};
+
+    // What the live turn CANNOT tell us. Every usage block the provider streams describes one
+    // request: its prompt (the context window, which is what the composer counter wants) and
+    // the tokens that one message generated. Reporting that second number as the session's
+    // output is what made this panel read 1,224 for a conversation that had generated 138,643
+    // — so the total comes from the transcript, where every message can be counted once.
+    let sessionOutputTokens;
+    let stored;
+    if (context?.sessionId && providerTokenUsageService) {
+      try {
+        stored = await providerTokenUsageService.getSessionTokenUsage(context.sessionId, {
+          includeSessionTotal: true,
+        });
+        sessionOutputTokens = stored?.sessionOutputTokens;
+      } catch (error) {
+        // A session with no transcript on disk yet, or another provider's storage missing:
+        // the live numbers are still worth showing, so this is a missing ROW, not an error.
+        console.warn('[/cost] Session output total unavailable:', error?.message || error);
+      }
+    }
     const provider = readModelProvider(context?.provider);
     const model = await resolveCommandModel(providerModelsService, provider, context);
 
@@ -269,7 +296,7 @@ Custom commands can be created in:
       Number(
         tokenUsage.used ?? tokenUsage.totalUsed ?? tokenUsage.total_tokens ?? 0,
       ) || 0;
-    const total =
+    let total =
       Number(
         tokenUsage.total ??
           tokenUsage.contextWindow ??
@@ -301,10 +328,10 @@ Custom commands can be created in:
           tokenUsage.cacheCreationInputTokens ??
           0,
       ) || 0;
-    const inputTokens = normalizedInputValue == null
+    let inputTokens = normalizedInputValue == null
       ? directInputTokens + cacheReadTokens + cacheCreationTokens
       : directInputTokens;
-    const outputTokens =
+    let outputTokens =
       Number(
         tokenUsage.outputTokens ??
           tokenUsage.output ??
@@ -315,8 +342,25 @@ Custom commands can be created in:
           0,
       ) || 0;
     const computedUsed = inputTokens + outputTokens;
-    const hasTokenBreakdown = computedUsed > 0;
-    const used = Math.max(reportedUsed, computedUsed);
+
+    // The transcript answers when the live counter cannot. That happens on a session opened but
+    // not yet spoken to, and after this panel's own Clear — which zeroes the live counter, and
+    // used to take the CONTEXT row down with it, reporting an empty window for a conversation
+    // still holding twenty thousand tokens of it.
+    const storedInputTokens = Number(stored?.inputTokens ?? 0) || 0;
+    const useStoredContext = computedUsed === 0 && storedInputTokens > 0;
+    if (useStoredContext) {
+      inputTokens = storedInputTokens;
+      outputTokens = Number(stored?.outputTokens ?? 0) || 0;
+    }
+
+    if (useStoredContext && !total) {
+      total = Number(stored?.total ?? 0) || 0;
+    }
+
+    const resolvedUsed = useStoredContext ? inputTokens + outputTokens : computedUsed;
+    const hasTokenBreakdown = resolvedUsed > 0;
+    const used = Math.max(reportedUsed, resolvedUsed);
 
     return {
       type: "builtin",
@@ -334,6 +378,7 @@ Custom commands can be created in:
               },
             }
           : {}),
+        ...(typeof sessionOutputTokens === 'number' ? { sessionOutputTokens } : {}),
         provider,
         model,
       },

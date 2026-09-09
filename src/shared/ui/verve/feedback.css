@@ -135,6 +135,35 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* An icon-only tab is a square target, not a word: the padding goes even so the glyph sits in
+ * the middle of it, and the box is wide enough (16px glyph + 2x11px) to stay a comfortable
+ * touch target on the mobile drawer. `line-height: 0` keeps the button's height off the text
+ * metrics of a label that is no longer drawn. */
+.vv-tabs__tab--icon {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  padding: 8px 11px;
+  line-height: 0;
+}
+.vv-tabs__icon { width: 16px; height: 16px; }
+/* A waiting count on an icon tab, as one accent dot over the glyph's top-right shoulder. It is
+ * positioned OUT of the flex row, not laid beside the glyph: an in-row mark widens that one tab
+ * and moves every tab after it the moment the count appears — the strip must not shuffle under
+ * a hand because a queue filled. The ring is --canvas, measured off the sidebar the strip
+ * actually sits on (bg-background/80 over the page), so the dot reads as a disc against the
+ * glyph's strokes instead of smearing into them. */
+.vv-tabs__dot {
+  position: absolute;
+  top: 5px;
+  right: 7px;
+  width: 6px;
+  height: 6px;
+  border-radius: var(--radius-pill);
+  background: var(--accent);
+  box-shadow: 0 0 0 2px var(--canvas);
+}
+
 /* Underline register — for chrome that is already a surface (the sidebar), where a second
  * filled tray reads as a card on a card. The rule under the row is the strip; the chosen tab
  * thickens its own slice of it. Every tab reserves the 2px whether chosen or not, so nothing

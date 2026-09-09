@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client'
 import { scan } from 'react-scan'
 
 import App from '@/App'
+import AppErrorBoundary from '@/AppErrorBoundary'
 // Before index.css, deliberately: index.css's `@tailwind base` and every Tailwind utility
 // mapped onto a Verve token must resolve against tokens that are already declared.
 import '@/shared/ui/verve/tokens.css'
@@ -33,6 +34,8 @@ if (!rootElement) {
 
 ReactDOM.createRoot(rootElement).render(
   <React.StrictMode>
-    <App />
+    <AppErrorBoundary>
+      <App />
+    </AppErrorBoundary>
   </React.StrictMode>,
 )

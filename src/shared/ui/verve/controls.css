@@ -163,6 +163,44 @@
 .vv-chip[data-selected='true'] { background: var(--accent-soft); color: var(--accent-ink); border-color: transparent; }
 .vv-chip--sm { padding: 5px 12px; font-size: 12.5px; }
 
+/* ---------------------------------------------------------------- Stepper */
+/* One control, not three: the group carries the border and the two buttons sit inside it, so a
+ * minus, a value and a plus read as a single object the way a segmented row does. The value is
+ * tabular-nums and has a floor width, so stepping 9 -> 10 never nudges the plus sideways. */
+.vv-stepper {
+  border: 1.5px solid var(--border-strong);
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  overflow: hidden;
+}
+.vv-stepper__button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 32px;
+  border: none;
+  background: none;
+  color: var(--ink-mid);
+  cursor: pointer;
+  transition: background-color 0.2s, color 0.2s;
+}
+.vv-stepper__button:hover:not(:disabled) { background: var(--accent-soft); color: var(--accent-ink); }
+.vv-stepper__button:disabled { color: var(--ink-faint); cursor: not-allowed; }
+.vv-stepper__value {
+  min-width: 46px;
+  padding: 0 2px;
+  border-left: 1.5px solid var(--border);
+  border-right: 1.5px solid var(--border);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  line-height: 32px;
+}
+
 /* ---------------------------------------------------------------- Switch */
 .vv-switch {
   position: relative;

@@ -1,4 +1,13 @@
-import type { Dispatch, SetStateAction } from 'react';
+import {
+  Brain,
+  FolderTree,
+  GitBranch,
+  Globe,
+  ListTodo,
+  MessageSquare,
+  Terminal,
+} from 'lucide-react';
+import type { ComponentType, Dispatch, SetStateAction } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { Tabs } from '@/shared/ui';
@@ -21,28 +30,36 @@ type WorkspaceTabsProps = {
 type BuiltInTab = {
   id: AppTab;
   labelKey: string;
+  /** Drawn instead of the label. The translated label stays the tab's accessible name. */
+  icon: ComponentType<{ className?: string; strokeWidth?: string | number }>;
 };
 
+// One glyph per view, each naming the thing the view actually shows rather than an action:
+// a speech bubble for the conversation, a terminal for the shell, a file tree for the files,
+// a branch for git, a globe for the browser, a checklist for tasks, a brain for memory.
 const BASE_TABS: BuiltInTab[] = [
-  { id: 'chat',  labelKey: 'tabs.chat' },
-  { id: 'shell', labelKey: 'tabs.shell' },
-  { id: 'files', labelKey: 'tabs.files' },
-  { id: 'git',   labelKey: 'tabs.git' },
+  { id: 'chat',  labelKey: 'tabs.chat',  icon: MessageSquare },
+  { id: 'shell', labelKey: 'tabs.shell', icon: Terminal },
+  { id: 'files', labelKey: 'tabs.files', icon: FolderTree },
+  { id: 'git',   labelKey: 'tabs.git',   icon: GitBranch },
 ];
 
-const BROWSER_TAB: BuiltInTab = { id: 'browser', labelKey: 'tabs.browser' };
+const BROWSER_TAB: BuiltInTab = { id: 'browser', labelKey: 'tabs.browser', icon: Globe };
 
-const TASKS_TAB: BuiltInTab = { id: 'tasks', labelKey: 'tabs.tasks' };
+const TASKS_TAB: BuiltInTab = { id: 'tasks', labelKey: 'tabs.tasks', icon: ListTodo };
 
-const MEMORY_TAB: BuiltInTab = { id: 'memory', labelKey: 'tabs.memory' };
+const MEMORY_TAB: BuiltInTab = { id: 'memory', labelKey: 'tabs.memory', icon: Brain };
 
 /**
  * Rendered by ProjectSidebarRegion, under the wordmark, to show the built-in workspace tabs plus
  * any enabled plugin tabs.
  *
- * The strip scrolls sideways rather than wrapping: a 288px sidebar cannot hold Chat / Shell /
- * Files / Git / Tasks / Browser plus plugin tabs on one line, and a row that reflows moves every
- * tab a hand already knows the position of each time a plugin is toggled.
+ * The built-in tabs are icon-only — a glyph each, named by `title` and `aria-label` — which is
+ * what lets seven of them share the sidebar's width. Plugin tabs keep their words: a plugin
+ * supplies a display name and no glyph, and a guessed icon would name it wrong.
+ *
+ * The strip still scrolls sideways rather than wrapping, because plugin tabs are words and a row
+ * that reflows moves every tab a hand already knows the position of each time one is toggled.
  */
 export default function WorkspaceTabs({
   activeTab,
@@ -76,6 +93,7 @@ export default function WorkspaceTabs({
     ...builtInTabs.map((tab) => ({
       id: tab.id as string,
       label: t(tab.labelKey),
+      icon: tab.icon,
       count: tab.id === 'memory' && memoryPendingCount > 0 ? memoryPendingCount : undefined,
     })),
     ...plugins.filter((plugin) => plugin.enabled).map((plugin) => ({

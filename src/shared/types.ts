@@ -602,6 +602,8 @@ export type CostCommandData = {
     input?: number;
     output?: number;
   };
+  /** Everything generated across the whole conversation, read from the transcript. */
+  sessionOutputTokens?: number;
   provider?: string;
   model?: string;
 };
@@ -1836,3 +1838,26 @@ export type CliVersionRun = { sessionId: string; startedAt: number; cliVersion: 
  * — and then NOTHING is stale: an invented `0.0.0` would compare stale to every run alive.
  */
 export type CliVersionReport = { installed: string | null; reason: string | null; binaryPath: string | null; running: CliVersionRun[] };
+
+// ---------------------------
+
+//----------------- LIVE WIDGETS ------------
+
+/** Frame → host: what a sandboxed widget's bridge script posts up to the page embedding it. */
+export type WidgetFrameMessage =
+  | { type: 'ready' }
+  | { type: 'subscribe'; topic: string }
+  | { type: 'unsubscribe'; topic: string }
+  | { type: 'resize'; height: number };
+
+/** Host → frame: what the page posts down into one widget's `contentWindow`. */
+export type WidgetHostMessage =
+  | { type: 'data'; topic: string; payload: unknown; at: number }
+  | { type: 'error'; topic: string; reason: 'topic not allowed' | 'too many subscriptions' }
+  | { type: 'theme'; dark: boolean; tokens: Record<string, string> };
+
+/** Host-side only, never on the wire: what the embedder plugs in to answer a frame's topic requests. */
+export type WidgetHostHandlers = {
+  onSubscribe?: (topic: string, send: (message: WidgetHostMessage) => void) => void;
+  onUnsubscribe?: (topic: string) => void;
+};

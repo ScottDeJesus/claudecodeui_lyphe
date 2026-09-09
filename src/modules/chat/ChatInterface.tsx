@@ -633,6 +633,7 @@ function ChatInterface({
         activeProvider={provider}
         activeProviderModel={currentProviderModel}
         currentSessionId={currentSessionId || selectedSession?.id || null}
+        onClearTokenUsage={() => setTokenBudget(null)}
         onSelectProviderModel={selectProviderModel}
       />
     </PermissionContext.Provider>

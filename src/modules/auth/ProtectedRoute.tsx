@@ -5,6 +5,7 @@ import { useAuth } from '@/modules/auth/context/AuthContext';
 import { Onboarding } from '@/modules/onboarding';
 import AuthLoadingScreen from '@/modules/auth/AuthLoadingScreen';
 import LoginForm from '@/modules/auth/LoginForm';
+import ServerUnreachableScreen from '@/modules/auth/ServerUnreachableScreen';
 import SetupForm from '@/modules/auth/SetupForm';
 
 type ProtectedRouteProps = {
@@ -13,10 +14,20 @@ type ProtectedRouteProps = {
 
 /** Used by App to gate the routed application behind setup, login and onboarding. */
 export default function ProtectedRoute({ children }: ProtectedRouteProps) {
-  const { user, isLoading, needsSetup, hasCompletedOnboarding, refreshOnboardingStatus } = useAuth();
+  const {
+    user,
+    token,
+    isLoading,
+    needsSetup,
+    hasCompletedOnboarding,
+    refreshOnboardingStatus,
+    serverUnreachable,
+    isReconnecting,
+    retryAuthStatus,
+  } = useAuth();
 
   if (isLoading) {
-    return <AuthLoadingScreen />;
+    return <AuthLoadingScreen reconnecting={isReconnecting} />;
   }
 
   if (IS_PLATFORM) {
@@ -29,6 +40,12 @@ export default function ProtectedRoute({ children }: ProtectedRouteProps) {
 
   if (needsSetup) {
     return <SetupForm />;
+  }
+
+  // Before the login form, deliberately: a held token plus a silent server is not a sign-out,
+  // and showing a password field for it is a lie about what happened.
+  if (!user && token && serverUnreachable) {
+    return <ServerUnreachableScreen onRetry={retryAuthStatus} />;
   }
 
   if (!user) {

@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { memo, useCallback, useMemo } from 'react';
-import type { Dispatch, RefObject, SetStateAction } from 'react';
+import type { CSSProperties, Dispatch, RefObject, SetStateAction } from 'react';
 
 import type { ChatMessage,
   Project,
@@ -12,6 +12,7 @@ import type { ReadToolPermissionState } from '@/modules/chat/hooks/useToolPermis
 import { getIntrinsicMessageKey } from '@/modules/chat/utils/messageKeys';
 import { resolveModelLabel as labelForModelId } from '@/modules/chat/utils/modelLabels';
 import { collectRunTerminalReplies, groupConsecutiveTools, isToolGroupItem } from '@/modules/chat/utils/toolGrouping';
+import { useChatFontSize } from '@/shared/hooks/useChatFontSize';
 import { useLazyRowObserver } from '@/modules/chat/hooks/useLazyRowObserver';
 import LazyMessageRow from '@/modules/chat/transcript/LazyMessageRow';
 import MessageComponent from '@/modules/chat/transcript/MessageComponent';
@@ -141,6 +142,8 @@ function ChatMessagesPane({
     [provider, providerModelCatalog],
   );
   const lazyRows = useLazyRowObserver(scrollContainerRef);
+  // The reader's own transcript size, published to every message body below as a variable.
+  const { size: chatFontSize } = useChatFontSize();
   const groupedVisibleMessages = useMemo(
     () => groupConsecutiveTools(visibleMessages, Boolean(showThinking)),
     [visibleMessages, showThinking],
@@ -191,6 +194,9 @@ function ChatMessagesPane({
       className={`chat-messages-pane relative min-h-0 flex-1 overflow-y-auto overflow-x-hidden pt-3 sm:pt-4 ${
         hasActivityIndicator ? 'pb-12 sm:pb-14' : 'pb-3 sm:pb-4'
       }`}
+      // Published here, on the scroller, rather than on :root — the reader's size belongs to
+      // the transcript, and every message body inside it reads the variable off this ancestor.
+      style={{ '--chat-font-size': `${chatFontSize}px` } as CSSProperties}
     >
       {chatMessages.length > 0 && (
         <div className="pointer-events-none sticky right-4 top-3 z-10 mb-2 flex justify-end sm:px-4">

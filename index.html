@@ -38,6 +38,161 @@
   </head>
   <body>
     <div id="root"></div>
+
+    <!--
+      The boot watchdog. Plain inline script on purpose: it is the one thing that has to keep
+      working when the bundle does NOT, and anything imported from /src is exactly what may
+      have failed. An empty #root is otherwise a black page with no message and no way out —
+      what a stale module (the dev server re-optimizes deps and answers an old request with
+      504), a throw at import time, or a React tree that unmounts itself all leave behind.
+
+      It KEEPS watching after the app is up. Standing down once the bundle ran was wrong twice
+      over: a tree that unmounts leaves #root empty with nothing coming (measured: 16s black),
+      and "the bundle ran" was itself only ever "a module body started" — a throw between that
+      first statement and createRoot() was invisible. The honest signal is the one thing that
+      cannot be faked: whether #root has children.
+
+      One automatic reload per broken run, not one per 30 seconds. A rate limit reloaded a
+      crash-every-40s app four times in 135s (measured), each reload destroying the websocket
+      and any in-flight turn. The count is cleared only after the app has been up and healthy
+      for a while, so a later, unrelated fault still gets its own retry.
+    -->
+    <script>
+      (function () {
+        var RETRY_KEY = 'cloudcli:boot-retry';
+        var MAX_AUTOMATIC_RELOADS = 1;
+        /** Up this long without a wobble and the last failure is history, not a pattern. */
+        var HEALTHY_RUN_MS = 60000;
+        var BOOT_DEADLINE_MS = 10000;
+        /** After a reload has already been spent, a still-empty page is broken, not slow. */
+        var RETRY_BOOT_DEADLINE_MS = 4000;
+        var WATCH_INTERVAL_MS = 2000;
+
+        var startedAt = Date.now();
+        var healthySince = 0;
+        var hasEverMounted = false;
+        var showingCard = false;
+        var timer = null;
+
+        // sessionStorage can THROW rather than return null — blocked site data, private
+        // browsing, a full quota. The count is what makes a reload SAFE, and it has to survive
+        // the reload to do that: an in-memory fallback is reset by the very navigation it is
+        // meant to limit, which turned one broken bundle into 223 reloads (measured). So the
+        // rule is: no durable count, no automatic reload — the card, and a button the person
+        // presses themselves.
+        function readState() {
+          try {
+            var parsed = JSON.parse(sessionStorage.getItem(RETRY_KEY));
+            if (parsed && Number.isFinite(parsed.n)) return parsed;
+          } catch (error) { /* unreadable or unavailable — treated as no attempts yet */ }
+          return { n: 0, at: 0 };
+        }
+
+        /** True only when the next attempt is recorded somewhere a reload cannot forget. */
+        function persistState(state) {
+          try {
+            sessionStorage.setItem(RETRY_KEY, JSON.stringify(state));
+            return Boolean(sessionStorage.getItem(RETRY_KEY));
+          } catch (error) {
+            return false;
+          }
+        }
+
+        function clearState() {
+          try { sessionStorage.removeItem(RETRY_KEY); } catch (error) { /* nothing to clear */ }
+        }
+
+        function rootChildren() {
+          var root = document.getElementById('root');
+          return root ? root.childElementCount : 0;
+        }
+
+        function card() {
+          var root = document.getElementById('root');
+          if (!root) return;
+          showingCard = true;
+          root.innerHTML =
+            '<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;' +
+            'font-family:system-ui,-apple-system,sans-serif;background:#101116;color:#e7e7ea;padding:24px">' +
+            '<div style="max-width:22rem;text-align:center">' +
+            '<div style="font-size:15px;font-weight:600;margin-bottom:6px">CloudCLI is not on screen</div>' +
+            // Says only what is true in BOTH paths that reach this card — a spent retry, and a
+            // browser whose storage is blocked so no retry could safely be spent at all.
+            '<div style="font-size:13px;line-height:1.5;opacity:0.7;margin-bottom:16px">' +
+            'The app did not finish drawing. The server may be mid-restart — reloading usually clears it.</div>' +
+            '<button onclick="location.reload()" style="border:0;border-radius:8px;padding:8px 16px;' +
+            'background:#2fa876;color:#fff;font-size:13px;font-weight:600;cursor:pointer">Reload</button>' +
+            '</div></div>';
+        }
+
+        function recover() {
+          if (showingCard || rootChildren() > 0) return;
+
+          var state = readState();
+          if (state.n < MAX_AUTOMATIC_RELOADS && persistState({ n: state.n + 1, at: Date.now() })) {
+            location.reload();
+            return;
+          }
+
+          card();
+        }
+
+        function tick() {
+          if (rootChildren() > 0) {
+            // Back on screen — including the card React just painted over. Either way the
+            // document is alive again and the watch resumes for whatever comes next.
+            showingCard = false;
+            hasEverMounted = true;
+            if (!healthySince) healthySince = Date.now();
+            if (Date.now() - healthySince >= HEALTHY_RUN_MS && readState().n > 0) {
+              clearState();
+            }
+            return;
+          }
+
+          healthySince = 0;
+
+          // Empty AFTER it was up: the tree unmounted, and nothing else is coming.
+          if (hasEverMounted) {
+            recover();
+            return;
+          }
+
+          // Still booting. A slow API is the app's own business — it mounts its own loading
+          // screen, which is a child of #root — so only a page with NOTHING on it is on the
+          // clock, and it is a shorter clock once a reload has already been spent.
+          var deadline = readState().n > 0 ? RETRY_BOOT_DEADLINE_MS : BOOT_DEADLINE_MS;
+          if (Date.now() - startedAt >= deadline) recover();
+        }
+
+        // A load-bearing script that 404s/504s reports on the element, which does not bubble —
+        // hence the capture phase. Same-origin scripts ONLY: the page also pulls fonts from a
+        // CDN, and treating that as fatal reloaded a perfectly healthy app and flashed a
+        // failure card at every cold load on a LAN-only or offline host (measured).
+        window.addEventListener('error', function (event) {
+          var target = event.target;
+          if (!target || target === window || target.tagName !== 'SCRIPT') return;
+          var source = target.src || '';
+          if (source && source.indexOf(window.location.origin) !== 0) return;
+          recover();
+        }, true);
+
+        // A module that failed to import says so in the message. Anything else that throws is
+        // left to the watch below: an app can throw once and still be on screen.
+        window.addEventListener('error', function (event) {
+          var message = (event && event.message) || '';
+          if (/dynamically imported module|error loading|Importing a module script failed/i.test(message)) {
+            recover();
+          }
+        });
+
+        // Deliberately NOT listening for unhandledrejection: a rejected API call during a slow
+        // boot is normal, and reloading on it turned a four-second server into a reload loop
+        // (measured).
+        timer = setInterval(tick, WATCH_INTERVAL_MS);
+      })();
+    </script>
+
     <script type="module" src="/src/main.tsx"></script>
     
     <!-- Service Worker Registration -->

@@ -1,11 +1,12 @@
 import { useTranslation } from 'react-i18next';
 
-import { DarkModeToggle, Select } from '@/shared/ui';
+import { DarkModeToggle, Select, Stepper } from '@/shared/ui';
 import type { AgentSettingsProject, ProjectSortOrder } from '@/shared/types';
 import { LanguageSelector } from '@/modules/i18n';
 import { useTasksSettings } from '@/modules/task-master';
 import { useSetUiPreference, useUiPreferences } from '@/shared/context/UiPreferencesContext';
 import { useTheme } from '@/shared/context/ThemeContext';
+import { useChatFontSize } from '@/shared/hooks/useChatFontSize';
 import { useSimpleChatListPreferences } from '@/shared/hooks/useSimpleChatListPreferences';
 import SettingsCard from '@/modules/settings/SettingsCard';
 import SettingsRow from '@/modules/settings/SettingsRow';
@@ -29,6 +30,9 @@ export default function AppearanceSettingsTab({
   // so the two can never disagree about who is in charge of the colour.
   const { followsSun, setFollowsSun } = useTheme();
   const { hideShellTab } = useUiPreferences();
+  // The transcript's reading size, read and written through the one hook the chat pane reads —
+  // so the stepper and the messages can never disagree about how big the text is.
+  const chatFontSize = useChatFontSize();
   const setPreference = useSetUiPreference();
   // "Hide the Tasks tab" is the Tasks tab's own enable switch, read from the one store that
   // already owns it. A second boolean here would let the two controls disagree.
@@ -83,6 +87,26 @@ export default function AppearanceSettingsTab({
       <SettingsSection title={t('mainTabs.appearance')}>
         <SettingsCard>
           <LanguageSelector />
+        </SettingsCard>
+      </SettingsSection>
+
+      <SettingsSection title={t('appearance.text.title')}>
+        <SettingsCard>
+          <SettingsRow
+            label={t('appearance.text.chatFontSize.label')}
+            description={t('appearance.text.chatFontSize.description')}
+          >
+            <Stepper
+              value={t('appearance.text.chatFontSize.value', { size: chatFontSize.size })}
+              onDecrease={chatFontSize.decrease}
+              onIncrease={chatFontSize.increase}
+              canDecrease={chatFontSize.canDecrease}
+              canIncrease={chatFontSize.canIncrease}
+              decreaseLabel={t('appearance.text.chatFontSize.decrease')}
+              increaseLabel={t('appearance.text.chatFontSize.increase')}
+              ariaLabel={t('appearance.text.chatFontSize.label')}
+            />
+          </SettingsRow>
         </SettingsCard>
       </SettingsSection>
 

@@ -8,6 +8,7 @@ import {
   Gauge,
   Package,
   Plus,
+  RotateCcw,
   Search,
   Server,
   Sparkles,
@@ -18,6 +19,7 @@ import {
 } from 'lucide-react';
 
 import { Badge, Button, Dialog, DialogContent, DialogTitle, Input } from '@/shared/ui';
+import { cn } from '@/shared/utils';
 import type {
   LLMProvider,
   ProviderModelActions,
@@ -25,6 +27,7 @@ import type {
   ProviderModelsDefinition,CommandModalPayload,CostCommandData,HelpCommandData,ModelCommandData,StatusCommandData
 } from '@/shared/types';
 import ModelLibraryPanel from '@/modules/chat/modals/ModelLibraryPanel';
+import { applyTokenUsageClear, readTokenUsageClear, writeTokenUsageClear } from '@/modules/chat/utils/tokenUsageClears';
 
 type CommandResultModalProps = {
   payload: CommandModalPayload | null;
@@ -34,6 +37,8 @@ type CommandResultModalProps = {
   activeProvider: LLMProvider;
   activeProviderModel: string;
   currentSessionId: string | null;
+  /** Zeroes the composer's live counter when the usage panel's Clear is pressed. */
+  onClearTokenUsage?: () => void;
   onSelectProviderModel: (
     provider: LLMProvider,
     model: string,
@@ -411,7 +416,15 @@ function ModelsContent({
   );
 }
 
-function CostContent({ data }: { data: CostCommandData }) {
+function CostContent({
+  data,
+  sessionId,
+  onClear,
+}: {
+  data: CostCommandData;
+  sessionId: string | null;
+  onClear: () => void;
+}) {
   const used = Number(data.tokenUsage?.used ?? 0);
   const total = Number(data.tokenUsage?.total ?? 0);
   const model = data.model || 'Unknown';
@@ -419,28 +432,21 @@ function CostContent({ data }: { data: CostCommandData }) {
   const hasBreakdown =
     typeof data.tokenBreakdown?.input === 'number' ||
     typeof data.tokenBreakdown?.output === 'number';
+
+  // The transcript's total, less whatever was already there when the panel was last cleared.
+  const sessionOutput =
+    typeof data.sessionOutputTokens === 'number'
+      ? applyTokenUsageClear(sessionId, data.sessionOutputTokens)
+      : null;
+  const clearedAt = readTokenUsageClear(sessionId)?.clearedAt ?? null;
+
   const usageRows = [
-    { label: 'Total tokens used', value: formatNumber(used), icon: Activity },
-    ...(hasBreakdown
-      ? [
-          {
-            label: 'Input tokens',
-            value: formatNumber(Number(data.tokenBreakdown?.input ?? 0)),
-            icon: TerminalSquare,
-          },
-          {
-            label: 'Output tokens',
-            value: formatNumber(Number(data.tokenBreakdown?.output ?? 0)),
-            icon: Coins,
-          },
-        ]
-      : [
-          {
-            label: 'Breakdown',
-            value: 'Unavailable',
-            icon: TerminalSquare,
-          },
-        ]),
+    { label: 'Context in use', value: formatNumber(hasBreakdown ? Number(data.tokenBreakdown?.input ?? 0) : used), icon: TerminalSquare },
+    // The whole conversation's generation when the transcript could be read, and only the
+    // last reply's when it could not — never the second wearing the first one's label.
+    sessionOutput !== null
+      ? { label: clearedAt ? 'Generated since cleared' : 'Generated this session', value: formatNumber(sessionOutput), icon: Coins }
+      : { label: 'Generated (last reply)', value: formatNumber(Number(data.tokenBreakdown?.output ?? 0)), icon: Coins },
     // Only when it is consistent with what was actually used. The window comes
     // from the CONTEXT_WINDOW setting, which cannot know whether a session is
     // running a 200K or a 1M variant of the same model name — and a row reading
@@ -451,21 +457,19 @@ function CostContent({ data }: { data: CostCommandData }) {
   ];
 
   return (
-    <div className="space-y-4">
-      <div className="overflow-hidden rounded-2xl border border-border/70 bg-background/75">
+    <div className="space-y-3">
+      <div className="overflow-hidden rounded-xl border border-border/70 bg-background/75">
         {usageRows.map((row) => {
           const Icon = row.icon;
 
           return (
             <div
               key={row.label}
-              className="flex items-center justify-between gap-4 border-b border-border/60 px-4 py-3 last:border-b-0"
+              className="flex items-center justify-between gap-4 border-b border-border/60 px-3 py-2.5 last:border-b-0"
             >
-              <div className="flex min-w-0 items-center gap-3">
-                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-primary/20 bg-primary/10 text-primary">
-                  <Icon className="h-4 w-4" />
-                </span>
-                <span className="truncate text-sm font-medium text-foreground">{row.label}</span>
+              <div className="flex min-w-0 items-center gap-2.5">
+                <Icon className="h-4 w-4 shrink-0 text-primary" />
+                <span className="truncate text-sm text-foreground">{row.label}</span>
               </div>
               <span className="shrink-0 font-mono text-sm font-semibold text-foreground">{row.value}</span>
             </div>
@@ -473,17 +477,24 @@ function CostContent({ data }: { data: CostCommandData }) {
         })}
       </div>
 
-      <div className="rounded-2xl border border-border/70 bg-muted/20 p-4">
-        <div className="grid gap-3 sm:grid-cols-2">
-          <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Provider</p>
-            <p className="mt-1 text-sm font-semibold text-foreground">{provider}</p>
-          </div>
-          <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Model</p>
-            <p className="mt-1 break-all font-mono text-sm text-foreground">{model}</p>
-          </div>
-        </div>
+      {/* Provider and model on ONE line, at label size. They were two headed columns in a card
+        * of their own, which gave a model id — the least-read thing here — more room than every
+        * number on the panel put together. */}
+      <div className="flex items-center justify-between gap-3 rounded-xl border border-border/70 bg-muted/20 px-3 py-2">
+        <span className="shrink-0 text-xs text-muted-foreground">{provider}</span>
+        <span className="truncate font-mono text-xs text-muted-foreground" title={model}>{model}</span>
+      </div>
+
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-xs text-muted-foreground">
+          {clearedAt
+            ? `Counting since ${new Date(clearedAt).toLocaleString()}`
+            : 'Counted over the whole conversation'}
+        </span>
+        <Button variant="ghost" size="sm" onClick={onClear} disabled={sessionOutput === null}>
+          <RotateCcw className="h-3.5 w-3.5" />
+          Clear
+        </Button>
       </div>
     </div>
   );
@@ -539,11 +550,14 @@ function CommandResultModal({
   activeProvider,
   activeProviderModel,
   currentSessionId,
+  onClearTokenUsage,
   onSelectProviderModel,
 }: CommandResultModalProps) {
   const isOpen = Boolean(payload);
   const kind = payload?.kind;
   const isModelsModal = kind === 'models';
+  // A list to scroll through (models, the command index) versus a few rows to read.
+  const isBrowsingModal = kind === 'models' || kind === 'help';
 
   const modalMeta = {
     help: {
@@ -577,7 +591,18 @@ function CommandResultModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="flex h-[min(92dvh,48rem)] w-[calc(100vw-1rem)] max-w-5xl flex-col overflow-hidden rounded-3xl border-border/80 bg-popover/95 p-0 shadow-2xl backdrop-blur-xl sm:w-[min(94vw,64rem)]">
+      {/* Only the browsing modals are given a room to browse in. Cost and status are a handful
+        * of rows, and the fixed 48rem-tall, 5xl-wide shell left two thirds of the panel as
+        * blank floor under three numbers. They size to their content instead, with the same
+        * ceiling for a viewport that cannot hold it. */}
+      <DialogContent
+        className={cn(
+          'flex w-[calc(100vw-1rem)] flex-col overflow-hidden rounded-3xl border-border/80 bg-popover/95 p-0 shadow-2xl backdrop-blur-xl',
+          isBrowsingModal
+            ? 'h-[min(92dvh,48rem)] max-w-5xl sm:w-[min(94vw,64rem)]'
+            : 'max-h-[min(92dvh,48rem)] max-w-xl sm:w-[min(94vw,32rem)]',
+        )}
+      >
         <DialogTitle>{activeMeta?.title || 'Command Result'}</DialogTitle>
 
         <div
@@ -631,7 +656,20 @@ function CommandResultModal({
               onSelectProviderModel={onSelectProviderModel}
             />
           )}
-          {payload?.kind === 'cost' && <CostContent data={payload.data as CostCommandData} />}
+          {payload?.kind === 'cost' && (
+            <CostContent
+              data={payload.data as CostCommandData}
+              sessionId={currentSessionId}
+              onClear={() => {
+                writeTokenUsageClear(
+                  currentSessionId,
+                  Number((payload.data as CostCommandData).sessionOutputTokens ?? 0),
+                );
+                onClearTokenUsage?.();
+                onClose();
+              }}
+            />
+          )}
           {payload?.kind === 'status' && <StatusContent data={payload.data as StatusCommandData} />}
         </div>
 

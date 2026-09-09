@@ -1,4 +1,4 @@
-import type { KeyboardEvent } from 'react';
+import type { ComponentType, KeyboardEvent } from 'react';
 
 import { cn } from '@/shared/utils';
 
@@ -6,8 +6,17 @@ import { cn } from '@/shared/utils';
  * `count` is a capability of the strip, not a prop every caller needs: a measured site
  * (doctrine §8) decides it exists. One caller today — the workspace strip's Memory tab
  * (Phase 5); the git panel's two tabs pass none.
+ *
+ * A tab with an `icon` draws the glyph ALONE and keeps `label` as its accessible name and
+ * hover title — the workspace strip's built-in tabs, where seven words never fit a 288px
+ * sidebar without a scroller. A tab without one draws its label, unchanged.
  */
-type TabItem = { id: string; label: string; count?: number };
+type TabItem = {
+  id: string;
+  label: string;
+  count?: number;
+  icon?: ComponentType<{ className?: string; strokeWidth?: string | number }>;
+};
 
 /**
  * Arrow / Home / End move the selection, which is the contract `role="tablist"` announces.
@@ -64,8 +73,9 @@ type TabsProps = {
  * indicator that animates `left`/`width` also reads a stale width for a frame whenever a
  * label changes, which is precisely when a tab strip is being looked at.
  *
- * A tab's optional `count` is a capability of the strip, drawn as Verve's own count pill; the
- * accessible name stays the bare label regardless.
+ * A tab's optional `count` is a capability of the strip: a word tab draws Verve's own count
+ * pill, an icon tab a single accent dot over the glyph's shoulder. The accessible name stays
+ * the bare label regardless.
  */
 export function Tabs({ tabs, active, onChange, ariaLabel, variant = 'segmented' }: TabsProps) {
   // Which tab holds the strip's single Tab stop. It falls back to the FIRST tab when `active`
@@ -82,31 +92,47 @@ export function Tabs({ tabs, active, onChange, ariaLabel, variant = 'segmented' 
       role="tablist"
       aria-label={ariaLabel}
     >
-      {tabs.map((tab, index) => (
-        <button
-          key={tab.id}
-          type="button"
-          role="tab"
-          className="vv-tabs__tab"
-          // The label again as the accessible name. It duplicates the button's own text on
-          // purpose: `aria-label` is the attribute the workspace strip has always carried and
-          // the one the verification harness selects a tab by, so a tab that dropped it would
-          // still LOOK right and be unreachable to everything that addresses tabs by name.
-          aria-label={tab.label}
-          aria-selected={tab.id === active}
-          // Roving: exactly one tab is a Tab stop, and the arrows walk the rest.
-          tabIndex={index === stopIndex ? 0 : -1}
-          onClick={() => onChange(tab.id)}
-          onKeyDown={moveSelectionByKey}
-        >
-          {tab.label}
-          {typeof tab.count === 'number' && tab.count > 0 && (
-            <span className="vv-tabs__count" data-tone="neutral" aria-hidden="true">
-              {tab.count}
-            </span>
-          )}
-        </button>
-      ))}
+      {tabs.map((tab, index) => {
+        const hasCount = typeof tab.count === 'number' && tab.count > 0;
+
+        return (
+          <button
+            key={tab.id}
+            type="button"
+            role="tab"
+            className={cn('vv-tabs__tab', tab.icon && 'vv-tabs__tab--icon')}
+            // The label again as the accessible name. It duplicates the button's own text on
+            // purpose: `aria-label` is the attribute the workspace strip has always carried and
+            // the one the verification harness selects a tab by, so a tab that dropped it would
+            // still LOOK right and be unreachable to everything that addresses tabs by name.
+            aria-label={tab.label}
+            aria-selected={tab.id === active}
+            // The native title, not the Tooltip primitive: Tooltip wraps its child in a div, and
+            // a div between `role="tablist"` and `role="tab"` breaks the relationship a screen
+            // reader announces the strip by. An icon-only tab still has to be nameable on hover,
+            // and it carries the count in words there, since the dot says only THAT something
+            // waits and never how much.
+            title={tab.icon ? (hasCount ? `${tab.label} (${tab.count})` : tab.label) : undefined}
+            // Roving: exactly one tab is a Tab stop, and the arrows walk the rest.
+            tabIndex={index === stopIndex ? 0 : -1}
+            onClick={() => onChange(tab.id)}
+            onKeyDown={moveSelectionByKey}
+          >
+            {tab.icon ? <tab.icon className="vv-tabs__icon" strokeWidth={2} /> : tab.label}
+            {/* A glyph has no room beside it for a number, so an icon tab marks a waiting count
+              * with a single accent dot; a word tab still counts out loud in the pill. Both are
+              * decoration — the tab's name is its aria-label either way. */}
+            {hasCount &&
+              (tab.icon ? (
+                <span className="vv-tabs__dot" aria-hidden="true" />
+              ) : (
+                <span className="vv-tabs__count" data-tone="neutral" aria-hidden="true">
+                  {tab.count}
+                </span>
+              ))}
+          </button>
+        );
+      })}
     </div>
   );
 }

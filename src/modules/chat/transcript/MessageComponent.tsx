@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { GitBranchIcon, PencilIcon } from 'lucide-react';
 
 import { LLMProviderLogo } from '@/shared/ui';
+import { cn } from '@/shared/utils';
 
 import type { ChatMessage, ClaudePermissionSuggestion, PermissionGrantResult, LLMProvider,DiffLine,Project } from '@/shared/types';
 import { formatUsageLimitText, stripProposedPlanEnvelope } from '@/modules/chat/utils/chatFormatting';
@@ -11,7 +12,7 @@ import type { ReadToolPermissionState } from '@/modules/chat/hooks/useToolPermis
 import { Reasoning, ReasoningContent, ReasoningTrigger } from '@/modules/chat/transcript/Reasoning';
 import ChatMessageImages from '@/modules/chat/transcript/ChatMessageImages';
 import ChatMessageFiles from '@/modules/chat/transcript/ChatMessageFiles';
-import { Markdown } from '@/modules/chat/transcript/Markdown';
+import { Markdown, TRANSCRIPT_PROSE } from '@/modules/chat/transcript/Markdown';
 import StreamingMarkdown from '@/modules/chat/transcript/StreamingMarkdown';
 import MessageCopyControl from '@/modules/chat/transcript/MessageCopyControl';
 import MessageSpeakControl from '@/modules/chat/transcript/MessageSpeakControl';
@@ -172,10 +173,10 @@ const MessageComponent = memo(({ message, prevMessage, isRunTerminal, createDiff
                 <div className="mb-1.5 text-xs uppercase tracking-[0.14em] text-ink-faint">
                   {messageTime.isValid ? `${t('messageTypes.you', { defaultValue: 'You' })} · ${formattedTime}` : t('messageTypes.you', { defaultValue: 'You' })}
                 </div>
-                <div dir="auto" className="break-words font-serif text-base sm:text-sm">
+                <div dir="auto" className="break-words font-serif text-base">
                   <Markdown
                     breaks
-                    className="prose prose-base sm:prose-sm max-w-none font-serif dark:prose-invert"
+                    className={TRANSCRIPT_PROSE}
                   >
                     {message.content}
                   </Markdown>
@@ -271,7 +272,7 @@ const MessageComponent = memo(({ message, prevMessage, isRunTerminal, createDiff
               <>
                 <div className="flex flex-col">
                   <div className="flex flex-col">
-                    <Markdown className="prose prose-base sm:prose-sm max-w-none font-serif dark:prose-invert">
+                    <Markdown className={TRANSCRIPT_PROSE}>
                       {String(message.displayText || '')}
                     </Markdown>
                   </div>
@@ -338,7 +339,7 @@ const MessageComponent = memo(({ message, prevMessage, isRunTerminal, createDiff
                   )}
                 />
                 <ReasoningContent>
-                  <Markdown className="prose prose-base sm:prose-sm prose-gray max-w-none font-serif dark:prose-invert">
+                  <Markdown className={cn(TRANSCRIPT_PROSE, 'prose-gray')}>
                     {message.content}
                   </Markdown>
                   {!isExporting && (
@@ -402,7 +403,7 @@ const MessageComponent = memo(({ message, prevMessage, isRunTerminal, createDiff
                     <StreamingMarkdown
                       content={content}
                       isStreaming={Boolean(message.isStreaming)}
-                      className="prose prose-base sm:prose-sm prose-gray max-w-none font-serif dark:prose-invert"
+                      className={cn(TRANSCRIPT_PROSE, 'prose-gray')}
                     />
                   ) : (
                     <div className="whitespace-pre-wrap">
