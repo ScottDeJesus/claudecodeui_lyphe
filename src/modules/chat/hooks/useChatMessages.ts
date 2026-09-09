@@ -292,6 +292,12 @@ export function normalizedToChatMessages(messages: NormalizedMessage[]): ChatMes
           toolInput: typeof msg.toolInput === 'string' ? msg.toolInput : JSON.stringify(msg.toolInput ?? '', null, 2),
           toolId: msg.toolId,
           toolResult,
+          // When the result landed — the finish time for a subagent container. The agent's own
+          // last activity is not: the stored timeline is truncated from the HEAD at 200 entries,
+          // and it stops before the closing reply that ends the run.
+          // Only the separately-delivered result row carries a time; a result attached inline
+          // to the tool call has none, and no stamp is better than the call's own start time.
+          toolResultAt: tr && 'timestamp' in tr ? tr.timestamp : undefined,
           toolStatus: typeof msg.status === 'string' ? msg.status : undefined,
           isSubagentContainer,
           subagent: msg.subagent,

@@ -42,6 +42,20 @@ export const NO_REQUEST_TIMEOUT = 0;
 export const BOOT_REQUEST_TIMEOUTS_MS = [4_000, 8_000, 12_000] as const;
 
 /**
+ * The whole gate's wall clock, not one request's. The ladder above is ~25s per request and the
+ * gate makes TWO in sequence, so without a shared budget the spinner could stand for ~50s while
+ * the code claimed 25 — the retries stop when this is spent, whichever request is in hand.
+ */
+export const BOOT_TOTAL_BUDGET_MS = 25_000;
+
+/**
+ * The least any single boot request may be given, even with the shared budget nearly spent.
+ * The gate's second request would otherwise inherit whatever milliseconds the first left it and
+ * "fail" instantly, which reported an unreachable server that had just answered.
+ */
+export const BOOT_REQUEST_FLOOR_MS = 3_000;
+
+/**
  * A signal that aborts on the deadline — unless the caller brought its own (it owns
  * cancellation then) or the body is an upload, whose duration belongs to the file.
  *
@@ -422,9 +436,12 @@ export const api = {
         headers: {}, // Let browser set Content-Type for FormData
         body: formData,
       }),
-    file: (storedName: string) => get(`/api/assets/files/${encodeURIComponent(storedName)}`),
+    // No deadline by default, for the reason `readFileBlob` has none: a 200MB attachment
+    // pulled over a slow link would otherwise be aborted mid-body and read as a broken file.
+    file: (storedName: string, options: ApiRequestOptions = {}) =>
+      get(`/api/assets/files/${encodeURIComponent(storedName)}`, { timeoutMs: NO_REQUEST_TIMEOUT, ...options }),
     image: (filename: string, options: ApiRequestOptions = {}) =>
-      get(`/api/assets/images/${encodeURIComponent(filename)}`, options),
+      get(`/api/assets/images/${encodeURIComponent(filename)}`, { timeoutMs: NO_REQUEST_TIMEOUT, ...options }),
   },
 
   // TaskMaster endpoints — all addressed by DB projectId post-migration.

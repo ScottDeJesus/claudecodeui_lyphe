@@ -16,6 +16,8 @@ type SubagentPanelProps = {
   /** Raw tool input of the call that spawned the agent, used for the prompt. */
   toolInput: unknown;
   toolResult?: ToolResult | null;
+  /** When that result landed, which is when the agent finished. */
+  toolResultAt?: string | number | Date;
   subagent?: SubagentInfo;
   activity?: SubagentActivity[];
   onFileOpen?: (filePath: string, diffInfo?: unknown) => void;
@@ -94,6 +96,7 @@ SubagentNote.displayName = 'SubagentNote';
 export const SubagentPanel = memo(({
   toolInput,
   toolResult,
+  toolResultAt,
   subagent,
   activity,
   onFileOpen,
@@ -120,6 +123,7 @@ export const SubagentPanel = memo(({
   const { status, label, nickname, description, toolCount, finishedAt } = readSubagentSummary({
     toolInput,
     toolResult,
+    toolResultAt,
     subagent,
     activity,
   });

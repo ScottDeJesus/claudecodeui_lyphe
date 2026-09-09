@@ -4,7 +4,7 @@ import { ACCOUNT_PANEL_ID, AccountPopover } from '@/modules/accounts/AccountPopo
 import { useDescentAccounts } from '@/modules/accounts/hooks/useDescentAccounts';
 import { useDescentUsage } from '@/modules/accounts/hooks/useDescentUsage';
 import { accountInitials } from '@/modules/accounts/utils/accountInitials';
-import { windowPercent, windowTone } from '@/modules/accounts/utils/usageWindows';
+import { formatWindowCountdown, windowPercent, windowTone } from '@/modules/accounts/utils/usageWindows';
 import { ProviderLoginModal } from '@/modules/provider-auth';
 import { Avatar, Meter } from '@/shared/ui';
 import type { DescentUsageWindow } from '@/shared/types';
@@ -12,8 +12,9 @@ import type { DescentUsageWindow } from '@/shared/types';
 type GlanceWindow = { key: string; short: string; full: string };
 
 /**
- * The windows the collapsed row shows, in the order it shows them. `short` is what fits beside a
- * 4px bar; `full` is the accessible name, because "5h" read aloud is not a window anyone knows.
+ * The windows the collapsed row shows, in the order it shows them. `short` is the fallback for
+ * a window Descent gives no reset time for — normally the label is the countdown to that reset.
+ * `full` is the accessible name, because "5h" read aloud is not a window anyone knows.
  */
 const GLANCE_WINDOWS: GlanceWindow[] = [
   { key: 'five_hour', short: '5h', full: 'Current 5-hour window' },
@@ -45,6 +46,11 @@ export function AccountFooterRow({ collapsed = false, onExpand }: AccountFooterR
   // Whether the provider's own login is running in the embedded terminal. Held here rather
   // than in the panel because the panel closes and this must not close with it.
   const [loginOpen, setLoginOpen] = useState(false);
+
+  // The glance labels count DOWN, so they cannot wait for the three-minute usage poll to be
+  // redrawn — a "1m" would sit there for three. One tick a minute, and only while there is a
+  // countdown on screen to move.
+  const [nowTick, setNowTick] = useState(() => Date.now());
 
   const rootRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -117,6 +123,13 @@ export function AccountFooterRow({ collapsed = false, onExpand }: AccountFooterR
     .filter((entry): entry is GlanceWindow & { usageWindow: DescentUsageWindow } => entry !== null);
 
   const label = picture?.activeLabel ?? '—';
+  const hasCountdown = glanceWindows.some(({ usageWindow }) => Boolean(usageWindow.resetsAt));
+
+  useEffect(() => {
+    if (!hasCountdown) return undefined;
+    const timer = setInterval(() => setNowTick(Date.now()), 60_000);
+    return () => clearInterval(timer);
+  }, [hasCountdown]);
 
   const togglePanel = () => {
     if (open) {
@@ -183,14 +196,17 @@ export function AccountFooterRow({ collapsed = false, onExpand }: AccountFooterR
             <span className="mt-1 flex items-center gap-3">
               {glanceWindows.map(({ key, short, full, usageWindow }) => {
                 const percent = windowPercent(usageWindow);
+                // Time left where there is one, the window's own name where there is not.
+                const countdown = formatWindowCountdown(usageWindow.resetsAt, nowTick);
+                const glanceLabel = countdown ?? short;
                 return (
-                  <span key={key} className="min-w-0 flex-1" title={full}>
+                  <span key={key} className="min-w-0 flex-1" title={countdown ? `${full} · ${countdown} left` : full}>
                     <Meter
                       variant="inline"
                       percent={percent}
                       tone={windowTone(usageWindow, percent)}
-                      label={short}
-                      ariaLabel={`${short} — ${full}`}
+                      label={glanceLabel}
+                      ariaLabel={countdown ? `${full} — ${countdown} left` : `${short} — ${full}`}
                       value={percent === null ? '—' : `${percent}%`}
                     />
                   </span>

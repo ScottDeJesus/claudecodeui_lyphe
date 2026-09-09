@@ -24,3 +24,34 @@ export function windowTone(usageWindow: DescentUsageWindow, percent: number | nu
   if (usageWindow.severity) return 'warn';
   return percent !== null && percent >= HEAVY_PERCENT ? 'warn' : 'accent';
 }
+
+/**
+ * How long until a window turns over, in the largest unit that still says something true:
+ * days past a day, hours past an hour, minutes below that.
+ *
+ * The glance row has room for one short string per bar, and a fixed "5h"/"7d" spends it on the
+ * window's LENGTH — a fact that never changes and that the bar beside it already implies. What
+ * a person wants at a glance is how long they have.
+ *
+ * Floors throughout, so a label never claims more time than there is: 23h50m reads "23h", not
+ * "1d", and 59m50s reads "59m" rather than the "60m" a ceiling would print. The one exception
+ * is the last minute, which reads "1m" rather than "0m" until it is actually spent. `null` when
+ * Descent reports no reset time — the caller keeps its static label rather than drawing a blank.
+ */
+export function formatWindowCountdown(resetsAt: string | null, now: number = Date.now()): string | null {
+  if (!resetsAt) return null;
+
+  const at = new Date(resetsAt).getTime();
+  if (Number.isNaN(at)) return null;
+
+  const msLeft = at - now;
+  if (msLeft <= 0) return 'now';
+
+  const days = Math.floor(msLeft / 86_400_000);
+  if (days >= 1) return `${days}d`;
+
+  const hours = Math.floor(msLeft / 3_600_000);
+  if (hours >= 1) return `${hours}h`;
+
+  return `${Math.max(1, Math.floor(msLeft / 60_000))}m`;
+}

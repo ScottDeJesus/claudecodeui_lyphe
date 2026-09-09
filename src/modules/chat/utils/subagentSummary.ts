@@ -18,9 +18,13 @@ export type SubagentSummary = {
   nickname: string;
   toolCount: number;
   /**
-   * The last thing the agent did — the closest honest reading of when it finished, and one
-   * that survives a reload, since both providers stamp the timeline they store. Null when the
-   * timeline arrived without stamps rather than a guessed time.
+   * When the agent's result landed. Null when nothing reliable says.
+   *
+   * NOT the last activity entry, which was the first cut and was wrong three ways: the stored
+   * timeline is truncated from the HEAD at 200 entries (so a long run reports entry #200's
+   * time), the live and server timelines are stamped from different rows so the value moved
+   * after the agent had already finished, and even untruncated the last tool precedes the
+   * closing reply.
    */
   finishedAt: string | null;
 };
@@ -36,30 +40,46 @@ export function parseSubagentToolInput(toolInput: unknown): Record<string, unkno
   }
 }
 
+/**
+ * A BACKGROUNDED agent answers its launch call at once, with a receipt — "Async agent launched
+ * successfully", carrying an agentId. Its real answer arrives much later, as a separate
+ * task-notification turn.
+ *
+ * So the presence of a tool result cannot mean "finished", and inferring that it did made the
+ * common case exactly backwards: measured, a 70-second background agent was never pinned at all
+ * and its row was stamped "4 tools · 2:46 PM" four seconds into the run. `isAsync` is the same
+ * evidence the history reader uses for this (claude-sessions.provider.ts, `isAwaitingAsyncAgent`).
+ */
+const isAsyncLaunchReceipt = (toolResult?: ToolResult | null): boolean => (
+  (toolResult as { toolUseResult?: { isAsync?: unknown } } | null | undefined)
+    ?.toolUseResult?.isAsync === true
+);
+
 export function readSubagentSummary({
   toolInput,
   toolResult,
+  toolResultAt,
   subagent,
   activity,
 }: {
   toolInput?: unknown;
   toolResult?: ToolResult | null;
+  /** When the result arrived, from the row the projection built. */
+  toolResultAt?: string | number | Date;
   subagent?: SubagentInfo;
   activity?: SubagentActivity[];
 }): SubagentSummary {
   const parsedInput = parseSubagentToolInput(toolInput);
   const entries = activity ?? [];
-  const status = subagent?.status ?? (toolResult ? 'completed' : 'running');
+  // The backend's own word wins wherever there is one — the history reader knows whether a
+  // background agent's notification has arrived. Only the live path, which carries no subagent
+  // metadata at all, falls through to the inference below.
+  const status = subagent?.status
+    ?? (toolResult && !isAsyncLaunchReceipt(toolResult) ? 'completed' : 'running');
 
-  let finishedAt: string | null = null;
-  if (status !== 'running') {
-    for (let index = entries.length - 1; index >= 0; index -= 1) {
-      if (entries[index]?.timestamp) {
-        finishedAt = entries[index].timestamp as string;
-        break;
-      }
-    }
-  }
+  const finishedAt = status !== 'running' && toolResultAt
+    ? new Date(toolResultAt).toISOString()
+    : null;
 
   return {
     status,

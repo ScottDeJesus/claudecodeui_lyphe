@@ -6,7 +6,8 @@ const loadingDotAnimationDelays = ['0s', '0.15s', '0.3s'];
  * Rendered by the auth module's ProtectedRoute while the initial auth status check is in flight.
  *
  * `reconnecting` is the second face of the same screen: the check retries a server on its way
- * back up for as long as ~25s, and a spinner that says nothing for that long reads as a hang.
+ * back up until its shared 25s budget is spent, and a spinner that says nothing for that long
+ * reads as a hang.
  */
 export default function AuthLoadingScreen({ reconnecting = false }: { reconnecting?: boolean }) {
   return (

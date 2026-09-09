@@ -48,30 +48,31 @@
 
       It KEEPS watching after the app is up. Standing down once the bundle ran was wrong twice
       over: a tree that unmounts leaves #root empty with nothing coming (measured: 16s black),
-      and "the bundle ran" was itself only ever "a module body started" — a throw between that
-      first statement and createRoot() was invisible. The honest signal is the one thing that
-      cannot be faked: whether #root has children.
+      and "the bundle ran" was itself only ever "a module body started". The honest signal is
+      the one thing that cannot be faked: whether #root holds something the APP put there.
 
-      One automatic reload per broken run, not one per 30 seconds. A rate limit reloaded a
-      crash-every-40s app four times in 135s (measured), each reload destroying the websocket
-      and any in-flight turn. The count is cleared only after the app has been up and healthy
-      for a while, so a later, unrelated fault still gets its own retry.
+      Reloading is capped twice — once per broken run, and a hard ceiling per tab that no
+      amount of elapsed health refunds. A per-run cap alone still looped forever on a crash
+      whose period outlived the healthy window (measured: 4 loads in 4 minutes at a 70s crash).
     -->
     <script>
       (function () {
         var RETRY_KEY = 'cloudcli:boot-retry';
+        var WATCHDOG_NODE_ATTRIBUTE = 'data-cloudcli-watchdog';
+        /** Per broken run. */
         var MAX_AUTOMATIC_RELOADS = 1;
-        /** Up this long without a wobble and the last failure is history, not a pattern. */
-        var HEALTHY_RUN_MS = 60000;
+        /** Per tab, ever. The stop that a decaying counter cannot provide. */
+        var MAX_LIFETIME_RELOADS = 3;
+        /** Long enough that no plausible crash period hides under it. */
+        var HEALTHY_RUN_MS = 600000;
         var BOOT_DEADLINE_MS = 10000;
-        /** After a reload has already been spent, a still-empty page is broken, not slow. */
-        var RETRY_BOOT_DEADLINE_MS = 4000;
         var WATCH_INTERVAL_MS = 2000;
 
         var startedAt = Date.now();
         var healthySince = 0;
         var hasEverMounted = false;
-        var showingCard = false;
+        var runCountCleared = false;
+        var reloading = false;
         var timer = null;
 
         // sessionStorage can THROW rather than return null — blocked site data, private
@@ -83,9 +84,11 @@
         function readState() {
           try {
             var parsed = JSON.parse(sessionStorage.getItem(RETRY_KEY));
-            if (parsed && Number.isFinite(parsed.n)) return parsed;
+            if (parsed && Number.isFinite(parsed.n)) {
+              return { n: parsed.n, total: Number.isFinite(parsed.total) ? parsed.total : parsed.n };
+            }
           } catch (error) { /* unreadable or unavailable — treated as no attempts yet */ }
-          return { n: 0, at: 0 };
+          return { n: 0, total: 0 };
         }
 
         /** True only when the next attempt is recorded somewhere a reload cannot forget. */
@@ -98,38 +101,56 @@
           }
         }
 
-        function clearState() {
-          try { sessionStorage.removeItem(RETRY_KEY); } catch (error) { /* nothing to clear */ }
+        /** Forgets the per-run count after a long healthy stretch; the lifetime cap stands. */
+        function decayRunCount(state) {
+          persistState({ n: 0, total: state.total });
         }
 
-        function rootChildren() {
+        // The app's own children only. The card is a child of #root too, and counting it as a
+        // mount let a permanently dead page look healthy, start the healthy clock, and be
+        // refunded the retry budget it had just spent (measured).
+        function appChildren() {
           var root = document.getElementById('root');
-          return root ? root.childElementCount : 0;
+          if (!root) return 0;
+          var count = 0;
+          for (var i = 0; i < root.children.length; i += 1) {
+            if (!root.children[i].hasAttribute(WATCHDOG_NODE_ATTRIBUTE)) count += 1;
+          }
+          return count;
         }
 
         function card() {
           var root = document.getElementById('root');
-          if (!root) return;
-          showingCard = true;
-          root.innerHTML =
-            '<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;' +
-            'font-family:system-ui,-apple-system,sans-serif;background:#101116;color:#e7e7ea;padding:24px">' +
+          if (!root || root.querySelector('[' + WATCHDOG_NODE_ATTRIBUTE + ']')) return;
+          var node = document.createElement('div');
+          node.setAttribute(WATCHDOG_NODE_ATTRIBUTE, '');
+          node.setAttribute('style', 'min-height:100vh;display:flex;align-items:center;justify-content:center;' +
+            'font-family:system-ui,-apple-system,sans-serif;background:#101116;color:#e7e7ea;padding:24px');
+          node.innerHTML =
             '<div style="max-width:22rem;text-align:center">' +
             '<div style="font-size:15px;font-weight:600;margin-bottom:6px">CloudCLI is not on screen</div>' +
-            // Says only what is true in BOTH paths that reach this card — a spent retry, and a
-            // browser whose storage is blocked so no retry could safely be spent at all.
+            // Says only what is true on every path that reaches this card — a spent retry, a
+            // lifetime cap, and a browser whose storage is blocked so no retry could be spent.
             '<div style="font-size:13px;line-height:1.5;opacity:0.7;margin-bottom:16px">' +
             'The app did not finish drawing. The server may be mid-restart — reloading usually clears it.</div>' +
             '<button onclick="location.reload()" style="border:0;border-radius:8px;padding:8px 16px;' +
             'background:#2fa876;color:#fff;font-size:13px;font-weight:600;cursor:pointer">Reload</button>' +
-            '</div></div>';
+            '</div>';
+          root.appendChild(node);
         }
 
         function recover() {
-          if (showingCard || rootChildren() > 0) return;
+          if (reloading || appChildren() > 0) return;
 
           var state = readState();
-          if (state.n < MAX_AUTOMATIC_RELOADS && persistState({ n: state.n + 1, at: Date.now() })) {
+          if (
+            state.n < MAX_AUTOMATIC_RELOADS
+            && state.total < MAX_LIFETIME_RELOADS
+            && persistState({ n: state.n + 1, total: state.total + 1 })
+          ) {
+            // The interval keeps running through a navigation that may take seconds; without
+            // this the next tick would paint a failure over a recovery already in flight.
+            reloading = true;
             location.reload();
             return;
           }
@@ -138,14 +159,17 @@
         }
 
         function tick() {
-          if (rootChildren() > 0) {
-            // Back on screen — including the card React just painted over. Either way the
-            // document is alive again and the watch resumes for whatever comes next.
-            showingCard = false;
+          if (reloading) return;
+
+          if (appChildren() > 0) {
+            // The app is on screen — including over the card, which React will have replaced.
             hasEverMounted = true;
             if (!healthySince) healthySince = Date.now();
-            if (Date.now() - healthySince >= HEALTHY_RUN_MS && readState().n > 0) {
-              clearState();
+            if (!runCountCleared && Date.now() - healthySince >= HEALTHY_RUN_MS) {
+              var state = readState();
+              // Latched: without it this branch re-reads storage every two seconds forever.
+              runCountCleared = true;
+              if (state.n > 0) decayRunCount(state);
             }
             return;
           }
@@ -160,9 +184,10 @@
 
           // Still booting. A slow API is the app's own business — it mounts its own loading
           // screen, which is a child of #root — so only a page with NOTHING on it is on the
-          // clock, and it is a shorter clock once a reload has already been spent.
-          var deadline = readState().n > 0 ? RETRY_BOOT_DEADLINE_MS : BOOT_DEADLINE_MS;
-          if (Date.now() - startedAt >= deadline) recover();
+          // clock. The same deadline on every attempt: a spent reload does not make a slow
+          // network faster, and shortening it showed a healthy-but-slow app a failure card for
+          // nearly nine seconds (measured).
+          if (Date.now() - startedAt >= BOOT_DEADLINE_MS) recover();
         }
 
         // A load-bearing script that 404s/504s reports on the element, which does not bubble —

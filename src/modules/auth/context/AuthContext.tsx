@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import type { ReactNode } from 'react';
 
 import { IS_PLATFORM } from '@/shared/utils';
-import { api, BOOT_REQUEST_TIMEOUTS_MS } from '@/shared/api';
+import { api, BOOT_REQUEST_FLOOR_MS, BOOT_REQUEST_TIMEOUTS_MS, BOOT_TOTAL_BUDGET_MS } from '@/shared/api';
 import { AUTH_SESSION_EXPIRED_EVENT, AUTH_TOKEN_REFRESHED_EVENT, getAuthTokenRefreshDelay, isValidRefreshedToken, storeAuthToken } from '@/shared/authToken';
 import { hydrateChatDrafts, resetChatDrafts } from '@/shared/chatDrafts';
 import { hydrateUserPreferences, resetUserPreferences } from '@/shared/userSettings';
@@ -143,14 +143,27 @@ export function useAuth(): AuthContextValue {
  * then told the user it could not be reached — which was false, it was answering, just not in
  * four seconds. A 4xx comes back untouched: that is an ANSWER, and repeating it would only ask
  * the same question again.
+ *
+ * `budgetEndsAt` is shared by both of the gate's requests, so the ladder cannot be walked twice
+ * and leave someone on a spinner for twice as long as this file claims.
  */
 async function requestWithRetry(
   run: (timeoutMs: number) => Promise<Response>,
+  budgetEndsAt: number,
   onAttemptFailed?: () => void,
 ): Promise<Response | null> {
   for (let attempt = 0; attempt < BOOT_REQUEST_TIMEOUTS_MS.length; attempt += 1) {
+    // A FLOOR under the shared budget, not just a share of it. Without one, a status call that
+    // needed its third attempt left the user call with a few hundred milliseconds and the gate
+    // declared the server unreachable — about a server that had answered 10ms earlier. Every
+    // request gets at least one honest attempt.
+    const remaining = Math.max(budgetEndsAt - Date.now(), 0);
+    if (remaining <= 0 && attempt > 0) {
+      return null;
+    }
+
     try {
-      const response = await run(BOOT_REQUEST_TIMEOUTS_MS[attempt]);
+      const response = await run(Math.max(Math.min(BOOT_REQUEST_TIMEOUTS_MS[attempt], remaining), BOOT_REQUEST_FLOOR_MS));
       if (response.status < 500) {
         return response;
       }
@@ -161,9 +174,10 @@ async function requestWithRetry(
       console.warn('[Auth] Boot request failed, retrying:', caughtError);
     }
 
-    onAttemptFailed?.();
-
-    if (attempt < BOOT_REQUEST_TIMEOUTS_MS.length - 1) {
+    // Only when another attempt actually follows: announcing a reconnect after the last one
+    // describes something that is not going to happen.
+    if (attempt < BOOT_REQUEST_TIMEOUTS_MS.length - 1 && Date.now() < budgetEndsAt) {
+      onAttemptFailed?.();
       await new Promise((resolve) => { setTimeout(resolve, 250 * (attempt + 1)); });
     }
   }
@@ -285,8 +299,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
       setServerUnreachable(false);
       setIsReconnecting(false);
 
+      const budgetEndsAt = Date.now() + BOOT_TOTAL_BUDGET_MS;
       const statusResponse = await requestWithRetry(
         (timeoutMs) => api.auth.status(timeoutMs),
+        budgetEndsAt,
         () => setIsReconnecting(true),
       );
       if (!statusResponse) {
@@ -310,6 +326,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
       const userResponse = await requestWithRetry(
         (timeoutMs) => api.auth.user(timeoutMs),
+        budgetEndsAt,
         () => setIsReconnecting(true),
       );
       // No answer at all after the retries: the server is down or unreachable, which says
