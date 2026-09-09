@@ -229,6 +229,7 @@ function ChatInterface({
     commandModalPayload,
     closeCommandModal,
     showCostModal,
+    compactConversation,
     editingAnchorId,
     beginEditMessage,
     cancelEditMessage,
@@ -634,6 +635,7 @@ function ChatInterface({
         activeProviderModel={currentProviderModel}
         currentSessionId={currentSessionId || selectedSession?.id || null}
         onClearTokenUsage={() => setTokenBudget(null)}
+        onCompactConversation={compactConversation}
         onSelectProviderModel={selectProviderModel}
       />
     </PermissionContext.Provider>

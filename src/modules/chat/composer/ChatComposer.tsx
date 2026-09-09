@@ -436,13 +436,12 @@ export default function ChatComposer({
             <TokenUsageSummary usage={tokenBudget} onClick={onShowTokenUsage} />
 
             {/* Crossed tools, not a speech bubble: this opens the SKILLS/commands menu, and a
-                bubble said "message". `text-accent-ink` is the Verve accent, so the one button
-                in the row that opens a menu of capabilities carries the theme's own colour
-                rather than the muted grey every other composer icon wears. */}
+                bubble said "message". No colour override — it wears the same accent the
+                paperclip does, so the composer's two icon buttons read as one family rather
+                than as two different greens. */}
             <PromptInputButton
               tooltip={{ content: t('input.showAllCommands') }}
               onClick={onToggleCommandMenu}
-              className="text-accent-ink hover:text-accent-ink"
             >
               <PencilRulerIcon />
             </PromptInputButton>

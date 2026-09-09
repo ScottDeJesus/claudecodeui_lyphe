@@ -9,6 +9,7 @@ import {
   Package,
   Plus,
   RotateCcw,
+  Shrink,
   Search,
   Server,
   Sparkles,
@@ -39,6 +40,8 @@ type CommandResultModalProps = {
   currentSessionId: string | null;
   /** Zeroes the composer's live counter when the usage panel's Clear is pressed. */
   onClearTokenUsage?: () => void;
+  /** Sends `/compact` as the next message, from the usage panel's Compact. */
+  onCompactConversation?: () => void;
   onSelectProviderModel: (
     provider: LLMProvider,
     model: string,
@@ -420,10 +423,12 @@ function CostContent({
   data,
   sessionId,
   onClear,
+  onCompact,
 }: {
   data: CostCommandData;
   sessionId: string | null;
   onClear: () => void;
+  onCompact?: () => void;
 }) {
   const used = Number(data.tokenUsage?.used ?? 0);
   const total = Number(data.tokenUsage?.total ?? 0);
@@ -486,15 +491,26 @@ function CostContent({
       </div>
 
       <div className="flex items-center justify-between gap-3">
-        <span className="text-xs text-muted-foreground">
+        <span className="min-w-0 flex-1 text-xs text-muted-foreground">
           {clearedAt
             ? `Counting since ${new Date(clearedAt).toLocaleString()}`
             : 'Counted over the whole conversation'}
         </span>
-        <Button variant="ghost" size="sm" onClick={onClear} disabled={sessionOutput === null}>
-          <RotateCcw className="h-3.5 w-3.5" />
-          Clear
-        </Button>
+        <div className="flex flex-shrink-0 items-center gap-1">
+          {/* Compact SENDS something — `/compact` as the next message — where Clear only
+              changes what this panel counts from. They sit together because both answer
+              "this conversation is getting long", but only one of them talks to the model. */}
+          {onCompact && (
+            <Button variant="ghost" size="sm" onClick={onCompact}>
+              <Shrink className="h-3.5 w-3.5" />
+              Compact
+            </Button>
+          )}
+          <Button variant="ghost" size="sm" onClick={onClear} disabled={sessionOutput === null}>
+            <RotateCcw className="h-3.5 w-3.5" />
+            Clear
+          </Button>
+        </div>
       </div>
     </div>
   );
@@ -551,6 +567,7 @@ function CommandResultModal({
   activeProviderModel,
   currentSessionId,
   onClearTokenUsage,
+  onCompactConversation,
   onSelectProviderModel,
 }: CommandResultModalProps) {
   const isOpen = Boolean(payload);
@@ -660,6 +677,10 @@ function CommandResultModal({
             <CostContent
               data={payload.data as CostCommandData}
               sessionId={currentSessionId}
+              onCompact={onCompactConversation && (() => {
+                onCompactConversation();
+                onClose();
+              })}
               onClear={() => {
                 writeTokenUsageClear(
                   currentSessionId,

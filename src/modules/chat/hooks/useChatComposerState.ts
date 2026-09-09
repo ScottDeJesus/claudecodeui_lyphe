@@ -435,6 +435,22 @@ export function useChatComposerState({
     ],
   );
 
+  /**
+   * Compaction, from the token-usage panel.
+   *
+   * `/compact` is the CLI's own command, not one of this app's built-ins: it is sent as the
+   * next message, exactly as typing it would, and the CLI replies with a compact boundary. The
+   * deferred submit is the same idiom `handleCustomCommand` uses — the text has to be in the
+   * composer's state before the submit reads it.
+   */
+  const compactConversation = useCallback(() => {
+    setInput('/compact');
+    inputValueRef.current = '/compact';
+    setTimeout(() => {
+      handleSubmitRef.current?.(createFakeSubmitEvent());
+    }, 0);
+  }, [setInput]);
+
   const showCostModal = useCallback(() => {
     executeCommand(
       {
@@ -1260,5 +1276,6 @@ export function useChatComposerState({
     commandModalPayload,
     closeCommandModal,
     showCostModal,
+    compactConversation,
   };
 }
