@@ -20,6 +20,7 @@ import ProviderSelectionEmptyState from '@/modules/chat/transcript/ProviderSelec
 import ToolGroupContainer from '@/modules/chat/transcript/ToolGroupContainer';
 import LoadAllMessagesOverlay from '@/modules/chat/transcript/LoadAllMessagesOverlay';
 import ChatExportMenu from '@/modules/chat/transcript/ChatExportMenu';
+import PinnedSubagents from '@/modules/chat/transcript/PinnedSubagents';
 
 /**
  * How many of the newest rows mount with real content on the first commit,
@@ -213,6 +214,8 @@ function ChatMessagesPane({
           </div>
         </div>
       )}
+      <PinnedSubagents messages={chatMessages} />
+
       <div className="mx-auto w-full max-w-[54.25rem] space-y-3 px-4 sm:space-y-4">
       {(isLoadingSessionMessages || isProcessing) && chatMessages.length === 0 ? (
         <div className="mt-8 text-center text-muted-foreground">

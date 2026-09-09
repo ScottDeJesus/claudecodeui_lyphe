@@ -6,6 +6,11 @@ import { cn } from '@/shared/utils';
 import { ToolRenderer } from '@/modules/chat/tools/ToolRenderer';
 import { useIsExportingTranscript } from '@/modules/chat/context/TranscriptRenderContext';
 import { MarkdownContent } from '@/modules/chat/tools/ContentRenderers/MarkdownContent';
+import {
+  formatSubagentFinishTime,
+  parseSubagentToolInput,
+  readSubagentSummary,
+} from '@/modules/chat/utils/subagentSummary';
 
 type SubagentPanelProps = {
   /** Raw tool input of the call that spawned the agent, used for the prompt. */
@@ -24,17 +29,6 @@ type SubagentPanelProps = {
  * otherwise mount hundreds of tool renderers the moment it is opened.
  */
 const INITIALLY_RENDERED_ACTIVITIES = 25;
-
-function parseToolInput(toolInput: unknown): Record<string, unknown> {
-  if (typeof toolInput !== 'string') {
-    return (toolInput as Record<string, unknown>) || {};
-  }
-  try {
-    return JSON.parse(toolInput) as Record<string, unknown>;
-  } catch {
-    return {};
-  }
-}
 
 /**
  * Unwraps the block-array shape agent results sometimes arrive in
@@ -116,17 +110,20 @@ export const SubagentPanel = memo(({
   const [renderLimit, setRenderLimit] = useState(INITIALLY_RENDERED_ACTIVITIES);
   const effectiveRenderLimit = isExporting ? Number.POSITIVE_INFINITY : renderLimit;
 
-  const parsedInput = useMemo(() => parseToolInput(toolInput), [toolInput]);
+  const parsedInput = useMemo(() => parseSubagentToolInput(toolInput), [toolInput]);
   const resultText = useMemo(() => readResultText(toolResult?.content), [toolResult?.content]);
 
   const entries = activity ?? [];
-  const status = subagent?.status ?? (toolResult ? 'completed' : 'running');
-  const toolCount = entries.filter((entry) => entry.kind === 'tool').length;
-  // Claude names its agent presets (Explore, Plan); Codex has none, so the
-  // neutral label carries and the assigned nickname shows alongside it.
-  const label = subagent?.type ?? String(parsedInput.subagent_type ?? '');
-  const nickname = subagent?.name && subagent.name !== subagent.type ? subagent.name : '';
-  const description = subagent?.description ?? String(parsedInput.description ?? '');
+  // The same reading the pinned bar takes, so the two can never disagree about whether this
+  // agent is still going. Claude names its agent presets (Explore, Plan); Codex has none, so
+  // the neutral label carries and the assigned nickname shows alongside it.
+  const { status, label, nickname, description, toolCount, finishedAt } = readSubagentSummary({
+    toolInput,
+    toolResult,
+    subagent,
+    activity,
+  });
+  const finishTime = formatSubagentFinishTime(finishedAt);
   const prompt = String(parsedInput.prompt ?? '');
   // The backend truncates very long timelines for transport; say so rather
   // than implying the agent stopped where the list does.
@@ -169,6 +166,11 @@ export const SubagentPanel = memo(({
             <>
               <CircleCheck className="h-3 w-3" />
               {toolCount > 0 ? `${toolCount} ${toolCount === 1 ? 'tool' : 'tools'}` : 'done'}
+              {/* When it ended, once it is no longer pinned above the transcript. Absent
+                * rather than guessed when the stored timeline carried no stamps. */}
+              {finishTime && (
+                <span className="text-muted-foreground/70">· {finishTime}</span>
+              )}
             </>
           )}
         </span>
