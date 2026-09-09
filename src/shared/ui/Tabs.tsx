@@ -74,7 +74,7 @@ type TabsProps = {
  * label changes, which is precisely when a tab strip is being looked at.
  *
  * A tab's optional `count` is a capability of the strip: a word tab draws Verve's own count
- * pill, an icon tab a single accent dot over the glyph's shoulder. The accessible name stays
+ * pill, an icon tab a single accent dot on the glyph's shoulder. The accessible name stays
  * the bare label regardless.
  */
 export function Tabs({ tabs, active, onChange, ariaLabel, variant = 'segmented' }: TabsProps) {
@@ -118,18 +118,23 @@ export function Tabs({ tabs, active, onChange, ariaLabel, variant = 'segmented' 
             onClick={() => onChange(tab.id)}
             onKeyDown={moveSelectionByKey}
           >
-            {tab.icon ? <tab.icon className="vv-tabs__icon" strokeWidth={2} /> : tab.label}
+            {tab.icon ? (
+              // The glyph carries the dot, not the tab: once the strip spreads its tabs to
+              // share the row, a dot anchored to the TAB's corner drifts as far from the icon
+              // as the slice is wide.
+              <span className="vv-tabs__glyph">
+                <tab.icon className="vv-tabs__icon" strokeWidth={2} />
+                {hasCount && <span className="vv-tabs__dot" aria-hidden="true" />}
+              </span>
+            ) : tab.label}
             {/* A glyph has no room beside it for a number, so an icon tab marks a waiting count
               * with a single accent dot; a word tab still counts out loud in the pill. Both are
               * decoration — the tab's name is its aria-label either way. */}
-            {hasCount &&
-              (tab.icon ? (
-                <span className="vv-tabs__dot" aria-hidden="true" />
-              ) : (
-                <span className="vv-tabs__count" data-tone="neutral" aria-hidden="true">
-                  {tab.count}
-                </span>
-              ))}
+            {hasCount && !tab.icon && (
+              <span className="vv-tabs__count" data-tone="neutral" aria-hidden="true">
+                {tab.count}
+              </span>
+            )}
           </button>
         );
       })}

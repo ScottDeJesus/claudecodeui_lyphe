@@ -140,23 +140,28 @@
  * touch target on the mobile drawer. `line-height: 0` keeps the button's height off the text
  * metrics of a label that is no longer drawn. */
 .vv-tabs__tab--icon {
-  position: relative;
   display: inline-flex;
   align-items: center;
+  /* Centred, because the tab is no longer only as wide as its glyph: the underline strip
+   * spreads its tabs across the row, and left-packed content in a 51px slice reads as a
+   * misaligned row rather than a spaced one. */
+  justify-content: center;
   padding: 8px 11px;
   line-height: 0;
 }
+.vv-tabs__glyph { position: relative; display: inline-flex; }
 .vv-tabs__icon { width: 16px; height: 16px; }
 /* A waiting count on an icon tab, as one accent dot over the glyph's top-right shoulder. It is
  * positioned OUT of the flex row, not laid beside the glyph: an in-row mark widens that one tab
  * and moves every tab after it the moment the count appears — the strip must not shuffle under
- * a hand because a queue filled. The ring is --canvas, measured off the sidebar the strip
+ * a hand because a queue filled. It hangs off the GLYPH's own corner, so it stays with the
+ * icon however wide the tab grows. The ring is --canvas, measured off the sidebar the strip
  * actually sits on (bg-background/80 over the page), so the dot reads as a disc against the
  * glyph's strokes instead of smearing into them. */
 .vv-tabs__dot {
   position: absolute;
-  top: 5px;
-  right: 7px;
+  top: -3px;
+  right: -4px;
   width: 6px;
   height: 6px;
   border-radius: var(--radius-pill);
@@ -179,6 +184,12 @@
   background: none;
   box-shadow: inset 0 -1px 0 var(--border);
 }
+/* The tabs share the row rather than packing against its left edge: five 36px glyphs in a
+ * 264px sidebar left a third of the rule bare, which reads as a row that failed to fill
+ * rather than as a row of five. `1 1 auto` grows them from their own widths, so equal
+ * icon tabs stay equal and a plugin's word tab keeps the room its label needs; once the
+ * whole set no longer fits, growth stops and the strip scrolls as before. */
+.vv-tabs--underline .vv-tabs__tab { flex: 1 1 auto; }
 .vv-tabs--underline .vv-tabs__tab {
   padding: 7px 10px;
   border-radius: 0;

@@ -38,7 +38,10 @@ type SidebarHeaderProps = {
 function LogoBlock({ t }: { t: TFunction }) {
   return (
     <div className="flex min-w-0 items-center">
-      <h1 className="truncate font-serif text-[21px] leading-[1.1] text-foreground">
+      {/* `text-accent-ink`, not `text-primary`: the accent FILL reads at 2.55:1 as text, and
+          the house rule is that a green WORD takes the ink and a green SHAPE takes the fill
+          (tailwind.config.js). */}
+      <h1 className="truncate font-serif text-[21px] leading-[1.1] text-accent-ink">
         {t('app.title')}
       </h1>
     </div>

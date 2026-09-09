@@ -24,7 +24,7 @@
     "conversationCount_other": "{{count}} conversaciones"
   },
   "app": {
-    "title": "CloudCLI",
+    "title": "LYPHE CLI",
     "subtitle": "Interfaz de asistente de programación con IA"
   },
   "sessions": {

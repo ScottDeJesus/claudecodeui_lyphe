@@ -23,7 +23,7 @@
     "conversationCount_other": "{{count}} konuşma"
   },
   "app": {
-    "title": "CloudCLI",
+    "title": "LYPHE CLI",
     "subtitle": "AI kodlama asistanı arayüzü"
   },
   "sessions": {
