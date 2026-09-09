@@ -67,6 +67,7 @@ const NAV_TABS: Array<{ id: AppTab; label: string; keywords: string }> = [
   { id: 'shell', label: 'Go to Shell', keywords: 'shell terminal console' },
   { id: 'git', label: 'Go to Git', keywords: 'git diff branches' },
   { id: 'tasks', label: 'Go to Tasks', keywords: 'tasks taskmaster' },
+  { id: 'memory', label: 'Go to Memory', keywords: 'memory intake pending descent' },
 ];
 
 /** Rendered by the project-workspace module to search projects, sessions, files, branches and commits and run their actions. */

@@ -121,6 +121,53 @@
   color: var(--ink);
   box-shadow: var(--shadow-rest);
 }
+/* The side-nav count pill in the Verve design file, verbatim: a routine count in the grey
+ * register, read off the same two tone tokens `.vv-badge` reads (controls.css:72-85). */
+.vv-tabs__count {
+  margin-left: 6px;
+  padding: 1px 7px;
+  display: inline-block;
+  border-radius: var(--radius-pill);
+  background: var(--tone-soft);
+  color: var(--tone-ink);
+  font-size: 11.5px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Underline register — for chrome that is already a surface (the sidebar), where a second
+ * filled tray reads as a card on a card. The rule under the row is the strip; the chosen tab
+ * thickens its own slice of it. Every tab reserves the 2px whether chosen or not, so nothing
+ * shifts by a pixel as the selection moves. Weight changes with it, so the choice survives
+ * greyscale (doctrine §6) — colour alone would not. */
+/* `min-width: 100%` so the rule spans the whole column when the tabs are short, and grows with
+ * them when they overflow their scroller — the divider is never a stub under three words. */
+.vv-tabs--underline {
+  min-width: 100%;
+  gap: 2px;
+  padding: 0;
+  border-radius: 0;
+  background: none;
+  box-shadow: inset 0 -1px 0 var(--border);
+}
+.vv-tabs--underline .vv-tabs__tab {
+  padding: 7px 10px;
+  border-radius: 0;
+  border-bottom: 2px solid transparent;
+  /* On the scale (--text-small), not a hand-picked 13px. */
+  font-size: var(--text-small);
+  transition: color 0.2s, border-color 0.2s;
+}
+/* 700, not 600: only the 400 / 500 / 700 cuts of Schibsted Grotesk are loaded, so a 600 here is
+ * a weight the family does not have — the browser resolves or synthesises it, and the strip
+ * stops being set in the same type as everything around it. Measured, per doctrine §7. */
+.vv-tabs--underline .vv-tabs__tab[aria-selected='true'] {
+  background: none;
+  box-shadow: none;
+  border-bottom-color: var(--accent);
+  color: var(--ink);
+  font-weight: 700;
+}
 
 /* ---------------------------------------------------------------- EmptyState */
 /* Dashed, because a solid card says "here is a thing" and the point is that there is not one. */

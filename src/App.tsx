@@ -7,6 +7,7 @@ import { UiPreferencesProvider } from '@/shared/context/UiPreferencesContext';
 import { ToastStack } from '@/shared/ui';
 import { AuthProvider, ProtectedRoute } from '@/modules/auth';
 import { TaskMasterProvider,TasksSettingsProvider } from '@/modules/task-master';
+import { MemoryIntakeProvider } from '@/modules/memory-intake';
 import { WebSocketProvider } from '@/shared/context/WebSocketContext';
 import { PluginsProvider } from '@/modules/plugins';
 import { ProjectWorkspaceRoute } from '@/modules/project-workspace';
@@ -125,12 +126,15 @@ export default function App() {
               <TasksSettingsProvider>
                 <TaskMasterProvider>
                 <ProtectedRoute>
-                  <Router basename={routerBasename}>
-                    <Routes>
-                      <Route path="/" element={<ProjectWorkspaceRoute />} />
-                      <Route path="/session/:sessionId" element={<ProjectWorkspaceRoute />} />
-                    </Routes>
-                  </Router>
+                  {/* Inside the auth gate, so the memory poll never fires against the login screen. */}
+                  <MemoryIntakeProvider>
+                    <Router basename={routerBasename}>
+                      <Routes>
+                        <Route path="/" element={<ProjectWorkspaceRoute />} />
+                        <Route path="/session/:sessionId" element={<ProjectWorkspaceRoute />} />
+                      </Routes>
+                    </Router>
+                  </MemoryIntakeProvider>
                 </ProtectedRoute>
                 </TaskMasterProvider>
               </TasksSettingsProvider>

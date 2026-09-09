@@ -5,12 +5,14 @@ import { FileManager } from '@/modules/file-manager';
 import { StandaloneShell } from '@/modules/standalone-shell';
 import { GitPanel } from '@/modules/git-panel';
 import { PluginTabContent } from '@/modules/plugins';
-import { BrowserUsePanel, useBrowserUseEnabled } from '@/modules/browser-use';
+import { BrowserUsePanel } from '@/modules/browser-use';
 import { usePaletteOpsRegister } from '@/modules/command-palette';
-import { TaskMasterPanel, useTaskMasterProjectSync, useTasksSettings } from '@/modules/task-master';
+import { MemoryIntakePanel } from '@/modules/memory-intake';
+import { TaskMasterPanel, useTaskMasterProjectSync } from '@/modules/task-master';
 import type { AppTab, Project, ProjectSession, SessionEstablishedContext, SessionNavigationOptions, SettingsMainTab } from '@/shared/types';
 import { useUiPreferences } from '@/shared/context/UiPreferencesContext';
 import { useFileOpenResolver } from '@/modules/project-workspace/hooks/useFileOpenResolver';
+import { useWorkspaceTabGates } from '@/modules/project-workspace/hooks/useWorkspaceTabGates';
 import WorkspaceHeader from '@/modules/project-workspace/WorkspaceHeader';
 import WorkspaceStateView from '@/modules/project-workspace/WorkspaceStateView';
 import WorkspaceErrorBoundary from '@/modules/project-workspace/WorkspaceErrorBoundary';
@@ -50,16 +52,19 @@ function WorkspaceMain({
   newSessionTrigger,
 }: WorkspaceMainProps) {
   const preferences = useUiPreferences();
-  const { showRawParameters, showThinking, sendByCtrlEnter, hideShellTab, settled: preferencesSettled } = preferences;
+  const { showRawParameters, showThinking, sendByCtrlEnter } = preferences;
 
-  const { tasksEnabled, isTaskMasterInstalled } = useTasksSettings();
-  const browserUseEnabled = useBrowserUseEnabled();
+  // The same reading the sidebar's tab strip takes — one hook, so the strip and these panes can
+  // never disagree about which tabs exist.
+  const {
+    shouldShowTasksTab,
+    shouldShowBrowserTab,
+    shouldShowShellTab,
+    shouldShowMemoryTab,
+    preferencesSettled,
+  } = useWorkspaceTabGates(activeTab);
 
   useTaskMasterProjectSync(selectedProject);
-
-  const shouldShowTasksTab = Boolean(tasksEnabled && isTaskMasterInstalled);
-  const shouldShowBrowserTab = browserUseEnabled;
-  const shouldShowShellTab = !hideShellTab;
 
   // The one path-opening capability three caller families share — the chat's Edit/Write cards and
   // bare links, the git panel's changed-file rows, and the tree beside the file manager. It lives
@@ -84,6 +89,16 @@ function WorkspaceMain({
   // real project files before opening them in the file manager.
   const resolvedFileOpen = useFileOpenResolver(selectedProject, handleFileOpen);
 
+  // The three effects below snap a PREFERENCE-gated tab back to chat when its gate turns off:
+  // tasks, shell and browser vanish the moment a person switches them off, and leaving the
+  // workspace pointed at a tab that is no longer on the bar leaves an empty pane. There is no
+  // fourth effect for the Memory tab, and adding one would fight the design: that tab is
+  // DATA-gated, so its gate is written to HOLD while it is the selected tab
+  // (`useWorkspaceTabGates`) and filing the last pending memory empties the panel instead of
+  // taking the tab away mid-act. Two kinds of tab, two policies, each living in the layer that
+  // owns the act — the gate rule in the hook that decides a tab exists, the navigation here,
+  // where `setActiveTab` is.
+  //
   // The two preference-gated snap-backs wait for `preferencesSettled`, and it is a dependency
   // rather than an early return so the flag flipping re-runs them on its own — the reducer
   // returns the SAME state object when the server's value equals the default, so a value that
@@ -118,6 +133,12 @@ function WorkspaceMain({
   // Stable so React.memo(ChatInterface) can bail out: an inline arrow here made every
   // WorkspaceMain render re-render the whole chat tree — and this component re-renders on
   // every `openRequest` change and on each of the two preference-gated tab effects settling.
+  //
+  // The chat is offered this (below, as `onShowAllTasks`) on `shouldShowTasksTab`, not on the
+  // bare `tasksEnabled` it once read: with tasks enabled but task-master NOT installed the Tasks
+  // tab is off the bar and its pane is never mounted, so the old predicate handed the reader a
+  // link to a tab the snap-back effect above returns straight to chat. One capability, one
+  // predicate.
   const showAllTasks = useCallback(() => {
     setActiveTab('tasks');
   }, [setActiveTab]);
@@ -140,17 +161,7 @@ function WorkspaceMain({
 
   return (
     <div className="flex h-full flex-col">
-      <WorkspaceHeader
-        activeTab={activeTab}
-        setActiveTab={setActiveTab}
-        selectedProject={selectedProject}
-        selectedSession={selectedSession}
-        shouldShowTasksTab={shouldShowTasksTab}
-        shouldShowBrowserTab={shouldShowBrowserTab}
-        shouldShowShellTab={shouldShowShellTab}
-        isMobile={isMobile}
-        onMenuClick={onMenuClick}
-      />
+      <WorkspaceHeader isMobile={isMobile} onMenuClick={onMenuClick} />
 
       <div className="flex min-h-0 min-w-[200px] flex-1 flex-col overflow-hidden">
         <div className={`h-full ${activeTab === 'chat' ? 'block' : 'hidden'}`}>
@@ -170,7 +181,7 @@ function WorkspaceMain({
               sendByCtrlEnter={sendByCtrlEnter}
               externalMessageUpdate={externalMessageUpdate}
               newSessionTrigger={newSessionTrigger}
-              onShowAllTasks={tasksEnabled ? showAllTasks : null}
+              onShowAllTasks={shouldShowTasksTab ? showAllTasks : null}
             />
           </WorkspaceErrorBoundary>
         </div>
@@ -212,6 +223,12 @@ function WorkspaceMain({
         {shouldShowBrowserTab && activeTab === 'browser' && (
           <div className="h-full overflow-hidden">
             <BrowserUsePanel isVisible={activeTab === 'browser'} onShowSettings={onShowSettings} />
+          </div>
+        )}
+
+        {shouldShowMemoryTab && activeTab === 'memory' && (
+          <div className="h-full overflow-hidden">
+            <MemoryIntakePanel />
           </div>
         )}
 

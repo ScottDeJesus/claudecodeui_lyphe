@@ -9,7 +9,7 @@ type ProjectsState = ReturnType<typeof useProjectsState>;
 
 type ProjectSidebarState = Pick<
   ProjectsState,
-  'sidebarOpen' | 'setSidebarOpen' | 'sidebarSharedProps'
+  'sidebarOpen' | 'setSidebarOpen' | 'sidebarSharedProps' | 'activeTab' | 'setActiveTab'
 >;
 
 type ProjectMainState = Pick<
@@ -30,7 +30,7 @@ type ProjectMainState = Pick<
 
 type ProjectCommandState = Pick<
   ProjectsState,
-  'selectedProject' | 'handleNewSession' | 'openSettings' | 'setActiveTab'
+  'selectedProject' | 'handleNewSession' | 'openSettings' | 'activeTab' | 'setActiveTab'
 >;
 
 type ProjectEffectsState = Pick<
@@ -79,8 +79,18 @@ export function ProjectsStateProvider({
       sidebarOpen: state.sidebarOpen,
       setSidebarOpen: state.setSidebarOpen,
       sidebarSharedProps: state.sidebarSharedProps,
+      // The workspace tab strip renders in the sidebar now, so the sidebar needs the same tab
+      // state the main region switches its panes on — the one `useProjectsState` already owns.
+      activeTab: state.activeTab,
+      setActiveTab: state.setActiveTab,
     }),
-    [state.sidebarOpen, state.setSidebarOpen, state.sidebarSharedProps],
+    [
+      state.activeTab,
+      state.setActiveTab,
+      state.sidebarOpen,
+      state.setSidebarOpen,
+      state.sidebarSharedProps,
+    ],
   );
 
   const mainState = useMemo<ProjectMainState>(
@@ -119,9 +129,10 @@ export function ProjectsStateProvider({
       selectedProject: state.selectedProject,
       handleNewSession: state.handleNewSession,
       openSettings: state.openSettings,
+      activeTab: state.activeTab,
       setActiveTab: state.setActiveTab,
     }),
-    [state.handleNewSession, state.openSettings, state.selectedProject, state.setActiveTab],
+    [state.activeTab, state.handleNewSession, state.openSettings, state.selectedProject, state.setActiveTab],
   );
 
   const effectsState = useMemo<ProjectEffectsState>(

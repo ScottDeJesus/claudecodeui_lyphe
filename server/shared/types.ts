@@ -1490,6 +1490,19 @@ export type DescentUsageWindow = { key: string; label: string; percent: number |
 export type DescentUsage =
   | { reachable: true; windows: DescentUsageWindow[]; degraded: boolean; reason: string; staleSince: number | null; checkedAt: number }
   | { reachable: false; reason: string };
+/** One row of Descent's memory-intake list, camelCased from its snake_case (`asserted_path`, `created_at`, `reviewed_at`). LEAN: no `body`, no `rationale` — enough to decide, not to read (`store_memory.py:88-106`); the body arrives from the by-id read for the ONE card the operator expands.
+ *  `refusal` is the cap guard's own plain-English text, recorded on the row when an approve was refused — it stays on a PENDING card and is cleared on the next approve, so a non-null `refusal` means "still waiting, and here is what to trim", never "gone". `status` is Descent's word (`pending` while it is listed here); `assertedPath` is the file an approved card landed in and is `null` until then. */
+export type MemoryCandidateLean = { id: string; name: string; target: string; project: string | null; status: string; source: string | null; assertedPath: string | null; refusal: string | null; createdAt: string | null; reviewedAt: string | null };
+/** One candidate read whole. `body` is the memory's proposed text and is REQUIRED — a full read without one is not a reading, so it fails the read rather than arriving empty. `indexLine`, `rationale` and `sessionId` are `null` when the staging never supplied them. Operator-authored free text throughout: it reaches the DOM as a text node, never as markup. */
+export type MemoryCandidateFull = MemoryCandidateLean & { body: string; indexLine: string | null; rationale: string | null; sessionId: string | null };
+/** The pending list, or the calm reason it is unknown — a read never fails. `reason` is one of this proxy's three words (`unreachable`|`timeout`|`bad-response`) and never Descent's text. `candidates` is whole or absent: one row missing `id`, `name` or `target` fails the WHOLE read as `bad-response`, because a silently shortened queue reads as "nothing to review". Descent caps the list at 100 rows. */
+export type MemoryPending =
+  | { reachable: true; candidates: MemoryCandidateLean[] }
+  | { reachable: false; reason: string };
+/** One candidate read by id, or the calm reason it is unknown. `candidate: null` is Descent answering `ok:false`, which means ONE thing: no row carries that id. A card ALREADY REVIEWED still reads whole, `status` reading `approved` or `rejected` — Descent's by-id read has no status filter (`store_memory.py:343-349`, measured 2026-09-08 on `mc-26`), so a reviewed card is a candidate the queue no longer lists, never a null. The null is an ANSWER, not an error: the route stays 200 and the client draws "no longer there". `reason` is again only this proxy's three words. */
+export type MemoryCandidateRead =
+  | { reachable: true; candidate: MemoryCandidateFull | null }
+  | { reachable: false; reason: string };
 
 // ---------------------------
 //----------------- CLI VERSION CONTRACTS ------------

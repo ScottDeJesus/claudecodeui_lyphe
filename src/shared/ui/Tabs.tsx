@@ -1,6 +1,13 @@
 import type { KeyboardEvent } from 'react';
 
-type TabItem = { id: string; label: string };
+import { cn } from '@/shared/utils';
+
+/**
+ * `count` is a capability of the strip, not a prop every caller needs: a measured site
+ * (doctrine §8) decides it exists. One caller today — the workspace strip's Memory tab
+ * (Phase 5); the git panel's two tabs pass none.
+ */
+type TabItem = { id: string; label: string; count?: number };
 
 /**
  * Arrow / Home / End move the selection, which is the contract `role="tablist"` announces.
@@ -36,21 +43,31 @@ type TabsProps = {
   onChange: (id: string) => void;
   /** The accessible name for the strip — "Workspace", "Git view". A tablist needs one. */
   ariaLabel: string;
+  /**
+   * `segmented` is the filled pill row. `underline` is the flat form for chrome that already
+   * has a surface of its own — the sidebar, where a second filled tray under the wordmark
+   * would read as a card floating on a card.
+   */
+  variant?: 'segmented' | 'underline';
 };
 
 /**
- * The app's one segmented tab strip.
+ * The app's one tab strip, in two registers: a filled segmented tray (`segmented`, the default)
+ * and a flat rule-and-underline row (`underline`).
  *
- * Used by the project-workspace module (Phase 5) for the Chat / Files / Git strip and by the
- * git-panel module (Phase 10) for its own two views — the same shape twice, so neither
- * hand-rolls it.
+ * Used by the project-workspace module for the Chat / Files / Git strip — `underline`, since it
+ * sits in the sidebar under the wordmark — and by the git-panel module for its own two views.
+ * The same shape twice, so neither hand-rolls it.
  *
  * There is no sliding indicator. The active tab paints its own background, which means the
  * only animated properties are colours: nothing measures a box, and nothing moves. An
  * indicator that animates `left`/`width` also reads a stale width for a frame whenever a
  * label changes, which is precisely when a tab strip is being looked at.
+ *
+ * A tab's optional `count` is a capability of the strip, drawn as Verve's own count pill; the
+ * accessible name stays the bare label regardless.
  */
-export function Tabs({ tabs, active, onChange, ariaLabel }: TabsProps) {
+export function Tabs({ tabs, active, onChange, ariaLabel, variant = 'segmented' }: TabsProps) {
   // Which tab holds the strip's single Tab stop. It falls back to the FIRST tab when `active`
   // names no tab in the list, because `tab.id === active` alone would then give the strip zero
   // stops and put it out of reach of the keyboard entirely — worse than no roving at all. That
@@ -60,7 +77,11 @@ export function Tabs({ tabs, active, onChange, ariaLabel }: TabsProps) {
   const stopIndex = activeIndex === -1 ? 0 : activeIndex;
 
   return (
-    <div className="vv-tabs inline-flex items-center" role="tablist" aria-label={ariaLabel}>
+    <div
+      className={cn('vv-tabs inline-flex items-center', variant === 'underline' && 'vv-tabs--underline')}
+      role="tablist"
+      aria-label={ariaLabel}
+    >
       {tabs.map((tab, index) => (
         <button
           key={tab.id}
@@ -79,6 +100,11 @@ export function Tabs({ tabs, active, onChange, ariaLabel }: TabsProps) {
           onKeyDown={moveSelectionByKey}
         >
           {tab.label}
+          {typeof tab.count === 'number' && tab.count > 0 && (
+            <span className="vv-tabs__count" data-tone="neutral" aria-hidden="true">
+              {tab.count}
+            </span>
+          )}
         </button>
       ))}
     </div>

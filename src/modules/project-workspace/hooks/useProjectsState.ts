@@ -346,7 +346,7 @@ const removeSessionFromProject = (project: Project, sessionIdToDelete: string): 
   return updatedProject;
 };
 
-const VALID_TABS: Set<string> = new Set(['chat', 'files', 'shell', 'git', 'tasks', 'browser']);
+const VALID_TABS: Set<string> = new Set(['chat', 'files', 'shell', 'git', 'tasks', 'browser', 'memory']);
 
 const isValidTab = (tab: string): tab is AppTab => {
   return VALID_TABS.has(tab) || tab.startsWith('plugin:');
@@ -1022,7 +1022,7 @@ export function useProjectsState({
       clearSessionAttention(session.id);
       setSelectedSession(session);
 
-      if (activeTab === 'tasks' || activeTab === 'browser') {
+      if (activeTab === 'tasks' || activeTab === 'browser' || activeTab === 'memory') {
         setActiveTab('chat');
       }
 
