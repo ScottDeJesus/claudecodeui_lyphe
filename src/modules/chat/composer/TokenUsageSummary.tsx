@@ -1,5 +1,5 @@
 import { memo } from 'react';
-import { ActivityIcon } from 'lucide-react';
+import { CoinsIcon } from 'lucide-react';
 
 type TokenUsageSummaryProps = {
   usage: Record<string, unknown> | null;
@@ -53,10 +53,11 @@ function TokenUsageSummary({ usage, onClick }: TokenUsageSummaryProps) {
       aria-label="Show token usage"
     >
       <span className="grid h-5 w-5 place-items-center rounded-md bg-primary/10 text-primary">
-        <ActivityIcon className="h-3.5 w-3.5" />
+        <CoinsIcon className="h-3.5 w-3.5" />
       </span>
+      {/* The count alone: the coin says what it counts, and the title and accessible name
+          still spell it out for anyone who needs the word. */}
       <span className="font-medium text-foreground">{formatTokenCount(usedTokens)}</span>
-      <span className="hidden text-muted-foreground/70 sm:inline">tokens</span>
     </button>
   );
 }

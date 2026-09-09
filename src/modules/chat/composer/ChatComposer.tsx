@@ -12,7 +12,6 @@ import type {
 } from 'react';
 import { PaperclipIcon, PencilRulerIcon, XIcon, Loader2, ArrowUpIcon, PencilIcon } from 'lucide-react';
 
-import { Button } from '@/shared/ui';
 import { useVoiceInput } from '@/modules/chat/hooks/useVoiceInput';
 import { useVoiceAvailable } from '@/modules/chat/hooks/useVoiceAvailable';
 import type { QueuedDraft, ScheduledMessage, SlashCommand,SessionActivity,PendingPermissionRequest,PermissionMode,ProviderModelOption } from '@/shared/types';
@@ -419,20 +418,13 @@ export default function ChatComposer({
 
         <PromptInputFooter className="flex-wrap gap-y-1">
           <PromptInputTools className="min-w-0">
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={openAttachmentPicker}
-              className="hidden sm:inline-flex"
-            >
-              {t('input.attachFiles')}
-            </Button>
+            {/* The paperclip at every width. The desktop half of this used to spell "Attach a
+                file" in full, which was the widest thing in a row of icons and said no more
+                than the clip does. */}
             <PromptInputButton
               tooltip={{ content: t('input.attachFiles') }}
               onClick={openAttachmentPicker}
               aria-label={t('input.attachFiles')}
-              className="sm:hidden"
             >
               <PaperclipIcon />
             </PromptInputButton>
