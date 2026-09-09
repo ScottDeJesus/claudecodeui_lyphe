@@ -25,7 +25,7 @@
     "conversationCount_other": "{{count}} разговора"
   },
   "app": {
-    "title": "LYPHE CLI",
+    "title": "LypheCLI",
     "subtitle": "Интерфейс AI помощника для программирования"
   },
   "sessions": {

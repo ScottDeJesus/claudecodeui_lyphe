@@ -23,7 +23,7 @@
     "conversationCount_other": "{{count}} Unterhaltungen"
   },
   "app": {
-    "title": "LYPHE CLI",
+    "title": "LypheCLI",
     "subtitle": "KI-Programmierassistent-Oberfläche"
   },
   "sessions": {

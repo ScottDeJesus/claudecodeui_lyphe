@@ -22,7 +22,7 @@
     "conversationCount_other": "{{count}} 个对话"
   },
   "app": {
-    "title": "LYPHE CLI",
+    "title": "LypheCLI",
     "subtitle": "AI 编程助手"
   },
   "sessions": {
