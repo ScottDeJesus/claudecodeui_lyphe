@@ -22,38 +22,16 @@ const ULTRACODE_EFFORT_OPTION = {
   description: 'Highest effort plus standing workflow orchestration.',
 };
 
+/**
+ * Only models whose context window is the 1M one, plus the two that have no such variant.
+ *
+ * `default` and `best` are POLICY selectors — "whatever your deployment recommends", "the
+ * latest and greatest" — and both resolve to a 200K model, as do the bare `sonnet` and `opus`
+ * aliases beside their `[1m]` twins. Offering them here put four entries in the picker that
+ * this operator would never choose and that read as duplicates of the ones they would.
+ */
 export const CLAUDE_PREDEFINED_MODELS: ProviderModelsDefinition = {
   OPTIONS: [
-    {
-      value: 'default',
-      label: 'Default (recommended)',
-      description: 'Use the recommended model for your Claude account and deployment.',
-      effort: {
-        default: 'high',
-        values: [
-          { value: 'low' },
-          { value: 'medium' },
-          { value: 'high' },
-          { value: 'max' },
-        ],
-      },
-    },
-    {
-      value: 'best',
-      label: 'Best available',
-      description: 'Use the latest Fable model when available, otherwise the latest Opus model.',
-      effort: {
-        default: 'high',
-        values: [
-          { value: 'low' },
-          { value: 'medium' },
-          { value: 'high' },
-          { value: 'xhigh' },
-          { value: 'max' },
-          ULTRACODE_EFFORT_OPTION,
-        ],
-      },
-    },
     {
       value: 'fable',
       label: 'Fable',
@@ -71,41 +49,9 @@ export const CLAUDE_PREDEFINED_MODELS: ProviderModelsDefinition = {
       },
     },
     {
-      value: 'sonnet',
-      label: 'Sonnet',
-      description: 'Latest Sonnet model for everyday coding tasks.',
-      effort: {
-        default: 'high',
-        values: [
-          { value: 'low' },
-          { value: 'medium' },
-          { value: 'high' },
-          { value: 'xhigh' },
-          { value: 'max' },
-          ULTRACODE_EFFORT_OPTION,
-        ],
-      },
-    },
-    {
       value: 'sonnet[1m]',
       label: 'Sonnet (1M context)',
       description: 'Latest Sonnet model with a 1M context window.',
-      effort: {
-        default: 'high',
-        values: [
-          { value: 'low' },
-          { value: 'medium' },
-          { value: 'high' },
-          { value: 'xhigh' },
-          { value: 'max' },
-          ULTRACODE_EFFORT_OPTION,
-        ],
-      },
-    },
-    {
-      value: 'opus',
-      label: 'Opus',
-      description: 'Latest Opus model for complex reasoning and coding tasks.',
       effort: {
         default: 'high',
         values: [
@@ -156,7 +102,10 @@ export const CLAUDE_PREDEFINED_MODELS: ProviderModelsDefinition = {
       },
     },
   ],
-  DEFAULT: 'default',
+  // The default has to name a model that is actually in OPTIONS: it is both the fallback the
+  // runtime hands the SDK when a turn carries no model, and what the service compares a
+  // session's resolved model against.
+  DEFAULT: 'opus[1m]',
 };
 
 export const findClaudeModelOption = (model: string | undefined | null): ProviderModelOption | null => {

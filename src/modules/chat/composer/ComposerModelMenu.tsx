@@ -1,7 +1,6 @@
-import { memo, useCallback, useEffect, useMemo, useState } from 'react';
+import { memo, useCallback, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
-import { ChevronDown, ChevronRight } from 'lucide-react';
 
 import type { ProviderModelOption } from '@/shared/types';
 import { DEFAULT_EFFORT_VALUE } from '@/shared/constants';
@@ -12,7 +11,6 @@ import {
   ComposerMenuHeading,
   ComposerMenuItem,
   ComposerMenuNote,
-  ComposerMenuSeparator,
   ComposerMenuSurface,
 } from '@/modules/chat/composer/ComposerMenuPrimitives';
 
@@ -33,6 +31,12 @@ type ComposerModelMenuProps = {
 /**
  * Rendered by chat's ChatComposer as the popover for choosing the active
  * provider's model and reasoning effort for the next turn.
+ *
+ * Two columns, model on the LEFT and reasoning on the right, in the order the choice is
+ * actually made: the model decides which efforts exist, so it cannot sensibly be the thing you
+ * reach second. The model list used to sit collapsed BELOW the efforts, which put the deciding
+ * choice one click away and underneath the choice that depends on it. Below `sm` the columns
+ * stack in the same order, model first.
  */
 function ComposerModelMenu({
   effort,
@@ -45,17 +49,10 @@ function ComposerModelMenu({
 }: ComposerModelMenuProps) {
   const { t } = useTranslation('chat');
   const [isOpen, setIsOpen] = useState(false);
-  const [isModelSectionOpen, setIsModelSectionOpen] = useState(false);
   const close = useCallback(() => setIsOpen(false), []);
-  const { triggerRef, menuRef, anchor, updateAnchor } = useComposerMenuAnchor(isOpen, close);
-
-  // The model list starts collapsed every time the menu opens, the way Codex
-  // shows reasoning first and keeps the longer model list one click away.
-  useEffect(() => {
-    if (!isOpen) {
-      setIsModelSectionOpen(false);
-    }
-  }, [isOpen]);
+  // Wide enough for two columns; the anchor clamps it to the viewport, and the columns stack
+  // when that clamp bites.
+  const { triggerRef, menuRef, anchor, updateAnchor } = useComposerMenuAnchor(isOpen, close, 34 * 16);
 
   const defaultEffortLabel = t('composer.effortDefault', { defaultValue: 'Default' });
   const resolvedEffortOptions = useMemo<EffortOption[]>(
@@ -116,73 +113,71 @@ function ComposerModelMenu({
 
       {isOpen && anchor && createPortal(
         <ComposerMenuSurface anchor={anchor} menuRef={menuRef} ariaLabel={ariaLabel}>
-          {hasEffortSection && (
-            <>
-              <ComposerMenuHeading>
-                {t('composer.reasoning', { defaultValue: 'Reasoning' })}
-              </ComposerMenuHeading>
-              {resolvedEffortOptions.map((option) => (
-                <ComposerMenuItem
-                  key={option.value}
-                  label={option.value === DEFAULT_EFFORT_VALUE ? defaultEffortLabel : option.value}
-                  description={option.description}
-                  isSelected={option.value === effort}
-                  onSelect={() => {
-                    onSelectEffort(option.value);
-                    setIsOpen(false);
-                  }}
-                  className="capitalize"
-                />
-              ))}
-            </>
-          )}
+          <div className="flex flex-col sm:flex-row sm:items-stretch sm:gap-1">
+            {hasModelSection && (
+              <div
+                role="group"
+                aria-label={t('composer.modelHeading', { defaultValue: 'Model for this conversation' })}
+                className="min-w-0 sm:flex-1"
+              >
+                <ComposerMenuHeading>
+                  {t('composer.modelHeading', { defaultValue: 'Model for this conversation' })}
+                </ComposerMenuHeading>
+                {modelOptions.length === 0 && modelsLoading && (
+                  <p className="px-2.5 py-1.5 text-sm text-muted-foreground">
+                    {t('composer.loadingModels', { defaultValue: 'Loading models…' })}
+                  </p>
+                )}
+                {modelOptions.map((option) => (
+                  <ComposerMenuItem
+                    key={option.value}
+                    label={option.label || option.value}
+                    isSelected={option.value === model}
+                    onSelect={() => {
+                      onSelectModel(option.value);
+                      setIsOpen(false);
+                    }}
+                  />
+                ))}
+                <ComposerMenuNote>
+                  {t('composer.modelNote', {
+                    defaultValue: 'Changing this starts the next message on the new model. Earlier messages stay as they are.',
+                  })}
+                </ComposerMenuNote>
+              </div>
+            )}
 
-          {hasModelSection && (
-            <>
-              {hasEffortSection && <ComposerMenuSeparator />}
-              <ComposerMenuItem
-                role="menuitem"
-                label={modelLabel}
-                isSelected={false}
-                onSelect={() => setIsModelSectionOpen((current) => !current)}
-                trailing={
-                  isModelSectionOpen
-                    ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
-                    : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
-                }
-                className="text-muted-foreground"
-              />
-
-              {isModelSectionOpen && (
-                <>
+            {hasEffortSection && (
+              <>
+                {/* A rule between the columns side by side, and across them once stacked. */}
+                {hasModelSection && (
+                  <div className="my-1 h-px shrink-0 bg-border sm:my-0 sm:h-auto sm:w-px" aria-hidden />
+                )}
+                <div
+                  role="group"
+                  aria-label={t('composer.reasoning', { defaultValue: 'Reasoning' })}
+                  className="min-w-0 sm:flex-1"
+                >
                   <ComposerMenuHeading>
-                    {t('composer.modelHeading', { defaultValue: 'Model for this conversation' })}
+                    {t('composer.reasoning', { defaultValue: 'Reasoning' })}
                   </ComposerMenuHeading>
-                  {modelOptions.length === 0 && modelsLoading && (
-                    <p className="px-2.5 py-1.5 text-sm text-muted-foreground">
-                      {t('composer.loadingModels', { defaultValue: 'Loading models…' })}
-                    </p>
-                  )}
-                  {modelOptions.map((option) => (
+                  {resolvedEffortOptions.map((option) => (
                     <ComposerMenuItem
                       key={option.value}
-                      label={option.label || option.value}
-                      isSelected={option.value === model}
+                      label={option.value === DEFAULT_EFFORT_VALUE ? defaultEffortLabel : option.value}
+                      description={option.description}
+                      isSelected={option.value === effort}
                       onSelect={() => {
-                        onSelectModel(option.value);
+                        onSelectEffort(option.value);
                         setIsOpen(false);
                       }}
+                      className="capitalize"
                     />
                   ))}
-                  <ComposerMenuNote>
-                    {t('composer.modelNote', {
-                      defaultValue: 'Changing this starts the next message on the new model. Earlier messages stay as they are.',
-                    })}
-                  </ComposerMenuNote>
-                </>
-              )}
-            </>
-          )}
+                </div>
+              </>
+            )}
+          </div>
         </ComposerMenuSurface>,
         document.body,
       )}
