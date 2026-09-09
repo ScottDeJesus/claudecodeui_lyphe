@@ -51,7 +51,7 @@ export type ProviderModelActions = {
 //----------------- PROJECTS AND SESSIONS ------------
 
 /** Identifies the workspace pane the user is looking at; plugin panes are namespaced by plugin id. */
-export type AppTab = 'chat' | 'files' | 'shell' | 'git' | 'tasks' | 'browser' | `plugin:${string}`;
+export type AppTab = 'chat' | 'files' | 'shell' | 'git' | 'tasks' | 'browser' | 'memory' | `plugin:${string}`;
 
 /** A message queued to be sent to a session at a future time. */
 export type ScheduledMessage = {
@@ -188,6 +188,25 @@ export type SessionActivitySnapshot = {
   statusText?: string | null;
   canInterrupt?: boolean;
   startedAt?: number;
+};
+
+/**
+ * One in-flight run as reported by `GET /api/providers/sessions/running`,
+ * carrying the project it belongs to.
+ *
+ * The project identity travels with the run so the sidebar's Running list can
+ * be built from the server's run registry rather than from the sessions a
+ * client happens to have paged in.
+ */
+export type RunningSessionListItem = {
+  sessionId: string;
+  provider: LLMProvider;
+  startedAt?: number;
+  projectId: string | null;
+  projectPath: string | null;
+  projectDisplayName: string;
+  sessionTitle: string;
+  lastActivity: string | null;
 };
 
 // ---------------------------
@@ -340,6 +359,10 @@ export type ChatMessage = {
   isThinking?: boolean;
   isStreaming?: boolean;
   isToolUse?: boolean;
+  /** The result text a background task notification carried, shown as prose; not the model's own reply. */
+  isTaskResult?: boolean;
+  /** A tool result that arrived with no tool call to attach to, shown as prose; not the model's own reply. */
+  isOrphanToolResult?: boolean;
   toolName?: string;
   toolInput?: unknown;
   toolResult?: ToolResult | null;
@@ -1738,6 +1761,60 @@ export type DescentUsageWindow = { key: string; label: string; percent: number |
 export type DescentUsage =
   | { reachable: true; windows: DescentUsageWindow[]; degraded: boolean; reason: string; staleSince: number | null; checkedAt: number }
   | { reachable: false; reason: string };
+
+// ---------------------------
+
+//----------------- DESCENT MEMORY INTAKE ------------
+// The client mirror of `server/shared/types.ts` § DESCENT CONTRACTS, where every field is
+// documented against Descent's behaviour; a change to either shape belongs in both files at once.
+
+/**
+ * One row of the memory-intake queue: enough to decide on, never enough to read.
+ * `refusal` is the cap guard's own words about the last refused approve — the card is STILL
+ * pending, so the row renders that text, and because Descent recorded it the text survives a
+ * refresh and reaches every other tab too.
+ */
+export type MemoryCandidateLean = { id: string; name: string; target: string; project: string | null; status: string; source: string | null; assertedPath: string | null; refusal: string | null; createdAt: string | null; reviewedAt: string | null };
+
+/**
+ * One candidate read whole — fetched only for the row a person actually expanded.
+ * `body`, `rationale` and `indexLine` are operator-authored free text: each reaches the DOM as
+ * a text node, never as markdown and never as markup, however much like markdown it looks.
+ */
+export type MemoryCandidateFull = MemoryCandidateLean & { body: string; indexLine: string | null; rationale: string | null; sessionId: string | null };
+
+/**
+ * The pending queue, or the calm reason there is none — a read never fails.
+ * `reachable: false` is NOT "zero pending": the count is 0 and the tab hides, but the panel
+ * says Descent could not be read in words. It must never render as "All filed".
+ */
+export type MemoryPending =
+  | { reachable: true; candidates: MemoryCandidateLean[] }
+  | { reachable: false; reason: string };
+
+/**
+ * One candidate read by id, or the calm reason there is none.
+ * `candidate: null` is Descent answering `ok: false`, which means ONE thing: no row carries that
+ * id. A card reviewed elsewhere is NOT null — Descent's by-id read has no status filter
+ * (`store_memory.py:343-349`) — it reads WHOLE, with `status` saying `approved` or `rejected`.
+ * Both cases render `memory.gone`: the screen's words for "no longer waiting", never an error.
+ */
+export type MemoryCandidateRead =
+  | { reachable: true; candidate: MemoryCandidateFull | null }
+  | { reachable: false; reason: string };
+
+/**
+ * What one review answered, in the terms the screen has to say back.
+ * `refused` is a 422 carrying Descent's OWN text verbatim, so the row can show what to trim and
+ * the card stays pending; `gone` is a 404 (reviewed elsewhere); `unreachable` is a 503 or a
+ * thrown fetch, and it alone is a fault.
+ */
+export type MemoryReviewOutcome =
+  | { kind: 'filed' }
+  | { kind: 'discarded' }
+  | { kind: 'refused'; reason: string }
+  | { kind: 'gone' }
+  | { kind: 'unreachable'; reason: string };
 
 // ---------------------------
 

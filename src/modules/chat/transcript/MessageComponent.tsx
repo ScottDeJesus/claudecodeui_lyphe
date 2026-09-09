@@ -2,6 +2,8 @@ import { memo, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { GitBranchIcon, PencilIcon } from 'lucide-react';
 
+import { LLMProviderLogo } from '@/shared/ui';
+
 import type { ChatMessage, ClaudePermissionSuggestion, PermissionGrantResult, LLMProvider,DiffLine,Project } from '@/shared/types';
 import { formatUsageLimitText, stripProposedPlanEnvelope } from '@/modules/chat/utils/chatFormatting';
 import { ToolRenderer, ToolErrorDisplay, SubagentPanel, shouldHideToolResult } from '@/modules/chat/tools';
@@ -19,6 +21,8 @@ import { MemoryCitations } from '@/modules/chat/transcript/MemoryCitations';
 type MessageComponentProps = {
   message: ChatMessage;
   prevMessage: ChatMessage | null;
+  /** This message is the prose reply that closes its run; it ends with the time it landed. */
+  isRunTerminal?: boolean;
   createDiff: (oldStr: string, newStr: string) => DiffLine[];
   onFileOpen?: (filePath: string, diffInfo?: unknown) => void;
   onShowSettings?: () => void;
@@ -57,8 +61,8 @@ const COPY_HIDDEN_TOOL_NAMES = new Set(['Bash', 'Edit', 'Write', 'ApplyPatch']);
  * Rendered by chat's ChatMessagesPane and ToolGroupContainer to draw one
  * transcript entry — user turn, assistant turn, or a tool call and its result.
  */
-const MessageComponent = memo(({ message, prevMessage, createDiff, onFileOpen, showRawParameters, showThinking, selectedProject, provider, onEditMessage, onForkFromMessage, resolveModelLabel, readToolPermissionState }: MessageComponentProps) => {
-  const { t } = useTranslation('chat');
+const MessageComponent = memo(({ message, prevMessage, isRunTerminal, createDiff, onFileOpen, showRawParameters, showThinking, selectedProject, provider, onEditMessage, onForkFromMessage, resolveModelLabel, readToolPermissionState }: MessageComponentProps) => {
+  const { t, i18n } = useTranslation('chat');
   const isGrouped = prevMessage && prevMessage.type === message.type &&
     ((prevMessage.type === 'assistant') ||
       (prevMessage.type === 'user') ||
@@ -95,10 +99,30 @@ const MessageComponent = memo(({ message, prevMessage, createDiff, onFileOpen, s
 
 
   // Hours and minutes only: seconds are noise in a transcript nobody times.
-  const formattedTime = useMemo(
-    () => new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-    [message.timestamp],
-  );
+  // Formatted in the app's language, not the browser's.
+  const messageTime = useMemo(() => {
+    const date = new Date(message.timestamp);
+    const isValid = !Number.isNaN(date.getTime());
+    return {
+      date,
+      isValid,
+      formatted: isValid ? date.toLocaleTimeString(i18n.language, { hour: '2-digit', minute: '2-digit' }) : '',
+    };
+  }, [message.timestamp, i18n.language]);
+  const formattedTime = messageTime.formatted;
+  // The reply that closes a run ends with the time it landed, in place of the
+  // time in its caption: after a long run it is the end the reader wants, and
+  // the caption is hidden anyway when the reply follows tool calls. A live
+  // affordance only — an exported document keeps the caption time instead.
+  const shouldShowResponseTime =
+    Boolean(isRunTerminal) &&
+    !isExporting &&
+    message.type === 'assistant' &&
+    !message.isToolUse &&
+    !message.isThinking &&
+    !message.isStreaming &&
+    messageTime.isValid &&
+    assistantCopyContent.trim().length > 0;
   const shouldHideThinkingMessage = Boolean(message.isThinking && !showThinking);
 
   const providerName = provider === 'cursor'
@@ -146,12 +170,12 @@ const MessageComponent = memo(({ message, prevMessage, createDiff, onFileOpen, s
             {userCopyContent.trim().length > 0 || (!message.images?.length && !message.files?.length) ? (
               <div className="group max-w-full bg-secondary px-4 py-3 text-foreground" style={{ borderRadius: 'var(--radius-card)' }}>
                 <div className="mb-1.5 text-xs uppercase tracking-[0.14em] text-ink-faint">
-                  {t('messageTypes.you', { defaultValue: 'You' })} · {formattedTime}
+                  {messageTime.isValid ? `${t('messageTypes.you', { defaultValue: 'You' })} · ${formattedTime}` : t('messageTypes.you', { defaultValue: 'You' })}
                 </div>
-                <div dir="auto" className="break-words font-serif text-sm">
+                <div dir="auto" className="break-words font-serif text-base sm:text-sm">
                   <Markdown
                     breaks
-                    className="prose prose-sm max-w-none font-serif dark:prose-invert"
+                    className="prose prose-base sm:prose-sm max-w-none font-serif dark:prose-invert"
                   >
                     {message.content}
                   </Markdown>
@@ -187,7 +211,7 @@ const MessageComponent = memo(({ message, prevMessage, createDiff, onFileOpen, s
             ) : (
               /* Attachment-only turn: no text bubble, but the caption still shows */
               <div className="flex items-center justify-end gap-1 text-xs uppercase tracking-[0.14em] text-ink-faint">
-                {t('messageTypes.you', { defaultValue: 'You' })} · {formattedTime}
+                {messageTime.isValid ? `${t('messageTypes.you', { defaultValue: 'You' })} · ${formattedTime}` : t('messageTypes.you', { defaultValue: 'You' })}
               </div>
             )}
           </div>
@@ -204,23 +228,27 @@ const MessageComponent = memo(({ message, prevMessage, createDiff, onFileOpen, s
         /* Claude/Error/Tool messages on the left */
         <div className="w-full">
           {!isGrouped && (
-            /* One dot and one caption, whoever is speaking. An error turn is
-               amber rather than red — nothing here is destructive, something
-               went wrong — and it says so in the word beside the dot, so the
-               state survives a screen with no colour at all. */
+            /* One mark and one caption, whoever is speaking.
+               A model's turn is marked by the LOGO of the agent that answered — the same
+               `LLMProviderLogo` the sidebar puts on every session row — because that mark
+               says WHO, and a plain disc said nothing a reader could not already read in
+               the caption. Error and tool turns keep a dot: they are STATES, not speakers,
+               and no provider owns them. An error turn is amber rather than red — nothing
+               here is destructive, something went wrong — and it says so in the word beside
+               the dot, so the state survives a screen with no colour at all. */
             <div className="mb-2.5 flex items-center gap-2.5">
-              <span
-                aria-hidden="true"
-                className={`h-5 w-5 flex-none rounded-full ${
-                  message.type === 'error'
-                    ? 'bg-warn-ink'
-                    : message.type === 'tool'
-                      ? 'bg-border'
-                      : 'bg-primary'
-                }`}
-              />
+              {message.type === 'error' || message.type === 'tool' ? (
+                <span
+                  aria-hidden="true"
+                  className={`h-5 w-5 flex-none rounded-full ${
+                    message.type === 'error' ? 'bg-warn-ink' : 'bg-border'
+                  }`}
+                />
+              ) : (
+                <LLMProviderLogo provider={provider} className="h-5 w-5 flex-none" />
+              )}
               <span className="text-xs uppercase tracking-[0.14em] text-ink-faint">
-                {speakerName} · {formattedTime}
+                {shouldShowResponseTime || !messageTime.isValid ? speakerName : `${speakerName} · ${formattedTime}`}
               </span>
             </div>
           )}
@@ -243,7 +271,7 @@ const MessageComponent = memo(({ message, prevMessage, createDiff, onFileOpen, s
               <>
                 <div className="flex flex-col">
                   <div className="flex flex-col">
-                    <Markdown className="prose prose-sm max-w-none font-serif dark:prose-invert">
+                    <Markdown className="prose prose-base sm:prose-sm max-w-none font-serif dark:prose-invert">
                       {String(message.displayText || '')}
                     </Markdown>
                   </div>
@@ -310,7 +338,7 @@ const MessageComponent = memo(({ message, prevMessage, createDiff, onFileOpen, s
                   )}
                 />
                 <ReasoningContent>
-                  <Markdown className="prose prose-sm prose-gray max-w-none font-serif dark:prose-invert">
+                  <Markdown className="prose prose-base sm:prose-sm prose-gray max-w-none font-serif dark:prose-invert">
                     {message.content}
                   </Markdown>
                   {!isExporting && (
@@ -374,7 +402,7 @@ const MessageComponent = memo(({ message, prevMessage, createDiff, onFileOpen, s
                     <StreamingMarkdown
                       content={content}
                       isStreaming={Boolean(message.isStreaming)}
-                      className="prose prose-sm prose-gray max-w-none font-serif dark:prose-invert"
+                      className="prose prose-base sm:prose-sm prose-gray max-w-none font-serif dark:prose-invert"
                     />
                   ) : (
                     <div className="whitespace-pre-wrap">
@@ -391,13 +419,23 @@ const MessageComponent = memo(({ message, prevMessage, createDiff, onFileOpen, s
               <MemoryCitations citations={message.memoryCitations} />
             )}
 
-            {shouldShowAssistantCopyControl && (
+            {(shouldShowAssistantCopyControl || shouldShowResponseTime) && (
               <div className="mt-1 flex w-full items-center gap-2 text-[11px] text-ink-faint">
                 {shouldShowAssistantCopyControl && (
                   <MessageCopyControl content={assistantCopyContent} messageType="assistant" />
                 )}
                 {shouldShowAssistantCopyControl && (
                   <MessageSpeakControl content={assistantCopyContent} />
+                )}
+                {shouldShowResponseTime && (
+                  <time
+                    dateTime={messageTime.date.toISOString()}
+                    title={messageTime.date.toLocaleString(i18n.language)}
+                    aria-label={t('responseTime.repliedAt', { time: formattedTime })}
+                    className="ml-auto tabular-nums"
+                  >
+                    {formattedTime}
+                  </time>
                 )}
               </div>
             )}

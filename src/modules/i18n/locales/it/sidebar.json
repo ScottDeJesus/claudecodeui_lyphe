@@ -154,5 +154,19 @@
     "deleteAllData": "Elimina tutti i dati permanentemente",
     "allConversationsDeleted": "Il progetto verrà rimosso dalla barra laterale. I tuoi file, memorie e dati delle sessioni verranno preservati.",
     "cannotUndo": "Puoi riaggiungerlo in seguito."
+  },
+  "simpleList": {
+    "project": "Progetto",
+    "newChat": "Nuova chat",
+    "empty": "Ancora nessuna chat. Iniziane una con Nuova chat.",
+    "loadMore": "Mostra altro",
+    "rename": "Rinomina",
+    "renamePlaceholder": "Nome chat",
+    "remove": "Rimuovi",
+    "running": "In esecuzione",
+    "stopTitle": "Questa chat è ancora in esecuzione",
+    "stopBody": "Interromperla e rimuoverla?",
+    "stopConfirm": "Interrompi e rimuovi",
+    "removeFailed": "Impossibile rimuovere questa chat."
   }
 }

@@ -5,6 +5,8 @@ import type { ComposerMenuAnchor } from '@/shared/types';
 
 const VIEWPORT_MARGIN = 8;
 const MENU_GAP = 8;
+/** `min-w-48` on the composer panels — the narrowest they are ever drawn. */
+const MIN_MENU_WIDTH = 192;
 
 /**
  * Positions a composer popover above its trigger and right-aligned to it.
@@ -29,7 +31,14 @@ export function useComposerMenuAnchor(
       return;
     }
 
-    const right = Math.max(VIEWPORT_MARGIN, window.innerWidth - rect.right);
+    // Capped so the menu's LEFT edge stays on screen. `right` alone is a right-edge anchor, and
+    // a trigger near the left edge pushes the panel's left side off the viewport — the
+    // `maxWidth` floor below (200) cannot rescue that, because a 200px-wide panel anchored 295px
+    // from the right still starts at -105. Same defect MessageCopyControl carried.
+    const right = Math.min(
+      Math.max(VIEWPORT_MARGIN, window.innerWidth - rect.right),
+      Math.max(VIEWPORT_MARGIN, window.innerWidth - MIN_MENU_WIDTH - VIEWPORT_MARGIN),
+    );
     setAnchor({
       right,
       bottom: window.innerHeight - rect.top + MENU_GAP,

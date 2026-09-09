@@ -14,6 +14,7 @@ import { useDropzone } from 'react-dropzone';
 import { api } from '@/shared/api';
 import { PROVIDER_PERMISSION_PREFERENCE_KEYS } from '@/shared/constants';
 import { readUserPreference } from '@/shared/userSettings';
+import { useSimpleChatListPreferences } from '@/shared/hooks/useSimpleChatListPreferences';
 import type { CommandModalPayload, CostCommandData, HelpCommandData, MarkSessionProcessing, ModelCommandData, QueuedDraft, SessionActivityMap, StatusCommandData,QueuedSendOptions,ChatAttachment,ChatMessage,PendingPermissionRequest,PermissionMode,SessionEstablishedContext,Project,ProjectSession,LLMProvider,SlashCommand } from '@/shared/types';
 import { grantClaudeToolPermission } from '@/modules/chat/utils/chatPermissions';
 import {
@@ -178,6 +179,11 @@ export function useChatComposerState({
   setIsUserScrolledUp,
   setPendingPermissionRequests,
 }: UseChatComposerStateArgs) {
+  // Whether a brand-new session minted from this composer should be tagged
+  // into the simple chat list — decided by the preference at mint time, not
+  // threaded down as a prop.
+  const { enabled: simpleChatListEnabled } = useSimpleChatListPreferences();
+
   // The composer text together with the chat scope it belongs to. They are one
   // state rather than a value plus a ref because they have to move in lockstep:
   // on a session switch there is one commit where the scope has already changed
@@ -444,7 +450,6 @@ export function useChatComposerState({
 
   const {
     slashCommands,
-    slashCommandsCount,
     filteredCommands,
     frequentCommands,
     commandQuery,
@@ -755,6 +760,7 @@ export function useChatComposerState({
             provider,
             projectPath: resolvedProjectPath,
             initialMessage: messageContent,
+            simpleList: simpleChatListEnabled,
           });
           if (!response.ok) {
             throw new Error(`Failed to create session (${response.status})`);
@@ -872,6 +878,7 @@ export function useChatComposerState({
       sessionKey,
       addMessage,
       setIsUserScrolledUp,
+      simpleChatListEnabled,
       slashCommands,
     ],
   );
@@ -1212,7 +1219,6 @@ export function useChatComposerState({
     textareaRef,
     inputHighlightRef,
     isTextareaExpanded,
-    slashCommandsCount,
     filteredCommands,
     frequentCommands,
     commandQuery,

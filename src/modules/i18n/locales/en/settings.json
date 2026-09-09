@@ -50,6 +50,17 @@
         "description": "Takes the task board out of the workspace. Your tasks stay where they are.",
         "unavailable": "TaskMaster isn't installed here, so there is no Tasks tab to hide."
       }
+    },
+    "sidebar": {
+      "title": "Sidebar",
+      "simpleChatList": {
+        "label": "Simple chat list",
+        "description": "Replace the project tree with a flat list of the chats you start here."
+      },
+      "simpleChatProject": {
+        "label": "Project for new chats",
+        "description": "New chats in the simple list start in this project."
+      }
     }
   },
   "actions": {
@@ -163,6 +174,10 @@
       "description": "How projects are ordered in the sidebar",
       "alphabetical": "Alphabetical",
       "recentActivity": "Recent Activity"
+    },
+    "followSun": {
+      "label": "Follow sunrise and sunset",
+      "description": "Switch to dark at sunset and back at sunrise, using your time zone. Choosing Dark Mode by hand turns this off."
     }
   },
   "mcpForm": {

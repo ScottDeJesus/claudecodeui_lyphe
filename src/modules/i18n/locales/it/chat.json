@@ -19,6 +19,9 @@
     "cursor": "Cursor",
     "codex": "Codex"
   },
+  "responseTime": {
+    "repliedAt": "Risposto alle {{time}}"
+  },
   "tools": {
     "settings": "Impostazioni strumento",
     "error": "Errore strumento",
@@ -103,10 +106,6 @@
     "attachImages": "Allega immagini",
     "send": "Invia",
     "stop": "Ferma",
-    "hintText": {
-      "ctrlEnter": "Ctrl+Invio per inviare • Shift+Invio per nuova riga • Tab per cambiare modalità • / per comandi",
-      "enter": "Invio per inviare • Shift+Invio per nuova riga • Tab per cambiare modalità • / per comandi"
-    },
     "clickToChangeMode": "Clicca per cambiare modalità permessi (o premi Tab nell'input)",
     "showAllCommands": "Mostra tutti i comandi",
     "clearInput": "Cancella input",

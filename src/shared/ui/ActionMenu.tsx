@@ -59,6 +59,8 @@ export function ActionMenu({
 }: ActionMenuProps) {
   const [isOpen, setIsOpen] = React.useState(false);
   const [portalPosition, setPortalPosition] = React.useState<{ top: number; left: number } | null>(null);
+  /** Horizontal correction that pulls a non-portal menu back inside the viewport. */
+  const [edgeShift, setEdgeShift] = React.useState(0);
   const rootRef = React.useRef<HTMLDivElement | null>(null);
   const triggerRef = React.useRef<HTMLButtonElement | null>(null);
   const menuRef = React.useRef<HTMLDivElement | null>(null);
@@ -178,6 +180,29 @@ export function ActionMenu({
     setMenuOpen(true);
   };
 
+  // The non-portal menu is absolutely positioned against its trigger, so `right-0` walks it off
+  // the LEFT edge whenever the trigger sits near it — measured on a 390px phone, the transcript's
+  // export menu opened from x=75 and ran to -185. The portal branch above already clamps; this
+  // gives the same guarantee to the branch that cannot, as a constant horizontal nudge.
+  //
+  // A constant is enough and a re-measure is not: the shift corrects a HORIZONTAL overflow, and
+  // vertical scrolling moves the menu with its trigger without changing that. Measuring with the
+  // current shift subtracted keeps the effect from feeding on its own output and oscillating.
+  React.useLayoutEffect(() => {
+    if (!isOpen || portal || !menuRef.current) {
+      setEdgeShift(0);
+      return;
+    }
+    const box = menuRef.current.getBoundingClientRect();
+    const left = box.left - edgeShift;
+    const right = box.right - edgeShift;
+    const margin = 8;
+    let next = 0;
+    if (right > window.innerWidth - margin) next = window.innerWidth - margin - right;
+    if (left + next < margin) next = margin - left;
+    if (next !== edgeShift) setEdgeShift(next);
+  }, [isOpen, portal, edgeShift, items.length]);
+
   const menu = isOpen && (!portal || portalPosition) && (
     <div
       ref={menuRef}
@@ -187,11 +212,13 @@ export function ActionMenu({
       className={cn(
         'vv-action-menu',
         portal ? 'fixed z-[70]' : 'absolute top-full z-50 mt-2',
-        'min-w-[220px]',
+        'min-w-[220px] max-w-[calc(100vw-1rem)]',
         !portal && (align === 'right' ? 'right-0' : 'left-0'),
         menuClassName,
       )}
-      style={portal && portalPosition ? portalPosition : undefined}
+      style={portal && portalPosition
+        ? portalPosition
+        : edgeShift !== 0 ? { transform: `translateX(${edgeShift}px)` } : undefined}
     >
       {header}
       {items.map((item) => {

@@ -11,6 +11,8 @@ type SelectProps = {
   placeholder?: string;
   /** The accessible name. A select whose label is a heading two rows up needs its own. */
   ariaLabel: string;
+  /** `sm` is the dense form for narrow chrome (the sidebar), sized to the `sm` Button. */
+  size?: 'md' | 'sm';
 };
 
 /**
@@ -26,7 +28,7 @@ type SelectProps = {
  * reader back to the top of the page. An outside pointerdown does NOT take focus: the pointer
  * has already chosen where to go.
  */
-export function Select({ options, value, onChange, placeholder = 'Choose…', ariaLabel }: SelectProps) {
+export function Select({ options, value, onChange, placeholder = 'Choose…', ariaLabel, size = 'md' }: SelectProps) {
   // Whether the overlay list is showing. It cannot be derived: `value` is the choice already
   // made, and the list is open precisely while the reader is reconsidering it.
   const [open, setOpen] = useState(false);
@@ -56,7 +58,7 @@ export function Select({ options, value, onChange, placeholder = 'Choose…', ar
   const selected = options.find((option) => option.value === value);
 
   return (
-    <div className="vv-select" ref={rootRef}>
+    <div className={cn('vv-select', size === 'sm' && 'vv-select--sm')} ref={rootRef}>
       <button
         ref={triggerRef}
         type="button"
@@ -66,8 +68,10 @@ export function Select({ options, value, onChange, placeholder = 'Choose…', ar
         aria-label={ariaLabel}
         onClick={() => setOpen((wasOpen) => !wasOpen)}
       >
-        <span className={cn(!selected && 'vv-select__placeholder')}>{selected ? selected.label : placeholder}</span>
-        <span className="vv-select__chevron inline-block" aria-hidden="true">
+        <span className={cn('truncate', !selected && 'vv-select__placeholder')}>
+          {selected ? selected.label : placeholder}
+        </span>
+        <span className="vv-select__chevron inline-block shrink-0" aria-hidden="true">
           ▼
         </span>
       </button>

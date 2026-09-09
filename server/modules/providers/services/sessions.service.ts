@@ -19,6 +19,7 @@ type CreateAppSessionResult = {
   provider: LLMProvider;
   projectPath: string;
   sessionName: string;
+  simpleList: boolean;
 };
 
 type ArchivedSessionListItem = {
@@ -43,6 +44,24 @@ type RecentSessionsPage = {
   conversations: RecentSessionListItem[];
   total: number;
   hasMore: boolean;
+};
+
+/**
+ * One in-flight run, as the sidebar's Running list needs it: the registry's
+ * status fields plus the project the session belongs to, so the list never
+ * depends on which sessions a client has paged in.
+ */
+type RunningSessionListItem = {
+  sessionId: string;
+  provider: LLMProvider;
+  startedAt: number;
+  lastSeq: number;
+  cliVersion: string | null;
+  projectId: string | null;
+  projectPath: string | null;
+  projectDisplayName: string;
+  sessionTitle: string;
+  lastActivity: string | null;
 };
 
 type SessionDetails = {
@@ -125,25 +144,51 @@ export const sessionsService = {
   },
 
   /**
-   * Returns app-facing ids for provider runs that are currently processing.
+   * Returns the provider runs that are currently processing, each carrying the
+   * project it belongs to.
    *
-   * This is intentionally status-only: callers that only need sidebar activity
-   * indicators should not attach to chat streams or request replayed messages.
+   * Still status-only — callers do not attach to chat streams or request
+   * replayed messages — but the project identity travels with the run so the
+   * sidebar's Running list can be built from the registry itself. Filtering the
+   * sessions a client happens to have paged in silently dropped any run whose
+   * row sat beyond a project's first page, leaving the Running chip counting a
+   * session the list below it could not show.
    */
-  listRunningSessions(): Array<{
-    sessionId: string;
-    provider: LLMProvider;
-    startedAt: number;
-    lastSeq: number;
-  }> {
-    return chatRunRegistry.listRunningRuns();
+  listRunningSessions(): RunningSessionListItem[] {
+    const projectCache = new Map<string, ReturnType<typeof projectsDb.getProjectPath>>();
+
+    return chatRunRegistry.listRunningRuns().map((run) => {
+      const session = sessionsDb.getSessionById(run.sessionId);
+      const projectPath = session?.project_path?.trim() ? session.project_path : null;
+      let project = null;
+
+      if (projectPath) {
+        if (!projectCache.has(projectPath)) {
+          projectCache.set(projectPath, projectsDb.getProjectPath(projectPath));
+        }
+        project = projectCache.get(projectPath) ?? null;
+      }
+
+      return {
+        ...run,
+        projectId: project?.project_id ?? null,
+        projectPath,
+        projectDisplayName: resolveProjectDisplayName(projectPath, project?.custom_project_name),
+        sessionTitle: session?.custom_name?.trim() || run.sessionId,
+        lastActivity: session?.updated_at ?? session?.created_at ?? null,
+      };
+    });
   },
 
   /**
    * Returns the active conversation feed in true global activity order.
    */
-  listRecentSessions(limit: number, offset: number): RecentSessionsPage {
-    const page = sessionsDb.getRecentSessionsPage(limit, offset);
+  listRecentSessions(
+    limit: number,
+    offset: number,
+    options: { simpleListOnly?: boolean } = {}
+  ): RecentSessionsPage {
+    const page = sessionsDb.getRecentSessionsPage(limit, offset, options);
     const projectCache = new Map<string, ReturnType<typeof projectsDb.getProjectPath>>();
     const conversations = page.sessions.map((session) => {
       const projectPath = session.project_path?.trim() ? session.project_path : null;
@@ -216,6 +261,7 @@ export const sessionsService = {
     provider: LLMProvider,
     projectPath: string,
     initialMessage: string,
+    simpleList = false,
   ): CreateAppSessionResult {
     const normalizedProjectPath = projectPath.trim();
     if (!normalizedProjectPath) {
@@ -227,13 +273,14 @@ export const sessionsService = {
 
     const sessionId = randomUUID();
     const sessionName = buildCloudCliSessionName(initialMessage);
-    sessionsDb.createAppSession(sessionId, provider, normalizedProjectPath, sessionName);
+    sessionsDb.createAppSession(sessionId, provider, normalizedProjectPath, sessionName, simpleList);
 
     return {
       sessionId,
       provider,
       projectPath: normalizedProjectPath,
       sessionName,
+      simpleList,
     };
   },
 
@@ -307,6 +354,8 @@ export const sessionsService = {
       provider,
       projectPath: source.project_path ?? '',
       sessionName,
+      // Forks are a tree-view action, never tagged for the simple list.
+      simpleList: false,
     };
   },
 

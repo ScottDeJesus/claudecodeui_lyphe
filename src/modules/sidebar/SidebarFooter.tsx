@@ -1,4 +1,4 @@
-import { ArrowUpCircle } from 'lucide-react';
+import { ArrowUpCircle, Settings } from 'lucide-react';
 import type { TFunction } from 'i18next';
 
 import { AccountFooterRow } from '@/modules/accounts';
@@ -99,7 +99,7 @@ export default function SidebarFooter({
           className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-muted-foreground transition-colors hover:bg-accent/60 hover:text-foreground"
           onClick={onShowSettings}
         >
-          <span aria-hidden="true" className="text-xs leading-none text-primary">✦</span>
+          <Settings aria-hidden="true" className="h-4 w-4 flex-none" />
           <span className="truncate text-sm">{t('actions.settings')}</span>
         </button>
       </div>
@@ -110,7 +110,7 @@ export default function SidebarFooter({
           className="flex h-10 w-full items-center gap-3 rounded-xl bg-muted/40 px-3.5 transition-all hover:bg-muted/60 active:scale-[0.98]"
           onClick={onShowSettings}
         >
-          <span aria-hidden="true" className="text-xs leading-none text-primary">✦</span>
+          <Settings aria-hidden="true" className="h-4 w-4 flex-none text-muted-foreground" />
           <span className="truncate text-sm font-normal text-foreground">{t('actions.settings')}</span>
         </button>
       </div>

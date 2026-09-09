@@ -1,5 +1,7 @@
 import { UsageMeters } from '@/modules/accounts/UsageMeters';
 import { accountInitials } from '@/modules/accounts/utils/accountInitials';
+import { useMinuteTick } from '@/modules/accounts/hooks/useMinuteTick';
+import { weeklyResetInWords } from '@/modules/accounts/utils/weeklyReset';
 import { Avatar, Banner, Button, Card } from '@/shared/ui';
 import type { DescentAccounts, DescentSlot, DescentUsage } from '@/shared/types';
 
@@ -59,10 +61,14 @@ type AccountRowProps = {
   hue: number;
   busy: boolean;
   onSwitch: (slug: string) => void;
+  /** The panel's ticking clock, passed in so every row counts down from the same instant. */
+  now: number;
 };
 
 /** One switchable account. The whole row is the button: there is no second control on it, so there is nothing to nest. */
-function AccountRow({ slot, hue, busy, onSwitch }: AccountRowProps) {
+function AccountRow({ slot, hue, busy, onSwitch, now }: AccountRowProps) {
+  const weeklyReset = weeklyResetInWords(slot.slug, now);
+
   return (
     <div data-account-slug={slot.slug} className="flex items-center gap-2">
       <button
@@ -78,6 +84,7 @@ function AccountRow({ slot, hue, busy, onSwitch }: AccountRowProps) {
               avatar's two letters can collide and the row must stay identifiable. */}
           <span className="block truncate text-[13px] font-medium text-foreground" title={slot.label}>{slot.label}</span>
           <span className="block text-xs text-muted-foreground">{savedCopyFreshness(slot.expiresAt)}</span>
+          {weeklyReset && <span className="block text-xs text-ink-faint">{weeklyReset}</span>}
         </span>
       </button>
     </div>
@@ -112,6 +119,10 @@ export function AccountPopover({
   onAddAccount,
   onSaveLiveLogin,
 }: AccountPopoverProps) {
+  // Advances once a minute so the reset countdowns stay true while the panel is open. The
+  // interval exists only for as long as this component does, and this component is mounted
+  // only while the panel is showing.
+  const now = useMinuteTick();
   const picture = accounts?.reachable ? accounts : null;
   const unknown = accounts !== null && !accounts.reachable;
   // Read off `picture` rather than kept as its own binding: narrowing has to survive into the
@@ -154,8 +165,10 @@ export function AccountPopover({
 
         {picture?.slots.map((slot, index) => {
           if (!slot.isActive) {
-            return <AccountRow key={slot.slug} slot={slot} hue={index} busy={busy} onSwitch={onSwitch} />;
+            return <AccountRow key={slot.slug} slot={slot} hue={index} busy={busy} onSwitch={onSwitch} now={now} />;
           }
+
+          const weeklyReset = weeklyResetInWords(slot.slug, now);
 
           return (
             <div
@@ -165,12 +178,19 @@ export function AccountPopover({
             >
               <Avatar initials={accountInitials(slot.label)} hue={index} size={24} />
               <div className="min-w-0 flex-1">
-                <div className="truncate text-[13px] font-medium text-accent-ink" title={slot.label}>{slot.label}</div>
+                {/* The mark rides on the LABEL's line rather than at the row's right edge. Out
+                    there it cost every line beneath it 20px of width, and the reset countdown —
+                    the longest of them — wrapped for want of exactly that. The label truncates
+                    and carries its full address in a `title`, so it is the line that can spare
+                    the room. The account in use is already switched to, so it carries a mark
+                    rather than a button — and the mark is a glyph, not a colour (doctrine §6). */}
+                <div className="flex items-center gap-1.5">
+                  <div className="truncate text-[13px] font-medium text-accent-ink" title={slot.label}>{slot.label}</div>
+                  <span title="In use now" className="flex-none text-xs text-accent-ink">✓</span>
+                </div>
                 <div className="text-xs text-muted-foreground">{activeMeta(picture.liveSessions)}</div>
+                {weeklyReset && <div className="text-xs text-ink-faint">{weeklyReset}</div>}
               </div>
-              {/* The account in use is already switched to, so it carries a mark rather than
-                  a button — and the mark is a glyph, not a colour (doctrine §6). */}
-              <span title="In use now" className="flex-none text-xs text-accent-ink">✓</span>
             </div>
           );
         })}

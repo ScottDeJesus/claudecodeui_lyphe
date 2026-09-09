@@ -1,10 +1,11 @@
 import { FolderPlus, PanelLeftClose, Plus, RefreshCw, Search, X } from 'lucide-react';
+import type { ReactNode } from 'react';
 import type { TFunction } from 'i18next';
 
 import { Button, Chip, Input } from '@/shared/ui';
 import { IS_PLATFORM } from '@/shared/utils';
 import type { SidebarSearchMode } from '@/shared/types';
-import GitHubStarBadge from '@/modules/sidebar/GitHubStarBadge';
+import { useCompactSidebar } from '@/modules/sidebar/hooks/useCompactSidebar';
 
 const MOD_KEY =
   typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform) ? '⌘' : 'Ctrl';
@@ -26,6 +27,10 @@ type SidebarHeaderProps = {
   isRefreshing: boolean;
   onCreateProject: () => void;
   onCollapseSidebar: () => void;
+  /** True while SidebarContent is rendering the simple chat list in place of the tree. */
+  simpleMode?: boolean;
+  /** The workspace tab strip, rendered under the wordmark. A slot: this file never imports it. */
+  tabs?: ReactNode;
   t: TFunction;
 };
 
@@ -98,9 +103,16 @@ export default function SidebarHeader({
   isRefreshing,
   onCreateProject,
   onCollapseSidebar,
+  simpleMode,
+  tabs,
   t,
 }: SidebarHeaderProps) {
-  const showSearchTools = (projectsCount > 0 || runningSessionsCount > 0 || archivedSessionsCount > 0 || isArchivedSessionsLoading) && !isLoading;
+  // This file draws its desktop and mobile headers as two blocks and hides one with CSS, so a
+  // slot placed in both would put TWO live tablists on the page — a duplicate accessible name and
+  // a second strip for anything that addresses tabs by role. The strip is rendered into whichever
+  // block is actually on screen, and once.
+  const isCompact = useCompactSidebar();
+  const showSearchTools = (projectsCount > 0 || runningSessionsCount > 0 || archivedSessionsCount > 0 || isArchivedSessionsLoading) && !isLoading && !simpleMode;
   const searchPlaceholder = searchMode === 'conversations'
     ? t('search.conversationsPlaceholder')
     : searchMode === 'archived'
@@ -165,7 +177,7 @@ export default function SidebarHeader({
           </div>
         </div>
 
-        <GitHubStarBadge />
+        {tabs && !isCompact && <div className="mt-2.5">{tabs}</div>}
 
         {/* Search bar */}
         {showSearchTools && (
@@ -245,6 +257,8 @@ export default function SidebarHeader({
             </button>
           </div>
         </div>
+
+        {tabs && isCompact && <div className="mt-2.5">{tabs}</div>}
 
         {/* Mobile search */}
         {showSearchTools && (

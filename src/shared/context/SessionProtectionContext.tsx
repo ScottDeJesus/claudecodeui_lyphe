@@ -4,13 +4,14 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useState,
 } from 'react';
 import type { ReactNode } from 'react';
 
 import {
   useSessionProtection,
 } from '@/shared/hooks/useSessionProtection';
-import type { IsSessionProcessing, MarkSessionIdle, MarkSessionProcessing, SessionActivityMap, SyncProcessingSessions } from '@/shared/types';
+import type { IsSessionProcessing, LLMProvider, MarkSessionIdle, MarkSessionProcessing, RunningSessionListItem, SessionActivityMap, SyncProcessingSessions } from '@/shared/types';
 import { api } from '@/shared/api';
 
 type RunningSessionApiItem = {
@@ -18,6 +19,12 @@ type RunningSessionApiItem = {
   startedAt?: unknown;
   statusText?: unknown;
   canInterrupt?: unknown;
+  provider?: unknown;
+  projectId?: unknown;
+  projectPath?: unknown;
+  projectDisplayName?: unknown;
+  sessionTitle?: unknown;
+  lastActivity?: unknown;
 };
 
 type RunningSessionsApiPayload = {
@@ -33,9 +40,35 @@ type SessionProtectionActions = {
   isSessionProcessing: IsSessionProcessing;
 };
 
+const NO_RUNNING_SESSIONS: readonly RunningSessionListItem[] = [];
+
 const SessionProtectionStateContext = createContext<SessionActivityMap | null>(null);
 const SessionProtectionActionsContext = createContext<SessionProtectionActions | null>(null);
 const BusySessionIdsContext = createContext<ReadonlySet<string> | null>(null);
+const RunningSessionsContext = createContext<readonly RunningSessionListItem[]>(NO_RUNNING_SESSIONS);
+
+const asOptionalString = (value: unknown): string | null =>
+  typeof value === 'string' && value.length > 0 ? value : null;
+
+/**
+ * Keeps the previous array when the poll returned the same runs, so a five-second
+ * refresh does not re-render every consumer while nothing has changed.
+ */
+const runningSessionListsMatch = (
+  left: readonly RunningSessionListItem[],
+  right: readonly RunningSessionListItem[],
+): boolean =>
+  left.length === right.length
+  && left.every((item, index) => {
+    const other = right[index];
+    return other !== undefined
+      && item.sessionId === other.sessionId
+      && item.projectId === other.projectId
+      && item.projectDisplayName === other.projectDisplayName
+      && item.sessionTitle === other.sessionTitle
+      && item.lastActivity === other.lastActivity
+      && item.provider === other.provider;
+  });
 
 /**
  * The set of session ids currently producing a response, with a stable identity
@@ -81,6 +114,8 @@ export function SessionProtectionProvider({ children }: { children: ReactNode })
     isSessionProcessing,
   } = useSessionProtection();
 
+  const [runningSessions, setRunningSessions] = useState<readonly RunningSessionListItem[]>(NO_RUNNING_SESSIONS);
+
   const refreshRunningSessions = useCallback(async () => {
     try {
       const response = await api.runningSessions();
@@ -90,6 +125,31 @@ export function SessionProtectionProvider({ children }: { children: ReactNode })
 
       const payload = (await response.json()) as RunningSessionsApiPayload;
       const sessions = Array.isArray(payload.data?.sessions) ? payload.data.sessions : [];
+
+      // The same payload feeds two consumers: the activity map (membership and
+      // status) and the sidebar's Running list, which needs the project each
+      // run belongs to.
+      setRunningSessions((previous) => {
+        const next = sessions.reduce<RunningSessionListItem[]>((acc, session) => {
+          if (typeof session.sessionId !== 'string' || !session.sessionId) {
+            return acc;
+          }
+
+          acc.push({
+            sessionId: session.sessionId,
+            provider: (typeof session.provider === 'string' ? session.provider : 'claude') as LLMProvider,
+            startedAt: parseStartedAt(session.startedAt),
+            projectId: asOptionalString(session.projectId),
+            projectPath: asOptionalString(session.projectPath),
+            projectDisplayName: asOptionalString(session.projectDisplayName) ?? 'Unknown Project',
+            sessionTitle: asOptionalString(session.sessionTitle) ?? session.sessionId,
+            lastActivity: asOptionalString(session.lastActivity),
+          });
+          return acc;
+        }, []);
+
+        return runningSessionListsMatch(previous, next) ? previous : next;
+      });
 
       syncProcessingSessions(
         sessions
@@ -144,9 +204,11 @@ export function SessionProtectionProvider({ children }: { children: ReactNode })
   return (
     <SessionProtectionActionsContext.Provider value={actions}>
       <BusySessionIdsContext.Provider value={busySessionIds}>
-        <SessionProtectionStateContext.Provider value={processingSessions}>
-          {children}
-        </SessionProtectionStateContext.Provider>
+        <RunningSessionsContext.Provider value={runningSessions}>
+          <SessionProtectionStateContext.Provider value={processingSessions}>
+            {children}
+          </SessionProtectionStateContext.Provider>
+        </RunningSessionsContext.Provider>
       </BusySessionIdsContext.Provider>
     </SessionProtectionActionsContext.Provider>
   );
@@ -162,6 +224,17 @@ export function useBusySessionIdSet(): ReadonlySet<string> {
     throw new Error('useBusySessionIdSet must be used within SessionProtectionProvider');
   }
   return busySessionIds;
+}
+
+/**
+ * The running runs the server knows about, each with the project it belongs to.
+ *
+ * Consumers that list running work read this rather than filtering the sessions
+ * they have already loaded — the server's registry is the only place that knows
+ * every run.
+ */
+export function useRunningSessions(): readonly RunningSessionListItem[] {
+  return useContext(RunningSessionsContext);
 }
 
 export function useProcessingSessions(): SessionActivityMap {

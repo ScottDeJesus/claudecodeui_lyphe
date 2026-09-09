@@ -228,6 +228,7 @@ export function normalizedToChatMessages(messages: NormalizedMessage[]): ChatMes
                 type: 'assistant',
                 content: formatUsageLimitText(taskNotif.result),
                 timestamp: msg.timestamp,
+                isTaskResult: true,
                 ...sharedMetadata,
               });
             }
@@ -382,6 +383,7 @@ export function normalizedToChatMessages(messages: NormalizedMessage[]): ChatMes
           content,
           timestamp: msg.timestamp,
           toolId: msg.toolId,
+          isOrphanToolResult: true,
           ...sharedMetadata,
         });
         break;

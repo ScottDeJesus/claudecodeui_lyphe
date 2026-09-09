@@ -24,7 +24,8 @@
     "git": "Git",
     "tasks": "Tasks",
     "browser": "Browser",
-    "computer": "Computer"
+    "computer": "Computer",
+    "memory": "Memory"
   },
   "status": {
     "loading": "Loading...",
@@ -46,6 +47,44 @@
     "invalidInput": "Invalid input",
     "requiredField": "This field is required",
     "unknownError": "An unknown error occurred"
+  },
+  "memory": {
+    "title": "Memory intake",
+    "pending": "{{count}} pending",
+    "empty": {
+      "title": "All filed",
+      "message": "Nothing is waiting for review."
+    },
+    "unreachable": "Descent is not reachable right now.",
+    "target": {
+      "memory": "memory note + index pointer",
+      "topic": "memory note",
+      "rules": "your RULES.md shelf",
+      "requirements": "your REQUIREMENTS.md shelf",
+      "claude": "global CLAUDE.md"
+    },
+    "blast": {
+      "label": "global",
+      "title": "reaches every session in every project and takes no size cap"
+    },
+    "actions": {
+      "file": "file it",
+      "discard": "discard",
+      "fileTitle": "file it — write this memory to disk",
+      "discardTitle": "discard — nothing is written"
+    },
+    "expand": "read the whole memory",
+    "reading": "reading…",
+    "gone": "This memory is no longer pending — it was reviewed elsewhere.",
+    "rationale": "Why",
+    "indexLine": "Index line",
+    "toast": {
+      "filed": "filed — the memory is on disk",
+      "discarded": "discarded — nothing was written",
+      "refused": "couldn't file that memory",
+      "gone": "already reviewed elsewhere",
+      "unreachable": "Descent is not reachable."
+    }
   },
   "navigation": {
     "settings": "Settings",

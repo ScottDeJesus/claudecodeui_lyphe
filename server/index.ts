@@ -11,14 +11,15 @@ import cors from 'cors';
 
 import { AppError, findApplicationRoot, getModuleDirectory, IS_PLATFORM, terminalTextStyles } from '@/shared/utils.js';
 import {
-    closeSessionsWatcher,
     initializeSessionsWatcher,
     providerRuntimeService,
+    readoptKeepaliveSessions,
 } from '@/modules/providers/index.js';
 import { createWebSocketServer } from '@/modules/websocket/index.js';
 
 import { getConnectableHost } from '../shared/networkHosts.js';
 
+import { handover, onTakeover, signalReady, supervised } from './supervised-boot.js';
 import { createGitModule } from './modules/git/index.js';
 import {
     authenticateToken,
@@ -43,7 +44,6 @@ import {
 import providerRoutes from './modules/providers/provider.routes.js';
 import { voiceRoutes } from './modules/voice/index.js';
 import {
-    closeScheduledMessageDispatcher,
     initializeScheduledMessageDispatcher,
     scheduledMessagesRoutes,
 } from './modules/scheduled-messages/index.js';
@@ -332,6 +332,26 @@ async function removeLocalServerMarker() {
     }
 }
 
+// Once, never twice: readoptKeepaliveSessions is not idempotent — a second pass re-connects the
+// hosts it already holds and severs the sockets the first pass adopted.
+let soleServerDutiesRan = false;
+
+/** The duties only the sole server on the port may perform; a handover boot waits for takeover. */
+async function soleServerDuties() {
+    if (soleServerDutiesRan) return;
+    soleServerDutiesRan = true;
+    try { // D-11: a browser that subscribes before this ran reads a live keepalive session as idle
+        const keepalive = await readoptKeepaliveSessions({ runtime: providerRuntimeService });
+        console.log(`[keepalive] re-adopted ${keepalive.readopted} host(s), swept ${keepalive.swept}`);
+    } catch (error) { console.error('[keepalive] re-adopt failed (continuing):', getErrorMessage(error)); }
+    // Sends anything that came due while the server was not running, then keeps polling.
+    initializeScheduledMessageDispatcher(providerRuntimeService);
+    // Start server-side plugin processes for enabled plugins
+    startEnabledPluginServers().catch(err => {
+        console.error('[Plugins] Error during startup:', err.message);
+    });
+}
+
 // Initialize database and start server
 async function startServer() {
     try {
@@ -355,7 +375,10 @@ async function startServer() {
 
         console.log(`${terminalTextStyles.info('[INFO]')} To run in development mode with hot-module replacement, go to http://${DISPLAY_HOST}:${VITE_PORT}`);
    
-        server.listen(SERVER_PORT, HOST, async () => {
+        if (!handover) await soleServerDuties();
+        else console.log('[keepalive] re-adoption deferred until the previous server exits (handover boot)');
+        server.listen({ port: SERVER_PORT, host: HOST, reusePort: supervised }, async () => {
+            signalReady();
             const appInstallPath = APP_ROOT;
             await writeLocalServerMarker().catch((error) => {
                 console.warn('[WARN] Could not write local server marker:', error.message);
@@ -373,20 +396,14 @@ async function startServer() {
 
             // Start watching the projects folder for changes
             await initializeSessionsWatcher();
-            // Sends anything that came due while the server was not running,
-            // then keeps polling.
-            initializeScheduledMessageDispatcher(providerRuntimeService);
-
-            // Start server-side plugin processes for enabled plugins
-            startEnabledPluginServers().catch(err => {
-                console.error('[Plugins] Error during startup:', err.message);
-            });
         });
+        if (handover) onTakeover(soleServerDuties);
 
-        await closeSessionsWatcher();
-        closeScheduledMessageDispatcher();
         // Clean up plugin processes on shutdown
         const shutdownRuntimeServices = async () => {
+            // Stop accepting first: with reusePort the kernel would keep handing this exiting
+            // process new connections. Never awaited — open WebSockets keep it from resolving.
+            server.close();
             try {
                 await browserUseService.stopAllSessions();
             } catch (err) {

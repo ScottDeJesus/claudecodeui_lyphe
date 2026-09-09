@@ -465,11 +465,12 @@ function handleChatSubscribe(
     }
 
     const lastSeqRaw = (target as AnyRecord).lastSeq;
-    const lastSeq = typeof lastSeqRaw === 'number' && Number.isFinite(lastSeqRaw)
+    let lastSeq = typeof lastSeqRaw === 'number' && Number.isFinite(lastSeqRaw)
       ? Math.max(0, Math.floor(lastSeqRaw))
       : 0;
 
     const run = chatRunRegistry.getRun(sessionId);
+    if (run && lastSeq > run.lastSeq) lastSeq = 0; // D-5: a cursor ABOVE this run's seq is a previous run's — replay all. One-sided on purpose: a stale cursor below it is left to the REST refetch.
     const isProcessing = chatRunRegistry.isProcessing(sessionId);
 
     // Future live events for this run should land on the socket that asked —
@@ -538,7 +539,7 @@ function handlePermissionResponse(data: AnyRecord, dependencies: ChatWebSocketDe
 /**
  * Runs a turn for a session with no client attached.
  *
- * Used by scheduled messages, which fire from a timer: there is no socket to
+ * Used by scheduled messages, which fire from a timer, and by keepalive re-adoption at boot: there is no socket to
  * report errors to and no audience to stream to. The run is registered exactly
  * like an interactive one, so anyone who opens the session while it is going
  * subscribes and replays it from the start, and the session shows as busy
@@ -560,6 +561,8 @@ export async function runDetachedChatTurn(
      * land mid-run, so the timer outranks whatever is running.
      */
     interruptActiveRun?: boolean;
+    /** Runs after the run is registered, before the provider: re-adoption ends an already-completed turn here. */
+    beforeRun?: (run: NonNullable<ReturnType<typeof chatRunRegistry.startRun>>) => void | Promise<void>;
   },
   dependencies: ChatWebSocketDependencies,
 ): Promise<{ started: boolean; error: string | null }> {
@@ -597,6 +600,7 @@ export async function runDetachedChatTurn(
     session,
     { sessionId: input.sessionId, content: input.content, options: input.options ?? {} },
     dependencies,
+    {}, input.beforeRun, // no extra runtime options; the hook is dispatchRun's eighth argument
   );
 }
 

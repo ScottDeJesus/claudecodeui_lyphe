@@ -36,7 +36,18 @@
   },
   "appearance": {
     "title": "Darstellung",
-    "theme": "Design"
+    "theme": "Design",
+    "sidebar": {
+      "title": "Seitenleiste",
+      "simpleChatList": {
+        "label": "Einfache Chat-Liste",
+        "description": "Ersetzt den Projektbaum durch eine einfache Liste der hier gestarteten Chats."
+      },
+      "simpleChatProject": {
+        "label": "Projekt für neue Chats",
+        "description": "Neue Chats in der einfachen Liste starten in diesem Projekt."
+      }
+    }
   },
   "actions": {
     "saveChanges": "Änderungen speichern",
@@ -124,6 +135,10 @@
       "description": "Wie Projekte in der Seitenleiste angeordnet werden",
       "alphabetical": "Alphabetisch",
       "recentActivity": "Letzte Aktivität"
+    },
+    "followSun": {
+      "label": "Sonnenauf- und -untergang folgen",
+      "description": "Bei Sonnenuntergang auf Dunkel wechseln und bei Sonnenaufgang zurück, basierend auf deiner Zeitzone. Ein manueller Wechsel schaltet dies aus."
     }
   },
   "mcpForm": {

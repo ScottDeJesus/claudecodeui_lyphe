@@ -123,7 +123,7 @@ sequenceDiagram
     WSC-->>UI: flush and finalize, clear busy, refresh persisted tail
 ```
 
-Three things in that picture are easy to get backwards:
+Four things in that picture are easy to get backwards:
 
 - **The client never sees the provider's session id.** `session_created` is consumed by
   the writer, turned into a database mapping, and dropped. Every other frame has its
@@ -136,6 +136,16 @@ Three things in that picture are easy to get backwards:
   its last 5000 events for replay, and stays available for five minutes after finishing.
   A reconnecting client sends `lastSeq` and gets only what it missed — and only if the
   run is still running, because a completed run is already on disk and served over REST.
+- **A Claude run can outlive the API process too, and then `seq` restarts at 1.** The CLI
+  lives in a tmux server rather than in the API's cgroup, and the API re-adopts it on boot
+  with a *fresh* registry run — so a client that reconnects across a restart holds a cursor
+  from the previous run, numbered above anything the new one has issued. `chat.subscribe`
+  detects exactly that (`lastSeq > run.lastSeq`) and replays the run from the start rather
+  than replaying nothing. The check is one-sided on purpose: a cursor *below* the run's seq
+  is left to the REST history refetch, which is what a reconnecting client does anyway. The
+  mechanism behind the survival is
+  [`server/modules/providers/README.md`](../../server/modules/providers/README.md)
+  §"The exception: `list/claude/session-host/`".
 
 ## What each provider actually emits
 
@@ -362,9 +372,11 @@ pins both directions. The counter shows context-window occupancy, not the turn's
 feeding it a summed `result.usage` is what made it bounce before commit `ab13376d`.
 
 The other arm of the `status` branch — the one that writes `statusText` and `canInterrupt`
-into the activity map — **has no producer today.** All three `status` emitters
-(`claude-runtime.provider.js:968`, `codex-runtime.provider.js:406`,
-`opencode-runtime.provider.js:338`) send `text: 'token_budget'`. The arm is live code
+into the activity map — **has no producer today.** All three `status` emitters send
+`text: 'token_budget'` — one apiece in `claude-runtime.provider.js`,
+`codex-runtime.provider.js` and `opencode-runtime.provider.js`, which
+`grep -rn "text: 'token_budget'" server/modules/providers/list/` finds in full (line
+numbers are not pinned here: the Claude one has already moved once). The arm is live code
 kept for a provider that reports progress text; do not delete it expecting nothing to
 change, and do not assume the status text you see in the UI came from it.
 

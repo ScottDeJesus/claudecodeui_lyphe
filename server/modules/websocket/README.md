@@ -21,7 +21,7 @@ Live-run registry; the providers module's `sessionsService` reads it for `listRu
 4. `broadcastSessionUpserted` and `broadcastSessionUpsertedBatch`  
 The `session_upserted` delta builders; the providers module's sessions watcher fans its re-indexed rows out through them.
 5. `runDetachedChatTurn` (and the `ProviderRuntimeGateway` type)  
-Runs one chat turn with no socket attached; the scheduled-messages module drives it from a timer.
+Runs one chat turn with no socket attached. Two consumers: the scheduled-messages module drives it from a timer, and keepalive re-adoption (`session-host/readopt.ts`) composes it on boot to give each CLI that outlived the API its run back (`beforeRun` exists for that caller — it settles a run whose turn already finished before the provider is asked for anything). Both compose it rather than re-implementing the dispatch, which is what keeps the session row lookup, the busy check and the run-completion safety net in one place.
 
 ## Why Dependency Injection Is Used
 

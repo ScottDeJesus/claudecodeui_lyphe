@@ -144,5 +144,19 @@
     "tryDifferentQuery": "別のキーワードで検索してください",
     "matches_other": "{{count}} 件の一致",
     "projectsScanned_other": "{{count}} 件のプロジェクトを検索済み"
+  },
+  "simpleList": {
+    "project": "プロジェクト",
+    "newChat": "新しいチャット",
+    "empty": "まだチャットがありません。「新しいチャット」で始めましょう。",
+    "loadMore": "もっと見る",
+    "rename": "名前を変更",
+    "renamePlaceholder": "チャット名",
+    "remove": "削除",
+    "running": "実行中",
+    "stopTitle": "このチャットはまだ実行中です",
+    "stopBody": "停止して削除しますか?",
+    "stopConfirm": "停止して削除",
+    "removeFailed": "このチャットを削除できませんでした。"
   }
 }

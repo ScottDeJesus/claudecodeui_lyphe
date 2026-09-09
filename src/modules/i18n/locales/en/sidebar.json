@@ -159,5 +159,19 @@
     "deleteAllData": "Delete all data permanently",
     "allConversationsDeleted": "The project will be removed from the sidebar. Your files, memories, and session data will be preserved.",
     "cannotUndo": "You can re-add the project later."
+  },
+  "simpleList": {
+    "project": "Project",
+    "newChat": "New chat",
+    "empty": "No chats yet. Start one with New chat.",
+    "loadMore": "Show more",
+    "rename": "Rename",
+    "renamePlaceholder": "Chat name",
+    "remove": "Remove",
+    "running": "Running",
+    "stopTitle": "This chat is still running",
+    "stopBody": "Stop it and remove?",
+    "stopConfirm": "Stop and remove",
+    "removeFailed": "Could not remove this chat."
   }
 }

@@ -151,5 +151,19 @@
     "deleteAllData": "Alle Daten dauerhaft löschen",
     "allConversationsDeleted": "Das Projekt wird aus der Seitenleiste entfernt. Deine Dateien, Erinnerungen und Sitzungsdaten bleiben erhalten.",
     "cannotUndo": "Du kannst das Projekt später erneut hinzufügen."
+  },
+  "simpleList": {
+    "project": "Projekt",
+    "newChat": "Neuer Chat",
+    "empty": "Noch keine Chats. Starte einen mit Neuer Chat.",
+    "loadMore": "Mehr anzeigen",
+    "rename": "Umbenennen",
+    "renamePlaceholder": "Chat-Name",
+    "remove": "Entfernen",
+    "running": "Aktiv",
+    "stopTitle": "Dieser Chat läuft noch",
+    "stopBody": "Stoppen und entfernen?",
+    "stopConfirm": "Stoppen und entfernen",
+    "removeFailed": "Dieser Chat konnte nicht entfernt werden."
   }
 }

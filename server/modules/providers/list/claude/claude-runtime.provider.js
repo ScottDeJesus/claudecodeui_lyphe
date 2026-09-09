@@ -37,6 +37,7 @@ import {
   notifyUserIfEnabled
 } from '@/modules/notifications/index.js';
 import { createCompleteMessage, createNormalizedMessage } from '@/shared/utils.js';
+import { armKeepaliveSpawn, keepaliveReadopt } from './session-host/index.js';
 
 const activeSessions = new Map();
 const pendingToolApprovals = new Map();
@@ -69,6 +70,9 @@ const TOOL_APPROVAL_TIMEOUT_MS = parseInt(process.env.CLAUDE_TOOL_APPROVAL_TIMEO
 // that never reports at all, so an abandoned session cannot leak a CLI process
 // forever. The timer resets on every message, so it measures silence, not total time.
 const BG_WAIT_CEILING_MS = 30 * 60 * 1000;
+// How long after a `task_notification` a zero-turn result can still be the
+// CLI's own reconciliation of an orphaned background task (see queryClaudeSDK).
+const RECONCILIATION_WINDOW_MS = 10 * 1000;
 
 const TOOLS_REQUIRING_INTERACTION = new Set(['AskUserQuestion', 'ExitPlanMode']);
 
@@ -329,7 +333,17 @@ function addSession(sessionId, queryInstance, writer = null, releaseInput = null
     Promise.resolve()
       .then(() => existing.instance.interrupt())
       .catch((error) => {
-        console.error(`Error interrupting superseded run for session ${sessionId}:`, error?.message || error);
+        const reason = error?.message || String(error);
+        // queryClaudeSDK releases the old run's stdin before this interrupt is
+        // sent, so the SDK usually drains the request with "Query closed" once
+        // the query object shuts — the outcome wanted. (That is the query, not
+        // proof the CLI process is gone; nothing here SIGTERMs a CLI that
+        // ignores stdin EOF.)
+        if (/query closed/i.test(reason)) {
+          console.log(`Interrupt for the superseded run of session ${sessionId} was dropped: its query had already closed`);
+          return;
+        }
+        console.error(`Error interrupting superseded run for session ${sessionId}:`, reason);
       });
     existing.releaseInput?.();
   }
@@ -361,13 +375,6 @@ function getSession(sessionId) {
   return activeSessions.get(sessionId);
 }
 
-/**
- * Gets all active session IDs
- * @returns {Array<string>} Array of active session IDs
- */
-function getAllSessions() {
-  return Array.from(activeSessions.keys());
-}
 
 /**
  * Transforms SDK messages to WebSocket format expected by frontend
@@ -720,19 +727,48 @@ async function queryClaudeSDK(command, options = {}, ws, context) {
   let idleReleaseTimer = null;
   // The client is told the turn is over as soon as `result` lands, even though
   // the process lingers, so the UI never waits out the idle hold.
-  let turnCompleteSent = false;
+  let turnCompleteSent = keepaliveReadopt(options.keepalive, sessionId)?.turnCompleteSent === true;
   // Set when a turn starts background work, cleared when the next `result`
   // arrives — only turns with work still outstanding hold their process open.
   let backgroundWorkPending = false;
   // True while the process is being held open for background work, so a later
   // `result` can be recognised as that work reporting back.
-  let heldForBackgroundWork = false;
+  let heldForBackgroundWork = keepaliveReadopt(options.keepalive, sessionId)?.heldForBackgroundWork === true;
   // Set once a turn publishes a budget read from an assistant message, so the
   // turn-ending `result` is only mined for usage when nothing better arrived.
   let assistantBudgetSent = false;
+  // The reconciliation window. On resume the CLI first closes out any
+  // background task its previous process took down with it — exactly what
+  // superseding a held run leaves behind — as a synthetic query of its own:
+  // `system/task_notification` → `system/init` → `result {success, num_turns:
+  // 0, result: ''}` → a second `system/init` that opens the user's real query.
+  // Read as the turn ending, that phantom result sent `complete` ahead of the
+  // answer and released stdin, so the new process could never hold for its own
+  // background work. Measured 2026-09-08, CLI 2.1.263 / SDK 0.3.165.
+  //
+  // INVARIANT: the window is only ever open BEFORE this run's first handled
+  // result. A local slash command (`/model`) also yields a zero-turn, empty
+  // result, and swallowing a real terminal result leaves the run `running` in
+  // the registry with stdin held and no timer — the session wedges, and the
+  // supersede that would rescue it is refused as RUN_IN_PROGRESS. So the window
+  // closes on the init that follows a skipped result, and in any case
+  // RECONCILIATION_WINDOW_MS after it opened (the phantom lands ~50 ms after the
+  // notification; a user's turn cannot).
+  let reconciliationPending = false;
+  let reconciliationArmedAt = 0;
+  let reconciliationSkipped = false;
 
   // A new turn supersedes any earlier one still holding this session's process
   // open, so held runs cannot stack up across a conversation.
+  //
+  // THE TRADE: during a hold the run registry reports the session idle, so a new
+  // message is admitted even while the CLI is streaming the background-work
+  // follow-up turn. Releasing here ends that turn mid-stream and `addSession`
+  // interrupts it, so its terminal event — and `notifyBackgroundWorkCompleted`,
+  // which fires only on that follow-up `result` — never arrive. One CLI per
+  // conversation is worth it, but the loss is silent: a long background job that
+  // finishes just as the user types again reports nothing. Emitting the
+  // background-completed notification on the supersede path would close it.
   if (sessionKey()) {
     getSession(sessionKey())?.releaseInput?.();
   }
@@ -755,6 +791,28 @@ async function queryClaudeSDK(command, options = {}, ws, context) {
   // still owns the activeSessions entry (or was superseded by a newer run).
   let queryInstance = null;
 
+  // THE ONLY PLACE THE ENTRY GOES, and it is the `finally` alone — the one moment
+  // that genuinely coincides with process exit, since the generator cannot end
+  // until the CLI has. The entry must live exactly as long as the process does: it
+  // is the only handle for releasing or superseding a run, and a turn ending is NOT
+  // the process ending — a turn that leaves background work running holds stdin
+  // open on purpose. Retiring at turn-completion instead left a live CLI with no
+  // handle, so the next turn could neither release it (the lookup above
+  // `scheduleRelease` found nothing) nor supersede it (`addSession` saw no
+  // `existing`), and started a second process beside it. Measured 2026-09-08: four
+  // CLI processes for one conversation, each holding its own background task.
+  //
+  // Retiring at either release site would NOT do: `releasePromptStream` only
+  // resolves a promise. The generator resumes on a later microtask, the SDK then
+  // ends the input iterable, closes stdin, and only then does the CLI tear down its
+  // MCP transports and exit — so a retire there deletes the entry while the process
+  // is still winding down, reopening a smaller window of the same bug.
+  const retireSession = () => {
+    if (sessionKey() && getSession(sessionKey())?.instance === queryInstance) {
+      removeSession(sessionKey());
+    }
+  };
+
   try {
     const resolvedModel = await context.resolveResumeModel(sessionId, options.model);
     let effortModels = CLAUDE_PREDEFINED_MODELS;
@@ -770,6 +828,7 @@ async function queryClaudeSDK(command, options = {}, ws, context) {
       model: resolvedModel || options.model,
       effortModels,
     });
+    const keepalive = armKeepaliveSpawn(sdkOptions, { appSessionId: sessionId ?? null, userId: ws?.userId ?? null, reattach: options.keepalive ?? null });
 
     const mcpServers = await loadMcpConfig(options.cwd);
     if (mcpServers) {
@@ -779,7 +838,7 @@ async function queryClaudeSDK(command, options = {}, ws, context) {
     // Every turn uses streaming input so stdin stays open past the turn's
     // `result`. The message list is reusable, but each query attempt needs its
     // own stream because an async generator cannot be replayed once consumed.
-    const promptMessages = await buildPromptMessages(command, options.images, options.files, options.cwd);
+    const promptMessages = keepaliveReadopt(options.keepalive, sessionId) ? [] : await buildPromptMessages(command, options.images, options.files, options.cwd);
 
     sdkOptions.hooks = {
       Notification: [{
@@ -941,6 +1000,44 @@ async function queryClaudeSDK(command, options = {}, ws, context) {
         // session_id already captured
       }
 
+      if (message.type === 'system' && !turnCompleteSent) {
+        if (message.subtype === 'task_notification') {
+          reconciliationPending = true;
+          reconciliationArmedAt = Date.now();
+          reconciliationSkipped = false;
+        } else if (message.subtype === 'init' && reconciliationSkipped) {
+          // The CLI opens the user's own query with a fresh init once the
+          // reconciliation query is done; anything after this is the user's.
+          reconciliationPending = false;
+          reconciliationSkipped = false;
+        }
+      }
+      if (message.type === 'result' && !turnCompleteSent) {
+        const zeroTurn = message.subtype === 'success' && message.is_error !== true
+          && message.num_turns === 0 && (message.result ?? '') === '';
+        const windowOpen = reconciliationPending
+          && (Date.now() - reconciliationArmedAt) < RECONCILIATION_WINDOW_MS;
+        if (zeroTurn && windowOpen) {
+          // Skipped before anything client-facing: not the user's turn, so
+          // neither its `complete` nor its token bill belongs on the wire. The
+          // window stays open so a run that left several tasks behind is
+          // reconciled in full, however many zero-turn results that takes.
+          reconciliationSkipped = true;
+          console.log(`[Claude SDK] Skipping the reconciliation result for session ${sessionKey() || 'NEW'}: resume closed out a background task its previous process left behind`);
+          keepalive?.note({ turnCompleteSent, heldForBackgroundWork });
+          continue;
+        }
+        // Drift alarms: the guard matches one measured shape, and a CLI that
+        // changes it fails silently back to the premature-complete defect.
+        if (zeroTurn) {
+          console.warn(`[Claude SDK] Zero-turn result outside a reconciliation window for session ${sessionKey() || 'NEW'} (pending=${reconciliationPending}, skipped=${reconciliationSkipped}) — the CLI's resume shape may have changed`);
+        } else if (reconciliationPending && !reconciliationSkipped) {
+          console.warn(`[Claude SDK] task_notification was not followed by a reconciliation result for session ${sessionKey() || 'NEW'} — the CLI's resume shape may have changed`);
+        }
+        reconciliationPending = false;
+        reconciliationSkipped = false;
+      }
+
       // Transform and normalize message via adapter
       const transformedMessage = transformMessage(message);
       const sid = capturedSessionId || sessionId || null;
@@ -990,6 +1087,7 @@ async function queryClaudeSDK(command, options = {}, ws, context) {
         } else if (heldForBackgroundWork && !abortPending) {
           // A result after the turn already reported complete means the work we
           // held the process open for has finished and pushed a follow-up turn.
+          console.log('[Claude SDK] Background work completed for session ' + (sessionKey() || 'NEW'));
           notifyBackgroundWorkCompleted({
             userId: ws?.userId || null,
             provider: 'claude',
@@ -1010,18 +1108,18 @@ async function queryClaudeSDK(command, options = {}, ws, context) {
           heldForBackgroundWork = false;
           releasePromptStream();
         }
+        keepalive?.note({ turnCompleteSent, heldForBackgroundWork });
       } else if (idleReleaseTimer) {
         // Background activity after the turn — push the countdown back out.
         scheduleRelease();
       }
     }
 
-    // Clean up session on completion — only while this run still owns the map
-    // entry. A superseding run may have replaced it, and deleting here would
-    // strand that run.
-    if (sessionKey() && getSession(sessionKey())?.instance === queryInstance) {
-      removeSession(sessionKey());
-    }
+    // NO cleanup here. A `result` means the TURN ended, not the process: when the
+    // turn leaves background work running, `releaseAndRetire` has not fired and the
+    // CLI is still alive, so the entry is still the only handle on it. It is
+    // retired the moment stdin actually closes — immediately above when nothing was
+    // held, on the idle ceiling, or in the `finally`.
 
     // A superseded run winds down silently: the map entry, the abort flag,
     // and all client-facing events belong to the run that replaced it.
@@ -1049,11 +1147,8 @@ async function queryClaudeSDK(command, options = {}, ws, context) {
   } catch (error) {
     console.error('SDK query error:', error);
 
-    // Clean up session on error — only while this run still owns the map entry
-    // (a superseding run may have replaced it).
-    if (sessionKey() && getSession(sessionKey())?.instance === queryInstance) {
-      removeSession(sessionKey());
-    }
+    // No cleanup here either: the `finally` below always calls `releaseAndRetire`,
+    // which closes stdin and retires the entry in one step.
 
     if (supersededInstances.has(queryInstance)) {
       // Interrupted because a newer run took over this session id; that run
@@ -1096,6 +1191,7 @@ async function queryClaudeSDK(command, options = {}, ws, context) {
       idleReleaseTimer = null;
     }
     releasePromptStream();
+    retireSession();
   }
 }
 
@@ -1142,24 +1238,6 @@ async function abortClaudeSDKSession(sessionId) {
 }
 
 /**
- * Checks if an SDK session is currently active
- * @param {string} sessionId - Session identifier
- * @returns {boolean} True if session is active
- */
-function isClaudeSDKSessionActive(sessionId) {
-  const session = getSession(sessionId);
-  return session && session.status === 'active';
-}
-
-/**
- * Gets all active SDK session IDs
- * @returns {Array<string>} Array of active session IDs
- */
-function getActiveClaudeSDKSessions() {
-  return getAllSessions();
-}
-
-/**
  * Get pending tool approvals for a specific session.
  * @param {string} sessionId - The session ID
  * @returns {Array} Array of pending permission request objects
@@ -1181,21 +1259,6 @@ function getPendingApprovalsForSession(sessionId) {
   return pending;
 }
 
-/**
- * Reconnect a session's WebSocketWriter to a new raw WebSocket.
- * Called when client reconnects (e.g. page refresh) while SDK is still running.
- * @param {string} sessionId - The session ID
- * @param {Object} newRawWs - The new raw WebSocket connection
- * @returns {boolean} True if writer was successfully reconnected
- */
-function reconnectSessionWriter(sessionId, newRawWs) {
-  const session = getSession(sessionId);
-  if (!session?.writer?.updateWebSocket) return false;
-  session.writer.updateWebSocket(newRawWs);
-  console.log(`[RECONNECT] Writer swapped for session ${sessionId}`);
-  return true;
-}
-
 export const claudeRuntime = {
   run: queryClaudeSDK,
   abort: abortClaudeSDKSession,
@@ -1209,11 +1272,8 @@ export const claudeRuntime = {
 export {
   queryClaudeSDK,
   abortClaudeSDKSession,
-  isClaudeSDKSessionActive,
-  getActiveClaudeSDKSessions,
   resolveToolApproval,
   getPendingApprovalsForSession,
-  reconnectSessionWriter,
   extractTokenBudget,
   extractCumulativeTokenBudget
 };

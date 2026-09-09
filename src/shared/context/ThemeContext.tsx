@@ -6,13 +6,26 @@ import {
   subscribeToUserPreferences,
   writeUserPreference,
 } from '@/shared/userSettings';
+import { readSunPhase } from '@/shared/solarSchedule';
 
 type ThemeContextValue = {
   isDarkMode: boolean;
   toggleDarkMode: () => void;
+  /** True while the theme is following the sun rather than a stored choice. */
+  followsSun: boolean;
+  setFollowsSun: (next: boolean) => void;
 };
 
 const ThemeContext = createContext<ThemeContextValue | null>(null);
+
+/**
+ * The longest the sun-follower will sleep before re-reading the phase (30 min).
+ *
+ * `setTimeout` is suspended while the machine is, so a timer armed for a sunset eight hours out
+ * does not fire on a laptop that was closed — the cap bounds how long a slept-through crossing
+ * can leave the wrong theme on screen.
+ */
+const MAX_SUN_CHECK_MS = 30 * 60_000;
 
 export const useTheme = () => {
   const context = useContext(ThemeContext);
@@ -27,7 +40,18 @@ export const ThemeProvider = ({ children }: { children: ReactNode }) => {
   // Check for saved theme preference or default to system preference. The
   // stored theme is read synchronously from the preference mirror so the very
   // first paint is already the right colour.
+  const [followsSun, setFollowsSunState] = useState(
+    () => readUserPreference<boolean>('themeFollowsSun', false),
+  );
+
   const [isDarkMode, setIsDarkMode] = useState(() => {
+    // Ahead of the stored theme: when the reader has asked for the sun, the sun is the choice,
+    // and the stored value is only the last colour it happened to leave behind.
+    if (readUserPreference<boolean>('themeFollowsSun', false)) {
+      const phase = readSunPhase();
+      if (phase.nextChangeAt) return !phase.isDaylight;
+    }
+
     const savedTheme = readUserPreference<string | null>('theme', null);
     if (savedTheme) {
       return savedTheme === 'dark';
@@ -44,6 +68,7 @@ export const ThemeProvider = ({ children }: { children: ReactNode }) => {
   // The theme now lives in auth.db, so a change made on another device (or in
   // another tab) arrives through the preference store rather than a re-render.
   useEffect(() => subscribeToUserPreferences(() => {
+    setFollowsSunState(readUserPreference<boolean>('themeFollowsSun', false));
     const savedTheme = readUserPreference<string | null>('theme', null);
     if (savedTheme) {
       setIsDarkMode(savedTheme === 'dark');
@@ -83,6 +108,47 @@ export const ThemeProvider = ({ children }: { children: ReactNode }) => {
       }
     }
   }, [isDarkMode]);
+
+  // Follow the sun: set the colour now, then wake exactly at the next crossing and set it again.
+  //
+  // A timer per transition, not a poll: there are two crossings a day, so a ticking interval
+  // would be thousands of wasted wake-ups to catch two moments it already knows the time of.
+  // `nextChangeAt` is recomputed after every flip, which is what makes the schedule follow the
+  // seasons instead of drifting off a fixed offset.
+  //
+  // ⚠ Two hazards this closes. `setTimeout` does not fire while a laptop is asleep, so the delay
+  // is CAPPED and the phase re-read on each wake — a machine that slept through sunset comes
+  // back and corrects within the cap rather than staying light until the next sunrise. And a
+  // delay over ~24.8 days overflows the 32-bit timer and fires immediately; the same cap makes
+  // that unreachable.
+  useEffect(() => {
+    if (!followsSun) return undefined;
+
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let cancelled = false;
+
+    const apply = () => {
+      if (cancelled) return;
+      const phase = readSunPhase();
+
+      // A polar day or night measured nothing, so nothing is changed — the theme stays where the
+      // reader last had it rather than being flipped by a time nobody computed.
+      if (phase.nextChangeAt) {
+        setIsDarkMode(!phase.isDaylight);
+      }
+
+      const msUntilChange = phase.nextChangeAt
+        ? phase.nextChangeAt.getTime() - Date.now()
+        : MAX_SUN_CHECK_MS;
+      timer = setTimeout(apply, Math.min(Math.max(msUntilChange, 1_000), MAX_SUN_CHECK_MS));
+    };
+
+    apply();
+    return () => {
+      cancelled = true;
+      if (timer) clearTimeout(timer);
+    };
+  }, [followsSun]);
 
   // Listen for system theme changes
   useEffect(() => {
@@ -129,13 +195,25 @@ export const ThemeProvider = ({ children }: { children: ReactNode }) => {
       writeUserPreference('theme', next ? 'dark' : 'light');
       return next;
     });
+
+    // Reaching for the switch IS the decision. Leaving the sun in charge would let it undo the
+    // choice at the next crossing, which reads as the control being broken.
+    if (readUserPreference<boolean>('themeFollowsSun', false)) {
+      writeUserPreference('themeFollowsSun', false);
+      setFollowsSunState(false);
+    }
+  }, []);
+
+  const setFollowsSun = useCallback((next: boolean) => {
+    writeUserPreference('themeFollowsSun', next);
+    setFollowsSunState(next);
   }, []);
 
   // A fresh object here would re-render every consumer in the app on any
   // render of this provider, theme change or not.
   const value = useMemo<ThemeContextValue>(
-    () => ({ isDarkMode, toggleDarkMode }),
-    [isDarkMode, toggleDarkMode],
+    () => ({ isDarkMode, toggleDarkMode, followsSun, setFollowsSun }),
+    [isDarkMode, toggleDarkMode, followsSun, setFollowsSun],
   );
 
   return (

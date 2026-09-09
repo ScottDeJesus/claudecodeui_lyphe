@@ -5,8 +5,8 @@ account has spent, and the two writes that change either. `src/modules/accounts/
 `AccountPopover` (with `UsageMeters` and its own `AccountRow`) under the one `AccountFooterRow` its
 barrel exports, with `hooks/useDescentAccounts` holding the picture and the writes,
 `hooks/useDescentUsage` holding the readings, and `utils/accountInitials` drawing the two letters on
-the avatar. The server half — the four routes, the null discipline, the units — is
-[descent-proxy.md](descent-proxy.md).
+the avatar. The server half — the four accounts routes, the null discipline, the units — is
+[descent-proxy.md](descent-proxy.md), which now carries a second lane this screen does not use.
 
 **One row, one poller.** `SidebarFooter` renders `AccountFooterRow` above Settings and
 `SidebarCollapsed` renders the same component as the rail's avatar, and never both at once. That

@@ -201,8 +201,9 @@ export const api = {
   sessionDetails: (sessionId: string) =>
     get(`/api/providers/sessions/${encodeURIComponent(sessionId)}`),
   runningSessions: () => get('/api/providers/sessions/running'),
-  recentConversations: ({ limit = 40, offset = 0 }: { limit?: number; offset?: number } = {}) =>
-    get(`/api/providers/sessions/recent${query({ limit, offset })}`),
+  recentConversations: (
+    { limit = 40, offset = 0, simpleList }: { limit?: number; offset?: number; simpleList?: boolean } = {},
+  ) => get(`/api/providers/sessions/recent${query({ limit, offset, simpleList })}`),
   providerSessionId: (sessionId: string) =>
     get(`/api/providers/sessions/${encodeURIComponent(sessionId)}/provider-id`),
   restoreSession: (sessionId: string) => post(`/api/providers/sessions/${sessionId}/restore`),
@@ -304,6 +305,7 @@ export const api = {
       provider: string;
       projectPath: string;
       initialMessage?: unknown;
+      simpleList?: boolean;
     }) => post('/api/providers/sessions', payload),
     sessionMessages: (
       sessionId: string,
@@ -484,12 +486,20 @@ export const api = {
   // The Descent proxy (docs/descent-proxy.md). Both reads answer 200 even when Descent is
   // down — the calm `{reachable:false, reason}` picture — so a caller reads the BODY rather
   // than the status. Both writes carry Descent's OWN status and body through, which is why
-  // they are read from the raw response and never through `readApiJson`.
+  // they are read from the raw response and never through `readApiJson`. The memory writes
+  // carry Descent's own status too, and a 422 there is a VERDICT the caller reads — the cap
+  // guard refusing in plain English, with the card left pending — never a failed request.
   descent: {
     accounts: () => get('/api/descent/accounts'),
     usage: () => get('/api/descent/usage'),
     switchAccount: (slug: string) => post('/api/descent/accounts/switch', { slug }),
     capture: () => post('/api/descent/accounts/capture', {}),
+    memory: {
+      pending: () => get('/api/descent/memory'),
+      candidate: (id: string) => get(`/api/descent/memory/${encodeURIComponent(id)}`),
+      approve: (id: string) => post(`/api/descent/memory/${encodeURIComponent(id)}/approve`, {}),
+      reject: (id: string) => post(`/api/descent/memory/${encodeURIComponent(id)}/reject`, {}),
+    },
   },
 
   // The installed Claude CLI and the version each LIVE run is on (docs/cli-version.md). It

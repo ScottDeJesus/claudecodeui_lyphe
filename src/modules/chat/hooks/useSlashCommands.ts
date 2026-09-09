@@ -455,7 +455,6 @@ export function useSlashCommands({
 
   return {
     slashCommands,
-    slashCommandsCount: slashCommands.length,
     filteredCommands,
     frequentCommands,
     commandQuery,

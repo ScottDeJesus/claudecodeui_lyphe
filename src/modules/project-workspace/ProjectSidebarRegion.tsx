@@ -6,6 +6,8 @@ import type {
 import { useTranslation } from 'react-i18next';
 
 import { useProjectSidebarState } from '@/modules/project-workspace/context/ProjectsStateContext';
+import { useWorkspaceTabGates } from '@/modules/project-workspace/hooks/useWorkspaceTabGates';
+import WorkspaceTabs from '@/modules/project-workspace/WorkspaceTabs';
 import { Sidebar } from '@/modules/sidebar';
 import type { ProjectWorkspaceShellProps } from '@/shared/types';
 
@@ -14,7 +16,37 @@ function ProjectSidebarRegion({
   isMobile,
 }: Pick<ProjectWorkspaceShellProps, 'isMobile'>) {
   const { t } = useTranslation('common');
-  const { sidebarOpen, setSidebarOpen, sidebarSharedProps } = useProjectSidebarState();
+  const { sidebarOpen, setSidebarOpen, sidebarSharedProps, activeTab, setActiveTab } = useProjectSidebarState();
+  const {
+    shouldShowTasksTab,
+    shouldShowBrowserTab,
+    shouldShowShellTab,
+    shouldShowMemoryTab,
+    memoryPendingCount,
+  } = useWorkspaceTabGates(activeTab);
+
+  // Choosing a tab on a phone means choosing a pane the drawer is covering, so the drawer gets
+  // out of the way. On desktop the sidebar is docked and this closes nothing.
+  const handleTabChange = useCallback(() => {
+    if (isMobile) setSidebarOpen(false);
+  }, [isMobile, setSidebarOpen]);
+
+  // The workspace tab strip, rendered INTO the sidebar as a slot node. The sidebar module never
+  // imports project-workspace — the dependency points one way, the way it already did.
+  // Gated on a selected project because with none the main region shows its empty state, and a
+  // strip that switches between panes that are not there is a row of dead buttons.
+  const tabs = sidebarSharedProps.selectedProject ? (
+    <WorkspaceTabs
+      activeTab={activeTab}
+      setActiveTab={setActiveTab}
+      shouldShowTasksTab={shouldShowTasksTab}
+      shouldShowBrowserTab={shouldShowBrowserTab}
+      shouldShowShellTab={shouldShowShellTab}
+      shouldShowMemoryTab={shouldShowMemoryTab}
+      memoryPendingCount={memoryPendingCount}
+      onTabChange={handleTabChange}
+    />
+  ) : null;
 
   const handleBackdropClick = useCallback((event: ReactMouseEvent<HTMLButtonElement>) => {
     event.stopPropagation();
@@ -30,7 +62,7 @@ function ProjectSidebarRegion({
   if (!isMobile) {
     return (
       <div className="h-full flex-shrink-0 border-r border-border/50">
-        <Sidebar {...sidebarSharedProps} />
+        <Sidebar {...sidebarSharedProps} tabs={tabs} />
       </div>
     );
   }
@@ -54,7 +86,7 @@ function ProjectSidebarRegion({
         onClick={(event) => event.stopPropagation()}
         onTouchStart={(event) => event.stopPropagation()}
       >
-        <Sidebar {...sidebarSharedProps} />
+        <Sidebar {...sidebarSharedProps} tabs={tabs} />
       </div>
     </div>
   );

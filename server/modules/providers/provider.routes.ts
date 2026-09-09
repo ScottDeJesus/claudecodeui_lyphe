@@ -731,7 +731,10 @@ router.post(
     const provider = parseProvider(body.provider);
     const projectPath = typeof body.projectPath === 'string' ? body.projectPath : '';
     const initialMessage = typeof body.initialMessage === 'string' ? body.initialMessage : '';
-    const result = sessionsService.createAppSession(provider, projectPath, initialMessage);
+    // Only the boolean `true` tags a session for the simple chat list — a
+    // truthy string like "true" from a stray client must not tag it.
+    const simpleList = body.simpleList === true;
+    const result = sessionsService.createAppSession(provider, projectPath, initialMessage, simpleList);
     res.status(201).json(createApiSuccessResponse(result));
   }),
 );
@@ -749,7 +752,8 @@ router.get(
   asyncHandler(async (req: Request, res: Response) => {
     const limit = parseBoundedIntegerQuery(req.query.limit, 'limit', 40, 1, 100);
     const offset = parseBoundedIntegerQuery(req.query.offset, 'offset', 0, 0);
-    const page = sessionsService.listRecentSessions(limit, offset);
+    const simpleListOnly = parseOptionalBooleanQuery(req.query.simpleList, 'simpleList') ?? false;
+    const page = sessionsService.listRecentSessions(limit, offset, { simpleListOnly });
     res.json(createApiSuccessResponse(page));
   }),
 );

@@ -12,3 +12,7 @@ export { sessionsService } from './services/sessions.service.js';
 
 export { initializeSessionsWatcher } from './services/sessions-watcher.service.js';
 export { closeSessionsWatcher } from './services/sessions-watcher.service.js';
+
+// readoptKeepaliveSessions: used by server/index.ts to give every CLI that outlived
+// the API its registry run back, before the server starts listening (D-11).
+export { readoptKeepaliveSessions } from './list/claude/session-host/index.js';

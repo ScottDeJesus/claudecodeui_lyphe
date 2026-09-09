@@ -471,6 +471,13 @@ asks for whatever the first did not already deliver.
 | A frame the client sent while closed | Dropped, with a console warning | Nothing re-sends it |
 | Sidebar deltas during the gap | Not delivered | `useProjectsState` refreshes the project list on `websocket_reconnected` (`:709-718`) |
 
+That table is about the *socket* dropping. A Claude run also survives the API **process** being
+replaced, and recovers differently: it is rebuilt on boot as a fresh registry run, which makes
+the reconnecting client's remembered cursor a previous run's — see
+[02-realtime-stream.md](./02-realtime-stream.md) §"One run, end to end". `handleChatSubscribe`
+catches that one case on the way in: a requested `lastSeq` above the run's own `lastSeq` is
+treated as 0, so the new run replays from its start instead of replaying nothing.
+
 ## Connection lifecycle in the browser
 
 ```mermaid

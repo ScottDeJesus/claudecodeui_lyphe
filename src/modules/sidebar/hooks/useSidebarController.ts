@@ -4,7 +4,7 @@ import type { TFunction } from 'i18next';
 import { api } from '@/shared/api';
 import { subscribeToUserPreferences } from '@/shared/userSettings';
 import { usePaletteOps } from '@/modules/command-palette';
-import type { ArchivedProjectListItem, ArchivedSessionListItem, ConversationProjectResult, ConversationSearchResults, LLMProvider, Project, ProjectSession, ProjectSortOrder, RecentConversationListItem, SearchProgress, ActiveSidebarRename, PendingSidebarDeletion, SessionTitleSearchResult, SessionWithProvider, SidebarSearchMode } from '@/shared/types';
+import type { ArchivedProjectListItem, ArchivedSessionListItem, ConversationProjectResult, ConversationSearchResults, LLMProvider, Project, ProjectSession, ProjectSortOrder, RecentConversationListItem, RunningSessionListItem, SearchProgress, ActiveSidebarRename, PendingSidebarDeletion, SessionTitleSearchResult, SessionWithProvider, SidebarSearchMode } from '@/shared/types';
 import {
   filterProjects,
   getAllSessions,
@@ -45,6 +45,8 @@ type UseSidebarControllerArgs = {
   selectedProject: Project | null;
   selectedSession: ProjectSession | null;
   activeSessions: ReadonlySet<string>;
+  /** Every run the server reports, with its project — the authority for the Running list. */
+  runningSessions: readonly RunningSessionListItem[];
   isLoading: boolean;
   isMobile: boolean;
   t: TFunction;
@@ -65,6 +67,7 @@ export function useSidebarController({
   selectedProject,
   selectedSession: _selectedSession,
   activeSessions,
+  runningSessions,
   isLoading,
   isMobile,
   t,
@@ -120,7 +123,6 @@ export function useSidebarController({
 
   const isSidebarCollapsed = !isMobile && !sidebarVisible;
   const activeSessionIds = activeSessions;
-  const runningSessionsCount = activeSessionIds.size;
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -647,31 +649,113 @@ export function useSidebarController({
     [projectSortOrder, projectsWithResolvedStarState],
   );
 
+  /**
+   * The Running list, grouped by project.
+   *
+   * Built from the server's run registry (`runningSessions`) rather than from
+   * the sessions the sidebar has paged in: a project only ships its first page
+   * of sessions, so filtering loaded rows dropped every run whose session sat
+   * deeper in the list, and the Running chip counted work the list below it then
+   * claimed did not exist. A loaded session row is still preferred when there is
+   * one — it carries the title and message count the row renders — and a run the
+   * registry has not reported yet (a send from this tab, before the next poll)
+   * is still matched against loaded sessions so it appears immediately.
+   */
   const runningProjects = useMemo(() => {
-    if (activeSessionIds.size === 0) {
+    const detailsBySessionId = new Map(runningSessions.map((session) => [session.sessionId, session]));
+    const runningIds = new Set<string>([...detailsBySessionId.keys(), ...activeSessionIds]);
+
+    if (runningIds.size === 0) {
       return [];
     }
 
-    return sortedProjects.reduce<Project[]>((acc, project) => {
-      const sessions = (project.sessions ?? []).filter((session) => activeSessionIds.has(String(session.id)));
-      const runningCount = sessions.length;
+    const placed = new Set<string>();
+    const result: Project[] = [];
 
-      if (runningCount === 0) {
-        return acc;
+    const toProject = (project: Project, sessions: ProjectSession[]): Project => ({
+      ...project,
+      sessions,
+      sessionMeta: {
+        ...project.sessionMeta,
+        total: sessions.length,
+        hasMore: false,
+      },
+    });
+
+    for (const project of sortedProjects) {
+      const sessions = (project.sessions ?? []).filter((session) => {
+        const sessionId = String(session.id);
+        if (!runningIds.has(sessionId) || placed.has(sessionId)) {
+          return false;
+        }
+        placed.add(sessionId);
+        return true;
+      });
+
+      // Runs this project owns whose session row has not been paged in.
+      for (const [sessionId, details] of detailsBySessionId) {
+        if (placed.has(sessionId) || details.projectId !== project.projectId) {
+          continue;
+        }
+        placed.add(sessionId);
+        sessions.push({
+          id: details.sessionId,
+          provider: details.provider,
+          summary: details.sessionTitle,
+          lastActivity: details.lastActivity ?? undefined,
+          messageCount: 0,
+          __projectId: project.projectId,
+        });
       }
 
-      acc.push({
-        ...project,
-        sessions,
-        sessionMeta: {
-          ...project.sessionMeta,
-          total: runningCount,
-          hasMore: false,
-        },
+      if (sessions.length > 0) {
+        result.push(toProject(project, sessions));
+      }
+    }
+
+    // Runs whose project is not in the sidebar list at all — an archived project,
+    // or one this client has not fetched. The run is real either way, so it is
+    // listed under the project identity the server reported with it.
+    const orphansByProjectId = new Map<string, { details: RunningSessionListItem; sessions: ProjectSession[] }>();
+    for (const [sessionId, details] of detailsBySessionId) {
+      if (placed.has(sessionId) || !details.projectId) {
+        continue;
+      }
+      placed.add(sessionId);
+      const orphan = orphansByProjectId.get(details.projectId)
+        ?? { details, sessions: [] };
+      orphan.sessions.push({
+        id: details.sessionId,
+        provider: details.provider,
+        summary: details.sessionTitle,
+        lastActivity: details.lastActivity ?? undefined,
+        messageCount: 0,
+        __projectId: details.projectId,
       });
-      return acc;
-    }, []);
-  }, [activeSessionIds, sortedProjects]);
+      orphansByProjectId.set(details.projectId, orphan);
+    }
+
+    for (const [projectId, orphan] of orphansByProjectId) {
+      result.push(toProject(
+        {
+          projectId,
+          displayName: orphan.details.projectDisplayName,
+          fullPath: orphan.details.projectPath ?? '',
+          path: orphan.details.projectPath ?? undefined,
+        },
+        orphan.sessions,
+      ));
+    }
+
+    return result;
+  }, [activeSessionIds, runningSessions, sortedProjects]);
+
+  // Counted from the rows the list actually renders, so the chip and the list
+  // can never disagree about how much is running.
+  const runningSessionsCount = useMemo(
+    () => runningProjects.reduce((total, project) => total + (project.sessions?.length ?? 0), 0),
+    [runningProjects],
+  );
 
   const filteredProjects = useMemo(
     () => filterProjects(searchMode === 'running' ? runningProjects : sortedProjects, debouncedSearchQuery),

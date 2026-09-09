@@ -142,6 +142,10 @@ CREATE TABLE IF NOT EXISTS sessions (
     -- normally. Informational only: a fork is a fully independent provider
     -- session, and deleting the source does not affect it.
     forked_from_session_id TEXT,
+    -- Set to the tagging timestamp when this session was created from the
+    -- simple chat list view; NULL for sessions created from the tree. Also
+    -- the simple list's sort key, so tagged rows never jump while running.
+    simple_list_at DATETIME,
     isArchived BOOLEAN DEFAULT 0,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,

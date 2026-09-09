@@ -36,7 +36,18 @@
   },
   "appearance": {
     "title": "Görünüm",
-    "theme": "Tema"
+    "theme": "Tema",
+    "sidebar": {
+      "title": "Kenar çubuğu",
+      "simpleChatList": {
+        "label": "Basit sohbet listesi",
+        "description": "Proje ağacını burada başlattığınız sohbetlerin düz bir listesiyle değiştirir."
+      },
+      "simpleChatProject": {
+        "label": "Yeni sohbetler için proje",
+        "description": "Basit listedeki yeni sohbetler bu projede başlar."
+      }
+    }
   },
   "actions": {
     "saveChanges": "Değişiklikleri Kaydet",
@@ -125,6 +136,10 @@
       "description": "Projelerin kenar çubuğunda nasıl sıralanacağı",
       "alphabetical": "Alfabetik",
       "recentActivity": "Son Etkinlik"
+    },
+    "followSun": {
+      "label": "Gün doğumu ve batımını izle",
+      "description": "Saat diliminize göre gün batımında koyuya, gün doğumunda açığa geçer. Temayı elle değiştirmek bunu kapatır."
     }
   },
   "mcpForm": {

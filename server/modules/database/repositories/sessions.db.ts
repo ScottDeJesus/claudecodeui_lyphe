@@ -15,6 +15,8 @@ type SessionRow = {
   effort: string | null;
   /** The app session this one was branched from; NULL unless it is a fork. */
   forked_from_session_id: string | null;
+  /** Set when this session was created from the simple chat list; also its sort key. NULL = not tagged. */
+  simple_list_at: string | null;
   isArchived: number;
   created_at: string;
   updated_at: string;
@@ -26,7 +28,7 @@ type RecentSessionsPage = {
 };
 
 const SESSION_ROW_COLUMNS =
-  'session_id, provider, provider_session_id, project_path, jsonl_path, custom_name, model, effort, forked_from_session_id, isArchived, created_at, updated_at';
+  'session_id, provider, provider_session_id, project_path, jsonl_path, custom_name, model, effort, forked_from_session_id, simple_list_at, isArchived, created_at, updated_at';
 
 const SQLITE_UTC_TIMESTAMP_REGEX = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/;
 
@@ -177,6 +179,7 @@ export const sessionsDb = {
     provider: string,
     projectPath: string,
     customName?: string,
+    simpleList = false,
   ): string {
     const db = getConnection();
     const normalizedProjectPath = normalizeProjectPathForProvider(provider, projectPath);
@@ -184,9 +187,9 @@ export const sessionsDb = {
     projectsDb.createProjectPath(normalizedProjectPath);
 
     db.prepare(
-      `INSERT INTO sessions (session_id, provider, provider_session_id, custom_name, project_path, jsonl_path, isArchived, created_at, updated_at)
-       VALUES (?, ?, NULL, ?, ?, NULL, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`
-    ).run(sessionId, provider, customName ?? null, normalizedProjectPath);
+      `INSERT INTO sessions (session_id, provider, provider_session_id, custom_name, project_path, jsonl_path, simple_list_at, isArchived, created_at, updated_at)
+       VALUES (?, ?, NULL, ?, ?, NULL, CASE WHEN ? = 1 THEN CURRENT_TIMESTAMP ELSE NULL END, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`
+    ).run(sessionId, provider, customName ?? null, normalizedProjectPath, simpleList ? 1 : 0);
 
     return sessionId;
   },
@@ -540,20 +543,37 @@ export const sessionsDb = {
    * and correctly ordered across projects instead of flattening only the
    * per-project slices already loaded by the client.
    */
-  getRecentSessionsPage(limit: number, offset: number): RecentSessionsPage {
+  getRecentSessionsPage(
+    limit: number,
+    offset: number,
+    options: { simpleListOnly?: boolean } = {}
+  ): RecentSessionsPage {
     const db = getConnection();
-    const visibilityClause = `
+    // Both the SELECT and the COUNT share this clause so `total` never
+    // disagrees with the rows returned for the same feed.
+    const visibilityClause = options.simpleListOnly
+      ? `
+      sessions.isArchived = 0
+      AND (projects.isArchived IS NULL OR projects.isArchived = 0)
+      AND sessions.simple_list_at IS NOT NULL
+    `
+      : `
       sessions.isArchived = 0
       AND (projects.isArchived IS NULL OR projects.isArchived = 0)
     `;
+    // The simple list sorts by tagging time so a running chat never jumps;
+    // the tree keeps sorting by last activity.
+    const orderByClause = options.simpleListOnly
+      ? 'sessions.simple_list_at DESC, sessions.session_id DESC'
+      : `julianday(COALESCE(sessions.updated_at, sessions.created_at)) DESC,
+                  sessions.session_id DESC`;
     const rows = db
       .prepare(
         `SELECT sessions.*
          FROM sessions
          LEFT JOIN projects ON projects.project_path = sessions.project_path
          WHERE ${visibilityClause}
-         ORDER BY julianday(COALESCE(sessions.updated_at, sessions.created_at)) DESC,
-                  sessions.session_id DESC
+         ORDER BY ${orderByClause}
          LIMIT ? OFFSET ?`
       )
       .all(limit, offset) as SessionRow[];

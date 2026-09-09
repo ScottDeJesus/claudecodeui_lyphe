@@ -6,6 +6,7 @@ import {
   mkdir,
   readFile,
   readdir,
+  open as openFile,
   readlink,
   realpath,
   stat,
@@ -1065,6 +1066,110 @@ export async function readFileTimestamps(
   } catch {
     return {};
   }
+}
+
+/**
+ * Returns the timestamp of the last timestamped record in a JSONL transcript.
+ *
+ * A transcript's mtime is not a record of conversation activity: the Claude
+ * CLI appends bookkeeping records with no timestamp (`last-prompt`,
+ * `permission-mode`, `cost-state`, `bridge-session`, `ai-title`, ...) while a
+ * session sits open and idle, and occasionally rewrites the file with nothing
+ * new in it. Session indexers use the last timestamped record instead so a
+ * session's `updated_at` moves only when the transcript itself grew.
+ *
+ * The file is read backwards in `chunkBytes` steps. Chunks that hold no line
+ * break are queued as raw bytes and decoded once, when the start of that line
+ * is found, so a single oversized record (multi-megabyte tool results are
+ * common) costs one pass rather than one re-decode per chunk. The scan gives
+ * up after `maxScanBytes` so a transcript with no timestamped record at all
+ * (truncated, corrupt, header-only) cannot cost a full read on every watcher
+ * tick. Returns `undefined` when no timestamped record is found.
+ */
+export async function readLastTranscriptTimestamp(
+  filePath: string,
+  chunkBytes = 256 * 1024,
+  maxScanBytes = 32 * 1024 * 1024
+): Promise<string | undefined> {
+  let handle: Awaited<ReturnType<typeof openFile>> | null = null;
+  try {
+    handle = await openFile(filePath, 'r');
+    const { size } = await handle.stat();
+    const floor = Math.max(0, size - maxScanBytes);
+    let position = size;
+    // Bytes of the not-yet-complete line at the front of the scanned region,
+    // in file order, newest last.
+    let pending: Buffer[] = [];
+
+    while (position > floor) {
+      const length = Math.min(position - floor, chunkBytes);
+      position -= length;
+      const buffer = Buffer.alloc(length);
+      const { bytesRead } = await handle.read(buffer, 0, length, position);
+      if (bytesRead === 0) {
+        // The file shrank underneath us (the CLI rewrote it); nothing more to read.
+        return undefined;
+      }
+      position += length - bytesRead;
+      const chunk = buffer.subarray(0, bytesRead);
+
+      if (chunk.indexOf(0x0a) === -1 && position > floor) {
+        pending.unshift(chunk);
+        continue;
+      }
+
+      const joined = pending.length > 0 ? Buffer.concat([chunk, ...pending]) : chunk;
+      let body = joined;
+      pending = [];
+      if (position > floor) {
+        // The first segment is the tail of a line that starts in an earlier
+        // chunk; hold it back until that chunk is read.
+        const cut = joined.indexOf(0x0a);
+        pending = [joined.subarray(0, cut)];
+        body = joined.subarray(cut + 1);
+      }
+
+      const timestamp = findLastTimestamp(body.toString('utf8').split(/\r?\n/));
+      if (timestamp) {
+        return timestamp;
+      }
+    }
+
+    return undefined;
+  } catch {
+    // Missing/unreadable files fall back to filesystem timestamps upstream.
+    return undefined;
+  } finally {
+    await handle?.close();
+  }
+}
+
+/**
+ * Walks JSONL lines from the end and returns the first valid top-level
+ * `timestamp` as an ISO string. Unparsable lines (a torn write in progress)
+ * are skipped.
+ */
+function findLastTimestamp(lines: string[]): string | undefined {
+  for (let index = lines.length - 1; index >= 0; index -= 1) {
+    const line = lines[index]?.trim();
+    if (!line) {
+      continue;
+    }
+
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(line);
+    } catch {
+      continue;
+    }
+
+    const timestamp = (parsed as Record<string, unknown> | null)?.timestamp;
+    if (typeof timestamp === 'string' && !Number.isNaN(Date.parse(timestamp))) {
+      return new Date(timestamp).toISOString();
+    }
+  }
+
+  return undefined;
 }
 
 // ---------------------------

@@ -1,0 +1,36 @@
+# DEPLOY (an EXISTING unit — the ExecStart changed, so systemd must re-read it):
+#   sudo cp /home/lyphe/.claude/claudecodeui_lyphe/deploy/systemd/cloudcli-server-dev.service /etc/systemd/system/
+#   sudo systemctl daemon-reload && sudo systemctl restart cloudcli-server-dev
+#   systemctl status cloudcli-server-dev   # → active; journal shows '[supervisor] serving pid <n>'
+[Unit]
+Description=CloudCLI dev API (dev-supervisor handover restarts, :3011 loopback; Vite proxies to it)
+After=network.target
+# A crash loop latches 'failed' after 5 starts in 2 min instead of restarting forever unseen
+# (the default 10 s window can never trip with RestartSec=5). The watchdog resets and retries.
+StartLimitIntervalSec=120
+StartLimitBurst=5
+
+[Service]
+Type=simple
+WorkingDirectory=/home/lyphe/.claude/claudecodeui_lyphe
+# .env carries SERVER_PORT=3011, VITE_PORT=5183, HOST=127.0.0.1, CLAUDE_CLI_PATH — the same file
+# the tmux dev session used. HOST stays loopback: every LAN request reaches the API through Vite's
+# proxy on :5183, so the API itself never has to face the LAN.
+EnvironmentFile=/home/lyphe/.claude/claudecodeui_lyphe/.env
+Environment=NODE_ENV=development
+# The interactive shell's PATH, in full: the app's shell tab and every spawned Claude session
+# inherit this process env, so a narrower list silently loses tools (pnpm, the sbin dirs).
+Environment=PATH=/home/lyphe/.claude/claudecodeui_lyphe/node_modules/.bin:/home/lyphe/.npm-global/bin:/home/lyphe/.local/share/pnpm:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/snap/bin
+# The supervisor, not the API itself: it boots an edited server BESIDE the running one and
+# retires the old only once the new one is listening, so a save under server/ never leaves the
+# port unanswered and a broken edit is a logged line instead of an outage
+# (deploy/dev-supervisor/README.md). Like the watcher it replaces it OUTLIVES a dead child and
+# waits for the next edit — so a dead API still leaves this unit 'active', and the watchdog's
+# API canary on /api/cli-version is what catches that (Restart= cannot).
+ExecStart=/usr/bin/node /home/lyphe/.claude/claudecodeui_lyphe/deploy/dev-supervisor/supervisor.mjs
+Restart=always
+RestartSec=5
+User=lyphe
+
+[Install]
+WantedBy=multi-user.target

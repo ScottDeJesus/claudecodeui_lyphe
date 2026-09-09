@@ -132,3 +132,59 @@ export function groupConsecutiveTools(
 
   return items;
 }
+
+/**
+ * Returns true for a message that reads as the model's prose reply — not a
+ * tool call, thinking, a task notification or the result it carried, a tool
+ * result with nothing to attach to, or a synthetic placeholder the server
+ * writes when a turn produced nothing ("No response requested.").
+ */
+export function isProseReply(message: ChatMessage): boolean {
+  return message.type === 'assistant'
+    && !message.isToolUse
+    && !message.isThinking
+    && !message.isTaskNotification
+    && !message.isTaskResult
+    && !message.isOrphanToolResult
+    && message.model !== '<synthetic>'
+    && String(message.content || '').trim().length > 0;
+}
+
+/**
+ * Picks, for every run (the messages between one user turn and the next),
+ * the prose reply that closes it: the last reply before the next user turn.
+ *
+ * A turn is not `[tools…, reply]` but `text → tool → text → tool → text`, so
+ * "the reply" is the final prose of the run, not any assistant message. The
+ * trailing run — the one no user turn has followed yet — is only closed when
+ * `isRunActive` is false: while the model is still working, its latest prose
+ * is not the end of anything, and a stamp there would claim it was. Tool
+ * calls after the last prose do not move the stamp; it marks the reply, not
+ * the last of the work.
+ */
+export function collectRunTerminalReplies(
+  items: MessageListItem[],
+  isRunActive = false,
+): Set<ChatMessage> {
+  const terminal = new Set<ChatMessage>();
+  let candidate: ChatMessage | null = null;
+  for (const item of items) {
+    if (isToolGroupItem(item)) {
+      continue;
+    }
+    if (item.type === 'user') {
+      if (candidate) {
+        terminal.add(candidate);
+      }
+      candidate = null;
+      continue;
+    }
+    if (isProseReply(item)) {
+      candidate = item;
+    }
+  }
+  if (candidate && !isRunActive) {
+    terminal.add(candidate);
+  }
+  return terminal;
+}

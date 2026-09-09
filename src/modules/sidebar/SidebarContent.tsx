@@ -86,6 +86,12 @@ type SidebarContentProps = {
   isMobile: boolean;
   isLoading: boolean;
   projects: Project[];
+  // A slot, not an import: this file stays ignorant of the component (and its props type) that
+  // fills it, so the body composer never has to know which mode is rendering. `null` means the
+  // tree — the ScrollArea body below falls through to its usual arms.
+  simpleList: ReactNode | null;
+  // The workspace tab strip, same slot discipline as `simpleList` — handed straight to the header.
+  tabs: ReactNode;
   runningSessionsCount: number;
   archivedProjects: ArchivedProjectListItem[];
   archivedSessions: ArchivedSessionListItem[];
@@ -134,6 +140,8 @@ export default function SidebarContent({
   isMobile,
   isLoading,
   projects,
+  simpleList,
+  tabs,
   runningSessionsCount,
   archivedProjects,
   archivedSessions,
@@ -204,11 +212,15 @@ export default function SidebarContent({
         isRefreshing={isRefreshing}
         onCreateProject={onCreateProject}
         onCollapseSidebar={onCollapseSidebar}
+        simpleMode={simpleList !== null}
+        tabs={tabs}
         t={t}
       />
 
       <ScrollArea className="flex-1 overflow-y-auto overscroll-contain md:px-1.5 md:py-2">
-        {showConversationSearch ? (
+        {simpleList !== null ? (
+          simpleList
+        ) : showConversationSearch ? (
           isSearching && !conversationResults ? (
             <div className="px-4 py-12 text-center md:py-8">
               <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-muted md:mb-3">

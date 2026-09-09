@@ -9,6 +9,7 @@ import {
   findFilesRecursivelyCreatedAfter,
   normalizeSessionName,
   readFileTimestamps,
+  readLastTranscriptTimestamp,
 } from '@/shared/utils.js';
 import type { IProviderSessionSynchronizer } from '@/shared/interfaces.js';
 
@@ -64,7 +65,7 @@ export class ClaudeSessionSynchronizer implements IProviderSessionSynchronizer {
         continue;
       }
 
-      const timestamps = await readFileTimestamps(filePath);
+      const timestamps = await this.readSessionTimestamps(filePath);
       sessionsDb.createSession(
         parsed.sessionId,
         this.provider,
@@ -97,7 +98,7 @@ export class ClaudeSessionSynchronizer implements IProviderSessionSynchronizer {
       return null;
     }
 
-    const timestamps = await readFileTimestamps(filePath);
+    const timestamps = await this.readSessionTimestamps(filePath);
     return sessionsDb.createSession(
       parsed.sessionId,
       this.provider,
@@ -107,6 +108,29 @@ export class ClaudeSessionSynchronizer implements IProviderSessionSynchronizer {
       timestamps.updatedAt,
       filePath
     );
+  }
+
+  /**
+   * Resolves the timestamps a session row is stamped with.
+   *
+   * `updated_at` is the last timestamped record in the transcript, not the
+   * file's mtime: the CLI touches idle transcripts (see
+   * `readLastTranscriptTimestamp`), and using mtime made idle sessions surface
+   * as "active a minute ago". The mtime remains the fallback for a transcript
+   * that holds no timestamped record yet. Codex and Cursor still stamp mtime;
+   * their CLIs have not been observed touching idle transcripts.
+   */
+  private async readSessionTimestamps(
+    filePath: string
+  ): Promise<{ createdAt?: string; updatedAt?: string }> {
+    const [fileTimestamps, lastRecordAt] = await Promise.all([
+      readFileTimestamps(filePath),
+      readLastTranscriptTimestamp(filePath),
+    ]);
+    return {
+      createdAt: fileTimestamps.createdAt,
+      updatedAt: lastRecordAt ?? fileTimestamps.updatedAt,
+    };
   }
 
   /**

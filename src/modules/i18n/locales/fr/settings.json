@@ -36,7 +36,18 @@
   },
   "appearance": {
     "title": "Apparence",
-    "theme": "Thème"
+    "theme": "Thème",
+    "sidebar": {
+      "title": "Barre latérale",
+      "simpleChatList": {
+        "label": "Liste de discussions simple",
+        "description": "Remplace l'arborescence des projets par une liste plate des discussions démarrées ici."
+      },
+      "simpleChatProject": {
+        "label": "Projet pour les nouvelles discussions",
+        "description": "Les nouvelles discussions de la liste simple démarrent dans ce projet."
+      }
+    }
   },
   "actions": {
     "saveChanges": "Enregistrer les modifications",
@@ -124,6 +135,10 @@
       "description": "Ordre d'affichage des projets dans la barre latérale",
       "alphabetical": "Alphabétique",
       "recentActivity": "Activité récente"
+    },
+    "followSun": {
+      "label": "Suivre le lever et le coucher du soleil",
+      "description": "Passe en sombre au coucher du soleil et revient au lever, selon votre fuseau horaire. Changer le mode à la main le désactive."
     }
   },
   "mcpForm": {

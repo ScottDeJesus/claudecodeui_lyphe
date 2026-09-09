@@ -74,6 +74,17 @@ those services themselves. This keeps `providerRegistry` as the only provider
 mapping without creating a circular dependency. Application-level consumers
 import the service from `server/modules/providers/index.ts`.
 
+### The exception: `list/claude/session-host/`
+
+`list/claude/` additionally holds a `session-host/` directory: the Claude runtime can spawn a
+turn's CLI into a tmux server through it instead of as a child of the API, which is what lets a
+chat session outlive an API restart. `claude-runtime.provider.js` imports `armKeepaliveSpawn` and
+`keepaliveReadopt` from it; `server/index.ts` calls `readoptKeepaliveSessions` once per boot
+through the providers barrel — before `server.listen`, except on a handover boot, where it waits
+for the retiring server to exit first. The mechanism, that exception, its gate, its fallback, and
+why three of its files are plain ESM JavaScript, are in
+[`session-host/README.md`](list/claude/session-host/README.md) §"Re-adoption, on boot".
+
 ## What Each Facet Does
 
 | Facet | Responsibility | Base / Service |
@@ -90,6 +101,11 @@ import the service from `server/modules/providers/index.ts`.
 
 - `sessions` handles runtime event normalization and history fetches.
 - `sessionSynchronizer` handles file-backed session indexing into `sessionsDb`.
+
+`POST /api/providers/sessions` accepts an optional `simpleList` boolean; only
+`true` tags the new row for the simple chat list. `GET /api/providers/sessions/recent`
+accepts an optional `simpleList=true` query flag that narrows the same feed to
+tagged rows only, ordered by tagging time instead of last activity.
 
 ## How To Add A Provider
 
@@ -196,6 +212,8 @@ Command forms currently used by the providers are:
   - `findFilesRecursivelyCreatedAfter(...)`
   - `normalizeSessionName(...)`
   - `readFileTimestamps(...)`
+  - `readLastTranscriptTimestamp(...)` — prefer this for `updated_at`; a
+    transcript's mtime moves on idle bookkeeping writes, not just messages
 - Make the sync resilient to partial, malformed, or missing provider files.
 - The orchestration service runs all provider synchronizers and only advances
   `scan_state.last_scanned_at` when every provider succeeds.

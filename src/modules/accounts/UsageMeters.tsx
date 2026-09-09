@@ -1,8 +1,6 @@
 import { Meter } from '@/shared/ui';
+import { windowPercent, windowTone } from '@/modules/accounts/utils/usageWindows';
 import type { DescentUsage, DescentUsageWindow } from '@/shared/types';
-
-/** Amber from here up (D7). One number, written once, so the bar and the figure can never disagree about what "heavy" is. */
-const HEAVY_PERCENT = 80;
 
 /** The line that closes the block, because a blank bar has to be readable as "unknown" and not as "you have used nothing". */
 const CLOSING_LINE =
@@ -54,18 +52,6 @@ function windowLabel(usageWindow: DescentUsageWindow): string {
 }
 
 /**
- * The reading, rounded ONCE.
- *
- * Descent emits one decimal place (`usage_windows.py:81,123` — `round(float(pct), 1)`), so a
- * raw 79.6 used to print "80% used" over a calm green bar: the label rounded and the threshold
- * did not. Everything downstream — the figure, the tone, the bar, `aria-valuenow` — reads this
- * one integer, so the number the reader sees is the number the threshold judged.
- */
-function windowPercent(usageWindow: DescentUsageWindow): number | null {
-  return usageWindow.percent === null ? null : Math.round(usageWindow.percent);
-}
-
-/**
  * The figure as the reader should see it.
  *
  * `0` is a REAL reading and says "0% used" over an empty track; only `null` is an em-dash.
@@ -79,16 +65,6 @@ function windowValue(percent: number | null, rolled: boolean): string {
   if (percent === null) return '—';
   const figure = `${percent}% used`;
   return rolled ? `was ${figure}` : figure;
-}
-
-/**
- * Warn is a FLOOR, never a ceiling. `severity` is present only when the vendor flagged that
- * window, so its presence alone forces amber: a flagged window can read a comfortable 12 %
- * and still mean an account lock.
- */
-function windowTone(usageWindow: DescentUsageWindow, percent: number | null): 'accent' | 'warn' {
-  if (usageWindow.severity) return 'warn';
-  return percent !== null && percent >= HEAVY_PERCENT ? 'warn' : 'accent';
 }
 
 /**
@@ -115,7 +91,13 @@ function resetsLine(resetsAt: string | null): string | undefined {
   const at = new Date(resetsAt);
   if (Number.isNaN(at.getTime())) return undefined;
 
-  const clock = at.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  // Rounded to the nearest minute before it is printed. Descent computes `resets_at` as
+  // "now + remaining", so the same boundary arrives as 13:59:59.6 on one poll and 14:00:00.4 on
+  // the next; `toLocaleTimeString` TRUNCATES, so the untouched stamp made one reset read
+  // "01:59 PM" and "02:00 PM" on alternating reads. The countdown below still measures from the
+  // real instant — only the clock face is rounded.
+  const clock = new Date(Math.round(at.getTime() / 60_000) * 60_000)
+    .toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   const msLeft = at.getTime() - Date.now();
   if (msLeft <= 0) return `Resets at ${clock}`;
 

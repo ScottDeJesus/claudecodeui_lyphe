@@ -37,7 +37,18 @@
   },
   "appearance": {
     "title": "Apariencia",
-    "theme": "Tema"
+    "theme": "Tema",
+    "sidebar": {
+      "title": "Barra lateral",
+      "simpleChatList": {
+        "label": "Lista de chats simple",
+        "description": "Sustituye el árbol de proyectos por una lista plana de los chats que inicias aquí."
+      },
+      "simpleChatProject": {
+        "label": "Proyecto para chats nuevos",
+        "description": "Los chats nuevos de la lista simple se inician en este proyecto."
+      }
+    }
   },
   "actions": {
     "saveChanges": "Guardar cambios",
@@ -150,6 +161,10 @@
       "description": "Cómo se ordenan los proyectos en la barra lateral",
       "alphabetical": "Alfabético",
       "recentActivity": "Actividad reciente"
+    },
+    "followSun": {
+      "label": "Seguir el amanecer y el atardecer",
+      "description": "Cambia a oscuro al atardecer y vuelve al amanecer, según tu zona horaria. Cambiar el modo a mano lo desactiva."
     }
   },
   "mcpForm": {

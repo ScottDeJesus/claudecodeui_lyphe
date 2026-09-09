@@ -36,7 +36,18 @@
   },
   "appearance": {
     "title": "外観",
-    "theme": "テーマ"
+    "theme": "テーマ",
+    "sidebar": {
+      "title": "サイドバー",
+      "simpleChatList": {
+        "label": "シンプルなチャットリスト",
+        "description": "プロジェクトツリーを、ここで開始したチャットのフラットなリストに置き換えます。"
+      },
+      "simpleChatProject": {
+        "label": "新規チャットのプロジェクト",
+        "description": "シンプルリストの新規チャットはこのプロジェクトで開始されます。"
+      }
+    }
   },
   "actions": {
     "saveChanges": "変更を保存",
@@ -124,6 +135,10 @@
       "description": "サイドバーでのプロジェクトの並び順を設定します",
       "alphabetical": "アルファベット順",
       "recentActivity": "最近のアクティビティ順"
+    },
+    "followSun": {
+      "label": "日の出・日の入りに合わせる",
+      "description": "タイムゾーンに基づき、日の入りでダーク、日の出でライトに切り替えます。手動で切り替えるとオフになります。"
     }
   },
   "mcpForm": {

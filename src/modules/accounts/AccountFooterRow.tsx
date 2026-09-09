@@ -4,8 +4,21 @@ import { ACCOUNT_PANEL_ID, AccountPopover } from '@/modules/accounts/AccountPopo
 import { useDescentAccounts } from '@/modules/accounts/hooks/useDescentAccounts';
 import { useDescentUsage } from '@/modules/accounts/hooks/useDescentUsage';
 import { accountInitials } from '@/modules/accounts/utils/accountInitials';
+import { windowPercent, windowTone } from '@/modules/accounts/utils/usageWindows';
 import { ProviderLoginModal } from '@/modules/provider-auth';
-import { Avatar } from '@/shared/ui';
+import { Avatar, Meter } from '@/shared/ui';
+import type { DescentUsageWindow } from '@/shared/types';
+
+type GlanceWindow = { key: string; short: string; full: string };
+
+/**
+ * The windows the collapsed row shows, in the order it shows them. `short` is what fits beside a
+ * 4px bar; `full` is the accessible name, because "5h" read aloud is not a window anyone knows.
+ */
+const GLANCE_WINDOWS: GlanceWindow[] = [
+  { key: 'five_hour', short: '5h', full: 'Current 5-hour window' },
+  { key: 'seven_day', short: '7d', full: 'This week' },
+];
 
 type AccountFooterRowProps = {
   /** The icon rail draws the avatar alone — there is no room for a label, let alone a panel. */
@@ -89,12 +102,19 @@ export function AccountFooterRow({ collapsed = false, onExpand }: AccountFooterR
 
   const picture = accounts?.reachable ? accounts : null;
 
-  // The 5-hour figure, inline. Guarded on the NUMBER and not on the window, because a window
-  // with `percent: null` is a reading nobody has — "usage —", never "undefined%" and never 0.
-  const fiveHour = usage?.reachable ? usage.windows.find((window) => window.key === 'five_hour') : undefined;
-  const usageText = typeof fiveHour?.percent === 'number'
-    ? `${Math.round(fiveHour.percent)}% of this 5-hour window`
-    : 'usage —';
+  // The two windows worth a glance, as bars. `weekly_scoped:*` plans are deliberately left out:
+  // the row has space for two, and the panel below carries every window Descent reports.
+  //
+  // A window is drawn only when it is actually in the reading — an absent one is not a bar at
+  // zero. `percent: null` DOES get a bar: the Meter draws an empty track and an em-dash for it,
+  // which is the one honest picture of "nobody has this number".
+  const windows = usage?.reachable ? usage.windows : [];
+  const glanceWindows = GLANCE_WINDOWS
+    .map((glance) => {
+      const found = windows.find((usageWindow) => usageWindow.key === glance.key);
+      return found ? { ...glance, usageWindow: found } : null;
+    })
+    .filter((entry): entry is GlanceWindow & { usageWindow: DescentUsageWindow } => entry !== null);
 
   const label = picture?.activeLabel ?? '—';
 
@@ -159,7 +179,27 @@ export function AccountFooterRow({ collapsed = false, onExpand }: AccountFooterR
         <Avatar initials={accountInitials(picture?.activeLabel ?? null)} size={26} muted={!picture?.activeLabel} />
         <span className="min-w-0 flex-1">
           <span className="block truncate text-[13px] font-medium text-foreground" title={label}>{label}</span>
-          <span className="block text-xs text-muted-foreground">{usageText}</span>
+          {glanceWindows.length > 0 ? (
+            <span className="mt-1 flex items-center gap-3">
+              {glanceWindows.map(({ key, short, full, usageWindow }) => {
+                const percent = windowPercent(usageWindow);
+                return (
+                  <span key={key} className="min-w-0 flex-1" title={full}>
+                    <Meter
+                      variant="inline"
+                      percent={percent}
+                      tone={windowTone(usageWindow, percent)}
+                      label={short}
+                      ariaLabel={`${short} — ${full}`}
+                      value={percent === null ? '—' : `${percent}%`}
+                    />
+                  </span>
+                );
+              })}
+            </span>
+          ) : (
+            <span className="block text-xs text-muted-foreground">usage —</span>
+          )}
         </span>
         <span aria-hidden="true" className="flex-none text-[9px] text-ink-faint">▼</span>
       </button>

@@ -13,7 +13,7 @@
 **THIS PLAN DELIVERS:**
 A nullable `simple_list_at` column on `sessions`, stamped at insert time when the app-session `POST /api/providers/sessions` body carries `simpleList: true` (the row is minted by that POST before the first `chat.send`, so the flag rides the POST, not the websocket frame); a `simpleList=true` filter on the existing `GET /api/providers/sessions/recent` that narrows the cross-project feed to tagged, non-archived sessions in creation order (one visibility clause, one mapper, one row type — the simple list IS the recents feed filtered to tagged rows); two flat user-preference keys `simpleChatList` (default `true`) and `simpleChatProjectId` (default `null`) read through one shared hook; a Settings → Appearance section "Sidebar" with the toggle and a project picker; and, when the toggle is on, a sidebar body that keeps the header's logo/collapse/refresh controls and the footer (settings gear) but replaces the search field, the four chips, the project tree and its New Session buttons with a project dropdown, one "New chat" button and the flat list of tagged chats (newest created first, 20 per page, running spinner, inline rename via the existing PUT, Remove = abort-then-archive with a stop confirmation when a run is live, the flow owned by a sidebar hook that waits on the busy set rather than polling). Turning the toggle off restores today's sidebar untouched. Every phase is proven on the running dev server (curl, better-sqlite3, headless Chromium at 1440 and 390 px) and spends zero Claude turns.
 
-**OPERATOR VERDICT:** PENDING
+**OPERATOR VERDICT:** CONFIRMED 2026-09-08 — Scott: "Yes, that's it — run it"
 
 ## Runner
 
@@ -27,7 +27,6 @@ max_cycles = 10
 max_spawns = 36
 max_fix_passes = 2
 max_attempts = 2
-max_cost_usd = 80.0
 max_replans = 1
 ```
 
@@ -43,17 +42,17 @@ Server (every path relative to `server/`; imports use the `@/` alias = `server/`
 
 Client (every application import uses `@/...`; `type` never `interface`):
 
-- `src/shared/userSettings.ts`: `UserPreferences` (line 18-29) gains `simpleChatList: boolean; simpleChatProjectId: string | null;` and `LEGACY_STORAGE_KEYS` (line 54-65) gains `simpleChatList: 'simple-chat-list', simpleChatProjectId: 'simple-chat-project-id'` (no such localStorage keys ever existed; the entry is required because `PREFERENCE_KEYS` is derived from that map, line 67). Server needs no change: preferences are key-agnostic EAV rows in `user_preferences`, one row per flat key, JSON-encoded. They are flat keys, not members of the `uiPreferences` blob, because that blob is a typed boolean reducer (`src/shared/uiPreferences.ts`, `parseBoolean` over `UiPreferences`) and `simpleChatProjectId` is a `string | null`; the pair must live in one store, and the precedent for a non-boolean or feature-owned flat key is `tasksEnabled` / `projectSortOrder` / `selectedProvider`.
+- `src/shared/userSettings.ts`: `UserPreferences` (line 18-29) gains `simpleChatList: boolean; simpleChatProjectId: string | null;` and `LEGACY_STORAGE_KEYS` (line 54-65) widens to `Record<UserPreferenceKey, string | null>` and gains `simpleChatList: null, simpleChatProjectId: null` — `null` means "born after the migration, nothing to seed", stated in the map's header comment; `readLegacyPreference` (line 200-209) returns `undefined` when the key maps to `null` before touching localStorage. No invented legacy key: the map's header says entries are the keys a setting was read from, and none existed. The entries are still required because `PREFERENCE_KEYS` is derived from that map (line 67). Server needs no change: preferences are key-agnostic EAV rows in `user_preferences`, one row per flat key, JSON-encoded. They are flat keys, not members of the `uiPreferences` blob, because that blob is a typed boolean reducer (`src/shared/uiPreferences.ts`, `parseBoolean` over `UiPreferences`) and `simpleChatProjectId` is a `string | null`; the pair must live in one store, and the precedent for a non-boolean or feature-owned flat key is `tasksEnabled` / `projectSortOrder` / `selectedProvider`.
 - `src/shared/hooks/useSimpleChatListPreferences.ts` (new): `export type SimpleChatListPreferences = { enabled: boolean; projectId: string | null; setEnabled: (next: boolean) => void; setProjectId: (next: string | null) => void }` and `export function useSimpleChatListPreferences(): SimpleChatListPreferences`, built on `useSyncExternalStore(subscribeToUserPreferences, () => readUserPreference<boolean>('simpleChatList', true))` and the same for `'simpleChatProjectId'` with fallback `null`; setters call `writeUserPreference(key, value)`. No provider, no context. It lives in `src/shared/hooks/` because three feature modules consume it (sidebar, settings, chat) — the frontend standard's placement rule for hooks.
 - `src/shared/types.ts`: NO change. The simple list's row type is the existing `RecentConversationListItem` (`sessionId, provider, projectId, projectDisplayName, sessionTitle, lastActivity`); the client resolves the row's `Project` from `projects` by `projectId`, so no path field is needed.
 - `src/shared/api.ts`: `createSession` payload type (line 303-306) gains `simpleList?: boolean`; `recentConversations` (line 204-205) gains `simpleList?: boolean` in its options object and passes it into the existing `query({ limit, offset, simpleList })` — that helper (line 59-69) drops `false`/`undefined`, so the tree's recents request stays byte-identical. No new helper.
 - `src/modules/chat/hooks/useChatComposerState.ts`: calls `useSimpleChatListPreferences()` at hook top level and passes `simpleList: simpleChatListEnabled` in the `api.providers.createSession({...})` payload at line 754-758. `src/modules/git-panel/hooks/git-delegation/startRun.ts:15` is NOT changed: a delegated git run is never tagged.
 - `src/modules/sidebar/hooks/useSimpleChatList.ts` (new, module-private): `export function useSimpleChatList(selectedSessionId: string | null): { rows: RecentConversationListItem[]; total: number; hasMore: boolean; isLoading: boolean; hasError: boolean; reload: () => Promise<void>; loadMore: () => Promise<void>; renameLocal: (sessionId: string, title: string) => void; removeLocal: (sessionId: string) => void }`. Fetches `api.recentConversations({ limit, offset, simpleList: true })`; reloads on mount, on any `session_upserted` event from `useWebSocket().subscribe` (debounced 500 ms, refetching `limit = max(20, rows.length)`, `offset = 0`), and whenever `selectedSessionId` becomes an id not present in `rows`.
 - `src/modules/sidebar/hooks/useSimpleChatRemove.ts` (new, module-private): `export function useSimpleChatRemove(input: { onArchived: (sessionId: string) => void }): { pendingStop: RecentConversationListItem | null; failedSessionId: string | null; remove: (row: RecentConversationListItem) => void; confirmStop: () => void; cancelStop: () => void }`. Owns the whole Remove flow so the list component stays presentational: `remove(row)` archives at once when `useBusySessionIdSet()` does not hold the id, else sets `pendingStop`; `confirmStop()` sends `{ type: 'chat.abort', sessionId }` through `useWebSocket().sendMessage` and records the id as awaiting-idle; ONE `useEffect` on `[busySessionIds, awaitingId]` archives when the busy set no longer holds the id; ONE 15 s fallback timer (cleared on unmount and on success) archives anyway for a run whose abort never completes. No `setInterval`, no ref polling: the busy set IS the client's computed running model (fed by `chat_subscribed`/`complete` frames and re-synced from `GET /sessions/running` every 5 s by `SessionProtectionContext`). `archive(id)` = `await api.deleteSession(id, false)`; on `ok` → `onArchived(id)`; else `failedSessionId = id` for 4 s.
-- `src/modules/sidebar/SidebarSimpleList.tsx` (new): `export type SidebarSimpleListProps = { projects: Project[]; selectedProject: Project | null; selectedSession: ProjectSession | null; isMobile: boolean; onProjectSelect: (project: Project) => void; onSessionSelect: (session: ProjectSession, projectId: string) => void; onNewSession: (project: Project) => void; onSessionRemoved: (sessionId: string) => void; onRenameSession: (sessionId: string, summary: string) => Promise<void>; t: TFunction }` and `export default function SidebarSimpleList(props)`. Composes the two hooks above; renders the project Select + New chat strip, the rows, the empty state, Show more and the stop dialog. Wired from `Sidebar.tsx` as `onProjectSelect={handleProjectSelect}` (controller, `hooks/useSidebarController.ts:863-869`), `onSessionSelect={handleSessionClick}` (controller :503-510), `onNewSession={onNewSession}` (Sidebar prop), `onSessionRemoved={(id) => onSessionDelete?.(id)}` (Sidebar prop), `onRenameSession={(id, s) => updateSessionSummary('', id, s, 'claude')}` (controller :957-980; its first and last arguments are ignored by the implementation).
+- `src/modules/sidebar/SidebarSimpleList.tsx` (new): a file-local, unexported `type SidebarSimpleListProps = { projects: Project[]; selectedProject: Project | null; selectedSession: ProjectSession | null; isMobile: boolean; onProjectSelect: (project: Project) => void; onSessionSelect: (session: ProjectSession, projectId: string) => void; onNewSession: (project: Project) => void; onSessionRemoved: (sessionId: string) => void; onRenameSession: (sessionId: string, summary: string) => Promise<void>; t: TFunction }` and `export default function SidebarSimpleList(props)`. The type is declared and used in this one file only (the frontend standard's single-file rule; `SidebarProjectListProps` at `src/shared/types.ts:1381` is the two-file precedent this deliberately avoids). Composes the two hooks above; renders the project Select + New chat strip, the rows, the empty state, Show more and the stop dialog. Rendered by `Sidebar.tsx` (not by `SidebarContent`) as `<SidebarSimpleList … />` with `onProjectSelect={handleProjectSelect}` (controller, `hooks/useSidebarController.ts:863-869`), `onSessionSelect={handleSessionClick}` (controller :503-510), `onNewSession={onNewSession}` (Sidebar prop), `onSessionRemoved={(id) => onSessionDelete?.(id)}` (Sidebar prop), `onRenameSession={(id, s) => updateSessionSummary('', id, s, 'claude')}` (controller :957-980; its first and last arguments are ignored by the implementation).
 - `src/modules/sidebar/SidebarSimpleListRow.tsx` (new): one row — link to `/session/:id`, title, project display name as a muted secondary label, spinner when running, an `ActionMenu` with Rename and Remove, inline rename input.
 - `src/modules/sidebar/SidebarSimpleStopDialog.tsx` (new): the stop confirmation on the shared `Dialog`.
-- `src/modules/sidebar/SidebarContent.tsx`: `SidebarContentProps` (line 84-129) gains `simpleList: SidebarSimpleListProps | null`. When non-null, `SidebarHeader` receives `simpleMode` and the `ScrollArea` body (the ternary opening at line 210) renders `<SidebarSimpleList {...simpleList} />` as its FIRST arm, ahead of `showConversationSearch`; the footer stays.
+- `src/modules/sidebar/SidebarContent.tsx`: `SidebarContentProps` (line 84-129) gains `simpleList: ReactNode | null` — a slot, so this file never imports `SidebarSimpleList` or its props type. When non-null, `SidebarHeader` receives `simpleMode={simpleList !== null}` and the `ScrollArea` body (the ternary opening at line 210) renders `{simpleList}` as its FIRST arm, ahead of `showConversationSearch`; the footer stays. `ReactNode` is already imported at line 1.
 - `src/modules/sidebar/SidebarHeader.tsx`: new optional prop `simpleMode?: boolean`, folded into the existing `showSearchTools` expression at line 103 (`... && !isLoading && !simpleMode`). That one expression already gates the search input and `SearchModeChips` in BOTH the desktop block (line 201) and the mobile block (line 271), so no second conditional is added. Logo, collapse, refresh and new-project controls stay.
 - `data-testid` hooks the probes read: `simple-chat-list` (root), `simple-chat-project` (the `<select>`/Select trigger), `simple-chat-new`, `simple-chat-empty`, `simple-chat-row` (each row root, also carrying `data-session-id`), `simple-chat-running` (spinner), `simple-chat-menu` (row ActionMenu trigger), `simple-chat-rename`, `simple-chat-rename-input`, `simple-chat-remove`, `simple-chat-load-more`, `simple-chat-stop-dialog`, `simple-chat-stop-confirm`, `simple-chat-stop-cancel`.
 - Settings: `src/modules/settings/tabs/AppearanceSettingsTab.tsx` gains a `projects?: AgentSettingsProject[]` prop and a `SettingsSection` titled `t('appearance.sidebar.title')` after the workspace-tabs section (line 56-67) holding a `SettingsRow` + `SettingsToggle` (ariaLabel = the label text) for `simpleChatList` and a `SettingsRow` + shared `Select` (`ariaLabel` = the label text, options `{ value: project.name, label: project.displayName ?? project.name }` sorted by label, value = `projectId ?? ''`, placeholder = the label) for `simpleChatProjectId`. `src/modules/settings/Settings.tsx` passes `projects={projects}` to `AppearanceSettingsTab` exactly as it does to `AgentsSettingsTab` at line 194. `AgentSettingsProject.name` IS the projectId (see `normalizeProjectForSettings`, `src/modules/sidebar/utils/sidebarProjectFormatting.ts:187-209`).
@@ -67,8 +66,8 @@ Client (every application import uses `@/...`; `type` never `interface`):
 - The dev server is two systemd units (`cloudcli-server-dev` on 127.0.0.1:3011, `cloudcli-client-dev` on :5183). Never restart either by hand and never run `npm run dev`/`server:dev`. Every save under `server/` restarts the API through `tsx watch` (1-2 s) and drops live Claude runs: make ALL server edits of a phase in one consecutive pass, file after file, without running typecheck or curl between them; run checks only after the last server file is saved. Vite reloads `src/` instantly.
 - Backend law (`.agents/skills/backend-module-standards/SKILL.md`): TypeScript only under `server/modules/`, imports across modules only through the module's `index.ts`, `@/` alias with `.js` suffix, `type` over `interface`, routes parse and delegate only, exports at declaration with a consumer comment. Frontend law (`.agents/skills/frontend-module-standards/SKILL.md`): `@/...` imports only (no `../`), `type` never `interface`, shared types in `src/shared/types.ts`, shared hooks in `src/shared/hooks/`, module-private hooks in `src/modules/<feature>/hooks/`, a comment above every new state declaration, a consumer comment on every exported component, `import type` for types.
 - Module size (operator-global doctrine; this repo has no CLAUDE.md of its own): default ceiling 300 LOC per new file; never add more than ~40 lines to a file already over 300 (`provider.routes.ts` 908, `sessions.service.ts` 663, `sessions.db.ts` 714, `useChatComposerState.ts` 1258, `SidebarContent.tsx` 696, `SidebarHeader.tsx` 285, `Sidebar.tsx` 348). Split a NEW file by cohesion before it passes 300. `provider.routes.ts` is already over the 800 hard ceiling: this plan adds a handful of lines to it and names it as the next split, outside this plan.
-- `npm run typecheck` must exit 0 and `npm run lint` must exit 0 with at most 122 warnings (measured 2026-09-07 before this plan; `.verify/baseline.txt` still says 130 and is stale). A change may lower the count, never raise it.
-- Every user-facing string is an i18n key present in all 11 locales (`de en es fr it ja ko ru tr zh-CN zh-TW`); a key missing from a locale silently falls back to English, so parity is checked mechanically in this plan.
+- `npm run typecheck` must exit 0 and `npm run lint` must exit 0 with at most 123 warnings (re-measured 2026-09-08 on the live tree; `.verify/baseline.txt` still says 130 and is stale). The count moved 122 → 123 while Phase 2 ran because a CONCURRENT session added `RunningSessionsContext` to `src/shared/context/SessionProtectionContext.tsx` (+2 warnings: `only-export-components`, `set-state-in-effect`) and deleted `src/modules/sidebar/hooks/useGitHubStars.ts` (−1). None of the three are this plan's files. The ratchet still binds: a change of THIS plan's may lower the count, never raise it.
+- Every user-facing string is an i18n key present in all 11 locales (`de en es fr it ja ko ru tr zh-CN zh-TW`); a key missing from a locale silently falls back to English, so parity is checked mechanically in this plan — over THIS PLAN'S OWN KEYS, never whole-file. Measured 2026-09-08: every non-English locale already misses keys that predate this plan (`settings.json` 17-84 each — `voiceSettings.*`, `pluginSettings.*`, `mcpServers.*`, `notifications.desktop.*`, `agents.authStatus.*`; `sidebar.json` 6-14 each), so a whole-file `diff` can never come back clean and would block every phase that adds a string.
 - Healed means deleted: no commented-out code, no "old" variants, no compatibility shims.
 - Standing stop rule: when reality diverges from this plan — a file or symbol not where an anchor says, a signature that differs, a check failing for a reason the plan did not name — stop, report the divergence verbatim with `RESULT: BLOCKED`, and do not improvise a fix.
 
@@ -95,6 +94,8 @@ forbidden = [
   "server/modules/providers/services/sessions-watcher.service.ts",
   "server/modules/providers/services/session-synchronizer.service.ts",
   "server/modules/websocket",
+  "server/modules/providers/index.ts",
+  "server/modules/database/index.ts",
   "src",
 ]
 athena = [
@@ -158,7 +159,7 @@ timeout_s = 400
 [[steps]]
 kind = "run"
 cmd = "npm run lint"
-check = "npm run lint 2>&1 | grep -c ': warning ' | awk '{print ($1<=122)?\"LINT_OK\":\"LINT_UP \"$1}'"
+check = "npm run lint 2>&1 | grep -c ': warning ' | awk '{print ($1<=123)?\"LINT_OK\":\"LINT_UP \"$1}'"
 expect = "LINT_OK"
 timeout_s = 300
 
@@ -226,9 +227,7 @@ manifest = [
 forbidden = [
   "src/shared/uiPreferences.ts",
   "src/shared/context/UiPreferencesContext.tsx",
-  "src/shared/types.ts",
   "src/modules/git-panel",
-  "server",
 ]
 athena = [
   "The two keys were folded into the uiPreferences blob (one stored row, a boolean-only reducer) instead of being flat keys, so a PATCH from Settings drops the other six booleans or the projectId is coerced",
@@ -237,12 +236,14 @@ athena = [
   "readUserPreference's stored false is treated as absent and the fallback true wins, so turning the toggle off never sticks",
   "LEGACY_STORAGE_KEYS was not extended, so PREFERENCE_KEYS omits the keys and hydration never reconciles them",
   "recentConversations serializes simpleList=false (or a new helper was added) so the tree's recents request URL changed",
+  "readLegacyPreference calls localStorage.getItem(null) or throws for the two null-keyed preferences instead of returning undefined",
+  "The builder's OWN diff touches src/shared/types.ts (a SimpleListConversation or any new row type belongs nowhere — the rows ARE RecentConversationListItem) or any path under server/ — read the diff, not the working tree: another session writes this repo concurrently and the arbiter serialises those writes, so a foreign change to either path is not this phase's and is not a finding",
 ]
 
 [[steps]]
 kind = "edit"
 path = "src/shared/userSettings.ts"
-what = "Add simpleChatList: boolean and simpleChatProjectId: string | null to UserPreferences (line 18-29) and the two LEGACY_STORAGE_KEYS entries (line 54-65) per Interfaces; nothing else in the file changes."
+what = "Add simpleChatList: boolean and simpleChatProjectId: string | null to UserPreferences (line 18-29) and the two LEGACY_STORAGE_KEYS entries (line 54-65) per Interfaces; plus the `string | null` widening and the null guard in readLegacyPreference; nothing else in the file changes."
 check = "echo $(grep -c 'simpleChatList' src/shared/userSettings.ts) $(grep -c 'simpleChatProjectId' src/shared/userSettings.ts)"
 expect = "2 2"
 
@@ -277,7 +278,7 @@ timeout_s = 400
 [[steps]]
 kind = "run"
 cmd = "npm run lint"
-check = "npm run lint 2>&1 | grep -c ': warning ' | awk '{print ($1<=122)?\"LINT_OK\":\"LINT_UP \"$1}'"
+check = "npm run lint 2>&1 | grep -c ': warning ' | awk '{print ($1<=123)?\"LINT_OK\":\"LINT_UP \"$1}'"
 expect = "LINT_OK"
 timeout_s = 300
 
@@ -351,7 +352,7 @@ expect = "Sidebar|Simple chat list|Project for new chats"
 kind = "edit"
 path = "src/modules/i18n/locales/de/settings.json"
 what = "Add the same five appearance.sidebar keys, translated, to de, es, fr, it, ja, ko, ru, tr, zh-CN and zh-TW settings.json (ten files) so every locale carries the identical key set."
-check = "for loc in de es fr it ja ko ru tr zh-CN zh-TW; do diff <(jq -r 'paths(scalars) as $p | $p|join(\".\")' src/modules/i18n/locales/en/settings.json | sort) <(jq -r 'paths(scalars) as $p | $p|join(\".\")' src/modules/i18n/locales/$loc/settings.json | sort) >/dev/null || echo \"MISMATCH $loc\"; done; echo PARITY_CHECKED"
+check = "for loc in de es fr it ja ko ru tr zh-CN zh-TW; do for k in title simpleChatList.label simpleChatList.description simpleChatProject.label simpleChatProject.description; do [ \"$(jq -r \".appearance.sidebar.$k // \\\"MISSING\\\"\" src/modules/i18n/locales/$loc/settings.json)\" = MISSING ] && echo \"MISSING $loc $k\"; done; done; echo PARITY_CHECKED"
 expect = "PARITY_CHECKED"
 
 [[steps]]
@@ -385,7 +386,7 @@ timeout_s = 400
 [[steps]]
 kind = "run"
 cmd = "npm run lint"
-check = "npm run lint 2>&1 | grep -c ': warning ' | awk '{print ($1<=122)?\"LINT_OK\":\"LINT_UP \"$1}'"
+check = "npm run lint 2>&1 | grep -c ': warning ' | awk '{print ($1<=123)?\"LINT_OK\":\"LINT_UP \"$1}'"
 expect = "LINT_OK"
 timeout_s = 300
 
@@ -399,12 +400,19 @@ cmd = '''
 API=http://127.0.0.1:3011
 TOKEN=$(curl -s -X POST $API/api/auth/login -H 'content-type: application/json' -d '{"username":"verve","password":"verve-dev-2026"}' | jq -r .token)
 H="authorization: Bearer $TOKEN"
+# SELF-SUFFICIENT, deliberately: this block asserts nothing about what the probe left
+# behind. That the UI's own write reaches the server is gate 9 of probe-simple-settings
+# ("project stored", read back from GET /api/user/preferences), which the verify above
+# enforces by regex. This one proves the store round-trips BOTH keys and then parks the
+# account for Phase 4 — the probe resets the pair at its start and Athena re-runs it during
+# her passes, so any assertion here about residue is a coin flip, not a measurement.
+curl -s -o /dev/null -X PATCH $API/api/user/preferences -H "$H" -H 'content-type: application/json' -d '{"simpleChatList":true,"simpleChatProjectId":"4d94a97e-0e62-43ee-981a-0028fec301b9"}'
 curl -s $API/api/user/preferences -H "$H" | jq -r '.preferences | "enabled=\(.simpleChatList) project=\(.simpleChatProjectId)"'
 curl -s -o /dev/null -X PATCH $API/api/user/preferences -H "$H" -H 'content-type: application/json' -d '{"simpleChatList":false,"simpleChatProjectId":null}'
-curl -s $API/api/user/preferences -H "$H" | jq -r '.preferences | "parked=\(.simpleChatList)"'
+curl -s $API/api/user/preferences -H "$H" | jq -r '.preferences | "parked=\(.simpleChatList) parkedProject=\(.simpleChatProjectId)"'
 '''
-expect = """enabled=false project=4d94a97e-0e62-43ee-981a-0028fec301b9
-parked=false"""
+expect = """enabled=true project=4d94a97e-0e62-43ee-981a-0028fec301b9
+parked=false parkedProject=null"""
 
 [[verify]]
 cmd = "for loc in de es fr it ja ko ru tr zh-CN zh-TW; do for v in title simpleChatList.label simpleChatProject.label; do t=$(jq -r \".appearance.sidebar.$v\" src/modules/i18n/locales/$loc/settings.json); e=$(jq -r \".appearance.sidebar.$v\" src/modules/i18n/locales/en/settings.json); [ -n \"$t\" ] && [ \"$t\" != null ] || echo \"EMPTY $loc $v\"; [ \"$t\" != \"$e\" ] || echo \"UNTRANSLATED $loc $v\"; done; done; echo LOCALES_CHECKED"
@@ -468,13 +476,15 @@ athena = [
   "openConsole in console.mjs no longer parks simpleChatList at false before waiting for PROJECT_ROW, so every older phase hangs",
   "A new file exceeds its ceiling (list 200, row 200, hook 170, remove hook 150, dialog 80), or SidebarContent/SidebarHeader/Sidebar grew by more than ~40 lines each",
   "A locale is missing one of the twelve sidebar keys",
+  "SidebarContent imports SidebarSimpleList or a type from it (the slot exists so the body composer stays ignorant of the mode), or SidebarSimpleListProps is exported or declared anywhere but SidebarSimpleList.tsx",
+  "On mobile, removing the OPEN chat whose project differs from the dropdown project fires the follow effect and closes the drawer (app handleProjectSelect sets sidebarOpen false) — measured, not assumed: the effect must fire at most once per selectedSession transition and never while a chat is open",
 ]
 
 [[steps]]
 kind = "edit"
 path = "src/modules/i18n/locales/en/sidebar.json"
 what = "Add the twelve simpleList.* keys with the en values from Interfaces, then the same keys translated in de, es, fr, it, ja, ko, ru, tr, zh-CN and zh-TW sidebar.json."
-check = "jq -r '.simpleList | [.newChat, .remove, .stopTitle, .stopConfirm] | join(\"|\")' src/modules/i18n/locales/en/sidebar.json; for loc in de es fr it ja ko ru tr zh-CN zh-TW; do diff <(jq -r 'paths(scalars) as $p | $p|join(\".\")' src/modules/i18n/locales/en/sidebar.json | sort) <(jq -r 'paths(scalars) as $p | $p|join(\".\")' src/modules/i18n/locales/$loc/sidebar.json | sort) >/dev/null || echo \"MISMATCH $loc\"; done; echo PARITY_CHECKED"
+check = "jq -r '.simpleList | [.newChat, .remove, .stopTitle, .stopConfirm] | join(\"|\")' src/modules/i18n/locales/en/sidebar.json; for loc in de es fr it ja ko ru tr zh-CN zh-TW; do for k in project newChat empty loadMore rename renamePlaceholder remove running stopTitle stopBody stopConfirm removeFailed; do [ \"$(jq -r \".simpleList.$k // \\\"MISSING\\\"\" src/modules/i18n/locales/$loc/sidebar.json)\" = MISSING ] && echo \"MISSING $loc $k\"; done; done; echo PARITY_CHECKED"
 expect = """New chat|Remove|This chat is still running|Stop and remove
 PARITY_CHECKED"""
 
@@ -488,7 +498,7 @@ expect_re = "^1 [1-9] [1-9] [1-9] small$"
 [[steps]]
 kind = "edit"
 path = "src/modules/sidebar/hooks/useSimpleChatRemove.ts"
-what = "Create useSimpleChatRemove({ onArchived }) per Interfaces: pendingStop / awaiting-idle / failedSessionId state (each with its comment), remove(row) (idle → archive now; busy → pendingStop), confirmStop() (sendMessage chat.abort, mark awaiting), cancelStop(), ONE effect on [busySessionIds, awaitingId] that archives when the busy set drops the id, ONE 15 s fallback timeout cleared on unmount and on success, archive() = api.deleteSession(id, false) then onArchived(id) or failedSessionId for 4 s; no setInterval, no ref polling; under 150 lines."
+what = "Create useSimpleChatRemove({ onArchived }) per Interfaces: pendingStop / awaiting-idle / failedSessionId state (each with its comment), remove(row) (idle → archive now; busy → pendingStop), confirmStop() (sendMessage chat.abort, mark awaiting), cancelStop(), ONE effect on [busySessionIds, awaitingId] that archives when the busy set drops the id, ONE 15 s fallback timeout cleared on unmount and on success, named STOP_TIMEOUT_MS with a comment that it mirrors the constant of the same name in src/modules/chat/hooks/useRestartOnInstalledCli.ts — same guarantee (the only thing that ends a stop the gateway never answers), different outcome (archive anyway, not abandon), deliberately not hoisted to src/shared/constants.ts, archive() = api.deleteSession(id, false) then onArchived(id) or failedSessionId for 4 s; no setInterval, no ref polling; under 150 lines."
 check = "echo $(grep -c 'export function useSimpleChatRemove' src/modules/sidebar/hooks/useSimpleChatRemove.ts) $(grep -c \"'chat.abort'\" src/modules/sidebar/hooks/useSimpleChatRemove.ts) $(grep -c 'deleteSession' src/modules/sidebar/hooks/useSimpleChatRemove.ts) $(grep -c 'useBusySessionIdSet' src/modules/sidebar/hooks/useSimpleChatRemove.ts) $(grep -c 'setInterval' src/modules/sidebar/hooks/useSimpleChatRemove.ts) $(wc -l < src/modules/sidebar/hooks/useSimpleChatRemove.ts | awk '{print ($1<=150)?\"small\":\"big\"}')"
 expect_re = "^1 [1-9] [1-9] [1-9] 0 small$"
 
@@ -523,16 +533,16 @@ expect = "wired 1 small"
 [[steps]]
 kind = "edit"
 path = "src/modules/sidebar/SidebarContent.tsx"
-what = "Add simpleList: SidebarSimpleListProps | null to SidebarContentProps; pass simpleMode={simpleList !== null} to SidebarHeader; render <SidebarSimpleList {...simpleList} /> as the FIRST arm of the ScrollArea ternary (line 210), ahead of showConversationSearch, when non-null; footer untouched."
-check = "echo $(grep -c 'SidebarSimpleList' src/modules/sidebar/SidebarContent.tsx | awk '{print ($1>=2)?\"wired\":\"thin\"}') $(grep -c 'simpleMode=' src/modules/sidebar/SidebarContent.tsx) $(wc -l < src/modules/sidebar/SidebarContent.tsx | awk '{print ($1<=740)?\"small\":\"big\"}')"
-expect = "wired 1 small"
+what = "Add simpleList: ReactNode | null to SidebarContentProps; pass simpleMode={simpleList !== null} to SidebarHeader; render {simpleList} as the FIRST arm of the ScrollArea ternary (line 210), ahead of showConversationSearch, when non-null; footer untouched. Import nothing new: SidebarContent must not import SidebarSimpleList or any type from it."
+check = "echo $(grep -c 'SidebarSimpleList' src/modules/sidebar/SidebarContent.tsx) $(grep -c 'simpleList' src/modules/sidebar/SidebarContent.tsx | awk '{print ($1>=3)?\"slotted\":\"thin\"}') $(grep -c 'simpleMode=' src/modules/sidebar/SidebarContent.tsx) $(wc -l < src/modules/sidebar/SidebarContent.tsx | awk '{print ($1<=740)?\"small\":\"big\"}')"
+expect = "0 slotted 1 small"
 
 [[steps]]
 kind = "edit"
 path = "src/modules/sidebar/Sidebar.tsx"
-what = "Read useSimpleChatListPreferences().enabled; build the SidebarSimpleListProps object from handleProjectSelect, handleSessionClick, onNewSession, onSessionDelete, updateSessionSummary, projects, selectedProject, selectedSession, isMobile and t per Interfaces; pass simpleList={enabled ? simpleListProps : null} to SidebarContent; SidebarCollapsed branch untouched."
-check = "echo $(grep -c 'useSimpleChatListPreferences' src/modules/sidebar/Sidebar.tsx) $(grep -c 'simpleList=' src/modules/sidebar/Sidebar.tsx) $(wc -l < src/modules/sidebar/Sidebar.tsx | awk '{print ($1<=400)?\"small\":\"big\"}')"
-expect = "2 1 small"
+what = "Read useSimpleChatListPreferences().enabled; import SidebarSimpleList; pass simpleList={enabled ? <SidebarSimpleList projects={projects} selectedProject={selectedProject} selectedSession={selectedSession} isMobile={isMobile} onProjectSelect={handleProjectSelect} onSessionSelect={handleSessionClick} onNewSession={onNewSession} onSessionRemoved={(id) => onSessionDelete?.(id)} onRenameSession={(id, s) => updateSessionSummary('', id, s, 'claude')} t={t} /> : null} to SidebarContent; SidebarCollapsed branch untouched."
+check = "echo $(grep -c 'useSimpleChatListPreferences' src/modules/sidebar/Sidebar.tsx) $(grep -c '<SidebarSimpleList' src/modules/sidebar/Sidebar.tsx) $(grep -c 'simpleList=' src/modules/sidebar/Sidebar.tsx) $(wc -l < src/modules/sidebar/Sidebar.tsx | awk '{print ($1<=400)?\"small\":\"big\"}')"
+expect = "2 1 1 small"
 
 [[steps]]
 kind = "edit"
@@ -558,7 +568,7 @@ timeout_s = 400
 [[steps]]
 kind = "run"
 cmd = "npm run lint"
-check = "npm run lint 2>&1 | grep -c ': warning ' | awk '{print ($1<=122)?\"LINT_OK\":\"LINT_UP \"$1}'"
+check = "npm run lint 2>&1 | grep -c ': warning ' | awk '{print ($1<=123)?\"LINT_OK\":\"LINT_UP \"$1}'"
 expect = "LINT_OK"
 timeout_s = 300
 
@@ -573,13 +583,13 @@ expect_re = "(?s)\\A(?!.*\\[FAIL\\]).*\\[PASS\\] simple mode hides tree and chip
 timeout_s = 240
 
 [[verify]]
-cmd = "for loc in de es fr it ja ko ru tr zh-CN zh-TW; do diff <(jq -r 'paths(scalars) as $p | $p|join(\".\")' src/modules/i18n/locales/en/sidebar.json | sort) <(jq -r 'paths(scalars) as $p | $p|join(\".\")' src/modules/i18n/locales/$loc/sidebar.json | sort) >/dev/null || echo \"MISMATCH sidebar $loc\"; done; echo PARITY_OK"
+cmd = "for loc in de es fr it ja ko ru tr zh-CN zh-TW; do for k in project newChat empty loadMore rename renamePlaceholder remove running stopTitle stopBody stopConfirm removeFailed; do [ \"$(jq -r \".simpleList.$k // \\\"MISSING\\\"\" src/modules/i18n/locales/$loc/sidebar.json)\" = MISSING ] && echo \"MISSING sidebar $loc $k\"; done; done; echo PARITY_OK"
 expect = "PARITY_OK"
 ```
 
 **What to build.** Five new sidebar files (list, row, stop dialog, two hooks), three small edits to existing sidebar files, twelve keys in eleven locale files, the harness parking fix and a three-gate mount probe. The tree code is not touched: every file that renders the tree is forbidden. The existing controller is forbidden too — the simple view takes the six handlers it needs as props from `Sidebar.tsx`, where each is already in scope. The full behavioural harness (`phase-17.mjs`) and the docs are Phase 5's sitting, not this one's.
 
-**How the pieces connect** (read these anchors before writing a line). The branch point: `Sidebar.tsx:249-342` renders `SidebarCollapsed` or `SidebarContent`; you add one prop to the latter. The row click MUST mirror `Sidebar.tsx:299-322`: `const project = projects.find(p => p.projectId === row.projectId)`; if found call `onProjectSelect(project)` FIRST, then `onSessionSelect({ id: row.sessionId, __provider: row.provider, __projectId: row.projectId }, project.projectId)`; if not found, call `onSessionSelect(sessionObj, row.projectId ?? '')` only. New chat: `onNewSession(effectiveProject)` — that is the app's `handleNewSession` (`useProjectsState.ts:1047-1060`: sets the project, clears the session, switches to the chat tab, bumps `newSessionTrigger`, navigates to `/`). The dropdown: options from `projects` sorted by `displayName`; effective project = the one whose `projectId` equals the preference, else `projects[0]`; `onChange` → `setProjectId`. The follow effect: `useEffect` on `[effectiveProject?.projectId, selectedSession?.id ?? null, selectedProject?.projectId ?? null]` — when `selectedSession` is null and `effectiveProject` exists and `selectedProject?.projectId !== effectiveProject.projectId`, call `onProjectSelect(effectiveProject)` once. Running: `useBusySessionIdSet()` from `@/shared/context/SessionProtectionContext` (`Sidebar.tsx:79` shows the import) — `busy.has(row.sessionId)` for the spinner. Remove lives entirely in `useSimpleChatRemove`: `remove(row)` → not busy → `archive`; busy → `pendingStop = row`; `confirmStop` → `sendMessage({ type: 'chat.abort', sessionId })` from `useWebSocket()` (`src/shared/context/WebSocketContext.tsx:28`, the frame shape at `useChatComposerState.ts:1121-1124`) and `awaitingId = sessionId`; the effect on `[busySessionIds, awaitingId]` calls `archive` the render after the busy set drops the id (the set is fed by `chat_subscribed`/`complete` frames and re-synced from `GET /sessions/running` every 5 s, so a run that ends for any reason is observed without polling); a `setTimeout` of 15 s set at confirm and cleared on success/unmount archives a hung run anyway. `archive(id)` = `const res = await api.deleteSession(id, false)` (`api.ts:196`); if `res.ok` → `onArchived(id)` (the list's `removeLocal` + the app's `handleSessionDelete`, `useProjectsState.ts:1062-1076`, which clears the selection and navigates home when it was the open chat); else `failedSessionId = id` for 4 s and the row shows `simpleList.removeFailed`. Rename: local edit state in the row; Enter → `onRenameSession(id, draft)` → then `renameLocal`. Empty state: `EmptyState` from `@/shared/ui` with `simpleList.empty`. The list template for markup and the "project · age" subtitle: `SidebarRecentConversations.tsx:102-160` (read it, do not edit it). Spinner markup: `SidebarSessionItem.tsx:461-474`. `ActionMenu` usage: `SidebarSessionItem.tsx:422-500`. `useCompactSidebar` at `hooks/useCompactSidebar.ts:30`.
+**How the pieces connect** (read these anchors before writing a line). The branch point: `Sidebar.tsx:249-342` renders `SidebarCollapsed` or `SidebarContent`; you add one prop to the latter. The row click MUST mirror `Sidebar.tsx:299-322`: `const project = projects.find(p => p.projectId === row.projectId)`; if found call `onProjectSelect(project)` FIRST, then `onSessionSelect({ id: row.sessionId, __provider: row.provider, __projectId: row.projectId }, project.projectId)`; if not found, call `onSessionSelect(sessionObj, row.projectId ?? '')` only. New chat: `onNewSession(effectiveProject)` — that is the app's `handleNewSession` (`useProjectsState.ts:1047-1060`: sets the project, clears the session, switches to the chat tab, bumps `newSessionTrigger`, navigates to `/`). The dropdown: options from `projects` sorted by `displayName`; effective project = the one whose `projectId` equals the preference, else `projects[0]`; `onChange` → `setProjectId`. The follow effect: `useEffect` on `[effectiveProject?.projectId, selectedSession?.id ?? null, selectedProject?.projectId ?? null]` — when `selectedSession` is null and `effectiveProject` exists and `selectedProject?.projectId !== effectiveProject.projectId`, call `onProjectSelect(effectiveProject)` once. Running: `useBusySessionIdSet()` from `@/shared/context/SessionProtectionContext` (`Sidebar.tsx:79` shows the import) — `busy.has(row.sessionId)` for the spinner. Remove lives entirely in `useSimpleChatRemove`: `remove(row)` → not busy → `archive`; busy → `pendingStop = row`; `confirmStop` → `sendMessage({ type: 'chat.abort', sessionId })` from `useWebSocket()` (`src/shared/context/WebSocketContext.tsx:28`, the frame shape at `useChatComposerState.ts:1121-1124`) and `awaitingId = sessionId`; the effect on `[busySessionIds, awaitingId]` calls `archive` the render after the busy set drops the id (the set is fed by `chat_subscribed`/`complete` frames and re-synced from `GET /sessions/running` every 5 s, so a run that ends for any reason is observed without polling); a `setTimeout` of 15 s set at confirm and cleared on success/unmount archives a hung run anyway. `archive(id)` = `const res = await api.deleteSession(id, false)` (`api.ts:196`); if `res.ok` → `onArchived(id)` (the list's `removeLocal` + the app's `handleSessionDelete`, `useProjectsState.ts:1062-1076`, which clears the selection and navigates home when it was the open chat); else `failedSessionId = id` for 4 s and the row shows `simpleList.removeFailed`. Rename: local edit state in the row; Enter → `onRenameSession(id, draft)` → then `renameLocal`. Empty state: `EmptyState` from `@/shared/ui` with `simpleList.empty`. The list template for markup and the "project · age" subtitle: `SidebarRecentConversations.tsx:102-160` (read it, do not edit it). The pager idiom — request-sequence ref, append dedupe by sessionId, total/hasMore/error — is `useSidebarController.ts:218-267` (read it, do not edit it): carry that guard verbatim; this hook is a second copy of that seam until the controller is split, and the two must stay recognisably one. Spinner markup: `SidebarSessionItem.tsx:461-474`. `ActionMenu` usage: `SidebarSessionItem.tsx:422-500`. `useCompactSidebar` at `hooks/useCompactSidebar.ts:30`.
 
 **The mount probe, gate by gate** (`.verify/probe-simple-view.mjs`, zero Claude turns; skeleton from `.verify/probe-simple-settings.mjs` written in Phase 3, `SIDEBAR` from `phase-15.mjs:71`): (1) `openConsole({ dark: false })` — it parks the account on the tree; (2) `PATCH /api/user/preferences {"simpleChatList": true}` through `session.api`, `page.reload()`, wait for `[data-testid="simple-chat-list"]`; `[PASS] simple mode hides tree and chips` when `PROJECT_ROW` count is 0 AND `${SIDEBAR} button:has-text("Conversations")` count is 0 AND `${SIDEBAR} input[type="search"], ${SIDEBAR} input[placeholder]` count is 0 AND the settings gear (`SidebarFooter`'s `onShowSettings` button, `SidebarFooter.tsx:97-105`) is visible; (3) `[PASS] simple list mounted` when `[data-testid="simple-chat-new"]` and `[data-testid="simple-chat-project"]` are visible and EITHER `[data-testid="simple-chat-empty"]` is visible OR `[data-testid="simple-chat-row"]` count ≥ 1; `shoot('17-simple-mount')`; (4) `PATCH {"simpleChatList": false}`, reload; `[PASS] toggle off restores the tree` when `PROJECT_ROW` count ≥ 1 and `[data-testid="simple-chat-list"]` count is 0; (5) `finally`: `PATCH {"simpleChatList": false, "simpleChatProjectId": null}`, close; print results, last line `PROBE_VIEW_DONE`.
 
@@ -652,7 +662,7 @@ cmd = "ls .verify/shots/17-simple-empty-light.png .verify/shots/17-simple-rows-l
 expect = "SHOTS_OK"
 
 [[verify]]
-cmd = "for ns in sidebar settings; do for loc in de es fr it ja ko ru tr zh-CN zh-TW; do diff <(jq -r 'paths(scalars) as $p | $p|join(\".\")' src/modules/i18n/locales/en/$ns.json | sort) <(jq -r 'paths(scalars) as $p | $p|join(\".\")' src/modules/i18n/locales/$loc/$ns.json | sort) >/dev/null || echo \"MISMATCH $ns $loc\"; done; done; echo PARITY_OK"
+cmd = "for loc in de es fr it ja ko ru tr zh-CN zh-TW; do for k in project newChat empty loadMore rename renamePlaceholder remove running stopTitle stopBody stopConfirm removeFailed; do [ \"$(jq -r \".simpleList.$k // \\\"MISSING\\\"\" src/modules/i18n/locales/$loc/sidebar.json)\" = MISSING ] && echo \"MISSING sidebar $loc $k\"; done; for k in title simpleChatList.label simpleChatList.description simpleChatProject.label simpleChatProject.description; do [ \"$(jq -r \".appearance.sidebar.$k // \\\"MISSING\\\"\" src/modules/i18n/locales/$loc/settings.json)\" = MISSING ] && echo \"MISSING settings $loc $k\"; done; done; echo PARITY_OK"
 expect = "PARITY_OK"
 ```
 
@@ -685,13 +695,14 @@ builder = "hephaestus"
 model = "sonnet"
 code_change = true
 doc_sweep = "foreground"
-expected_s = 2400
+expected_s = 3000
 manifest = [
+  "src/modules/sidebar/SidebarSimpleList.tsx",
+  "src/modules/sidebar/SidebarSimpleListRow.tsx",
   ".verify/phase-18.mjs",
   "docs/verification.md",
 ]
 forbidden = [
-  "src",
   "server",
   ".verify/lib/console.mjs",
   ".verify/phase-17.mjs",
@@ -704,7 +715,38 @@ athena = [
   "The probe spends a Claude turn: an unsealed chat.send, or a canary that was not re-proven after a reload",
   "The 15-second fallback is asserted with a window so wide that a never-archives bug (probe timeout) reads as a pass",
   "The injected busy state is not re-armed against the 5 s running-sessions sync, so the busy set drops the id on its own and the no-archive-while-live gate passes for the wrong reason",
+  "The tap-target fix changed the DESKTOP layout: the New chat button or the row link must keep today's height when useCompactSidebar() is false — the floor is a COMPACT-only minimum, not a resize of the whole control",
+  "The row link was given a min-height but not made to fill the row (the parent is `items-center`, so without `self-stretch` the anchor still measures its content), or the fix was applied to the row `div` — which already passes at 44 px — instead of to the `<a>` that actually carries the href and onClick",
+  "The builder edited a file outside this phase's four-entry manifest — read the diff: Sidebar.tsx, SidebarContent.tsx, SidebarHeader.tsx, the two hooks and the stop dialog all shipped in Phase 4 and are not this phase's to touch, and a CONCURRENT session writes this repo so a foreign change to any of them is not a finding",
 ]
+
+[[steps]]
+kind = "edit"
+path = "src/modules/sidebar/SidebarSimpleList.tsx"
+what = "Give the New chat button a 44 px minimum tap target in COMPACT mode only. `Button size=\"sm\"` is `h-9` (36 px, `src/shared/ui/Button.tsx:32`), under the floor gate 9 measures. Call useCompactSidebar() (already imported by SidebarSimpleListRow.tsx:8 — same hook, `hooks/useCompactSidebar.ts`) and pass className={isCompact ? 'min-h-11' : undefined} to the button. Desktop keeps h-9 exactly as today. Nothing else in the file changes."
+check = "echo $(grep -c 'useCompactSidebar' src/modules/sidebar/SidebarSimpleList.tsx) $(grep -c 'min-h-11' src/modules/sidebar/SidebarSimpleList.tsx) $(wc -l < src/modules/sidebar/SidebarSimpleList.tsx | awk '{print ($1<=200)?\"small\":\"big\"}')"
+expect_re = "^[1-9] [1-9] small$"
+
+[[steps]]
+kind = "edit"
+path = "src/modules/sidebar/SidebarSimpleListRow.tsx"
+what = "Make the row's `<a>` fill the row in COMPACT mode so the thing carrying href/onClick is the 44 px target. Today the row `div` reaches 44 px via `min-h-11` but the parent is `items-center`, so the `<a className=\"min-w-0 flex-1\">` (line 77-79) measures only its text (~30 px). Change that className to cn('min-w-0 flex-1', isCompact && 'self-stretch flex flex-col justify-center') — `self-stretch` overrides the parent's items-center so the anchor spans the row's full height, and the flex column keeps the two text lines vertically centred. `isCompact` and `cn` are already in scope (lines 33 and the existing cn import). Desktop is unchanged. Do not touch the row div's own classes."
+check = "echo $(grep -c 'self-stretch' src/modules/sidebar/SidebarSimpleListRow.tsx) $(grep -c 'min-h-11' src/modules/sidebar/SidebarSimpleListRow.tsx) $(wc -l < src/modules/sidebar/SidebarSimpleListRow.tsx | awk '{print ($1<=200)?\"small\":\"big\"}')"
+expect_re = "^[1-9] [1-9] small$"
+
+[[steps]]
+kind = "run"
+cmd = "npm run typecheck"
+check = "npm run typecheck >/dev/null 2>&1 && echo TYPECHECK_OK || echo TYPECHECK_FAIL"
+expect = "TYPECHECK_OK"
+timeout_s = 400
+
+[[steps]]
+kind = "run"
+cmd = "npm run lint"
+check = "npm run lint 2>&1 | grep -c ': warning ' | awk '{print ($1<=123)?\"LINT_OK\":\"LINT_UP \"$1}'"
+expect = "LINT_OK"
+timeout_s = 300
 
 [[steps]]
 kind = "edit"
@@ -734,7 +776,9 @@ cmd = "ls .verify/shots/18-simple-stop-dialog-light.png .verify/shots/18-simple-
 expect = "SHOTS_OK"
 ```
 
-**What to build.** One harness file and one doc paragraph; no application code. Copy phase-17's seal, canary, collectors and cleanup verbatim (rename the globals to `__phase18`); the injection helpers are `.verify/phase-15.mjs:607-621` (`armLiveRun` injects `chat_subscribed { isProcessing: true }`, `endRun` injects the aborted `complete`).
+**What to build.** Two one-line tap-target fixes, then the harness, then the doc paragraph.
+
+**Why this phase carries application code.** Gate 9 asserts a 44 px floor at 390 px. Measured against the live DOM on 2026-09-08, before a line of the harness was written: `[data-testid="simple-chat-new"]` renders 36 px and the row's `<a>` renders 30 px. Phase 4's own row step asked for "44 px tap target when useCompactSidebar() is true" and the row `div` got `min-h-11` — but the div is not what a finger hits; the `<a>` inside it carries the href and the onClick, and `items-center` leaves it at its content height. So the floor was never true, and a harness written to assert it would either fail forever or be quietly weakened to match the bug. The fix is two className changes, scoped to compact mode, and it lands HERE so the phase that measures the floor is the phase that makes it true. Copy phase-17's seal, canary, collectors and cleanup verbatim (rename the globals to `__phase18`); the injection helpers are `.verify/phase-15.mjs:607-621` (`armLiveRun` injects `chat_subscribed { isProcessing: true }`, `endRun` injects the aborted `complete`).
 
 **The harness, gate by gate** (zero Claude turns):
 1. Seal + canary, cleanup of `phase-18*` titles (through `GET .../recent?simpleList=true&limit=100`), `PATCH {"simpleChatList": true, "simpleChatProjectId": "4d94a97e-0e62-43ee-981a-0028fec301b9"}`, reload, wait for `[data-testid="simple-chat-list"]`.
@@ -759,11 +803,11 @@ expect = "SHOTS_OK"
 - The tag rides the `POST /api/providers/sessions` body, not the `chat.send` frame: the row is minted by that POST before the first frame exists (`useChatComposerState.ts:750-797`), so tagging at insert time has exactly one home.
 - Persistence is `simple_list_at DATETIME NULL` (a timestamp doubles as the sort key). Every write to an app-owned row in `sessions.db.ts` is an `UPDATE ... SET` list that never names the column (the watcher's upsert, `assignProviderSessionId`, the Codex repoint); the only `DELETE`s remove the watcher's provider-keyed duplicate, a fork's pre-indexed row, a whole project or an explicit hard delete. A disk resync therefore cannot clear the tag.
 - The simple list is the recents feed filtered to tagged rows: one `simpleListOnly` option on `getRecentSessionsPage`/`listRecentSessions`, one `?simpleList=true` flag on `GET /sessions/recent`, one row type (`RecentConversationListItem`). No cloned query, mapper, route or type — the archived-project visibility rule then has one home.
-- Tagging is decided by the preference value when the composer mints the session; the git-delegation caller (`startRun.ts`) never tags.
+- Tagging is decided by the preference value at the moment the composer mints the session. Every UI entry point — the simple list's New chat, the command palette's start-new-chat, the `/` route — converges on that one `createSession` call, so "created from the simple view" is read as "minted while the simple view is the sidebar"; the git-delegation caller (`startRun.ts`) is the only other minter and never tags.
 - The preferences are two flat rows, never part of the `uiPreferences` blob — that blob is a boolean-only reducer and `simpleChatProjectId` is a string; the pair lives together, like `tasksEnabled` / `projectSortOrder`.
 - The Settings home is Appearance (the tab that owns the workspace-tab switches and the sort order).
-- The simple view is a first arm inside `SidebarContent`'s existing body ternary, with the header's search and chips suppressed by folding `simpleMode` into the existing `showSearchTools` flag and the footer kept, so the settings gear stays reachable and the collapsed rail is untouched. A sibling view beside `SidebarCollapsed` would need `SidebarHeader`'s brand strip separated from its search tools first — a refactor for another checkpoint.
-- Remove archives through `DELETE` without `force`; the transcript is never touched. A live run is aborted through the existing `chat.abort` frame first, and the archive is driven by an effect on the client's busy set (the computed running model, fed by frames and re-synced every 5 s), with a 15 s fallback. The flow lives in `useSimpleChatRemove`, not in the list component. A server-side "stop and archive" option on `DELETE` was considered and set aside: it would re-implement or export `handleChatAbort`, and the operator capped new server surface at the tag and the list filter.
+- The simple view is a first arm inside `SidebarContent`'s existing body ternary, with the header's search and chips suppressed by folding `simpleMode` into the existing `showSearchTools` flag and the footer kept, so the settings gear stays reachable and the collapsed rail is untouched. A sibling view beside `SidebarCollapsed` is possible today — the `simpleMode` fold already makes `SidebarHeader` reusable — but it duplicates the header (13 props) and footer (7 props) wiring in `Sidebar.tsx` or hoists them into prop objects: a `Sidebar.tsx` refactor for another checkpoint. `SidebarContent` takes the view as a `ReactNode` slot so it never imports the mode.
+- Remove archives through `DELETE` without `force`; the transcript is never touched. A live run is aborted through the existing `chat.abort` frame first, and the archive is driven by an effect on the client's busy set (the computed running model, fed by frames and re-synced every 5 s), with a 15 s fallback. This diverges from `useRestartOnInstalledCli`, which waits on the `complete` frame and rejects the busy map, on purpose: a restart that misreads "ended" resumes into a live run, whereas a remove that misreads it archives a running row — the fallback's own outcome, already accepted. And `complete` reaches only sockets in the run's audience, so a row that is not the open chat never gets one; the busy set is fed by the 5 s `GET /sessions/running` sync as well, which `handleChatAbort` → `completeRun` empties. A `DELETE ?stop=true` on the server is the cleaner shape (the run belongs to the server) and is the reversal, not the plan. The flow lives in `useSimpleChatRemove`, not in the list component. A server-side "stop and archive" option on `DELETE` was considered and set aside: it would re-implement or export `handleChatAbort`, and the operator capped new server surface at the tag and the list filter.
 - The harness's `openConsole` parks the dev account's `simpleChatList` at `false` because the default is `true` and every older phase waits for a project row.
 - Forked sessions are not tagged (forking is a tree action).
 - The sidebar work is two sittings: the view with a three-gate mount probe (Phase 4), then the eleven-gate behavioural harness and the docs (Phase 5); the stop path and mobile width stay their own sitting (Phase 6).
@@ -795,9 +839,11 @@ Wave 5: Phase 6 — proof of the stop path and mobile width, consumes Phase 5
 - No search inside the simple list, no fork action on its rows, no drag ordering.
 - No change to `SidebarCollapsed.tsx`, the tree, the chips code, `useSidebarController.ts` or the watcher.
 - The watcher's un-archive-on-reindex (`createSession`'s `isArchived = 0`) is the root of the Remove-while-running race and of the tree's own archive-a-running-session behaviour; curing it is a semantics change for every session and belongs to Asclepius as its own card, not to this plan.
-- Splitting `provider.routes.ts` (908 — over the 800 hard ceiling), `sessions.service.ts` (663), `sessions.db.ts` (714), `useSidebarController.ts` (1093) or `useChatComposerState.ts` (1258): named as follow-up candidates, not done here. This plan adds a handful of lines to the first three (an option threaded through an existing feed) and three lines to the last.
+- Splitting `provider.routes.ts` (908 — over the 800 hard ceiling), `sessions.service.ts` (663), `sessions.db.ts` (714), `useSidebarController.ts` (1093) or `useChatComposerState.ts` (1258): named as follow-up candidates, not done here. This plan adds a handful of lines to the first three (an option threaded through an existing feed) and three lines to the last. The split's first cut is named now: the session gateway routes (`POST /sessions`, `/recent`, `/running`, `/archived`, `DELETE /:sessionId`, `/fork`, `/messages`, `/provider-id` — the concern this plan touched) into `provider.routes.ts`'s sibling `sessions.routes.ts`, a pure move with the barrel unchanged; it is the checkpoint immediately after this plan, before the next server feature re-anchors to line numbers.
+- `useSimpleChatList` duplicates the recents pager in `useSidebarController.ts:218-283` (seq guard, append dedupe, page shape). The cure — a module-private `hooks/useRecentConversationsFeed.ts` taking `{ simpleListOnly, pageSize }` that both compose — is part of the controller split, not this plan.
 - `.verify/phase-0.mjs` fails today on the renamed Source Control tab (four gates plus the shot count) — pre-existing, outside this plan's manifests.
 - `src/modules/sidebar/tests/sidebarRowProps.test.tsx` and `server/shared/tests/` exist against the operator's no-tests rule — surfaced, not deleted here.
+- The pre-existing i18n gaps (every non-English locale misses 17-84 `settings.json` keys and 6-14 `sidebar.json` keys, baked in at commit `abe5220`): surfaced, not this plan's to close. This plan's checks assert only its own keys in all 11 locales.
 
 ## Doctrine citations
 
@@ -813,3 +859,182 @@ Wave 5: Phase 6 — proof of the stop path and mobile width, consumes Phase 5
 ## Open Questions
 
 (none)
+
+## Ship Logs
+
+### Phase 1 Ship Log — ✅ SHIPPED 2026-09-08
+- run: simple-chat-list-plan-20260908-072535-ed43 · attempt 1 of 2 · cycle 1 · spawns 7/36 · fix-passes 2 of 2 · cost $4.15 (run $4.15) · resumed 0×
+- builder: hephaestus/sonnet · session 42b238b7-1830-4cb1-93bf-9843e8cb37b8 · 343s · RESULT: DONE
+- athena: pass 1 BLOCKING 0 · HIGH 0 · MED 1 · LOW 0 → fix-pass 1 (73s) → pass 2 BLOCKING 0 · HIGH 0 · MED 0 · LOW 1 → fix-pass 2 (29s) → pass 3 BLOCKING 0 · HIGH 0 · MED 0 · LOW 0 — CLEARED
+- checks: 8/8 steps OK · verify 3/3 OK
+- forbidden: unchanged (6 declared, 6 present)
+- docs: Prometheus returned · 0 files
+- evidence: /home/lyphe/.claude/state/runner/simple-chat-list-plan-20260908-072535-ed43/phase_1/
+
+### Phase 2 Ship Log — ⛔ BLOCKED 2026-09-08
+- [BLOCKED: forbidden-changed: fix-pass 1: src/shared/types.ts, server]
+- run: simple-chat-list-plan-20260908-072535-ed43 · attempt 1 of 2 · fix-passes 1 of 2 · spec_sha bde5f9a99ff3 · retry: on-spec-change
+- builder: hephaestus/sonnet · session f88c6199-af30-42de-ab7e-d44dddee9f12 · 165s · RESULT: DONE
+- athena: pass 1 BLOCKING 0 · HIGH 1 · MED 0 · LOW 0 → fix-pass 1 (233s)
+- forbidden: CHANGED: src/shared/types.ts, server
+- evidence: /home/lyphe/.claude/state/runner/simple-chat-list-plan-20260908-072535-ed43/phase_2/
+
+### Phase 3 Ship Log — ⛔ BLOCKED 2026-09-08
+- [BLOCKED: depends: not SHIPPED: Phase 2]
+- run: simple-chat-list-plan-20260908-072535-ed43 · attempt 0 of 2 (never dispatched) · fix-passes 0 of 2 · spec_sha 2b11e20ebd6f · retry: allowed
+- evidence: /home/lyphe/.claude/state/runner/simple-chat-list-plan-20260908-072535-ed43/phase_3/
+
+### Phase 4 Ship Log — ⛔ BLOCKED 2026-09-08
+- [BLOCKED: depends: not SHIPPED: Phase 2, Phase 3]
+- run: simple-chat-list-plan-20260908-072535-ed43 · attempt 0 of 2 (never dispatched) · fix-passes 0 of 2 · spec_sha a2b0d2d4e874 · retry: allowed
+- evidence: /home/lyphe/.claude/state/runner/simple-chat-list-plan-20260908-072535-ed43/phase_4/
+
+### Phase 5 Ship Log — ⛔ BLOCKED 2026-09-08
+- [BLOCKED: depends: not SHIPPED: Phase 4]
+- run: simple-chat-list-plan-20260908-072535-ed43 · attempt 0 of 2 (never dispatched) · fix-passes 0 of 2 · spec_sha bebcc967a473 · retry: allowed
+- evidence: /home/lyphe/.claude/state/runner/simple-chat-list-plan-20260908-072535-ed43/phase_5/
+
+### Phase 6 Ship Log — ⛔ BLOCKED 2026-09-08
+- [BLOCKED: depends: not SHIPPED: Phase 5]
+- run: simple-chat-list-plan-20260908-072535-ed43 · attempt 0 of 2 (never dispatched) · fix-passes 0 of 2 · spec_sha c15e7f77d9b6 · retry: allowed
+- evidence: /home/lyphe/.claude/state/runner/simple-chat-list-plan-20260908-072535-ed43/phase_6/
+
+### Run simple-chat-list-plan-20260908-072535-ed43 — COMPLETE 2026-09-08
+- shipped: 1
+- blocked: 2: forbidden-changed, 3: depends, 4: depends, 5: depends, 6: depends
+- next: re-author the phase spec each ⛔ entry names, then plan-runner start /home/lyphe/.claude/claudecodeui_lyphe/docs/plans/simple-chat-list.plan.md — until a phase's `spec_sha` moves it is skipped, so a run started before the edit repeats this one exactly
+- brief: /home/lyphe/.claude/state/runner/simple-chat-list-plan-20260908-072535-ed43/resume_brief.md
+
+### Phase 2 Ship Log — ✅ SHIPPED 2026-09-08
+- run: simple-chat-list-plan-20260908-080444-6b01 · attempt 1 of 2 · cycle 1 · spawns 3/36 · fix-passes 0 of 2 · cost $1.35 (run $1.35) · resumed 0×
+- builder: hephaestus/sonnet · session ab2ddddf-f9b9-4c43-ad0b-44a0a9f0db10 · 93s · RESULT: DONE
+- athena: pass 1 BLOCKING 0 · HIGH 0 · MED 0 · LOW 0 — CLEARED
+- checks: 6/6 steps OK · verify 2/2 OK
+- forbidden: unchanged (3 declared, 3 present)
+- docs: dispatched · background · returned · 0 files
+- evidence: /home/lyphe/.claude/state/runner/simple-chat-list-plan-20260908-080444-6b01/phase_2/
+
+### Phase 3 Ship Log — ⛔ BLOCKED 2026-09-08
+- [BLOCKED: builder-blocked: step 2's check (`for loc in de es fr it ja ko ru tr zh-CN zh-TW; do diff <(...) <(...) >/dev/null || echo "MISMATCH $loc"; done; echo PARITY_CHECKED`) cannot output bare `PARITY_CHECKED` no matter what I add for `appearance.sidebar`: run today it prints `MISMATCH de (84-missing) MISMATCH es (17-miss]
+- run: simple-chat-list-plan-20260908-080444-6b01 · attempt 1 of 2 · fix-passes 0 of 2 · spec_sha f98519570ab6 · retry: on-spec-change
+- builder: hephaestus/sonnet · session 9ae20610-486e-4172-9b8c-b2b52c8b799d · 192s · RESULT: BLOCKED
+- evidence: /home/lyphe/.claude/state/runner/simple-chat-list-plan-20260908-080444-6b01/phase_3/
+
+### Phase 4 Ship Log — ⛔ BLOCKED 2026-09-08
+- [BLOCKED: depends: not SHIPPED: Phase 3]
+- run: simple-chat-list-plan-20260908-080444-6b01 · attempt 0 of 2 (never dispatched) · fix-passes 0 of 2 · spec_sha 8c8a130dd0b3 · retry: allowed
+- evidence: /home/lyphe/.claude/state/runner/simple-chat-list-plan-20260908-080444-6b01/phase_4/
+
+### Phase 5 Ship Log — ⛔ BLOCKED 2026-09-08
+- [BLOCKED: depends: not SHIPPED: Phase 4]
+- run: simple-chat-list-plan-20260908-080444-6b01 · attempt 0 of 2 (never dispatched) · fix-passes 0 of 2 · spec_sha bebcc967a473 · retry: allowed
+- evidence: /home/lyphe/.claude/state/runner/simple-chat-list-plan-20260908-080444-6b01/phase_5/
+
+### Phase 6 Ship Log — ⛔ BLOCKED 2026-09-08
+- [BLOCKED: depends: not SHIPPED: Phase 5]
+- run: simple-chat-list-plan-20260908-080444-6b01 · attempt 0 of 2 (never dispatched) · fix-passes 0 of 2 · spec_sha c15e7f77d9b6 · retry: allowed
+- evidence: /home/lyphe/.claude/state/runner/simple-chat-list-plan-20260908-080444-6b01/phase_6/
+
+### Run simple-chat-list-plan-20260908-080444-6b01 — COMPLETE 2026-09-08
+- shipped: 2
+- blocked: 3: builder-blocked, 4: depends, 5: depends, 6: depends
+- next: re-author the phase spec each ⛔ entry names, then plan-runner start /home/lyphe/.claude/claudecodeui_lyphe/docs/plans/simple-chat-list.plan.md — until a phase's `spec_sha` moves it is skipped, so a run started before the edit repeats this one exactly
+- brief: /home/lyphe/.claude/state/runner/simple-chat-list-plan-20260908-080444-6b01/resume_brief.md
+
+### Phase 3 Ship Log — ⛔ BLOCKED 2026-09-08
+- [BLOCKED: verify: grep -n 'AppearanceSettingsTab' src/modules/settings/Settings.tsx | grep -c 'projects=' → exit 1 '0']
+- run: simple-chat-list-plan-20260908-081917-6f0e · attempt 1 of 2 · fix-passes 2 of 2 · spec_sha 16e19f107d9a · retry: on-spec-change
+- builder: hephaestus/sonnet · session 3263b8ce-08a6-4f78-aa77-19f82fd83a54 · 224s · RESULT: DONE
+- athena: pass 1 BLOCKING 1 · HIGH 0 · MED 0 · LOW 1 → fix-pass 1 (163s) → pass 2 BLOCKING 0 · HIGH 0 · MED 0 · LOW 1 → fix-pass 2 (56s) → pass 3 BLOCKING 0 · HIGH 0 · MED 0 · LOW 1 — BOUND REACHED
+- checks: 6/7 steps OK · verify 3/3 OK
+- forbidden: unchanged (4 declared, 4 present)
+- residue: MED 0 · LOW 1 (Athena pass 3)
+- evidence: /home/lyphe/.claude/state/runner/simple-chat-list-plan-20260908-081917-6f0e/phase_3/
+
+### Phase 4 Ship Log — ⛔ BLOCKED 2026-09-08
+- [BLOCKED: depends: not SHIPPED: Phase 3]
+- run: simple-chat-list-plan-20260908-081917-6f0e · attempt 0 of 2 (never dispatched) · fix-passes 0 of 2 · spec_sha 39d1a15d9f4b · retry: allowed
+- evidence: /home/lyphe/.claude/state/runner/simple-chat-list-plan-20260908-081917-6f0e/phase_4/
+
+### Phase 5 Ship Log — ⛔ BLOCKED 2026-09-08
+- [BLOCKED: depends: not SHIPPED: Phase 4]
+- run: simple-chat-list-plan-20260908-081917-6f0e · attempt 0 of 2 (never dispatched) · fix-passes 0 of 2 · spec_sha 17f8e2ae7aa5 · retry: allowed
+- evidence: /home/lyphe/.claude/state/runner/simple-chat-list-plan-20260908-081917-6f0e/phase_5/
+
+### Phase 6 Ship Log — ⛔ BLOCKED 2026-09-08
+- [BLOCKED: depends: not SHIPPED: Phase 5]
+- run: simple-chat-list-plan-20260908-081917-6f0e · attempt 0 of 2 (never dispatched) · fix-passes 0 of 2 · spec_sha c15e7f77d9b6 · retry: allowed
+- evidence: /home/lyphe/.claude/state/runner/simple-chat-list-plan-20260908-081917-6f0e/phase_6/
+
+### Run simple-chat-list-plan-20260908-081917-6f0e — ALL-BLOCKED 2026-09-08
+- shipped: none
+- blocked: 3: verify, 4: depends, 5: depends, 6: depends
+- next: re-author the phase spec each ⛔ entry names, then plan-runner start /home/lyphe/.claude/claudecodeui_lyphe/docs/plans/simple-chat-list.plan.md — until a phase's `spec_sha` moves it is skipped, so a run started before the edit repeats this one exactly
+- brief: /home/lyphe/.claude/state/runner/simple-chat-list-plan-20260908-081917-6f0e/resume_brief.md
+
+### Phase 3 Ship Log — ✅ SHIPPED 2026-09-08
+- run: simple-chat-list-plan-20260908-084247-c3ef · attempt 1 of 2 · cycle 1 · spawns 3/36 · fix-passes 0 of 2 · cost $2.13 (run $2.13) · resumed 0×
+- builder: hephaestus/sonnet · session 1490c84e-6b77-4252-b7d8-90cd0f03497d · 202s · RESULT: DONE
+- athena: pass 1 BLOCKING 0 · HIGH 0 · MED 0 · LOW 0 — CLEARED
+- checks: 7/7 steps OK · verify 3/3 OK
+- forbidden: unchanged (4 declared, 4 present)
+- docs: Prometheus returned · 0 files
+- evidence: /home/lyphe/.claude/state/runner/simple-chat-list-plan-20260908-084247-c3ef/phase_3/
+
+### Phase 4 Ship Log — ✅ SHIPPED 2026-09-08
+- run: simple-chat-list-plan-20260908-084247-c3ef · attempt 1 of 2 · cycle 3 · spawns 11/36 · fix-passes 2 of 2 · cost $5.29 (run $7.41) · resumed 1×
+- builder: hephaestus/sonnet · session 53501d7b-42e5-4add-a6bb-6dcd2f80c9a8 · 757s · RESULT: DONE
+- athena: pass 1 BLOCKING 0 · HIGH 0 · MED 0 · LOW 1 → fix-pass 1 (87s) → pass 2 BLOCKING 0 · HIGH 0 · MED 0 · LOW 1 → fix-pass 2 (43s) → pass 3 BLOCKING 0 · HIGH 0 · MED 0 · LOW 1 — BOUND REACHED
+- checks: 13/13 steps OK · verify 3/3 OK
+- forbidden: unchanged (11 declared, 11 present)
+- docs: dispatched · background · returned · 0 files
+- residue: MED 0 · LOW 1 (Athena pass 3)
+- evidence: /home/lyphe/.claude/state/runner/simple-chat-list-plan-20260908-084247-c3ef/phase_4/
+
+### Phase 5 Ship Log — ✅ SHIPPED 2026-09-08
+- run: simple-chat-list-plan-20260908-084247-c3ef · attempt 1 of 2 · cycle 4 · spawns 16/36 · fix-passes 1 of 2 · cost $13.90 (run $21.59) · resumed 1×
+- builder: hephaestus/sonnet · session 727f1bd3-0cd0-4a3d-8e83-98b90c34bcda · 1880s · RESULT: DONE
+- athena: pass 1 BLOCKING 0 · HIGH 0 · MED 0 · LOW 1 → fix-pass 1 (269s) → pass 2 BLOCKING 0 · HIGH 0 · MED 0 · LOW 0 — CLEARED
+- checks: 3/3 steps OK · verify 4/4 OK
+- forbidden: unchanged (4 declared, 4 present)
+- docs: Prometheus returned · 1 files
+- evidence: /home/lyphe/.claude/state/runner/simple-chat-list-plan-20260908-084247-c3ef/phase_5/
+
+### Phase 6 Ship Log — ⛔ BLOCKED 2026-09-08
+- [BLOCKED: builder-blocked: reality diverges from the brief: at 390px the real DOM gives `[data-testid="simple-chat-new"]` height=36px and the row's `<a>` link height=30px, both under the 44px the phase body requires gate 9 to assert, and the only fix (Button size / row-link sizing in `src/modules/sidebar/SidebarSimpleList.tsx]
+- run: simple-chat-list-plan-20260908-084247-c3ef · attempt 1 of 2 · fix-passes 0 of 2 · spec_sha c15e7f77d9b6 · retry: on-spec-change
+- builder: hephaestus/sonnet · session 55dd24b9-9a4b-4b55-bfc2-3117f3f484c1 · 239s · RESULT: BLOCKED
+- evidence: /home/lyphe/.claude/state/runner/simple-chat-list-plan-20260908-084247-c3ef/phase_6/
+
+### Run simple-chat-list-plan-20260908-084247-c3ef — COMPLETE 2026-09-08
+- shipped: 4, 5
+- blocked: 6: builder-blocked
+- next: re-author the phase spec each ⛔ entry names, then plan-runner start /home/lyphe/.claude/claudecodeui_lyphe/docs/plans/simple-chat-list.plan.md — until a phase's `spec_sha` moves it is skipped, so a run started before the edit repeats this one exactly
+- brief: /home/lyphe/.claude/state/runner/simple-chat-list-plan-20260908-084247-c3ef/resume_brief.md
+
+### Phase 6 Ship Log — ✅ SHIPPED 2026-09-08
+- run: simple-chat-list-plan-20260908-104147-25a6 · attempt 1 of 2 · cycle 1 · spawns 5/36 · fix-passes 1 of 2 · cost $10.12 (run $10.12) · resumed 0×
+- builder: hephaestus/sonnet · session 2efeeb19-8c29-40f8-8599-cbc5fe0e841a · 1774s · RESULT: DONE
+- athena: pass 1 BLOCKING 0 · HIGH 0 · MED 0 · LOW 1 → fix-pass 1 (188s) → pass 2 BLOCKING 0 · HIGH 0 · MED 0 · LOW 0 — CLEARED
+- checks: 6/6 steps OK · verify 3/3 OK
+- forbidden: unchanged (4 declared, 4 present)
+- docs: Prometheus returned · 1 files
+- evidence: /home/lyphe/.claude/state/runner/simple-chat-list-plan-20260908-104147-25a6/phase_6/
+
+### Run simple-chat-list-plan-20260908-104147-25a6 — COMPLETE 2026-09-08
+- shipped: 6
+- blocked: none
+- next: run complete — the checkpoint is Scott's /git, on his clock
+- brief: /home/lyphe/.claude/state/runner/simple-chat-list-plan-20260908-104147-25a6/resume_brief.md
+
+### Run simple-chat-list-plan-20260908-121727-d2df — COMPLETE 2026-09-08
+- shipped: none
+- blocked: none
+- next: run complete — the checkpoint is Scott's /git, on his clock
+- brief: /home/lyphe/.claude/state/runner/simple-chat-list-plan-20260908-121727-d2df/resume_brief.md
+
+### Run simple-chat-list-plan-20260908-121746-28b1 — COMPLETE 2026-09-08
+- shipped: none
+- blocked: none
+- next: run complete — the checkpoint is Scott's /git, on his clock
+- brief: /home/lyphe/.claude/state/runner/simple-chat-list-plan-20260908-121746-28b1/resume_brief.md

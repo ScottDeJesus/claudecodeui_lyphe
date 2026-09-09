@@ -11,7 +11,7 @@ import type { ChatMessage,
 import type { ReadToolPermissionState } from '@/modules/chat/hooks/useToolPermissionState';
 import { getIntrinsicMessageKey } from '@/modules/chat/utils/messageKeys';
 import { resolveModelLabel as labelForModelId } from '@/modules/chat/utils/modelLabels';
-import { groupConsecutiveTools, isToolGroupItem } from '@/modules/chat/utils/toolGrouping';
+import { collectRunTerminalReplies, groupConsecutiveTools, isToolGroupItem } from '@/modules/chat/utils/toolGrouping';
 import { useLazyRowObserver } from '@/modules/chat/hooks/useLazyRowObserver';
 import LazyMessageRow from '@/modules/chat/transcript/LazyMessageRow';
 import MessageComponent from '@/modules/chat/transcript/MessageComponent';
@@ -144,6 +144,11 @@ function ChatMessagesPane({
   const groupedVisibleMessages = useMemo(
     () => groupConsecutiveTools(visibleMessages, Boolean(showThinking)),
     [visibleMessages, showThinking],
+  );
+  // The reply that closes each run carries the time it landed at its foot.
+  const runTerminalReplies = useMemo(
+    () => collectRunTerminalReplies(groupedVisibleMessages, isProcessing),
+    [groupedVisibleMessages, isProcessing],
   );
 
   // Stable, deterministic keys for the messages rendered this pass.
@@ -328,6 +333,7 @@ function ChatMessagesPane({
                   <MessageComponent
                     message={item}
                     prevMessage={messagePrevMessage}
+                    isRunTerminal={runTerminalReplies.has(item)}
                     createDiff={createDiff}
                     onFileOpen={onFileOpen}
                     onShowSettings={onShowSettings}

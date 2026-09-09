@@ -37,7 +37,18 @@
   },
   "appearance": {
     "title": "외관",
-    "theme": "테마"
+    "theme": "테마",
+    "sidebar": {
+      "title": "사이드바",
+      "simpleChatList": {
+        "label": "간단한 채팅 목록",
+        "description": "프로젝트 트리를 여기서 시작한 채팅의 단순 목록으로 바꿉니다."
+      },
+      "simpleChatProject": {
+        "label": "새 채팅용 프로젝트",
+        "description": "단순 목록의 새 채팅은 이 프로젝트에서 시작됩니다."
+      }
+    }
   },
   "actions": {
     "saveChanges": "변경사항 저장",
@@ -150,6 +161,10 @@
       "description": "사이드바에서 프로젝트 정렬 방식",
       "alphabetical": "알파벳순",
       "recentActivity": "최근 활동순"
+    },
+    "followSun": {
+      "label": "일출·일몰에 맞추기",
+      "description": "표준 시간대를 기준으로 일몰에 다크로, 일출에 라이트로 전환합니다. 직접 전환하면 해제됩니다."
     }
   },
   "mcpForm": {

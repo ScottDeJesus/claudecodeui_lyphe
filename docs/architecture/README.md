@@ -143,7 +143,8 @@ unrelated to the change that caused them.
 2. **Exactly one `complete` per run**, whatever happened — success, failure or abort.
    `error` is not terminal and does not end a run.
 3. **A run belongs to the server, not to a socket.** It survives disconnects, serves
-   several viewers at once, and may begin with no viewer at all.
+   several viewers at once, and may begin with no viewer at all. A Claude run survives the
+   server *process* too — re-adopted on boot as a new run, with `seq` starting over.
 4. **Live and persisted rows stay in separate arrays.** Merging them eagerly reintroduces
    duplicate rows and a transcript that flashes empty.
 5. **The persisted transcript is the source of truth.** Realtime rows are an overlay,
@@ -162,6 +163,7 @@ unrelated to the change that caused them.
 | Old messages never load, or loading is slow | [4](./04-message-store-and-lazy-loading.md) |
 | A tool renders wrong, or a group collapses oddly | [6](./06-tool-view.md) |
 | Nothing arrives at all after a network blip | [1](./01-websocket-transport.md) — reconnect and `lastSeq` |
+| A live session reads as idle, or replays itself, right after the API restarted | [2](./02-realtime-stream.md) — a re-adopted run's fresh `seq`, and [hosting.md](../hosting.md) |
 
 ---
 

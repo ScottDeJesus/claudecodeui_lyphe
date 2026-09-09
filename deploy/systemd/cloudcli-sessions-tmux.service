@@ -1,0 +1,71 @@
+# CloudCLI — the chat-session TMUX KEEPALIVE service (restart-survival).
+#
+# WHAT THIS IS. A do-nothing keepalive whose ONLY job is to hold a tmux server alive on the
+# private `-L cloudcli-sessions` socket, in its OWN cgroup, OUTSIDE
+# cloudcli-server-dev.service's lifecycle. A chat session is a tmux `new-session` on THIS
+# server — so the `claude` process lives in THIS unit's cgroup, not the API's. That is what
+# lets a `tsx watch` reload (or a full `systemctl restart cloudcli-server-dev`) leave a
+# running chat session untouched: the API's restart tears down only the API's own cgroup;
+# this server, and every session pane it owns, is a different cgroup entirely — so the
+# session keeps running and the gateway RE-ADOPTS it from `tmux -L cloudcli-sessions
+# list-sessions` when it comes back up.
+#
+# WHY A DEDICATED LONG-LIVED UNIT (not `systemd-run --scope` per launch). One server,
+# created once, owned by systemd, surviving independently — the API is a mere CLIENT of it.
+# A per-launch transient scope would re-introduce a lifecycle the gateway has to track; a
+# standing keepalive is the simplest "tmux owns the terminals" boundary.
+#
+# Type=forking: `tmux new-session -d` forks the tmux SERVER as a daemon (reparents to PID 1)
+# and the client exits 0 — the classic double-fork daemon shape systemd's forking type
+# expects. `-f /dev/null` skips the operator's ~/.tmux.conf so a personal tmux config can
+# never reshape a chat session's pane. The `_keepalive` session (running `sleep infinity`)
+# keeps the server from exiting when it holds no other sessions; re-adoption excludes it by
+# name.
+#
+# RemainAfterExit=yes: the forked client exits immediately; without this systemd would
+# consider the unit dead. With it (plus Type=forking tracking the daemon), `systemctl status
+# cloudcli-sessions-tmux` stays ACTIVE for the tmux server's whole lifetime.
+#
+# There is deliberately no systemd runtime-dir setting here (D-1). Session journals, sockets
+# and meta live on DISK under ~/.cloudcli/sessions (mode 0700, env override
+# CLOUDCLI_SESSIONS_DIR), never on /run's tmpfs, where a long session's journal would sit in
+# RAM for the whole life of that session. Surviving a reboot is NOT the argument: the boot
+# sweep deletes a dead host's files on the next API boot anyway.
+#
+# DEPLOY (a NEW unit — needs a full install, not just daemon-reload):
+#   sudo cp /home/lyphe/.claude/claudecodeui_lyphe/deploy/systemd/cloudcli-sessions-tmux.service /etc/systemd/system/
+#   sudo systemctl daemon-reload && sudo systemctl enable --now cloudcli-sessions-tmux
+#   systemctl status cloudcli-sessions-tmux   # → active; tmux -L cloudcli-sessions ls → _keepalive
+
+[Unit]
+Description=CloudCLI chat-session keepalive (holds the -L cloudcli-sessions tmux server across API restarts)
+After=network.target
+
+[Service]
+Type=forking
+User=lyphe
+Group=lyphe
+# Hold a tmux server on the private socket with one no-op keepalive session. The forked
+# server reparents to PID 1; Type=forking + RemainAfterExit keep the unit ACTIVE.
+ExecStart=/usr/bin/tmux -L cloudcli-sessions -f /dev/null new-session -d -s _keepalive sleep infinity
+# Tear the WHOLE server down on stop — every chat-session pane it owns goes with it. (An
+# operator `systemctl stop cloudcli-sessions-tmux` is the deliberate "kill every live chat
+# session" switch.)
+# The `-` prefix: ignore a failing kill-server. Stopping when the server is ALREADY dead (the
+# silent-death state) makes kill-server exit 1 ("no server running"), and without the `-`
+# that lands the unit in FAILED — indistinguishable from crash residue. With it a deliberate
+# stop ALWAYS lands `inactive`, keeping the state contract readable: `inactive` = the
+# operator's choice, `failed` = crash/OOM residue.
+ExecStop=-/usr/bin/tmux -L cloudcli-sessions kill-server
+RemainAfterExit=yes
+Restart=always
+RestartSec=2
+# OOMPolicy=continue: when the kernel OOM-killer reaps ONE process in this unit's cgroup
+# (a single runaway chat session), keep the unit — and every SIBLING session — running. The
+# default (OOMPolicy=stop) tears the WHOLE cgroup down on ANY single OOM kill, which would
+# turn one oversized session's death into the simultaneous loss of every live chat.
+# `continue` confines the blast radius to the process the kernel actually killed.
+OOMPolicy=continue
+
+[Install]
+WantedBy=multi-user.target

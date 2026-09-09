@@ -151,5 +151,19 @@
     "deleteAllData": "Tüm veriyi kalıcı olarak sil",
     "allConversationsDeleted": "Proje kenar çubuğundan kaldırılacak. Dosyaların, bellek verilerin ve oturum verilerin korunacak.",
     "cannotUndo": "Projeyi sonra tekrar ekleyebilirsin."
+  },
+  "simpleList": {
+    "project": "Proje",
+    "newChat": "Yeni sohbet",
+    "empty": "Henüz sohbet yok. Yeni sohbet ile başlayın.",
+    "loadMore": "Daha fazla göster",
+    "rename": "Yeniden adlandır",
+    "renamePlaceholder": "Sohbet adı",
+    "remove": "Kaldır",
+    "running": "Çalışıyor",
+    "stopTitle": "Bu sohbet hâlâ çalışıyor",
+    "stopBody": "Durdurulsun ve kaldırılsın mı?",
+    "stopConfirm": "Durdur ve kaldır",
+    "removeFailed": "Bu sohbet kaldırılamadı."
   }
 }

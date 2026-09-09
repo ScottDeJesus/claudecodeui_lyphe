@@ -10,7 +10,7 @@ import type {
   RefObject,
   TouchEvent,
 } from 'react';
-import { PaperclipIcon, MessageSquareIcon, XIcon, Loader2, ArrowUpIcon, PencilIcon } from 'lucide-react';
+import { PaperclipIcon, PencilRulerIcon, XIcon, Loader2, ArrowUpIcon, PencilIcon } from 'lucide-react';
 
 import { Button } from '@/shared/ui';
 import { useVoiceInput } from '@/modules/chat/hooks/useVoiceInput';
@@ -65,7 +65,6 @@ type ChatComposerProps = {
   modelsLoading: boolean;
   tokenBudget: Record<string, unknown> | null;
   onShowTokenUsage: () => void;
-  slashCommandsCount: number;
   onToggleCommandMenu: () => void;
   hasInput: boolean;
   onClearInput: () => void;
@@ -112,7 +111,6 @@ type ChatComposerProps = {
   onInputFocusChange?: (focused: boolean) => void;
   placeholder: string;
   isTextareaExpanded: boolean;
-  sendByCtrlEnter?: boolean;
 };
 
 /**
@@ -139,7 +137,6 @@ export default function ChatComposer({
   modelsLoading,
   tokenBudget,
   onShowTokenUsage,
-  slashCommandsCount,
   onToggleCommandMenu,
   hasInput,
   onClearInput,
@@ -184,7 +181,6 @@ export default function ChatComposer({
   onInputFocusChange,
   placeholder,
   isTextareaExpanded,
-  sendByCtrlEnter,
 }: ChatComposerProps) {
   const { t } = useTranslation('chat');
   const fileDropdownRef = useRef<HTMLDivElement | null>(null);
@@ -252,13 +248,6 @@ export default function ChatComposer({
 
   const hasQueuedDraft = Boolean(queuedDraft);
   const canQueueDraft = isLoading && Boolean(input.trim() || attachedFiles.length > 0);
-  const submitHint = canQueueDraft
-    ? hasQueuedDraft
-      ? t('input.hintText.updateQueued', { defaultValue: 'Enter to update queued message' })
-      : t('input.hintText.queue', { defaultValue: 'Enter to queue your next message' })
-    : sendByCtrlEnter
-      ? t('input.hintText.ctrlEnter')
-      : t('input.hintText.enter');
   const submitAriaLabel = canQueueDraft
     ? hasQueuedDraft
       ? t('input.queue.update', { defaultValue: 'Update queued message' })
@@ -454,19 +443,16 @@ export default function ChatComposer({
 
             <TokenUsageSummary usage={tokenBudget} onClick={onShowTokenUsage} />
 
+            {/* Crossed tools, not a speech bubble: this opens the SKILLS/commands menu, and a
+                bubble said "message". `text-accent-ink` is the Verve accent, so the one button
+                in the row that opens a menu of capabilities carries the theme's own colour
+                rather than the muted grey every other composer icon wears. */}
             <PromptInputButton
               tooltip={{ content: t('input.showAllCommands') }}
               onClick={onToggleCommandMenu}
-              className="relative"
+              className="text-accent-ink hover:text-accent-ink"
             >
-              <MessageSquareIcon />
-              {slashCommandsCount > 0 && (
-                <span
-                  className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground"
-                >
-                  {slashCommandsCount}
-                </span>
-              )}
+              <PencilRulerIcon />
             </PromptInputButton>
 
             {hasInput && (
@@ -481,7 +467,11 @@ export default function ChatComposer({
 
           </PromptInputTools>
 
-          <div className="ml-auto flex shrink-0 items-center gap-1.5 sm:gap-2">
+          {/* `min-w-0` and no `shrink-0`: measured at 390px this row wanted 371px inside a 358px
+              track and the send button was clipped off the right edge. Shrinking is only
+              possible if the row may shrink, and only useful if its children may too —
+              the two menu buttons already truncate their labels. */}
+          <div className="ml-auto flex min-w-0 items-center gap-1.5 sm:gap-2">
             <ScheduleMessagePopover
               disabled={!input.trim()}
               onSchedule={onScheduleMessage}
@@ -496,10 +486,6 @@ export default function ChatComposer({
               onSelectModel={onSelectModel}
               modelsLoading={modelsLoading}
             />
-
-            <span className="hidden max-w-64 text-xs leading-4 text-ink-faint lg:inline">
-              {t(`composer.editMode.help.${permissionMode}`, { defaultValue: '' })}
-            </span>
 
             <ComposerPermissionMenu
               permissionMode={permissionMode}
@@ -544,13 +530,6 @@ export default function ChatComposer({
             </PromptInputSubmit>
           </div>
 
-          <div
-            className={`order-last hidden basis-full px-2 text-center text-xs leading-4 text-muted-foreground/50 transition-opacity duration-200 lg:block ${
-              input.trim() && !canQueueDraft ? 'opacity-0' : 'opacity-100'
-            }`}
-          >
-            {submitHint}
-          </div>
         </PromptInputFooter>
       </PromptInput>
       </div>}

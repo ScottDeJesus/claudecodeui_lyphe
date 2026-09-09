@@ -69,10 +69,18 @@ const MessageCopyControl = ({
     const rect = triggerRef.current?.getBoundingClientRect();
     if (rect) {
       const ESTIMATED_MENU_HEIGHT = 84;
+      // `min-w-36` on the panel below. Anchoring by `right` alone walks the menu off the LEFT
+      // edge whenever the trigger sits near it: measured on a 390px phone this trigger opens at
+      // x=75, which put the panel's left edge at -49. Capping `right` at
+      // `innerWidth - width - margin` keeps that edge on screen without moving the common case.
+      const MENU_MIN_WIDTH = 144;
       const openUp = rect.bottom + ESTIMATED_MENU_HEIGHT + 8 > window.innerHeight;
       setMenuStyle({
         position: 'fixed',
-        right: Math.max(8, window.innerWidth - rect.right),
+        right: Math.min(
+          Math.max(8, window.innerWidth - rect.right),
+          Math.max(8, window.innerWidth - MENU_MIN_WIDTH - 8),
+        ),
         zIndex: 1000,
         ...(openUp
           ? { bottom: window.innerHeight - rect.top + 4 }

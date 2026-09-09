@@ -6,23 +6,28 @@ back no worse than the recorded baseline. This fork does not verify by unit test
 
 ## The dev server
 
-It runs under tmux, not in your shell. Check before you touch anything:
+It runs as two systemd units, not in your shell — `cloudcli-server-dev.service` (the API under
+the handover supervisor, :3011 loopback) and `cloudcli-client-dev.service` (Vite, :5183 on every
+interface); see [hosting.md](hosting.md). Check before you touch anything:
 
 ```bash
 curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:5183/   # 200 = healthy, leave it alone
-tmux capture-pane -p -t cloudcli-dev | tail -40                 # its log — read this first
+systemctl is-active cloudcli-server-dev cloudcli-client-dev
+journalctl -u cloudcli-server-dev -n 40 --no-pager                # the API's log — read this first
 ```
 
-Start it only when that curl is not `200`:
+Start it only when a unit is not `active`:
 
 ```bash
-tmux new -d -s cloudcli-dev -c /home/lyphe/.claude/claudecodeui_lyphe \
-  "npx concurrently --kill-others 'npm run server:dev-watch' 'npm run client'"
+sudo systemctl start cloudcli-server-dev cloudcli-client-dev
 ```
 
-Both halves reload themselves — Vite for `src/`, `tsx watch` for `server/` — so no code
-change needs a restart, and a restart costs you the running session. Note this is *not*
-`npm run dev`, whose `server:dev` has no watcher.
+Both halves reload themselves — Vite for `src/`, the dev-supervisor for `server/` — so no
+code change needs a restart. A `server/` edit hands over: the supervisor boots the edited
+server beside the running one and retires the old one only when the new one reports READY.
+A `server/` edit that fails to load never parks the API: the previous server keeps serving
+and the journal carries one `[supervisor] boot failed — previous server kept:` line naming
+the error; fix the edit and it hands over. Chat sessions ride the keepalive through both.
 
 Ports live in `.env` and are deliberately not upstream's defaults: the backend is on
 **3011** because a Caddy container for another local service already owns 3001, and Vite is
@@ -185,13 +190,22 @@ real `/git` was said somewhere. The shots are `11-git-idle` (light and dark), `-
 `-dismiss-held-by-the-server` and `-refused-checkpoint-elsewhere`. Its contract is at
 [git-panel.md](git-panel.md).
 
-Phase 12 opens no browser either: the Descent proxy is four HTTP contracts, so `phase-12.mjs` signs
-in through the real login route and drives them with `fetch`. What the live picture cannot show —
-the null discipline, a rolled percent, a vendor `severity`, a Descent that is down — it measures
-under `tsx` against bodies copied from Descent's own handlers, a closed port and a socket that
-stalls mid-body. It never calls `capture` nor sends `switch` a real slug, since either moves the
-operator's live Claude login; the refused `__no_such_slug__` is how Descent's own verdict is shown
-to travel through intact. Its contract is at [descent-proxy.md](descent-proxy.md).
+Phase 12 opens no browser either: the Descent proxy's accounts lane is four HTTP contracts, so
+`phase-12.mjs` signs in through the real login route and drives them with `fetch`. What the live
+picture cannot show — the null discipline, a rolled percent, a vendor `severity`, a Descent that is
+down — it measures under `tsx` against bodies copied from Descent's own handlers, a closed port and a
+socket that stalls mid-body. It never calls `capture` nor sends `switch` a real slug, since either
+moves the operator's live Claude login; the refused `__no_such_slug__` is how Descent's own verdict
+is shown to travel through intact. Its 40 gates are the accounts lane's alone, and stayed 40 when the
+memory lane joined the router: what changed is the down-Descent snippet, which now mounts the real
+router the way `descent.module.ts` mounts it — BOTH lanes — because a probe left constructing it one
+argument short measures a proxy nobody ships. That snippet is also why its `tsx` runs name
+`server/tsconfig.json` through `TSX_TSCONFIG_PATH`: the repo root maps `@/` to `src/`, so without it
+the memory service's runtime import of `readObjectRecord` from `@/shared/utils.js` loads the frontend
+file instead. Nothing under `runTsx` here reaches the memory mapper, so no assertion in this file
+would catch that — deleting the env leaves all 40 green — which is the reason the line is commented
+where it sits rather than left to look like decoration. Its contract is at
+[descent-proxy.md](descent-proxy.md).
 
 Phase 13 is back in the browser, and it splits its evidence in two rather than choosing between
 them. Everything the operator's own Descent can answer — the label on the footer row, the figure
@@ -250,6 +264,154 @@ re-read at the end to show the server saw no run start. Shots are `15-baseline-f
 `15-stale-chip-light`, `15-banner-light`, `15-banner-dark` and `15-resumed-light`. Its contract is
 at [cli-version.md](cli-version.md).
 
+Phase 17 is the flat list's own proof, and it also spends **zero** Claude turns. Two real
+conversations are created — a real `POST /api/providers/sessions`, a real row tagged
+`simple_list_at` — but the websocket is sealed the way Phase 15 seals it, `chat.send`,
+`chat.edit-send`, `chat.abort` and `chat.subscribe` swallowed inside the page and the seal
+re-proven two-sided right after the reload that turns simple mode on, so a regression that let a
+send slip through would be caught before anything is pressed. Because Phase 2 made the server
+default `true`, `openConsole` itself now PATCHes `simpleChatList: false` right after sign-in and
+reloads before it waits for `PROJECT_ROW`, so every earlier phase keeps opening on the project
+tree it always has; `phase-17.mjs` is one of the harnesses that flips the preference to `true`
+itself and back in its own `finally`. `probe-simple-settings.mjs` and `probe-simple-view.mjs` are
+the cheap smokes underneath it — the toggle exists in Settings, and the view mounts and unmounts
+cleanly — so `phase-17.mjs` does not re-prove either; what it proves instead is a New chat's POST
+carrying `simpleList: true` for the dropdown's own project, the row that appears naming both the
+chat and its project, the sealed send leaving nothing but the frame itself on the wire, a rename
+round-tripping through a real `PUT`, opening two different rows and the Files tab reading each
+row's own project, an idle Remove archiving without ever opening the stop dialog, and toggling off
+handing the tree back. Its contract is at [simple-chat-list.md](simple-chat-list.md).
+
+Phase 18 is the flat list's stop-and-remove path and its mobile width, and it too spends **zero**
+Claude turns. Over the same sealed socket Phase 17 seals, two things are replayed rather than run
+for real: a processing ack (`chat_subscribed { isProcessing: true }`, the gateway's own ack shape)
+kept alive against `SessionProtectionContext`'s 5s running-sessions re-sync — a bare re-injection
+cannot outrun that sync's 10s local grace window, so `phase-18.mjs` also splices the armed id into
+`GET /sessions/running` itself, the way `phase-15.mjs` answers `/api/cli-version` inside the page —
+and, once the row's abort is proven, a terminal `complete` in the shape `createCompleteMessage`
+builds. What is measured: that Remove on a busy row opens the stop dialog rather than archiving on
+the spot, that Cancel leaves it standing with nothing sent, that Confirm puts exactly one
+`chat.abort` on the wire for that row's own id, that nothing archives in the 3s the run is still
+live, that the archive follows the injected complete and not before it, and — on a second row
+whose complete never arrives — that `useSimpleChatRemove`'s own 15s fallback timer is what
+archives it, landing 14-20s after the confirm click. The mobile pass resizes to 390px, opens the
+sidebar the way a thumb would, and reads the live DOM rather than the source: the New chat button
+and the row's own link (not the row `div`, which the fix never had to touch) both measure at least
+44px tall and stay inside the viewport, in both themes. Shots are `18-simple-stop-dialog-light`,
+`18-simple-390-light` and `18-simple-390-dark`. Its contract is at
+[simple-chat-list.md](simple-chat-list.md).
+
+Phase 19 is the Descent proxy's other lane — memory intake — and it opens no browser either: four
+more HTTP contracts with nothing visual about them, driven with `fetch` behind a token from the real
+login route. Its first duty is to decide no real card. Approving one writes into a file every future
+session in a project reads, and rejecting one destroys a proposal, so the write path is proven
+against ids that cannot move anything: one Descent does not have, a malformed one refused at the
+route, and one Descent already lists as approved, which it refuses before touching disk with its CAS
+matching zero rows. Twelve gates, in this order: the lane sits behind the app's auth like its
+accounts sibling (1); the live list's count matches Descent's own and every row carries exactly the
+lean key set (2-3) — a key-set inspection over the parsed rows, never a substring scan of the
+response text, since an operator-authored `name` containing "body" would redden a proxy behaving
+correctly; one candidate reads whole by id, body and all (4); an unknown id is a calm 200
+`candidate:null` rather than a 404, because a read never fails (5); a write carries DESCENT's verdict
+— its 404 and the cap guard's 422 arriving in its own words, with item 10 comparing the proxy's body
+against Descent's byte for byte, since a rewritten refusal is one the reviewer cannot act on (6-7,
+10); a malformed id never travels, on approve AND on reject (8-9); and the lane stays calm when
+Descent is down, item 11 measuring the service and item 12 the MOUNTED router with both lanes wired —
+200 on both reads, 503 only on the write (11-12). Items 3, 4 and 7 depend on what the board holds:
+with an empty pending queue, or nothing approved, each prints a `[NOTE]` and no gate, so the PASS
+count moves with the queue rather than staying pinned. Like phase 12, the down path is measured
+against a closed port and never by stopping the operator's Descent — which, with nothing pending ever
+written to, is what makes this one safe to run while the operator is in the app: it toggles no
+preference, moves no card and opens no browser. Its contract is at
+[descent-proxy.md](descent-proxy.md).
+
+Phase 20 is that lane's screen — the Memory tab — and it is back in Chromium. Eleven gates, in
+three movements: the tab is on the strip and carries the pending count as Verve's pill while its
+`aria-label` stays the bare word `Memory` (1-3), and it selects (4); the panel behind it draws one
+row per waiting candidate, marks the global-blast one, reads a body whole on expand and offers both
+verbs (5-8); and the sticky rule, which is this phase's own decision, is driven both ways — the tab
+HELD on the strip and still selected at a count of zero, showing *All filed* with no pill (9), gone
+on the first tab change (10), back the moment something waits again (11). Gate 6 depends on what the
+queue holds: with nothing targeting the global file it prints a `[NOTE]` and no gate. It reviews
+nothing, and the run's whole shape is built around that — filing a card writes into a file every
+future session reads and discarding one destroys a proposal — so the zero-count half is produced by
+answering `GET /api/descent/memory` inside the page and re-reading through a dispatched
+`visibilitychange`, the provider's own return-to-the-foreground path, rather than by emptying the
+queue. When the operator's own Descent has nothing pending, the UI half runs on a synthetic two-row
+list injected the same way, since a probe that quietly passed on an empty queue would be measuring
+an absence; a `[NOTE]` says which of the two it read. The 390 px pass MEASURES the one new thing on
+the mobile strip rather than photographing it — choosing a tab closes the drawer, so the tab's
+bounding box is read while the drawer is still up, a tab pushed off the sideways-scrolling strip by
+its own pill being indistinguishable in the picture. Unlike its HTTP-only sibling this one is **not**
+safe to run while the operator is in the app, for a reason that has nothing to do with memory: it
+opens two `openConsole` sessions and each ends in `ensureTheme`, so it leaves the dev account on
+whichever mode ran last — every browser probe's cost here, see *Hosted instance* below. What is true
+of it narrowly is that it reviews no card, toggles no preference of its own, and leaves Descent's
+queue exactly as it found it. Shots are `20-memory-light`, `20-memory-expanded-light`,
+`20-memory-empty-light`, `20-memory-390-light` and `20-memory-dark`. Its contract is at
+[memory-intake.md](memory-intake.md).
+
+Keepalive survival is the one proof here that is not a phase and is not in `all.mjs`, because what
+is under test is the API's own death. `.verify/keepalive-turn.mjs` is the client every case
+spawns — a driver whose socket keeps dying, which re-subscribes with the seq it remembers and
+never re-sends the turn — and three runners drive the real systemd units around it:
+`.verify/keepalive-host-case.mjs` takes one host process end to end with no API in the picture at
+all; `.verify/keepalive-cases-p3.mjs` covers the spawn path and the gate (`turn`, `abort`,
+`env-off`, `unit-down`); and `.verify/keepalive-cases-p4.mjs` covers survival itself (`A` through
+`F`). `.verify/keepalive-lib.mjs` under them holds the measurement helpers and signs in as the
+same dev account `.verify/lib/console.mjs` uses. Every case spends **one real Claude turn** on the
+operator's own credentials and on the account's own default model — `claude-opus-5[1m]` in the
+journals these were built against, not a cheap one — which is why the prompts are deliberately
+trivial and why a sweep is not free. Three observables carry most of the weight, each measured
+rather than asserted: the CLI's pid is the same before and after the API's pid changes, no
+`claude` process is a child of the API while the keepalive is up, and the turn's own `complete`
+arrives exactly once on the far side. What each case kills, and the four things to know before
+running one, are at §"The keepalive cases".
+
+Its neighbours under `.verify/handover/` prove a different thing — that a save under `server/`
+replaces the API without an outage — and only one of them is free. `handover-cases.mjs` is the
+matrix (`GOOD`, `BROKEN`, `COALESCE`, `READOPT`, `RESTART`) over the measurement helpers in
+`handover-lib.mjs`, and it drives the LIVE unit by editing the real `server/index.ts`: that edit
+IS the handover under test. What each case edits, what has to hold, and the four things to know
+before running one are at §"The handover cases".
+
+`seam-probe.mjs` beside it costs nothing: it measures the boot seam in
+`server/supervised-boot.ts`. The unit now runs that seam for real on every `server/` edit, so the
+healthy paths are visible on :3011 — but the modes worth fearing are exactly the ones a working
+supervisor never produces, and those are what this probe makes runnable. It boots a
+**second** instance of this same server on :3999 — no systemd unit is touched and no Claude turn
+is spent — and reads every answer out of the world rather than out of the code: the kernel's
+listener table for who holds the port, a real `SO_REUSEPORT` join for whether the child asked for
+the option, the IPC channel for the READY message, and the child's own stdout for the ORDER of
+its boot.
+
+```bash
+node .verify/handover/seam-probe.mjs <plain|nochannel|firstboot|handover|steal> --evidence <dir>
+```
+
+One `SEAM <mode> key=value …` line prints last, under the rule the CASE lines follow — every key
+measured, none asserted. `plain` is the boot with no supervisor at all and `nochannel` the boot
+with the environment bit exported but no channel behind it: the dangerous one made runnable, since
+only the missing channel stands between it and a second server sharing the port. Neither may bind
+with `reusePort` and neither may park waiting for a takeover nobody can send. `firstboot` is a
+supervised boot with no predecessor, which still re-adopts before it reports ready; `handover`
+holds the sole-server duties back until the supervisor's takeover message and runs them once, on
+the far side of the ready banner; and `steal` is the most-feared failure made observable — the
+supervisor dies having sent no takeover, and the child must go on serving the port without ever
+running the duties, because re-adopting hosts the predecessor still holds ends those runs. Only
+`steal` shortens the 30 s takeover warning, through `CLOUDCLI_TAKEOVER_WARN_MS`; nothing in
+production sets it and it is no part of the supervisor's contract with its child.
+
+Two things to know before running it. The second instance is **sealed off** from the live one — its
+own database and an empty `CLOUDCLI_SESSIONS_DIR`, so `listLiveHosts()` returns nothing and it can
+never re-adopt, which is to say steal, a host the live server is serving; never point it at the
+real sessions directory to "see a real re-adoption". Every mode also reads the live API's own
+`/api/cli-version` as a canary, so a run that disturbed :3011 says so rather than passing quietly.
+And the one file the two instances share is the local server marker `~/.cloudcli/local-server.json`:
+the child clobbers it on boot and removes its own on the way out, so the probe puts the original
+back in a `finally` — except where the live API restarted mid-probe and wrote a fresher one, a
+marker naming a living process being better truth than a snapshot naming a dead pid.
+
 ## Standing colour baselines
 
 Measured in Phase 1 on the running app. Ratchets, like the warning count: improve, never regress.
@@ -262,6 +424,113 @@ Measured in Phase 1 on the running app. Ratchets, like the warning count: improv
 | `text-destructive` on canvas | 3.17 dark — below AA | reported, never asserted |
 | Accent on canvas | 2.81 light — under the 3:1 graphics floor | reported: the palette's own |
 | Rejected blue `rgb(37,99,235)` | 3 light sites · 1 dark | asserted as a ceiling |
+
+## The keepalive cases
+
+Session keepalive — a Claude turn's CLI outliving the API that started it — cannot be proven
+from a browser, because the thing under test is the API's own death. Its probes drive the real
+gateway over a WebSocket instead, and kill the real systemd units underneath it. They are **not
+part of `all.mjs`** and are run one case at a time:
+
+```bash
+node .verify/keepalive-cases-p4.mjs <A|B|C|D|E|F> --evidence <dir>
+```
+
+Each case prints one `CASE <name> key=value …` line last. Every key on it is **measured** — from
+the process table, the systemd unit, the journal copy the host wrote, or the driver's own frame
+log — and a key the script could not measure prints `unmeasured`, which no expectation accepts. A
+case that dies halfway therefore cannot print a passing line.
+
+| Case | What dies, and what has to survive it |
+|---|---|
+| **A** | An edit-triggered handover lands mid-turn. The API's pid changes, the CLI's does not, the new server's boot logs `[keepalive] re-adopted`, and the turn's own reply still arrives — once. |
+| **B** | A hard restart while the CLI is held open for background work. The background result and its notification both land on the far side of the boot. |
+| **C** | The turn's `result` lands while there is no API at all to hand it to. The reply is read back out of session history, which is the observable that survives the gap. |
+| **D** | The stop switch: `systemctl stop cloudcli-sessions-tmux` takes every CLI with it, and the client is told so with an error frame rather than left hanging. |
+| **E** | The boot sweep collects a host whose tmux session is gone — planted as a dead meta file, counted as swept, no files left behind. |
+| **F** | The replay cursor's safe direction: re-subscribing with a cursor the run itself issued replays nothing twice. |
+
+Four things to know before running one:
+
+- **It needs passwordless sudo** (`sudo -n systemctl …`) and it restarts `cloudcli-server-dev`
+  and `cloudcli-sessions-tmux`. This is the browser suite's "run it solo, when nobody is in the
+  app" rule with teeth — a case takes the API down under anyone else's session. Six cases run in
+  about five minutes.
+- **Every turn is a real `claude` turn** against the operator's own credentials, so a sweep
+  spends real tokens. The prompts are deliberately trivial ("reply with exactly the word
+  FINISHED") for that reason.
+- **Each case creates and deletes its own probe session** (D-12) however it ends, so a sweep
+  leaves the sessions list as it found it. `probe-*` files left in `~/.cloudcli/sessions` mean an
+  interrupted run — see [hosting.md](hosting.md) §"Runbook".
+- **Case A hands the API over by nudging a file**, appending a newline to
+  `server/modules/providers/list/claude/session-host/index.ts` and restoring it. Any file under
+  `server/` now triggers a boot — the supervisor watches the tree, not an import graph — so the
+  nudge no longer depends on that file being reachable by an import; it stays there because it is
+  never a change under test. Never aim it at a file the run is verifying.
+
+Its siblings — the driver they all spawn, the `turn|abort|env-off|unit-down` cases and the
+host-only one — share the same discipline, and which script drives what is in §"The browser
+harness" above, under *Keepalive survival*. What the mechanism itself is, and what the boot pass
+does, is in [hosting.md](hosting.md) §"Rules that bite" and
+[`session-host/README.md`](../server/modules/providers/list/claude/session-host/README.md).
+
+## The handover cases
+
+A handover cannot be proven from a browser either: what is under test is one API process replacing
+another on the same port, and the browser sees at most a reconnect. The cases provoke it the way a
+developer provokes it — by saving a file under `server/` — and read every answer out of the world:
+the kernel's listener table for who holds `:3011`, `ps` for the supervisor's children and their
+`STAT` column, the journal's JSON entries (with `_PID`, so "which process said this" is an answer
+rather than an assumption), an HTTP canary sampled throughout, and sha256 of the live file against
+the backup. Like the keepalive cases they are **not part of `all.mjs`** and run one at a time:
+
+```bash
+node .verify/handover/handover-cases.mjs <GOOD|BROKEN|COALESCE|READOPT|RESTART|restore> --evidence <dir>
+```
+
+Each case prints one `CASE <name> key=value …` line last, under the same rule: every key is
+**measured**, and a key the script could not measure prints `unmeasured`, which no expectation
+accepts. Nothing defaults to `true`, and a failed probe is never read as a measured `false` — so a
+case that dies halfway cannot print a passing line.
+
+| Case | What it edits | What has to hold |
+|---|---|---|
+| **GOOD** | one newline appended to `server/index.ts` | The successor binds before the predecessor is retired: `old_pid_gone=true new_pid_bound=true single_child=true main_pid_same=true handover_lines=2 index_restored=true`, with `canary_misses` 0 or 1. Two completed handovers, because putting the file back is the second one. `handover_s` is reported, not asserted — about a second here. |
+| **BROKEN** | `export { doesNotExist };` + a call to it | The API never stops answering: `canary_samples_ge80=true canary_misses=0 boot_failed_lines=1 names_error=true old_pid_kept=true recovered_new_pid=true index_restored=true`. The call is what breaks the boot — esbuild elides a bare unresolved export from a `.ts` file, so the export alone boots cleanly. |
+| **COALESCE** | two newlines, a second apart | However the supervisor splits them, one server is left: `surviving_children=1 zombies=0 old_pid_gone=true single_bound=true index_restored=true`, `canary_misses` 0 or 1. One boot or two handovers is not a distinction the CASE line makes — the journal's `change during boot` line does. |
+| **READOPT** | one newline, under a live session whose background work has not finished | The successor re-adopts only once the predecessor is *gone*: `complete_count=1 handover_ok=true readopted_ge1=true readopt_from_new_pid=true readopt_after_retire=true bg_completed_lines=1 host_gone=true index_restored=true`. Adopting sooner would SIGHUP the very host it inherited; the journal's own ordering against `retired pid <old>` is what proves it did not. |
+| **RESTART** | nothing — `sudo -n systemctl restart cloudcli-server-dev` | The unit still lands the supervisor as MainPID with one child under it: `canary_back_within_5s=true supervisor_is_main=true single_child=true watchdog_sha_same=true`. This one is a real outage, unlike a handover, and it is timed from *before* the command is issued. |
+| `restore` | nothing — it puts the file back | The escape hatch, not a case: prints `RESTORED changed` or `RESTORED unchanged`, waits out the handover a real restore provokes, and measures nothing. |
+
+Four things to know before running one:
+
+- **Every case edits the live `server/index.ts`** and copies it back from `<evidence>/index.ts.bak`
+  in a `finally`, whatever happens; `index_restored` is read from the bytes immediately before the
+  line prints. `^C` and `SIGTERM` restore it on the way out too. A run killed harder than that
+  leaves the live file edited — that is what the `restore` verb is for, and it is the first thing
+  to run after any interrupted sweep.
+- **`BROKEN` leaves that file unbootable for a full 20 s on purpose.** The previous server answers
+  throughout, and watching it do so *is* the measurement — a window cut short would not have
+  watched it. Its canary samples every 200 ms rather than the default 250, so 80 samples of the
+  window carry slack instead of sitting on the arithmetic maximum.
+- **`READOPT` spends one real Claude turn** on the operator's own credentials and default model,
+  the same cost the keepalive cases carry, and holds its probe session open for about two minutes
+  waiting on background work. It creates and deletes that session however it ends.
+- **`RESTART` needs passwordless sudo** (`sudo -n systemctl …`) and takes the API down for real.
+  Run the whole matrix solo, when nobody is in the app — the keepalive cases' rule, for the same
+  reason.
+
+Two neighbours are not cases. `.verify/handover/seam-probe.mjs` costs nothing and touches no unit:
+it boots a second, sealed-off server on `:3999` to measure the boot seam in the five modes a
+working supervisor never produces — described under §"The browser harness" above, where its `SEAM`
+line and its two cautions are. `bash .verify/handover/smoke.sh` is the one-command sanity check —
+it touches `server/index.ts` and prints `HANDOVER old=<pid> new=<pid> seconds=<n>`, or
+`NO-HANDOVER` with what it found bound.
+
+What the mechanism itself is — the state machine, every log line, the two environment bits and the
+failure table — is in
+[`deploy/dev-supervisor/README.md`](../deploy/dev-supervisor/README.md), and the rule it puts on a
+person editing `server/` is in [hosting.md](hosting.md) §"Rules that bite".
 
 ## What bites people
 
@@ -278,6 +547,8 @@ Measured in Phase 1 on the running app. Ratchets, like the warning count: improv
 | **The Shell tab prints `bash: claude: command not found`** | The PTY spawns `bash -c "claude …"` — a bare `PATH` lookup — and the server process on this host carries no `~/.npm-global/bin`, which is where the CLI is. `.env`'s `CLAUDE_CLI_PATH` does not reach it: that is read by the SDK providers through `server/shared/claude-cli-path.ts`, never by the PTY. Nor does upstream's `prioritizeUserNpmGlobalBin`, which only re-*orders* entries already on `PATH` and hands it back untouched when none of its candidates are there — `npm_config_prefix` being set is not enough. An environment fact rather than a fork defect, and the fix belongs at deploy time: whatever runs the server must have the CLI's directory on its own `PATH`. |
 | **`uiPreferences` is one stored key, not six** | The preference store keeps a row per name, and all six workspace booleans live inside the single `uiPreferences` value. A `PATCH /api/user/preferences` carrying `{"uiPreferences":{"hideShellTab":false}}` therefore *replaces* the blob and silently drops the other five. Click the switch, or send the whole object back. A flat key is its own row and patches safely alone — which is why `phase-4.mjs` patches `tasksEnabled` directly and clicks for the rest. |
 | **The Tasks tab is absent** | It is preference-gated and TaskMaster is not installed here, so its absence is recorded as a note rather than asserted as a pass — except in `phase-4.mjs`, which asserts the biconditional instead: the tab is on the bar exactly when TaskMaster is installed. A tab that can never appear would also leave the board itself unmeasured, so `phase-16.mjs` opens the tab when it is there and otherwise mounts the app's own `TaskBoardContent` and `TaskEmptyState` from the running dev server — phase 2's technique, and it says in a `[NOTE]` which of the two it read. |
+| **The Memory tab is on the bar only while something is waiting** | It is gated on Descent's pending queue rather than on a preference, so a host with an empty queue has no Memory tab and no *Go to Memory* row in the palette — an absence, not a fault. `phase-20.mjs` falls back to a synthetic two-row queue answered inside the page when the live count is 0, and says so in a `[NOTE]`. It is also the one tab that deliberately STAYS on the strip at a count of zero, while it is the selected tab. Its contract is at [memory-intake.md](memory-intake.md). |
+| **The Memory panel is driven by its English strings** | `phase-20.mjs` finds the two verbs by the words `file it` and `discard`, the empty state by `All filed`, and the global-blast mark by the substring `global`. All four live under `memory.*` in `en/common.json` (English only; the other locales fall back to `en`). Re-word one and the phase stops finding a control rather than reporting one wrong — re-point it in the same change, the way `phase-4.mjs` is re-pointed for Settings. |
 | **There is no logout control** | Nothing in `src/` consumes `AuthContext`'s `logout`, so the harness removes the `auth-token` key the app itself wrote and reloads. No token is forged and no route is bypassed. |
 | **Project rows are desktop-only** | The `PROJECT_ROW` selector matches nothing below 768px, where the compact sidebar renders a card instead of a button. Counting rows at 390px and reading `0` is that blind spot, not an empty sidebar. |
 | **A hand-written module specifier forks the module** | Vite stamps `?t=<timestamp>` on every module it has re-transformed since the server started, so an `import('/src/…')` written without that query resolves to a *second* instance — two React contexts, and a provider stops seeing its own consumer. `phase-3.mjs` reads the specifier back out of the served consumer file instead of typing one. Editing a context file with the server already up is what makes this bite. |
@@ -295,5 +566,6 @@ session — `cloudcli-server-dev.service` (:3011 loopback) and `cloudcli-client-
 `phase-*.mjs` runs as before. Two consequences: the app is now the operator's daily instance,
 so a probe run mutates a live session's state (theme, preferences, the login modal, the sealed
 `/git` press) — **run the suite only when nobody is in the app**, and always solo; and a server
-edit made while a probe is mid-flight restarts the API under it (`tsx watch`), which reads as a
-transient — re-run, never re-aim.
+edit made while a probe is mid-flight hands the API over under it, which reads as a transient —
+re-run, never re-aim. The handover keeps `:3011` answered throughout, so what a probe sees is a
+dropped WebSocket rather than a refused request, but it is a transient either way.

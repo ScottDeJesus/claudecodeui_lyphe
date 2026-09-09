@@ -37,7 +37,18 @@
   },
   "appearance": {
     "title": "外观",
-    "theme": "主题"
+    "theme": "主题",
+    "sidebar": {
+      "title": "侧边栏",
+      "simpleChatList": {
+        "label": "简易聊天列表",
+        "description": "用你在此处发起的聊天的扁平列表替换项目树。"
+      },
+      "simpleChatProject": {
+        "label": "新聊天的项目",
+        "description": "简易列表中的新聊天将从此项目开始。"
+      }
+    }
   },
   "actions": {
     "saveChanges": "保存更改",
@@ -150,6 +161,10 @@
       "description": "项目在侧边栏中的排列方式",
       "alphabetical": "按字母顺序",
       "recentActivity": "最近活动"
+    },
+    "followSun": {
+      "label": "跟随日出日落",
+      "description": "根据你的时区，在日落时切换到深色，日出时切换回浅色。手动切换主题会关闭此项。"
     }
   },
   "mcpForm": {

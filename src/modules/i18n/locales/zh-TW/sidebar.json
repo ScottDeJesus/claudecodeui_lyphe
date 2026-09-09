@@ -147,5 +147,19 @@
     "deleteAllData": "永久刪除所有資料",
     "allConversationsDeleted": "專案將從側邊欄中移除。您的檔案、記憶和工作階段資料將會保留。",
     "cannotUndo": "您可以稍後重新新增此專案。"
+  },
+  "simpleList": {
+    "project": "專案",
+    "newChat": "新增對話",
+    "empty": "尚無對話，點擊「新增對話」開始吧。",
+    "loadMore": "顯示更多",
+    "rename": "重新命名",
+    "renamePlaceholder": "對話名稱",
+    "remove": "移除",
+    "running": "執行中",
+    "stopTitle": "此對話仍在執行中",
+    "stopBody": "要停止並移除嗎?",
+    "stopConfirm": "停止並移除",
+    "removeFailed": "無法移除此對話。"
   }
 }

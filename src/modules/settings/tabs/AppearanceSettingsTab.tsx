@@ -1,10 +1,12 @@
 import { useTranslation } from 'react-i18next';
 
-import { DarkModeToggle } from '@/shared/ui';
-import type { ProjectSortOrder } from '@/shared/types';
+import { DarkModeToggle, Select } from '@/shared/ui';
+import type { AgentSettingsProject, ProjectSortOrder } from '@/shared/types';
 import { LanguageSelector } from '@/modules/i18n';
 import { useTasksSettings } from '@/modules/task-master';
 import { useSetUiPreference, useUiPreferences } from '@/shared/context/UiPreferencesContext';
+import { useTheme } from '@/shared/context/ThemeContext';
+import { useSimpleChatListPreferences } from '@/shared/hooks/useSimpleChatListPreferences';
 import SettingsCard from '@/modules/settings/SettingsCard';
 import SettingsRow from '@/modules/settings/SettingsRow';
 import SettingsSection from '@/modules/settings/SettingsSection';
@@ -13,14 +15,19 @@ import SettingsToggle from '@/modules/settings/SettingsToggle';
 type AppearanceSettingsTabProps = {
   projectSortOrder: ProjectSortOrder;
   onProjectSortOrderChange: (value: ProjectSortOrder) => void;
+  projects?: AgentSettingsProject[];
 };
 
-/** Rendered by Settings for the "appearance" tab, covering theme, language, which tabs the workspace shows and project sorting. */
+/** Rendered by Settings for the "appearance" tab, covering theme, language, which tabs the workspace shows, the simple chat list and project sorting. */
 export default function AppearanceSettingsTab({
   projectSortOrder,
   onProjectSortOrderChange,
+  projects = [],
 }: AppearanceSettingsTabProps) {
   const { t } = useTranslation('settings');
+  // The sun-follow switch reads the same theme context the Dark Mode switch beside it writes,
+  // so the two can never disagree about who is in charge of the colour.
+  const { followsSun, setFollowsSun } = useTheme();
   const { hideShellTab } = useUiPreferences();
   const setPreference = useSetUiPreference();
   // "Hide the Tasks tab" is the Tasks tab's own enable switch, read from the one store that
@@ -34,6 +41,22 @@ export default function AppearanceSettingsTab({
   // in flight, and reads as "not yet known" rather than "no", so the row does not flicker.
   const tasksTabUnavailable = isTaskMasterInstalled === false;
 
+  // The simple chat list's own switch and default project, read and written through the one
+  // hook every consumer (sidebar, settings, chat composer) shares — never uiPreferences, whose
+  // typed boolean reducer has no room for a project id.
+  const {
+    enabled: simpleChatListEnabled,
+    projectId: simpleChatProjectId,
+    setEnabled: setSimpleChatListEnabled,
+    setProjectId: setSimpleChatProjectId,
+  } = useSimpleChatListPreferences();
+
+  // Sorted by display name so the picker reads alphabetically regardless of the order
+  // `projects` arrived in; the value stays `project.name` — the id the sidebar resolves by.
+  const simpleChatProjectOptions = [...projects]
+    .map((project) => ({ value: project.name, label: project.displayName ?? project.name }))
+    .sort((a, b) => a.label.localeCompare(b.label));
+
   return (
     <div className="space-y-8">
       <SettingsSection title={t('appearanceSettings.darkMode.label')}>
@@ -43,6 +66,16 @@ export default function AppearanceSettingsTab({
             description={t('appearanceSettings.darkMode.description')}
           >
             <DarkModeToggle ariaLabel={t('appearanceSettings.darkMode.label')} />
+          </SettingsRow>
+          <SettingsRow
+            label={t('appearanceSettings.followSun.label')}
+            description={t('appearanceSettings.followSun.description')}
+          >
+            <SettingsToggle
+              checked={followsSun}
+              onChange={setFollowsSun}
+              ariaLabel={t('appearanceSettings.followSun.label')}
+            />
           </SettingsRow>
         </SettingsCard>
       </SettingsSection>
@@ -79,6 +112,34 @@ export default function AppearanceSettingsTab({
               onChange={(value) => setTasksEnabled(!value)}
               ariaLabel={t('appearance.workspaceTabs.hideTasks.label')}
               disabled={tasksTabUnavailable}
+            />
+          </SettingsRow>
+        </SettingsCard>
+      </SettingsSection>
+
+      <SettingsSection title={t('appearance.sidebar.title')}>
+        <SettingsCard divided>
+          <SettingsRow
+            label={t('appearance.sidebar.simpleChatList.label')}
+            description={t('appearance.sidebar.simpleChatList.description')}
+          >
+            <SettingsToggle
+              checked={simpleChatListEnabled}
+              onChange={setSimpleChatListEnabled}
+              ariaLabel={t('appearance.sidebar.simpleChatList.label')}
+            />
+          </SettingsRow>
+
+          <SettingsRow
+            label={t('appearance.sidebar.simpleChatProject.label')}
+            description={t('appearance.sidebar.simpleChatProject.description')}
+          >
+            <Select
+              ariaLabel={t('appearance.sidebar.simpleChatProject.label')}
+              value={simpleChatProjectId ?? ''}
+              options={simpleChatProjectOptions}
+              placeholder={t('appearance.sidebar.simpleChatProject.label')}
+              onChange={(next) => setSimpleChatProjectId(next || null)}
             />
           </SettingsRow>
         </SettingsCard>

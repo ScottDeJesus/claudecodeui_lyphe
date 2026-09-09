@@ -1,17 +1,21 @@
 import { memo, useCallback, useEffect } from 'react';
+import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useDeviceSettings } from '@/shared/hooks/useDeviceSettings';
 import { useVersionCheck } from '@/shared/hooks/useVersionCheck';
 import { useUiPreferences, useSetUiPreference } from '@/shared/context/UiPreferencesContext';
+import { useSimpleChatListPreferences } from '@/shared/hooks/useSimpleChatListPreferences';
+import { usePageTitle } from '@/shared/hooks/usePageTitle';
 import { useSidebarController } from '@/modules/sidebar/hooks/useSidebarController';
 import { useTaskMaster, useTasksSettings } from '@/modules/task-master';
 import { usePaletteOps } from '@/modules/command-palette';
-import { useBusySessionIdSet } from '@/shared/context/SessionProtectionContext';
+import { useBusySessionIdSet, useRunningSessions } from '@/shared/context/SessionProtectionContext';
 import type { LLMProvider, LoadingProgress, MCPServerStatus, Project, ProjectSession, SidebarProjectListProps } from '@/shared/types';
 import SidebarCollapsed from '@/modules/sidebar/SidebarCollapsed';
 import SidebarContent from '@/modules/sidebar/SidebarContent';
 import SidebarModals from '@/modules/sidebar/SidebarModals';
+import SidebarSimpleList from '@/modules/sidebar/SidebarSimpleList';
 
 type SidebarProps = {
   projects: Project[];
@@ -34,6 +38,9 @@ type SidebarProps = {
   settingsInitialTab: string;
   onCloseSettings: () => void;
   isMobile: boolean;
+  // A slot, not an import: the workspace tab strip is built by project-workspace and rendered
+  // here, under the wordmark, so the dependency keeps pointing one way. `null` = no strip.
+  tabs?: ReactNode;
 };
 
 type TaskMasterSidebarContext = {
@@ -61,8 +68,11 @@ function Sidebar({
   settingsInitialTab,
   onCloseSettings,
   isMobile,
+  tabs,
 }: SidebarProps) {
   const { t } = useTranslation(['sidebar', 'common']);
+  // Here, not in the project tree: this component renders in BOTH sidebar modes.
+  usePageTitle(selectedProject, selectedSession);
   const { isPWA } = useDeviceSettings({ trackMobile: false });
   const { updateAvailable, restartRequired, latestVersion, currentVersion, releaseInfo, installMode } = useVersionCheck(
     'siteboon',
@@ -77,6 +87,10 @@ function Sidebar({
   // Only membership is rendered here, so subscribing to the full activity map
   // would re-render the whole tree on every provider status frame.
   const activeSessions = useBusySessionIdSet();
+  // The Running list is grouped from the server's run registry, which knows every
+  // run and the project it belongs to — not from the sessions paged in below.
+  const runningSessions = useRunningSessions();
+  const { enabled: simpleChatListEnabled } = useSimpleChatListPreferences();
 
   const {
     isSidebarCollapsed,
@@ -144,6 +158,7 @@ function Sidebar({
     selectedProject,
     selectedSession,
     activeSessions,
+    runningSessions,
     isLoading,
     isMobile,
     t,
@@ -262,6 +277,21 @@ function Sidebar({
             isMobile={isMobile}
             isLoading={isLoading}
             projects={projects}
+            simpleList={simpleChatListEnabled ? (
+              <SidebarSimpleList
+                projects={projects}
+                selectedProject={selectedProject}
+                selectedSession={selectedSession}
+                isMobile={isMobile}
+                onProjectSelect={handleProjectSelect}
+                onSessionSelect={handleSessionClick}
+                onNewSession={onNewSession}
+                onSessionRemoved={(id) => onSessionDelete?.(id)}
+                onRenameSession={(id, s) => updateSessionSummary('', id, s, 'claude')}
+                t={t}
+              />
+            ) : null}
+            tabs={tabs}
             runningSessionsCount={runningSessionsCount}
             archivedProjects={archivedProjects}
             archivedSessions={archivedSessions}

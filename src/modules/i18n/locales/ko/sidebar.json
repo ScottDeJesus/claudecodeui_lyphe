@@ -148,5 +148,19 @@
     "deleteAllData": "모든 데이터 영구 삭제",
     "allConversationsDeleted": "프로젝트가 사이드바에서 제거됩니다. 파일, 메모리 및 세션 데이터는 보존됩니다.",
     "cannotUndo": "나중에 프로젝트를 다시 추가할 수 있습니다."
+  },
+  "simpleList": {
+    "project": "프로젝트",
+    "newChat": "새 채팅",
+    "empty": "아직 채팅이 없습니다. 새 채팅으로 시작해 보세요.",
+    "loadMore": "더 보기",
+    "rename": "이름 바꾸기",
+    "renamePlaceholder": "채팅 이름",
+    "remove": "제거",
+    "running": "실행 중",
+    "stopTitle": "이 채팅은 아직 실행 중입니다",
+    "stopBody": "중지하고 제거할까요?",
+    "stopConfirm": "중지하고 제거",
+    "removeFailed": "이 채팅을 제거할 수 없습니다."
   }
 }

@@ -26,6 +26,9 @@ export type UserPreferences = {
   opencodePermissions: unknown;
   uiPreferences: unknown;
   selectedProvider: string;
+  simpleChatList: boolean;
+  simpleChatProjectId: string | null;
+  themeFollowsSun: boolean;
 };
 
 export type UserPreferenceKey = keyof UserPreferences;
@@ -50,8 +53,11 @@ const SERVER_WRITE_DEBOUNCE_MS = 400;
  * first hydrate, any key the server has never seen is seeded from its legacy
  * location and pushed up. Removing an entry here silently resets that setting
  * for every user who has not opened the app since the migration.
+ *
+ * A `null` entry means the preference was born after this migration existed —
+ * there is no legacy localStorage key to seed it from.
  */
-const LEGACY_STORAGE_KEYS: Record<UserPreferenceKey, string> = {
+const LEGACY_STORAGE_KEYS: Record<UserPreferenceKey, string | null> = {
   theme: 'theme',
   userLanguage: 'userLanguage',
   tasksEnabled: 'tasks-enabled',
@@ -62,6 +68,9 @@ const LEGACY_STORAGE_KEYS: Record<UserPreferenceKey, string> = {
   opencodePermissions: 'opencode-settings',
   uiPreferences: 'uiPreferences',
   selectedProvider: 'selected-provider',
+  simpleChatList: null,
+  themeFollowsSun: null,
+  simpleChatProjectId: null,
 };
 
 const PREFERENCE_KEYS = Object.keys(LEGACY_STORAGE_KEYS) as UserPreferenceKey[];
@@ -198,9 +207,14 @@ export function subscribeToUserPreferences(listener: () => void): () => void {
  * `claudePermissions` are pulled out of it separately.
  */
 function readLegacyPreference(key: UserPreferenceKey): unknown {
+  const legacyKey = LEGACY_STORAGE_KEYS[key];
+  if (legacyKey === null) {
+    return undefined;
+  }
+
   let raw: string | null = null;
   try {
-    raw = localStorage.getItem(LEGACY_STORAGE_KEYS[key]);
+    raw = localStorage.getItem(legacyKey);
   } catch {
     return undefined;
   }

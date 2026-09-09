@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState, type Dispatch, type SetStateAction } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { ChatInterface } from '@/modules/chat';
 import { FileManager } from '@/modules/file-manager';
@@ -51,6 +52,7 @@ function WorkspaceMain({
   externalMessageUpdate,
   newSessionTrigger,
 }: WorkspaceMainProps) {
+  const { t } = useTranslation();
   const preferences = useUiPreferences();
   const { showRawParameters, showThinking, sendByCtrlEnter } = preferences;
 
@@ -161,7 +163,13 @@ function WorkspaceMain({
 
   return (
     <div className="flex h-full flex-col">
-      <WorkspaceHeader isMobile={isMobile} onMenuClick={onMenuClick} />
+      <WorkspaceHeader
+        selectedProject={selectedProject}
+        selectedSession={selectedSession}
+        isMobile={isMobile}
+        onMenuClick={onMenuClick}
+        newSessionLabel={t('mainContent.newSession')}
+      />
 
       <div className="flex min-h-0 min-w-[200px] flex-1 flex-col overflow-hidden">
         <div className={`h-full ${activeTab === 'chat' ? 'block' : 'hidden'}`}>

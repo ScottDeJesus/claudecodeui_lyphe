@@ -228,6 +228,16 @@
 .vv-meter--warn .vv-meter__value::before { content: '▲ '; }
 .vv-meter__sub { font-size: 12px; color: var(--ink-faint); }
 
+/* Inline register — label, track and figure on one baseline, for chrome with a single line to
+ * spare (the sidebar's account row). The track is the only thing that flexes, so two meters set
+ * side by side keep their figures aligned however long the labels are. */
+.vv-meter--inline .vv-meter__label { flex: none; font-size: 10.5px; color: var(--ink-faint); }
+.vv-meter--inline .vv-meter__track { flex: 1 1 auto; min-width: 16px; height: 4px; }
+.vv-meter--inline .vv-meter__value { flex: none; margin-left: 0; font-size: 10.5px; }
+/* The stacked register spends a whole line on '▲'; one line has no room for it, and the amber
+ * fill plus the amber figure already carry the warning in two channels. */
+.vv-meter--inline.vv-meter--warn .vv-meter__value::before { content: none; }
+
 /* ---------------------------------------------------------------- Spinner */
 .vv-spinner__ring {
   border-radius: 50%;
@@ -294,3 +304,17 @@
 /* The chosen row is filled AND ticked, so the choice survives greyscale. */
 .vv-select__option[aria-selected='true'] { background: var(--accent-soft); color: var(--accent-ink); }
 .vv-select__option[aria-selected='true']::after { content: '✓'; font-size: 12px; color: var(--accent); }
+
+/* Dense form, for narrow chrome. The stock trigger is ~46px tall and towers over the `sm`
+   Button it shares a strip with in the sidebar; this sits at that button's own 36px. Below
+   the sidebar's compact breakpoint the 44px touch floor outranks the density. */
+.vv-select--sm .vv-select__trigger {
+  min-height: 36px;
+  padding: 0 10px;
+  font-size: 13px;
+}
+.vv-select--sm .vv-select__chevron { font-size: 9px; }
+.vv-select--sm .vv-select__option { padding: 6px 10px; font-size: 13px; }
+@media (max-width: 767px) {
+  .vv-select--sm .vv-select__trigger { min-height: 44px; }
+}

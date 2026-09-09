@@ -202,6 +202,10 @@ Three details worth pinning:
 - **The real row.** The first *server* `session_upserted` arrives mid-run, from
   `recordProviderSessionId`. The reducer matches it to the optimistic row by alias id,
   updates in place, and refuses to blank a title it already has.
+- **This describes the project tree.** The flat simple chat list is a second front door onto
+  the same `POST /api/providers/sessions` (see [simple-chat-list.md](../simple-chat-list.md))
+  and has no optimistic row at all: `useSimpleChatList` only reloads once the server's own
+  `session_upserted` reaches it, debounced 500 ms.
 
 Navigation happens once. `ChatInterface.handleSessionEstablished` sets `currentSessionId`,
 calls `onSessionEstablished` (which registers the optimistic row) and then
