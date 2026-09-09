@@ -1,3 +1,4 @@
+import { BrainIcon, InboxIcon, PlugZapIcon } from 'lucide-react';
 import { useCallback, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -58,6 +59,9 @@ export function MemoryIntakePanel() {
   return (
     <div className="flex h-full flex-col">
       <div className="flex items-center gap-2 border-b border-border px-4 py-3">
+        <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg border border-primary/25 bg-primary/10 text-primary">
+          <BrainIcon className="h-4 w-4" aria-hidden="true" />
+        </span>
         <h2 className="text-sm font-medium">{t('memory.title')}</h2>
         {/* A queue nobody could read has no count. Stating "0 pending" over "Descent is not
             reachable" would have the panel contradict itself in two adjacent lines. */}
@@ -68,20 +72,23 @@ export function MemoryIntakePanel() {
 
       {pending === null ? (
         // Not asked yet — a different fact from an empty queue, and never "All filed".
-        <div className="flex flex-1 items-center justify-center">
+        <div className="flex flex-1 items-center justify-center p-4">
           <Spinner label={t('memory.reading')} />
         </div>
       ) : !pending.reachable ? (
-        <div className="flex flex-1 items-center justify-center">
-          <EmptyState title={t('memory.unreachable')} />
+        <div className="flex flex-1 items-center justify-center p-4">
+          <EmptyState icon={PlugZapIcon} title={t('memory.unreachable')} />
         </div>
       ) : pendingCount === 0 ? (
-        <div className="flex flex-1 items-center justify-center">
-          <EmptyState title={t('memory.empty.title')} message={t('memory.empty.message')} />
+        <div className="flex flex-1 items-center justify-center p-4">
+          <EmptyState icon={InboxIcon} title={t('memory.empty.title')} message={t('memory.empty.message')} />
         </div>
       ) : (
         <ScrollArea className="flex-1">
-          <ul className="px-4">
+          {/* A measured column, centred: the queue is a stack of short cards, and letting them
+              run the full width of a desktop workspace leaves each one a line of text stranded
+              in a field of empty surface. */}
+          <ul className="mx-auto flex w-full max-w-2xl flex-col gap-3 px-4 py-5">
             {pending.candidates.map((candidate) => (
               <MemoryCandidateRow
                 key={candidate.id}
