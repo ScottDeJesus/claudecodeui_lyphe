@@ -34,7 +34,7 @@ export const CLAUDE_PREDEFINED_MODELS: ProviderModelsDefinition = {
   OPTIONS: [
     {
       value: 'fable',
-      label: 'Fable',
+      label: 'Fable 5.1',
       description: 'Latest Fable model, the most capable Claude, for the hardest, longest-running tasks.',
       effort: {
         default: 'high',
@@ -50,7 +50,7 @@ export const CLAUDE_PREDEFINED_MODELS: ProviderModelsDefinition = {
     },
     {
       value: 'sonnet[1m]',
-      label: 'Sonnet (1M context)',
+      label: 'Sonnet 5 (1M context)',
       description: 'Latest Sonnet model with a 1M context window.',
       effort: {
         default: 'high',
@@ -66,7 +66,7 @@ export const CLAUDE_PREDEFINED_MODELS: ProviderModelsDefinition = {
     },
     {
       value: 'opus[1m]',
-      label: 'Opus (1M context)',
+      label: 'Opus 5 (1M context)',
       description: 'Latest Opus model with a 1M context window.',
       effort: {
         default: 'high',
@@ -82,12 +82,12 @@ export const CLAUDE_PREDEFINED_MODELS: ProviderModelsDefinition = {
     },
     {
       value: 'haiku',
-      label: 'Haiku',
+      label: 'Haiku 4.5',
       description: 'Fast and efficient Claude model for simple tasks.',
     },
     {
       value: 'opusplan',
-      label: 'Opus Plan',
+      label: 'Opus 5 Plan',
       description: 'Use Opus while planning, then switch to Sonnet for execution.',
       effort: {
         default: 'high',
