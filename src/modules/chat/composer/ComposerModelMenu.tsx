@@ -71,6 +71,10 @@ function ComposerModelMenu({
   // last resort and only a custom model reaches it — there, the id IS the name
   // the user gave it.
   const modelLabel = selectedModelOption?.label || resolveModelLabel(modelOptions, model) || model;
+  // The chip has one line beside the composer, and every model in this catalog carries the 1M
+  // window — so "(1M context)" spends a third of that line distinguishing nothing. The menu
+  // keeps the full label, where it still separates a `[1m]` alias from a bare one.
+  const chipModelLabel = modelLabel.replace(/\s*\(1M context\)\s*$/i, '');
 
   const hasEffortSection = resolvedEffortOptions.length > 0;
   const hasModelSection = modelOptions.length > 0 || modelsLoading;
@@ -78,7 +82,7 @@ function ComposerModelMenu({
     return null;
   }
 
-  const triggerLabel = hasModelSection ? modelLabel : effortLabel;
+  const triggerLabel = hasModelSection ? chipModelLabel : effortLabel;
   const ariaLabel = t('composer.modelMenu', {
     defaultValue: 'Select model and reasoning effort',
   });
@@ -107,7 +111,6 @@ function ComposerModelMenu({
           {hasModelSection && hasEffortSection && effort !== DEFAULT_EFFORT_VALUE && (
             <span className="hidden shrink-0 capitalize sm:inline">· {effortLabel}</span>
           )}
-          <span aria-hidden="true">▲</span>
         </Chip>
       </button>
 

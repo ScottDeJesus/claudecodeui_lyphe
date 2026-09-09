@@ -69,7 +69,6 @@ function ComposerPermissionMenu({
             gives it the filled treatment rather than the outline. */}
         <Chip size="sm" selected>
           <span className="max-w-28 truncate sm:max-w-none">{modeLabel(permissionMode)}</span>
-          <span aria-hidden="true">▲</span>
         </Chip>
       </button>
 

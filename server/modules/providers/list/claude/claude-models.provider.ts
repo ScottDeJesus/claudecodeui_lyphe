@@ -30,7 +30,10 @@ const ULTRACODE_EFFORT_OPTION = {
  * All four were duplicates of an entry already in this list: the CLI's own baked catalog
  * resolves `opus` to claude-opus-5 and `sonnet` to claude-sonnet-5, and BOTH are natively 1M
  * (`context.window: 1e6, native_1m: true`), so the `[1m]` suffix changes nothing for this
- * generation. Four rows, no fifth choice.
+ * generation.
+ *
+ * `opusplan` — the CLI's Opus-plans-then-Sonnet-executes mode — is gone for the same reason:
+ * planning here runs through its own flow, and the alias had never been selected once.
  */
 export const CLAUDE_PREDEFINED_MODELS: ProviderModelsDefinition = {
   OPTIONS: [
@@ -86,22 +89,6 @@ export const CLAUDE_PREDEFINED_MODELS: ProviderModelsDefinition = {
       value: 'haiku',
       label: 'Haiku 4.5',
       description: 'Fast and efficient Claude model for simple tasks.',
-    },
-    {
-      value: 'opusplan',
-      label: 'Opus 5 Plan',
-      description: 'Use Opus while planning, then switch to Sonnet for execution.',
-      effort: {
-        default: 'high',
-        values: [
-          { value: 'low' },
-          { value: 'medium' },
-          { value: 'high' },
-          { value: 'xhigh' },
-          { value: 'max' },
-          ULTRACODE_EFFORT_OPTION,
-        ],
-      },
     },
   ],
   // The default has to name a model that is actually in OPTIONS: it is both the fallback the
