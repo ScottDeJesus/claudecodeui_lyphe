@@ -1,9 +1,22 @@
 import { memo } from 'react';
 import { CoinsIcon } from 'lucide-react';
 
+import { cn } from '@/shared/utils';
+
+/**
+ * What a surface needs to draw the count somewhere other than the composer: the session's
+ * usage and the handler that opens the breakdown. ChatInterface hands one of these up to the
+ * workspace so the mobile header can carry the count while the composer hides its own copy.
+ */
+export type TokenUsageSurface = {
+  usage: Record<string, unknown> | null;
+  onShow: () => void;
+};
+
 type TokenUsageSummaryProps = {
   usage: Record<string, unknown> | null;
   onClick?: () => void;
+  className?: string;
 };
 
 const formatTokenCount = (value: number) => {
@@ -32,10 +45,12 @@ const readUsageNumber = (value: unknown) => {
 };
 
 /**
- * Rendered by chat's ChatComposer to show the session's context-window usage
- * and open the detailed token breakdown on click.
+ * The session's context-window usage; clicking opens the detailed token breakdown.
+ * Rendered by chat's ChatComposer from `md` up and by the workspace's mobile header below it —
+ * the same 768px line `useDeviceSettings` draws, so the count is in exactly one place at every
+ * width and never in both.
  */
-function TokenUsageSummary({ usage, onClick }: TokenUsageSummaryProps) {
+function TokenUsageSummary({ usage, onClick, className }: TokenUsageSummaryProps) {
   const breakdown =
     usage?.breakdown && typeof usage.breakdown === 'object'
       ? usage.breakdown as Record<string, unknown>
@@ -48,7 +63,10 @@ function TokenUsageSummary({ usage, onClick }: TokenUsageSummaryProps) {
     <button
       type="button"
       onClick={onClick}
-      className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-border/70 bg-background/70 px-2 text-xs text-muted-foreground shadow-sm transition-colors hover:border-primary/25 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 sm:gap-2 sm:px-2.5"
+      className={cn(
+        'inline-flex h-8 items-center gap-1.5 rounded-lg border border-border/70 bg-background/70 px-2 text-xs text-muted-foreground shadow-sm transition-colors hover:border-primary/25 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 sm:gap-2 sm:px-2.5',
+        className,
+      )}
       title={`${usedTokens.toLocaleString()} tokens used`}
       aria-label="Show token usage"
     >

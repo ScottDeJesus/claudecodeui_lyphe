@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState, type Dispatch, type SetStateAction } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { ChatInterface } from '@/modules/chat';
+import { ChatInterface, type TokenUsageSurface } from '@/modules/chat';
 import { FileManager } from '@/modules/file-manager';
 import { StandaloneShell } from '@/modules/standalone-shell';
 import { GitPanel } from '@/modules/git-panel';
@@ -74,6 +74,11 @@ function WorkspaceMain({
   // that shows it. Asking for the SAME path twice is a second request because the first was retired
   // to `null` on its way through — the wrapper's identity is the signal, and it is always fresh.
   const [openRequest, setOpenRequest] = useState<{ path: string } | null>(null);
+
+  // The chat's token count, lifted so the mobile header can carry it (the composer hides its
+  // copy below `md`). Chat-tab only: the number is that chat's, and the header stays a strip of
+  // navigation on every other tab.
+  const [tokenUsageSurface, setTokenUsageSurface] = useState<TokenUsageSurface | null>(null);
 
   const handleFileOpen = useCallback((filePath: string) => {
     setOpenRequest({ path: filePath });
@@ -169,6 +174,7 @@ function WorkspaceMain({
         isMobile={isMobile}
         onMenuClick={onMenuClick}
         newSessionLabel={t('mainContent.newSession')}
+        tokenUsage={activeTab === 'chat' ? tokenUsageSurface : null}
       />
 
       <div className="flex min-h-0 min-w-[200px] flex-1 flex-col overflow-hidden">
@@ -189,6 +195,7 @@ function WorkspaceMain({
               sendByCtrlEnter={sendByCtrlEnter}
               externalMessageUpdate={externalMessageUpdate}
               newSessionTrigger={newSessionTrigger}
+              onTokenUsageSurface={setTokenUsageSurface}
               onShowAllTasks={shouldShowTasksTab ? showAllTasks : null}
             />
           </WorkspaceErrorBoundary>

@@ -438,7 +438,15 @@ export default function ChatComposer({
               <VoiceInputButton state={voiceState} onToggle={voiceToggle} errorMsg={voiceError} />
             )}
 
-            <TokenUsageSummary usage={tokenBudget} onClick={onShowTokenUsage} />
+            {/* Below `md` the count rides the workspace header instead (WorkspaceHeader) — on a
+                phone this footer row is the tightest strip on the screen and the header has the
+                room. `md` is the 768px line `useDeviceSettings` calls mobile, so the two never
+                show at once. */}
+            <TokenUsageSummary
+              usage={tokenBudget}
+              onClick={onShowTokenUsage}
+              className="hidden md:inline-flex"
+            />
 
             {/* Crossed tools, not a speech bubble: this opens the SKILLS/commands menu, and a
                 bubble said "message". No colour override — it wears the same accent the

@@ -5,6 +5,7 @@ import { ArrowDownIcon } from 'lucide-react';
 import { useTasksSettings } from '@/modules/task-master';
 import { useWebSocket } from '@/shared/context/WebSocketContext';
 import PermissionContext from '@/modules/chat/context/PermissionContext';
+import type { TokenUsageSurface } from '@/modules/chat/composer/TokenUsageSummary';
 import { api } from '@/shared/api';
 import type {
   ChatMessage,
@@ -47,6 +48,9 @@ type ChatInterfaceProps = {
   newSessionTrigger?: number;
   onTaskClick?: (...args: unknown[]) => void;
   onShowAllTasks?: (() => void) | null;
+  /** Receives the token count + its breakdown opener so a surface outside the chat (the mobile
+      workspace header) can draw them; `null` again when this chat unmounts. */
+  onTokenUsageSurface?: (surface: TokenUsageSurface | null) => void;
 };
 
 /**
@@ -70,6 +74,7 @@ function ChatInterface({
   externalMessageUpdate,
   newSessionTrigger,
   onShowAllTasks,
+  onTokenUsageSurface,
 }: ChatInterfaceProps) {
   const { tasksEnabled, isTaskMasterInstalled } = useTasksSettings();
   const { subscribe } = useWebSocket();
@@ -262,6 +267,14 @@ function ChatInterface({
     setPendingPermissionRequests,
     resolvePermissionModeForProvider,
   });
+
+  // The mobile workspace header draws the token count while the composer hides its own copy
+  // below `md`; it lives outside this module, so the count and its opener are handed up here
+  // and withdrawn on unmount so a closed chat never leaves a stale number in the header.
+  useEffect(() => {
+    onTokenUsageSurface?.({ usage: tokenBudget, onShow: showCostModal });
+  }, [onTokenUsageSurface, tokenBudget, showCostModal]);
+  useEffect(() => () => onTokenUsageSurface?.(null), [onTokenUsageSurface]);
 
   // On WebSocket reconnect, request a bounded persisted-tail sync (deferred
   // while Chat is hidden), then re-subscribe — the

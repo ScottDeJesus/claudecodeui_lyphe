@@ -2,6 +2,7 @@ import { LLMProviderLogo } from '@/shared/ui';
 import { getSessionTitle } from '@/shared/utils';
 import type { Project, ProjectSession } from '@/shared/types';
 import MobileMenuButton from '@/modules/project-workspace/MobileMenuButton';
+import { TokenUsageSummary, type TokenUsageSurface } from '@/modules/chat';
 
 type WorkspaceHeaderProps = {
   selectedProject: Project;
@@ -9,6 +10,8 @@ type WorkspaceHeaderProps = {
   isMobile: boolean;
   onMenuClick: () => void;
   newSessionLabel: string;
+  /** The open chat's token count and its breakdown opener; `null` off the chat tab. */
+  tokenUsage?: TokenUsageSurface | null;
 };
 
 /**
@@ -21,7 +24,9 @@ type WorkspaceHeaderProps = {
  * navigation, and the only place the open chat is named.
  *
  * The Chat / Files / Git tabs used to live here too, with a scroller and a pair of chevrons;
- * they moved to the sidebar under the wordmark and did not come back.
+ * they moved to the sidebar under the wordmark and did not come back. The token count came the
+ * other way: on a phone the composer's footer row is the tightest strip on the screen, so below
+ * `md` the count sits at this row's right edge and the composer hides its copy.
  */
 export default function WorkspaceHeader({
   selectedProject,
@@ -29,6 +34,7 @@ export default function WorkspaceHeader({
   isMobile,
   onMenuClick,
   newSessionLabel,
+  tokenUsage = null,
 }: WorkspaceHeaderProps) {
   if (!isMobile) return null;
 
@@ -52,6 +58,9 @@ export default function WorkspaceHeader({
           {selectedProject.displayName}
         </div>
       </div>
+      {tokenUsage && (
+        <TokenUsageSummary usage={tokenUsage.usage} onClick={tokenUsage.onShow} className="flex-none" />
+      )}
     </header>
   );
 }
