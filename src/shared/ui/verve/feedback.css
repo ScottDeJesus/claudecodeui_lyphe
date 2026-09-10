@@ -171,12 +171,15 @@
 }
 
 /* Underline register — for chrome that is already a surface (the sidebar), where a second
- * filled tray reads as a card on a card. The rule under the row is the strip; the chosen tab
- * thickens its own slice of it. Every tab reserves the 2px whether chosen or not, so nothing
- * shifts by a pixel as the selection moves. Weight changes with it, so the choice survives
- * greyscale (doctrine §6) — colour alone would not. */
-/* `min-width: 100%` so the rule spans the whole column when the tabs are short, and grows with
- * them when they overflow their scroller — the divider is never a stub under three words. */
+ * filled tray reads as a card on a card. There is no rail under the row: the indicator below
+ * is the only mark, and a full-width hairline behind it added a second horizontal line to a
+ * column that already closes with one under the search field. Every tab still reserves 2px
+ * whether chosen or not, so nothing shifts by a pixel as the selection moves. Weight changes
+ * with the selection too, so the choice survives greyscale (doctrine §6) — colour alone would
+ * not. */
+/* `min-width: 100%` so the strip spans the whole column when the tabs are short, and grows with
+ * them when they overflow their scroller — which is also what keeps the indicator's measured
+ * offsets in the same coordinate space at every width. */
 .vv-tabs--underline {
   position: relative;
   min-width: 100%;
@@ -184,7 +187,6 @@
   padding: 0;
   border-radius: 0;
   background: none;
-  box-shadow: inset 0 -1px 0 var(--border);
 }
 /* The one bar that travels. `transform` and `width` only — both compositor-friendly — and it
  * rides the strip's own coordinate space, so a scrolled strip carries it along instead of
