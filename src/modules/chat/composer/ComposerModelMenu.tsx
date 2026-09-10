@@ -6,6 +6,7 @@ import type { PermissionMode, ProviderModelOption } from '@/shared/types';
 import { DEFAULT_EFFORT_VALUE } from '@/shared/constants';
 import { Chip } from '@/shared/ui';
 import { resolveModelLabel } from '@/modules/chat/utils/modelLabels';
+import { permissionMark } from '@/modules/chat/utils/permissionMarks';
 import { useComposerMenuAnchor } from '@/modules/chat/hooks/useComposerMenuAnchor';
 import {
   ComposerMenuHeading,
@@ -106,8 +107,10 @@ function ComposerModelMenu({
   const permissionHelp = (mode: PermissionMode) => t(`composer.editMode.help.${mode}`, { defaultValue: '' }) || undefined;
 
   const triggerLabel = hasModelSection ? chipModelLabel : effortLabel;
-  const ariaLabel = hasPermissionSection
-    ? t('composer.setupMenu', { defaultValue: 'Select model, reasoning effort and how edits happen' })
+  // The mark on the pill is colour and fill; the words it replaced live on here, so the
+  // current mode is still readable by anyone hovering, or on a screen reader.
+  const ariaLabel = hasPermissionSection && permissionMode
+    ? `${t('composer.setupMenu', { defaultValue: 'Select model, reasoning effort and how edits happen' })} — ${permissionLabel(permissionMode)}`
     : t('composer.modelMenu', { defaultValue: 'Select model and reasoning effort' });
 
   return (
@@ -134,11 +137,17 @@ function ComposerModelMenu({
           {hasModelSection && hasEffortSection && effort !== DEFAULT_EFFORT_VALUE && (
             <span className="hidden shrink-0 capitalize sm:inline">· {effortLabel}</span>
           )}
-          {/* The folded-in edit mode keeps its own weight inside the shared pill: as its own
-              chip it is the FILLED one, because it is a standing decision about what the next
-              turn may do to the files, and merging must not quietly demote it. */}
+          {/* The folded-in edit mode as a MARK rather than its words. "Never ask" and "Ask
+              before every edit" are the widest labels in the app and both truncated to an
+              ambiguous stem on a phone; the dot says the same thing in 9px, and the menu
+              below carries the identical mark beside each mode, so one tap is the legend. */}
           {hasPermissionSection && permissionMode && (
-            <span className="max-w-28 truncate text-accent-ink">· {permissionLabel(permissionMode)}</span>
+            <span
+              className="vv-chip__tone"
+              data-tone={permissionMark(permissionMode).tone}
+              data-filled={permissionMark(permissionMode).writesUnasked}
+              aria-hidden="true"
+            />
           )}
         </Chip>
       </button>
@@ -224,6 +233,13 @@ function ComposerModelMenu({
                       key={mode}
                       label={permissionLabel(mode)}
                       description={permissionHelp(mode)}
+                      icon={(
+                        <span
+                          className="vv-chip__tone"
+                          data-tone={permissionMark(mode).tone}
+                          data-filled={permissionMark(mode).writesUnasked}
+                        />
+                      )}
                       isSelected={mode === permissionMode}
                       onSelect={() => {
                         onSelectPermissionMode(mode);

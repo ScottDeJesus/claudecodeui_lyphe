@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 
 import type { PermissionMode } from '@/shared/types';
 import { Chip } from '@/shared/ui';
+import { permissionMark } from '@/modules/chat/utils/permissionMarks';
 import { useComposerMenuAnchor } from '@/modules/chat/hooks/useComposerMenuAnchor';
 import {
   ComposerMenuHeading,
@@ -22,10 +23,11 @@ type ComposerPermissionMenuProps = {
  * Rendered by chat's ChatComposer as the popover for choosing how edits happen
  * — the one setting that decides whether a file changes without being asked.
  *
- * The chip says the mode in words rather than colouring a symbol, so the state
- * survives a greyscale screen and needs no legend. An unknown mode (a provider
- * the capability matrix grew past this build) falls back to its own id, which
- * is ugly on purpose: it is a missing translation, not a working label.
+ * The chip says the mode in words AND carries its tone mark — the same mark the pill wears
+ * alone below `sm`, where the words do not fit. Words first: the mark is a second channel, and
+ * this width has room for both, which is also what makes this chip the legend for the narrow
+ * one. An unknown mode (a provider the capability matrix grew past this build) falls back to
+ * its own id, which is ugly on purpose: it is a missing translation, not a working label.
  */
 function ComposerPermissionMenu({
   permissionMode,
@@ -68,6 +70,12 @@ function ComposerPermissionMenu({
             decision about what the next turn may do to the files, so Verve
             gives it the filled treatment rather than the outline. */}
         <Chip size="sm" selected>
+          <span
+            className="vv-chip__tone"
+            data-tone={permissionMark(permissionMode).tone}
+            data-filled={permissionMark(permissionMode).writesUnasked}
+            aria-hidden="true"
+          />
           <span className="max-w-28 truncate sm:max-w-none">{modeLabel(permissionMode)}</span>
         </Chip>
       </button>
@@ -80,6 +88,13 @@ function ComposerPermissionMenu({
               key={mode}
               label={modeLabel(mode)}
               description={modeHelp(mode)}
+              icon={(
+                <span
+                  className="vv-chip__tone"
+                  data-tone={permissionMark(mode).tone}
+                  data-filled={permissionMark(mode).writesUnasked}
+                />
+              )}
               isSelected={mode === permissionMode}
               onSelect={() => {
                 onSelectPermissionMode(mode);

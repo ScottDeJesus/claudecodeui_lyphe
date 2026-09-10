@@ -162,6 +162,26 @@
 /* Not colour alone: the outline goes and a fill arrives, so the states differ in greyscale. */
 .vv-chip[data-selected='true'] { background: var(--accent-soft); color: var(--accent-ink); border-color: transparent; }
 .vv-chip--sm { padding: 5px 12px; font-size: 12.5px; }
+/* The tone mark a chip can carry instead of spelling its state out — the composer's edit-mode
+ * pill uses it, where the words cost more of the row than a phone has to give. Colour comes
+ * from the tone block (§5, a token swap and never a rule of its own); the FILL is the second
+ * channel §6 asks for, so "something can change my files without asking" is legible with no
+ * colour at all.
+ *
+ * `--tone-ink`, not `--tone-dot`: this mark has to be READ, and the dark palette declares no
+ * lighter danger dot — measured, `--danger-dot` is 2.88:1 on the dark surface, under the 3:1
+ * floor for non-text, on the mark for the one mode that never asks. The inks are 5.1-9.4:1 in
+ * both themes. Verve declares them in both blocks, so nothing here invents a colour the design
+ * did not (see the header note in tokens.css on why dark gets no lighter `--danger`). */
+.vv-chip__tone {
+  width: 9px;
+  height: 9px;
+  flex: none;
+  border: 1.5px solid var(--tone-ink);
+  border-radius: 50%;
+  background: none;
+}
+.vv-chip__tone[data-filled='true'] { background: var(--tone-ink); }
 
 /* ---------------------------------------------------------------- Stepper */
 /* One control, not three: the group carries the border and the two buttons sit inside it, so a
