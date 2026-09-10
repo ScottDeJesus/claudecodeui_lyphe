@@ -29,7 +29,7 @@ export default function AppearanceSettingsTab({
   // The sun-follow switch reads the same theme context the Dark Mode switch beside it writes,
   // so the two can never disagree about who is in charge of the colour.
   const { followsSun, setFollowsSun } = useTheme();
-  const { hideShellTab } = useUiPreferences();
+  const { hideShellTab, showRawParameters, showThinking, sendByCtrlEnter } = useUiPreferences();
   // The transcript's reading size, read and written through the one hook the chat pane reads —
   // so the stepper and the messages can never disagree about how big the text is.
   const chatFontSize = useChatFontSize();
@@ -105,6 +105,44 @@ export default function AppearanceSettingsTab({
               decreaseLabel={t('appearance.text.chatFontSize.decrease')}
               increaseLabel={t('appearance.text.chatFontSize.increase')}
               ariaLabel={t('appearance.text.chatFontSize.label')}
+            />
+          </SettingsRow>
+        </SettingsCard>
+      </SettingsSection>
+
+      {/* These three moved here whole when the quick-settings drawer went. They were the only
+          settings that drawer alone could reach, so deleting its handle without rehoming them
+          would have made three switches unreachable rather than tidier. */}
+      <SettingsSection title={t('appearance.toolDisplay.title')}>
+        <SettingsCard divided>
+          <SettingsRow label={t('appearance.toolDisplay.showThinking')}>
+            <SettingsToggle
+              checked={showThinking}
+              onChange={(value) => setPreference('showThinking', value)}
+              ariaLabel={t('appearance.toolDisplay.showThinking')}
+            />
+          </SettingsRow>
+
+          <SettingsRow label={t('appearance.toolDisplay.showRawParameters')}>
+            <SettingsToggle
+              checked={showRawParameters}
+              onChange={(value) => setPreference('showRawParameters', value)}
+              ariaLabel={t('appearance.toolDisplay.showRawParameters')}
+            />
+          </SettingsRow>
+        </SettingsCard>
+      </SettingsSection>
+
+      <SettingsSection title={t('appearance.inputSettings.title')}>
+        <SettingsCard>
+          <SettingsRow
+            label={t('appearance.inputSettings.sendByCtrlEnter')}
+            description={t('appearance.inputSettings.sendByCtrlEnterDescription')}
+          >
+            <SettingsToggle
+              checked={sendByCtrlEnter}
+              onChange={(value) => setPreference('sendByCtrlEnter', value)}
+              ariaLabel={t('appearance.inputSettings.sendByCtrlEnter')}
             />
           </SettingsRow>
         </SettingsCard>

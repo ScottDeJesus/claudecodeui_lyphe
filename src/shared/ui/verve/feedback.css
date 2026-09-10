@@ -58,8 +58,9 @@
  *
  * `z-index: 10001` is ONE ABOVE the app's ceiling, and the number is measured rather than
  * chosen: the highest z-index anywhere in `src/` is 10000, at McpServerFormModal.tsx:107 and
- * ProviderSkills.tsx:577, with six more surfaces at 9999 (Settings, the file-tree menu and
- * tree, the provider login, the quick-settings panel, the shared Tooltip) and its scrim at 9998. Verve's own bundle says 120, which is right for a page that owns no
+ * ProviderSkills.tsx:577, with five more surfaces at 9999 (Settings, the file-tree menu and
+ * tree, the provider login, the shared Tooltip) and its scrim at 9998. Verve's own bundle
+ * says 120, which is right for a page that owns no
  * 9999-class modal; in THIS app 120 puts a toast UNDERNEATH every modal there is — measured
  * with a real toast node in the live stack under an open Settings, where `elementFromPoint` at
  * the toast's centre returned `div.modal-backdrop`. The stack is the app's topmost surface by

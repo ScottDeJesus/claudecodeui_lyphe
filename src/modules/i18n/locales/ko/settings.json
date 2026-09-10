@@ -48,6 +48,16 @@
         "label": "새 채팅용 프로젝트",
         "description": "단순 목록의 새 채팅은 이 프로젝트에서 시작됩니다."
       }
+    },
+    "toolDisplay": {
+      "title": "도구 표시",
+      "showThinking": "생각 과정 표시",
+      "showRawParameters": "Raw 파라미터 표시"
+    },
+    "inputSettings": {
+      "title": "입력 설정",
+      "sendByCtrlEnter": "Ctrl+Enter로 전송",
+      "sendByCtrlEnterDescription": "활성화하면 Enter 대신 Ctrl+Enter로 메시지를 전송합니다. IME 사용자가 실수로 전송하는 것을 방지하는 데 유용합니다."
     }
   },
   "actions": {
@@ -69,27 +79,6 @@
     "voice": "음성",
     "format": "오디오 형식",
     "note": "사용자 지정 기본 URL은 브라우저에서 직접 호출되므로 브라우저 CORS 요청을 허용해야 합니다. 비워두면 서버에 설정된 백엔드를 사용합니다."
-  },
-  "quickSettings": {
-    "title": "빠른 설정",
-    "sections": {
-      "appearance": "외관",
-      "toolDisplay": "도구 표시",
-      "inputSettings": "입력 설정"
-    },
-    "darkMode": "다크 모드",
-    "showRawParameters": "Raw 파라미터 표시",
-    "showThinking": "생각 과정 표시",
-    "sendByCtrlEnter": "Ctrl+Enter로 전송",
-    "voiceEnabled": "음성 (마이크 + 소리 내어 읽기)",
-    "sendByCtrlEnterDescription": "활성화하면 Enter 대신 Ctrl+Enter로 메시지를 전송합니다. IME 사용자가 실수로 전송하는 것을 방지하는 데 유용합니다.",
-    "dragHandle": {
-      "dragging": "드래그 핸들",
-      "closePanel": "설정 패널 닫기",
-      "openPanel": "설정 패널 열기",
-      "draggingStatus": "드래그 중...",
-      "toggleAndMove": "클릭하여 토글, 드래그하여 이동"
-    }
   },
   "terminalShortcuts": {
     "title": "터미널 단축키",

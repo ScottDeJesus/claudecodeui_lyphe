@@ -1,6 +1,5 @@
 import { memo } from 'react';
 
-import { QuickSettingsPanel } from '@/modules/quick-settings-panel';
 import ProjectEffects from '@/modules/project-workspace/controllers/ProjectEffects';
 import type { ProjectWorkspaceShellProps } from '@/shared/types';
 import ProjectCommandPalette from '@/modules/project-workspace/ProjectCommandPalette';
@@ -32,7 +31,6 @@ function ProjectWorkspaceShell({
       </div>
 
       <ProjectCommandPalette />
-      <QuickSettingsPanel />
     </div>
   );
 }

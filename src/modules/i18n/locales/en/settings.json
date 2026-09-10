@@ -71,6 +71,16 @@
         "label": "Project for new chats",
         "description": "New chats in the simple list start in this project."
       }
+    },
+    "toolDisplay": {
+      "title": "Tool Display",
+      "showThinking": "Show thinking",
+      "showRawParameters": "Show raw parameters"
+    },
+    "inputSettings": {
+      "title": "Input Settings",
+      "sendByCtrlEnter": "Send by Ctrl+Enter",
+      "sendByCtrlEnterDescription": "When enabled, pressing Ctrl+Enter will send the message instead of just Enter. This is useful for IME users to avoid accidental sends."
     }
   },
   "actions": {
@@ -92,27 +102,6 @@
     "voice": "Voice",
     "format": "Audio format",
     "note": "A custom base URL is called directly by your browser and must allow browser CORS requests. Leave it blank to use the server-configured backend."
-  },
-  "quickSettings": {
-    "title": "Quick Settings",
-    "sections": {
-      "appearance": "Appearance",
-      "toolDisplay": "Tool Display",
-      "inputSettings": "Input Settings"
-    },
-    "darkMode": "Dark Mode",
-    "showRawParameters": "Show raw parameters",
-    "showThinking": "Show thinking",
-    "sendByCtrlEnter": "Send by Ctrl+Enter",
-    "voiceEnabled": "Voice (mic + read aloud)",
-    "sendByCtrlEnterDescription": "When enabled, pressing Ctrl+Enter will send the message instead of just Enter. This is useful for IME users to avoid accidental sends.",
-    "dragHandle": {
-      "dragging": "Dragging handle",
-      "closePanel": "Close settings panel",
-      "openPanel": "Open settings panel",
-      "draggingStatus": "Dragging...",
-      "toggleAndMove": "Click to toggle, drag to move"
-    }
   },
   "terminalShortcuts": {
     "title": "Terminal Shortcuts",

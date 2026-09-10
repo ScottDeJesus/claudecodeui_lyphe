@@ -47,32 +47,22 @@
         "label": "Projekt für neue Chats",
         "description": "Neue Chats in der einfachen Liste starten in diesem Projekt."
       }
+    },
+    "toolDisplay": {
+      "title": "Werkzeuganzeige",
+      "showThinking": "Denken anzeigen",
+      "showRawParameters": "Rohe Parameter anzeigen"
+    },
+    "inputSettings": {
+      "title": "Eingabeeinstellungen",
+      "sendByCtrlEnter": "Mit Strg+Enter senden",
+      "sendByCtrlEnterDescription": "Wenn aktiviert, sendet Strg+Enter die Nachricht anstelle von Enter. Dies ist nützlich für IME-Benutzer:innen, um versehentliches Senden zu vermeiden."
     }
   },
   "actions": {
     "saveChanges": "Änderungen speichern",
     "resetToDefaults": "Auf Standardwerte zurücksetzen",
     "cancelChanges": "Änderungen abbrechen"
-  },
-  "quickSettings": {
-    "title": "Schnelleinstellungen",
-    "sections": {
-      "appearance": "Darstellung",
-      "toolDisplay": "Werkzeuganzeige",
-      "inputSettings": "Eingabeeinstellungen"
-    },
-    "darkMode": "Darkmode",
-    "showRawParameters": "Rohe Parameter anzeigen",
-    "showThinking": "Denken anzeigen",
-    "sendByCtrlEnter": "Mit Strg+Enter senden",
-    "sendByCtrlEnterDescription": "Wenn aktiviert, sendet Strg+Enter die Nachricht anstelle von Enter. Dies ist nützlich für IME-Benutzer:innen, um versehentliches Senden zu vermeiden.",
-    "dragHandle": {
-      "dragging": "Handle wird gezogen",
-      "closePanel": "Einstellungspanel schließen",
-      "openPanel": "Einstellungspanel öffnen",
-      "draggingStatus": "Wird gezogen...",
-      "toggleAndMove": "Klicken zum Umschalten, ziehen zum Verschieben"
-    }
   },
   "terminalShortcuts": {
     "title": "Terminal-Tastenkürzel",

@@ -48,6 +48,16 @@
         "label": "Proyecto para chats nuevos",
         "description": "Los chats nuevos de la lista simple se inician en este proyecto."
       }
+    },
+    "toolDisplay": {
+      "title": "Visualización de herramientas",
+      "showThinking": "Mostrar razonamiento",
+      "showRawParameters": "Mostrar parámetros sin procesar"
+    },
+    "inputSettings": {
+      "title": "Ajustes de entrada",
+      "sendByCtrlEnter": "Enviar con Ctrl+Enter",
+      "sendByCtrlEnterDescription": "Si está activado, Ctrl+Enter envía el mensaje en lugar de solo Enter. Útil para usuarios de IME y evitar envíos accidentales."
     }
   },
   "actions": {
@@ -69,27 +79,6 @@
     "voice": "Voz",
     "format": "Formato de audio",
     "note": "Una URL base personalizada la llama directamente tu navegador y debe permitir solicitudes CORS. Déjala en blanco para usar el backend configurado en el servidor."
-  },
-  "quickSettings": {
-    "title": "Ajustes rápidos",
-    "sections": {
-      "appearance": "Apariencia",
-      "toolDisplay": "Visualización de herramientas",
-      "inputSettings": "Ajustes de entrada"
-    },
-    "darkMode": "Modo oscuro",
-    "showRawParameters": "Mostrar parámetros sin procesar",
-    "showThinking": "Mostrar razonamiento",
-    "sendByCtrlEnter": "Enviar con Ctrl+Enter",
-    "voiceEnabled": "Voz (micro + lectura en voz alta)",
-    "sendByCtrlEnterDescription": "Si está activado, Ctrl+Enter envía el mensaje en lugar de solo Enter. Útil para usuarios de IME y evitar envíos accidentales.",
-    "dragHandle": {
-      "dragging": "Arrastrando el control",
-      "closePanel": "Cerrar panel de ajustes",
-      "openPanel": "Abrir panel de ajustes",
-      "draggingStatus": "Arrastrando...",
-      "toggleAndMove": "Clic para alternar, arrastra para mover"
-    }
   },
   "terminalShortcuts": {
     "title": "Atajos de terminal",

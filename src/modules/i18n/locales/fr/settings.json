@@ -47,32 +47,22 @@
         "label": "Projet pour les nouvelles discussions",
         "description": "Les nouvelles discussions de la liste simple démarrent dans ce projet."
       }
+    },
+    "toolDisplay": {
+      "title": "Affichage des outils",
+      "showThinking": "Afficher la réflexion",
+      "showRawParameters": "Afficher les paramètres bruts"
+    },
+    "inputSettings": {
+      "title": "Paramètres de saisie",
+      "sendByCtrlEnter": "Envoyer avec Ctrl+Entrée",
+      "sendByCtrlEnterDescription": "Lorsqu'activé, appuyer sur Ctrl+Entrée envoie le message au lieu de simplement Entrée. Utile pour les utilisateurs IME pour éviter les envois accidentels."
     }
   },
   "actions": {
     "saveChanges": "Enregistrer les modifications",
     "resetToDefaults": "Rétablir les valeurs par défaut",
     "cancelChanges": "Annuler les modifications"
-  },
-  "quickSettings": {
-    "title": "Paramètres rapides",
-    "sections": {
-      "appearance": "Apparence",
-      "toolDisplay": "Affichage des outils",
-      "inputSettings": "Paramètres de saisie"
-    },
-    "darkMode": "Mode sombre",
-    "showRawParameters": "Afficher les paramètres bruts",
-    "showThinking": "Afficher la réflexion",
-    "sendByCtrlEnter": "Envoyer avec Ctrl+Entrée",
-    "sendByCtrlEnterDescription": "Lorsqu'activé, appuyer sur Ctrl+Entrée envoie le message au lieu de simplement Entrée. Utile pour les utilisateurs IME pour éviter les envois accidentels.",
-    "dragHandle": {
-      "dragging": "Glissement en cours",
-      "closePanel": "Fermer le panneau de paramètres",
-      "openPanel": "Ouvrir le panneau de paramètres",
-      "draggingStatus": "Glissement...",
-      "toggleAndMove": "Cliquer pour basculer, glisser pour déplacer"
-    }
   },
   "terminalShortcuts": {
     "title": "Raccourcis terminal",

@@ -8,7 +8,7 @@ type DarkModeToggleProps = {
 };
 
 /**
- * Used by the settings and quick-settings-panel modules to switch the shared theme.
+ * Used by the settings module to switch the shared theme.
  *
  * The track, the knob and its spring are the library `Switch` now; what stays here is the only
  * thing this component ever really owned — deciding whether the state comes from a controlling

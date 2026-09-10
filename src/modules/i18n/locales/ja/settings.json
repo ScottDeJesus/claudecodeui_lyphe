@@ -47,32 +47,22 @@
         "label": "新規チャットのプロジェクト",
         "description": "シンプルリストの新規チャットはこのプロジェクトで開始されます。"
       }
+    },
+    "toolDisplay": {
+      "title": "ツール表示",
+      "showThinking": "思考を表示",
+      "showRawParameters": "生パラメータを表示"
+    },
+    "inputSettings": {
+      "title": "入力設定",
+      "sendByCtrlEnter": "Ctrl+Enterで送信",
+      "sendByCtrlEnterDescription": "有効にすると、Enterではなく Ctrl+Enter でメッセージを送信します。IMEユーザーの誤送信防止に便利です。"
     }
   },
   "actions": {
     "saveChanges": "変更を保存",
     "resetToDefaults": "デフォルトに戻す",
     "cancelChanges": "変更をキャンセル"
-  },
-  "quickSettings": {
-    "title": "クイック設定",
-    "sections": {
-      "appearance": "外観",
-      "toolDisplay": "ツール表示",
-      "inputSettings": "入力設定"
-    },
-    "darkMode": "ダークモード",
-    "showRawParameters": "生パラメータを表示",
-    "showThinking": "思考を表示",
-    "sendByCtrlEnter": "Ctrl+Enterで送信",
-    "sendByCtrlEnterDescription": "有効にすると、Enterではなく Ctrl+Enter でメッセージを送信します。IMEユーザーの誤送信防止に便利です。",
-    "dragHandle": {
-      "dragging": "ドラッグ中",
-      "closePanel": "設定パネルを閉じる",
-      "openPanel": "設定パネルを開く",
-      "draggingStatus": "ドラッグ中...",
-      "toggleAndMove": "クリックで切替、ドラッグで移動"
-    }
   },
   "terminalShortcuts": {
     "title": "ターミナルショートカット",

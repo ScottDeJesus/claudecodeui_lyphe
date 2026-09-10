@@ -47,32 +47,22 @@
         "label": "Проект для новых чатов",
         "description": "Новые чаты в простом списке начинаются в этом проекте."
       }
+    },
+    "toolDisplay": {
+      "title": "Отображение инструментов",
+      "showThinking": "Показывать размышления",
+      "showRawParameters": "Показывать сырые параметры"
+    },
+    "inputSettings": {
+      "title": "Настройки ввода",
+      "sendByCtrlEnter": "Отправка по Ctrl+Enter",
+      "sendByCtrlEnterDescription": "Когда включено, нажатие Ctrl+Enter будет отправлять сообщение вместо просто Enter. Это полезно для пользователей IME, чтобы избежать случайной отправки."
     }
   },
   "actions": {
     "saveChanges": "Сохранить изменения",
     "resetToDefaults": "Сбросить к значениям по умолчанию",
     "cancelChanges": "Отменить изменения"
-  },
-  "quickSettings": {
-    "title": "Быстрые настройки",
-    "sections": {
-      "appearance": "Внешний вид",
-      "toolDisplay": "Отображение инструментов",
-      "inputSettings": "Настройки ввода"
-    },
-    "darkMode": "Темная тема",
-    "showRawParameters": "Показывать сырые параметры",
-    "showThinking": "Показывать размышления",
-    "sendByCtrlEnter": "Отправка по Ctrl+Enter",
-    "sendByCtrlEnterDescription": "Когда включено, нажатие Ctrl+Enter будет отправлять сообщение вместо просто Enter. Это полезно для пользователей IME, чтобы избежать случайной отправки.",
-    "dragHandle": {
-      "dragging": "Перетаскивание ручки",
-      "closePanel": "Закрыть панель настроек",
-      "openPanel": "Открыть панель настроек",
-      "draggingStatus": "Перетаскивание...",
-      "toggleAndMove": "Нажмите для переключения, перетащите для перемещения"
-    }
   },
   "terminalShortcuts": {
     "title": "Горячие клавиши терминала",
