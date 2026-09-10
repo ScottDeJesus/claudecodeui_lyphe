@@ -167,11 +167,15 @@
     "loadMore": "Show more",
     "rename": "Rename",
     "renamePlaceholder": "Chat name",
-    "remove": "Remove",
+    "archive": "Archive",
+    "delete": "Delete permanently",
     "running": "Running",
     "stopTitle": "This chat is still running",
-    "stopBody": "Stop it and remove?",
-    "stopConfirm": "Stop and remove",
-    "removeFailed": "Could not remove this chat."
+    "stopBody": "Stop it and archive?",
+    "stopConfirm": "Stop and archive",
+    "removeFailed": "Could not remove this chat.",
+    "deleteTitle": "Delete this chat?",
+    "deleteBody": "Its transcript is removed from disk. This cannot be undone.",
+    "deleteBodyRunning": "It is still running. It will be stopped, then its transcript removed from disk. This cannot be undone."
   }
 }

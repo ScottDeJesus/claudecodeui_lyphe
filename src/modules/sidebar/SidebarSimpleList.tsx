@@ -9,6 +9,7 @@ import { useCompactSidebar } from '@/modules/sidebar/hooks/useCompactSidebar';
 import { useSimpleChatList } from '@/modules/sidebar/hooks/useSimpleChatList';
 import { useSimpleChatRemove } from '@/modules/sidebar/hooks/useSimpleChatRemove';
 import SidebarSimpleListRow from '@/modules/sidebar/SidebarSimpleListRow';
+import SidebarSimpleDeleteDialog from '@/modules/sidebar/SidebarSimpleDeleteDialog';
 import SidebarSimpleStopDialog from '@/modules/sidebar/SidebarSimpleStopDialog';
 
 // File-local: this shape is read only here (the frontend standard's single-file rule for a
@@ -62,8 +63,16 @@ export default function SidebarSimpleList({
     onSessionRemoved(sessionId);
   }, [removeLocal, onSessionRemoved]);
 
-  const { pendingStop, failedSessionId, remove, confirmStop, cancelStop } =
-    useSimpleChatRemove({ onArchived: handleArchived });
+  const {
+    pendingStop,
+    pendingDelete,
+    failedSessionId,
+    remove,
+    confirmStop,
+    cancelStop,
+    confirmDelete,
+    cancelDelete,
+  } = useSimpleChatRemove({ onArchived: handleArchived });
 
   // The dropdown's options, sorted by the label a person reads — same order the row's own
   // project label uses.
@@ -176,7 +185,8 @@ export default function SidebarSimpleList({
               isRunning={busySessionIds.has(row.sessionId)}
               isRemoveFailed={failedSessionId === row.sessionId}
               onSelect={() => handleRowSelect(row)}
-              onRemove={() => remove(row)}
+              onArchive={() => remove(row, 'archive')}
+              onDelete={() => remove(row, 'delete')}
               onRename={(title) => void handleRename(row.sessionId, title)}
               t={t}
             />
@@ -199,6 +209,16 @@ export default function SidebarSimpleList({
         open={pendingStop !== null}
         onConfirm={confirmStop}
         onCancel={cancelStop}
+        t={t}
+      />
+
+      <SidebarSimpleDeleteDialog
+        open={pendingDelete !== null}
+        // Read at open time from the same busy model the hook acts on, so the sentence the
+        // dialog shows and the path it takes on confirm can never disagree.
+        isRunning={pendingDelete !== null && busySessionIds.has(pendingDelete.sessionId)}
+        onConfirm={confirmDelete}
+        onCancel={cancelDelete}
         t={t}
       />
     </div>

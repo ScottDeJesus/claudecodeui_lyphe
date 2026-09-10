@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Edit2, Loader2, MoreHorizontal, Trash2 } from 'lucide-react';
+import { Edit2, EyeOff, Loader2, MoreHorizontal, Trash2 } from 'lucide-react';
 import type { TFunction } from 'i18next';
 
 import { ActionMenu, Tooltip } from '@/shared/ui';
@@ -14,19 +14,21 @@ type SidebarSimpleListRowProps = {
   isRunning: boolean;
   isRemoveFailed: boolean;
   onSelect: () => void;
-  onRemove: () => void;
+  onArchive: () => void;
+  onDelete: () => void;
   onRename: (title: string) => void;
   t: TFunction;
 };
 
-/** One row of SidebarSimpleList: title, project, a running spinner, and Rename/Remove behind one ActionMenu. */
+/** One row of SidebarSimpleList: title, project, a running spinner, and Rename/Archive/Delete behind one ActionMenu. */
 export default function SidebarSimpleListRow({
   row,
   isSelected,
   isRunning,
   isRemoveFailed,
   onSelect,
-  onRemove,
+  onArchive,
+  onDelete,
   onRename,
   t,
 }: SidebarSimpleListRowProps) {
@@ -132,13 +134,22 @@ export default function SidebarSimpleListRow({
                 icon: Edit2,
                 onSelect: startRename,
               },
+              // Two entries where there was one "Remove", because they are two different
+              // outcomes: archive keeps the transcript and can be undone from the archive
+              // list, delete takes it off disk. Only the second is painted as danger.
               {
-                key: 'simple-chat-remove',
-                label: t('simpleList.remove'),
+                key: 'simple-chat-archive',
+                label: t('simpleList.archive', { defaultValue: 'Archive' }),
+                icon: EyeOff,
+                showDividerBefore: true,
+                onSelect: onArchive,
+              },
+              {
+                key: 'simple-chat-delete',
+                label: t('simpleList.delete', { defaultValue: 'Delete permanently' }),
                 icon: Trash2,
                 isDanger: true,
-                showDividerBefore: true,
-                onSelect: onRemove,
+                onSelect: onDelete,
               },
             ]}
           />
