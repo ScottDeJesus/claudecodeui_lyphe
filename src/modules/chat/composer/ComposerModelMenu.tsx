@@ -2,7 +2,7 @@ import { memo, useCallback, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 
-import type { ProviderModelOption } from '@/shared/types';
+import type { PermissionMode, ProviderModelOption } from '@/shared/types';
 import { DEFAULT_EFFORT_VALUE } from '@/shared/constants';
 import { Chip } from '@/shared/ui';
 import { resolveModelLabel } from '@/modules/chat/utils/modelLabels';
@@ -26,6 +26,14 @@ type ComposerModelMenuProps = {
   modelOptions: ProviderModelOption[];
   onSelectModel: (model: string) => void;
   modelsLoading: boolean;
+  /**
+   * The edit-mode choice, folded in — passed ONLY where the composer row cannot hold a second
+   * chip. Absent, this menu is the model menu it has always been and the permission chip
+   * stands beside it.
+   */
+  permissionMode?: PermissionMode;
+  permissionModes?: PermissionMode[];
+  onSelectPermissionMode?: (mode: PermissionMode) => void;
 };
 
 /**
@@ -37,6 +45,11 @@ type ComposerModelMenuProps = {
  * reach second. The model list used to sit collapsed BELOW the efforts, which put the deciding
  * choice one click away and underneath the choice that depends on it. Below `sm` the columns
  * stack in the same order, model first.
+ *
+ * Below `sm` it also absorbs the edit-mode choice, which is its own chip at every wider width.
+ * Measured at 390px the two chips plus their gap took ~198px of a row that also has to hold
+ * the scheduler, the send button and four icon buttons — one pill saying both is the only way
+ * both fit. Nothing merges on desktop: two decisions get two chips wherever there is room.
  */
 function ComposerModelMenu({
   effort,
@@ -46,6 +59,9 @@ function ComposerModelMenu({
   modelOptions,
   onSelectModel,
   modelsLoading,
+  permissionMode,
+  permissionModes,
+  onSelectPermissionMode,
 }: ComposerModelMenuProps) {
   const { t } = useTranslation('chat');
   const [isOpen, setIsOpen] = useState(false);
@@ -78,14 +94,21 @@ function ComposerModelMenu({
 
   const hasEffortSection = resolvedEffortOptions.length > 0;
   const hasModelSection = modelOptions.length > 0 || modelsLoading;
-  if (!hasEffortSection && !hasModelSection) {
+  const hasPermissionSection = Boolean(
+    permissionMode && permissionModes && permissionModes.length > 0 && onSelectPermissionMode,
+  );
+  if (!hasEffortSection && !hasModelSection && !hasPermissionSection) {
     return null;
   }
 
+  const permissionHeading = t('composer.editMode.heading', { defaultValue: 'How edits happen' });
+  const permissionLabel = (mode: PermissionMode) => t(`composer.editMode.labels.${mode}`, { defaultValue: mode });
+  const permissionHelp = (mode: PermissionMode) => t(`composer.editMode.help.${mode}`, { defaultValue: '' }) || undefined;
+
   const triggerLabel = hasModelSection ? chipModelLabel : effortLabel;
-  const ariaLabel = t('composer.modelMenu', {
-    defaultValue: 'Select model and reasoning effort',
-  });
+  const ariaLabel = hasPermissionSection
+    ? t('composer.setupMenu', { defaultValue: 'Select model, reasoning effort and how edits happen' })
+    : t('composer.modelMenu', { defaultValue: 'Select model and reasoning effort' });
 
   return (
     <>
@@ -110,6 +133,12 @@ function ComposerModelMenu({
           <span className="max-w-20 truncate sm:max-w-56">{triggerLabel}</span>
           {hasModelSection && hasEffortSection && effort !== DEFAULT_EFFORT_VALUE && (
             <span className="hidden shrink-0 capitalize sm:inline">· {effortLabel}</span>
+          )}
+          {/* The folded-in edit mode keeps its own weight inside the shared pill: as its own
+              chip it is the FILLED one, because it is a standing decision about what the next
+              turn may do to the files, and merging must not quietly demote it. */}
+          {hasPermissionSection && permissionMode && (
+            <span className="max-w-28 truncate text-accent-ink">· {permissionLabel(permissionMode)}</span>
           )}
         </Chip>
       </button>
@@ -175,6 +204,31 @@ function ComposerModelMenu({
                         setIsOpen(false);
                       }}
                       className="capitalize"
+                    />
+                  ))}
+                </div>
+              </>
+            )}
+
+            {hasPermissionSection && permissionMode && permissionModes && onSelectPermissionMode && (
+              <>
+                {/* Only ever reached below `sm`, where the row above is already stacked — so
+                    this rule is always the horizontal one. */}
+                {(hasModelSection || hasEffortSection) && (
+                  <div className="my-1 h-px shrink-0 bg-border" aria-hidden />
+                )}
+                <div role="group" aria-label={permissionHeading} className="min-w-0">
+                  <ComposerMenuHeading>{permissionHeading}</ComposerMenuHeading>
+                  {permissionModes.map((mode) => (
+                    <ComposerMenuItem
+                      key={mode}
+                      label={permissionLabel(mode)}
+                      description={permissionHelp(mode)}
+                      isSelected={mode === permissionMode}
+                      onSelect={() => {
+                        onSelectPermissionMode(mode);
+                        setIsOpen(false);
+                      }}
                     />
                   ))}
                 </div>

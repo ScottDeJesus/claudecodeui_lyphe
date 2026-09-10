@@ -148,6 +148,7 @@
     "effortDefault": "Default",
     "loadingModels": "Loading models…",
     "modelMenu": "Select model and reasoning effort",
+    "setupMenu": "Select model, reasoning effort and how edits happen",
     "permissionHeading": "How should {{provider}} actions be approved?",
     "editing": {
       "title": "Replacing an earlier message",
@@ -264,6 +265,7 @@
     "elapsed": {
       "seconds": "{{count}}s",
       "minutesSeconds": "{{minutes}}m {{seconds}}s",
+      "hoursMinutes": "{{hours}}h {{minutes}}m",
       "label": "{{time}} elapsed",
       "startingNow": "Starting now"
     },

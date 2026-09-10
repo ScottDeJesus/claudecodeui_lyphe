@@ -12,6 +12,7 @@ import type {
 } from 'react';
 import { PaperclipIcon, PencilRulerIcon, XIcon, Loader2, ArrowUpIcon, PencilIcon } from 'lucide-react';
 
+import { useDeviceSettings } from '@/shared/hooks/useDeviceSettings';
 import { useVoiceInput } from '@/modules/chat/hooks/useVoiceInput';
 import { useVoiceAvailable } from '@/modules/chat/hooks/useVoiceAvailable';
 import type { QueuedDraft, ScheduledMessage, SlashCommand,SessionActivity,PendingPermissionRequest,PermissionMode,ProviderModelOption } from '@/shared/types';
@@ -182,6 +183,10 @@ export default function ChatComposer({
   isTextareaExpanded,
 }: ChatComposerProps) {
   const { t } = useTranslation('chat');
+  // 640px is Tailwind's `sm`, which is the breakpoint every other rule in this footer reads.
+  // Below it the model menu carries the edit mode and the permission chip is not rendered at
+  // all — a CSS-hidden second chip would still mount a second popover for the same choice.
+  const { isMobile: isNarrowComposer } = useDeviceSettings({ mobileBreakpoint: 640, trackPWA: false });
   const fileDropdownRef = useRef<HTMLDivElement | null>(null);
   const selectedFileRef = useRef<HTMLDivElement | null>(null);
   const commandMenuPosition = useMemo(() => {
@@ -468,6 +473,9 @@ export default function ChatComposer({
               onSchedule={onScheduleMessage}
             />
 
+            {/* One pill or two, never both: below `sm` the model menu carries the edit mode as
+                a third section, so rendering the permission chip as well would put the same
+                choice on screen twice. */}
             <ComposerModelMenu
               effort={effort}
               effortOptions={availableEffortOptions}
@@ -476,13 +484,18 @@ export default function ChatComposer({
               modelOptions={availableModelOptions}
               onSelectModel={onSelectModel}
               modelsLoading={modelsLoading}
+              permissionMode={isNarrowComposer ? permissionMode : undefined}
+              permissionModes={isNarrowComposer ? availablePermissionModes : undefined}
+              onSelectPermissionMode={isNarrowComposer ? onSelectPermissionMode : undefined}
             />
 
-            <ComposerPermissionMenu
-              permissionMode={permissionMode}
-              permissionModes={availablePermissionModes}
-              onSelectPermissionMode={onSelectPermissionMode}
-            />
+            {!isNarrowComposer && (
+              <ComposerPermissionMenu
+                permissionMode={permissionMode}
+                permissionModes={availablePermissionModes}
+                onSelectPermissionMode={onSelectPermissionMode}
+              />
+            )}
 
             <PromptInputSubmit
               onClick={
