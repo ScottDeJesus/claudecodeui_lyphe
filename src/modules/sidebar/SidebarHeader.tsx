@@ -223,8 +223,11 @@ export default function SidebarHeader({
         )}
       </div>
 
-      {/* Desktop divider */}
-      <div className="nav-divider hidden md:block" />
+      {/* Desktop divider — the line that closes the header off from the list below it.
+          Not drawn in simple mode: it exists to sit under the search field and its chips, and
+          with those gone it collapses to 8px under the tab strip (measured; 138px with them),
+          where it reads as a second rule under the tabs rather than the end of a header. */}
+      {!simpleMode && <div className="nav-divider hidden md:block" />}
 
       {/* Mobile header */}
       <div
