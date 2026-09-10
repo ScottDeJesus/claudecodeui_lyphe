@@ -433,6 +433,13 @@ function extractClaudeSearchableMessage(entry: AnyRecord): ClaudeSearchableMessa
     return null;
   }
 
+  // A user row the harness wrote (a skill body, hook feedback): never something
+  // the user typed, so it must not surface as a user hit. Compact summaries are
+  // meta too but are re-labelled as assistant text below, so they pass through.
+  if (rawRole === 'user' && entry.isMeta === true && entry.isCompactSummary !== true) {
+    return null;
+  }
+
   if (typeof entry.message.content === 'string') {
     const content = String(entry.message.content);
 

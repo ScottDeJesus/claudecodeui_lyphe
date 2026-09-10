@@ -60,14 +60,29 @@ type ClaudeHistoryMessagesResult =
     limit?: number | null;
   };
 
+/**
+ * How long a transcript that never reached its closing reply is still believed to be a live
+ * run. The pair of `RUNNING_BELIEVED_FOR_MS` in the client's `PinnedSubagents.tsx`: an agent
+ * whose finish notification was compacted out of the parent transcript would otherwise read
+ * as running forever, on every load. Well past any real run; short of a day.
+ */
+const IN_FLIGHT_BELIEVED_FOR_MS = 4 * 60 * 60 * 1000;
+
 type ClaudeSubagentTranscript = {
   activity: SubagentActivity[];
   model?: string;
   /**
-   * True when the transcript's last tool call never received a result, which
-   * is the only evidence in the file that the agent stopped mid-flight.
+   * True while the transcript has not reached its closing reply. The evidence is the last
+   * ASSISTANT record's `stop_reason`: a finished agent ends on `end_turn` (its report — measured
+   * on three real transcripts, 2026-09-10), while a running one ends on a `tool_use` still
+   * awaiting its result, a user `tool_result` the model has not answered yet, or a streamed
+   * thinking/text record with no stop reason at all. The earlier test — "the last tool call has
+   * no result" — was true only for the instants an agent spent INSIDE a tool call; between
+   * tools every live agent read as finished, was never pinned on a reload, and was stamped with
+   * a finish time it had not reached. Bounded by `IN_FLIGHT_BELIEVED_FOR_MS` on the file's
+   * last write.
    */
-  endedMidToolCall: boolean;
+  inFlight: boolean;
 };
 
 /**
@@ -79,8 +94,10 @@ type ClaudeSubagentTranscript = {
  */
 async function readClaudeSubagentTranscript(filePath: string): Promise<ClaudeSubagentTranscript> {
   const activity: SubagentActivity[] = [];
-  const transcript: ClaudeSubagentTranscript = { activity, endedMidToolCall: false };
+  const transcript: ClaudeSubagentTranscript = { activity, inFlight: false };
   const toolsById = new Map<string, SubagentActivity>();
+  // The stop reason of the last assistant record seen — `undefined` until one carries it.
+  let lastStopReason: string | null | undefined;
 
   try {
     const fileStream = fs.createReadStream(filePath);
@@ -102,6 +119,7 @@ async function readClaudeSubagentTranscript(filePath: string): Promise<ClaudeSub
           if (typeof entry.message.model === 'string') {
             transcript.model = entry.message.model;
           }
+          lastStopReason = typeof entry.message.stop_reason === 'string' ? entry.message.stop_reason : null;
 
           for (const part of entry.message.content as AnyRecord[]) {
             if (part.type === 'tool_use') {
@@ -160,8 +178,14 @@ async function readClaudeSubagentTranscript(filePath: string): Promise<ClaudeSub
     console.warn(`Error parsing agent file ${filePath}:`, message);
   }
 
-  const lastActivity = activity[activity.length - 1];
-  transcript.endedMidToolCall = lastActivity?.kind === 'tool' && !lastActivity.toolResult;
+  const reachedClosingReply = lastStopReason === 'end_turn' || lastStopReason === 'stop_sequence' || lastStopReason === 'max_tokens';
+  let lastWriteAgeMs = 0;
+  try {
+    lastWriteAgeMs = Date.now() - (await fsp.stat(filePath)).mtimeMs;
+  } catch {
+    // An unreadable stat leaves the age at zero: the transcript is believed until it is not.
+  }
+  transcript.inFlight = !reachedClosingReply && lastWriteAgeMs < IN_FLIGHT_BELIEVED_FOR_MS;
 
   return transcript;
 }
@@ -439,7 +463,7 @@ async function getSessionMessages(
     const subagentsById = new Map<string, {
       activity: SubagentActivity[];
       info: SubagentInfo;
-      endedMidToolCall: boolean;
+      inFlight: boolean;
     }>();
     for (const agentId of agentIds) {
       const located = await findClaudeSubagentTranscript(projectDir, providerSessionId, agentId);
@@ -453,7 +477,7 @@ async function getSessionMessages(
       ]);
 
       subagentsById.set(agentId, {
-        endedMidToolCall: transcript.endedMidToolCall,
+        inFlight: transcript.inFlight,
         activity: transcript.activity
           .slice(0, MAX_TRANSMITTED_SUBAGENT_ACTIVITIES)
           .map(truncateSubagentActivity),
@@ -489,10 +513,11 @@ async function getSessionMessages(
       // An async agent's launch row never tells you it finished — only the
       // later notification does. When that notification is missing (a live run,
       // or one compacted out of the transcript), the agent's own transcript is
-      // the evidence: a timeline that does not stop mid-tool-call is done.
+      // the evidence: one that has not reached its closing reply is still going
+      // (`inFlight`, bounded by the file's last write).
       const isAwaitingAsyncAgent = message.toolUseResult?.isAsync === true
         && !notification
-        && (!subagent || subagent.endedMidToolCall);
+        && (!subagent || subagent.inFlight);
 
       if (subagent) {
         if (subagent.activity.length > 0) {
@@ -561,19 +586,28 @@ async function getSessionMessages(
  *   (`<local-command-stdout>...`) should be remapped into normal chat messages
  *   instead of being discarded as internal content
  *
- * Skill bodies belong in the first group. When a skill is invoked, Claude
- * injects the entire SKILL.md as a synthetic user turn. Persisted transcripts
- * tag it `isMeta: true`, but the live SDK stream does not, so without a
- * content-level check the same payload renders as a huge user bubble during the
- * run and then vanishes on reload. The skill is already represented by the
- * `Skill` tool call, so it is never user-visible content.
+ * Skill bodies are a third case, gated by a row flag rather than by content.
+ * When a skill is invoked, Claude injects the entire SKILL.md as a synthetic
+ * user turn. The persisted transcript tags that row `isMeta: true`; the live
+ * SDK stream tags the same row `isSynthetic: true` instead. Both flags are
+ * honoured in `isInjectedUserRow`, so the payload is hidden during the run and
+ * on reload alike. The skill is already represented by the `Skill` tool call,
+ * so it is never user-visible content.
  */
 const INTERNAL_CONTENT_PREFIXES = [
   '<system-reminder>',
   'Caveat:',
   '[Request interrupted',
-  'Base directory for this skill:',
 ] as const;
+
+/**
+ * A user row the harness wrote rather than the user: hook feedback, a skill
+ * body, a compact summary. `isMeta` is the persisted-transcript spelling and
+ * `isSynthetic` is the live-stream spelling of the same fact.
+ */
+function isInjectedUserRow(raw: AnyRecord): boolean {
+  return raw.isMeta === true || raw.isSynthetic === true;
+}
 
 function isInternalContent(content: string): boolean {
   return INTERNAL_CONTENT_PREFIXES.some((prefix) => content.startsWith(prefix));
@@ -691,7 +725,7 @@ export class ClaudeSessionsProvider implements IProviderSessions {
     const ts = raw.timestamp || new Date().toISOString();
     const baseId = raw.uuid || generateMessageId('claude');
 
-    if (raw.message?.role === 'user' && raw.message?.content && raw.isMeta !== true) {
+    if (raw.message?.role === 'user' && raw.message?.content && !isInjectedUserRow(raw)) {
       if (Array.isArray(raw.message.content)) {
         // Image attachments sent through the SDK are persisted as base64
         // `image` blocks next to the prompt text. Collect them so the UI can
