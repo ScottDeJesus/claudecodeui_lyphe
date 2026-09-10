@@ -132,22 +132,19 @@ function ComposerModelMenu({
         aria-label={ariaLabel}
         title={ariaLabel}
       >
-        <Chip size="sm">
+        {/* The folded-in edit mode is the pill's own RING rather than anything inside it.
+            "Never ask" and "Ask before every edit" are the widest labels in the app and both
+            truncated to an ambiguous stem on a phone; the outline says the same thing in no
+            width at all, and the menu below carries the tone as a swatch beside each mode, so
+            one tap is the legend. */}
+        <Chip
+          size="sm"
+          tone={hasPermissionSection && permissionMode ? permissionMark(permissionMode).tone : undefined}
+          selected={Boolean(hasPermissionSection && permissionMode && permissionMark(permissionMode).writesUnasked)}
+        >
           <span className="max-w-20 truncate sm:max-w-56">{triggerLabel}</span>
           {hasModelSection && hasEffortSection && effort !== DEFAULT_EFFORT_VALUE && (
             <span className="hidden shrink-0 capitalize sm:inline">· {effortLabel}</span>
-          )}
-          {/* The folded-in edit mode as a MARK rather than its words. "Never ask" and "Ask
-              before every edit" are the widest labels in the app and both truncated to an
-              ambiguous stem on a phone; the dot says the same thing in 9px, and the menu
-              below carries the identical mark beside each mode, so one tap is the legend. */}
-          {hasPermissionSection && permissionMode && (
-            <span
-              className="vv-chip__tone"
-              data-tone={permissionMark(permissionMode).tone}
-              data-filled={permissionMark(permissionMode).writesUnasked}
-              aria-hidden="true"
-            />
           )}
         </Chip>
       </button>
@@ -235,7 +232,7 @@ function ComposerModelMenu({
                       description={permissionHelp(mode)}
                       icon={(
                         <span
-                          className="vv-chip__tone"
+                          className="vv-tone-dot"
                           data-tone={permissionMark(mode).tone}
                           data-filled={permissionMark(mode).writesUnasked}
                         />

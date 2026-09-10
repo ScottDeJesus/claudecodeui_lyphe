@@ -9,10 +9,12 @@ import type { PermissionMode, Tone } from '@/shared/types';
  * (files change while you watch) and two adjacent ambers would only pretend to be a
  * distinction. Which of the two is running is what the menu is for.
  *
- * `writesUnasked` is the second channel. Doctrine §6: colour is never the whole signal, so the
- * mark is a RING for the modes that stop and ask and a FILLED dot for the modes that do not —
- * a difference that survives a greyscale screen and the two commonest colour deficiencies,
- * which is exactly the boundary a person needs to see at a glance.
+ * `writesUnasked` is the second channel. Doctrine §6: colour is never the whole signal, so on
+ * the composer's pill the tone is an outline alone for the modes that stop and ask, and the
+ * tone's soft FILL arrives for the modes that do not — a difference that survives a greyscale
+ * screen and the two commonest colour deficiencies, which is exactly the boundary a person
+ * needs to see at a glance. In the menu, where each row has room for its words, the same two
+ * channels are a ring and a filled swatch.
  */
 export type PermissionMark = {
   tone: Tone;

@@ -162,18 +162,31 @@
 /* Not colour alone: the outline goes and a fill arrives, so the states differ in greyscale. */
 .vv-chip[data-selected='true'] { background: var(--accent-soft); color: var(--accent-ink); border-color: transparent; }
 .vv-chip--sm { padding: 5px 12px; font-size: 12.5px; }
-/* The tone mark a chip can carry instead of spelling its state out — the composer's edit-mode
- * pill uses it, where the words cost more of the row than a phone has to give. Colour comes
- * from the tone block (§5, a token swap and never a rule of its own); the FILL is the second
- * channel §6 asks for, so "something can change my files without asking" is legible with no
- * colour at all.
+/* A chip whose RING carries a tone — the composer's edit-mode pill, where the words cost more
+ * of the row than a phone has to give. Colour comes from the tone block (§5, a token swap and
+ * never a rule of its own), and `--tone-ink` rather than `--tone-dot` because this has to be
+ * read: measured, `--danger-dot` is 2.88:1 on the dark surface, under the 3:1 floor for
+ * non-text, on the ring for the one mode that never asks. The inks are 5.1-9.4:1 in both
+ * themes and Verve declares them in both blocks, so nothing here invents a colour the design
+ * did not (see tokens.css's header note on why dark gets no lighter `--danger`).
  *
- * `--tone-ink`, not `--tone-dot`: this mark has to be READ, and the dark palette declares no
- * lighter danger dot — measured, `--danger-dot` is 2.88:1 on the dark surface, under the 3:1
- * floor for non-text, on the mark for the one mode that never asks. The inks are 5.1-9.4:1 in
- * both themes. Verve declares them in both blocks, so nothing here invents a colour the design
- * did not (see the header note in tokens.css on why dark gets no lighter `--danger`). */
-.vv-chip__tone {
+ * The text stays its own ink. On the merged pill the words are the MODEL's name, and tinting
+ * "Opus 5" red would have the colour claim something about the model.
+ *
+ * `data-selected` is the second channel §6 asks for: the soft fill arrives for the modes that
+ * write without asking, so the boundary that matters survives a greyscale screen — the same
+ * outline-goes-fill-arrives move the accent-selected chip above already makes. */
+.vv-chip--toned { border-color: var(--tone-ink); }
+.vv-chip--toned:hover { border-color: var(--tone-ink); }
+.vv-chip--toned[data-selected='true'] {
+  border-color: var(--tone-ink);
+  background: var(--tone-soft);
+  color: var(--ink-mid);
+}
+
+/* The same tone as a swatch, for a menu row that has room for the words beside it. The rows of
+ * "How edits happen" wear it, which is what makes that menu the legend for the ring above. */
+.vv-tone-dot {
   width: 9px;
   height: 9px;
   flex: none;
@@ -181,7 +194,7 @@
   border-radius: 50%;
   background: none;
 }
-.vv-chip__tone[data-filled='true'] { background: var(--tone-ink); }
+.vv-tone-dot[data-filled='true'] { background: var(--tone-ink); }
 
 /* ---------------------------------------------------------------- Stepper */
 /* One control, not three: the group carries the border and the two buttons sit inside it, so a

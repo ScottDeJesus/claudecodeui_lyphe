@@ -23,11 +23,12 @@ type ComposerPermissionMenuProps = {
  * Rendered by chat's ChatComposer as the popover for choosing how edits happen
  * — the one setting that decides whether a file changes without being asked.
  *
- * The chip says the mode in words AND carries its tone mark — the same mark the pill wears
- * alone below `sm`, where the words do not fit. Words first: the mark is a second channel, and
- * this width has room for both, which is also what makes this chip the legend for the narrow
- * one. An unknown mode (a provider the capability matrix grew past this build) falls back to
- * its own id, which is ugly on purpose: it is a missing translation, not a working label.
+ * The chip says the mode in words AND wears its tone as an outline — the same ring the merged
+ * pill wears alone below `sm`, where the words do not fit. Words first: the ring is a second
+ * channel, and this width has room for both, which is also what makes this chip the legend for
+ * the narrow one. An unknown mode (a provider the capability matrix grew past this build)
+ * falls back to its own id, which is ugly on purpose: it is a missing translation, not a
+ * working label.
  */
 function ComposerPermissionMenu({
   permissionMode,
@@ -66,16 +67,10 @@ function ComposerPermissionMenu({
         aria-label={heading}
         title={heading}
       >
-        {/* Selected, always: unlike the model chip this one is a standing
-            decision about what the next turn may do to the files, so Verve
-            gives it the filled treatment rather than the outline. */}
-        <Chip size="sm" selected>
-          <span
-            className="vv-chip__tone"
-            data-tone={permissionMark(permissionMode).tone}
-            data-filled={permissionMark(permissionMode).writesUnasked}
-            aria-hidden="true"
-          />
+        {/* The ring carries the mode's tone and the fill arrives for the modes that write
+            without asking — the same two channels the narrow pill wears, which is what lets
+            this chip, with its words still on it, be the legend for that one. */}
+        <Chip size="sm" tone={permissionMark(permissionMode).tone} selected={permissionMark(permissionMode).writesUnasked}>
           <span className="max-w-28 truncate sm:max-w-none">{modeLabel(permissionMode)}</span>
         </Chip>
       </button>
@@ -90,7 +85,7 @@ function ComposerPermissionMenu({
               description={modeHelp(mode)}
               icon={(
                 <span
-                  className="vv-chip__tone"
+                  className="vv-tone-dot"
                   data-tone={permissionMark(mode).tone}
                   data-filled={permissionMark(mode).writesUnasked}
                 />
