@@ -2,7 +2,7 @@ import { memo, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { GitBranchIcon, PencilIcon } from 'lucide-react';
 
-import { LLMProviderLogo } from '@/shared/ui';
+import { Card, LLMProviderLogo } from '@/shared/ui';
 import { cn } from '@/shared/utils';
 
 import type { ChatMessage, ClaudePermissionSuggestion, PermissionGrantResult, LLMProvider,DiffLine,Project } from '@/shared/types';
@@ -149,6 +149,30 @@ const MessageComponent = memo(({ message, prevMessage, isRunTerminal, createDiff
     return null;
   }
 
+  const isReplyCard = !message.isSubagentContainer && !message.isToolUse && !message.isThinking;
+  // Copy, speak and the landing time close the turn: inside the card for a reply,
+  // under the row for a tool call.
+  const replyFooter = (shouldShowAssistantCopyControl || shouldShowResponseTime) && (
+    <div className="mt-1 flex w-full items-center gap-2 text-[11px] text-ink-faint">
+      {shouldShowAssistantCopyControl && (
+        <MessageCopyControl content={assistantCopyContent} messageType="assistant" />
+      )}
+      {shouldShowAssistantCopyControl && (
+        <MessageSpeakControl content={assistantCopyContent} />
+      )}
+      {shouldShowResponseTime && (
+        <time
+          dateTime={messageTime.date.toISOString()}
+          title={messageTime.date.toLocaleString(i18n.language)}
+          aria-label={t('responseTime.repliedAt', { time: formattedTime })}
+          className="ml-auto tabular-nums"
+        >
+          {formattedTime}
+        </time>
+      )}
+    </div>
+  );
+
   return (
     <div
       ref={messageRef}
@@ -169,7 +193,7 @@ const MessageComponent = memo(({ message, prevMessage, isRunTerminal, createDiff
               <ChatMessageFiles files={message.files} />
             )}
             {userCopyContent.trim().length > 0 || (!message.images?.length && !message.files?.length) ? (
-              <div className="group max-w-full bg-secondary px-4 py-3 text-foreground" style={{ borderRadius: 'var(--radius-card)' }}>
+              <div className="group max-w-full bg-secondary px-4 py-3 text-foreground" style={{ borderRadius: 'var(--radius-card)', borderTopRightRadius: 'var(--radius-tail)' }}>
                 <div className="mb-1.5 text-xs uppercase tracking-[0.14em] text-ink-faint">
                   {messageTime.isValid ? `${t('messageTypes.you', { defaultValue: 'You' })} · ${formattedTime}` : t('messageTypes.you', { defaultValue: 'You' })}
                 </div>
@@ -351,7 +375,16 @@ const MessageComponent = memo(({ message, prevMessage, isRunTerminal, createDiff
                 </ReasoningContent>
               </Reasoning>
             ) : (
-              <div dir="auto" className="text-[15px] leading-relaxed text-foreground">
+              /* A reply is a message, so it sits in a card like the operator's own
+                 turn: white where theirs is grey, and squared at the top-left corner
+                 that points up at the speaker's mark, as theirs is at the top-right.
+                 It fits its text — a one-line answer is a short bubble, not a banner. */
+              <Card
+                data-reply-card
+                dir="auto"
+                className="w-fit max-w-full px-4 py-3 text-[15px] leading-relaxed text-foreground"
+                style={{ borderTopLeftRadius: 'var(--radius-tail)' }}
+              >
                 {/* Reasoning accordion */}
                 {showThinking && message.reasoning && (
                   <Reasoning className="mb-3" defaultOpen={false}>
@@ -412,7 +445,8 @@ const MessageComponent = memo(({ message, prevMessage, isRunTerminal, createDiff
                     </div>
                   );
                 })()}
-              </div>
+                {replyFooter}
+              </Card>
             )}
 
             {/* Outside the branches on purpose: a provider can cite memory on a
@@ -421,26 +455,7 @@ const MessageComponent = memo(({ message, prevMessage, isRunTerminal, createDiff
               <MemoryCitations citations={message.memoryCitations} />
             )}
 
-            {(shouldShowAssistantCopyControl || shouldShowResponseTime) && (
-              <div className="mt-1 flex w-full items-center gap-2 text-[11px] text-ink-faint">
-                {shouldShowAssistantCopyControl && (
-                  <MessageCopyControl content={assistantCopyContent} messageType="assistant" />
-                )}
-                {shouldShowAssistantCopyControl && (
-                  <MessageSpeakControl content={assistantCopyContent} />
-                )}
-                {shouldShowResponseTime && (
-                  <time
-                    dateTime={messageTime.date.toISOString()}
-                    title={messageTime.date.toLocaleString(i18n.language)}
-                    aria-label={t('responseTime.repliedAt', { time: formattedTime })}
-                    className="ml-auto tabular-nums"
-                  >
-                    {formattedTime}
-                  </time>
-                )}
-              </div>
-            )}
+            {!isReplyCard && replyFooter}
           </div>
         </div>
       )}
