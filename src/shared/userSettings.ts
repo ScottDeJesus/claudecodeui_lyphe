@@ -31,6 +31,8 @@ export type UserPreferences = {
   themeFollowsSun: boolean;
   /** The transcript's reading size in px. See `useChatFontSize`. */
   chatFontSize: number;
+  /** The Runner tab's memory, a blob merged by its writers: `{ dismissedEndings: {run_id, ended_at}[] }`. See `modules/plan-runner/dismissedRuns.ts`. */
+  planRunner: unknown;
 };
 
 export type UserPreferenceKey = keyof UserPreferences;
@@ -74,6 +76,7 @@ const LEGACY_STORAGE_KEYS: Record<UserPreferenceKey, string | null> = {
   themeFollowsSun: null,
   simpleChatProjectId: null,
   chatFontSize: null,
+  planRunner: null,
 };
 
 const PREFERENCE_KEYS = Object.keys(LEGACY_STORAGE_KEYS) as UserPreferenceKey[];

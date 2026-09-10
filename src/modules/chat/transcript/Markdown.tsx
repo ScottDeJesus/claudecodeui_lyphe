@@ -107,7 +107,15 @@ const CodeBlock = ({ node: _node, className, children, forceBlock, ...props }: C
     return <MermaidDiagram code={raw} />;
   }
 
-  if (language === 'widget') {
+  // The widget opt-in is the WHOLE info-string word. `language` above is a `\w+` capture, which
+  // stops at a hyphen, so a `widget-config` fence sets it to `widget` — and an ordinary
+  // documentation label would mount a live scripted frame. That is tolerable for mermaid, where a
+  // mis-trigger draws a diagram; it is not tolerable here, where it runs script. `fenceToken` is
+  // the same capture without the hyphen boundary, so requiring the two to AGREE is requiring that
+  // nothing was cut off the end. `language` is left alone: it also feeds the block's label and
+  // the highlighter, where stopping at the hyphen is what makes ```js{1,3} still highlight as js.
+  const fenceToken = /language-(\S+)/.exec(className || '')?.[1] ?? '';
+  if (language === 'widget' && fenceToken === language) {
     return <WidgetFrame code={raw} streaming={streaming} />;
   }
 

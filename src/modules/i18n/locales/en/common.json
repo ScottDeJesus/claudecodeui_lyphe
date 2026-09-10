@@ -25,7 +25,8 @@
     "tasks": "Tasks",
     "browser": "Browser",
     "computer": "Computer",
-    "memory": "Memory"
+    "memory": "Memory",
+    "runner": "Runner"
   },
   "status": {
     "loading": "Loading...",
@@ -84,6 +85,49 @@
       "refused": "couldn't file that memory",
       "gone": "already reviewed elsewhere",
       "unreachable": "Descent is not reachable."
+    }
+  },
+  "runner": {
+    "title": "Runner",
+    "empty": "Nothing is running",
+    "phases": "Phases",
+    "pipeline": "Pipeline",
+    "phaseCount_one": "{{count}} phase",
+    "phaseCount": "{{count}} phases",
+    "spawns": "spawns {{used}}/{{max}}",
+    "more": "+{{count}} more in Runner",
+    "stop": "Stop",
+    "resume": "Resume",
+    "state": {
+      "live": "LIVE",
+      "paused": "PAUSED",
+      "stale": "STALE"
+    },
+    "phase": {
+      "shipped": "shipped",
+      "running": "running",
+      "blocked": "blocked",
+      "deferred": "deferred",
+      "pending": "pending"
+    },
+    "timeline": {
+      "empty": "Nothing logged for this phase yet."
+    },
+    "toast": {
+      "stopping": "stopping — the runner was asked to park this run",
+      "resumed": "resumed — the run is moving again"
+    },
+    "dismiss": "Dismiss",
+    "ended": "ended {{elapsed}} ago",
+    "outcome": {
+      "complete": "COMPLETE",
+      "halted": "HALTED",
+      "all-blocked": "ALL BLOCKED",
+      "budget": "BUDGET",
+      "flag-off": "FLAG OFF",
+      "dry-run": "DRY RUN",
+      "unknown": "ENDED",
+      "incomplete": "INCOMPLETE"
     }
   },
   "navigation": {

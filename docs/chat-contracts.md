@@ -58,3 +58,25 @@ timer is a DATA-LOSS bug: changing a setting and closing within half a second is
 to use that screen, and the write was lost while the control looked inert. The timer nulls its own
 ref when it fires — so a non-null ref means exactly "a change is still waiting" — and an
 unmount-only effect declared AFTER it flushes that write through `saveSettingsRef`.
+
+## 7. A widget fence is the opt-in, and only on this surface
+
+A turn knows it is running inside CloudCLI's chat, rather than a terminal, from two things
+`claude-runtime.provider.js` sets on `sdkOptions` inside `mapCliOptionsToSDK`, per turn: the SDK
+child's env carries `CLAUDE_SURFACE=cloudcli`, and its system prompt gains one appended sentence
+naming the fence and the bus. Both come from `surface-signal.ts` and nowhere else — never `.env`,
+never a systemd unit, never `process.env` read at module load. A terminal launch of `claude` reads
+neither, so their absence is what tells a turn it is not talking to CloudCLI's chat; the runner's
+own souls (Heph, Athena, Prometheus, …) run a different path entirely and never pass through this
+provider, so they never see the sentence either.
+
+The opt-in itself is narrow: a fenced code block whose info string is exactly `widget` renders as
+a live widget instead of highlighted source — the WHOLE word, so a hyphenated extension of it such
+as `widget-config` stays an ordinary documentation label and runs nothing. Nothing else opts in: a
+plain `html` fence, or any other language tag, stays a code block, because that fence does not
+exist anywhere `CLAUDE_SURFACE` is not `cloudcli`.
+
+What a widget is allowed to do is narrower still: its sandbox is `allow-scripts` and nothing else —
+no `allow-same-origin`, no network of any kind — and it reaches the rest of the app only by naming
+a TOPIC through `live.subscribe`, never a URL. The full shape of the fence, the sandbox and the bus
+it talks to is [architecture/07-live-widgets.md](architecture/07-live-widgets.md).

@@ -31,7 +31,9 @@ it.
    touches a raw frame. It does not branch on provider, does not navigate, and does not
    translate session ids — the backend has already done all three. A frame with no `kind`
    is dropped on the first line, which is what makes Task Master's `type`-keyed
-   broadcasts invisible to chat.
+   broadcasts invisible to chat. A `runner_state` frame is the other case: it HAS a kind,
+   so it is returned early by name, the same way `session_upserted` and `loading_progress`
+   are — a box-wide picture owned by a reader outside the transcript.
 2. **The default action is "append to the store".** Read the switch as a filter, not a
    dispatcher: gateway kinds and the two streaming kinds are handled specially, five
    kinds are control events that are deliberately *not* stored, and everything else —
@@ -316,7 +318,13 @@ Three surprises, all of them intended:
   realistic replies, once each.
 - **A block that crosses the boundary loses transient in-block state.** It changes parent,
   so its DOM is recreated: a code block's "Copied" tick and any text selection inside it
-  are gone. Do not park state in a streamed block.
+  are gone. Do not park state in a streamed block. The sharpest instance is a live
+  `widget` fence, where what is recreated is a whole sandboxed document rather than a
+  tick: a retraction over an already-live widget unmounts it, flashes its raw source back
+  into the transcript for a tick, and reloads it when the reply ends. That is measured,
+  not inferred, and nothing in the widget module can prevent it — the cure, if it is ever
+  wanted, is to keep a block in ONE slot across the boundary, which is this component's
+  shape to change. See [live widgets](./07-live-widgets.md) §"The fence".
 - **The same component renders finished replies**, with `isStreaming: false` and no split.
   That is deliberate. `MessageComponent` used to swap `<StreamingMarkdown>` for
   `<Markdown>` at that position, and React treats a different element type in the same

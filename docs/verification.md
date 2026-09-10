@@ -326,11 +326,11 @@ preference, moves no card and opens no browser. Its contract is at
 [descent-proxy.md](descent-proxy.md).
 
 Phase 20 is that lane's screen — the Memory tab — and it is back in Chromium. Eleven gates, in
-three movements: the tab is on the strip and carries the pending count as Verve's pill while its
-`aria-label` stays the bare word `Memory` (1-3), and it selects (4); the panel behind it draws one
+three movements: the tab is on the strip and carries the pending count while its `aria-label` stays
+the bare word `Memory` (1-3), and it selects (4); the panel behind it draws one
 row per waiting candidate, marks the global-blast one, reads a body whole on expand and offers both
 verbs (5-8); and the sticky rule, which is this phase's own decision, is driven both ways — the tab
-HELD on the strip and still selected at a count of zero, showing *All filed* with no pill (9), gone
+HELD on the strip and still selected at a count of zero, showing *All filed* with no count (9), gone
 on the first tab change (10), back the moment something waits again (11). Gate 6 depends on what the
 queue holds: with nothing targeting the global file it prints a `[NOTE]` and no gate. It reviews
 nothing, and the run's whole shape is built around that — filing a card writes into a file every
@@ -342,7 +342,7 @@ list injected the same way, since a probe that quietly passed on an empty queue 
 an absence; a `[NOTE]` says which of the two it read. The 390 px pass MEASURES the one new thing on
 the mobile strip rather than photographing it — choosing a tab closes the drawer, so the tab's
 bounding box is read while the drawer is still up, a tab pushed off the sideways-scrolling strip by
-its own pill being indistinguishable in the picture. Unlike its HTTP-only sibling this one is **not**
+its own count being indistinguishable in the picture. Unlike its HTTP-only sibling this one is **not**
 safe to run while the operator is in the app, for a reason that has nothing to do with memory: it
 opens two `openConsole` sessions and each ends in `ensureTheme`, so it leaves the dev account on
 whichever mode ran last — every browser probe's cost here, see *Hosted instance* below. What is true
@@ -350,6 +350,271 @@ of it narrowly is that it reviews no card, toggles no preference of its own, and
 queue exactly as it found it. Shots are `20-memory-light`, `20-memory-expanded-light`,
 `20-memory-empty-light`, `20-memory-390-light` and `20-memory-dark`. Its contract is at
 [memory-intake.md](memory-intake.md).
+
+Phase 21 is the surface signal, and it is the one phase in this whole plan that spends a Claude
+turn — once, on haiku, through the real composer a person uses. What `phase-21.mjs` proves is not
+that `surface-signal.ts` and its three-line wiring into `claude-runtime.provider.js` exist as
+source (the phase's own `check` commands already read that directly) but that they reach a LIVE
+child process and a LIVE system prompt: the SDK child's own environment carries
+`CLAUDE_SURFACE=cloudcli`, and the model, asked to name what its system prompt calls the surface
+and whether it describes a widget fence, answers `SURFACE=cloudcli` and `WIDGET=yes` in its own
+words. The env half is read out of `/proc/<pid>/environ` with a 50 ms `setInterval` sweep that
+starts BEFORE the prompt is sent, never after: the SDK spawns one child per turn and that child
+exits the moment the turn ends, so a scan begun once the reply is on screen has no window left to
+read — it would find nothing and prove nothing, where a scan running the whole time the turn is in
+flight catches it. The turn is spent once: the pid it saw, the moment it saw it, the reply text and
+the session it landed in are kept in `.verify/artifacts/21-surface.json`, and every later run reads
+that back — replaying both the env gate and the reply gate, the latter re-fetched from the
+session's own persisted row on disk — rather than asking the model the same question twice.
+
+Phase 22 is the widget fence, and it is the gallery technique again for the oldest reason: nothing in
+the app mounts a widget, because the fence only exists when a model writes one. So it mounts
+`MarkdownBody` from the running dev server over the signed-in page and feeds it fences built in the
+probe as strings — both module specifiers read back out of served source rather than typed, the `?t=`
+rule, with `ThemeContext` taken from what `useWidgetHost` itself imports so the gallery's own
+`ThemeProvider` and the component reading it are the same instance. Fourteen gates, in order: a `widget`
+fence yields exactly one iframe whose `sandbox` attribute is the string `allow-scripts`, with a
+`srcdoc` and no `src` (1); inside that frame the origin reads `null` and both the parent document and
+`localStorage` throw `SecurityError`, which is the invariant the whole feature rests on and the reason
+`allow-same-origin` is never negotiable — the login JWT is in that storage (2); the frame wears the
+page's theme, carrying the `dark` class in the dark session and not in the light one, with `--canvas`
+resolving inside to exactly what it resolves to outside (3); the iframe follows the widget's height,
+which is *sampled* every 25ms across the widget's own 500ms growth rather than read at two chosen
+moments, so both the settled 160 and the grown 320 are observed instead of raced — and a second
+widget SHRINKS from 320 back to 160, because a host that applied the reported height as a
+`min-height` would satisfy every growth assertion ever written and still trap a shrinking widget at
+its high-water mark (4); a widget that
+reaches for the network is refused by the document's CSP and zero requests leave the browser, the
+call carrying a `widget-probe=22` marker so the app's own polling of that path can neither redden the
+gate nor quietly satisfy it (5); an unterminated fence in the pending half of a streaming reply
+mounts no frame and renders its raw source (6); a plain `html` fence stays a code block AND so does a
+`widget-config` one — the opt-in is the whole info-string word, since `\w+` stops at a hyphen and
+would otherwise let an ordinary documentation label mount a scripted frame — each half carrying a
+positive control, because "zero iframes" is also what a case that rendered nothing at all reports (7);
+a frame claiming a million pixels is clamped to
+exactly 2000 (8); `buildTranscriptExport` over a one-message transcript carrying a widget fence
+gives markdown holding the fence and HTML holding a `<pre>` with no `<iframe>` anywhere in it, which
+is what keeps a saved conversation a static file (9); a widget that NAVIGATES ITSELF AWAY is never
+spoken to again (9b) — `contentWindow` identity survives a navigation, so without the revoke rule a
+widget could subscribe, move the frame to a page it controls, and keep receiving whatever the host
+pushes; the gate reads the answer from inside the navigated document, which forges the `ready` a real
+widget sends and must hear silence, and it navigates to `about:blank` rather than to an app URL
+precisely so the gate adds no console noise of its own to gate 11; a widget whose FENCE BODY CHANGES
+is still talked to (9c), which is 9b's mirror and guards the same rule from the other side — the host
+tells a navigation from a rebuild by counting `load` events on the element, and an in-place `srcDoc`
+reassignment fires a second load exactly as a navigation does, so without the `key` on
+`WidgetFrameLive` an ordinary body change would revoke a healthy widget permanently and in silence.
+Its read is `live.theme` inside the new document, non-null only once the host has ANSWERED that
+document's `ready`; the gate's sentinel half passes either way, because an in-place swap is also a
+new document — which is exactly why the sentinel is not the assertion that counts. Both were
+falsified: removing the key turns `live.theme` from `set` to `null` while the sentinel stays green
+through it. And a theme flip on a MOUNTED widget arrives as
+a `{type:'theme'}` message rather than a fresh document, proved by leaving a sentinel on the frame's
+`window` and requiring it to survive the flip — a rebuilt `srcDoc` is a new window and the sentinel is
+simply not in it (10). Gate 10 exists because gate 3 cannot see this: gate 3 compares two documents
+built by two separate sessions, and both are correct whether the theme was posted or rebuilt. These
+gates were falsified before being trusted — making the height monotonic reddens the shrink
+assertion, and adding the theme to the `useMemo` key reddens the sentinel, while the flip's own
+"did the frame go dark" assertion stays green through both, which is exactly why it is not enough on
+its own.
+
+One gate was DELETED here rather than fixed, and the reason generalises. An earlier revision asserted
+that a live widget survives the streaming split boundary retracting back over it, and it passed — but
+it drove the retraction by flipping the `streaming` prop on one `MarkdownBody` in a stable position,
+which is not a transition `StreamingMarkdown` ever produces. The real component renders two fixed
+sibling slots and MOVES a block between them, so a fence crossing the boundary changes parent and
+React remounts it. Driving that against the real component leaves zero iframes and one `<pre>`: the
+widget genuinely restarts, and the gate had been reporting PASS for a property the system does not
+have. A probe that mounts a component in a shape its caller never uses can only test the shape it
+invented. Gate 11 holds the signed-in stage to zero
+console errors beyond two EXPECTED lines (see *What bites people*). The widget bodies deliberately
+paint with the tokens they were handed — five tone chips in their soft/ink pairs — so the shots are
+evidence of the theme crossing an opaque origin rather than pictures of grey rectangles; the dark
+shots open on the widget cases themselves rather than the whole gallery — the `huge` case's iframe
+is clamped to a full 2000px, so what sits below it depends on when the shutter falls, and the shots
+are read as evidence of the theme and the frames, never as a census of the cases. The gates are what
+count the cases. It sends no Claude turn and files no card; gate 10 writes the `theme`
+preference and puts the previous value straight back, which is the same preference `openConsole`
+already writes through the app's real Dark Mode switch, and no other preference is touched. Like
+every browser probe here it ends in `ensureTheme` twice and leaves the dev account on
+whichever mode ran last. Shots are `22-widget-light`, `22-widget-dark` and `22-widget-390-light`. Its
+contract is at [architecture/07-live-widgets.md](architecture/07-live-widgets.md).
+
+Phase 23 is the plan-runner lane, and it is back to fetch and a socket — no browser, because nothing
+in it is visual. It signs in the way `phase-7.mjs` does and holds the token for every read and every
+verb it issues — the polling gates re-read until they settle, so the count is not a fixed one — plus
+one `ws://…/ws?token=` connection held open across the middle gates, and REOPENED on its own if it
+closes before they are done with it. `tsx watch` restarts the API on any save under `server/` and the
+dev supervisor hands over on its own schedule, so a socket opened at the top of a probe that runs for
+half a minute is not guaranteed to still be open at the frame gate, where a closed one reads as `no
+frame in 5000 ms (socket 3)` and fails a lane that is working. The reopen re-arms the push it is
+waiting for, because the watcher broadcasts its whole picture to whoever is listening on its first
+tick after a restart; a `[NOTE]` gives the reopen count, and normally there is no such line.
+Its fixture, `.verify/lib/runner-fixture.mjs`, writes a
+fake run into the REAL state directory the server is already reading, and that is the point rather
+than a shortcut: a hermetic tree under `PLAN_RUNNER_STATE_DIR` would prove the classification and
+nothing about the lane that is running, since the server reads the root it was started with and
+nothing restarts it mid-probe. The fence that makes it safe is one prefix kept at both ends — every
+id begins `fixture-live-widgets-`, the library refuses to build or delete anything else, and the run
+is removed in a `finally`, so a failed gate still leaves the directory as it found it. Twelve gates,
+in order: the mount's own auth on a read and on a write; the live list, with every state one of the
+three and no fixture left over from an earlier run; a new run directory carried whole — five phases,
+its position, three timeline rows; the same run read back by id; a stage change arriving unasked on
+the open socket as a `runner_state` frame carrying its detail and its fourth timeline row; a parked
+run reading `paused` and not `stale`, which is the one place this lane deliberately disagrees with
+the terminal bar; a lapsed heartbeat reading `stale`; the runner's own refusal coming back as a 409
+with its own exit and its own sentence and no stack in the body; a malformed id refused at the route
+before anything is spawned; an unknown id answered in the runner's own words; a receipt taking the
+run off both the list and the by-id read; and nothing left behind. The operator's own runs are read
+by every gate and NEVER named in a request — the plan being executed while the probe runs is one of
+them, it shows up in the `[NOTE]` line that lists what the list carried, and a verb sent to it would
+stop the run that is running the probe. Its contract is at [plan-runner.md](plan-runner.md).
+
+Phase 24 is the live bus, and it is the first proof that reads the far end of the chain rather than
+any point along it. It is the gallery technique again — nothing in the app mounts a widget, so
+`MarkdownBody` is mounted from the running dev server into the signed-in page as a second React
+root — but the gallery here carries a provider stack, because a second root cannot see the app's
+contexts and the thing under test IS a context: `AuthProvider`, `WebSocketProvider`,
+`LiveBusProvider` and `RunnerFeed`, in App's own order, which costs a second websocket for the life
+of the probe and buys the real modules at every link. The specifiers are read out of served source
+the way phase-22 reads them, and TWO of them are compared — the bus as `useWidgetBridge` resolves it
+against the bus as `RunnerFeed` resolves it — because if those ever differ the app has two buses and
+every widget goes silent with nothing wrong in the code. It reuses phase-23's fixture
+(`.verify/lib/runner-fixture.mjs`, unchanged), so one fake run travels the same real path: the state
+directory the server is already reading, the same poll, the same frame. Six widgets read it. Eleven
+gates, in order: the retained list replayed to a widget on the way in — the providers are mounted
+first and the bus is filled BEFORE a single widget is rendered, so what the widget shows can only
+have been replayed to it as it subscribed, never pushed to it afterwards; a
+stage written to DISK arriving in that widget and, with its detail, in a second widget subscribed to
+that one run by id — file to watcher to socket to feed to bus to bridge to frame, live; a topic off
+the allowlist refused in words and a topic shaped like a URL refused identically, because a widget
+names topics and never endpoints; the seventeenth topic in one frame refused as `too many
+subscriptions`; two malformed `subscribe` messages posted straight at the host and dropped in
+silence, with the widget reporting that it ran so "no error" cannot be satisfied by a widget that
+never executed; the widgets dropped while the bus and the feed STAY MOUNTED and go on publishing,
+with every subscription they held released — counted at the bus itself, through a wrapper over
+`subscribe`, because a leaked listener posts into a dead `contentWindow` and that is silently
+null-safe, so no console-error gate could ever see the leak it claims to catch; a widget
+mounting into a FRESH bus reading a stage that changed while no widget was on screen, which is the
+REST seed on mount doing its whole job — the gate also requires the seed REQUEST to have fired after
+the remount, so a `runner_state` push alone cannot satisfy it, though it stops short of proving the
+push lost the race; and a run that ends leaving `runner:*` rather than being
+remembered as a ghost. The shot is `24-widget-live` (light, 1440), taken after the third gate: six
+sandboxed frames painted with the host's own tokens, each showing runner state that crossed an
+opaque-origin boundary. The eleventh gate holds the signed-in stage to zero console errors apart
+from the app's own serviceWorker guard, which any sandboxed frame trips once (phase-22 measured it
+four ways; it is not this change's). The operator's own runs are in `runner:*` too and the first
+widget lists them — the gates read the fixture's id alone, and name no other run anywhere. The
+fixture is removed in a `finally`.
+
+Phase 25 is the runner card's ABSENCE from the chat view, and it exists because the card was
+pinned there first. It was built into a `flex-none` band between the CLI-version banner and the
+transcript, looked at on a phone, and refused: at 390px it took half the screen, and with the
+keyboard up the conversation was down to one visible line (operator ruling 2026-09-09). Nothing
+renders over the transcript — not a card, not a strip, not a chip, not a banner of the runner's —
+and the Runner tab is the card's one home. So this phase proves a negative, and an absence is the
+easiest thing in the world to prove badly: a probe that merely counted `[data-runner-card]` in the
+chat view would pass just as happily against a server that never sent a run, a bus that dropped it,
+or a lane that was never wired at all. It would be
+measuring nothing and reporting a success. The reading is therefore taken in two halves and the
+ORDER is load-bearing. First the data is proved to arrive: phase-23's fixture
+(`.verify/lib/runner-fixture.mjs`, unchanged) writes a real run to the real state directory, and
+`GET /api/plan-runner/runs` is polled until the server lists it beside the operator's own runs.
+Only then is the chat view read — and held open for five seconds rather than glanced at once,
+because the frame travels on the watcher's own 2 s poll and a single early sample would find an
+empty view and call it a ruling upheld. Seven gates: the fixture reaching the app over the route; no
+`[data-runner-card]` at the busiest of ~20 samples; no `[data-runner-pinned]` either; nothing
+carrying the fixture's own `data-run-id` anywhere on the page, which catches a card drawn under
+some other attribute; the transcript pane MEASURED filling its chat root exactly — root height less
+the composer below it and the CLI banner above it, to within a subpixel — because an absent
+`data-` attribute says nothing about a strip or a banner someone adds in its place later; and
+nothing but that banner standing above the transcript at all, which is the gate a future region
+fails whatever it is named. The chat root is found by walking UP from `.chat-messages-pane` rather
+than by its classes, so the measurement survives a restyle. One shot,
+`25-runner-chat-390-light.png`, and the seventh gate holds the signed-in stage to ZERO console
+errors: this probe mounts no widget and creates no sandboxed frame, so unlike phases 22 and 24
+there is no known noise to filter and anything in that list is new. It presses no button, sends no
+Claude turn and names no run but its own in a request — the plan being executed while the probe
+runs is live in the same list. The fixture is removed in a `finally`. The card's own visual gates
+— the badge, the meter, the stage strip, the phase glyphs, the two verbs — belong to the surface
+that renders it, and travel with the Runner tab into `phase-26.mjs`.
+
+Phase 26 is the Runner tab, in the browser, and it opens by NOT asserting the thing a tab probe
+would normally assert first. The program executing this plan is itself a plan-runner run, so the
+lane is never empty on this host and the Runner tab is already on the bar before the probe writes
+anything: a gate reading "no Runner tab" would fail on a correct build, every time. The opening
+reading is therefore a `[NOTE]` recording the baseline — how many tabs, at what count — and NO GATE
+BELOW IS WRITTEN AGAINST THE LANE'S ABSOLUTE TOTAL, because the operator's own runs start and finish
+inside the probe's own window and such a gate would go red for a run it does not test. Three
+disciplines replace it, and the probe's header states the same three. The fixture's ARRIVAL is the
+one count delta: phase-23's fixture (`.verify/lib/runner-fixture.mjs`, unchanged) must raise the
+count to at least one above the baseline, which is falsifiable whatever else is running. Every other
+reading about the fixture is SCOPED TO ITS OWN CARD by `data-run-id` — its pause, its end, its meter,
+its phases — so each is judged per-run; where a lane total is printed beside such a gate it is an
+observation and never an assertion. And where a gate must know whether anything is running at all,
+it reads the lane over the API rather than the tab's count, which cannot tell "no count" from "no
+tab". The tab is found the way `phase-20.mjs` finds the Memory tab, by `aria-label`; its COUNT,
+however, is read from
+the tab's `title` and not from a `.vv-tabs__count` pill, because `Tabs` renders that pill for word
+tabs only — the workspace tabs are icon-only, so the number reaches the title (`Runner (2)`) and the
+glyph carries a bare dot. Seventeen gates: the fixture reaching the app over
+`GET /api/plan-runner/runs`, which is the one reading that tells a failing UI gate from an empty
+lane; the tab on the bar, marked with its dot, its count raised by the fixture; `Go to Runner` in the
+command palette; the tab opening a panel holding a card with the fixture's own `data-run-id`; that
+card arriving with its phase list already open, which is the panel's one variance; the count equal
+to the number of cards drawn; the Meter reading the fixture's `1 / 5` at 20%; the PipelineStrip
+drawing the reviewed six-stage chain; one row per phase with its title; a phase row expanding onto
+the two stages the fixture's log says it walked; Stop offered on a live run and its REFUSAL spoken
+aloud; `pauseRun` repainting the card as PAUSED with a Resume button and the run STILL LISTED in
+the panel — asserted per-run against the fixture's own card, deliberately NOT as an equality on
+the lane's absolute total, because those totals are read seconds apart on a host where the
+operator's own runs start and finish and such a gate would go red for a run that has nothing to
+do with pausing (the totals are printed beside the gate, and are an observation, not an
+assertion — do not "restore" the equality);
+`endRun` KEEPING the card as ENDED — COMPLETE, Stop gone, Dismiss offered — and the tab under the
+reader (the sticky rule; the card's removal is phase 27's, by dismissal); the bar after navigating to
+Chat held to what the LANE says rather than to the tab's own count — `readCount` answers 0 both
+for a tab with no count and for a tab that is not there, so branching on it would let the very
+regression that gate guards satisfy its assertion, and the branch is therefore chosen by an
+independent read of `GET /api/plan-runner/runs`; a restored `runner` tab landing on the panel; the phone drawer
+carrying the tab with the panel measured fitting 390px; and the signed-in console held to zero. The
+probe presses Stop exactly once, on its own fixture, and expects to be refused — no lock names a
+fixture, so the runner exits 1 and the lane answers 409 — which is why exactly ONE such entry is
+excused from the console gate, matched on the browser's whole sentence rather than on the bare
+string `409` (which would also excuse a run id or a byte count that merely contained those three
+digits); a second 409 is something the probe did not ask for and still turns it red. Matching by
+ROUTE would be tighter and is not reachable: `console.mjs` records `message.text()` only, while a
+failed resource's URL lives in `message.location()`. IT NEVER
+PRESSES RESUME: resume would ask the real runner to launch a daemon against the fixture's one-line
+plan file. Two gates adapt to the host rather than pretending: the `EmptyState` and the
+tab-drops-off-the-bar readings only apply when nothing else is running, and say so in a `[NOTE]`
+when the operator's own runs are still on the lane. Shots are `26-runner-tab-light`,
+`26-runner-tab-dark` and `26-runner-tab-390-light`. Fixtures are removed in an outermost `finally`,
+each guarded separately so one failure cannot strand another. Its contract is at
+[plan-runner.md](plan-runner.md).
+
+Phase 27 is the ended card, in the browser, and it is the one probe here that writes the dev
+account's synced preferences: dismissing a run is a MERGED write to the `planRunner` blob, and the
+gate that matters most reloads the page and expects the dismissal to hold — that is the whole
+point of syncing it. Its fixtures each carry a plan of their own (`createFixtureRun({ planName })`),
+because an ended run is superseded by a newer run of the same plan and two fixtures on one plan
+would read as one plan re-walked. Sixteen gates on five fixtures plus a sixth that never appears: a live fixture on
+the lane; `endRun` keeping its card as ENDED with the outcome word `COMPLETE`, no Stop, Dismiss
+offered and the count still counting it; a second fixture ended `halted` reading in the warn tone
+with Resume beside Dismiss; Dismiss on the first taking its card and dropping the count by one;
+a newer ended run of a fixture's plan superseding it, one ended card per plan; a fresh load with
+the dismissed card still gone and the halted one still there; a second dismissal keeping the first
+(the stored list is pruned against the WHOLE lane, never the visible list — pruning against the
+visible list dropped every earlier dismissal the moment a second was made, and the server still
+carried those runs, so they came straight back); a `complete` receipt written over blocked phases
+reading INCOMPLETE in the warn tone with Resume, because the runner's `complete` only means something
+shipped; a dismissed run reopened in place (`reopenRun`, the rename a resume makes) and ended again
+coming back as a new card, because a dismissal is of one ending and not of an id; a fixture whose receipt is a day old
+never listed, over the API or on the tab; two shots at 390
+wide, light and dark. What bites: the write to preferences is debounced on the client, so the
+reload waits for the server to acknowledge it (the probe polls `GET /api/user/preferences` for
+the id) rather than reloading on the click; and the fixture ids it dismisses stay in the operator's
+list until the next dismissal prunes them — harmless, capped, and noted.
 
 Keepalive survival is the one proof here that is not a phase and is not in `all.mjs`, because what
 is under test is the API's own death. `.verify/keepalive-turn.mjs` is the client every case
@@ -539,6 +804,7 @@ person editing `server/` is in [hosting.md](hosting.md) §"Rules that bite".
 | **Dev account** | `verve` / `verve-dev-2026`, created through the real setup form on the first run. To start over, delete `~/.cloudcli/auth.db` (an operator act) and run the harness again. |
 | **One dev user, so two runs collide** | Every phase signs in as that one account, and `phase-4.mjs` changes its *server-side* preferences mid-run — hiding and revealing the Shell tab, toggling `tasksEnabled` — then restores them inline and asserts it did. Two `all.mjs` runs at once therefore read and overwrite each other's half-done state, which surfaces as a regression rather than as the collision it is: run the harness solo. The restore being inline rather than in a `finally` also means a run that dies part-way leaves the dev user non-default — re-run the phase, or put the switches back by hand. |
 | **Onboarding writes real git config** | Its first step arrives pre-filled from the host's global git identity and the harness submits it unchanged. It never types one: an empty field stops the run rather than writing a fabricated identity into `git config --global`. |
+| **The Runner tab comes and goes** | It is DATA-gated: it is on the bar only while the plan runner is actually carrying a run, so a workspace with a quiet lane has no Runner tab and nothing is wrong. It is also STICKY — once it is the selected tab it stays at a count of zero, so a run ending under you empties the panel instead of moving you. A probe that asserts the tab's absence will fail on this box, where the plan runner is usually running something; and its count is read from the tab's `title`, never from a `.vv-tabs__count` pill, which icon-only tabs do not render. |
 | **One stored theme per user** | The theme is saved server-side against the account, so every run leaves the dev user on whichever mode ran last. `ensureTheme` therefore forces it in both directions by driving Settings → **Appearance** → **Dark Mode**. Those are English labels — a phase that restyles or re-labels Settings must re-point them. |
 | **Settings is driven by its English labels** | Beyond `ensureTheme`'s two above, `phase-4.mjs` clicks the **Appearance** rail row and then finds its controls by the strings `Tabs in the workspace`, `Hide the Shell tab` and `Hide the Tasks tab` — the last two as `aria-label` on the switches. Re-word one in `en/settings.json` and the phase stops finding a control rather than reporting one wrong, so re-point it in the same change. |
 | **12 console errors before sign-in** | `App.tsx` mounts the plugins, tasks and TaskMaster providers above `ProtectedRoute`, so the login and post-logout screens call authenticated endpoints with no token and the browser logs the 401s. A pre-existing upstream defect, measured rather than budgeted: the signed-in stage is held to zero errors, the unauthenticated ones to exactly this count. |
@@ -547,8 +813,9 @@ person editing `server/` is in [hosting.md](hosting.md) §"Rules that bite".
 | **The Shell tab prints `bash: claude: command not found`** | The PTY spawns `bash -c "claude …"` — a bare `PATH` lookup — and the server process on this host carries no `~/.npm-global/bin`, which is where the CLI is. `.env`'s `CLAUDE_CLI_PATH` does not reach it: that is read by the SDK providers through `server/shared/claude-cli-path.ts`, never by the PTY. Nor does upstream's `prioritizeUserNpmGlobalBin`, which only re-*orders* entries already on `PATH` and hands it back untouched when none of its candidates are there — `npm_config_prefix` being set is not enough. An environment fact rather than a fork defect, and the fix belongs at deploy time: whatever runs the server must have the CLI's directory on its own `PATH`. |
 | **`uiPreferences` is one stored key, not six** | The preference store keeps a row per name, and all six workspace booleans live inside the single `uiPreferences` value. A `PATCH /api/user/preferences` carrying `{"uiPreferences":{"hideShellTab":false}}` therefore *replaces* the blob and silently drops the other five. Click the switch, or send the whole object back. A flat key is its own row and patches safely alone — which is why `phase-4.mjs` patches `tasksEnabled` directly and clicks for the rest. |
 | **The Tasks tab is absent** | It is preference-gated and TaskMaster is not installed here, so its absence is recorded as a note rather than asserted as a pass — except in `phase-4.mjs`, which asserts the biconditional instead: the tab is on the bar exactly when TaskMaster is installed. A tab that can never appear would also leave the board itself unmeasured, so `phase-16.mjs` opens the tab when it is there and otherwise mounts the app's own `TaskBoardContent` and `TaskEmptyState` from the running dev server — phase 2's technique, and it says in a `[NOTE]` which of the two it read. |
-| **The Memory tab is on the bar only while something is waiting** | It is gated on Descent's pending queue rather than on a preference, so a host with an empty queue has no Memory tab and no *Go to Memory* row in the palette — an absence, not a fault. `phase-20.mjs` falls back to a synthetic two-row queue answered inside the page when the live count is 0, and says so in a `[NOTE]`. It is also the one tab that deliberately STAYS on the strip at a count of zero, while it is the selected tab. Its contract is at [memory-intake.md](memory-intake.md). |
+| **The Memory tab is on the bar only while something is waiting** | It is gated on Descent's pending queue rather than on a preference, so a host with an empty queue has no Memory tab and no *Go to Memory* row in the palette — an absence, not a fault. `phase-20.mjs` falls back to a synthetic two-row queue answered inside the page when the live count is 0, and says so in a `[NOTE]`. It also STAYS on the strip at a count of zero while it is the selected tab, deliberately — the Runner tab above is the second tab written that way, and both are read by the same gate. Its contract is at [memory-intake.md](memory-intake.md). |
 | **The Memory panel is driven by its English strings** | `phase-20.mjs` finds the two verbs by the words `file it` and `discard`, the empty state by `All filed`, and the global-blast mark by the substring `global`. All four live under `memory.*` in `en/common.json` (English only; the other locales fall back to `en`). Re-word one and the phase stops finding a control rather than reporting one wrong — re-point it in the same change, the way `phase-4.mjs` is re-pointed for Settings. |
+| **The runner card is driven by its English strings** | The card reads every word it draws from `runner.*` in `en/common.json` — the state badge (`LIVE` / `PAUSED` / `STALE`), the phase states, the meter's label, the phase count, the two verbs and both toasts — English only; the other locales fall back to `en`. The elapsed clocks are the exception and are NOT the card's to re-word alone: their three keys are `claudeStatus.elapsed.*` in `en/chat.json`, shared with the composer's own clock, which is why there is no private formatter in `useElapsed`. A probe that drives the card finds its controls by those strings, so re-word one and the phase stops finding a control rather than reporting one wrong — re-point it in the same change, the way `phase-4.mjs` is re-pointed for Settings. `phase-25.mjs` reads NONE of them: nothing in the chat view draws the card, and its gates are an absence and a measured height. `phase-26.mjs`, the Runner tab's probe, is where these words are read. |
 | **There is no logout control** | Nothing in `src/` consumes `AuthContext`'s `logout`, so the harness removes the `auth-token` key the app itself wrote and reloads. No token is forged and no route is bypassed. |
 | **Project rows are desktop-only** | The `PROJECT_ROW` selector matches nothing below 768px, where the compact sidebar renders a card instead of a button. Counting rows at 390px and reading `0` is that blind spot, not an empty sidebar. |
 | **A hand-written module specifier forks the module** | Vite stamps `?t=<timestamp>` on every module it has re-transformed since the server started, so an `import('/src/…')` written without that query resolves to a *second* instance — two React contexts, and a provider stops seeing its own consumer. `phase-3.mjs` reads the specifier back out of the served consumer file instead of typing one. Editing a context file with the server already up is what makes this bite. |
@@ -556,6 +823,10 @@ person editing `server/` is in [hosting.md](hosting.md) §"Rules that bite".
 | **A colour read mid-transition is a colour between two tokens** | `.vv-button` transitions `background-color`, `border-color` and `color` over 0.2s and `.vv-tabs__tab` over 0.35s, so a `getComputedStyle` taken right after a click or hover reports the blend, not either token. Read a freshly inserted element, or wait the transition out. |
 | **A ratio read with the pointer on the row is the hover's ratio** | `.vv-button--ghost:hover:not(:disabled)` paints `--accent-soft`, and at `(0,3,0)` it out-specifies a call site's own `hover:bg-…` utility at `(0,2,0)` — nothing here is in a cascade layer, so specificity alone decides. A hovered project row is therefore standing on Verve's wash, not on the ground its own classes name, and `page.click()` leaves the cursor exactly where it clicked. Park it off the surface before measuring, or measure a row nothing is over. |
 | **A success-only sign-in never reaches the error branch** | `phase-5.mjs` types a wrong password first, asserts the amber `Banner`, then signs in for real — because the login route answers `{error:{code,message}}` and a screen that hands that object to JSX takes the tree down rather than showing a message. No correct password visits that branch. Verify any new screen that surfaces an API error the same way: drive the rejection. |
+| **`phase-22.mjs` expects two console errors, and neither is a defect in it** | The CSP refusal is the PROOF of gate 5, not noise — Chromium logs the one blocked call as two differently worded lines, so the probe filters on the `widget-probe=22` marker in the URL rather than on either phrasing. The second is the app's own: any sandboxed frame on this page raises one `SecurityError: Failed to read the 'serviceWorker' property from 'Navigator'`, because `'serviceWorker' in navigator` is true in a sandboxed context while *reading* the property throws (`index.html`, `src/main.tsx`). Measured, not assumed: it reproduces with an empty `srcdoc` carrying none of the widget code, does not reproduce with `about:blank` as the parent, and is unaffected by blocking `/sw.js`. The widget fence is simply the first thing in the app to create a sandboxed frame, so it is what exposes it. Both are filtered by substring; every other error still reddens the gate. |
+| **A fixture run flashes in the terminal status bar** | `phase-23.mjs` and `phase-26.mjs` both write real run directories under the real state root, so for the few seconds one exists `scripts/runner_statusline.py` lists `fixture-live-widgets-<ms>` beside the operator's own runs — in the bar, and in `plan-runner status`. Expected, not a stray run: each probe removes what it wrote in a `finally`, `phase-23.mjs`'s last gate asserts the state root holds no `fixture-live-widgets-*` entry, and `phase-26.mjs` reddens its own run if a fixture will not remove. One left behind means a probe was killed mid-flight; delete it by hand. |
+| **`phase-23.mjs` notes that the socket was reopened** | The API restarted mid-probe — a save under `server/` under `tsx watch`, or the dev supervisor handing over — and the probe's chat socket healed through it rather than failing the frame gate on a closed one. A `[NOTE]`, never a failure: the gates after it are worth as much as on a run that carried no such line. The reopen contract is in the phase 23 entry of §"The browser harness". |
+| **The surface probe reads a process that only lives for one turn** | `phase-21.mjs` polls `/proc/<pid>/environ` of the SDK child spawned for its one Claude turn, and that child exists only while the turn is in flight — it is gone by the time a reply is on screen. The poll has to start before the prompt is sent and keep running through it; a reading taken after the reply arrives finds no such pid and proves nothing. |
 | **Three sidebar readings are only as good as this host's data** | "↳ Show N older conversations" is *asserted*, and needs a project whose first page of sessions is not its whole history — a host without one reports a failure where there is an absence. The other two can only be noted: `messageCount` is `0` on every session server-side, so the "N messages" segment never renders, and no plugin is installed here — the registry reads `~/.claude-code-ui/plugins`, not this repo's `plugins/`, and it is empty — so the plugin tabs draw nothing to read. |
 
 ## Hosted instance
@@ -568,4 +839,5 @@ so a probe run mutates a live session's state (theme, preferences, the login mod
 `/git` press) — **run the suite only when nobody is in the app**, and always solo; and a server
 edit made while a probe is mid-flight hands the API over under it, which reads as a transient —
 re-run, never re-aim. The handover keeps `:3011` answered throughout, so what a probe sees is a
-dropped WebSocket rather than a refused request, but it is a transient either way.
+dropped WebSocket rather than a refused request, but it is a transient either way — except in
+`phase-23.mjs`, whose socket reopens itself through the handover and says so in a `[NOTE]`.

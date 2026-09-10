@@ -132,6 +132,14 @@ and the banner goes with it, dismissed or not:
 state — a new version is a different fact and asks again, and nothing is persisted, so a reload asks
 again too.
 
+The banner is also the ONLY thing that stands there. By operator ruling 2026-09-09 nothing else renders
+above the transcript — the reasoning is with the lane that provoked it,
+[plan-runner.md](plan-runner.md) §"The runner card" — and `.verify/phase-25.mjs` measures the
+transcript's height against its chat root minus the composer and this banner, so a second region
+above the messages reddens that gate whatever it is named. This banner is inside the measurement,
+not an exception to it: it earns the height because it describes the very turn being read and
+leaves when that run ends.
+
 ## Stop and resume
 
 `src/modules/chat/hooks/useRestartOnInstalledCli.ts`, consumed by `useChatComposerState` in 17 lines.

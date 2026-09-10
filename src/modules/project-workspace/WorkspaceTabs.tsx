@@ -1,4 +1,5 @@
 import {
+  Activity,
   Brain,
   FolderTree,
   GitBranch,
@@ -23,6 +24,9 @@ type WorkspaceTabsProps = {
   shouldShowMemoryTab: boolean;
   /** How many memories are waiting, for the tab's count pill. Zero draws no pill at all. */
   memoryPendingCount: number;
+  shouldShowRunnerTab: boolean;
+  /** How many runs are on the lane, for the tab's count pill. Zero draws no pill at all. */
+  runnerCount: number;
   /** Run after the tab actually changes — the mobile drawer closes on it. */
   onTabChange?: () => void;
 };
@@ -36,7 +40,8 @@ type BuiltInTab = {
 
 // One glyph per view, each naming the thing the view actually shows rather than an action:
 // a speech bubble for the conversation, a terminal for the shell, a file tree for the files,
-// a branch for git, a globe for the browser, a checklist for tasks, a brain for memory.
+// a branch for git, a globe for the browser, a checklist for tasks, a brain for memory, and a
+// pulse for the runner — the one view whose subject is something moving on its own.
 const BASE_TABS: BuiltInTab[] = [
   { id: 'chat',  labelKey: 'tabs.chat',  icon: MessageSquare },
   { id: 'shell', labelKey: 'tabs.shell', icon: Terminal },
@@ -50,12 +55,14 @@ const TASKS_TAB: BuiltInTab = { id: 'tasks', labelKey: 'tabs.tasks', icon: ListT
 
 const MEMORY_TAB: BuiltInTab = { id: 'memory', labelKey: 'tabs.memory', icon: Brain };
 
+const RUNNER_TAB: BuiltInTab = { id: 'runner', labelKey: 'tabs.runner', icon: Activity };
+
 /**
  * Rendered by ProjectSidebarRegion, under the wordmark, to show the built-in workspace tabs plus
  * any enabled plugin tabs.
  *
  * The built-in tabs are icon-only — a glyph each, named by `title` and `aria-label` — which is
- * what lets seven of them share the sidebar's width. Plugin tabs keep their words: a plugin
+ * what lets eight of them share the sidebar's width. Plugin tabs keep their words: a plugin
  * supplies a display name and no glyph, and a guessed icon would name it wrong.
  *
  * The strip still scrolls sideways rather than wrapping, because plugin tabs are words and a row
@@ -69,6 +76,8 @@ export default function WorkspaceTabs({
   shouldShowShellTab,
   shouldShowMemoryTab,
   memoryPendingCount,
+  shouldShowRunnerTab,
+  runnerCount,
   onTabChange,
 }: WorkspaceTabsProps) {
   const { t } = useTranslation();
@@ -82,19 +91,27 @@ export default function WorkspaceTabs({
     ...(shouldShowBrowserTab ? [BROWSER_TAB] : []),
     ...(shouldShowTasksTab ? [TASKS_TAB] : []),
     ...(shouldShowMemoryTab ? [MEMORY_TAB] : []),
+    ...(shouldShowRunnerTab ? [RUNNER_TAB] : []),
   ];
+
+  // Two tabs carry a count, and each only while there is something to count: `undefined` is what
+  // tells `Tabs` to draw no pill at all, so a queue that has just been emptied — or a lane whose
+  // last run has just ended under the person standing in the tab — leaves a bare glyph rather
+  // than a zero nobody needs to read. Both tabs are sticky, so both outlive their own counts.
+  const countFor = (id: AppTab): number | undefined => {
+    if (id === 'memory') return memoryPendingCount > 0 ? memoryPendingCount : undefined;
+    if (id === 'runner') return runnerCount > 0 ? runnerCount : undefined;
+    return undefined;
+  };
 
   // Plugin tabs keep their place at the end of the strip, after every built-in one, so a newly
   // enabled plugin never moves the tab a person's hand already knows the position of.
   const tabs = [
-    // Only the Memory tab carries a count, and only while there is something to count:
-    // `undefined` is what tells `Tabs` to draw no pill at all, so a queue that has just been
-    // emptied leaves a bare label rather than a zero nobody needs to read.
     ...builtInTabs.map((tab) => ({
       id: tab.id as string,
       label: t(tab.labelKey),
       icon: tab.icon,
-      count: tab.id === 'memory' && memoryPendingCount > 0 ? memoryPendingCount : undefined,
+      count: countFor(tab.id),
     })),
     ...plugins.filter((plugin) => plugin.enabled).map((plugin) => ({
       id: `plugin:${plugin.name}`,

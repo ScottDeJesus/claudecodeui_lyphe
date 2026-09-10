@@ -20,6 +20,7 @@ function ProjectCommandPalette() {
     shouldShowTasksTab,
     shouldShowBrowserTab,
     shouldShowMemoryTab,
+    shouldShowRunnerTab,
   } = useWorkspaceTabGates(activeTab);
 
   // Every gate comes off the one hook the tab strip reads, so the palette can never disagree
@@ -36,8 +37,9 @@ function ProjectCommandPalette() {
     if (shouldShowTasksTab) tabs.push('tasks');
     if (shouldShowBrowserTab) tabs.push('browser');
     if (shouldShowMemoryTab) tabs.push('memory');
+    if (shouldShowRunnerTab) tabs.push('runner');
     return tabs;
-  }, [shouldShowBrowserTab, shouldShowMemoryTab, shouldShowShellTab, shouldShowTasksTab]);
+  }, [shouldShowBrowserTab, shouldShowMemoryTab, shouldShowRunnerTab, shouldShowShellTab, shouldShowTasksTab]);
 
   return (
     <CommandPalette

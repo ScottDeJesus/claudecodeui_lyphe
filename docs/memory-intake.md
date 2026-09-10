@@ -12,19 +12,24 @@ not from a copy here (see §"Where the shapes live").
 
 **One provider, one poller.** `App.tsx` mounts `MemoryIntakeProvider` inside `ProtectedRoute`, so
 the queue is never asked for against the login screen. The provider holds the READING alone: four
-consumers read it — `useWorkspaceTabGates` (twice over, for the strip and for the main region), the
-command palette, and the panel — and only the panel writes. The write lifecycle lives in
-`useMemoryReview` rather than in the context for exactly that reason: a value carrying the in-flight
-id and the held refusals would change on every button press and re-render all four.
+consumers read it — `useWorkspaceTabGates` three times over, once at each of its call sites (the
+sidebar region that renders the strip, the main region, the command palette), and the panel — and
+only the panel writes. The write lifecycle lives in `useMemoryReview` rather than in the context for
+exactly that reason: a value carrying the in-flight id and the held refusals would change on every
+button press and re-render all four.
 
 ## Where the tab is, and when
 
-The tab sits on the workspace strip in the sidebar, after every other built-in tab and before any
-plugin tab, and it carries the pending count as Verve's own pill. The pill is absent below 1 — a
-queue that has just been emptied leaves a bare label rather than a zero nobody needs to read.
-`useWorkspaceTabGates(activeTab)` is the one place the rule lives; `WorkspaceTabs`,
-`WorkspaceMain` and `ProjectCommandPalette` all read it, so the strip, the pane and the palette
-cannot disagree about whether the tab exists.
+The tab sits on the workspace strip in the sidebar, after every other built-in tab except the
+Runner tab ([plan-runner.md](plan-runner.md) §"The Runner tab") and before any plugin tab, and it
+carries the pending count. The strip's built-in tabs are icon-only, so that count never reaches
+Verve's `.vv-tabs__count` pill — `Tabs` draws that for word tabs only. The glyph wears a bare accent
+dot instead, and the number is spelled out in the tab's `title` (`Memory (2)`), which is what
+anything reading this strip's count reads. Both are absent below 1: a queue that has just been
+emptied leaves a plain glyph rather than a zero nobody needs to read.
+`useWorkspaceTabGates(activeTab)` is the one place the rule lives; `ProjectSidebarRegion` (which
+hands the strip its props), `WorkspaceMain` and `ProjectCommandPalette` all read it, so the strip,
+the pane and the palette cannot disagree about whether the tab exists.
 
 **The tab is sticky, and that is the whole design.** `shouldShowMemoryTab` is
 `pendingCount > 0 || activeTab === 'memory'`: once it is the tab a person is standing in it stays on
@@ -35,13 +40,15 @@ That is also why there is no snap-back effect for it. `WorkspaceMain` has three,
 tabs that vanish when a preference is switched off — tasks, shell, browser — because leaving the
 workspace pointed at a tab no longer on the bar leaves an empty pane. The Memory tab is DATA-gated
 rather than preference-gated, its gate is written to hold while it is selected, and a fourth effect
-would fight that rule. Two kinds of tab, two policies, each in the layer that owns the act: the gate
-rule in the hook that decides a tab exists, the navigation where `setActiveTab` is.
+would fight that rule. The Runner tab is the second tab written this way and takes the rule whole,
+snap-back and all — that is, none ([plan-runner.md](plan-runner.md) §"The Runner tab"). Two kinds of
+tab, two policies, each in the layer that owns the act: the gate rule in the hook that decides a tab
+exists, the navigation where `setActiveTab` is.
 
-One move does leave it: choosing a conversation. `handleSessionSelect` sends `tasks`, `browser` and
-`memory` back to `chat` (`hooks/useProjectsState.ts`), because picking a session is asking to read
-that session. The tab then stays on the strip while anything is pending and drops off it when
-nothing is.
+One move does leave it: choosing a conversation. `handleSessionSelect` sends `tasks`, `browser`,
+`memory` and `runner` back to `chat` (`hooks/useProjectsState.ts`), because picking a session is
+asking to read that session. The tab then stays on the strip while anything is pending and drops
+off it when nothing is.
 
 `memory` is a valid persisted tab (`VALID_TABS`), so a reload restores it — and the sticky clause
 holds it there through the first paint, before the first poll has answered.
@@ -175,11 +182,12 @@ label at `tabs.memory`. English only, deliberately: the other ten locales fall b
 
 ## What is left standing
 
-- **The count pill is `aria-hidden`.** `Tabs` keeps `aria-label={tab.label}` as the accessible name
-  so the harness can select by the bare word `Memory` and the label never grows a number, and the
-  pill beside it is hidden from assistive technology outright. A screen reader is told the tab
-  exists but not how many memories are behind it; the panel's own `N pending` badge is where that
-  count is announced.
+- **The count is never part of the tab's name.** `Tabs` keeps `aria-label={tab.label}` as the
+  accessible name so the harness can select by the bare word `Memory` and the label never grows a
+  number, and the accent dot beside the glyph is `aria-hidden` outright — it says THAT something
+  waits, never how much. The number itself rides the tab's `title`, a hover affordance rather than
+  the tab's name; the panel's own `N pending` badge is where the count is stated in the pane a
+  person is actually reading.
 - **No row is announced when it arrives.** The queue can grow under a person reading it — the panel
   has no live region, so a memory proposed while the tab is open appears silently at the next poll.
 - **A read that failed is retried, a read that succeeded is not.** `readFailed` leaves the card

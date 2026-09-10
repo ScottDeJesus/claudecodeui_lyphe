@@ -582,6 +582,19 @@ export const api = {
     },
   },
 
+  // The plan-runner lane (docs/plan-runner.md). The server READS the runner's state directory and
+  // relays two verbs to the runner's own binary; it never writes a state file and never starts a
+  // run. The reads are plain gets. The two writes are read from the RAW response, like
+  // `descent.memory.approve` above and for the same reason: a 409 here carries the runner's own
+  // verdict — its refusal in its own `stderr`, with the run left exactly as it was — and putting it
+  // through `readApiJson` would turn that verdict into a thrown error the caller cannot show.
+  planRunner: {
+    runs: () => get('/api/plan-runner/runs'),
+    run: (id: string) => get(`/api/plan-runner/runs/${encodeURIComponent(id)}`),
+    stop: (id: string) => post(`/api/plan-runner/runs/${encodeURIComponent(id)}/stop`, {}),
+    resume: (id: string) => post(`/api/plan-runner/runs/${encodeURIComponent(id)}/resume`, {}),
+  },
+
   // The installed Claude CLI and the version each LIVE run is on (docs/cli-version.md). It
   // answers 200 even when no version could be read — an unreadable binary is a fact in words,
   // so the caller reads the body's `installed`/`reason` rather than the status.

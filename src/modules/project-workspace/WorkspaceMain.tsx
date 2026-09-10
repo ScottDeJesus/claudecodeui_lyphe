@@ -9,6 +9,7 @@ import { PluginTabContent } from '@/modules/plugins';
 import { BrowserUsePanel } from '@/modules/browser-use';
 import { usePaletteOpsRegister } from '@/modules/command-palette';
 import { MemoryIntakePanel } from '@/modules/memory-intake';
+import { RunnerPanel } from '@/modules/plan-runner';
 import { TaskMasterPanel, useTaskMasterProjectSync } from '@/modules/task-master';
 import type { AppTab, Project, ProjectSession, SessionEstablishedContext, SessionNavigationOptions, SettingsMainTab } from '@/shared/types';
 import { useUiPreferences } from '@/shared/context/UiPreferencesContext';
@@ -63,6 +64,7 @@ function WorkspaceMain({
     shouldShowBrowserTab,
     shouldShowShellTab,
     shouldShowMemoryTab,
+    shouldShowRunnerTab,
     preferencesSettled,
   } = useWorkspaceTabGates(activeTab);
 
@@ -105,7 +107,9 @@ function WorkspaceMain({
   // fourth effect for the Memory tab, and adding one would fight the design: that tab is
   // DATA-gated, so its gate is written to HOLD while it is the selected tab
   // (`useWorkspaceTabGates`) and filing the last pending memory empties the panel instead of
-  // taking the tab away mid-act. Two kinds of tab, two policies, each living in the layer that
+  // taking the tab away mid-act. The Runner tab is the SECOND DATA-gated tab and takes the same
+  // policy — no fifth effect for it either, for exactly the same reason: a run ending under
+  // someone reading its phases must leave them where they are standing. Two kinds of tab, two policies, each living in the layer that
   // owns the act — the gate rule in the hook that decides a tab exists, the navigation here,
   // where `setActiveTab` is.
   //
@@ -249,6 +253,12 @@ function WorkspaceMain({
         {shouldShowMemoryTab && activeTab === 'memory' && (
           <div className="h-full overflow-hidden">
             <MemoryIntakePanel />
+          </div>
+        )}
+
+        {shouldShowRunnerTab && activeTab === 'runner' && (
+          <div className="h-full overflow-hidden">
+            <RunnerPanel />
           </div>
         )}
 

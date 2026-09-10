@@ -205,6 +205,7 @@ export type GatewayEventKind =
   | 'chat_subscribed'
   | 'session_upserted'
   | 'loading_progress'
+  | 'runner_state'
   | 'protocol_error';
 
 /**
@@ -251,6 +252,44 @@ export type SessionUpsertedEvent = {
   project: SessionUpsertedProject | null;
   timestamp: string;
 };
+
+// ---------------------------
+//----------------- PLAN RUNNER CONTRACTS ------------
+// The plan runner writes `~/.claude/state/runner/<run_id>/` and this server only READS it: `progress.json` (the
+// whole picture, replaced whole by `os.replace`), `run.json` (`stopped_at` is the pause), `receipt.json` (present ⇒ the
+// run is over) and `runner.log` (one line per stage change). Nothing here is ever written back — the runner is a
+// separate process that may be executing right now, and a second writer would race its own atomic rewrite.
+// Every timestamp below is epoch SECONDS, because that is what the runner's Python writes (`time.time()`);
+// read one as milliseconds and a live run renders in 1970. Mirrored field-for-field in `src/shared/types.ts`.
+
+/** How this lane reads one run's liveness. `paused` is the ONE deliberate difference from `scripts/runner_statusline.py`, whose `read_run` returns `None` for a parked run because its bar is for what is moving; this lane CARRIES paused runs so the tab can list them and offer Resume. `ended` is a run whose receipt has landed and is still within the keep window — carried so the operator sees the ending and dismisses it themselves; after the window it is omitted. */
+export type RunnerRunState = 'live' | 'paused' | 'stale' | 'ended';
+/** One phase's outcome as the runner spells it, from `progress.json.phases[].state`. */
+export type RunnerPhaseState = 'shipped' | 'running' | 'blocked' | 'deferred' | 'pending';
+/** One row of `progress.json.phases[]`. `note` is the runner's own short word for the state (a ship date, `builder-blocked`, `depends`) and is free text — it reaches the DOM as a text node, never as markup. */
+export type RunnerPhaseRow = { rank: number; id: string; title: string; state: RunnerPhaseState; note: string };
+/** One `runner.log` stage change. `at` is the runner's LOCAL ISO timestamp to the second, kept as the string it wrote — never re-parsed into an epoch, since it carries no zone to parse it against. `detail` is `''` when the stage word stood alone. */
+export type RunnerTimelineEntry = { at: string; phase_id: string; stage: string; detail: string };
+/** Where the run stands, from `progress.json.position`. `pipeline` is the phase's own chain as the runner composed it (`heph → athena → prometheus`), so a phase with no code change carries a shorter one. `stage_since` is epoch SECONDS. */
+export type RunnerPosition = { rank: number; total: number; phase_id: string; title: string; remain: number; pipeline: string; stage: string; stage_detail: string; stage_since: number };
+/**
+ * One run as this lane reads it off disk. Every field but `state` and `timeline` is `progress.json`'s own;
+ * `state` is this lane's classification and `timeline` is `runner.log` parsed.
+ *
+ * `stopped_at` is `run.json`'s, `null` when the run was never parked. `outcome` and `ended_at` are the receipt's `status` and
+ * `ended_at`, `null` until the run ends; `outcome` is the runner's own word (`complete`, `halted`, `all-blocked`, `budget`, `flag-off`) and is shown, never branched on beyond its tone. `pid` is the runner process the run
+ * last announced — a fact to show, never something to signal: this server does not own that process.
+ * `position` is `null` while the runner has not composed one yet, which a live run does show in its first seconds.
+ * `line` is the composed status-bar line the terminal bar renders, carried through unaltered.
+ */
+export type RunnerRunSnapshot = { run_id: string; plan_path: string; plan_title: string; state: RunnerRunState; status: string; started_at: number; heartbeat_at: number; stopped_at: number | null; outcome: string | null; ended_at: number | null; pid: number | null; position: RunnerPosition | null; phases: RunnerPhaseRow[]; spawns: number; max_spawns: number; cost_usd: number; line: string; timeline: RunnerTimelineEntry[] };
+/** The whole picture, pushed on change over `/ws`. `runs` is ordered by `started_at` ascending, oldest first, the order the terminal bar uses. `at` is epoch MILLISECONDS (`Date.now()`), unlike every field inside a snapshot. */
+export type RunnerStateEvent = { kind: 'runner_state'; runs: RunnerRunSnapshot[]; at: number };
+/** The two verbs this server may relay. Starting a run needs a plan and an intent lock and is `/execute`'s act, never a button's. */
+export type RunnerVerb = 'stop' | 'resume';
+/** What one relayed verb did. `ok` is the runner's own exit being 0 — a refusal is a RESULT, not an error, and `stderr` carries the runner's own line whole so the reader sees the verdict rather than our paraphrase. `reason` is present only when the runner never got to answer: it timed out, or its binary could not be spawned. */
+export type RunnerVerbResult = { ok: boolean; verb: RunnerVerb; run_id: string; exit: number | null; stdout: string; stderr: string; reason?: 'timeout' | 'spawn-failed' };
+// ---------------------------
 
 /**
  * Provider-neutral message envelope used in REST responses and realtime channels.

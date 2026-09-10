@@ -8,6 +8,8 @@ import { ToastStack } from '@/shared/ui';
 import { AuthProvider, ProtectedRoute } from '@/modules/auth';
 import { TaskMasterProvider,TasksSettingsProvider } from '@/modules/task-master';
 import { MemoryIntakeProvider } from '@/modules/memory-intake';
+import { LiveBusProvider } from '@/modules/live-bus';
+import { RunnerFeed } from '@/modules/plan-runner';
 import { WebSocketProvider } from '@/shared/context/WebSocketContext';
 import { PluginsProvider } from '@/modules/plugins';
 import { ProjectWorkspaceRoute } from '@/modules/project-workspace';
@@ -126,15 +128,22 @@ export default function App() {
               <TasksSettingsProvider>
                 <TaskMasterProvider>
                 <ProtectedRoute>
-                  {/* Inside the auth gate, so the memory poll never fires against the login screen. */}
-                  <MemoryIntakeProvider>
-                    <Router basename={routerBasename}>
-                      <Routes>
-                        <Route path="/" element={<ProjectWorkspaceRoute />} />
-                        <Route path="/session/:sessionId" element={<ProjectWorkspaceRoute />} />
-                      </Routes>
-                    </Router>
-                  </MemoryIntakeProvider>
+                  {/* The feed sits INSIDE the bus because it publishes into it, and both sit inside the
+                      auth gate so the REST seed never fires against the login screen — and below
+                      WebSocketProvider above, because the feed subscribes to the one socket. */}
+                  <LiveBusProvider>
+                    <RunnerFeed>
+                      {/* Inside the auth gate, so the memory poll never fires against the login screen. */}
+                      <MemoryIntakeProvider>
+                        <Router basename={routerBasename}>
+                          <Routes>
+                            <Route path="/" element={<ProjectWorkspaceRoute />} />
+                            <Route path="/session/:sessionId" element={<ProjectWorkspaceRoute />} />
+                          </Routes>
+                        </Router>
+                      </MemoryIntakeProvider>
+                    </RunnerFeed>
+                  </LiveBusProvider>
                 </ProtectedRoute>
                 </TaskMasterProvider>
               </TasksSettingsProvider>

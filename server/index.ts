@@ -51,6 +51,7 @@ import browserUseRoutes from './modules/browser-use/browser-use.routes.js';
 import { assetsRoutes } from './modules/assets/index.js';
 import { createCliVersionModule } from './modules/cli-version/index.js';
 import { createDescentModule } from './modules/descent/index.js';
+import { createPlanRunnerModule } from './modules/plan-runner/index.js';
 import { fileTreeRoutes } from './modules/file-tree/index.js';
 import { worktreesRoutes } from './modules/worktrees/index.js';
 import browserUseMcpRoutes from './modules/browser-use/browser-use-mcp.routes.js';
@@ -183,6 +184,12 @@ app.use('/api/descent', authenticateToken, createDescentModule());
 
 // Installed CLI version + what the live runs are on (protected)
 app.use('/api/cli-version', authenticateToken, createCliVersionModule());
+
+// The plan runner's live runs, and the relay for its own stop/resume (protected).
+// Built once here rather than inline: the poll behind its websocket frame is started after
+// `listen` and stopped on shutdown, so the module has to be something both can name.
+const planRunner = createPlanRunnerModule();
+app.use('/api/plan-runner', authenticateToken, planRunner.router);
 
 app.use('/api/notifications', authenticateToken, notificationRoutes);
 
@@ -396,6 +403,10 @@ async function startServer() {
 
             // Start watching the projects folder for changes
             await initializeSessionsWatcher();
+
+            // Start polling the plan runner's state directory. After `listen`, because the
+            // frames it broadcasts are for sockets this server is only now able to accept.
+            planRunner.start();
         });
         if (handover) onTakeover(soleServerDuties);
 
@@ -404,6 +415,7 @@ async function startServer() {
             // Stop accepting first: with reusePort the kernel would keep handing this exiting
             // process new connections. Never awaited — open WebSockets keep it from resolving.
             server.close();
+            planRunner.stop();
             try {
                 await browserUseService.stopAllSessions();
             } catch (err) {

@@ -50,7 +50,7 @@ export type ProviderModelActions = {
 //----------------- PROJECTS AND SESSIONS ------------
 
 /** Identifies the workspace pane the user is looking at; plugin panes are namespaced by plugin id. */
-export type AppTab = 'chat' | 'files' | 'shell' | 'git' | 'tasks' | 'browser' | 'memory' | `plugin:${string}`;
+export type AppTab = 'chat' | 'files' | 'shell' | 'git' | 'tasks' | 'browser' | 'memory' | 'runner' | `plugin:${string}`;
 
 /** A message queued to be sent to a session at a future time. */
 export type ScheduledMessage = {
@@ -1855,3 +1855,51 @@ export type WidgetHostHandlers = {
   onSubscribe?: (topic: string, send: (message: WidgetHostMessage) => void) => void;
   onUnsubscribe?: (topic: string) => void;
 };
+
+/**
+ * A topic is a NAME, never an address. The host owns the vocabulary and `isAllowedTopic`
+ * (`src/modules/live-bus/topics.ts`) owns the shapes; this alias exists so a signature reads
+ * `topic` rather than `string` and cannot be confused with a URL by whoever writes the next one.
+ */
+export type LiveTopic = string;
+
+/** One retained reading: the value and the instant it was published, epoch MILLISECONDS (`Date.now()`). */
+export type LiveValue<T = unknown> = { payload: T; at: number };
+
+/**
+ * The client-side bus: a retained value per topic, dispatched synchronously to whoever subscribed.
+ *
+ * `subscribe` on an allowed topic replays the retained value SYNCHRONOUSLY when one is held, so a
+ * subscriber that arrives after the producer still starts with a picture rather than with nothing;
+ * on a disallowed topic it replays nothing and returns a no-op unsubscribe. `publish` on a
+ * disallowed topic is a no-op. The bus knows no producer — it retains, dispatches and admits
+ * topics, and a feed (the first is `RunnerFeed`, in `src/modules/plan-runner/`) publishes into it.
+ */
+export type LiveBus = {
+  subscribe<T = unknown>(topic: LiveTopic, listener: (value: LiveValue<T>) => void): () => void;
+  get<T = unknown>(topic: LiveTopic): LiveValue<T> | undefined;
+  publish<T = unknown>(topic: LiveTopic, payload: T, at?: number): void;
+  isAllowedTopic(topic: unknown): topic is string;
+};
+
+// The client mirror of `server/shared/types.ts` § PLAN RUNNER CONTRACTS, where every field is
+// documented against what the runner writes on disk; a change to either shape belongs in both at once.
+
+/** How the lane reads one run's liveness. `paused` is carried rather than omitted, so the tab can list it and offer Resume. `ended` is a run whose receipt has landed and is still within the keep window — carried so the operator sees the ending and dismisses it themselves; after the window it is omitted. */
+export type RunnerRunState = 'live' | 'paused' | 'stale' | 'ended';
+/** One phase's outcome as the runner spells it, from `progress.json.phases[].state`. */
+export type RunnerPhaseState = 'shipped' | 'running' | 'blocked' | 'deferred' | 'pending';
+/** One row of `progress.json.phases[]`. `note` is the runner's own short word and is free text — it reaches the DOM as a text node, never as markup. */
+export type RunnerPhaseRow = { rank: number; id: string; title: string; state: RunnerPhaseState; note: string };
+/** One `runner.log` stage change. `at` is the runner's LOCAL ISO timestamp to the second, kept as the string it wrote. `detail` is `''` when the stage word stood alone. */
+export type RunnerTimelineEntry = { at: string; phase_id: string; stage: string; detail: string };
+/** Where the run stands, from `progress.json.position`. `stage_since` is epoch SECONDS, like every timestamp inside a snapshot. */
+export type RunnerPosition = { rank: number; total: number; phase_id: string; title: string; remain: number; pipeline: string; stage: string; stage_detail: string; stage_since: number };
+/** One run as the lane reads it off disk. `position` is `null` while the runner has not composed one yet, which a live run does show in its first seconds. */
+export type RunnerRunSnapshot = { run_id: string; plan_path: string; plan_title: string; state: RunnerRunState; status: string; started_at: number; heartbeat_at: number; stopped_at: number | null; outcome: string | null; ended_at: number | null; pid: number | null; position: RunnerPosition | null; phases: RunnerPhaseRow[]; spawns: number; max_spawns: number; cost_usd: number; line: string; timeline: RunnerTimelineEntry[] };
+/** The whole picture, pushed on change over `/ws`. `runs` is ordered by `started_at` ascending. `at` is epoch MILLISECONDS, unlike every field inside a snapshot. */
+export type RunnerStateEvent = { kind: 'runner_state'; runs: RunnerRunSnapshot[]; at: number };
+/** The two verbs the server may relay. Starting a run is `/execute`'s act, never a button's. */
+export type RunnerVerb = 'stop' | 'resume';
+/** What one relayed verb did. A refusal is a RESULT, not an error: `stderr` carries the runner's own line whole so the reader sees the verdict rather than our paraphrase. */
+export type RunnerVerbResult = { ok: boolean; verb: RunnerVerb; run_id: string; exit: number | null; stdout: string; stderr: string; reason?: 'timeout' | 'spawn-failed' };

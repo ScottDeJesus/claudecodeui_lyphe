@@ -2,8 +2,8 @@
 
 *How a message gets from the composer to a provider CLI and back onto the screen.*
 
-Six documents covering the websocket transport, the realtime stream, conversation
-handoff, the message store and lazy loading, scrolling, and tool views.
+Seven documents covering the websocket transport, the realtime stream, conversation
+handoff, the message store and lazy loading, scrolling, tool views, and live widgets.
 
 These subsystems are hard to read from the source alone, because in every case the
 behaviour lives in the *interaction between files* rather than in any one of them. Each
@@ -48,7 +48,8 @@ one of those two paths disagreeing with the other.
 | 3 | [Conversation handoff](./03-conversation-handoff.md) | Which ids exist, and the four points where a conversation changes hands. Answers "why does this conversation have two ids". |
 | 4 | [The message store and lazy loading](./04-message-store-and-lazy-loading.md) | Where messages live in the client, and how a huge transcript loads without freezing the tab. |
 | 5 | [Scrolling](./05-scrolling.md) | Where the view sits, and why five different pieces of code move it. |
-| 6 | [Tool views](./06-tool-view.md) | How a tool call becomes UI. Last, because it needs the message model from 2 and 4. |
+| 6 | [Tool views](./06-tool-view.md) | How a tool call becomes UI. Needs the message model from 2 and 4. |
+| 7 | [Live widgets](./07-live-widgets.md) | How a `widget` fence becomes a sandboxed live frame. Last, because it needs the streaming markdown pipeline from 2 — and the transport from 1 once a widget can subscribe to live data. |
 
 **In a hurry?** Read 1 and 2.
 **Debugging something a user can see?** Start at 5 or 6.
@@ -86,6 +87,7 @@ This is the shared vocabulary every document uses. Both unions are declared in
 | `chat_subscribed` | gateway | Ack for `chat.subscribe`: authoritative processing state plus pending permissions. |
 | `session_upserted` | gateway | Sidebar delta. Owned by the projects state, not by chat. |
 | `loading_progress` | gateway | Project scan progress. |
+| `runner_state` | gateway | The plan runner's runs, pushed on change. |
 | `protocol_error` | gateway | The request was rejected or never started. No `complete` follows. |
 
 One more kind never crosses the wire: **`websocket_reconnected`** is synthesized inside

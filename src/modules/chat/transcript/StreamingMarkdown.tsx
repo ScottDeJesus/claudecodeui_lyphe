@@ -43,6 +43,10 @@ type StreamingMarkdownProps = {
  * not a bug; measured on realistic replies at streaming speed it happens for
  * about a third of them, once. Only blocks in a message still being streamed are
  * affected.
+ *
+ * An unclosed fence and everything after it stay in the pending half, which is why that half
+ * alone is marked streaming: a widget fence still being written renders as its own source
+ * until the closing backticks arrive and the block settles.
  */
 export default function StreamingMarkdown({
   content,
@@ -57,7 +61,7 @@ export default function StreamingMarkdown({
   return (
     <div className={className}>
       {settled && <MarkdownBody>{settled}</MarkdownBody>}
-      {pending && <MarkdownBody>{pending}</MarkdownBody>}
+      {pending && <MarkdownBody streaming>{pending}</MarkdownBody>}
     </div>
   );
 }

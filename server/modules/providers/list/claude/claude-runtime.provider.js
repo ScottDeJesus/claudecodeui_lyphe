@@ -38,6 +38,7 @@ import {
 } from '@/modules/notifications/index.js';
 import { createCompleteMessage, createNormalizedMessage } from '@/shared/utils.js';
 import { armKeepaliveSpawn, keepaliveReadopt } from './session-host/index.js';
+import { SURFACE_ENV, SURFACE_PROMPT_APPEND } from './surface-signal.js';
 
 const activeSessions = new Map();
 const pendingToolApprovals = new Map();
@@ -226,7 +227,7 @@ function mapCliOptionsToSDK(options = {}) {
 
   // Forward all host env vars (e.g. ANTHROPIC_BASE_URL) to the subprocess.
   // Since SDK 0.2.113, options.env replaces process.env instead of overlaying it.
-  sdkOptions.env = { ...process.env, CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS: String(BG_WAIT_CEILING_MS) };
+  sdkOptions.env = { ...process.env, CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS: String(BG_WAIT_CEILING_MS), ...SURFACE_ENV };
 
   // Resolve the executable eagerly on Windows because the SDK uses raw child_process.spawn,
   // which does not reliably follow npm's shell wrappers like cross-spawn does.
@@ -285,7 +286,8 @@ function mapCliOptionsToSDK(options = {}) {
 
   sdkOptions.systemPrompt = {
     type: 'preset',
-    preset: 'claude_code'
+    preset: 'claude_code',
+    append: SURFACE_PROMPT_APPEND
   };
 
   sdkOptions.settingSources = ['project', 'user', 'local'];

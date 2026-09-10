@@ -71,7 +71,7 @@ written from five places coordinated by refs and timers rather than by one owner
 | `src/modules/chat/utils/messageKeys.ts` | `getIntrinsicMessageKey` — stable render keys, so a prepend does not remount the rows below it. |
 | `src/index.css` | `.chat-messages-pane` / `.chat-message` containment, mobile `touch-action`, document-level overscroll containment, `.search-highlight-flash`. |
 | `src/modules/project-workspace/hooks/useVisualViewportKeyboardOffset.ts` | Publishes `--keyboard-height` so the shell shrinks above the iOS keyboard. |
-| `src/shared/ui/ScrollArea.tsx` | **Not used by chat.** `FileTree.tsx` and `SidebarContent.tsx` only. |
+| `src/shared/ui/ScrollArea.tsx` | **Not used by chat.** Every caller is a pane outside the transcript — `FileTree.tsx`, `SidebarContent.tsx`, `MemoryIntakePanel.tsx` and the Runner tab's `RunnerPanel.tsx`. Grep before trusting that list to be complete; the rule is the exclusion, not the roll call. |
 | `src/modules/chat/tests/transcriptScrollOwnership.test.tsx` | Pins the two ownership bugs — the deferred scroll and the cross-session search jump. |
 | `src/modules/chat/tests/lazyMessageRow.test.tsx` | Pins placeholder height and the hidden-tab zero-rect case. |
 | `src/modules/chat/tests/searchTargetLocator.test.ts` | Pins snippet-first resolution, the timestamp fallback and the window size. |
@@ -108,6 +108,15 @@ scroll state.**
 `sticky right-4 top-3`, which is why it stays put while the list moves. The pane is
 `memo`ised, and neither it, `MessageComponent`, nor any tool view reads or writes a scroll
 offset.
+
+**`flex-1` is the whole height rule: every `flex-none` sibling above the pane is height the
+conversation loses.** Exactly one thing stands there — the CLI-version banner
+([../cli-version.md](../cli-version.md)) — and by operator ruling 2026-09-09 nothing else may,
+not a card, not a strip, not a chip. The plan-runner lane provoked it and keeps the reasoning
+([../plan-runner.md](../plan-runner.md) §"The runner card"); what matters here is that the rule is
+MEASURED and not merely written down. `.verify/phase-25.mjs`
+reads the pane's height against its chat root, minus the composer below and the banner above, and
+fails a new region above the transcript whatever that region is named.
 
 Three row-level scrollers do exist — `BashCommandDisplay.tsx` (`max-h-80 overflow-auto`),
 `FileListContent.tsx` and `AskUserQuestionPanel.tsx` (`max-h-48 overflow-y-auto`). They are

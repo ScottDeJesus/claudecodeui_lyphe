@@ -177,6 +177,13 @@ export function useChatRealtimeHandlers({
         case 'loading_progress':
           return;
 
+        // A box-wide frame owned by the live bus, never a chat row. It must RETURN and not break:
+        // `default` falls into the NormalizedMessage path below, where a frame carrying no
+        // sessionId of its own inherits the viewed session's and is appended to the open
+        // transcript, evicting real messages from the realtime buffer as it goes.
+        case 'runner_state':
+          return;
+
         default:
           break;
       }

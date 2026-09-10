@@ -1,5 +1,6 @@
 import { useBrowserUseEnabled } from '@/modules/browser-use';
 import { useMemoryIntake } from '@/modules/memory-intake';
+import { useRunnerRuns } from '@/modules/plan-runner';
 import { useTasksSettings } from '@/modules/task-master';
 import { useUiPreferences } from '@/shared/context/UiPreferencesContext';
 import type { AppTab } from '@/shared/types';
@@ -12,6 +13,10 @@ export type WorkspaceTabGates = {
   shouldShowMemoryTab: boolean;
   /** How many memories are waiting. Zero whenever Descent could not be read, so the pill and the gate agree. */
   memoryPendingCount: number;
+  /** True while the Runner tab belongs on the bar — the same sticky rule the Memory tab takes. */
+  shouldShowRunnerTab: boolean;
+  /** How many runs the lane is carrying, for the tab's count pill. Paused runs are counted: they are still runs. */
+  runnerCount: number;
   /** True once the UI preference store has answered — the snap-back effects wait on it. */
   preferencesSettled: boolean;
 };
@@ -36,8 +41,11 @@ export type WorkspaceTabGates = {
  * The Memory tab is STICKY, which is the whole reason `activeTab` is an argument: once it is the
  * tab a person is standing in it stays on the bar until they choose another one, so filing the
  * last pending memory empties the panel rather than taking the tab out from under them — and no
- * snap-back effect exists for it, because the gate itself never turns off mid-act. The other
- * three are PREFERENCE-gated and keep their snap-backs in WorkspaceMain.
+ * snap-back effect exists for it, because the gate itself never turns off mid-act. The Runner tab
+ * is the SECOND DATA-gated, sticky tab and takes that rule whole: it appears while a run is in
+ * motion, it stays while it is the selected tab even once the last run ends, and it has no
+ * snap-back effect either. The other three are PREFERENCE-gated and keep their snap-backs in
+ * WorkspaceMain.
  *
  * Three call sites read this now — WorkspaceMain, ProjectSidebarRegion and ProjectCommandPalette
  * — each passing its own `activeTab`. The palette used to recompute the gates privately from the
@@ -48,6 +56,7 @@ export function useWorkspaceTabGates(activeTab: AppTab): WorkspaceTabGates {
   const { tasksEnabled, isTaskMasterInstalled } = useTasksSettings();
   const browserUseEnabled = useBrowserUseEnabled();
   const { pendingCount } = useMemoryIntake();
+  const { count: runnerCount } = useRunnerRuns();
 
   return {
     shouldShowTasksTab: Boolean(tasksEnabled && isTaskMasterInstalled),
@@ -55,6 +64,8 @@ export function useWorkspaceTabGates(activeTab: AppTab): WorkspaceTabGates {
     shouldShowShellTab: !hideShellTab,
     shouldShowMemoryTab: pendingCount > 0 || activeTab === 'memory',
     memoryPendingCount: pendingCount,
+    shouldShowRunnerTab: runnerCount > 0 || activeTab === 'runner',
+    runnerCount,
     preferencesSettled,
   };
 }

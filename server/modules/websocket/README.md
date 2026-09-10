@@ -238,6 +238,8 @@ That shared set is consumed by:
 Broadcasts `kind: loading_progress` while project snapshots are being built.
 2. `modules/providers/services/sessions-watcher.service.ts`
 Broadcasts per-session `kind: session_upserted` deltas when provider session artifacts change (no full project snapshots).
+3. `modules/plan-runner/runner-watcher.service.ts`
+Broadcasts `kind: runner_state` when the plan runner's state directory changes, reaching this set through `modules/websocket/index.js` rather than a deep import.
 
 This design centralizes cross-module realtime fanout without requiring route-local references to WebSocket internals.
 

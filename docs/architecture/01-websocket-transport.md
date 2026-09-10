@@ -161,14 +161,20 @@ Put frames in state instead and two frames arriving in the same tick collapse in
 render carrying only the later one. A listener that throws is caught individually
 (`:63-67`) so it cannot take the others down with it.
 
-There are exactly three `useWebSocket()` call sites, and two of them immediately hand
-`subscribe` to the hook that does the real work:
+There are eight `useWebSocket()` call sites. Four of them are rowed below, and two of those
+immediately hand `subscribe` to the hook that does the real work:
 
 | Call site | Handler | Frames it acts on | State it owns |
 | --- | --- | --- | --- |
 | `ChatInterface.tsx:72` | `useChatRealtimeHandlers` | every provider `kind`, `chat_subscribed`, `history_truncated`, `protocol_error`, `websocket_reconnected` | session store, processing state, pending permissions, token budget |
 | `ProjectWorkspaceRoute.tsx:32` | `useProjectsState` | `session_upserted`, `loading_progress`, `websocket_reconnected`, plus a sessionId-keyed "attention" marker for background sessions | project list, sidebar rows, session aliasing, selection |
 | `TaskMasterContext.tsx:102` | itself | `taskmaster-project-updated`, `taskmaster-tasks-updated` (`type`-keyed) | task board data |
+| `RunnerFeed.tsx` | itself | `runner_state`, `websocket_reconnected` | none of its own — it publishes the retained runner topics into the live bus |
+
+The four the table does not row — `useRestartOnInstalledCli.ts`, `useGitDelegation.ts`,
+`useSimpleChatList.ts` and `useSimpleChatRemove.ts` — are later arcs' call sites that take
+`subscribe` or `sendMessage` straight into their own hooks rather than owning a slice of the
+frame vocabulary; re-grep before quoting the number, because it grows with every such arc.
 
 Ownership is deliberately disjoint: the chat handler returns early on `session_upserted` and
 `loading_progress` (`useChatRealtimeHandlers.ts:175-178`), and returns immediately on any
@@ -287,6 +293,7 @@ Two kinds in those unions never appear where you would look for them:
 | `protocol_error` | `chat-websocket.service.ts:127` | Error row, spinner cleared |
 | `session_upserted` | `session-upsert-broadcast.service.ts:81-105` | `useProjectsState` — sidebar rows and alias folding |
 | `loading_progress` | `projects-with-sessions-fetch.service.ts:164-175` | `useProjectsState` — project scan progress (`:720-736`) |
+| `runner_state` | `plan-runner/runner-watcher.service.ts` | The plan runner's live runs, pushed on change. Not consumed by the chat handler, which returns early on it |
 
 ### The one exception
 
@@ -524,12 +531,22 @@ flowchart TD
     SET --> E1["loading_progress"]
     SET --> E2["session_upserted"]
     SET --> E3["taskmaster frames"]
+    SET --> E4["runner_state"]
   end
   subgraph PerRun["Per-run, this run's audience only"]
     W["ChatSessionWriter connections set"]
-    W --> E4["every provider frame for one session"]
+    W --> E5["every provider frame for one session"]
   end
 ```
+
+There are four broadcasters over that set, not three: `loading_progress`, `session_upserted`, the
+Task Master frames, and the plan-runner watcher (`server/modules/plan-runner/`), which polls the
+runner's state directory every two seconds and puts a frame on the wire only when the picture
+actually changed — a live→stale flip included, since that is a change in the snapshot like any
+other. Its dedup records a picture as sent only AFTER the send returns, so a broadcast that throws
+part-way is re-sent on the next tick instead of being suppressed as unchanged — the frame carries the
+whole picture, so a client receiving it twice receives it once. It reaches `connectedClients` through
+the websocket module's own barrel, never a deep import.
 
 A socket joins `connectedClients` when `handleChatConnection` runs
 (`chat-websocket.service.ts:589`) and leaves on close (`:632`) — closing a tab removes a
