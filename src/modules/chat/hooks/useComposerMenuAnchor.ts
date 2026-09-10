@@ -15,18 +15,26 @@ const MIN_MENU_WIDTH = 192;
  * upward and leftward without measuring itself first, so it never paints in the
  * wrong spot for a frame. The same anchor works on phones because `maxWidth`
  * shrinks the menu instead of letting it run off the left edge.
+ *
+ * `getExternalTrigger` is for a menu whose opener is not its own button — the schedule menu
+ * hangs off the SEND button, which the composer owns. It is a getter rather than a second ref
+ * so that `triggerRef` below stays a plain `useRef` the compiler can still recognise; aliasing
+ * the two made every `.current` read look like a dependency. Handing it in keeps one rule for
+ * where a composer popover sits, and keeps the outside-pointerdown check honest: a press on the
+ * trigger must not read as a press outside the menu.
  */
 export function useComposerMenuAnchor(
   isOpen: boolean,
   onClose: () => void,
   preferredWidth = 320,
+  getExternalTrigger?: () => HTMLElement | null,
 ) {
   const triggerRef = useRef<HTMLButtonElement | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
   const [anchor, setAnchor] = useState<ComposerMenuAnchor | null>(null);
 
   const updateAnchor = useCallback(() => {
-    const rect = triggerRef.current?.getBoundingClientRect();
+    const rect = (getExternalTrigger?.() ?? triggerRef.current)?.getBoundingClientRect();
     if (!rect) {
       return;
     }
@@ -45,7 +53,7 @@ export function useComposerMenuAnchor(
       maxHeight: Math.max(160, rect.top - MENU_GAP - VIEWPORT_MARGIN),
       maxWidth: Math.max(200, Math.min(preferredWidth, window.innerWidth - right - VIEWPORT_MARGIN)),
     });
-  }, [preferredWidth]);
+  }, [preferredWidth, getExternalTrigger]);
 
   useEffect(() => {
     if (!isOpen) {
@@ -54,7 +62,8 @@ export function useComposerMenuAnchor(
 
     const handlePointerDown = (event: PointerEvent) => {
       const target = event.target as Node;
-      if (!triggerRef.current?.contains(target) && !menuRef.current?.contains(target)) {
+      const trigger = getExternalTrigger?.() ?? triggerRef.current;
+      if (!trigger?.contains(target) && !menuRef.current?.contains(target)) {
         onClose();
       }
     };
@@ -66,7 +75,7 @@ export function useComposerMenuAnchor(
       event.preventDefault();
       event.stopPropagation();
       onClose();
-      triggerRef.current?.focus();
+      (getExternalTrigger?.() ?? triggerRef.current)?.focus();
     };
 
     document.addEventListener('pointerdown', handlePointerDown);
@@ -81,7 +90,7 @@ export function useComposerMenuAnchor(
       window.removeEventListener('scroll', updateAnchor, true);
       window.removeEventListener('keydown', handleKeyDown, { capture: true });
     };
-  }, [isOpen, onClose, updateAnchor]);
+  }, [isOpen, onClose, updateAnchor, getExternalTrigger]);
 
   return { triggerRef, menuRef, anchor, updateAnchor };
 }

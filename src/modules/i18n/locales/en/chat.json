@@ -308,6 +308,7 @@
   "schedule": {
     "trigger": "Schedule this message",
     "heading": "Send later",
+    "holdHint": "hold to send later",
     "customLabel": "Or pick a time",
     "confirm": "Schedule",
     "in": {

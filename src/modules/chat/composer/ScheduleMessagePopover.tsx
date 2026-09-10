@@ -1,9 +1,7 @@
-import { useCallback, useState } from 'react';
+import { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
-import { Clock } from 'lucide-react';
 
-import { cn } from '@/shared/utils';
 import { useComposerMenuAnchor } from '@/modules/chat/hooks/useComposerMenuAnchor';
 import {
   ComposerMenuHeading,
@@ -13,7 +11,11 @@ import {
 } from '@/modules/chat/composer/ComposerMenuPrimitives';
 
 type ScheduleMessagePopoverProps = {
-  disabled: boolean;
+  /** Open state, owned by the composer: the SEND button is this menu's trigger. */
+  isOpen: boolean;
+  onClose: () => void;
+  /** Reads the send button, so the panel sits above it the way every composer popover does. */
+  getTrigger: () => HTMLElement | null;
   onSchedule: (scheduledFor: Date) => void;
 };
 
@@ -38,93 +40,75 @@ function toLocalInputValue(date: Date): string {
 }
 
 /**
- * Rendered by chat's ChatComposer beside the send button so the message in the
- * box can be sent later instead of now.
+ * Rendered by chat's ChatComposer as the panel behind a PRESS-AND-HOLD on the send button, so
+ * the message in the box can be sent later instead of now.
+ *
+ * It draws no trigger of its own. It used to own a clock button beside send, which cost a
+ * 32px slot in the tightest row on a phone to offer the rarest thing in it; holding the button
+ * that already means "send" is the same gesture a phone keyboard uses for its own alternates.
+ * The composer owns the open state because the composer owns that button.
  */
-export function ScheduleMessagePopover({ disabled, onSchedule }: ScheduleMessagePopoverProps) {
+export function ScheduleMessagePopover({ isOpen, onClose, getTrigger, onSchedule }: ScheduleMessagePopoverProps) {
   const { t } = useTranslation('chat');
-  const [isOpen, setIsOpen] = useState(false);
-  const close = useCallback(() => setIsOpen(false), []);
   // Portalled and anchored like the model and permission menus: the composer
   // sits inside the scrolling transcript's stacking context, so a popover
   // positioned inside it is clipped by the message pane.
-  const { triggerRef, menuRef, anchor, updateAnchor } = useComposerMenuAnchor(isOpen, close);
+  const { menuRef, anchor } = useComposerMenuAnchor(isOpen, onClose, 320, getTrigger);
   // Seeded an hour out, because a picker that opens on "now" is never what
   // scheduling means.
   const [customValue, setCustomValue] = useState(() => toLocalInputValue(new Date(Date.now() + 3_600_000)));
 
   const commit = (scheduledFor: Date) => {
     onSchedule(scheduledFor);
-    setIsOpen(false);
+    onClose();
   };
 
   const ariaLabel = t('schedule.trigger');
 
-  return (
-    <>
-      <button
-        ref={triggerRef}
-        type="button"
-        disabled={disabled}
-        onClick={() => {
-          updateAnchor();
-          setIsOpen((current) => !current);
-        }}
-        aria-haspopup="menu"
-        aria-expanded={isOpen}
-        aria-label={ariaLabel}
-        title={ariaLabel}
-        className={cn(
-          'flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-border/60 bg-muted/40 text-muted-foreground transition-colors',
-          disabled ? 'cursor-not-allowed opacity-40' : 'hover:bg-muted hover:text-foreground',
-          isOpen && 'text-foreground',
-        )}
-      >
-        <Clock className="h-4 w-4" />
-      </button>
+  if (!isOpen || !anchor) {
+    return null;
+  }
 
-      {isOpen && anchor && createPortal(
-        <ComposerMenuSurface anchor={anchor} menuRef={menuRef} ariaLabel={ariaLabel}>
-          <ComposerMenuHeading>{t('schedule.heading')}</ComposerMenuHeading>
-          {QUICK_OFFSETS_MINUTES.map((minutes) => (
-            <ComposerMenuItem
-              key={minutes}
-              label={t(`schedule.in.${minutes}`)}
-              description={new Date(Date.now() + minutes * 60_000).toLocaleTimeString([], {
-                hour: '2-digit',
-                minute: '2-digit',
-              })}
-              isSelected={false}
-              onSelect={() => commit(new Date(Date.now() + minutes * 60_000))}
-            />
-          ))}
+  return createPortal(
+    <ComposerMenuSurface anchor={anchor} menuRef={menuRef} ariaLabel={ariaLabel}>
+      <ComposerMenuHeading>{t('schedule.heading')}</ComposerMenuHeading>
+      {QUICK_OFFSETS_MINUTES.map((minutes) => (
+        <ComposerMenuItem
+          key={minutes}
+          label={t(`schedule.in.${minutes}`)}
+          description={new Date(Date.now() + minutes * 60_000).toLocaleTimeString([], {
+            hour: '2-digit',
+            minute: '2-digit',
+          })}
+          isSelected={false}
+          onSelect={() => commit(new Date(Date.now() + minutes * 60_000))}
+        />
+      ))}
 
-          <ComposerMenuSeparator />
-          <div className="px-2.5 pb-1.5">
-            <label className="block text-[11px] font-medium text-muted-foreground" htmlFor="schedule-at">
-              {t('schedule.customLabel')}
-            </label>
-            <input
-              id="schedule-at"
-              type="datetime-local"
-              value={customValue}
-              onChange={(event) => setCustomValue(event.target.value)}
-              className="mt-1 w-full rounded-md border border-border/60 bg-background px-2 py-1 text-xs text-foreground"
-            />
-            <button
-              type="button"
-              onClick={() => {
-                const parsed = readLocalDateTime(customValue);
-                if (parsed) commit(parsed);
-              }}
-              className="mt-2 w-full rounded-md bg-primary px-2 py-1.5 text-xs font-medium text-primary-foreground transition-opacity hover:opacity-90"
-            >
-              {t('schedule.confirm')}
-            </button>
-          </div>
-        </ComposerMenuSurface>,
-        document.body,
-      )}
-    </>
+      <ComposerMenuSeparator />
+      <div className="px-2.5 pb-1.5">
+        <label className="block text-[11px] font-medium text-muted-foreground" htmlFor="schedule-at">
+          {t('schedule.customLabel')}
+        </label>
+        <input
+          id="schedule-at"
+          type="datetime-local"
+          value={customValue}
+          onChange={(event) => setCustomValue(event.target.value)}
+          className="mt-1 w-full rounded-md border border-border/60 bg-background px-2 py-1 text-xs text-foreground"
+        />
+        <button
+          type="button"
+          onClick={() => {
+            const parsed = readLocalDateTime(customValue);
+            if (parsed) commit(parsed);
+          }}
+          className="mt-2 w-full rounded-md bg-primary px-2 py-1.5 text-xs font-medium text-primary-foreground transition-opacity hover:opacity-90"
+        >
+          {t('schedule.confirm')}
+        </button>
+      </div>
+    </ComposerMenuSurface>,
+    document.body,
   );
 }

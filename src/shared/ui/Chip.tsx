@@ -16,6 +16,8 @@ type ChipProps = {
    * greyscale (the same trick the accent-selected chip already plays).
    */
   tone?: Tone;
+  /** For a caller that has to line the chip up with the controls beside it — a height, mostly. */
+  className?: string;
 };
 
 /**
@@ -28,11 +30,12 @@ type ChipProps = {
  * its pressed state; without one it is a `<span>`, because a static tag that takes focus
  * sends the reader somewhere nothing happens.
  */
-export function Chip({ selected = false, onClick, children, size = 'md', tone }: ChipProps) {
+export function Chip({ selected = false, onClick, children, size = 'md', tone, className: extra }: ChipProps) {
   const className = cn(
     'vv-chip inline-flex items-center gap-1.5',
     size === 'sm' && 'vv-chip--sm',
-    tone && 'vv-chip--toned'
+    tone && 'vv-chip--toned',
+    extra
   );
 
   if (!onClick) {

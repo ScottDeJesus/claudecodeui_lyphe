@@ -114,6 +114,14 @@ type ChatComposerProps = {
 };
 
 /**
+ * How long a press on send has to last before it means "later" instead of "now".
+ *
+ * 500ms is the platform convention for a long press (Android's own default), and it is far
+ * enough past a deliberate tap that a fast one never trips it.
+ */
+const LONG_PRESS_MS = 500;
+
+/**
  * Rendered by chat's ChatInterface as the whole input area: textarea, pending
  * attachments, queued message, permission banner, voice input and the
  * model/permission popovers that drive the next turn.
@@ -187,6 +195,16 @@ export default function ChatComposer({
   // Below it the model menu carries the edit mode and the permission chip is not rendered at
   // all — a CSS-hidden second chip would still mount a second popover for the same choice.
   const { isMobile: isNarrowComposer } = useDeviceSettings({ mobileBreakpoint: 640, trackPWA: false });
+
+  // Send-later hangs off a press-and-hold on the SEND button; it has no button of its own.
+  const sendButtonRef = useRef<HTMLButtonElement | null>(null);
+  const [isScheduleOpen, setIsScheduleOpen] = useState(false);
+  const longPressTimerRef = useRef<number | null>(null);
+  // Set the moment the hold fires, and read by the click that a hold always produces afterwards
+  // — without it, holding to schedule would ALSO send the message on release.
+  const longPressFiredRef = useRef(false);
+  const closeSchedule = useCallback(() => setIsScheduleOpen(false), []);
+  const getSendButton = useCallback(() => sendButtonRef.current, []);
   const fileDropdownRef = useRef<HTMLDivElement | null>(null);
   const selectedFileRef = useRef<HTMLDivElement | null>(null);
   const commandMenuPosition = useMemo(() => {
@@ -241,6 +259,36 @@ export default function ChatComposer({
   const isRecording = voiceState === 'recording';
   const isTranscribing = voiceState === 'transcribing';
 
+  // A hold is only an alternate for SEND. While a turn is running the button means stop, while
+  // a recording is live it means finish, and with nothing typed there is nothing to schedule —
+  // in each case holding must do nothing rather than open a menu that cannot act.
+  const canScheduleFromSend = !isLoading && !isRecording && !isTranscribing && input.trim().length > 0;
+
+  const cancelLongPress = useCallback(() => {
+    if (longPressTimerRef.current !== null) {
+      window.clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+  }, []);
+
+  const startLongPress = useCallback(() => {
+    // Cleared BEFORE the guard, not after it. A hold that opened the menu and then released
+    // off the button leaves no click to consume the flag; if the next press could return early
+    // without clearing it, that press's click would be swallowed — and by then the button may
+    // well mean "stop".
+    longPressFiredRef.current = false;
+    cancelLongPress();
+    if (!canScheduleFromSend) return;
+    longPressTimerRef.current = window.setTimeout(() => {
+      longPressTimerRef.current = null;
+      longPressFiredRef.current = true;
+      setIsScheduleOpen(true);
+    }, LONG_PRESS_MS);
+  }, [canScheduleFromSend, cancelLongPress]);
+
+  // A timer left running past unmount would call setState on a dead component.
+  useEffect(() => cancelLongPress, [cancelLongPress]);
+
   // Detect if the AskUserQuestion interactive panel is active
   const hasQuestionPanel = pendingPermissionRequests.some(
     (r) => r.toolName === 'AskUserQuestion'
@@ -259,6 +307,10 @@ export default function ChatComposer({
     : isLoading
       ? t('input.stop')
       : t('input.send');
+
+  const sendLabelWithHint = canScheduleFromSend
+    ? `${submitAriaLabel} — ${t('schedule.holdHint', { defaultValue: 'hold to send later' })}`
+    : submitAriaLabel;
 
   return (
     <div className="chat-composer-shell relative flex-shrink-0 px-2 pb-2 pt-0 sm:px-4 sm:pb-4 md:px-4 md:pb-6">
@@ -476,11 +528,6 @@ export default function ChatComposer({
               possible if the row may shrink, and only useful if its children may too —
               the two menu buttons already truncate their labels. */}
           <div className="ml-auto flex min-w-0 items-center gap-1.5 sm:gap-2">
-            <ScheduleMessagePopover
-              disabled={!input.trim()}
-              onSchedule={onScheduleMessage}
-            />
-
             {/* One pill or two, never both: below `sm` the model menu carries the edit mode as
                 a third section, so rendering the permission chip as well would put the same
                 choice on screen twice. */}
@@ -506,6 +553,25 @@ export default function ChatComposer({
             )}
 
             <PromptInputSubmit
+              ref={sendButtonRef}
+              // Press and hold is send-later. The click a hold always leaves behind is swallowed
+              // here rather than in each branch below, so no path can send the message that the
+              // menu is at that moment offering to schedule.
+              onPointerDown={startLongPress}
+              onPointerUp={cancelLongPress}
+              onPointerLeave={cancelLongPress}
+              onPointerCancel={cancelLongPress}
+              onContextMenu={(e: MouseEvent<HTMLButtonElement>) => {
+                // Holding a button raises the platform's own callout on some phones, which
+                // would cover the menu the same gesture just opened.
+                if (canScheduleFromSend) e.preventDefault();
+              }}
+              onClickCapture={(e: MouseEvent<HTMLButtonElement>) => {
+                if (!longPressFiredRef.current) return;
+                longPressFiredRef.current = false;
+                e.preventDefault();
+                e.stopPropagation();
+              }}
               onClick={
                 canQueueDraft
                   ? (e: MouseEvent<HTMLButtonElement>) => {
@@ -530,9 +596,13 @@ export default function ChatComposer({
                       ? true
                       : !input.trim() && attachedFiles.length === 0
               }
-              aria-label={submitAriaLabel}
-              title={submitAriaLabel}
-              className="h-10 w-10 sm:h-10 sm:w-10"
+              // The hold is the only way to reach send-later now that the clock button is gone, so
+              // the button that answers it says so — in the tooltip and to a screen reader both.
+              aria-label={sendLabelWithHint}
+              title={sendLabelWithHint}
+              // Same 32px as every other control in this row on a phone, which is the
+              // width where they sit shoulder to shoulder; desktop keeps the bigger target.
+              className="h-8 w-8 sm:h-10 sm:w-10"
             >
               {isTranscribing ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -540,6 +610,14 @@ export default function ChatComposer({
                 <ArrowUpIcon className="h-4 w-4" />
               ) : undefined}
             </PromptInputSubmit>
+
+            {/* Draws no trigger — the send button above is it. */}
+            <ScheduleMessagePopover
+              isOpen={isScheduleOpen}
+              onClose={closeSchedule}
+              getTrigger={getSendButton}
+              onSchedule={onScheduleMessage}
+            />
           </div>
 
         </PromptInputFooter>

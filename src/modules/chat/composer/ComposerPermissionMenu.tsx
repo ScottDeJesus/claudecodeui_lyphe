@@ -70,7 +70,7 @@ function ComposerPermissionMenu({
         {/* The ring carries the mode's tone and the fill arrives for the modes that write
             without asking — the same two channels the narrow pill wears, which is what lets
             this chip, with its words still on it, be the legend for that one. */}
-        <Chip size="sm" tone={permissionMark(permissionMode).tone} selected={permissionMark(permissionMode).writesUnasked}>
+        <Chip className="h-8" size="sm" tone={permissionMark(permissionMode).tone} selected={permissionMark(permissionMode).writesUnasked}>
           <span className="max-w-28 truncate sm:max-w-none">{modeLabel(permissionMode)}</span>
         </Chip>
       </button>

@@ -138,6 +138,7 @@ function ComposerModelMenu({
             width at all, and the menu below carries the tone as a swatch beside each mode, so
             one tap is the legend. */}
         <Chip
+          className="h-8"
           size="sm"
           tone={hasPermissionSection && permissionMode ? permissionMark(permissionMode).tone : undefined}
           selected={Boolean(hasPermissionSection && permissionMode && permissionMark(permissionMode).writesUnasked)}
