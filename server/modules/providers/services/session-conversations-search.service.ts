@@ -6,6 +6,7 @@ import { spawn } from 'cross-spawn';
 import { rgPath } from '@vscode/ripgrep';
 
 import { projectsDb, sessionsDb } from '@/modules/database/index.js';
+import { localCommandDisplayText, type LocalCommandPayload } from '@/shared/local-commands.js';
 
 type AnyRecord = Record<string, any>;
 type SearchableProvider = 'claude' | 'codex';
@@ -374,11 +375,7 @@ function extractTaggedContent(content: string, tagName: string): string | null {
   return match ? match[1] : null;
 }
 
-type ClaudeLocalCommandPayload = {
-  commandName: string;
-  commandMessage: string;
-  commandArgs: string;
-};
+type ClaudeLocalCommandPayload = LocalCommandPayload;
 
 function parseClaudeLocalCommandPayload(content: string): ClaudeLocalCommandPayload | null {
   const commandName = extractTaggedContent(content, 'command-name');
@@ -396,18 +393,6 @@ function parseClaudeLocalCommandPayload(content: string): ClaudeLocalCommandPayl
   };
 }
 
-function buildClaudeLocalCommandDisplayText(payload: ClaudeLocalCommandPayload): string {
-  const commandName = payload.commandName.trim();
-  const commandMessage = payload.commandMessage.trim();
-  const commandArgs = payload.commandArgs.trim();
-  const baseCommand = commandName || commandMessage;
-
-  if (!baseCommand) {
-    return '';
-  }
-
-  return commandArgs ? `${baseCommand} ${commandArgs}` : baseCommand;
-}
 
 function stripAnsiFormatting(text: string): string {
   return text.replace(/\u001B\[[0-9;?]*[ -/]*[@-~]/g, '');
@@ -452,7 +437,7 @@ function extractClaudeSearchableMessage(entry: AnyRecord): ClaudeSearchableMessa
 
     const localCommand = parseClaudeLocalCommandPayload(content);
     if (localCommand) {
-      const displayText = buildClaudeLocalCommandDisplayText(localCommand);
+      const displayText = localCommandDisplayText(localCommand);
       return displayText
         ? {
             text: displayText,

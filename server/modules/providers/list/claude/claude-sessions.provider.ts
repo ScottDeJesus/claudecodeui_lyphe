@@ -13,6 +13,7 @@ import type {
   SubagentInfo,
 } from '@/shared/types.js';
 import { parseFilesInputTag } from '@/shared/image-attachments.js';
+import { localCommandDisplayText, type LocalCommandPayload } from '@/shared/local-commands.js';
 import { prepareTranscriptMessages } from '@/shared/message-unification.js';
 import {
   createNormalizedMessage,
@@ -624,11 +625,7 @@ function extractTaggedContent(content: string, tagName: string): string | null {
   return match ? match[1] : null;
 }
 
-type ClaudeLocalCommandPayload = {
-  commandName: string;
-  commandMessage: string;
-  commandArgs: string;
-};
+type ClaudeLocalCommandPayload = LocalCommandPayload;
 
 /**
  * Converts Claude's hidden local command wrapper into structured metadata.
@@ -652,25 +649,6 @@ function parseLocalCommandPayload(content: string): ClaudeLocalCommandPayload | 
   };
 }
 
-/**
- * Produces the short user-visible command string that should appear in chat.
- *
- * We prefer the slash-prefixed command name because that most closely matches
- * what the user actually typed, and only fall back to the message body when the
- * command name is unavailable in older transcript variants.
- */
-function buildLocalCommandDisplayText(payload: ClaudeLocalCommandPayload): string {
-  const commandName = payload.commandName.trim();
-  const commandMessage = payload.commandMessage.trim();
-  const commandArgs = payload.commandArgs.trim();
-  const baseCommand = commandName || commandMessage;
-
-  if (!baseCommand) {
-    return '';
-  }
-
-  return commandArgs ? `${baseCommand} ${commandArgs}` : baseCommand;
-}
 
 /**
  * Claude local-command stdout may contain ANSI styling codes because it was
@@ -847,7 +825,7 @@ export class ClaudeSessionsProvider implements IProviderSessions {
          */
         const localCommandPayload = parseLocalCommandPayload(text);
         if (localCommandPayload) {
-          const displayText = buildLocalCommandDisplayText(localCommandPayload);
+          const displayText = localCommandDisplayText(localCommandPayload);
           if (displayText) {
             messages.push(createNormalizedMessage({
               id: baseId,
