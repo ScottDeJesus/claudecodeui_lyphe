@@ -2,7 +2,7 @@ import { LLMProviderLogo } from '@/shared/ui';
 import { getSessionTitle } from '@/shared/utils';
 import type { Project, ProjectSession } from '@/shared/types';
 import MobileMenuButton from '@/modules/project-workspace/MobileMenuButton';
-import { TokenUsageSummary, type TokenUsageSurface } from '@/modules/chat';
+import { ChatExportMenu, TokenUsageSummary, type ChatExportSurface, type TokenUsageSurface } from '@/modules/chat';
 
 type WorkspaceHeaderProps = {
   selectedProject: Project;
@@ -12,6 +12,8 @@ type WorkspaceHeaderProps = {
   newSessionLabel: string;
   /** The open chat's token count and its breakdown opener; `null` off the chat tab. */
   tokenUsage?: TokenUsageSurface | null;
+  /** What the open chat needs to be exported; `null` off the chat tab or with nothing to export. */
+  chatExport?: ChatExportSurface | null;
 };
 
 /**
@@ -26,7 +28,9 @@ type WorkspaceHeaderProps = {
  * The Chat / Files / Git tabs used to live here too, with a scroller and a pair of chevrons;
  * they moved to the sidebar under the wordmark and did not come back. The token count came the
  * other way: on a phone the composer's footer row is the tightest strip on the screen, so below
- * `md` the count sits at this row's right edge and the composer hides its copy.
+ * `md` the count sits at this row's right edge and the composer hides its copy. The export
+ * button sits to the count's right for the same reason: on a phone it floated over the top of
+ * the transcript it was offering to export.
  */
 export default function WorkspaceHeader({
   selectedProject,
@@ -35,6 +39,7 @@ export default function WorkspaceHeader({
   onMenuClick,
   newSessionLabel,
   tokenUsage = null,
+  chatExport = null,
 }: WorkspaceHeaderProps) {
   if (!isMobile) return null;
 
@@ -60,6 +65,11 @@ export default function WorkspaceHeader({
       </div>
       {tokenUsage && (
         <TokenUsageSummary usage={tokenUsage.usage} onClick={tokenUsage.onShow} className="flex-none" />
+      )}
+      {chatExport && (
+        <div className="flex-none">
+          <ChatExportMenu {...chatExport} />
+        </div>
       )}
     </header>
   );

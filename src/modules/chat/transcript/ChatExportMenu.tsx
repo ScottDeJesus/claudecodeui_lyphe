@@ -9,6 +9,13 @@ import {
   type TranscriptExportFormat,
 } from '@/modules/chat/utils/chatExport';
 
+/**
+ * Everything this menu needs, as one value — so a surface OUTSIDE the chat module can draw the
+ * same button without the seven props travelling separately. The mobile workspace header takes
+ * one of these; see ChatMessagesPane, which assembles it.
+ */
+export type ChatExportSurface = ChatExportMenuProps;
+
 type ChatExportMenuProps = {
   messages: ChatMessage[];
   sessionTitle?: string;

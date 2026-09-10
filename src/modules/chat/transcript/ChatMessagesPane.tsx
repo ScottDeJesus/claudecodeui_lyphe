@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import { memo, useCallback, useMemo } from 'react';
+import { memo, useCallback, useEffect, useMemo } from 'react';
 import type { CSSProperties, Dispatch, RefObject, SetStateAction } from 'react';
 
 import type { ChatMessage,
@@ -19,7 +19,7 @@ import MessageComponent from '@/modules/chat/transcript/MessageComponent';
 import ProviderSelectionEmptyState from '@/modules/chat/transcript/ProviderSelectionEmptyState';
 import ToolGroupContainer from '@/modules/chat/transcript/ToolGroupContainer';
 import LoadAllMessagesOverlay from '@/modules/chat/transcript/LoadAllMessagesOverlay';
-import ChatExportMenu from '@/modules/chat/transcript/ChatExportMenu';
+import ChatExportMenu, { type ChatExportSurface } from '@/modules/chat/transcript/ChatExportMenu';
 import PinnedSubagents from '@/modules/chat/transcript/PinnedSubagents';
 
 /**
@@ -80,6 +80,11 @@ type ChatMessagesPaneProps = {
   onLoadFullTranscript?: () => Promise<ChatMessage[]>;
   /** Asks whether a tool call is blocked on a person, or was allowed by one. */
   readToolPermissionState?: ReadToolPermissionState;
+  /**
+   * Receives what the export button needs so a surface outside this module (the mobile
+   * workspace header) can draw it; `null` when there is nothing to export or this pane goes.
+   */
+  onExportSurface?: (surface: ChatExportSurface | null) => void;
 };
 
 /**
@@ -132,6 +137,7 @@ function ChatMessagesPane({
   showThinking,
   selectedProject,
   readToolPermissionState,
+  onExportSurface,
 }: ChatMessagesPaneProps) {
   const { t } = useTranslation('chat');
   // The catalog this pane already holds, asked the one question the transcript
@@ -181,6 +187,29 @@ function ChatMessagesPane({
     return keys;
   }, [groupedVisibleMessages]);
 
+  // Assembled once and used twice: the floating button below draws it from `md` up, and the
+  // mobile workspace header draws the same menu from the published copy. `null` while there is
+  // nothing to export, which is also what makes the button disappear at zero messages.
+  const exportSurface = useMemo<ChatExportSurface | null>(
+    () => (chatMessages.length === 0 ? null : {
+      messages: chatMessages,
+      sessionTitle: selectedSession?.summary || selectedSession?.title,
+      provider,
+      selectedProject,
+      createDiff,
+      resolveModelLabel,
+      onLoadFullTranscript,
+    }),
+    [chatMessages, selectedSession, provider, selectedProject, createDiff, resolveModelLabel, onLoadFullTranscript],
+  );
+
+  useEffect(() => {
+    onExportSurface?.(exportSurface);
+  }, [onExportSurface, exportSurface]);
+  // Withdrawn on unmount, so a closed chat never leaves a button that would export its
+  // transcript into whatever is open next.
+  useEffect(() => () => onExportSurface?.(null), [onExportSurface]);
+
   const getMessageKey = useCallback(
     (message: ChatMessage) =>
       messageKeyMap.get(message) ?? getIntrinsicMessageKey(message) ?? 'message-generated',
@@ -199,18 +228,12 @@ function ChatMessagesPane({
       // the transcript, and every message body inside it reads the variable off this ancestor.
       style={{ '--chat-font-size': `${chatFontSize}px` } as CSSProperties}
     >
-      {chatMessages.length > 0 && (
-        <div className="pointer-events-none sticky right-4 top-3 z-10 mb-2 flex justify-end sm:px-4">
+      {/* From `md` up only: below it the same menu rides the workspace header beside the token
+          count, and two of them would both float over the same transcript. */}
+      {exportSurface && (
+        <div className="pointer-events-none sticky right-4 top-3 z-10 mb-2 hidden justify-end sm:px-4 md:flex">
           <div className="pointer-events-auto">
-            <ChatExportMenu
-              messages={chatMessages}
-              sessionTitle={selectedSession?.summary || selectedSession?.title}
-              provider={provider}
-              selectedProject={selectedProject}
-              createDiff={createDiff}
-              resolveModelLabel={resolveModelLabel}
-              onLoadFullTranscript={onLoadFullTranscript}
-            />
+            <ChatExportMenu {...exportSurface} />
           </div>
         </div>
       )}

@@ -6,6 +6,7 @@ import { useTasksSettings } from '@/modules/task-master';
 import { useWebSocket } from '@/shared/context/WebSocketContext';
 import PermissionContext from '@/modules/chat/context/PermissionContext';
 import type { TokenUsageSurface } from '@/modules/chat/composer/TokenUsageSummary';
+import type { ChatExportSurface } from '@/modules/chat/transcript/ChatExportMenu';
 import { api } from '@/shared/api';
 import type {
   ChatMessage,
@@ -51,6 +52,8 @@ type ChatInterfaceProps = {
   /** Receives the token count + its breakdown opener so a surface outside the chat (the mobile
       workspace header) can draw them; `null` again when this chat unmounts. */
   onTokenUsageSurface?: (surface: TokenUsageSurface | null) => void;
+  /** The same arrangement for the export button, which rides the mobile header beside the count. */
+  onChatExportSurface?: (surface: ChatExportSurface | null) => void;
 };
 
 /**
@@ -75,6 +78,7 @@ function ChatInterface({
   newSessionTrigger,
   onShowAllTasks,
   onTokenUsageSurface,
+  onChatExportSurface,
 }: ChatInterfaceProps) {
   const { tasksEnabled, isTaskMasterInstalled } = useTasksSettings();
   const { subscribe } = useWebSocket();
@@ -551,6 +555,7 @@ function ChatInterface({
           onEditMessage={supportsMessageEditing && !isProcessing ? beginEditMessage : undefined}
           onForkFromMessage={supportsSessionForking ? handleForkFromMessage : undefined}
           onLoadFullTranscript={loadFullTranscript}
+          onExportSurface={onChatExportSurface}
         />
 
         <div className="relative flex-shrink-0">

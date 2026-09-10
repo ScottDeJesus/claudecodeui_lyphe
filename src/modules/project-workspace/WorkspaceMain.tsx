@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState, type Dispatch, type SetStateAction } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { ChatInterface, type TokenUsageSurface } from '@/modules/chat';
+import { ChatInterface, type ChatExportSurface, type TokenUsageSurface } from '@/modules/chat';
 import { FileManager } from '@/modules/file-manager';
 import { StandaloneShell } from '@/modules/standalone-shell';
 import { GitPanel } from '@/modules/git-panel';
@@ -79,6 +79,9 @@ function WorkspaceMain({
   // copy below `md`). Chat-tab only: the number is that chat's, and the header stays a strip of
   // navigation on every other tab.
   const [tokenUsageSurface, setTokenUsageSurface] = useState<TokenUsageSurface | null>(null);
+  // The export button travels the same way and for the same reason: on a phone it used to float
+  // over the transcript it was exporting.
+  const [chatExportSurface, setChatExportSurface] = useState<ChatExportSurface | null>(null);
 
   const handleFileOpen = useCallback((filePath: string) => {
     setOpenRequest({ path: filePath });
@@ -175,6 +178,7 @@ function WorkspaceMain({
         onMenuClick={onMenuClick}
         newSessionLabel={t('mainContent.newSession')}
         tokenUsage={activeTab === 'chat' ? tokenUsageSurface : null}
+        chatExport={activeTab === 'chat' ? chatExportSurface : null}
       />
 
       <div className="flex min-h-0 min-w-[200px] flex-1 flex-col overflow-hidden">
@@ -196,6 +200,7 @@ function WorkspaceMain({
               externalMessageUpdate={externalMessageUpdate}
               newSessionTrigger={newSessionTrigger}
               onTokenUsageSurface={setTokenUsageSurface}
+              onChatExportSurface={setChatExportSurface}
               onShowAllTasks={shouldShowTasksTab ? showAllTasks : null}
             />
           </WorkspaceErrorBoundary>
