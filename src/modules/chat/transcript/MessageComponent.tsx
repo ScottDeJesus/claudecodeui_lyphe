@@ -2,7 +2,7 @@ import { memo, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { GitBranchIcon, PencilIcon } from 'lucide-react';
 
-import { Card, LLMProviderLogo } from '@/shared/ui';
+import { LLMProviderLogo } from '@/shared/ui';
 import { cn } from '@/shared/utils';
 
 import type { ChatMessage, ClaudePermissionSuggestion, PermissionGrantResult, LLMProvider,DiffLine,Project } from '@/shared/types';
@@ -148,31 +148,6 @@ const MessageComponent = memo(({ message, prevMessage, isRunTerminal, createDiff
   if (shouldHideThinkingMessage) {
     return null;
   }
-
-  const isReplyCard = !message.isSubagentContainer && !message.isToolUse && !message.isThinking;
-  // Copy, speak and the landing time close the turn: inside the card for a reply,
-  // under the row for a tool call.
-  const replyFooter = (shouldShowAssistantCopyControl || shouldShowResponseTime) && (
-    <div className="mt-1 flex w-full items-center gap-2 text-[11px] text-ink-faint">
-      {shouldShowAssistantCopyControl && (
-        <MessageCopyControl content={assistantCopyContent} messageType="assistant" />
-      )}
-      {shouldShowAssistantCopyControl && (
-        <MessageSpeakControl content={assistantCopyContent} />
-      )}
-      {shouldShowResponseTime && (
-        <time
-          dateTime={messageTime.date.toISOString()}
-          title={messageTime.date.toLocaleString(i18n.language)}
-          aria-label={t('responseTime.repliedAt', { time: formattedTime })}
-          className="ml-auto tabular-nums"
-        >
-          {formattedTime}
-        </time>
-      )}
-    </div>
-  );
-
   return (
     <div
       ref={messageRef}
@@ -375,16 +350,7 @@ const MessageComponent = memo(({ message, prevMessage, isRunTerminal, createDiff
                 </ReasoningContent>
               </Reasoning>
             ) : (
-              /* A reply is a message, so it sits in a card like the operator's own
-                 turn: white where theirs is grey, and squared at the top-left corner
-                 that points up at the speaker's mark, as theirs is at the top-right.
-                 It fits its text — a one-line answer is a short bubble, not a banner. */
-              <Card
-                data-reply-card
-                dir="auto"
-                className="w-fit max-w-full px-4 py-3 text-[15px] leading-relaxed text-foreground"
-                style={{ borderTopLeftRadius: 'var(--radius-tail)' }}
-              >
+              <div dir="auto" className="text-[15px] leading-relaxed text-foreground">
                 {/* Reasoning accordion */}
                 {showThinking && message.reasoning && (
                   <Reasoning className="mb-3" defaultOpen={false}>
@@ -445,8 +411,7 @@ const MessageComponent = memo(({ message, prevMessage, isRunTerminal, createDiff
                     </div>
                   );
                 })()}
-                {replyFooter}
-              </Card>
+              </div>
             )}
 
             {/* Outside the branches on purpose: a provider can cite memory on a
@@ -455,7 +420,26 @@ const MessageComponent = memo(({ message, prevMessage, isRunTerminal, createDiff
               <MemoryCitations citations={message.memoryCitations} />
             )}
 
-            {!isReplyCard && replyFooter}
+            {(shouldShowAssistantCopyControl || shouldShowResponseTime) && (
+              <div className="mt-1 flex w-full items-center gap-2 text-[11px] text-ink-faint">
+                {shouldShowAssistantCopyControl && (
+                  <MessageCopyControl content={assistantCopyContent} messageType="assistant" />
+                )}
+                {shouldShowAssistantCopyControl && (
+                  <MessageSpeakControl content={assistantCopyContent} />
+                )}
+                {shouldShowResponseTime && (
+                  <time
+                    dateTime={messageTime.date.toISOString()}
+                    title={messageTime.date.toLocaleString(i18n.language)}
+                    aria-label={t('responseTime.repliedAt', { time: formattedTime })}
+                    className="ml-auto tabular-nums"
+                  >
+                    {formattedTime}
+                  </time>
+                )}
+              </div>
+            )}
           </div>
         </div>
       )}

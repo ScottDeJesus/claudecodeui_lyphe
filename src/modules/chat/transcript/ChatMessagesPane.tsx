@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { memo, useCallback, useEffect, useMemo } from 'react';
-import type { CSSProperties, Dispatch, RefObject, SetStateAction } from 'react';
+import type { CSSProperties, Dispatch, ReactElement, RefObject, SetStateAction } from 'react';
 
 import type { ChatMessage,
   Project,
@@ -14,6 +14,7 @@ import { resolveModelLabel as labelForModelId } from '@/modules/chat/utils/model
 import { collectRunTerminalReplies, groupConsecutiveTools, isToolGroupItem } from '@/modules/chat/utils/toolGrouping';
 import { useChatFontSize } from '@/shared/hooks/useChatFontSize';
 import { useLazyRowObserver } from '@/modules/chat/hooks/useLazyRowObserver';
+import { Card } from '@/shared/ui';
 import LazyMessageRow from '@/modules/chat/transcript/LazyMessageRow';
 import MessageComponent from '@/modules/chat/transcript/MessageComponent';
 import ProviderSelectionEmptyState from '@/modules/chat/transcript/ProviderSelectionEmptyState';
@@ -317,7 +318,7 @@ function ChatMessagesPane({
             let prevMessage: ChatMessage | null = null;
             const rowCount = groupedVisibleMessages.length;
 
-            return groupedVisibleMessages.map((item, index) => {
+            const rows = groupedVisibleMessages.map((item, index) => {
               // Rows near the tail mount their content on first commit so the
               // initial scroll-to-bottom measures real heights; older rows
               // start as placeholders and mount when scrolled toward.
@@ -327,7 +328,7 @@ function ChatMessagesPane({
                 const groupPrevMessage = prevMessage;
                 prevMessage = item.messages[item.messages.length - 1] || prevMessage;
 
-                return (
+                return { isUser: false, node: (
                   <LazyMessageRow
                     key={`tool-group-${getMessageKey(item.messages[0])}`}
                     lazyRows={lazyRows}
@@ -349,13 +350,13 @@ function ChatMessagesPane({
                       readToolPermissionState={readToolPermissionState}
                     />
                   </LazyMessageRow>
-                );
+                ) };
               }
 
               const messagePrevMessage = prevMessage;
               prevMessage = item;
 
-              return (
+              return { isUser: item.type === 'user', node: (
                 <LazyMessageRow
                   key={getMessageKey(item)}
                   lazyRows={lazyRows}
@@ -380,8 +381,39 @@ function ChatMessagesPane({
                     readToolPermissionState={readToolPermissionState}
                   />
                 </LazyMessageRow>
-              );
+              ) };
             });
+
+            // Everything between two of the operator's turns — replies, tool calls, commands,
+            // notices — is one turn of Claude's, so it sits in one card, as theirs sits in
+            // its bubble. The rows stay separate LazyMessageRows inside it, so lazy mounting
+            // and timestamp anchors work exactly as before. Squared at the top-left, the
+            // corner under the speaker's mark, as the operator's bubble is at the top-right.
+            const turns: ReactElement[] = [];
+            let turn: ReactElement[] = [];
+            const closeTurn = () => {
+              if (turn.length === 0) return;
+              turns.push(
+                <Card
+                  key={`turn-${turn[0].key}`}
+                  className="space-y-3 py-3 sm:space-y-4 sm:px-4"
+                  style={{ borderTopLeftRadius: 'var(--radius-tail)' }}
+                >
+                  {turn}
+                </Card>
+              );
+              turn = [];
+            };
+            for (const row of rows) {
+              if (row.isUser) {
+                closeTurn();
+                turns.push(row.node);
+              } else {
+                turn.push(row.node);
+              }
+            }
+            closeTurn();
+            return turns;
           })()}
         </>
       )}
