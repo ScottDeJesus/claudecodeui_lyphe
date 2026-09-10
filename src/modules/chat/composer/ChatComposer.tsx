@@ -13,6 +13,7 @@ import type {
 import { PaperclipIcon, PencilRulerIcon, XIcon, Loader2, ArrowUpIcon, PencilIcon } from 'lucide-react';
 
 import { useDeviceSettings } from '@/shared/hooks/useDeviceSettings';
+import { Chip } from '@/shared/ui';
 import { useVoiceInput } from '@/modules/chat/hooks/useVoiceInput';
 import { useVoiceAvailable } from '@/modules/chat/hooks/useVoiceAvailable';
 import type { QueuedDraft, ScheduledMessage, SlashCommand,SessionActivity,PendingPermissionRequest,PermissionMode,ProviderModelOption } from '@/shared/types';
@@ -66,6 +67,9 @@ type ChatComposerProps = {
   tokenBudget: Record<string, unknown> | null;
   onShowTokenUsage: () => void;
   onToggleCommandMenu: () => void;
+  /** Every message goes out under `/plain` while this is on. */
+  plainMode: boolean;
+  onTogglePlainMode: () => void;
   hasInput: boolean;
   onClearInput: () => void;
   onSubmit: (event: FormEvent<HTMLFormElement> | MouseEvent<HTMLButtonElement> | TouchEvent<HTMLButtonElement>) => void;
@@ -146,6 +150,8 @@ export default function ChatComposer({
   tokenBudget,
   onShowTokenUsage,
   onToggleCommandMenu,
+  plainMode,
+  onTogglePlainMode,
   hasInput,
   onClearInput,
   onSubmit,
@@ -289,11 +295,6 @@ export default function ChatComposer({
   // A timer left running past unmount would call setState on a dead component.
   useEffect(() => cancelLongPress, [cancelLongPress]);
 
-  // Detect if the AskUserQuestion interactive panel is active
-  const hasQuestionPanel = pendingPermissionRequests.some(
-    (r) => r.toolName === 'AskUserQuestion'
-  );
-
   // Hide the thinking/status bar while any permission request is pending
   const hasPendingPermissions = pendingPermissionRequests.length > 0;
   const hasActivityIndicator = Boolean(activity && !hasPendingPermissions);
@@ -320,15 +321,11 @@ export default function ChatComposer({
         </div>
       )}
 
-      {pendingPermissionRequests.length > 0 && (
-        <div className="mx-auto mb-3 max-w-[54.25rem]">
-          <PermissionRequestsBanner
-            pendingPermissionRequests={pendingPermissionRequests}
-            handlePermissionDecision={handlePermissionDecision}
-            handleGrantToolPermission={handleGrantToolPermission}
-          />
-        </div>
-      )}
+      <PermissionRequestsBanner
+        pendingPermissionRequests={pendingPermissionRequests}
+        handlePermissionDecision={handlePermissionDecision}
+        handleGrantToolPermission={handleGrantToolPermission}
+      />
 
       <ScheduledMessageList
         scheduledMessages={scheduledMessages}
@@ -364,7 +361,7 @@ export default function ChatComposer({
         />
       )}
 
-      {!hasQuestionPanel && <div className="relative mx-auto max-w-[54.25rem]">
+      <div className="relative mx-auto max-w-[54.25rem]">
         {showFileDropdown && filteredFiles.length > 0 && (
           <div
             ref={fileDropdownRef}
@@ -511,6 +508,19 @@ export default function ChatComposer({
               <PencilRulerIcon />
             </PromptInputButton>
 
+            {/* A pressed chip, not an icon: the state has to be readable at a glance from the
+                strip, and "on" for a mode is a word plus a fill, the same grammar the model
+                and permission pills use on the right. */}
+            <Chip
+              size="sm"
+              className="h-8"
+              selected={plainMode}
+              onClick={onTogglePlainMode}
+              title={t('input.plainModeTooltip')}
+            >
+              {t('input.plainMode')}
+            </Chip>
+
             {hasInput && (
               <PromptInputButton
                 tooltip={{ content: t('input.clearInput', { defaultValue: 'Clear input' }) }}
@@ -622,7 +632,7 @@ export default function ChatComposer({
 
         </PromptInputFooter>
       </PromptInput>
-      </div>}
+      </div>
     </div>
   );
 }

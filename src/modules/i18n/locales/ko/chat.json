@@ -117,6 +117,8 @@
     "stop": "중지",
     "clickToChangeMode": "클릭하여 권한 모드 변경 (또는 입력창에서 Tab)",
     "showAllCommands": "모든 명령어 보기",
+    "plainMode": "간결",
+    "plainModeTooltip": "모든 메시지를 /plain과 함께 전송: 짧고 읽기 쉬운 답변",
     "clearInput": "입력 지우기",
     "scrollToBottom": "맨 아래로 스크롤",
     "queue": {

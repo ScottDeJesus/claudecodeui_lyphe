@@ -108,6 +108,8 @@
     "stop": "Durdur",
     "clickToChangeMode": "İzin modunu değiştirmek için tıkla (veya girdide Tab tuşuna bas)",
     "showAllCommands": "Tüm komutları göster",
+    "plainMode": "Sade",
+    "plainModeTooltip": "Her mesajı /plain ile gönder: kısa, kolay okunur yanıtlar",
     "clearInput": "Girdiyi temizle",
     "scrollToBottom": "En alta git"
   },

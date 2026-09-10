@@ -117,6 +117,8 @@
     "stop": "Detener",
     "clickToChangeMode": "Haz clic para cambiar el modo de permisos (o pulsa Tab en el campo de texto)",
     "showAllCommands": "Mostrar todos los comandos",
+    "plainMode": "Simple",
+    "plainModeTooltip": "Enviar cada mensaje con /plain: respuestas cortas y fáciles de leer",
     "clearInput": "Limpiar entrada",
     "scrollToBottom": "Ir al final",
     "queue": {

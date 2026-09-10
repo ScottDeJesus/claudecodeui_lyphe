@@ -108,6 +108,8 @@
     "stop": "Stoppen",
     "clickToChangeMode": "Klicken, um den Berechtigungsmodus zu ändern (oder Tab in der Eingabe drücken)",
     "showAllCommands": "Alle Befehle anzeigen",
+    "plainMode": "Schlicht",
+    "plainModeTooltip": "Jede Nachricht mit /plain senden: kurze, überfliegbare Antworten",
     "clearInput": "Eingabe leeren",
     "scrollToBottom": "Nach unten scrollen"
   },

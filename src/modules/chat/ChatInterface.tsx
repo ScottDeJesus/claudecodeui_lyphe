@@ -27,6 +27,7 @@ import {
   useSessionProtectionActions,
 } from '@/shared/context/SessionProtectionContext';
 import { useCliVersion } from '@/shared/hooks/useCliVersion';
+import { usePlainModePreference } from '@/shared/hooks/usePlainModePreference';
 import { Banner, Button } from '@/shared/ui';
 import ChatMessagesPane from '@/modules/chat/transcript/ChatMessagesPane';
 import ChatComposer from '@/modules/chat/composer/ChatComposer';
@@ -191,6 +192,9 @@ function ChatInterface({
     onSessionEstablished?.(sessionId, context);
     onNavigateToSession?.(sessionId);
   }, [setCurrentSessionId, onSessionEstablished, onNavigateToSession]);
+  const plainMode = usePlainModePreference();
+  const togglePlainMode = useCallback(() => plainMode.setEnabled(!plainMode.enabled), [plainMode]);
+
 
   const {
     input,
@@ -387,9 +391,10 @@ function ChatInterface({
   }, [currentProviderEffort, currentProviderModel, input, permissionMode, scheduleMessage, setInput]);
 
   const permissionContextValue = useMemo(() => ({
+    sessionId: currentSessionId ?? null,
     pendingPermissionRequests,
     handlePermissionDecision,
-  }), [pendingPermissionRequests, handlePermissionDecision]);
+  }), [currentSessionId, pendingPermissionRequests, handlePermissionDecision]);
 
   // A composer pick becomes the default for new chats and, when a session is
   // open, is recorded against that session so reopening it restores this model.
@@ -598,6 +603,8 @@ function ChatInterface({
           onScheduleMessage={handleScheduleMessage}
           onCancelScheduledMessage={cancelScheduledMessage}
           onToggleCommandMenu={handleToggleCommandMenu}
+          plainMode={plainMode.enabled}
+          onTogglePlainMode={togglePlainMode}
           hasInput={Boolean(input.trim())}
           onClearInput={handleClearInput}
           onSubmit={handleSubmit}

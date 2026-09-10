@@ -18,6 +18,8 @@ type ChipProps = {
   tone?: Tone;
   /** For a caller that has to line the chip up with the controls beside it — a height, mostly. */
   className?: string;
+  /** Native tooltip, for a chip whose one word needs a sentence behind it. */
+  title?: string;
 };
 
 /**
@@ -30,7 +32,7 @@ type ChipProps = {
  * its pressed state; without one it is a `<span>`, because a static tag that takes focus
  * sends the reader somewhere nothing happens.
  */
-export function Chip({ selected = false, onClick, children, size = 'md', tone, className: extra }: ChipProps) {
+export function Chip({ selected = false, onClick, children, size = 'md', tone, className: extra, title }: ChipProps) {
   const className = cn(
     'vv-chip inline-flex items-center gap-1.5',
     size === 'sm' && 'vv-chip--sm',
@@ -40,7 +42,7 @@ export function Chip({ selected = false, onClick, children, size = 'md', tone, c
 
   if (!onClick) {
     return (
-      <span className={className} data-selected={selected} data-tone={tone}>
+      <span className={className} data-selected={selected} data-tone={tone} title={title}>
         {children}
       </span>
     );
@@ -54,6 +56,7 @@ export function Chip({ selected = false, onClick, children, size = 'md', tone, c
       data-tone={tone}
       aria-pressed={selected}
       onClick={onClick}
+      title={title}
     >
       {children}
     </button>

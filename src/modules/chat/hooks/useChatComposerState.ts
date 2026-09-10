@@ -15,6 +15,7 @@ import { api } from '@/shared/api';
 import { PROVIDER_PERMISSION_PREFERENCE_KEYS } from '@/shared/constants';
 import { readUserPreference } from '@/shared/userSettings';
 import { useSimpleChatListPreferences } from '@/shared/hooks/useSimpleChatListPreferences';
+import { applyPlainMode, usePlainModePreference } from '@/shared/hooks/usePlainModePreference';
 import type { CommandModalPayload, CostCommandData, HelpCommandData, MarkSessionProcessing, ModelCommandData, QueuedDraft, SessionActivityMap, StatusCommandData,QueuedSendOptions,ChatAttachment,ChatMessage,PendingPermissionRequest,PermissionMode,SessionEstablishedContext,Project,ProjectSession,LLMProvider,SlashCommand } from '@/shared/types';
 import { grantClaudeToolPermission } from '@/modules/chat/utils/chatPermissions';
 import {
@@ -183,6 +184,7 @@ export function useChatComposerState({
   // into the simple chat list — decided by the preference at mint time, not
   // threaded down as a prop.
   const { enabled: simpleChatListEnabled } = useSimpleChatListPreferences();
+  const { enabled: plainModeEnabled } = usePlainModePreference();
 
   // The composer text together with the chat scope it belongs to. They are one
   // state rather than a value plus a ref because they have to move in lockstep:
@@ -743,7 +745,9 @@ export function useChatComposerState({
         }
       }
 
-      const messageContent = currentInput;
+      // What the CLI receives. The echo above the composer keeps `currentInput`
+      // as typed; only the wire copy wears the `/plain` prefix.
+      const messageContent = applyPlainMode(currentInput, plainModeEnabled);
 
       let uploadedAttachments = previouslyUploadedAttachments;
       if (uploadedAttachments.length === 0 && currentAttachments.length > 0) {
@@ -775,7 +779,7 @@ export function useChatComposerState({
           const response = await api.providers.createSession({
             provider,
             projectPath: resolvedProjectPath,
-            initialMessage: messageContent,
+            initialMessage: currentInput,
             simpleList: simpleChatListEnabled,
           });
           if (!response.ok) {
@@ -895,6 +899,7 @@ export function useChatComposerState({
       addMessage,
       setIsUserScrolledUp,
       simpleChatListEnabled,
+      plainModeEnabled,
       slashCommands,
     ],
   );

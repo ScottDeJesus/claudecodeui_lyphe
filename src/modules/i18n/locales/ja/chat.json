@@ -107,7 +107,9 @@
     "send": "送信",
     "stop": "停止",
     "clickToChangeMode": "クリックで権限モードを変更（または入力欄でTab）",
-    "showAllCommands": "すべてのコマンドを表示"
+    "showAllCommands": "すべてのコマンドを表示",
+    "plainMode": "簡潔",
+    "plainModeTooltip": "すべてのメッセージを /plain 付きで送信: 短く読みやすい返答"
   },
   "providerSelection": {
     "title": "AIアシスタントを選択",

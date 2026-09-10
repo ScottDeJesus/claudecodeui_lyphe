@@ -108,6 +108,8 @@
     "stop": "Ferma",
     "clickToChangeMode": "Clicca per cambiare modalità permessi (o premi Tab nell'input)",
     "showAllCommands": "Mostra tutti i comandi",
+    "plainMode": "Semplice",
+    "plainModeTooltip": "Invia ogni messaggio con /plain: risposte brevi e scorrevoli",
     "clearInput": "Cancella input",
     "scrollToBottom": "Scorri in basso"
   },

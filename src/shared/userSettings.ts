@@ -33,6 +33,8 @@ export type UserPreferences = {
   chatFontSize: number;
   /** The Runner tab's memory, a blob merged by its writers: `{ dismissedEndings: {run_id, ended_at}[] }`. See `modules/plan-runner/dismissedRuns.ts`. */
   planRunner: unknown;
+  /** Composer toggle: every sent message rides under the `/plain` command. See `usePlainModePreference`. */
+  plainMode: boolean;
 };
 
 export type UserPreferenceKey = keyof UserPreferences;
@@ -77,6 +79,7 @@ const LEGACY_STORAGE_KEYS: Record<UserPreferenceKey, string | null> = {
   simpleChatProjectId: null,
   chatFontSize: null,
   planRunner: null,
+  plainMode: null,
 };
 
 const PREFERENCE_KEYS = Object.keys(LEGACY_STORAGE_KEYS) as UserPreferenceKey[];
