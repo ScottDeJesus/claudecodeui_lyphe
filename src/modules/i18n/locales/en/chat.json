@@ -288,7 +288,9 @@
   },
   "message": {
     "editAndResend": "Edit and resend",
-    "forkFromHere": "Fork from here"
+    "forkFromHere": "Fork from here",
+    "showMore": "Show more",
+    "showLess": "Show less"
   },
   "export": {
     "trigger": "Export conversation",

@@ -146,6 +146,25 @@
 .vv-card--interactive { cursor: pointer; }
 .vv-card--interactive:hover { transform: translateY(-5px); box-shadow: var(--shadow-lift); }
 
+/* ---------------------------------------------------------------- Chat bubble
+ * A tail on the side the speaker sits: `data-side="start"` points left (Claude's turn card),
+ * `end` points right (the operator's bubble). The tail is a square turned 45° and half
+ * tucked under the edge; it takes the bubble's own fill, and on a bordered card it draws the
+ * two outer sides of the border so the outline runs unbroken around it. */
+.vv-bubble { position: relative; }
+.vv-bubble::before {
+  content: '';
+  position: absolute;
+  top: 16px;
+  width: 12px;
+  height: 12px;
+  background: inherit;
+  transform: rotate(45deg);
+  pointer-events: none;
+}
+.vv-bubble[data-side='start']::before { left: -7px; border-left: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+.vv-bubble[data-side='end']::before { right: -6px; }
+
 /* ---------------------------------------------------------------- Chip */
 .vv-chip {
   padding: 7px 15px;

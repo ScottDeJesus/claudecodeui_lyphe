@@ -16,6 +16,7 @@ import { Markdown, TRANSCRIPT_PROSE } from '@/modules/chat/transcript/Markdown';
 import StreamingMarkdown from '@/modules/chat/transcript/StreamingMarkdown';
 import MessageCopyControl from '@/modules/chat/transcript/MessageCopyControl';
 import MessageSpeakControl from '@/modules/chat/transcript/MessageSpeakControl';
+import CollapsibleUserText from '@/modules/chat/transcript/CollapsibleUserText';
 import { useIsExportingTranscript } from '@/modules/chat/context/TranscriptRenderContext';
 import { MemoryCitations } from '@/modules/chat/transcript/MemoryCitations';
 
@@ -168,18 +169,23 @@ const MessageComponent = memo(({ message, prevMessage, isRunTerminal, createDiff
               <ChatMessageFiles files={message.files} />
             )}
             {userCopyContent.trim().length > 0 || (!message.images?.length && !message.files?.length) ? (
-              <div className="group max-w-full bg-secondary px-4 py-3 text-foreground" style={{ borderRadius: 'var(--radius-card)', borderTopRightRadius: 'var(--radius-tail)' }}>
+              /* The row paints nothing past its own box (`.chat-message` is paint-contained),
+                 so from `sm` up, where the row has no side padding, the bubble stands in from
+                 the edge by the tail's reach — flush, the tail would be clipped away. */
+              <div data-side="end" className="vv-bubble group max-w-full bg-secondary px-4 py-3 text-foreground sm:mr-2.5" style={{ borderRadius: 'var(--radius-card)' }}>
                 <div className="mb-1.5 text-xs uppercase tracking-[0.14em] text-ink-faint">
                   {messageTime.isValid ? `${t('messageTypes.you', { defaultValue: 'You' })} · ${formattedTime}` : t('messageTypes.you', { defaultValue: 'You' })}
                 </div>
-                <div dir="auto" className="break-words font-serif text-base">
-                  <Markdown
-                    breaks
-                    className={TRANSCRIPT_PROSE}
-                  >
-                    {message.content}
-                  </Markdown>
-                </div>
+                <CollapsibleUserText turnKey={message.transcriptAnchorId || String(message.timestamp)}>
+                  <div dir="auto" className="break-words font-serif text-base">
+                    <Markdown
+                      breaks
+                      className={TRANSCRIPT_PROSE}
+                    >
+                      {message.content}
+                    </Markdown>
+                  </div>
+                </CollapsibleUserText>
                 <div className="mt-1 flex items-center justify-end gap-1 text-xs text-muted-foreground">
                   {onEditMessage && message.transcriptAnchorId && (
                     <button

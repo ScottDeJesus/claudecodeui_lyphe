@@ -387,8 +387,8 @@ function ChatMessagesPane({
             // Everything between two of the operator's turns — replies, tool calls, commands,
             // notices — is one turn of Claude's, so it sits in one card, as theirs sits in
             // its bubble. The rows stay separate LazyMessageRows inside it, so lazy mounting
-            // and timestamp anchors work exactly as before. Squared at the top-left, the
-            // corner under the speaker's mark, as the operator's bubble is at the top-right.
+            // and timestamp anchors work exactly as before. Its tail points left, at the
+            // speaker's mark, as the operator's bubble points right.
             const turns: ReactElement[] = [];
             let turn: ReactElement[] = [];
             const closeTurn = () => {
@@ -396,8 +396,8 @@ function ChatMessagesPane({
               turns.push(
                 <Card
                   key={`turn-${turn[0].key}`}
-                  className="space-y-3 py-3 sm:space-y-4 sm:px-4"
-                  style={{ borderTopLeftRadius: 'var(--radius-tail)' }}
+                  data-side="start"
+                  className="vv-bubble space-y-3 py-3 sm:space-y-4 sm:px-4"
                 >
                   {turn}
                 </Card>
