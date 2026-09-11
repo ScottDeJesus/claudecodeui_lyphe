@@ -166,6 +166,13 @@
 
         // --- React Refresh (Vite HMR) ---
         "react/only-export-components": ["warn", { "allowConstantExport": true }],
+        // An import cycle breaks HMR outright: an edit anywhere on the loop hands the page a
+        // second copy of every module on it, and a context created on the loop then has two
+        // identities — the provider holds one, the edited consumer reads the other, and the
+        // app crashes with "must be used within a …Provider". Zero cycles at adoption. Static
+        // imports only: a loop closed through a dynamic `import()` passes this rule and still
+        // breaks HMR the same way.
+        "import/no-cycle": "error",
 
         // --- Import ordering & hygiene ---
         "import/no-duplicates": "warn",

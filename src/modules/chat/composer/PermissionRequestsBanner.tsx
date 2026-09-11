@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import type { PendingPermissionRequest } from '@/shared/types';
 import { Banner, Button } from '@/shared/ui';
 import { buildClaudeToolPermissionEntry, formatToolInputForDisplay } from '@/modules/chat/utils/chatPermissions';
-import { getClaudeSettings } from '@/modules/chat/utils/chatStorage';
+import { getClaudeSettings } from '@/shared/userSettings';
 import { getPermissionPanel, registerPermissionPanel } from '@/modules/chat/tools/configs/permissionPanelRegistry';
 import { AskUserQuestionPanel } from '@/modules/chat/tools/InteractiveRenderers/AskUserQuestionPanel';
 

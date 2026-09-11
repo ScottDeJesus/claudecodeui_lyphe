@@ -1,4 +1,5 @@
 import { api } from '@/shared/api';
+import type { ClaudeSettings } from '@/shared/types';
 
 /**
  * The one reader and writer for the settings that used to live in browser
@@ -168,6 +169,35 @@ function queueServerWrite(updates: PreferenceRecord): void {
 export function readUserPreference<T>(key: UserPreferenceKey, fallback: T): T {
   const value = preferences[key];
   return value === undefined || value === null ? fallback : (value as T);
+}
+
+/**
+ * Claude's tool-permission settings, stored in auth.db so the allow-list a user
+ * builds up on one machine applies on the next. Read by the chat and by the
+ * terminal, which seeds its own permission toggle from it — so the reader and
+ * its writer below live here, where neither module has to import the other.
+ *
+ * `projectSortOrder` is a separate preference now, but stays on the returned
+ * object because ClaudeSettings still describes the whole legacy blob.
+ */
+export function getClaudeSettings(): ClaudeSettings {
+  const stored = readUserPreference<Partial<ClaudeSettings>>('claudePermissions', {});
+
+  return {
+    allowedTools: Array.isArray(stored.allowedTools) ? stored.allowedTools : [],
+    disallowedTools: Array.isArray(stored.disallowedTools) ? stored.disallowedTools : [],
+    skipPermissions: Boolean(stored.skipPermissions),
+    projectSortOrder: readUserPreference<ClaudeSettings['projectSortOrder']>('projectSortOrder', 'name'),
+  };
+}
+
+/** Persists Claude's tool permissions after the user grants one from the chat. */
+export function saveClaudePermissions(permissions: {
+  allowedTools: string[];
+  disallowedTools: string[];
+  skipPermissions: boolean;
+}): void {
+  writeUserPreference('claudePermissions', permissions);
 }
 
 /** Writes one preference through to the mirror, the listeners and the server. */

@@ -47,7 +47,8 @@ on a 29k-row session costs ~112 MB instead of ~1 GB.
    is safe: `captureScrollRestoreState` takes the first such row at or below the container's
    top edge, and rows at the viewport edge are inside the mounted band by definition.
 8. **No message is persisted client-side.** No localStorage, no IndexedDB for transcripts
-   (composer drafts, in `chatStorage.ts`, are the only chat state that touches localStorage).
+   (composer drafts, in `src/shared/chatDrafts.ts`, and slash-command history, through
+   `chatStorage.ts`'s `safeLocalStorage`, are the only chat state that touches localStorage).
    The provider's transcript file is the source of truth and a reload re-fetches the tail page.
 
 ## The pieces
