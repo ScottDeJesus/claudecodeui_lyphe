@@ -71,7 +71,7 @@ function resolveRequestedPath(projectRoot: string, requestedPath: string): strin
 }
 
 /** What `readTextPreview` hands back — the text arm of `FilePreview` minus its file metadata. */
-type TextPreviewBody = { lines: string[]; totalLines: number | null; truncated: boolean };
+type TextPreviewBody = { lines: string[]; startLine: number; totalLines: number | null; truncated: boolean };
 
 /** Directories first, then by name — the order the listing is served in, so no client re-sorts. */
 function compareDirectoryEntries(left: DirectoryEntry, right: DirectoryEntry): number {
@@ -127,8 +127,19 @@ export function createFileTreeListingService(dependencies: FileTreeListingServic
    * `totalLines` is a separate question: under the size cap the walk runs to the end
    * counting newlines and keeping nothing; over it, the read stops once the preview is
    * full and the count is unknown.
+   *
+   * `startLine` opens the window somewhere other than the top, which is what lets a file
+   * reference carrying `:line` land on that line. Lines before it are COUNTED and thrown
+   * away rather than skipped over: a line is only knowable by walking to its newline, and
+   * counting them is also what keeps `totalLines` and `truncated` telling the truth about a
+   * window that does not start at 1.
    */
-  async function readTextPreview(filePath: string, maxLines: number, bytes: number): Promise<TextPreviewBody> {
+  async function readTextPreview(
+    filePath: string,
+    maxLines: number,
+    bytes: number,
+    startLine = 1,
+  ): Promise<TextPreviewBody> {
     const countEveryLine = bytes <= LARGE_TEXT_FILE_BYTES;
     const stream = fileSystem.createReadStream(filePath);
     const decoder = new StringDecoder('utf8');
@@ -160,7 +171,11 @@ export function createFileTreeListingService(dependencies: FileTreeListingServic
         carriedText = segments.pop() ?? '';
         for (const segment of segments) {
           finishedLines += 1;
-          keepLine(segment.endsWith('\r') ? segment.slice(0, -1) : segment);
+          // Before the window: counted, never kept. The count is what `totalLines` and
+          // `truncated` are read off, so a skipped line still has to be walked past.
+          if (finishedLines >= startLine) {
+            keepLine(segment.endsWith('\r') ? segment.slice(0, -1) : segment);
+          }
         }
 
         // Nothing more can be kept and nothing is being counted: stop reading.
@@ -178,7 +193,9 @@ export function createFileTreeListingService(dependencies: FileTreeListingServic
       const trailingText = carriedText + decoder.end();
       if (trailingText.length > 0) {
         finishedLines += 1;
-        keepLine(trailingText);
+        if (finishedLines >= startLine) {
+          keepLine(trailingText);
+        }
       }
     } finally {
       stream.destroy();
@@ -186,7 +203,11 @@ export function createFileTreeListingService(dependencies: FileTreeListingServic
 
     return {
       lines,
+      startLine,
       totalLines: countEveryLine ? finishedLines : null,
+      // Still the same claim it always made — "there is more of this file than you are
+      // holding" — and a window that begins after line 1 satisfies it without a second
+      // rule: every skipped line was counted into `finishedLines` and kept out of `lines`.
       truncated: truncated || finishedLines > lines.length,
     };
   }
@@ -252,7 +273,7 @@ export function createFileTreeListingService(dependencies: FileTreeListingServic
       return { path: resolvedPath, entries: entries.sort(compareDirectoryEntries) };
     },
 
-    async previewFile(projectId, filePath, maxLines) {
+    async previewFile(projectId, filePath, maxLines, startLine = 1) {
       const projectRoot = await dependencies.resolveProjectRoot(projectId);
       const resolvedPath = resolveRequestedPath(projectRoot, filePath);
 
@@ -287,7 +308,7 @@ export function createFileTreeListingService(dependencies: FileTreeListingServic
 
         return {
           kind,
-          ...(await readTextPreview(resolvedPath, maxLines, bytes)),
+          ...(await readTextPreview(resolvedPath, maxLines, bytes, startLine)),
           bytes,
           mtime,
           language: LANGUAGE_BY_EXTENSION[path.extname(resolvedPath).toLowerCase()] ?? null,

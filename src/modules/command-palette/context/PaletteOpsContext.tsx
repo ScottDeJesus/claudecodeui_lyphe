@@ -5,7 +5,9 @@ export type PaletteOps = {
   openFile: (path: string) => void;
   // Opens a bare or partial file reference — the text of an in-chat file link —
   // which is resolved against the project before the file manager previews it.
-  openFileReference: (path: string) => void;
+  // `line` is the line the reference named (`foo.ts:42`); the preview opens a window
+  // around it and scrolls to it. Absent means the top of the file, as it always did.
+  openFileReference: (path: string, line?: number) => void;
   openSettings: (tab?: string) => void;
   refreshProjects: () => Promise<void> | void;
 };
@@ -32,8 +34,8 @@ export function usePaletteOps(): PaletteOps {
   return useMemo<PaletteOps>(
     () => ({
       openFile: (path) => (ref?.current.openFile ?? defaultOps.openFile)(path),
-      openFileReference: (path) =>
-        (ref?.current.openFileReference ?? defaultOps.openFileReference)(path),
+      openFileReference: (path, line) =>
+        (ref?.current.openFileReference ?? defaultOps.openFileReference)(path, line),
       openSettings: (tab) => (ref?.current.openSettings ?? defaultOps.openSettings)(tab),
       refreshProjects: () => (ref?.current.refreshProjects ?? defaultOps.refreshProjects)(),
     }),

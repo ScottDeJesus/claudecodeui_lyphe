@@ -1,7 +1,16 @@
 import { useCallback, useRef } from 'react';
 
 import { api } from '@/shared/api';
-import type { FileOpenHandler, Project } from '@/shared/types';
+import type { Project } from '@/shared/types';
+
+/**
+ * "Open this path, optionally at this line."
+ *
+ * Deliberately NOT `FileOpenHandler`: that type's second parameter is `diffInfo` and
+ * `ToolRenderer` already passes a real diff object into it, so a line number riding there
+ * would land as a line on every Edit/Write card in the chat. Two capabilities, two signatures.
+ */
+type FileOpenAtHandler = (path: string, line?: number) => void;
 
 type FileNode = {
   type: 'file' | 'directory';
@@ -49,17 +58,18 @@ const findBestMatch = (files: FlatFile[], ref: string): string | null => {
 };
 
 /**
- * Wraps an `onFileOpen` handler so a possibly bare/partial file reference is
+ * Wraps an "open at a line" handler so a possibly bare/partial file reference is
  * resolved against the project's file tree (cached per project) before the file
  * is opened.
  *
- * The `diffInfo` a caller may still spell is carried through untouched, and the handler this
- * wraps is free to ignore it — the file manager's preview is read-only.
+ * The LINE is carried straight through: resolving a reference answers WHICH file it meant and
+ * says nothing about where inside it to look, so the line the caller named survives the lookup
+ * unchanged — including when no match is found and the reference is opened as it came.
  */
 export function useFileOpenResolver(
   selectedProject: Project | null | undefined,
-  onFileOpen: FileOpenHandler,
-): FileOpenHandler {
+  onFileOpen: FileOpenAtHandler,
+): FileOpenAtHandler {
   const projectId = selectedProject?.projectId;
   const cacheRef = useRef<{ projectId?: string; files: Promise<FlatFile[]> | null }>({
     projectId: undefined,
@@ -94,12 +104,12 @@ export function useFileOpenResolver(
     return filesPromise;
   }, [projectId]);
 
-  return useCallback<FileOpenHandler>(
-    (filePath, diffInfo) => {
+  return useCallback<FileOpenAtHandler>(
+    (filePath, line) => {
       const ref = normalize(filePath).trim();
       void loadFiles().then((files) => {
         const match = findBestMatch(files, ref);
-        onFileOpen(match ?? filePath, diffInfo);
+        onFileOpen(match ?? filePath, line);
       });
     },
     [loadFiles, onFileOpen],

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState, type Dispatch, type SetStateAction } from 'react';
+import React, { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { ChatInterface, type ChatExportSurface, type TokenUsageSurface } from '@/modules/chat';
@@ -75,7 +75,16 @@ function WorkspaceMain({
   // here because opening a path is a WORKSPACE act: the Files tab has to come forward for the pane
   // that shows it. Asking for the SAME path twice is a second request because the first was retired
   // to `null` on its way through — the wrapper's identity is the signal, and it is always fresh.
-  const [openRequest, setOpenRequest] = useState<{ path: string } | null>(null);
+  //
+  // `line` is optional and only `openFileAt` below ever sets it. `nonce` rides ALONG the wrapper
+  // identity rather than instead of it: the wrapper is retired at the workspace, but the file
+  // manager's own selection is not, so re-asking for the same path at the same line needs a value
+  // that CHANGES for the selection to notice and re-scroll.
+  const [openRequest, setOpenRequest] = useState<{ path: string; line?: number; nonce: number } | null>(null);
+
+  // The counter behind that nonce. A ref, not state: nothing renders from it, and bumping it must
+  // not be a second render on top of the request it is part of.
+  const openRequestNonce = useRef(0);
 
   // The chat's token count, lifted so the mobile header can carry it (the composer hides its
   // copy below `md`). Chat-tab only: the number is that chat's, and the header stays a strip of
@@ -86,7 +95,18 @@ function WorkspaceMain({
   const [chatExportSurface, setChatExportSurface] = useState<ChatExportSurface | null>(null);
 
   const handleFileOpen = useCallback((filePath: string) => {
-    setOpenRequest({ path: filePath });
+    openRequestNonce.current += 1;
+    setOpenRequest({ path: filePath, nonce: openRequestNonce.current });
+    setActiveTab('files');
+  }, [setActiveTab]);
+
+  // The same act, at a line. A SECOND function rather than a second parameter on `handleFileOpen`:
+  // that one is a `FileOpenHandler`, whose second parameter is `diffInfo` and is already carrying a
+  // real diff object from `ToolRenderer` — so a line threaded through there would arrive as a line
+  // on every Edit/Write card in the chat. Its three existing consumers are untouched by this.
+  const openFileAt = useCallback((filePath: string, line?: number) => {
+    openRequestNonce.current += 1;
+    setOpenRequest({ path: filePath, line, nonce: openRequestNonce.current });
     setActiveTab('files');
   }, [setActiveTab]);
 
@@ -97,9 +117,9 @@ function WorkspaceMain({
     setOpenRequest(null);
   }, []);
 
-  // Resolves bare/partial file references (e.g. links inside chat messages) to
-  // real project files before opening them in the file manager.
-  const resolvedFileOpen = useFileOpenResolver(selectedProject, handleFileOpen);
+  // Resolves bare/partial file references (e.g. links inside chat messages) to real project files
+  // before opening them in the file manager — at the line the reference named, when it named one.
+  const resolvedFileOpen = useFileOpenResolver(selectedProject, openFileAt);
 
   // The three effects below snap a PREFERENCE-gated tab back to chat when its gate turns off:
   // tasks, shell and browser vanish the moment a person switches them off, and leaving the

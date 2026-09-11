@@ -23,7 +23,7 @@ max_cycles = 40
 max_spawns = 200
 max_fix_passes = 3
 max_attempts = 2
-max_replans = 1
+max_replans = 0
 ```
 
 ## Interfaces
@@ -191,7 +191,9 @@ Both maps are module constants (nothing closes over a hook any more once `Markdo
 - `src/modules/project-workspace/WorkspaceMain.tsx` — `openRequest` becomes `{ path: string; line?: number; nonce: number } | null`; a NEW `openFileAt(filePath, line?)` sets it and switches to the files tab; `handleFileOpen(filePath)` is unchanged and keeps its three existing consumers; `usePaletteOpsRegister({ openFile: handleFileOpen, openFileReference: resolvedFileOpen })` now registers the line-aware resolver.
 - `src/modules/file-manager/FileManager.tsx` — `openRequest: { path: string; line?: number; nonce: number } | null`; the effect calls `select(openRequest.path, openRequest.line)` BEFORE `onRequestHandled()`; `PreviewPane` gains `targetLine: number | null`.
 - `src/modules/file-manager/hooks/useFileManagerState.ts` — selection becomes `{ projectId, path, line, nonce }`; `select(path, line?)`; the preview fetch sends `start = line ? Math.max(1, line - 40) : 1`; `start` and `nonce` join `previewSubject` so the same file at a new line refetches.
-- `src/modules/file-manager/PreviewPane.tsx` — rows carry `data-line={startLine + index}` and show that number; a ref on the `:102` scroll container; one effect keyed on `[preview, targetLine]` sets `scrollTop` on THAT container (never `scrollIntoView`, which would also scroll `FileManager.tsx:259`) and marks the row `data-target-line="true"` with a token-based highlight; the footer reads `Lines a–b of N`.
+- `src/modules/file-manager/PreviewPane.tsx` — rows carry `data-line={startLine + index}` and show that number; a ref on the `:102` scroll container; one LAYOUT effect keyed on `[preview, targetLine]` sets `scrollTop` on THAT container and marks the row `data-target-line="true"` with a token-based highlight; the footer reads `Lines a–b of N`. `scrollIntoView` stays banned — it scrolls every ancestor, the page included — but the inner scroll ALONE leaves the pane itself below the fold on a narrow layout (measured at 768×1024 and 390×844: the section top at 1061 and 1158 with the outer container still at `scrollTop 0`, so the reader lands on the directory listing and never sees the line). The same effect therefore ALSO sets `scrollTop` once on the outer `FileManager.tsx:259` container, to bring the preview section's own top into view — a bounded write to one named node, not a browser-chosen scroll of every ancestor. A LAYOUT effect and not a passive one: a passive effect paints the window at its own top and then jumps, one visible frame of the wrong position on every open.
+- `src/modules/file-manager/DirectoryListing.tsx` — takes the same height cap the preview pane takes. The two sit on one flex line; capping one alone lets a long listing stretch to content while the preview holds at `max-h-full`, and measured at 1600×900 in a 62-entry folder that put the listing at 2796px against the preview's 809px and scrolled the preview off screen entirely. The cap is one pair applied in one pass, or neither.
+- A target line PAST the end of the file is clamped to the file's last line, and the footer says which line it settled on — rather than fetching a window past the end and drawing an empty pane whose footer names `line − 40` (measured: line 99999 of a 216-line file drew no rows and read "No lines at 99959"). Chips are parsed out of model prose, where a stale line number is the ordinary case.
 
 **The surface signal.** `server/modules/providers/list/claude/surface-signal.ts` keeps `SURFACE_ENV` and `SURFACE_PROMPT_APPEND`, but the existing sentence (1078 characters, including another session's uncommitted DocSpace clause) moves VERBATIM into a `const WIDGET_SIGNAL` and `SURFACE_PROMPT_APPEND` becomes `` `${WIDGET_SIGNAL} ${MARKDOWN_SIGNAL}` ``. `MARKDOWN_SIGNAL` is four sentences naming only what Claude would not write unprompted: a `stats` fence of `label | value | delta` lines, a `VERDICT: PASS` / `VERDICT: FAIL` line optionally carrying ` — B:n H:n M:n L:n`, `path/to/file.ext:line` references, and `mermaid` fences — and saying that ordinary markdown (tables, `> [!NOTE]` alerts, task lists, `diff` fences) already renders as rich components on this surface, so no widget is needed for them.
 
@@ -241,6 +243,7 @@ manifest = [
   "src/modules/file-manager/FileManager.tsx",
   "src/modules/file-manager/hooks/useFileManagerState.ts",
   "src/modules/file-manager/PreviewPane.tsx",
+  "src/modules/file-manager/DirectoryListing.tsx",
   ".verify/probe-shapes-lineopen.mjs",
 ]
 forbidden = [
@@ -255,12 +258,16 @@ athena = [
   "the preview footer still claims 'First N of M lines' when the window starts in the middle",
   "the scroll is done with scrollIntoView, which also scrolls the outer file-manager container and pushes the listing off screen on a narrow layout",
   "truncated no longer tells the truth once a window can start after line 1, or totalLines is null for a large file and the clamp divides by it",
+  "at 768x1024 or 390x844 the preview section is still below the fold after an open, so the reader lands on the listing and never sees the line",
+  "a line past the end of the file draws an empty pane, or a footer naming a number the reader never asked for",
+  "the two panes on one flex line take wildly different heights in an ordinary desktop folder, so the preview scrolls out of existence",
+  "the target row paints at the window's top for a frame and then jumps, because the scroll runs after paint",
 ]
 
 [[steps]]
 kind = "edit"
 path = "server/modules/file-tree/file-tree-listing.service.ts"
-what = "Add a startLine parameter to readTextPreview and previewFile per Interfaces: lines before startLine are counted but not kept, the result carries startLine, and totalLines and truncated keep their existing meanings with truncated now also true when lines were skipped before the window."
+what = "Add a startLine parameter to readTextPreview and previewFile per Interfaces: lines before startLine are counted but not kept, the result carries startLine, and totalLines and truncated keep their existing meanings with truncated now also true when lines were skipped before the window. Correct the FilePreview doc comment in server/shared/types.ts in the same pass: it says the text is the FIRST lines.length lines and that truncated means more lines exist BEYOND the window, and neither stays true here, while its client twin in src/shared/types.ts already says the amended thing — one wire shape cannot carry two contracts."
 check = "grep -c 'startLine' server/modules/file-tree/file-tree-listing.service.ts | awk '{print ($1>=4)?\"OK\":\"THIN\"}'"
 expect = "OK"
 
@@ -281,15 +288,15 @@ expect = "OK"
 [[steps]]
 kind = "edit"
 path = "src/modules/file-manager/hooks/useFileManagerState.ts"
-what = "Carry line and nonce in the selection, widen select to (path, line?), compute start as line minus 40 floored at 1, include start and nonce in the preview key, and expose the target line to the consumer."
+what = "Carry line and nonce in the selection, widen select to (path, line?), compute start as line minus 40 floored at 1, include start in the preview key, and expose the target line to the consumer. The nonce rides in the selection so a repeat open re-scrolls, but it must NOT join the preview key: keyed on it, clicking the already-selected row blanks the pane to Reading and refetches a file already on screen."
 check = "grep -cE 'nonce|targetLine|start' src/modules/file-manager/hooks/useFileManagerState.ts | awk '{print ($1>=3)?\"OK\":\"THIN\"}'"
 expect = "OK"
 
 [[steps]]
 kind = "edit"
 path = "src/modules/file-manager/PreviewPane.tsx"
-what = "Number rows from preview.startLine, carry data-line on every row and data-target-line on the target, hold a ref on the inner scroll container, and in one effect keyed on the preview and the target line set that container's scrollTop so the target sits about a third of the way down, with a token-based highlight. Never call scrollIntoView. The footer reads a line range."
-check = "grep -cE 'data-target-line|scrollTop' src/modules/file-manager/PreviewPane.tsx | awk '{print ($1>=2)?\"OK\":\"THIN\"}'"
+what = "Number rows from preview.startLine, carry data-line on every row and data-target-line on the target, hold a ref on the inner scroll container, and in one LAYOUT effect keyed on the preview and the target line set that container's scrollTop so the target sits about a third of the way down, with a token-based highlight, and in that same effect set the outer FileManager container's scrollTop once so the preview section's own top is in view on a narrow layout. Never call scrollIntoView. Clamp a target line past the end of the file to the last line and say in the footer which line it settled on. The footer reads a line range. Give DirectoryListing.tsx the same height cap this pane takes, so two panes on one flex line keep comparable heights."
+check = "grep -cE 'data-target-line|scrollTop|useLayoutEffect' src/modules/file-manager/PreviewPane.tsx | awk '{print ($1>=3)?\"OK\":\"THIN\"}'"
 expect = "OK"
 
 [[steps]]
@@ -1366,7 +1373,7 @@ expect = "SIZE-OK"
 
 **What to build.** One probe that exercises the finished feature through both paths — the fixture mount and the app's real streaming path — and the one helper it needs.
 
-**When a gate reddens here.** `src/modules/chat/transcript/shapes` and `Markdown.tsx` are forbidden in this phase ON PURPOSE: a builder who can edit the thing it is proving will edit the thing it is proving, and the proof stops meaning anything. So a red gallery gate is neither a fix-pass item nor a reason to soften the probe — it is a REPLAN trigger, and `max_replans = 1` is there for it. Report which gate reddened with the measured value beside the expected one, name the phase whose work it belongs to, and stop. The same holds for `BASELINE: DOM CHANGED` in any phase: it means a promise this plan made was broken upstream, and the repair belongs to the phase that broke it, never to the phase that noticed.
+**When a gate reddens here.** `src/modules/chat/transcript/shapes` and `Markdown.tsx` are forbidden in this phase ON PURPOSE: a builder who can edit the thing it is proving will edit the thing it is proving, and the proof stops meaning anything. So a red gallery gate is neither a fix-pass item nor a reason to soften the probe — it is a block for the launching session to cure in the plan — `max_replans = 0` this run, because the replanner is pinned to a model whose weekly allowance is spent until 2026-09-15, and a run that reaches for it parks itself for five days instead of ending with a block somebody can act on. Report which gate reddened with the measured value beside the expected one, name the phase whose work it belongs to, and stop. The same holds for `BASELINE: DOM CHANGED` in any phase: it means a promise this plan made was broken upstream, and the repair belongs to the phase that broke it, never to the phase that noticed.
 
 **Sirens.** You will be tempted to assert "no shape is missing" by counting elements without a control: a container that rendered nothing also reports zero, so every count gate needs a case that would fail. You will want to spend a Claude turn to get a real reply: inject the frames instead, exactly as `.verify/phase-15.mjs` does, with its send-swallowing seal and its canary so no frame can reach a model. The injected rows live only in memory and must never be written to the operator's transcript on disk. If the export gate is hard to read from a download, catch the `download` event as `ChatExportMenu.tsx` creates it and read the blob's text.
 
@@ -1440,3 +1447,17 @@ Wave 7: Phase 10, then Phase 11 — the signal, the doc, and the whole-feature p
 None.
 
 ## Ship Logs
+
+### Phase 8 Ship Log — ⛔ BLOCKED 2026-09-10
+- [BLOCKED: athena: fix-pass 1: MED-1 cannot close without re-litigating the plan's sealed Interfaces rule "sets `scrollTop` on THAT container (never `scrollIntoView`, which would also scroll `FileManager.tsx:259`)", because the only cure is a deliberate bounded scroll of that same `FileManager.tsx:259` container on th]
+- run: markdown-shapes-plan-20260910-221624-6a5a · attempt 1 of 2 · fix-passes 1 of 3 · spec_sha 0ea709bf86b4 · retry: on-spec-change
+- builder: asclepius/opus · session f0abf54e-f32a-4906-b9e5-2bd57b3b1428 · 1059s · RESULT: DONE
+- athena: pass 1 BLOCKING 0 · HIGH 0 · MED 3 · LOW 3 → fix-pass 1 (548s)
+- forbidden: unchanged (3 declared, 2 present)
+- evidence: /home/lyphe/.claude/state/runner/markdown-shapes-plan-20260910-221624-6a5a/phase_8/
+
+### Run markdown-shapes-plan-20260910-221624-6a5a — RATE-LIMITED 2026-09-10
+- shipped: none
+- blocked: 8: athena
+- next: plan-runner resume markdown-shapes-plan-20260910-221624-6a5a (runner-watchdog does this itself at 2026-09-15 00:01 PDT)
+- brief: /home/lyphe/.claude/state/runner/markdown-shapes-plan-20260910-221624-6a5a/resume_brief.md

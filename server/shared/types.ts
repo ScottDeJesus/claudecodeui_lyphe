@@ -1162,10 +1162,12 @@ export type DirectoryListing = {
  * What the preview pane can show for one file.
  *
  * The three arms are a closed set and the client switches on `kind`:
- * - `text`  — the first `lines.length` lines, already split. `totalLines` is
- *   `null` when the file is too large to count without walking all of it, so a
- *   client can never render an invented line count; `truncated` still says
- *   truthfully whether more lines exist beyond the ones returned.
+ * - `text`  — `lines.length` lines, already split, beginning at `startLine` and
+ *   NOT necessarily at the top of the file. `totalLines` is `null` when the file
+ *   is too large to count without walking all of it, so a client can never render
+ *   an invented line count; `truncated` says truthfully whether the file holds
+ *   more than the window returned — lines skipped BEFORE it count, so a window
+ *   opened mid-file is truncated even when it runs to the last line.
  * - `image` — no pixels are read here. The browser loads the file through the
  *   existing content stream and measures it with `naturalWidth`/`naturalHeight`.
  * - `none`  — a binary this app will not guess at. Download is the only action.
@@ -1176,6 +1178,11 @@ export type FilePreview =
   | {
       kind: 'text';
       lines: string[];
+      /**
+       * The line number `lines[0]` carries — 1 for a window opened at the top. When `lines`
+       * is empty this is still the window that was ASKED for, and the file ends before it.
+       */
+      startLine: number;
       totalLines: number | null;
       truncated: boolean;
       bytes: number | null;
@@ -1401,12 +1408,13 @@ export type FileTreeListingServiceDependencies = {
  * no state with browsing, editing, or uploads — the routes call whichever
  * service owns the request.
  *
- * `maxLines` is already clamped by the route; the service treats it as a
- * trusted positive count.
+ * `maxLines` and `startLine` are already clamped by the route; the service treats them as
+ * trusted positive counts. `startLine` opens the text window somewhere other than line 1, so
+ * a file reference carrying `:line` can be shown at that line.
  */
 export type FileTreeListingServices = {
   listDirectory(projectId: string, directoryPath: string): Promise<DirectoryListing>;
-  previewFile(projectId: string, filePath: string, maxLines: number): Promise<FilePreview>;
+  previewFile(projectId: string, filePath: string, maxLines: number, startLine?: number): Promise<FilePreview>;
 };
 
 // ---------------------------

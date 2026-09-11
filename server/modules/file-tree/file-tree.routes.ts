@@ -87,6 +87,20 @@ function readPreviewLineCount(value: unknown): number {
     : DEFAULT_PREVIEW_LINES;
 }
 
+/**
+ * Reads `start` for a preview request — the first line of the window.
+ *
+ * Clamped to at least 1 exactly as `lines` is clamped above, and for the same reason: a
+ * client spelling `0`, `-5`, `abc` or nothing at all means "from the top", and a 400 would
+ * tell it nothing it could act on. There is deliberately no UPPER clamp — a start past the
+ * end of the file is not an error, it is an empty window, and the service already walks a
+ * countable file end to end to answer `totalLines`.
+ */
+function readPreviewStartLine(value: unknown): number {
+  const parsedStart = typeof value === 'string' ? Number.parseInt(value, 10) : Number.NaN;
+  return Number.isFinite(parsedStart) ? Math.max(parsedStart, 1) : 1;
+}
+
 function readRequestedFileCount(value: unknown, fallbackCount: number): number {
   const parsedCount = typeof value === 'string' ? Number.parseInt(value, 10) : Number.NaN;
   return Number.isFinite(parsedCount) && parsedCount > 0 ? parsedCount : fallbackCount;
@@ -309,6 +323,7 @@ export function createFileTreeListingRouter(
       readProjectId(request),
       readRequiredString(request.query.path, 'path', 'Invalid file path'),
       readPreviewLineCount(request.query.lines),
+      readPreviewStartLine(request.query.start),
     ));
   }, logger));
 

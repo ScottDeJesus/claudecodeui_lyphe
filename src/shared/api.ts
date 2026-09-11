@@ -313,8 +313,16 @@ export const api = {
   // interpolated. Both answer `DirectoryListing` / `FilePreview`; the server clamps `lines`.
   listDirectory: (projectId: string, path: string, options: ApiRequestOptions = {}) =>
     get(`/api/file-tree/projects/${projectId}/list${query({ path })}`, options),
-  previewFile: (projectId: string, path: string, lines = 200, options: ApiRequestOptions = {}) =>
-    get(`/api/file-tree/projects/${projectId}/preview${query({ path, lines })}`, options),
+  // `start` is the first line of the window — 1 for the top of the file, and `line - 40` when a
+  // file reference asked for a line. The server clamps it to at least 1 and answers an empty
+  // window for a start past the end, so nothing here has to know how long the file is.
+  previewFile: (
+    projectId: string,
+    path: string,
+    lines = 200,
+    start = 1,
+    options: ApiRequestOptions = {},
+  ) => get(`/api/file-tree/projects/${projectId}/preview${query({ path, lines, start })}`, options),
 
   // File operations
   createFile: (

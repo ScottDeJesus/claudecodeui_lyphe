@@ -16,11 +16,12 @@ import { useFileManagerState } from '@/modules/file-manager/hooks/useFileManager
 type FileManagerProps = {
   selectedProject: Project;
   /**
-   * A path somewhere else in the app asked to open. It is a fresh wrapper every time, and the owner
-   * retires it once `onRequestHandled` fires — which is what makes asking for the SAME path twice a
-   * second request rather than a no-op.
+   * A path somewhere else in the app asked to open, and the line it asked for when it named one. It
+   * is a fresh wrapper every time, and the owner retires it once `onRequestHandled` fires — which is
+   * what makes asking for the SAME path twice a second request rather than a no-op. `nonce` carries
+   * that same "this is a new ask" downward, where the wrapper's identity does not reach.
    */
-  openRequest: { path: string } | null;
+  openRequest: { path: string; line?: number; nonce: number } | null;
   /** Called once the request above has been acted on, so the owner can retire it. */
   onRequestHandled: () => void;
   /** The one "open a path" capability, so the tree reaches the workspace the way chat and git do. */
@@ -86,6 +87,9 @@ export function FileManager({ selectedProject, openRequest, onRequestHandled, on
     listing,
     selectedPath,
     preview,
+    targetLine,
+    targetNonce,
+    missedLine,
     loading,
     error,
     previewError,
@@ -99,6 +103,12 @@ export function FileManager({ selectedProject, openRequest, onRequestHandled, on
   // a message with no file in it, and "was not uploaded" needs to name something.
   const pendingUploadLabelRef = useRef('The file');
   const uploadInputRef = useRef<HTMLInputElement>(null);
+  // The div that ARRANGES the two panes, handed to the preview pane so it can bring its own top
+  // into view. Below `md` the panes wrap and this is the scroller they stack inside, so a pane
+  // that scrolls only its own rows still sits a full container-height below the fold. Passed down
+  // rather than reached for through `parentElement`: the pane then moves one node it was GIVEN,
+  // which is the whole difference between this and `scrollIntoView`.
+  const paneScrollRef = useRef<HTMLDivElement>(null);
 
   const reportUploadFailure = useCallback((message: string, type: 'success' | 'error') => {
     // The hook's own success line counts files; the record-driven toast below names them, so only
@@ -209,7 +219,7 @@ export function FileManager({ selectedProject, openRequest, onRequestHandled, on
       return;
     }
     enter(directoryOf(openRequest.path));
-    select(openRequest.path);
+    select(openRequest.path, openRequest.line);
     onRequestHandled();
   }, [enter, onRequestHandled, openRequest, select]);
 
@@ -256,7 +266,15 @@ export function FileManager({ selectedProject, openRequest, onRequestHandled, on
           onChange={handleUploadInputChange}
         />
 
-        <div className="flex min-h-0 flex-1 flex-wrap content-start overflow-y-auto overflow-x-hidden">
+        {/* `[&>section]:max-h-full` bounds BOTH panes, and belongs here because this is what
+            arranges them. Each pane declares an inner `overflow-y-auto` that was never a real
+            scroller: a pane is a flex item on a WRAPPING line, so nothing capped its height — it
+            grew to its content (4,827px for a 200-line preview at 1440x900), its inner div
+            inherited that, and `scrollTop` was stuck at 0. THIS div scrolled instead, which is why
+            revealing a line took the directory listing with it. Capping one pane alone unbalances
+            the row (a capped preview beside a listing still growing to 2,796px scrolls out of view),
+            so the cap must be symmetric — and a child selector stays symmetric for a third pane. */}
+        <div ref={paneScrollRef} className="flex min-h-0 flex-1 flex-wrap content-start overflow-y-auto overflow-x-hidden [&>section]:max-h-full">
           <DirectoryListing
             entries={listing?.entries ?? []}
             hasParent={currentDir !== ''}
@@ -271,9 +289,13 @@ export function FileManager({ selectedProject, openRequest, onRequestHandled, on
           />
 
           <PreviewPane
+            paneScrollRef={paneScrollRef}
             projectId={projectId}
             selectedPath={selectedPath}
             preview={preview}
+            targetLine={targetLine}
+            targetNonce={targetNonce}
+            missedLine={missedLine}
             error={previewError}
             onDownload={() => { void handleDownload(); }}
           />

@@ -859,15 +859,22 @@ export type DirectoryListing = {
 /**
  * What the preview pane can show for one file — a closed set of three, switched on `kind`.
  *
- * `text` carries the first `lines.length` lines already split, with `totalLines` `null` when
- * the file was too big to count; `image` carries no pixels (the browser loads them through the
- * content stream and measures them itself); `none` is a binary this app will not guess at, and
- * download is the only action offered.
+ * `text` carries `lines.length` lines already split, beginning at `startLine`, with `totalLines`
+ * `null` when the file was too big to count; `image` carries no pixels (the browser loads them
+ * through the content stream and measures them itself); `none` is a binary this app will not
+ * guess at, and download is the only action offered.
  */
 export type FilePreview =
   | {
       kind: 'text';
       lines: string[];
+      /**
+       * The line number `lines[0]` carries — 1 for a window opened at the top, and whatever a
+       * file reference's `:line` asked for otherwise. The preview pane numbers its rows from
+       * this, so it is never an offset the client has to remember alongside the text. When
+       * `lines` is empty this is still the window that was asked for, and the file ends before it.
+       */
+      startLine: number;
       totalLines: number | null;
       truncated: boolean;
       bytes: number | null;
@@ -903,7 +910,7 @@ type FileDiffInfo = {
   new_string: string;
 };
 
-/** Callback for "open this path", crossed by the chat's file cards and links, the git panel's changed-file rows and the file tree: the workspace brings the Files tab forward and the file manager previews the file. `diffInfo` is forwarded untouched by useFileOpenResolver and dropped by the handler at the end — the preview is read-only, so do not wire a diff view to it expecting one. */
+/** Callback for "open this path", crossed by the chat's file cards and links, the git panel's changed-file rows and the file tree: the workspace brings the Files tab forward and the file manager previews the file. `diffInfo` is dropped by the handler at the end — the preview is read-only, so do not wire a diff view to it expecting one. It is also NOT a spare slot: `ToolRenderer` passes a real diff object there, so a LINE NUMBER never rides this parameter. Opening at a line goes through `openFileAt` / `PaletteOps.openFileReference`, which carry it as their own second argument. */
 export type FileOpenHandler = (filePath: string, diffInfo?: FileDiffInfo) => void;
 
 
