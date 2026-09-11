@@ -66,9 +66,13 @@
         /** Long enough that no plausible crash period hides under it. */
         var HEALTHY_RUN_MS = 600000;
         var BOOT_DEADLINE_MS = 10000;
+        /** A boot is only dead once its files stop arriving for this long. */
+        var BOOT_STALL_MS = 8000;
         var WATCH_INTERVAL_MS = 2000;
 
         var startedAt = Date.now();
+        var lastProgressAt = startedAt;
+        var lastTickAt = startedAt;
         var healthySince = 0;
         var hasEverMounted = false;
         var runCountCleared = false;
@@ -161,6 +165,13 @@
         function tick() {
           if (reloading) return;
 
+          // A tick far behind schedule means the page itself was frozen or busy — a phone that
+          // backgrounded the tab mid-boot, a main thread still evaluating modules — not that
+          // the network stalled. Judging then would reload a boot the moment it resumed.
+          var tickAt = Date.now();
+          if (tickAt - lastTickAt > WATCH_INTERVAL_MS * 2) lastProgressAt = tickAt;
+          lastTickAt = tickAt;
+
           if (appChildren() > 0) {
             // The app is on screen — including over the card, which React will have replaced.
             hasEverMounted = true;
@@ -187,7 +198,35 @@
           // clock. The same deadline on every attempt: a spent reload does not make a slow
           // network faster, and shortening it showed a healthy-but-slow app a failure card for
           // nearly nine seconds (measured).
-          if (Date.now() - startedAt >= BOOT_DEADLINE_MS) recover();
+          //
+          // And the deadline alone is not death: the dev server hands the browser ~1,100
+          // separate modules, ~20 MB uncompressed, and at a phone's 40–120 ms a round trip the
+          // first paint lands at 12–26 s while every file is still arriving — longer again on
+          // thin bandwidth (measured). Reloading then threw away a boot that was working and
+          // started it over, and the second slow boot ended on this card. So a boot past the
+          // deadline is only dead once its files have STOPPED arriving; a failed script is
+          // caught by the listeners below without waiting at all. The price: a request that
+          // hangs forever reaches the card later on a slow link (~50 s at 80 ms, measured),
+          // because each attempt first runs as far as the link lets it.
+          var now = Date.now();
+          if (now - startedAt >= BOOT_DEADLINE_MS && now - lastProgressAt >= BOOT_STALL_MS) recover();
+        }
+
+        // Progress is a same-origin file finishing, API calls excepted: those are the app's
+        // own business once it runs, and a page polling an API is not a page drawing itself.
+        if (typeof PerformanceObserver === 'function') {
+          try {
+            new PerformanceObserver(function (list) {
+              var entries = list.getEntries();
+              for (var i = 0; i < entries.length; i += 1) {
+                var name = entries[i].name || '';
+                if (name.indexOf(window.location.origin + '/') === 0 && name.indexOf('/api/') === -1) {
+                  lastProgressAt = Date.now();
+                  return;
+                }
+              }
+            }).observe({ type: 'resource', buffered: true });
+          } catch (error) { /* no observer — the plain deadline stands, as before */ }
         }
 
         // A load-bearing script that 404s/504s reports on the element, which does not bubble —
@@ -198,7 +237,7 @@
           var target = event.target;
           if (!target || target === window || target.tagName !== 'SCRIPT') return;
           var source = target.src || '';
-          if (source && source.indexOf(window.location.origin) !== 0) return;
+          if (source && source.indexOf(window.location.origin + '/') !== 0) return;
           recover();
         }, true);
 

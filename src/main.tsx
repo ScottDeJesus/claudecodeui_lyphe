@@ -1,6 +1,5 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
-import { scan } from 'react-scan'
 
 import App from '@/App'
 import AppErrorBoundary from '@/AppErrorBoundary'
@@ -17,8 +16,14 @@ import '@/modules/i18n'
 // this app it roughly halves the dev frame rate, adds ~14 MB of heap and injects
 // a few thousand DOM nodes of its own. It is worth all of that while hunting a
 // render bug and worth none of it the rest of the time, so it is opt-in —
-// `localStorage.setItem('react-scan', 'on')` and reload.
-scan({ enabled: import.meta.env.DEV && localStorage.getItem('react-scan') === 'on' })
+// `localStorage.setItem('react-scan', 'on')` and reload. Imported only then: a static import
+// shipped its ~760 KB to every boot, on or off, and on a phone's link that is seconds.
+const reactScanReady = import.meta.env.DEV && localStorage.getItem('react-scan') === 'on'
+  ? import('react-scan')
+    .then(({ scan }) => scan({ enabled: true }))
+    // A diagnostics overlay that failed to load must not keep the app off screen.
+    .catch((error) => console.warn('React Scan failed to load:', error))
+  : Promise.resolve()
 
 // Register service worker for PWA + Web Push support
 if ('serviceWorker' in navigator) {
@@ -32,10 +37,13 @@ if (!rootElement) {
   throw new Error('Unable to mount the app: #root is missing from the document')
 }
 
-ReactDOM.createRoot(rootElement).render(
-  <React.StrictMode>
-    <AppErrorBoundary>
-      <App />
-    </AppErrorBoundary>
-  </React.StrictMode>,
-)
+// After the overlay when it is on, so it sees the first render; at once when it is off.
+void reactScanReady.then(() => {
+  ReactDOM.createRoot(rootElement).render(
+    <React.StrictMode>
+      <AppErrorBoundary>
+        <App />
+      </AppErrorBoundary>
+    </React.StrictMode>,
+  )
+})
