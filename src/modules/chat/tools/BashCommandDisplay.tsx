@@ -1,14 +1,23 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { ChevronRight, Copy, Check } from 'lucide-react';
+import { Copy, Check } from 'lucide-react';
 
 import { cn,copyTextToClipboard } from '@/shared/utils';
 import { ToolStatusBadge } from '@/modules/chat/tools/ToolStatusBadge';
-import { ToolOutcomeBadge, ToolOutcomeGlyph } from '@/modules/chat/tools/ToolOutcomeBadge';
+import { ToolOutcomeBadge } from '@/modules/chat/tools/ToolOutcomeBadge';
 import type { ToolOutcome } from '@/modules/chat/tools/toolOutcome';
+import { ToolRowIcon } from '@/modules/chat/tools/ToolRowIcon';
+import {
+  TOOL_ROW_FRAME,
+  TOOL_ROW_HEADER,
+  TOOL_ROW_LABEL,
+  TOOL_ROW_SEPARATOR,
+} from '@/modules/chat/tools/toolRow';
 import { useIsExportingTranscript } from '@/modules/chat/context/TranscriptRenderContext';
 import type { ToolStatus } from '@/shared/types';
 
 type BashCommandDisplayProps = {
+  /** The tool's name as the row shows it. */
+  label?: string;
   command: string;
   description?: string;
   /** Combined stdout/stderr from the tool result (empty while running). */
@@ -21,15 +30,16 @@ type BashCommandDisplayProps = {
 };
 
 /**
- * Codex-in-VSCode style command row: a compact, single-line command with a
- * chevron on the left. When the command produced output, the row becomes a
- * dropdown that expands to reveal the output inline. Theme-integrated surfaces
- * keep it clean in both light and dark mode; consecutive commands stack tightly
- * into a clean list.
+ * One shell run as a compact row that leads with what it is doing: the
+ * model's description is the headline, and the command line itself sits
+ * behind the chevron with the output. A run with no description falls back to
+ * the command as its headline. Theme-integrated surfaces keep it clean in both
+ * light and dark mode; consecutive runs stack tightly into a clean list.
  *
  * Rendered by chat's ToolRenderer for shell tools (Bash and friends).
  */
 export const BashCommandDisplay: React.FC<BashCommandDisplayProps> = ({
+  label = 'Bash',
   command,
   description,
   output,
@@ -42,6 +52,10 @@ export const BashCommandDisplay: React.FC<BashCommandDisplayProps> = ({
   const hasOutput = trimmedOutput.length > 0;
   const outputLineCount = hasOutput ? trimmedOutput.split('\n').length : 0;
   const isRunning = status === 'running';
+  const headline = (description || '').trim();
+  // With a description in the header, the command is hidden detail too, so the
+  // row expands even before any output has come back.
+  const canExpand = hasOutput || Boolean(headline && command);
   // `open` is raised by an effect once output arrives (below). A document is
   // rendered without effects, so it would show every command and no output.
   const isExporting = useIsExportingTranscript();
@@ -63,7 +77,7 @@ export const BashCommandDisplay: React.FC<BashCommandDisplayProps> = ({
   }, [hasOutput, defaultOpen]);
 
   const toggle = () => {
-    if (hasOutput) {
+    if (canExpand) {
       setOpen((prev) => !prev);
     }
   };
@@ -79,67 +93,53 @@ export const BashCommandDisplay: React.FC<BashCommandDisplayProps> = ({
   return (
     <div
       className={cn(
-        'group/cmd overflow-hidden rounded-lg border bg-muted/40 backdrop-blur-sm transition-all duration-200',
-        isError ? 'border-red-500/30' : 'border-border/60',
-        hasOutput && !open && 'hover:border-border hover:bg-muted/60',
+        'group/cmd backdrop-blur-sm transition-all duration-200',
+        TOOL_ROW_FRAME,
+        isError && 'border-red-500/30',
+        canExpand && !open && 'hover:border-border hover:bg-muted/60',
         open && 'bg-muted/50 shadow-sm',
       )}
     >
-      {/* Command header — clickable when there is output to expand */}
+      {/* Header — clickable when there is detail to expand */}
       <div
-        role={hasOutput ? 'button' : undefined}
-        tabIndex={hasOutput ? 0 : undefined}
-        aria-expanded={hasOutput ? open : undefined}
+        role={canExpand ? 'button' : undefined}
+        tabIndex={canExpand ? 0 : undefined}
+        aria-expanded={canExpand ? open : undefined}
         onClick={toggle}
         onKeyDown={(event) => {
-          if (hasOutput && (event.key === 'Enter' || event.key === ' ')) {
+          if (canExpand && (event.key === 'Enter' || event.key === ' ')) {
             event.preventDefault();
             toggle();
           }
         }}
         className={cn(
-          'flex items-center gap-2 px-2.5 py-1.5 outline-none',
-          hasOutput && 'cursor-pointer focus-visible:ring-1 focus-visible:ring-ring',
+          TOOL_ROW_HEADER,
+          'outline-none',
+          canExpand && 'cursor-pointer focus-visible:ring-1 focus-visible:ring-ring',
         )}
       >
-        <ChevronRight
-          className={cn(
-            'h-3.5 w-3.5 flex-shrink-0 text-muted-foreground/70 transition-transform duration-200',
-            open && 'rotate-90',
-            !hasOutput && 'opacity-0',
-          )}
-        />
-        <span className="flex-shrink-0 select-none font-mono text-xs font-semibold text-emerald-500 dark:text-emerald-400">
-          $
-        </span>
+        <ToolRowIcon icon="terminal" className="text-emerald-500 dark:text-emerald-400" />
+        <span className={TOOL_ROW_LABEL}>{label}</span>
+        <span className={TOOL_ROW_SEPARATOR}>/</span>
         {/* Not a <code> tag: the global `.chat-message code` rule forces
             `white-space: pre-wrap !important`, which would defeat `truncate`
             and render collapsed multi-line commands in full. */}
-        <span
-          className={cn(
-            'min-w-0 flex-1 font-mono text-xs text-foreground',
-            open ? 'whitespace-pre-wrap break-all' : 'truncate',
-          )}
-        >
-          {command}
-        </span>
+        {headline ? (
+          <span className="min-w-0 flex-1 truncate text-xs text-foreground">{headline}</span>
+        ) : (
+          <span
+            className={cn(
+              'min-w-0 flex-1 font-mono text-xs text-foreground',
+              open ? 'whitespace-pre-wrap break-all' : 'truncate',
+            )}
+          >
+            {command}
+          </span>
+        )}
 
         {isRunning && (
           <span className="h-2.5 w-2.5 flex-shrink-0 animate-spin rounded-full border-[1.5px] border-muted-foreground/30 border-t-emerald-400" />
         )}
-        {status && status !== 'running' && <ToolStatusBadge status={status} className="flex-shrink-0" />}
-        {outcome && (
-          <span className="inline-flex flex-shrink-0 items-center gap-1.5">
-            <ToolOutcomeGlyph outcome={outcome} />
-            <ToolOutcomeBadge outcome={outcome} />
-          </span>
-        )}
-        {!open && hasOutput && !isRunning && (
-          <span className="flex-shrink-0 text-[10px] tabular-nums text-muted-foreground/70 transition-opacity group-hover/cmd:opacity-0">
-            {outputLineCount} {outputLineCount === 1 ? 'line' : 'lines'}
-          </span>
-        )}
-
         <button
           onClick={handleCopy}
           onKeyDown={(event) => event.stopPropagation()}
@@ -149,28 +149,46 @@ export const BashCommandDisplay: React.FC<BashCommandDisplayProps> = ({
         >
           {copied ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5" />}
         </button>
+
+        {!open && hasOutput && !isRunning && (
+          <span className="flex-shrink-0 text-[10px] tabular-nums text-muted-foreground/70">
+            {outputLineCount} {outputLineCount === 1 ? 'line' : 'lines'}
+          </span>
+        )}
+
+        {/* The outcome is always the row's rightmost mark. */}
+        {status && status !== 'running' && <ToolStatusBadge status={status} className="flex-shrink-0" />}
+        {outcome && (
+          <span className="flex flex-shrink-0 items-center">
+            <ToolOutcomeBadge outcome={outcome} />
+          </span>
+        )}
       </div>
 
-      {description && !open && (
-        <div className="truncate px-2.5 pb-1.5 pl-[2.4rem] text-[11px] italic text-muted-foreground/70">
-          {description}
-        </div>
-      )}
-
-      {/* Expanded output */}
-      {open && hasOutput && (
+      {/* Expanded detail: the command (when the header showed the description), then the output */}
+      {open && canExpand && (
         <div className="settings-content-enter border-t border-border/50 bg-background/50">
-          {description && (
-            <div className="px-3 pt-2 text-[11px] italic text-muted-foreground/70">{description}</div>
+          {headline && command && (
+            <div
+              className={cn(
+                'whitespace-pre-wrap break-all px-3 pt-2 font-mono text-xs text-foreground',
+                !hasOutput && 'pb-2',
+              )}
+            >
+              <span className="select-none font-semibold text-emerald-500 dark:text-emerald-400">$ </span>
+              {command}
+            </div>
           )}
-          <pre
-            className={cn(
-              'max-h-80 overflow-auto whitespace-pre-wrap break-all px-3 py-2 font-mono text-xs leading-relaxed',
-              isError ? 'text-red-600 dark:text-red-400' : 'text-muted-foreground',
-            )}
-          >
-            {trimmedOutput}
-          </pre>
+          {hasOutput && (
+            <pre
+              className={cn(
+                'max-h-80 overflow-auto whitespace-pre-wrap break-all px-3 py-2 font-mono text-xs leading-relaxed',
+                isError ? 'text-red-600 dark:text-red-400' : 'text-muted-foreground',
+              )}
+            >
+              {trimmedOutput}
+            </pre>
+          )}
         </div>
       )}
     </div>

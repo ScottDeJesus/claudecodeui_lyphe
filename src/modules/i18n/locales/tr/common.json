@@ -267,5 +267,8 @@
       "updateAvailable": "Güncelleme mevcut",
       "closeSidebar": "Kenar çubuğunu kapat"
     }
+  },
+  "shapes": {
+    "diagramFailed": "Bu diyagram çizilemedi; kaynağı gösteriliyor."
   }
 }

@@ -36,8 +36,8 @@ Under `sessionsDir` — `CLOUDCLI_SESSIONS_DIR`, else `~/.cloudcli/sessions`, cr
 | `<hostId>.ndjson` | the host | The `out`/`exit` frames verbatim, one per line, `0600` — replay is "stream the file" |
 | `<hostId>.json` | the host | The meta below, written by atomic rename |
 
-`hostId` is `<appSessionId>-<Date.now().toString(36)>`, never the bare app session id: a supersede
-overlap puts two hosts on one session for seconds and `tmux new-session -s <name>` refuses a
+`hostId` is `<appSessionId>-<Date.now().toString(36)>`, never the bare app session id: a retirement
+(a message whose launch argument the running process cannot take) puts two hosts on one session for seconds and `tmux new-session -s <name>` refuses a
 duplicate (D-8). The tmux session, the socket, the journal and the meta all carry that id. A
 socket path is ~81 bytes here, under the 108-byte limit — a `$HOME` longer than ~40 bytes needs
 `CLOUDCLI_SESSIONS_DIR` pointed somewhere shorter.
@@ -57,7 +57,7 @@ Client → host:
 | `{"t":"stdin","b64":string}` | Bytes for the CLI's stdin, base64 so no frame boundary can split a character. Buffered to complete lines; a trailing partial line waits |
 | `{"t":"end_input"}` | `child.stdin.end()` — the only path by which the CLI ever sees end-of-file |
 | `{"t":"kill","signal":"SIGTERM"\|"SIGKILL"}` | `child.kill(signal)` |
-| `{"t":"note","turnCompleteSent","heldForBackgroundWork"}` | One per `result` the provider has finished handling: shifts `pendingResults` and writes both bits in the same rename |
+| `{"t":"note","turnCompleteSent","heldForBackgroundWork"}` | One per `result` the provider has finished handling: shifts `pendingResults` and writes both bits in the same rename. With `"ack":false` — sent when a message joins the running process — it writes the bits and shifts nothing; a host from before the field ignores it, and retires nothing anyway since no result is outstanding then |
 
 Host → client:
 
@@ -205,7 +205,7 @@ host.
 | Two API processes at once (a manual `npm run server:dev` beside the unit) | The second connection replaces the first, and the first facade errors its run. Unsupported. The supervisor's own handover overlap is not this case: there the successor is spawned as a handover child and re-adopts nothing until the first process has exited |
 | The host process itself dies | The CLI's stdin pipe closes, so the CLI sees end-of-file and winds down; the facade errors the run. The same loss as before this package, and visible |
 | A session row deleted while its host lives | Re-adoption finds no row: `end_input`, then SIGTERM; the files are swept next boot |
-| Journal growth | Bounded by one CLI lifetime, deleted by the attached adapter on `exit` or by the next boot's sweep. A held-for-background CLI lives at most `BG_WAIT_CEILING_MS` (30 min) |
+| Journal growth | Bounded by one CLI lifetime — one per CONVERSATION, since every message joins the process already running for its session (`claude-runtime.provider.js`, `chat-process.ts`). Deleted by the attached adapter on `exit` or by the next boot's sweep. A CLI ends after two hours without a message (`CLAUDE_CHAT_IDLE_CLOSE_MS`, or `options.idleCloseMs` on the turn), never while a task or watcher is running in it; after its EOF, `BG_WAIT_CEILING_MS` (30 min) bounds anything that slipped in |
 
 ## See also
 

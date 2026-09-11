@@ -50,6 +50,7 @@
     },
     "toolDisplay": {
       "title": "Affichage des outils",
+      "showWork": "Afficher le travail",
       "showThinking": "Afficher la réflexion",
       "showRawParameters": "Afficher les paramètres bruts"
     },

@@ -74,6 +74,7 @@
     },
     "toolDisplay": {
       "title": "Tool Display",
+      "showWork": "Show work",
       "showThinking": "Show thinking",
       "showRawParameters": "Show raw parameters"
     },

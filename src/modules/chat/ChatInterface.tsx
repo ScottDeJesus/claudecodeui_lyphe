@@ -46,6 +46,8 @@ type ChatInterfaceProps = {
   onShowSettings?: () => void;
   showRawParameters?: boolean;
   showThinking?: boolean;
+  /** Draws tool calls and other work between replies; off shows a typing indicator instead. */
+  showWork?: boolean;
   sendByCtrlEnter?: boolean;
   externalMessageUpdate?: number;
   newSessionTrigger?: number;
@@ -75,6 +77,7 @@ function ChatInterface({
   onShowSettings,
   showRawParameters,
   showThinking,
+  showWork = false,
   sendByCtrlEnter,
   externalMessageUpdate,
   newSessionTrigger,
@@ -158,6 +161,7 @@ function ChatInterface({
     visibleMessageCount,
     visibleMessages,
     loadEarlierMessages,
+    fillViewportWithHistory,
     loadAllMessages,
     loadFullTranscript,
     allMessagesLoaded,
@@ -544,6 +548,7 @@ function ChatInterface({
           visibleMessageCount={visibleMessageCount}
           visibleMessages={visibleMessages}
           loadEarlierMessages={loadEarlierMessages}
+          onUnderfilled={fillViewportWithHistory}
           loadAllMessages={loadAllMessages}
           allMessagesLoaded={allMessagesLoaded}
           isLoadingAllMessages={isLoadingAllMessages}
@@ -555,6 +560,7 @@ function ChatInterface({
           onGrantToolPermission={handleGrantToolPermission}
           showRawParameters={showRawParameters}
           showThinking={showThinking}
+          showWork={showWork}
           selectedProject={selectedProject}
           // Editing replaces the turn and everything after it, so it is only
           // offered when the session is idle — a half-truncated transcript with

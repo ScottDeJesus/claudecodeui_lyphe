@@ -138,6 +138,18 @@ Four things in that picture are easy to get backwards:
   its last 5000 events for replay, and stays available for five minutes after finishing.
   A reconnecting client sends `lastSeq` and gets only what it missed — and only if the
   run is still running, because a completed run is already on disk and served over REST.
+- **A Claude run is a turn, not a process.** `runtime.run` for the Claude provider pushes the
+  message into the CLI already running for that conversation and settles when THAT turn's
+  `result` lands, matched by the uuid stamped on the user message; the process stays up for
+  the next message and closes only after two hours without one, never while a background
+  task or watcher is running in it (`chat-process.ts`). A model, effort or permission-mode
+  change is applied to the running query, and so is a GROWN allowed-tool list; a changed
+  working directory, MCP configuration, an edited message (`resumeAnchorId`), a conversation
+  restarted from scratch, any change to the disallowed list or a tool REMOVED from the allowed
+  list (both are launch arguments the CLI resolves before ever asking the callback) retires the
+  process — interrupt first, then end-of-input — and spawns a fresh one. The launch profile
+  travels in the host meta, so a re-adopted process is diffed against what it was really
+  launched with.
 - **A Claude run can outlive the API process too, and then `seq` restarts at 1.** The CLI
   lives in a tmux server rather than in the API's cgroup, and the API re-adopts it on boot
   with a *fresh* registry run — so a client that reconnects across a restart holds a cursor
@@ -308,7 +320,7 @@ a boundary if the nearest non-blank line on **either** side matches
 row, or a link-reference definition. The **last** surviving candidate wins, so the
 settled half is as long as it can safely be.
 
-Three surprises, all of them intended:
+Four surprises, all of them intended:
 
 - **Settled blocks can un-settle.** The boundary is recomputed from scratch each tick, so
   a paragraph that was settled goes back to pending as soon as a list or a table starts
@@ -337,6 +349,20 @@ Three surprises, all of them intended:
   completed, destroying a selection the user had started. `messageStreamEnd.test.tsx`
   asserts on node identity, not HTML, because identity is what the browser keys a
   selection to.
+- **The `streaming` flag decides more than the widget fence.** `StreamingMarkdown`
+  renders the pending half as `<MarkdownBody streaming>`, and `MarkdownBodyRenderer`
+  reads that one flag to pick which react-markdown component map to hand down: the plain
+  map, which is today's markup element for element, or the shape map. So a half-arrived
+  table, list, blockquote or paragraph cannot be read as a rendered shape, and that rule has
+  exactly ONE enforcement site instead of one per shape — which also means a shape
+  appears at the moment the split boundary settles over it, and disappears again for a
+  tick whenever the boundary retracts, the same way a widget fence does. The same flag
+  keeps `remarkShapeGroups` out of the pending half's remark plugins, because grouping
+  rearranges sibling blocks and a half-arrived fence would join a tab group and leave it
+  again on the next delta. Fences and inline marks cross the map rather than obey it —
+  fences take the flag as a prop through `CodeBlock`, and file chips, colour swatches and
+  keycaps draw on both halves. That, and the probes that hold each half, is
+  [rendered shapes](./08-rendered-shapes.md) §"Streaming".
 
 ## Run lifecycle and busy state
 

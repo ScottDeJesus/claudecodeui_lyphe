@@ -20,7 +20,7 @@ export type ReadToolPermissionState = (toolName: string | undefined, toolInput: 
  * The pending list is cleared the instant a decision is sent
  * (useChatRealtimeHandlers.ts, `permission_resolved`), so it answers "is this
  * blocked right now" and nothing else — the row would flip straight from
- * "Waiting for you" to "Done automatically" while the person still had their
+ * "Waiting for you" to "Finished" while the person still had their
  * finger on the button. This keeps the keys it has seen for as long as the answer
  * is knowable, which is one conversation: a transcript on disk records that a
  * tool ran, never that anyone was asked.

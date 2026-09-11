@@ -1,4 +1,5 @@
 import { useEffect, useId, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 // Type-only: erased at build time, so it does not pull mermaid into the main chunk.
 import type mermaid from 'mermaid';
 
@@ -25,12 +26,23 @@ type MermaidDiagramProps = {
  *
  * While mermaid is loading — or when the source doesn't parse (e.g. a block
  * that is still streaming in) — the raw source is shown instead, so the
- * content is never blank or replaced by an error box.
+ * content is never blank or replaced by an error box. A source that FAILED
+ * gets one muted line above it saying so, so a reader can tell a broken
+ * diagram from one still loading.
+ *
+ * The line reads the `common` namespace, never `chat`: this component is
+ * shared with the PRD editor, and a shared module reaching into one
+ * feature's strings would point a dependency the wrong way.
  */
 export default function MermaidDiagram({ code }: MermaidDiagramProps) {
+  const { t } = useTranslation('common');
   const { isDarkMode } = useTheme();
   const reactId = useId();
   const [svg, setSvg] = useState<string | null>(null);
+  // Whether the LAST render attempt threw. `svg === null` alone cannot tell a failure from a
+  // diagram still loading, and only the failure earns the "could not be drawn" line. It starts
+  // false, so the first synchronous render — the one a static export keeps — is the bare source.
+  const [failed, setFailed] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -49,11 +61,13 @@ export default function MermaidDiagram({ code }: MermaidDiagramProps) {
       .then((result) => {
         if (!cancelled) {
           setSvg(result.svg);
+          setFailed(false);
         }
       })
       .catch(() => {
         if (!cancelled) {
           setSvg(null);
+          setFailed(true);
         }
         // suppressErrorRendering still leaves the scratch element behind on
         // parse failures in some mermaid versions; clean it up.
@@ -66,10 +80,24 @@ export default function MermaidDiagram({ code }: MermaidDiagramProps) {
   }, [code, isDarkMode, reactId]);
 
   if (!svg) {
-    return (
+    const source = (
       <pre className="my-3 overflow-x-auto rounded-xl border border-border bg-muted/50 p-4 font-mono text-[0.8125rem] leading-relaxed text-muted-foreground dark:bg-zinc-900">
         {code.trim()}
       </pre>
+    );
+    if (!failed) {
+      return source;
+    }
+    // A `div` and not a `p`: inside the chat's `prose` wrapper a paragraph takes prose margins.
+    // Its negative bottom margin collapses into the source block's top margin, so the line
+    // sits close above the block it describes rather than floating a full block-gap away.
+    return (
+      <>
+        <div data-diagram-failed className="-mb-1.5 mt-3 text-xs text-muted-foreground">
+          {t('shapes.diagramFailed')}
+        </div>
+        {source}
+      </>
     );
   }
 

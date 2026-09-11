@@ -860,9 +860,11 @@ export type DirectoryListing = {
  * What the preview pane can show for one file — a closed set of three, switched on `kind`.
  *
  * `text` carries `lines.length` lines already split, beginning at `startLine`, with `totalLines`
- * `null` when the file was too big to count; `image` carries no pixels (the browser loads them
- * through the content stream and measures them itself); `none` is a binary this app will not
- * guess at, and download is the only action offered.
+ * `null` when the READ did not walk the whole file rather than whenever the file is big — a window
+ * near the end of a large one reaches EOF anyway and answers with a real count, which is what lets
+ * the file manager tell a line that is past the end from one that simply is not in this window;
+ * `image` carries no pixels (the browser loads them through the content stream and measures them
+ * itself); `none` is a binary this app will not guess at, and download is the only action offered.
  */
 export type FilePreview =
   | {
@@ -1310,6 +1312,7 @@ export type ProviderAuthStatusMap = Record<LLMProvider, ProviderAuthStatus>;
 /** Identifier of a boolean user preference exposed in the quick settings panel; use it as the key when reading or writing one preference. */
 export type PreferenceToggleKey =
   | 'showRawParameters'
+  | 'showWork'
   | 'showThinking'
   | 'sendByCtrlEnter'
   | 'voiceEnabled';
@@ -1942,7 +1945,7 @@ export type RunnerTimelineEntry = { at: string; phase_id: string; stage: string;
 /** Where the run stands, from `progress.json.position`. `stage_since` is epoch SECONDS, like every timestamp inside a snapshot. */
 export type RunnerPosition = { rank: number; total: number; phase_id: string; title: string; remain: number; pipeline: string; stage: string; stage_detail: string; stage_since: number };
 /** One run as the lane reads it off disk. `position` is `null` while the runner has not composed one yet, which a live run does show in its first seconds. */
-export type RunnerRunSnapshot = { run_id: string; plan_path: string; plan_title: string; state: RunnerRunState; status: string; started_at: number; heartbeat_at: number; stopped_at: number | null; outcome: string | null; ended_at: number | null; pid: number | null; position: RunnerPosition | null; phases: RunnerPhaseRow[]; spawns: number; max_spawns: number; cost_usd: number; line: string; timeline: RunnerTimelineEntry[] };
+export type RunnerRunSnapshot = { run_id: string; plan_path: string; plan_title: string; state: RunnerRunState; status: string; started_at: number; heartbeat_at: number; stopped_at: number | null; outcome: string | null; ended_at: number | null; pid: number | null; position: RunnerPosition | null; phases: RunnerPhaseRow[]; spawns: number; max_spawns: number; cost_usd: number; plan_runs: number; plan_spawns: number; plan_cost_usd: number; line: string; timeline: RunnerTimelineEntry[] };
 /** The whole picture, pushed on change over `/ws`. `runs` is ordered by `started_at` ascending. `at` is epoch MILLISECONDS, unlike every field inside a snapshot. */
 export type RunnerStateEvent = { kind: 'runner_state'; runs: RunnerRunSnapshot[]; at: number };
 /** The two verbs the server may relay. Starting a run is `/execute`'s act, never a button's. */

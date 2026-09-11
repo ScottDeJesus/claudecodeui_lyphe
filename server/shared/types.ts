@@ -282,7 +282,7 @@ export type RunnerPosition = { rank: number; total: number; phase_id: string; ti
  * `position` is `null` while the runner has not composed one yet, which a live run does show in its first seconds.
  * `line` is the composed status-bar line the terminal bar renders, carried through unaltered.
  */
-export type RunnerRunSnapshot = { run_id: string; plan_path: string; plan_title: string; state: RunnerRunState; status: string; started_at: number; heartbeat_at: number; stopped_at: number | null; outcome: string | null; ended_at: number | null; pid: number | null; position: RunnerPosition | null; phases: RunnerPhaseRow[]; spawns: number; max_spawns: number; cost_usd: number; line: string; timeline: RunnerTimelineEntry[] };
+export type RunnerRunSnapshot = { run_id: string; plan_path: string; plan_title: string; state: RunnerRunState; status: string; started_at: number; heartbeat_at: number; stopped_at: number | null; outcome: string | null; ended_at: number | null; pid: number | null; position: RunnerPosition | null; phases: RunnerPhaseRow[]; spawns: number; max_spawns: number; cost_usd: number; plan_runs: number; plan_spawns: number; plan_cost_usd: number; line: string; timeline: RunnerTimelineEntry[] };
 /** The whole picture, pushed on change over `/ws`. `runs` is ordered by `started_at` ascending, oldest first, the order the terminal bar uses. `at` is epoch MILLISECONDS (`Date.now()`), unlike every field inside a snapshot. */
 export type RunnerStateEvent = { kind: 'runner_state'; runs: RunnerRunSnapshot[]; at: number };
 /** The two verbs this server may relay. Starting a run needs a plan and an intent lock and is `/execute`'s act, never a button's. */
@@ -1163,11 +1163,14 @@ export type DirectoryListing = {
  *
  * The three arms are a closed set and the client switches on `kind`:
  * - `text`  — `lines.length` lines, already split, beginning at `startLine` and
- *   NOT necessarily at the top of the file. `totalLines` is `null` when the file
- *   is too large to count without walking all of it, so a client can never render
- *   an invented line count; `truncated` says truthfully whether the file holds
- *   more than the window returned — lines skipped BEFORE it count, so a window
- *   opened mid-file is truncated even when it runs to the last line.
+ *   NOT necessarily at the top of the file. `totalLines` is `null` when the READ
+ *   did not walk the whole file — not merely when the file is large, because a
+ *   window near the end of a big one walks to EOF anyway and its count is real —
+ *   so a client can never render an invented line count, and can trust the one it
+ *   is given to decide whether a line exists at all; `truncated` says truthfully
+ *   whether the file holds more than the window returned — lines skipped BEFORE
+ *   it count, so a window opened mid-file is truncated even when it runs to the
+ *   last line.
  * - `image` — no pixels are read here. The browser loads the file through the
  *   existing content stream and measures it with `naturalWidth`/`naturalHeight`.
  * - `none`  — a binary this app will not guess at. Download is the only action.

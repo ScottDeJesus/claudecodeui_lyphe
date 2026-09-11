@@ -2,8 +2,9 @@
 
 *How a message gets from the composer to a provider CLI and back onto the screen.*
 
-Seven documents covering the websocket transport, the realtime stream, conversation
-handoff, the message store and lazy loading, scrolling, tool views, and live widgets.
+Eight documents covering the websocket transport, the realtime stream, conversation
+handoff, the message store and lazy loading, scrolling, tool views, live widgets, and the
+rendered markdown shapes.
 
 These subsystems are hard to read from the source alone, because in every case the
 behaviour lives in the *interaction between files* rather than in any one of them. Each
@@ -49,7 +50,8 @@ one of those two paths disagreeing with the other.
 | 4 | [The message store and lazy loading](./04-message-store-and-lazy-loading.md) | Where messages live in the client, and how a huge transcript loads without freezing the tab. |
 | 5 | [Scrolling](./05-scrolling.md) | Where the view sits, and why five different pieces of code move it. |
 | 6 | [Tool views](./06-tool-view.md) | How a tool call becomes UI. Needs the message model from 2 and 4. |
-| 7 | [Live widgets](./07-live-widgets.md) | How a `widget` fence becomes a live frame — two of them, chosen by the body: a sandboxed HTML document, or one DocSpace block embedded from ArchPulse's own origin. Last, because it needs the streaming markdown pipeline from 2 — and the transport from 1 once a widget can subscribe to live data. |
+| 7 | [Live widgets](./07-live-widgets.md) | How a `widget` fence becomes a live frame — two of them, chosen by the body: a sandboxed HTML document, or one DocSpace block embedded from ArchPulse's own origin. Late, because it needs the streaming markdown pipeline from 2 — and the transport from 1 once a widget can subscribe to live data. |
+| 8 | [Rendered shapes](./08-rendered-shapes.md) | How ordinary markdown in a settled reply becomes a component — a sortable table, a callout, a verdict banner, a file chip — and why a block that misses its trigger renders exactly as it always did. After 7, because both share the `code` override's dispatcher, and it needs the streaming split from 2. |
 
 **In a hurry?** Read 1 and 2.
 **Debugging something a user can see?** Start at 5 or 6.
@@ -164,6 +166,7 @@ unrelated to the change that caused them.
 | Transcript opens part-way up, or jumps while reading | [5](./05-scrolling.md) |
 | Old messages never load, or loading is slow | [4](./04-message-store-and-lazy-loading.md) |
 | A tool renders wrong, or a group collapses oddly | [6](./06-tool-view.md) |
+| Markdown in a reply drew as a card, banner or chip it should not have — or lost words doing it | [8](./08-rendered-shapes.md) — the trigger table, then `detect.ts` |
 | Nothing arrives at all after a network blip | [1](./01-websocket-transport.md) — reconnect and `lastSeq` |
 | A live session reads as idle, or replays itself, right after the API restarted | [2](./02-realtime-stream.md) — a re-adopted run's fresh `seq`, and [hosting.md](../hosting.md) |
 

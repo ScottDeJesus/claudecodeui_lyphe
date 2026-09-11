@@ -256,5 +256,46 @@
     "failed": "Gönderilmedi — {{reason}}",
     "cancel": "Zamanlanmış mesajı iptal et",
     "dismiss": "Hata bildirimini kapat"
+  },
+  "shapes": {
+    "collapse": "Daralt",
+    "expand": "Genişlet",
+    "copyCsv": "CSV olarak kopyala",
+    "copied": "Kopyalandı",
+    "sortBy": "{{column}} ölçütüne göre sırala",
+    "sortByColumnNumber": "{{number}}. sütuna göre sırala",
+    "tasksDone": "{{total}} görevden {{done}} tanesi tamamlandı",
+    "checksPassed": "{{count}} başarılı",
+    "checksFailed": "{{count}} başarısız",
+    "blocking": "Engelleyici",
+    "high": "Yüksek",
+    "medium": "Orta",
+    "low": "Düşük",
+    "showAllLines": "{{count}} satırın tümünü göster",
+    "showLess": "Daha az göster",
+    "openFile": "{{path}} dosyasını aç",
+    "titles": {
+      "table": "Tablo",
+      "options": "Seçenekler",
+      "beforeAfter": "Öncesi ve sonrası",
+      "callout": "Bilgi notu",
+      "tasks": "Görevler",
+      "checks": "Kontroller",
+      "timeline": "Zaman çizelgesi",
+      "facts": "Ayrıntılar",
+      "verdict": "Karar",
+      "stats": "İstatistikler",
+      "diff": "Diff",
+      "output": "Çıktı",
+      "diagram": "Diyagram",
+      "code": "Kod"
+    },
+    "alert": {
+      "note": "Not",
+      "tip": "İpucu",
+      "important": "Önemli",
+      "warning": "Uyarı",
+      "caution": "Dikkat"
+    }
   }
 }

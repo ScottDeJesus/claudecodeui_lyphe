@@ -77,8 +77,11 @@ import the service from `server/modules/providers/index.ts`.
 ### The exception: `list/claude/session-host/`
 
 `list/claude/` additionally holds a `session-host/` directory: the Claude runtime can spawn a
-turn's CLI into a tmux server through it instead of as a child of the API, which is what lets a
-chat session outlive an API restart. `claude-runtime.provider.js` imports `armKeepaliveSpawn` and
+conversation's CLI into a tmux server through it instead of as a child of the API, which is what
+lets a chat session outlive an API restart. There is one CLI per conversation, not per message:
+the first message spawns it and every later one is pushed into its open input stream
+(`claude-runtime.provider.js` §`queryClaudeSDK`; the queue, the idle closer and the live-vs-launch
+setting split are in `list/claude/chat-process.ts`). `claude-runtime.provider.js` imports `armKeepaliveSpawn` and
 `keepaliveReadopt` from it; `server/index.ts` calls `readoptKeepaliveSessions` once per boot
 through the providers barrel — before `server.listen`, except on a handover boot, where it waits
 for the retiring server to exit first. The mechanism, that exception, its gate, its fallback, and

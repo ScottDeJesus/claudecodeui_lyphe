@@ -281,5 +281,46 @@
     "failed": "No enviado — {{reason}}",
     "cancel": "Cancelar mensaje programado",
     "dismiss": "Descartar el aviso de fallo"
+  },
+  "shapes": {
+    "collapse": "Contraer",
+    "expand": "Expandir",
+    "copyCsv": "Copiar como CSV",
+    "copied": "Copiado",
+    "sortBy": "Ordenar por {{column}}",
+    "sortByColumnNumber": "Ordenar por la columna {{number}}",
+    "tasksDone": "{{done}} de {{total}} completadas",
+    "checksPassed": "{{count}} correctas",
+    "checksFailed": "{{count}} fallidas",
+    "blocking": "Bloqueante",
+    "high": "Alta",
+    "medium": "Media",
+    "low": "Baja",
+    "showAllLines": "Mostrar las {{count}} líneas",
+    "showLess": "Mostrar menos",
+    "openFile": "Abrir {{path}}",
+    "titles": {
+      "table": "Tabla",
+      "options": "Opciones",
+      "beforeAfter": "Antes y después",
+      "callout": "Aviso",
+      "tasks": "Tareas",
+      "checks": "Comprobaciones",
+      "timeline": "Cronología",
+      "facts": "Detalles",
+      "verdict": "Veredicto",
+      "stats": "Métricas",
+      "diff": "Diff",
+      "output": "Salida",
+      "diagram": "Diagrama",
+      "code": "Código"
+    },
+    "alert": {
+      "note": "Nota",
+      "tip": "Consejo",
+      "important": "Importante",
+      "warning": "Advertencia",
+      "caution": "Precaución"
+    }
   }
 }

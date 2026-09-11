@@ -11,6 +11,12 @@ import { readUserPreference } from '@/shared/userSettings';
 /** Toggles the user controls from Quick Settings and the Settings dialog. */
 export type UiPreferences = {
   showRawParameters: boolean;
+  /**
+   * Draws the work between replies — tool calls, commands, edits, task notices. Default OFF:
+   * the reader sees the conversation, and a typing indicator stands in while work runs.
+   * A row that needs the person (a question, a plan, a permission prompt) shows regardless.
+   */
+  showWork: boolean;
   showThinking: boolean;
   sendByCtrlEnter: boolean;
   sidebarVisible: boolean;
@@ -31,6 +37,7 @@ export type UiPreferencesAction =
 
 const DEFAULTS: UiPreferences = {
   showRawParameters: false,
+  showWork: false,
   showThinking: true,
   sendByCtrlEnter: false,
   sidebarVisible: true,

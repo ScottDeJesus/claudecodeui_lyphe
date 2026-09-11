@@ -18,7 +18,6 @@ export type ToolDisplayConfig = {
       primary?: string;
       secondary?: string;
       background?: string;
-      border?: string;
       icon?: string;
     };
     // Collapsible config
@@ -124,7 +123,6 @@ export const TOOL_CONFIGS: Record<string, ToolDisplayConfig> = {
         primary: 'text-green-400 font-mono',
         secondary: 'text-gray-400',
         background: '',
-        border: 'border-green-500 dark:border-green-400',
         icon: 'text-green-500 dark:text-green-400'
       }
     },
@@ -150,7 +148,6 @@ export const TOOL_CONFIGS: Record<string, ToolDisplayConfig> = {
         primary: 'text-green-400 font-mono',
         secondary: 'text-gray-400',
         background: '',
-        border: 'border-green-500 dark:border-green-400',
         icon: 'text-green-500 dark:text-green-400'
       }
     },
@@ -167,12 +164,12 @@ export const TOOL_CONFIGS: Record<string, ToolDisplayConfig> = {
   WebSearch: {
     input: {
       type: 'one-line',
+      icon: 'search',
       label: 'Search',
       getValue: (input) => input.query || '',
       action: 'none',
       colorScheme: {
         primary: 'text-gray-700 dark:text-gray-300',
-        border: 'border-sky-400 dark:border-sky-500',
         icon: 'text-sky-500 dark:text-sky-400'
       }
     },
@@ -188,12 +185,12 @@ export const TOOL_CONFIGS: Record<string, ToolDisplayConfig> = {
   WebFetch: {
     input: {
       type: 'one-line',
+      icon: 'globe',
       label: 'Fetch',
       getValue: (input) => input.url || '',
       action: 'none',
       colorScheme: {
         primary: 'text-gray-700 dark:text-gray-300',
-        border: 'border-sky-400 dark:border-sky-500',
         icon: 'text-sky-500 dark:text-sky-400'
       }
     },
@@ -213,13 +210,13 @@ export const TOOL_CONFIGS: Record<string, ToolDisplayConfig> = {
   Read: {
     input: {
       type: 'one-line',
+      icon: 'file',
       label: 'Read',
       getValue: (input) => input.file_path || '',
       action: 'open-file',
       colorScheme: {
         primary: 'text-gray-700 dark:text-gray-300',
         background: '',
-        border: 'border-gray-300 dark:border-gray-600',
         icon: 'text-gray-500 dark:text-gray-400'
       }
     },
@@ -238,6 +235,8 @@ export const TOOL_CONFIGS: Record<string, ToolDisplayConfig> = {
       defaultOpen: false,
       contentType: 'diff',
       actionButton: 'none',
+      icon: 'pencil',
+      colorScheme: { icon: 'text-amber-500 dark:text-amber-400' },
       getContentProps: (input) => ({
         oldContent: input.old_string,
         newContent: input.new_string,
@@ -261,6 +260,8 @@ export const TOOL_CONFIGS: Record<string, ToolDisplayConfig> = {
       defaultOpen: false,
       contentType: 'diff',
       actionButton: 'none',
+      icon: 'pencil',
+      colorScheme: { icon: 'text-amber-500 dark:text-amber-400' },
       getContentProps: (input) => ({
         oldContent: '',
         newContent: input.content,
@@ -284,6 +285,8 @@ export const TOOL_CONFIGS: Record<string, ToolDisplayConfig> = {
       defaultOpen: false,
       contentType: 'diff',
       actionButton: 'none',
+      icon: 'pencil',
+      colorScheme: { icon: 'text-amber-500 dark:text-amber-400' },
       getContentProps: (input) => ({
         oldContent: input.old_string,
         newContent: input.new_string,
@@ -304,6 +307,7 @@ export const TOOL_CONFIGS: Record<string, ToolDisplayConfig> = {
   Grep: {
     input: {
       type: 'one-line',
+      icon: 'search',
       label: 'Grep',
       getValue: (input) => input.pattern,
       getSecondary: (input) => input.path ? `in ${input.path}` : undefined,
@@ -312,7 +316,6 @@ export const TOOL_CONFIGS: Record<string, ToolDisplayConfig> = {
         primary: 'text-gray-700 dark:text-gray-300',
         secondary: 'text-gray-500 dark:text-gray-400',
         background: '',
-        border: 'border-gray-400 dark:border-gray-500',
         icon: 'text-gray-500 dark:text-gray-400'
       }
     },
@@ -337,6 +340,7 @@ export const TOOL_CONFIGS: Record<string, ToolDisplayConfig> = {
   Glob: {
     input: {
       type: 'one-line',
+      icon: 'search',
       label: 'Glob',
       getValue: (input) => input.pattern,
       getSecondary: (input) => input.path ? `in ${input.path}` : undefined,
@@ -345,7 +349,6 @@ export const TOOL_CONFIGS: Record<string, ToolDisplayConfig> = {
         primary: 'text-gray-700 dark:text-gray-300',
         secondary: 'text-gray-500 dark:text-gray-400',
         background: '',
-        border: 'border-gray-400 dark:border-gray-500',
         icon: 'text-gray-500 dark:text-gray-400'
       }
     },
@@ -415,7 +418,6 @@ export const TOOL_CONFIGS: Record<string, ToolDisplayConfig> = {
       action: 'none',
       colorScheme: {
         primary: 'text-gray-500 dark:text-gray-400',
-        border: 'border-violet-400 dark:border-violet-500'
       }
     },
     result: {
@@ -450,7 +452,6 @@ export const TOOL_CONFIGS: Record<string, ToolDisplayConfig> = {
       action: 'none',
       colorScheme: {
         primary: 'text-gray-700 dark:text-gray-300',
-        border: 'border-violet-400 dark:border-violet-500',
         icon: 'text-violet-500 dark:text-violet-400'
       }
     },
@@ -473,7 +474,6 @@ export const TOOL_CONFIGS: Record<string, ToolDisplayConfig> = {
       action: 'none',
       colorScheme: {
         primary: 'text-gray-700 dark:text-gray-300',
-        border: 'border-violet-400 dark:border-violet-500',
         icon: 'text-violet-500 dark:text-violet-400'
       }
     },
@@ -490,7 +490,6 @@ export const TOOL_CONFIGS: Record<string, ToolDisplayConfig> = {
       action: 'none',
       colorScheme: {
         primary: 'text-gray-500 dark:text-gray-400',
-        border: 'border-violet-400 dark:border-violet-500',
         icon: 'text-violet-500 dark:text-violet-400'
       }
     },
@@ -513,7 +512,6 @@ export const TOOL_CONFIGS: Record<string, ToolDisplayConfig> = {
       action: 'none',
       colorScheme: {
         primary: 'text-gray-700 dark:text-gray-300',
-        border: 'border-violet-400 dark:border-violet-500',
         icon: 'text-violet-500 dark:text-violet-400'
       }
     },
@@ -591,7 +589,6 @@ export const TOOL_CONFIGS: Record<string, ToolDisplayConfig> = {
         };
       },
       colorScheme: {
-        border: 'border-purple-500 dark:border-purple-400',
         icon: 'text-purple-500 dark:text-purple-400'
       }
     },

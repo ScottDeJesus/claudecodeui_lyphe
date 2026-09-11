@@ -11,7 +11,12 @@ import type {
 } from '@/shared/types.js';
 import { AppError, resolvePathInsideProject } from '@/shared/utils.js';
 
-/** Above this size lines are not counted: `totalLines` is `null`, never a guess or a 0. */
+/**
+ * Above this size a read is allowed to STOP once the window is full, rather than walking on to
+ * count. It is not a promise that the count is unknown: a read that reaches the end of a large
+ * file anyway — which every window near its end does — reports the count it just paid for.
+ * `totalLines` is `null` only where the walk stopped early, and never a guess or a 0.
+ */
 const LARGE_TEXT_FILE_BYTES = 2 * 1024 * 1024;
 
 /** How much of a file's head decides binary-vs-text. */
@@ -124,9 +129,12 @@ export function createFileTreeListingService(dependencies: FileTreeListingServic
    * preview costs one chunk plus the kept budget — the same for a 2 KB source file and for
    * a 100 MB minified bundle.
    *
-   * `totalLines` is a separate question: under the size cap the walk runs to the end
-   * counting newlines and keeping nothing; over it, the read stops once the preview is
-   * full and the count is unknown.
+   * `totalLines` is a separate question, and it is answered by where the READ ended rather than
+   * by how big the file is. Under the size cap the walk always runs to the end, counting newlines
+   * and keeping nothing. Over it the read is allowed to stop as soon as the preview is full — but
+   * a window near the end of the file never fills, so that walk reaches EOF too, and the count it
+   * made on the way is reported rather than thrown away. Only a read that stopped early says it
+   * does not know.
    *
    * `startLine` opens the window somewhere other than the top, which is what lets a file
    * reference carrying `:line` land on that line. Lines before it are COUNTED and thrown
@@ -141,6 +149,20 @@ export function createFileTreeListingService(dependencies: FileTreeListingServic
     startLine = 1,
   ): Promise<TextPreviewBody> {
     const countEveryLine = bytes <= LARGE_TEXT_FILE_BYTES;
+    // A window that CANNOT exist, answered without opening the file. A line costs at least the
+    // newline that ends it, so a file of `bytes` bytes holds at most `bytes + 1` of them: past
+    // that the answer is an empty window whatever the contents are. Only above the counting cap
+    // is this worth asking — below it the walk is owed anyway, for `totalLines`.
+    //
+    // Without it an unreachable start read the whole file: the keep-budget never fills, so the
+    // loop's own stop condition (`!stillCollecting() && !countEveryLine`) never fired and a
+    // 9 MB file streamed end to end for a window it could never reach — 16-19 ms against the
+    // 2-3 ms of a normal read, and rising with the file. The route deliberately puts no upper
+    // clamp on `start`; this is the layer that can bound it, because it is the one holding the size.
+    if (!countEveryLine && startLine > bytes + 1) {
+      return { lines: [], startLine, totalLines: null, truncated: true };
+    }
+
     const stream = fileSystem.createReadStream(filePath);
     const decoder = new StringDecoder('utf8');
     const lines: string[] = [];
@@ -163,6 +185,10 @@ export function createFileTreeListingService(dependencies: FileTreeListingServic
     /** False once no further character can be kept — the signal to stop carrying text. */
     const stillCollecting = (): boolean => lines.length < maxLines && keptChars < MAXIMUM_PREVIEW_CHARS;
 
+    // Did the read actually reach the end of the file? That — not the file's SIZE — is what makes
+    // `finishedLines` a true count, and it is the only honest condition to report one on.
+    let reachedEndOfFile = true;
+
     try {
       for await (const chunk of stream) {
         carriedText += decoder.write(Buffer.isBuffer(chunk) ? chunk : Buffer.from(String(chunk)));
@@ -178,8 +204,12 @@ export function createFileTreeListingService(dependencies: FileTreeListingServic
           }
         }
 
-        // Nothing more can be kept and nothing is being counted: stop reading.
-        if (!stillCollecting() && !countEveryLine) break;
+        // Nothing more can be kept and nothing is being counted: stop reading. This is the ONE
+        // way out of the walk short of the end, so it is the one place the count becomes unknown.
+        if (!stillCollecting() && !countEveryLine) {
+          reachedEndOfFile = false;
+          break;
+        }
         // The carry is CLIPPED, never dropped. Past the per-line cap the rest of that line
         // can never be kept — but at EOF the carry IS the file's final unterminated line,
         // and dropping it left the count one short and let `truncated` read false on a
@@ -204,7 +234,13 @@ export function createFileTreeListingService(dependencies: FileTreeListingServic
     return {
       lines,
       startLine,
-      totalLines: countEveryLine ? finishedLines : null,
+      // `null` means "this read did not walk the whole file", NOT "the file is large". Above the
+      // counting cap the walk still runs to EOF whenever the keep-budget never fills — which is
+      // exactly what a window near the END of a big file does — and `finishedLines` is then the
+      // file's true length, already paid for. Discarding it as `null` because of the file's SIZE
+      // was what left a 28 MB log unable to answer "is line 255589 past the end?", so a reference
+      // one line past it marked nothing and the reader's number appeared nowhere.
+      totalLines: reachedEndOfFile ? finishedLines : null,
       // Still the same claim it always made — "there is more of this file than you are
       // holding" — and a window that begins after line 1 satisfies it without a second
       // rule: every skipped line was counted into `finishedLines` and kept out of `lines`.

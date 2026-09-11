@@ -237,5 +237,8 @@
       "updateAvailable": "Update verfügbar",
       "closeSidebar": "Seitenleiste schließen"
     }
+  },
+  "shapes": {
+    "diagramFailed": "Dieses Diagramm konnte nicht gezeichnet werden – der Quelltext wird angezeigt."
   }
 }

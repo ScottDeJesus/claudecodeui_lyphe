@@ -50,6 +50,7 @@
     },
     "toolDisplay": {
       "title": "ツール表示",
+      "showWork": "作業を表示",
       "showThinking": "思考を表示",
       "showRawParameters": "生パラメータを表示"
     },

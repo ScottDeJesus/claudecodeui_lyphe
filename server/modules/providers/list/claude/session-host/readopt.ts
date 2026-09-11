@@ -56,7 +56,9 @@ function readoptHost(host: LiveHost, deps: ReadoptDeps): boolean {
           reattach: true,
           hostId: host.hostId,
           turnCompleteSent: host.turnCompleteSent,
-          heldForBackgroundWork: host.heldForBackgroundWork
+          heldForBackgroundWork: host.heldForBackgroundWork,
+          profile: host.profile,
+          deferredTools: host.deferredTools
         }
       },
       beforeRun: (run) => {

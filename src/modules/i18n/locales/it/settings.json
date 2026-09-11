@@ -50,6 +50,7 @@
     },
     "toolDisplay": {
       "title": "Visualizzazione strumenti",
+      "showWork": "Mostra lavoro",
       "showThinking": "Mostra ragionamento",
       "showRawParameters": "Mostra parametri grezzi"
     },

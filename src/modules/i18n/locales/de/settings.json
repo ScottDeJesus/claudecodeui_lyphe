@@ -50,6 +50,7 @@
     },
     "toolDisplay": {
       "title": "Werkzeuganzeige",
+      "showWork": "Arbeit anzeigen",
       "showThinking": "Denken anzeigen",
       "showRawParameters": "Rohe Parameter anzeigen"
     },

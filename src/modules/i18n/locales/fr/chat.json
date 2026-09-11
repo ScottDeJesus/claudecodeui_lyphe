@@ -258,5 +258,46 @@
     "failed": "Non envoyé — {{reason}}",
     "cancel": "Annuler le message programmé",
     "dismiss": "Masquer l'avis d'échec"
+  },
+  "shapes": {
+    "collapse": "Réduire",
+    "expand": "Développer",
+    "copyCsv": "Copier en CSV",
+    "copied": "Copié",
+    "sortBy": "Trier par {{column}}",
+    "sortByColumnNumber": "Trier par la colonne {{number}}",
+    "tasksDone": "{{done}} sur {{total}} terminées",
+    "checksPassed": "{{count}} réussies",
+    "checksFailed": "{{count}} échouées",
+    "blocking": "Bloquant",
+    "high": "Élevée",
+    "medium": "Moyenne",
+    "low": "Faible",
+    "showAllLines": "Afficher les {{count}} lignes",
+    "showLess": "Afficher moins",
+    "openFile": "Ouvrir {{path}}",
+    "titles": {
+      "table": "Tableau",
+      "options": "Options",
+      "beforeAfter": "Avant et après",
+      "callout": "Encadré",
+      "tasks": "Tâches",
+      "checks": "Vérifications",
+      "timeline": "Chronologie",
+      "facts": "Détails",
+      "verdict": "Verdict",
+      "stats": "Statistiques",
+      "diff": "Diff",
+      "output": "Sortie",
+      "diagram": "Diagramme",
+      "code": "Code"
+    },
+    "alert": {
+      "note": "Note",
+      "tip": "Astuce",
+      "important": "Important",
+      "warning": "Avertissement",
+      "caution": "Attention"
+    }
   }
 }

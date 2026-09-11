@@ -218,6 +218,10 @@ export function classifyRun(
     spawns: readNumber(field(progress, 'spawns'), 0),
     max_spawns: readNumber(field(progress, 'max_spawns'), 0),
     cost_usd: readNumber(field(progress, 'cost_usd'), 0),
+    // Just this run; `snapshotRuns` folds in the plan's other runs (`withPlanTotals`).
+    plan_runs: 1,
+    plan_spawns: readNumber(field(progress, 'spawns'), 0),
+    plan_cost_usd: readNumber(field(progress, 'cost_usd'), 0),
     line: readString(field(progress, 'line')),
     timeline: parseTimeline(files.logLines),
   };
@@ -256,10 +260,13 @@ export function snapshotRuns(
   endedKeepS: number = DEFAULT_ENDED_KEEP_S,
 ): RunnerRunSnapshot[] {
   const runs: RunnerRunSnapshot[] = [];
+  const books = new Map<string, PlanBooks>();
 
   for (const dir of listRunDirs(stateDir)) {
     try {
-      const snapshot = classifyRun(readRunFiles(dir), now, staleAfterS, readRunLockBeat, endedKeepS);
+      const files = readRunFiles(dir);
+      tally(books, files.run);
+      const snapshot = classifyRun(files, now, staleAfterS, readRunLockBeat, endedKeepS);
       if (snapshot !== null) runs.push(snapshot);
     } catch (error) {
       // ONE bad directory never costs the others their reading: a single permanently-unreadable
@@ -270,7 +277,39 @@ export function snapshotRuns(
       onRunError?.(dir, error instanceof Error ? error.message : String(error));
     }
   }
-  return supersedeEnded(runs).sort((left, right) => left.started_at - right.started_at);
+  return supersedeEnded(runs.map((run) => withPlanTotals(run, books)))
+    .sort((left, right) => left.started_at - right.started_at);
+}
+
+/** One plan's spend, summed over the `run.json` of every run of it. */
+type PlanBooks = { runs: number; spawns: number; cost: number };
+
+/**
+ * One run's books into its plan's totals.
+ *
+ * `run.json` is the runner's own record, and it is read for EVERY run directory: ended,
+ * superseded, and long past the lane's window. A restart opens a new run at 0, and the run's
+ * counters alone read as a reset (operator, 2026-09-11: "You should never reset the counter").
+ *
+ * A plan is its PATH. A moved plan starts a new total, and a new plan written at a retired one's
+ * path inherits its history. A dry run spawns nothing and is not a run. A count that is not a
+ * finite, non-negative number adds nothing rather than poisoning the sum.
+ */
+function tally(books: Map<string, PlanBooks>, run: unknown): void {
+  const planPath = readStringOrNull(field(run, 'plan_path'));
+  if (planPath === null || field(run, 'status') === 'dry-run') return;
+  const held = books.get(planPath) ?? { runs: 0, spawns: 0, cost: 0 };
+  books.set(planPath, {
+    runs: held.runs + 1,
+    spawns: held.spawns + Math.max(0, readNumber(field(run, 'spawns'), 0)),
+    cost: held.cost + Math.max(0, readNumber(field(run, 'cost_usd'), 0)),
+  });
+}
+
+/** The snapshot with its plan's totals, or with its own counters when no book of its plan was read. */
+function withPlanTotals(run: RunnerRunSnapshot, books: Map<string, PlanBooks>): RunnerRunSnapshot {
+  const plan = books.get(run.plan_path);
+  return plan === undefined ? run : { ...run, plan_runs: plan.runs, plan_spawns: plan.spawns, plan_cost_usd: plan.cost };
 }
 
 /**

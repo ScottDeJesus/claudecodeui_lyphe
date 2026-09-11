@@ -4,6 +4,7 @@ import { createRequire } from 'node:module';
 import readline from 'node:readline';
 
 import { AppError } from '@/shared/utils.js';
+import { userFacingEnv } from '@/shared/child-env.js';
 
 /**
  * Minimal JSON-RPC client for `codex app-server`.
@@ -75,7 +76,7 @@ async function withAppServer<T>(
 ): Promise<T> {
   const launcher = resolveCodexLauncher();
   const child = spawn(process.execPath, [launcher, 'app-server'], {
-    env: process.env,
+    env: userFacingEnv(),
     stdio: ['pipe', 'pipe', 'pipe'],
   });
 

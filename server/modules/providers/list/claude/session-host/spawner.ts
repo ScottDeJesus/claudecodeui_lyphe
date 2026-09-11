@@ -47,9 +47,19 @@ export type KeepaliveReattach = {
   hostId: string;
   turnCompleteSent: boolean;
   heldForBackgroundWork: boolean;
+  /** The launch profile the host recorded at spawn (chat-process.ts); null from an older host. */
+  profile: Record<string, unknown> | null;
+  /** The tool-call ids whose work was still outstanding when the meta was last written. */
+  deferredTools: string[];
 };
 
-type SpawnContext = { appSessionId: string; userId: string | number | null; reattach: KeepaliveReattach | null };
+type SpawnContext = {
+  appSessionId: string;
+  userId: string | number | null;
+  reattach: KeepaliveReattach | null;
+  /** Written into the host meta at spawn, so a re-adoption knows what the CLI was launched with. */
+  profile: Record<string, unknown> | null;
+};
 
 // D-7: read once per boot, default ON. Flipping this default is the whole feature's reversal.
 let gateOpen: boolean | null = null;
@@ -146,7 +156,11 @@ function bindSocket(
       send({
         t: 'note',
         turnCompleteSent: bits.turnCompleteSent,
-        heldForBackgroundWork: bits.heldForBackgroundWork
+        heldForBackgroundWork: bits.heldForBackgroundWork,
+        ...(Array.isArray(bits.deferredTools) ? { deferredTools: bits.deferredTools } : {}),
+        // A host from before these fields ignores them and retires nothing anyway (no result is
+        // outstanding when a message joins), so the frame stays readable by every host.
+        ...(bits.ack === false ? { ack: false } : {})
       })
   };
 
@@ -252,7 +266,8 @@ async function placeInHost(facade: Facade, options: SpawnOptions, ctx: SpawnCont
     cwd: options.cwd ?? null,
     env: plainEnv(options.env),
     appSessionId: ctx.appSessionId,
-    userId: ctx.userId
+    userId: ctx.userId,
+    profile: ctx.profile
   });
 }
 
@@ -269,13 +284,19 @@ export function armKeepaliveSpawn(
     appSessionId: string | null;
     userId: string | number | null;
     reattach: KeepaliveReattach | null;
+    profile?: Record<string, unknown> | null;
   }
 ): KeepaliveHandle | null {
   const appSessionId = ctx.appSessionId;
   if (appSessionId === null || !armedFor(appSessionId)) return null;
 
   let bound: Facade | null = null;
-  const spawnContext: SpawnContext = { appSessionId, userId: ctx.userId, reattach: ctx.reattach };
+  const spawnContext: SpawnContext = {
+    appSessionId,
+    userId: ctx.userId,
+    reattach: ctx.reattach,
+    profile: ctx.profile ?? null
+  };
 
   sdkOptions.spawnClaudeCodeProcess = (options: SpawnOptions): SpawnedProcess => {
     const facade = createFacade();

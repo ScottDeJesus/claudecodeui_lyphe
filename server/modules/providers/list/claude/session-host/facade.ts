@@ -38,7 +38,18 @@ process.on('SIGINT', markApiExiting);
 /** consumer: spawner.ts — a socket that closes while this is set is a detach, not a CLI exit. */
 export const isApiExiting = (): boolean => apiExiting;
 
-export type TurnBits = { turnCompleteSent: boolean; heldForBackgroundWork: boolean };
+/**
+ * The two turn-state bits the meta persists. `ack: false` writes them WITHOUT retiring an
+ * unacked result: sent when a message joins the running process, where no result is
+ * outstanding and the D-3 cursor must not move.
+ */
+export type TurnBits = {
+  turnCompleteSent: boolean;
+  heldForBackgroundWork: boolean;
+  /** The tool-call ids whose work is still outstanding — what `heldForBackgroundWork` counts. */
+  deferredTools?: string[];
+  ack?: false;
+};
 
 /** Whatever is actually carrying this turn: a host socket, or a local child process. */
 export type HostTransport = {

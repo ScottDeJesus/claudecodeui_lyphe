@@ -267,5 +267,8 @@
       "updateAvailable": "アップデートあり",
       "closeSidebar": "サイドバーを閉じる"
     }
+  },
+  "shapes": {
+    "diagramFailed": "この図を描画できませんでした。ソースを表示しています。"
   }
 }

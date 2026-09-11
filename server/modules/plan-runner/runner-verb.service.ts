@@ -3,6 +3,7 @@ import os from 'node:os';
 import { promisify } from 'node:util';
 
 import type { RunnerVerb, RunnerVerbResult } from '@/shared/types.js';
+import { userFacingEnv } from '@/shared/child-env.js';
 
 /**
  * Relaying the runner's own two verbs, `stop` and `resume`.
@@ -95,7 +96,7 @@ export async function runRunnerVerb(
     const result = await execFileAsync(dependencies.bin, [verb, runId], {
       timeout: dependencies.timeoutMs,
       maxBuffer: VERB_MAX_BUFFER,
-      env: { ...process.env, PATH: searchPath },
+      env: { ...userFacingEnv(), PATH: searchPath },
       cwd: os.homedir(),
     });
     return {

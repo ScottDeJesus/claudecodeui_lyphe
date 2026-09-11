@@ -267,5 +267,8 @@
       "updateAvailable": "Aggiornamento disponibile",
       "closeSidebar": "Chiudi barra laterale"
     }
+  },
+  "shapes": {
+    "diagramFailed": "Impossibile disegnare questo diagramma: ne viene mostrata la sorgente."
   }
 }

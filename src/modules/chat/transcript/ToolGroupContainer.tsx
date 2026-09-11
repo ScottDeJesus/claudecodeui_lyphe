@@ -1,9 +1,14 @@
 import { memo, useMemo, useState } from 'react';
-import { ChevronRight } from 'lucide-react';
 
 import type { ChatMessage, ClaudePermissionSuggestion, PermissionGrantResult, LLMProvider,DiffLine,DiffStats,Project,ToolGroupItem } from '@/shared/types';
-import { Card } from '@/shared/ui';
-import { ToolOutcomeBadge, ToolOutcomeGlyph, deriveToolOutcome, getToolConfig } from '@/modules/chat/tools';
+import { ToolOutcomeBadge, deriveToolOutcome, getToolConfig } from '@/modules/chat/tools';
+import { ToolRowIcon } from '@/modules/chat/tools/ToolRowIcon';
+import {
+  TOOL_ROW_FRAME,
+  TOOL_ROW_HEADER,
+  TOOL_ROW_LABEL,
+  TOOL_ROW_SEPARATOR,
+} from '@/modules/chat/tools/toolRow';
 import type { ReadToolPermissionState } from '@/modules/chat/hooks/useToolPermissionState';
 import MessageComponent from '@/modules/chat/transcript/MessageComponent';
 import { useIsExportingTranscript } from '@/modules/chat/context/TranscriptRenderContext';
@@ -65,17 +70,11 @@ function useGroupDiffStats(
   }, [createDiff, messages, toolName]);
 }
 
-function getToolGroupIcon(icon: string | undefined, toolName: string): string {
-  if (icon === 'terminal') {
-    return '$';
-  }
-
-  return icon || toolName.slice(0, 1).toUpperCase();
-}
-
 /**
  * Rendered by chat's ChatMessagesPane to collapse a run of consecutive tool
- * calls into a single expandable group in the transcript.
+ * calls into a single expandable group in the transcript. The row reads like
+ * every other tool row: icon, label `xN`, diff counts, `/`, preview, then the
+ * outcome rightmost. The whole row is the toggle.
  */
 function ToolGroupContainer({
   group,
@@ -99,9 +98,7 @@ function ToolGroupContainer({
   const showChildren = isExpanded || isExporting;
   const config = getToolConfig(group.toolName).input;
   const label = config.label || group.toolName;
-  const borderClass = config.colorScheme?.border || 'border-border';
   const iconClass = config.colorScheme?.icon || 'text-muted-foreground';
-  const icon = getToolGroupIcon(config.icon, group.toolName);
 
   const preview = group.preview;
   const groupDiffStats = useGroupDiffStats(group.toolName, group.messages, createDiff);
@@ -118,41 +115,33 @@ function ToolGroupContainer({
       : states.includes('prompted') ? 'prompted' : 'idle',
     hasResult: group.messages.every((message) => Boolean(message.toolResult)),
     isError: group.messages.some((message) => Boolean(message.toolResult?.isError)),
-    isShellCommand: group.toolName === 'Bash',
   });
 
   return (
     <div className="chat-message tool px-3 sm:px-0" data-message-timestamp={group.timestamp || undefined}>
-      <Card className="overflow-hidden">
+      <div className={TOOL_ROW_FRAME}>
         <button
           type="button"
-          className={`group flex w-full items-center gap-2 border-l-2 ${borderClass} px-3 py-2.5 text-left transition-colors hover:bg-secondary/60`}
+          className={`${TOOL_ROW_HEADER} group w-full text-left transition-colors hover:bg-muted/60`}
           onClick={() => setIsExpanded((current) => !current)}
           aria-expanded={isExpanded}
         >
-          {outcome && <ToolOutcomeGlyph outcome={outcome} />}
-          <ChevronRight
-            className={`h-3.5 w-3.5 flex-shrink-0 text-muted-foreground transition-transform ${isExpanded ? 'rotate-90' : ''}`}
-            aria-hidden
-          />
-          <span className={`${iconClass} flex h-5 w-5 flex-shrink-0 items-center justify-center rounded bg-background/80 text-xs font-medium`}>
-            {icon}
-          </span>
-          <span className="min-w-0 flex-shrink-0 text-xs font-medium text-foreground">{label}</span>
-          <span className="flex-shrink-0 rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+          <ToolRowIcon icon={config.icon} className={iconClass} />
+          <span className={TOOL_ROW_LABEL}>{label}</span>
+          <span className="flex-shrink-0 rounded-full bg-muted px-1.5 py-px text-[10px] font-medium text-muted-foreground">
             x{group.messages.length}
           </span>
+          {groupDiffStats && <DiffStatsBadge stats={groupDiffStats} className="flex-shrink-0" />}
           {preview && (
             <>
-              <span className="text-[10px] text-muted-foreground/40">/</span>
-              <span className="min-w-0 truncate font-mono text-xs text-muted-foreground">{preview}</span>
+              <span className={TOOL_ROW_SEPARATOR}>/</span>
+              <span className={`min-w-0 truncate text-xs text-muted-foreground ${config.style === 'terminal' ? '' : 'font-mono'}`}>{preview}</span>
             </>
           )}
-          {groupDiffStats && <DiffStatsBadge stats={groupDiffStats} className="ml-auto pl-2" />}
           {outcome && (
-            // `whitespace-nowrap` because the preview beside it is greedy: without it the two
-            // words of "✓ Finished" break onto separate lines and the row grows a second line.
-            <span className={`${groupDiffStats ? '' : 'ml-auto '}flex-shrink-0 whitespace-nowrap pl-2`}>
+            // `whitespace-nowrap` because the preview beside it is greedy: without it the
+            // words of "Waiting for you" break onto separate lines and the row grows a second line.
+            <span className="ml-auto inline-flex flex-shrink-0 items-center whitespace-nowrap pl-2">
               <ToolOutcomeBadge outcome={outcome} />
             </span>
           )}
@@ -178,7 +167,7 @@ function ToolGroupContainer({
             ))}
           </div>
         )}
-      </Card>
+      </div>
     </div>
   );
 }

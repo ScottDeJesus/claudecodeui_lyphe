@@ -267,5 +267,8 @@
       "updateAvailable": "Mise à jour disponible",
       "closeSidebar": "Masquer la barre latérale"
     }
+  },
+  "shapes": {
+    "diagramFailed": "Impossible de dessiner ce diagramme — sa source est affichée."
   }
 }

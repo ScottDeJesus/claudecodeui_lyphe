@@ -445,6 +445,34 @@
     contain: layout style;
   }
 
+  /* The transcript's typing indicator (TypingIndicator.tsx), shown while "Show work" hides
+     the tool calls. Timings are the LottieFiles "Chat typing indicator" file's own: a 1.83s
+     loop, each dot 178ms after the last. The greys are ink at two strengths, so the dots
+     follow the theme; the global reduced-motion rule stills them. */
+  .chat-typing-indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    height: 24px;
+    padding: 0 2px;
+  }
+
+  .chat-typing-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--ink) 30%, transparent);
+    animation: chat-typing-hop 1833ms infinite;
+  }
+
+  .chat-typing-dot:nth-child(2) {
+    animation-delay: 178ms;
+  }
+
+  .chat-typing-dot:nth-child(3) {
+    animation-delay: 356ms;
+  }
+
   .chat-activity-enter {
     animation: chat-activity-enter 320ms cubic-bezier(0.22, 1, 0.36, 1) both;
     transform-origin: bottom center;
@@ -860,6 +888,35 @@
       opacity: 0;
       filter: blur(2px);
       transform: translateY(14px) scaleY(0.96);
+    }
+  }
+
+  /* One dot's hop, as the Lottie file keys it (frames of a 110-frame loop at 60fps): a
+     1px dip at 2.8%, the top of the hop and the darkest grey at 13.9%, a small overshoot
+     below rest at 22.9%, back at rest and pale by 29.8%, then still for the rest of the loop. */
+  @keyframes chat-typing-hop {
+    0% {
+      transform: translateY(0);
+      background: color-mix(in srgb, var(--ink) 30%, transparent);
+      animation-timing-function: cubic-bezier(1, 0, 0.47, 1);
+    }
+    2.8% {
+      transform: translateY(0.5px);
+      animation-timing-function: cubic-bezier(1, 0, 0.47, 1);
+    }
+    13.9% {
+      transform: translateY(-8px);
+      background: color-mix(in srgb, var(--ink) 65%, transparent);
+      animation-timing-function: cubic-bezier(1, 0, 0.49, 1);
+    }
+    22.9% {
+      transform: translateY(1.5px);
+      animation-timing-function: cubic-bezier(1, 0, 0.47, 1);
+    }
+    29.8%,
+    100% {
+      transform: translateY(0);
+      background: color-mix(in srgb, var(--ink) 30%, transparent);
     }
   }
 

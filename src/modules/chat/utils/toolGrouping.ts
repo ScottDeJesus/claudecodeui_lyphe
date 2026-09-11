@@ -44,9 +44,15 @@ function getToolInputPreview(message: ChatMessage): string {
   const config = getToolConfig(message.toolName || 'UnknownTool').input;
   const parsedInput = parseToolInput(message.toolInput);
   const title = typeof config.title === 'function' ? config.title(parsedInput) : config.title;
-  const value = config.getValue?.(parsedInput);
+  const rawValue = config.getValue?.(parsedInput);
+  // A file is named by its basename, as its own row names it.
+  const value = config.action === 'open-file' && typeof rawValue === 'string'
+    ? rawValue.split('/').pop()
+    : rawValue;
+  // A shell run is previewed by what it is doing, not by its command line.
+  const headline = config.style === 'terminal' ? config.getSecondary?.(parsedInput) : undefined;
 
-  return String(value || title || message.displayText || message.content || '').trim();
+  return String(headline || value || title || message.displayText || message.content || '').trim();
 }
 
 /**

@@ -40,17 +40,26 @@ type PreviewPaneProps = {
  * file reference's line would have it claim to be showing the first 200 lines of a file it is
  * showing the middle of, which is the kind of wrong a reader has no way to notice.
  */
-function lineRangeLabel(preview: Extract<FilePreview, { kind: 'text' }>, missedLine: number | null): string {
+function lineRangeLabel(
+  preview: Extract<FilePreview, { kind: 'text' }>,
+  missedLine: number | null,
+  settledLine: number | null,
+): string {
+  // Names the line the READER asked for, never the window start derived from it: `99959` is
+  // `line - 40`, a number nobody typed and nobody can map back to what they clicked. When the
+  // file's length was known the ask was clamped to its last line, and saying WHICH line that is
+  // turns a pane the reader cannot account for into one that explains itself.
+  const overshot = missedLine === null ? '' : (settledLine !== null
+    ? ` Line ${missedLine} is past the end of this file — this is line ${settledLine}, its last.`
+    : ` Line ${missedLine} is past the end of this file.`);
+
   if (preview.lines.length === 0) {
-    return preview.totalLines !== null
+    return (preview.totalLines !== null
       ? `No lines from ${preview.startLine} — the file has ${preview.totalLines}.`
-      : `No lines from ${preview.startLine}.`;
+      : `No lines from ${preview.startLine}.`) + overshot;
   }
   const range = `Lines ${preview.startLine}–${preview.startLine + preview.lines.length - 1}`;
-  const counted = preview.totalLines !== null ? `${range} of ${preview.totalLines}.` : `${range}.`;
-  // Names the line the READER asked for, never the window start derived from it: `99959` is
-  // `line - 40`, a number nobody typed and nobody can map back to what they clicked.
-  return missedLine !== null ? `${counted} Line ${missedLine} is past the end of this file.` : counted;
+  return (preview.totalLines !== null ? `${range} of ${preview.totalLines}.` : `${range}.`) + overshot;
 }
 
 /** Joins the facts the app actually has into one meta line, dropping the ones it does not. */
@@ -130,13 +139,19 @@ export function PreviewPane({
   }, [imagePath, projectId]);
 
   /**
-   * Puts the targeted line on screen, inside this pane's own scroller.
+   * Puts the targeted line on screen — which takes TWO scrollers, one of them not this pane's.
    *
-   * NEVER `scrollIntoView`: that walks every scrollable ancestor, and the file manager's wrapper
-   * around both panes is one of them. Below `md` the three panes WRAP instead of sitting side by
-   * side, so revealing a line that way scrolls the directory listing clean off the top of the
-   * screen — the reader lands on their line having lost the folder they were standing in. Writing
-   * `scrollTop` on the one container this component owns cannot move anything else.
+   * NEVER `scrollIntoView`: that walks every scrollable ancestor it can find, the page included,
+   * and below `md` the two panes WRAP inside the arranger, so revealing a line that way scrolls
+   * the directory listing clean off the top — the reader lands on their line having lost the
+   * folder they were standing in.
+   *
+   * What makes this different is not that it stays inside the component — it does NOT. It writes
+   * `scrollTop` on this pane's row scroller AND on `paneScrollRef`, the arranger owned by
+   * `FileManager` and passed in deliberately. Both are single NAMED nodes, chosen here rather
+   * than discovered by the browser, and the second is written only when it can actually scroll.
+   * That is the whole distinction, and the reason it is spelled out: the next editor must not
+   * read "it already reaches outside" as licence to reach for `scrollIntoView` again.
    *
    * Keyed on the preview OBJECT and on the ASK: a new window is a new object, and `targetNonce`
    * moves when the same window is asked for again — which is what returns a reader who has since
@@ -144,7 +159,8 @@ export function PreviewPane({
    *
    * A LAYOUT effect, not a passive one: `useEffect` runs after paint, so the window painted at its
    * own top and then jumped to the target — one visible frame at the wrong position on every open.
-   * This only reads and writes `scrollTop` on one node it owns, which is safe to do before paint.
+   * It reads and writes `scrollTop` and nothing else, on two nodes that are already laid out, which
+   * is cheap enough to do before paint.
    */
   useLayoutEffect(() => {
     const container = scrollRef.current;
@@ -252,7 +268,9 @@ export function PreviewPane({
             </div>
 
             <div className="px-4 pb-4 text-[12.5px] text-ink-faint">
-              {lineRangeLabel(preview, missedLine)}
+              {/* `targetLine` IS the line the ask settled on once `missedLine` is set — the hook
+                  clamps one to the other — so the footer names both without a third prop. */}
+              {lineRangeLabel(preview, missedLine, targetLine)}
               {' '}Editing happens in your own editor — ask an agent here to change the file.
             </div>
           </div>

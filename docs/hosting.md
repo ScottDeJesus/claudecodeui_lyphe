@@ -141,7 +141,7 @@ systemctl status cloudcli-server-dev cloudcli-client-dev cloudcli-dev-watchdog.t
 sudo iptables -S INPUT | grep 5183           # the two bridge drops (docker0, br-+)
 cat /run/cloudcli-dev-watchdog/*.heals 2>/dev/null   # consecutive heals per unit, absent when healthy
 tmux -L cloudcli-sessions ls                 # the truthful liveness probe (see "A dead tmux keepalive…"); `_keepalive` alone = no chat CLI running
-                                             # one `<app session id>-<base36>` per live turn; a restart re-adopts or retires the rest, so a lingering one means the gate is off (see "A server heal…")
+                                             # one `<app session id>-<base36>` per live CONVERSATION (every message joins it; it closes two hours after the last one, never mid-task); a restart re-adopts or retires the rest, so a lingering one means the gate is off (see "A server heal…")
 ls -A ~/.cloudcli/sessions                   # `.sock`/`.ndjson`/`.json` per host above, so empty only when that list is `_keepalive` alone
                                              # `probe-*` here = an interrupted `.verify/keepalive-host-case.mjs`
 sudo systemctl restart cloudcli-server-dev      # API only; the client keeps HMR — KillMode=control-group, so this ends

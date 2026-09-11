@@ -8,6 +8,7 @@ import { githubTokensDb } from '@/modules/database/index.js';
 import { createProject } from '@/modules/projects/services/project-management.service.js';
 import type { WorkspacePathValidationResult } from '@/shared/types.js';
 import { AppError, validateWorkspacePath } from '@/shared/utils.js';
+import { userFacingEnv } from '@/shared/child-env.js';
 
 type CloneProjectInput = {
   workspacePath: string;
@@ -130,7 +131,7 @@ const defaultDependencies: CloneProjectDependencies = {
     spawn('git', ['clone', '--progress', '--', cloneUrl, clonePath], {
       stdio: ['ignore', 'pipe', 'pipe'],
       env: {
-        ...process.env,
+        ...userFacingEnv(),
         GIT_TERMINAL_PROMPT: '0',
       },
     }) as unknown as GitCloneProcess,

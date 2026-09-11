@@ -92,9 +92,11 @@ function readPreviewLineCount(value: unknown): number {
  *
  * Clamped to at least 1 exactly as `lines` is clamped above, and for the same reason: a
  * client spelling `0`, `-5`, `abc` or nothing at all means "from the top", and a 400 would
- * tell it nothing it could act on. There is deliberately no UPPER clamp — a start past the
- * end of the file is not an error, it is an empty window, and the service already walks a
- * countable file end to end to answer `totalLines`.
+ * tell it nothing it could act on. There is deliberately no UPPER clamp: nothing at this layer
+ * knows how long the file is, and a start past its end is not an error but an empty window.
+ * What that costs is bounded in the SERVICE, which is the only layer holding the file's size —
+ * below the counting cap it walks the file for `totalLines` regardless, and above it a start
+ * past what the bytes could possibly hold is answered without reading at all.
  */
 function readPreviewStartLine(value: unknown): number {
   const parsedStart = typeof value === 'string' ? Number.parseInt(value, 10) : Number.NaN;

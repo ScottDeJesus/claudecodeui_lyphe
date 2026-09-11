@@ -76,6 +76,8 @@ export function createJournal({ hostId, sessionsDir }) {
     pid: null,
     turnCompleteSent: false,
     heldForBackgroundWork: false,
+    deferredTools: [],
+    profile: null,
     deliveredSeq: 0,
     pendingResults: [],
     exited: null
@@ -145,15 +147,18 @@ export function createJournal({ hostId, sessionsDir }) {
      * done". A note with nothing outstanding is a duplicate; it records the bits and retires
      * nothing, and says so rather than silently moving the D-3 cursor.
      */
-    note({ turnCompleteSent, heldForBackgroundWork }) {
-      if (meta.pendingResults.length === 0) {
+    note({ turnCompleteSent, heldForBackgroundWork, deferredTools, ack }) {
+      if (ack === false) {
+        // A message joined the running process: the bits change, the cursor does not.
+      } else if (meta.pendingResults.length === 0) {
         console.warn(`[keepalive] host ${hostId}: note with no unacked result; nothing retired`);
       } else {
         meta.pendingResults.shift();
       }
       writeMeta({
         turnCompleteSent: turnCompleteSent === true,
-        heldForBackgroundWork: heldForBackgroundWork === true
+        heldForBackgroundWork: heldForBackgroundWork === true,
+        ...(Array.isArray(deferredTools) ? { deferredTools: deferredTools.filter((id) => typeof id === 'string') } : {})
       });
     },
 

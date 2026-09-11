@@ -51,6 +51,8 @@ export type HostMeta = {
   pid: number | null;
   turnCompleteSent: boolean;
   heldForBackgroundWork: boolean;
+  deferredTools?: string[];
+  profile?: Record<string, unknown> | null;
   deliveredSeq: number;
   pendingResults: number[];
   exited: { code: number | null; signal: string | null; at: number } | null;
@@ -64,6 +66,8 @@ export type LiveHost = {
   startedAt: number;
   turnCompleteSent: boolean;
   heldForBackgroundWork: boolean;
+  deferredTools: string[];
+  profile: Record<string, unknown> | null;
 };
 
 export type TmuxResult = { ok: boolean; stdout: string; error: string | null };
@@ -158,7 +162,11 @@ export function listLiveHosts(): LiveHost[] {
       cwd: meta.cwd ?? null,
       startedAt: typeof meta.startedAt === 'number' ? meta.startedAt : 0,
       turnCompleteSent: meta.turnCompleteSent === true,
-      heldForBackgroundWork: meta.heldForBackgroundWork === true
+      heldForBackgroundWork: meta.heldForBackgroundWork === true,
+      deferredTools: Array.isArray(meta.deferredTools)
+        ? meta.deferredTools.filter((id): id is string => typeof id === 'string')
+        : [],
+      profile: meta.profile && typeof meta.profile === 'object' ? meta.profile : null
     });
   }
   return live;

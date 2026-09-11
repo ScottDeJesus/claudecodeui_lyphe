@@ -95,6 +95,9 @@
     "phaseCount_one": "{{count}} phase",
     "phaseCount": "{{count}} phases",
     "spawns": "spawns {{used}}/{{max}}",
+    "planSpend_one": "{{spawns}} spawns · ${{cost}} across {{count}} run",
+    "planSpend": "{{spawns}} spawns · ${{cost}} across {{count}} runs",
+    "thisRun": "this run {{used}}/{{max}}",
     "more": "+{{count}} more in Runner",
     "stop": "Stop",
     "resume": "Resume",
@@ -351,5 +354,8 @@
       "updateAvailable": "Update available",
       "closeSidebar": "Close sidebar"
     }
+  },
+  "shapes": {
+    "diagramFailed": "This diagram could not be drawn — showing its source."
   }
 }

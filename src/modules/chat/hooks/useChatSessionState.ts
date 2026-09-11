@@ -13,6 +13,11 @@ import { readSelectedProvider } from '@/shared/selectedProvider';
 import type { SearchTarget } from '@/modules/chat/utils/searchTargetLocator';
 
 const INITIAL_VISIBLE_MESSAGES = 100;
+/**
+ * How far the transcript must overflow its scroller before `fillViewportWithHistory`
+ * stops loading older pages — enough that the scroll-up pager has room to fire.
+ */
+const VIEWPORT_FILL_MARGIN_PX = 200;
 
 /** Messages kept below a search hit so it lands mid-viewport rather than at the edge. */
 const SEARCH_TARGET_CONTEXT_MESSAGES = 20;
@@ -101,6 +106,15 @@ type ScrollRestoreState = {
   top: number;
   anchor: HTMLElement | null;
   anchorOffset: number | null;
+};
+
+type PendingScrollRestore = ScrollRestoreState & {
+  /**
+   * The oldest rendered message when a page load armed this restore. The restore waits
+   * for the commit whose oldest rendered message differs — the one that added the older
+   * rows. Absent ("Load all") means restore on the next commit.
+   */
+  armedOldest?: ChatMessage | null;
 };
 
 function captureScrollRestoreState(container: HTMLDivElement): ScrollRestoreState {
@@ -227,8 +241,13 @@ export function useChatSessionState({
   const isUserScrolledUpRef = useRef(false);
   const isLoadingMoreRef = useRef(false);
   const allMessagesLoadedRef = useRef(false);
-  const topLoadLockRef = useRef(false);
-  const pendingScrollRestoreRef = useRef<ScrollRestoreState | null>(null);
+  const pendingScrollRestoreRef = useRef<PendingScrollRestore | null>(null);
+  // The reader's view as of their latest scroll event. A prepend restores to this, not to
+  // the view captured when its fetch began, which would undo every step taken meanwhile.
+  const liveScrollStateRef = useRef<ScrollRestoreState | null>(null);
+  // The oldest rendered message, mirrored each render, so the restore can tell the commit
+  // that actually added older rows from the commits in between.
+  const oldestRenderedRef = useRef<ChatMessage | null>(null);
   const pendingInitialScrollRef = useRef(true);
   const messagesOffsetRef = useRef(0);
   const scrollPositionRef = useRef({ height: 0, top: 0 });
@@ -287,8 +306,8 @@ export function useChatSessionState({
     setSearchTarget(null);
     wasNearTopRef.current = false;
     searchScrollActiveRef.current = false;
-    topLoadLockRef.current = false;
     pendingScrollRestoreRef.current = null;
+    liveScrollStateRef.current = null;
     pendingInitialScrollRef.current = true;
     lastLoadedSessionKeyRef.current = null;
 
@@ -486,7 +505,7 @@ export function useChatSessionState({
   }, []);
 
   const loadOlderMessages = useCallback(
-    async (container: HTMLDivElement) => {
+    async (container: HTMLDivElement, options: { pinToBottom?: boolean } = {}) => {
       if (!isActive) return false;
       if (!container || isLoadingMoreRef.current || isLoadingMoreMessages) return false;
       if (allMessagesLoadedRef.current) return false;
@@ -495,6 +514,13 @@ export function useChatSessionState({
       isLoadingMoreRef.current = true;
       setIsLoadingMoreMessages(true);
       const scrollRestoreState = captureScrollRestoreState(container);
+      if (!options.pinToBottom) {
+        // Armed before the fetch, so the commit that adds the rows is the one restored —
+        // including when the store renders them before this await returns.
+        pendingScrollRestoreRef.current = { ...scrollRestoreState, armedOldest: oldestRenderedRef.current };
+        liveScrollStateRef.current = scrollRestoreState;
+      }
+      let prepended = false;
 
       try {
         const result = await sessionStore.fetchMore(selectedSession.id, {
@@ -525,7 +551,13 @@ export function useChatSessionState({
           return false;
         }
 
-        pendingScrollRestoreRef.current = scrollRestoreState;
+        prepended = true;
+        if (options.pinToBottom) {
+          // Filling a screen the reader has not scrolled: the older page lands above and
+          // the settle loop keeps the newest reply in view, as when the session opened.
+          // An anchor restore here would pin a top row and let the tail drift off.
+          pendingInitialScrollRef.current = true;
+        }
         setVisibleMessageCount((prev) => prev + SESSION_MESSAGES_PAGE_SIZE);
         if (!slot.hasMore) {
           allMessagesLoadedRef.current = true;
@@ -538,6 +570,12 @@ export function useChatSessionState({
         }
         return true;
       } finally {
+        // A load that added nothing (or failed) must not leave a restore armed: it would
+        // hold off the append-follow and fire on some unrelated later commit.
+        const pending = pendingScrollRestoreRef.current;
+        if (!prepended && pending && 'armedOldest' in pending) {
+          pendingScrollRestoreRef.current = null;
+        }
         isLoadingMoreRef.current = false;
         setIsLoadingMoreMessages(false);
       }
@@ -556,6 +594,7 @@ export function useChatSessionState({
       height: container.scrollHeight,
       top: container.scrollTop,
     };
+    liveScrollStateRef.current = captureScrollRestoreState(container);
 
     const scrolledNearTop = container.scrollTop < 100;
 
@@ -575,14 +614,13 @@ export function useChatSessionState({
       wasNearTopRef.current = false;
     }
 
-    if (!allMessagesLoadedRef.current) {
-      if (!scrolledNearTop) { topLoadLockRef.current = false; return; }
-      if (topLoadLockRef.current) {
-        if (container.scrollTop > 20) topLoadLockRef.current = false;
-        return;
-      }
-      const didLoad = await loadOlderMessages(container);
-      if (didLoad) topLoadLockRef.current = true;
+    // Older history is requested once the reader is within a screen of the top, so a page
+    // is usually in place before they get there. Nothing latches the pager shut: a page that
+    // adds little on screen (hidden work) must not strand the reader at the top. Loads run one at a time
+    // (isLoadingMoreRef), and the run ends once a screen of history sits above the view —
+    // each prepend moves scrollTop down by what it added — or a page brings nothing back.
+    if (!allMessagesLoadedRef.current && container.scrollTop < container.clientHeight) {
+      await loadOlderMessages(container);
     }
   }, [hasMoreMessages, isActive, isNearBottom, loadOlderMessages]);
 
@@ -593,8 +631,11 @@ export function useChatSessionState({
     if (!isActive || !scrollContainerRef.current) return;
 
     const container = scrollContainerRef.current;
-    if (pendingScrollRestoreRef.current) {
-      const { height, top, anchor, anchorOffset } = pendingScrollRestoreRef.current;
+    const pending = pendingScrollRestoreRef.current;
+    const waitingForRows = Boolean(pending && 'armedOldest' in pending && pending.armedOldest === oldestRenderedRef.current);
+    if (pending && !waitingForRows) {
+      // The reader's latest position, not the one captured when the fetch began.
+      const { height, top, anchor, anchorOffset } = liveScrollStateRef.current ?? pending;
       if (anchor?.isConnected && anchorOffset !== null) {
         const nextAnchorOffset = (
           anchor.getBoundingClientRect().top
@@ -607,13 +648,16 @@ export function useChatSessionState({
       pendingScrollRestoreRef.current = null;
       return;
     }
+    // Armed and still waiting for the commit that adds the older rows.
+    if (pending) return;
 
     if (becameActive) {
       container.scrollTop = isUserScrolledUp
         ? scrollPositionRef.current.top
         : container.scrollHeight;
     }
-  }, [chatMessages.length, isActive, isUserScrolledUp]);
+  // `visibleMessageCount`: a prepend can reach the screen by widening the window alone.
+  }, [chatMessages.length, isActive, isUserScrolledUp, visibleMessageCount]);
 
   // Reset scroll/pagination state on session change
   useEffect(() => {
@@ -636,8 +680,8 @@ export function useChatSessionState({
 
     pendingInitialScrollRef.current = true;
     setVisibleMessageCount(INITIAL_VISIBLE_MESSAGES);
-    topLoadLockRef.current = false;
     pendingScrollRestoreRef.current = null;
+    liveScrollStateRef.current = null;
     wasNearTopRef.current = false;
     setIsUserScrolledUp(false);
   }, [selectedProject?.projectId, selectedSession?.id]);
@@ -684,7 +728,9 @@ export function useChatSessionState({
     return () => {
       if (rafId) cancelAnimationFrame(rafId);
     };
-  }, [chatMessages.length, isActive, isLoadingSessionMessages, scrollToBottom]);
+  // `visibleMessageCount` re-runs the loop when a fill widens the window over rows the
+  // slot already held (no length change); it is a no-op unless the pending flag is set.
+  }, [chatMessages.length, isActive, isLoadingSessionMessages, scrollToBottom, visibleMessageCount]);
 
   // Session replay/subscription remains active regardless of which main tab is
   // visible. Only persisted-history HTTP traffic is visibility-gated below.
@@ -1004,6 +1050,7 @@ export function useChatSessionState({
     if (chatMessages.length <= visibleMessageCount) return chatMessages;
     return chatMessages.slice(-visibleMessageCount);
   }, [chatMessages, visibleMessageCount]);
+  oldestRenderedRef.current = visibleMessages[0] ?? null;
 
   useEffect(() => {
     if (!isActive) return;
@@ -1125,6 +1172,30 @@ export function useChatSessionState({
     setVisibleMessageCount((prev) => prev + 100);
   }, []);
 
+  // A page is 20 raw rows. With the work (or thinking) hidden, those can leave one reply
+  // on screen and nothing to scroll — so the scroll-up pager can never fire. Called by
+  // ChatMessagesPane after every commit: while the transcript does not overflow the
+  // viewport, widen the render window if the slot already holds older rows, else fetch
+  // the next older page. Pages stay in the session's slot, so a switch back keeps them.
+  const lastFillAttemptRef = useRef<string | null>(null);
+  const fillViewportWithHistory = useCallback(() => {
+    const container = scrollContainerRef.current;
+    if (!isActive || !container || isLoadingSessionMessages || isLoadingMoreRef.current) return;
+    if (container.scrollHeight > container.clientHeight + VIEWPORT_FILL_MARGIN_PX) return;
+    // One attempt per state: a load that brought nothing back is not retried in a loop.
+    const attemptKey = `${activeSessionId}:${chatMessages.length}:${visibleMessageCount}`;
+    if (lastFillAttemptRef.current === attemptKey) return;
+    lastFillAttemptRef.current = attemptKey;
+    // A reader still at the bottom stays there while older rows arrive above.
+    const pinToBottom = !isUserScrolledUpRef.current;
+    if (chatMessages.length > visibleMessageCount) {
+      if (pinToBottom) pendingInitialScrollRef.current = true;
+      setVisibleMessageCount((prev) => prev + SESSION_MESSAGES_PAGE_SIZE);
+      return;
+    }
+    void loadOlderMessages(container, { pinToBottom });
+  }, [activeSessionId, chatMessages.length, isActive, isLoadingSessionMessages, loadOlderMessages, visibleMessageCount]);
+
   return {
     chatMessages,
     agentMessages,
@@ -1145,6 +1216,7 @@ export function useChatSessionState({
     visibleMessageCount,
     visibleMessages,
     loadEarlierMessages,
+    fillViewportWithHistory,
     loadAllMessages,
     loadFullTranscript,
     allMessagesLoaded,

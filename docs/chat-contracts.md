@@ -26,15 +26,15 @@ falls back to the provider's name, so a model the catalog never carried reads "C
 
 ## 3. The tool badge ranks what it knows
 
-`toolOutcome.ts::deriveToolOutcome` ranks four outcomes: `waiting` over `approved` over `finished`
-(a shell command that ran) over `automatic`. A row blocked on a person, or one that person allowed
-by hand, was not "done automatically", and saying so is the one wrong thing this badge can say.
+`toolOutcome.ts::deriveToolOutcome` ranks three outcomes: `waiting` over `approved` over `finished`.
+A row blocked on a person, or one that person allowed by hand, has not plainly "finished", and
+saying so is the one wrong thing this badge can say.
 Null is a real answer — a call still running, or one that failed, is named by `ToolStatusBadge`
 already. A row finds its own prompt through `permissionKey(toolName, input)`, the permission event
 carrying no tool-use id to line the two sides up by.
 
 **Its stated limit.** A transcript records that a tool ran, never that anyone was asked, so a RELOADED
-conversation shows a hand-approved call as "Done automatically". Never infer approval from a stored row.
+conversation shows a hand-approved call as "Finished". Never infer approval from a stored row.
 
 ## 4. The permission prompt has three actions
 
@@ -63,12 +63,15 @@ unmount-only effect declared AFTER it flushes that write through `saveSettingsRe
 
 A turn knows it is running inside CloudCLI's chat, rather than a terminal, from two things
 `claude-runtime.provider.js` sets on `sdkOptions` inside `mapCliOptionsToSDK`, per turn: the SDK
-child's env carries `CLAUDE_SURFACE=cloudcli`, and its system prompt gains one appended sentence
-naming the fence and the bus. Both come from `surface-signal.ts` and nowhere else — never `.env`,
+child's env carries `CLAUDE_SURFACE=cloudcli`, and its system prompt gains `SURFACE_PROMPT_APPEND`
+— one sentence naming the fence and the bus (`WIDGET_SIGNAL`), then a short paragraph naming the
+four markdown conventions this surface draws as components (`MARKDOWN_SIGNAL`; what it names, and
+why only four, is [architecture/08-rendered-shapes.md](architecture/08-rendered-shapes.md)
+§"The triggers"). Both come from `surface-signal.ts` and nowhere else — never `.env`,
 never a systemd unit, never `process.env` read at module load. A terminal launch of `claude` reads
 neither, so their absence is what tells a turn it is not talking to CloudCLI's chat; the runner's
 own souls (Heph, Athena, Prometheus, …) run a different path entirely and never pass through this
-provider, so they never see the sentence either.
+provider, so they never see the appended text either.
 
 The opt-in itself is narrow: a fenced code block whose info string is exactly `widget` renders as
 a live widget instead of highlighted source — the WHOLE word, so a hyphenated extension of it such
@@ -95,8 +98,8 @@ through `DocSpaceFrame`, an iframe pointed at ArchPulse's own origin and never a
 the ORIGIN itself the invariant rather than any flag read off the fence. That is also why this is
 the one frame whose sandbox carries `allow-same-origin` — a real origin with its own document and
 a login-free API, so a grant the HTML widget's `srcDoc` sandbox never may hold is safe here
-precisely because the origin differs. The surface sentence (`surface-signal.ts`) carries this in
-its own clause now: anything that should persist, be edited by the reader, or be read back on a
+precisely because the origin differs. The widget sentence (`WIDGET_SIGNAL` in `surface-signal.ts`)
+carries this in its own clause: anything that should persist, be edited by the reader, or be read back on a
 later turn is steered toward a DocSpace block instead of a one-off HTML fence. The full protocol
 both frames speak is still [architecture/07-live-widgets.md](architecture/07-live-widgets.md)
 §"The DocSpace kind".

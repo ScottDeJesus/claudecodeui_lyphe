@@ -256,5 +256,46 @@
     "failed": "Nicht gesendet – {{reason}}",
     "cancel": "Geplante Nachricht abbrechen",
     "dismiss": "Fehlerhinweis ausblenden"
+  },
+  "shapes": {
+    "collapse": "Einklappen",
+    "expand": "Ausklappen",
+    "copyCsv": "Als CSV kopieren",
+    "copied": "Kopiert",
+    "sortBy": "Nach {{column}} sortieren",
+    "sortByColumnNumber": "Nach Spalte {{number}} sortieren",
+    "tasksDone": "{{done}} von {{total}} erledigt",
+    "checksPassed": "{{count}} bestanden",
+    "checksFailed": "{{count}} fehlgeschlagen",
+    "blocking": "Blockierend",
+    "high": "Hoch",
+    "medium": "Mittel",
+    "low": "Niedrig",
+    "showAllLines": "Alle {{count}} Zeilen anzeigen",
+    "showLess": "Weniger anzeigen",
+    "openFile": "{{path}} öffnen",
+    "titles": {
+      "table": "Tabelle",
+      "options": "Optionen",
+      "beforeAfter": "Vorher und nachher",
+      "callout": "Hinweis",
+      "tasks": "Aufgaben",
+      "checks": "Prüfungen",
+      "timeline": "Zeitleiste",
+      "facts": "Details",
+      "verdict": "Urteil",
+      "stats": "Kennzahlen",
+      "diff": "Diff",
+      "output": "Ausgabe",
+      "diagram": "Diagramm",
+      "code": "Code"
+    },
+    "alert": {
+      "note": "Hinweis",
+      "tip": "Tipp",
+      "important": "Wichtig",
+      "warning": "Warnung",
+      "caution": "Achtung"
+    }
   }
 }

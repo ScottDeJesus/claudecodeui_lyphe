@@ -3,27 +3,18 @@ import type { Tone } from '@/shared/types';
 /**
  * What a tool row can truthfully say about itself once the facts are in.
  *
- * `waiting` and `approved` outrank `automatic` on purpose. A row that is blocked
- * on a person has not been "done automatically", and neither has one the person
- * personally allowed — saying so about either is the one wrong thing this badge
+ * `waiting` and `approved` outrank `finished` on purpose. A row that is blocked
+ * on a person has not finished, and one the person personally allowed says who
+ * decided — calling either plainly "finished" is the one wrong thing this badge
  * could say (design handoff §5: say what ran on its OWN).
  */
-export type ToolOutcome = 'waiting' | 'approved' | 'finished' | 'automatic';
+export type ToolOutcome = 'waiting' | 'approved' | 'finished';
 
 /** What the permission layer knows about one tool call right now. */
 export type ToolPermissionState = 'idle' | 'waiting' | 'prompted';
 
-/** The mark that carries the outcome when the colour does not (doctrine §6). */
-export const TOOL_OUTCOME_GLYPH: Record<ToolOutcome, string> = {
-  automatic: '≔',
-  waiting: '▲',
-  approved: '✓',
-  finished: '✓',
-};
-
 /** The tone each outcome is painted in — a token swap, never a colour of its own. */
 export const TOOL_OUTCOME_TONE: Record<ToolOutcome, Tone> = {
-  automatic: 'neutral',
   waiting: 'warn',
   // Neutral, not positive: a person answering a prompt is not an achievement to
   // celebrate, it is a fact about who decided. Positive stays with a command
@@ -76,8 +67,6 @@ type DeriveToolOutcomeArgs = {
   hasResult: boolean;
   /** That result reports a failure — an outcome none of these words describe. */
   isError: boolean;
-  /** Shell tools get the louder "finished": they RAN something, they did not just read. */
-  isShellCommand: boolean;
 };
 
 /**
@@ -90,17 +79,16 @@ type DeriveToolOutcomeArgs = {
  *
  * ⚠ `prompted` is known only while the session that answered the prompt is still
  * open. A transcript records that a tool ran, never that a person was asked, so a
- * reloaded conversation shows that same call as "Done automatically". That is the
+ * reloaded conversation shows that same call as "Finished". That is the
  * limit of the evidence on disk, not a claim this function is making.
  */
 export function deriveToolOutcome({
   permissionState,
   hasResult,
   isError,
-  isShellCommand,
 }: DeriveToolOutcomeArgs): ToolOutcome | null {
   if (permissionState === 'waiting') return 'waiting';
   if (!hasResult || isError) return null;
   if (permissionState === 'prompted') return 'approved';
-  return isShellCommand ? 'finished' : 'automatic';
+  return 'finished';
 }

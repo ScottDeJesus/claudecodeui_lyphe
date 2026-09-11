@@ -16,6 +16,12 @@ type CollapsibleDisplayProps = {
   rawContent?: string;
   className?: string;
   toolCategory?: string;
+  /** Sits inside the shared tool-row frame (the call's card), so it drops its own stripe. */
+  framed?: boolean;
+  /** The tool's mark, drawn between the caret and the label. */
+  icon?: React.ReactNode;
+  /** Facts that read with the tool's name — an edit's `+12 -3` — drawn right after it. */
+  meta?: React.ReactNode;
 };
 
 const borderColorMap: Record<string, string> = {
@@ -46,11 +52,14 @@ export const CollapsibleDisplay: React.FC<CollapsibleDisplayProps> = ({
   rawContent,
   className = '',
   toolCategory,
+  framed = false,
+  icon,
+  meta,
 }) => {
   const borderColor = borderColorMap[toolCategory || 'default'] || borderColorMap.default;
 
   return (
-    <div className={`border-l-2 ${borderColor} my-1 py-0.5 pl-3 ${className}`}>
+    <div className={framed ? className : `border-l-2 ${borderColor} my-1 py-0.5 pl-3 ${className}`}>
       <CollapsibleSection
         title={title}
         toolName={toolName}
@@ -58,6 +67,9 @@ export const CollapsibleDisplay: React.FC<CollapsibleDisplayProps> = ({
         action={action}
         badge={badge}
         onTitleClick={onTitleClick}
+        framed={framed}
+        icon={icon}
+        meta={meta}
       >
         {children}
 

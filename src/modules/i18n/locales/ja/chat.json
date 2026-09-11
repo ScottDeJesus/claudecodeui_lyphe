@@ -243,5 +243,46 @@
     "failed": "未送信 — {{reason}}",
     "cancel": "予約を取り消す",
     "dismiss": "失敗の通知を閉じる"
+  },
+  "shapes": {
+    "collapse": "折りたたむ",
+    "expand": "展開",
+    "copyCsv": "CSVとしてコピー",
+    "copied": "コピーしました",
+    "sortBy": "{{column}} で並べ替え",
+    "sortByColumnNumber": "{{number}} 列目で並べ替え",
+    "tasksDone": "{{total}} 件中 {{done}} 件完了",
+    "checksPassed": "{{count}} 件成功",
+    "checksFailed": "{{count}} 件失敗",
+    "blocking": "ブロッカー",
+    "high": "高",
+    "medium": "中",
+    "low": "低",
+    "showAllLines": "{{count}} 行すべて表示",
+    "showLess": "表示を減らす",
+    "openFile": "{{path}} を開く",
+    "titles": {
+      "table": "テーブル",
+      "options": "選択肢",
+      "beforeAfter": "変更前と変更後",
+      "callout": "注記",
+      "tasks": "タスク",
+      "checks": "チェック",
+      "timeline": "タイムライン",
+      "facts": "詳細",
+      "verdict": "判定",
+      "stats": "統計",
+      "diff": "差分",
+      "output": "出力",
+      "diagram": "図",
+      "code": "コード"
+    },
+    "alert": {
+      "note": "ノート",
+      "tip": "ヒント",
+      "important": "重要",
+      "warning": "警告",
+      "caution": "注意"
+    }
   }
 }

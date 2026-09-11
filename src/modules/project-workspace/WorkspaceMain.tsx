@@ -55,7 +55,7 @@ function WorkspaceMain({
 }: WorkspaceMainProps) {
   const { t } = useTranslation();
   const preferences = useUiPreferences();
-  const { showRawParameters, showThinking, sendByCtrlEnter } = preferences;
+  const { showRawParameters, showThinking, showWork, sendByCtrlEnter } = preferences;
 
   // The same reading the sidebar's tab strip takes — one hook, so the strip and these panes can
   // never disagree about which tabs exist.
@@ -220,6 +220,7 @@ function WorkspaceMain({
               onShowSettings={onShowSettings}
               showRawParameters={showRawParameters}
               showThinking={showThinking}
+              showWork={showWork}
               sendByCtrlEnter={sendByCtrlEnter}
               externalMessageUpdate={externalMessageUpdate}
               newSessionTrigger={newSessionTrigger}

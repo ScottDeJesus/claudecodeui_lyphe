@@ -275,5 +275,46 @@
     "failed": "전송되지 않음 — {{reason}}",
     "cancel": "예약 취소",
     "dismiss": "실패 알림 닫기"
+  },
+  "shapes": {
+    "collapse": "접기",
+    "expand": "펼치기",
+    "copyCsv": "CSV로 복사",
+    "copied": "복사됨",
+    "sortBy": "{{column}} 기준 정렬",
+    "sortByColumnNumber": "{{number}}번째 열 기준 정렬",
+    "tasksDone": "{{total}}개 중 {{done}}개 완료",
+    "checksPassed": "{{count}}개 통과",
+    "checksFailed": "{{count}}개 실패",
+    "blocking": "차단",
+    "high": "높음",
+    "medium": "중간",
+    "low": "낮음",
+    "showAllLines": "{{count}}줄 모두 보기",
+    "showLess": "간략히 보기",
+    "openFile": "{{path}} 열기",
+    "titles": {
+      "table": "표",
+      "options": "옵션",
+      "beforeAfter": "변경 전후",
+      "callout": "안내",
+      "tasks": "작업",
+      "checks": "검사",
+      "timeline": "타임라인",
+      "facts": "세부 정보",
+      "verdict": "판정",
+      "stats": "통계",
+      "diff": "차이",
+      "output": "출력",
+      "diagram": "다이어그램",
+      "code": "코드"
+    },
+    "alert": {
+      "note": "참고",
+      "tip": "팁",
+      "important": "중요",
+      "warning": "경고",
+      "caution": "주의"
+    }
   }
 }

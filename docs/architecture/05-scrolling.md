@@ -48,9 +48,9 @@ written from five places coordinated by refs and timers rather than by one owner
    to `false` also arms a scroll, which is what snaps you the last few pixels when you
    scroll back down.
 7. **A claim ref suppresses the other writers.** `pendingInitialScrollRef`,
-   `pendingScrollRestoreRef`, `searchScrollActiveRef`, plus two latches at the top of the
-   list, `topLoadLockRef` and `wasNearTopRef`. A session change clears or re-arms all five
-   in one effect.
+   `pendingScrollRestoreRef`, `searchScrollActiveRef`, plus one latch at the top of the
+   list, `wasNearTopRef`. A session change clears or re-arms all four in one effect, and
+   drops `liveScrollStateRef` with them.
 8. **Row geometry does not change behind the user's back.** Lazy rows keep their measured
    height when their content unmounts, React keys are derived from intrinsic message fields
    rather than object identity, and `contain-intrinsic-size: auto` lets the browser
@@ -93,8 +93,12 @@ flowchart TD
 ```
 
 All five are in `useChatSessionState.ts`. A repo-wide grep for `scrollTop =`, `scrollTop +=`,
-`scrollIntoView` and `scrollTo(` finds no other transcript writer — the remaining hits are
-the composer's textarea highlight overlay, the command menu and the workspace tab strip.
+`scrollIntoView` and `scrollTo(` finds no other transcript writer — the remaining hits are the
+composer's textarea highlight overlay and its own dropdown, the command menu, the sidebar's mobile
+rename input, the mobile terminal's momentum scroller, and the file manager's preview pane, which
+reveals a targeted line by writing two NAMED scrollers of its own rather than reaching for
+`scrollIntoView` — the same discipline this page holds the transcript to, argued out for that pane
+in [the file manager](../file-manager.md) §"The rules that bite".
 
 ## The single scroll container
 
@@ -268,10 +272,11 @@ fresh. The cost is that scrolling up within 100 ms of sending is undone.
 
 ## Reaching the top: the pager, the lock and the overlay
 
-**RULE: the top 100 px is a trigger zone, and it fires at most once per visit.**
+**RULE: older history is requested a screen before the top, so it is in place before the
+reader arrives. The load-all overlay still marks arriving at the top 100 px.**
 
-The second half of `handleScroll` computes `scrolledNearTop = container.scrollTop < 100`
-and runs two independent latches off it.
+The second half of `handleScroll` computes `scrolledNearTop = container.scrollTop < 100` for
+the overlay latch, and requests the next page whenever `scrollTop < clientHeight`.
 
 ```mermaid
 flowchart TD
@@ -280,11 +285,11 @@ flowchart TD
   B -->|"yes"| D{"wasNearTopRef already set"}
   D -->|"yes"| C
   D -->|"no"| E["Set wasNearTopRef, show the load-all overlay, hide it again after 2500 ms"]
-  A --> F{"allMessagesLoaded"}
+  P["handleScroll, at any position"] --> F{"allMessagesLoaded"}
   F -->|"yes"| G["Stop, nothing left to page"]
-  F -->|"no"| H{"topLoadLockRef set"}
-  H -->|"yes"| I["Release the lock once scrollTop is above 20, then stop"]
-  H -->|"no"| J["await loadOlderMessages, and take the lock if a page was prepended"]
+  F -->|"no"| H{"scrollTop within one screen of the top"}
+  H -->|"no"| I["Stop"]
+  H -->|"yes"| J["await loadOlderMessages, one at a time behind isLoadingMoreRef"]
 ```
 
 - **`wasNearTopRef`** debounces the overlay so it appears once when the user arrives at the
@@ -292,12 +297,12 @@ flowchart TD
   false. The 2500 ms hide timer in the hook is matched by the overlay's own
   `loadAllOverlayAutoFade 2500ms` animation in `LoadAllMessagesOverlay.tsx`, so the pill
   fades out exactly as the state clears.
-- **`topLoadLockRef`** stops a page load from immediately triggering the next one. After a
-  successful prepend the restore leaves you near the top again, which would satisfy
-  `scrolledNearTop` on the very next event. The lock is only released once
-  `container.scrollTop > 20` — the user must actively move away from the very top before
-  another page is fetched. Note the asymmetry: entering the zone is `< 100`, leaving the
-  lock is `> 20`.
+- **Paging is bounded by distance, not by a latch.** With "Show work" off a page can add
+  almost nothing on screen, so a latch that waits for the reader to move away from the top
+  would strand them there. The run only happens within a screen of the top, each prepend
+  moves `scrollTop` down by what it added, and a page that brings nothing back ends it. A
+  restore's own `scroll` event can chain the next page; that is intended, and it stops once a
+  screen of history sits above the view.
 
 `loadAllMessages` (the overlay's button) takes a different path: it fetches the whole
 transcript with `limit: null`, sets `visibleMessageCount` to `Infinity`, captures a scroll
@@ -314,9 +319,16 @@ offset from the container's top edge. The anchor is the first `.chat-message` wh
 `getBoundingClientRect().bottom` is at or past the container's top edge — in plain terms,
 the topmost row that is not entirely scrolled off.
 
-After `sessionStore.fetchMore` reports `prependedCount > 0`, the captured state is parked in
-`pendingScrollRestoreRef` and `visibleMessageCount` grows by `SESSION_MESSAGES_PAGE_SIZE`. A
-`useLayoutEffect` — before paint — drains it:
+The captured state is parked in `pendingScrollRestoreRef` **before** the fetch, stamped with
+`armedOldest` (the oldest rendered message), so the commit that adds the rows is the one
+restored even when the store renders them before the `await` returns. A `useLayoutEffect` —
+before paint — drains it on the first commit whose oldest rendered message differs, and it
+restores to **`liveScrollStateRef`**, which `handleScroll` refreshes on every scroll event, not
+to the fetch-time capture, because that capture would undo every wheel step taken while the
+page is in flight and snap the reader back down the chat. A load that prepends
+nothing clears the armed restore in its `finally`, and `visibleMessageCount` is in the effect's
+dependencies because a prepend can reach the screen by widening the window alone. After a
+prepend `visibleMessageCount` grows by `SESSION_MESSAGES_PAGE_SIZE`. The correction:
 
 | Case | Correction |
 | --- | --- |
@@ -345,6 +357,7 @@ also beats the tab-reactivation restore in the same commit.
 | Opening a session | rAF settle loop | `pendingInitialScrollRef` |
 | Returning to the Chat tab | `useLayoutEffect` reactivation branch | — |
 | Older page prepended | `useLayoutEffect` restore branch | `pendingScrollRestoreRef` |
+| Short screen filled while at the bottom | rAF settle loop, re-armed | `pendingInitialScrollRef` |
 | Sidebar search hit | `scrollIntoView` retry chain | `searchScrollActiveRef` |
 | Expanding a tool view | nothing — pure layout change | — |
 
@@ -367,11 +380,21 @@ bottom rather than placeholder estimates.
 The loop declines entirely if `searchScrollActiveRef` is set — a session opened from a
 search hit is not supposed to land at the bottom.
 
+**Filling a short screen.** A 20-row page with "Show work" or thinking off can leave one
+reply and nothing to scroll, so `fillViewportWithHistory` (asked by `ChatMessagesPane` after
+every commit; see [the message store](./04-message-store-and-lazy-loading.md)) loads older
+history until the transcript overflows by 200 px. While the reader has not scrolled up it
+passes `pinToBottom`, and `loadOlderMessages` **re-arms `pendingInitialScrollRef`** instead
+of setting `pendingScrollRestoreRef`: the older page lands above and the settle loop keeps
+the newest reply in view. An anchor restore there would pin a row near the top and let the
+tail drift off screen as the prepended rows change the heights below it. `visibleMessageCount` is
+in the loop's dependencies so a fill that only widens the window re-runs it too.
+
 ### Switching sessions
 
 The session-change effect (keyed on `selectedProject?.projectId` and `selectedSession?.id`)
 clears the pending search timer, clears `searchScrollActiveRef` and `searchTarget`, nulls
-`pendingScrollRestoreRef`, clears `topLoadLockRef` and `wasNearTopRef`, re-arms
+`pendingScrollRestoreRef` and `liveScrollStateRef`, clears `wasNearTopRef`, re-arms
 `pendingInitialScrollRef`, resets `visibleMessageCount` to `INITIAL_VISIBLE_MESSAGES`, and
 sets `isUserScrolledUp` to false. Its comment records that ordering is load-bearing: the
 effect that reads `__searchTargetSnippet` off the newly selected session runs *after* this
@@ -527,10 +550,11 @@ a scroll event.
   through `handleScroll` and rewrites the flag. That is why the deferred writers guard
   themselves — an unguarded write both moves the user *and* erases the evidence that they
   had scrolled away.
-- **The pager's two thresholds are deliberately different.** You enter the trigger zone at
-  `scrollTop < 100` but only release `topLoadLockRef` at `scrollTop > 20`. If both were 100,
-  the restore after a prepend — which lands you near the top by design — would immediately
-  fetch the next page, and a long session would drain in one gesture.
+- **The pager cannot drain a long session in one gesture.** The restore after a prepend
+  lands the reader near the top by design, but the zone is `scrollTop < clientHeight` and each
+  prepend moves the reader down by what it added, so the chain stops once a screen of history
+  is above them. It only runs long when the pages are mostly hidden work, which is the case
+  it exists for.
 - **`loadEarlierMessages` has no scroll restore.** It just does
   `setVisibleMessageCount(prev + 100)` on already-loaded messages, so `chatMessages.length`
   never changes and neither the follow effect nor the restore `useLayoutEffect` runs. Only
@@ -571,14 +595,14 @@ a scroll event.
 | If you touch | Also check |
 | --- | --- |
 | The 50 px threshold in `isNearBottom` | The follow effect, the tab-reactivation branch and the jump-to-bottom button all read the same flag. |
-| The `< 100` top zone or the `> 20` lock release | `topLoadLockRef` must still need an explicit move away from the top, or paging runs away. |
+| The one-screen (`clientHeight`) pager zone | Each prepend must still move the reader down by what it added (the anchor restore), or paging runs away. |
 | `chatMessages` shape or identity | The follow effect and the restore/reactivation `useLayoutEffect` are both keyed on `chatMessages.length`; in-place row rewrites are invisible to both. |
 | Anything that adds a deferred scroll | It must re-read `isUserScrolledUpRef` at fire time, or `transcriptScrollOwnership.test.tsx` should fail. |
 | `getIntrinsicMessageKey` or the key map in `ChatMessagesPane` | The prepend restore needs the anchor element to survive; unstable keys remount rows and drop it to the height-delta fallback. |
 | `LazyMessageRow` placeholder height, the `.chat-message` class placement, or the 1200 px observer margin | Prepend anchor scan, search-jump row lookup, and `lazyMessageRow.test.tsx`. |
 | `SEARCH_SCROLL_RETRIES`, the retry delay, or `findRenderedMessageElement` | The cross-session cancellation test and `searchTargetLocator.test.ts`; `allowNearest` must stay on the final attempt only. |
 | `.chat-message` containment or `content-visibility` | The export override in `buildTranscriptHtml.tsx` mirrors these declarations. |
-| Session load or pagination in `useChatSessionState.ts` | `pendingScrollRestoreRef`, `pendingInitialScrollRef`, `searchScrollActiveRef`, `topLoadLockRef` and `wasNearTopRef` are all handled by the session-change effect — see [the message store](./04-message-store-and-lazy-loading.md). |
+| Session load or pagination in `useChatSessionState.ts` | `pendingScrollRestoreRef`, `liveScrollStateRef`, `pendingInitialScrollRef`, `searchScrollActiveRef` and `wasNearTopRef` are all handled by the session-change effect — see [the message store](./04-message-store-and-lazy-loading.md). |
 | Composer send or the activity indicator | `handleSubmit` forces `isUserScrolledUp` false and scrolls unconditionally at +100 ms; the indicator changes the pane's padding without a scroll event. |
 | Tool card expand/collapse | Nothing scrolls today — see [tool views](./06-tool-view.md). Adding a `scrollIntoView` there adds a sixth writer with no claim ref. |
 

@@ -43,7 +43,7 @@ Read [the realtime stream](./02-realtime-stream.md) first for how the frames arr
 7. **`Bash` is one card, not two.** Its input render owns the command and the output, and
    `MessageComponent` suppresses the separate result section for it by name.
 8. **Every collapsed surface reads `useIsExportingTranscript()` — except
-   `ToolErrorDisplay`.** An exported document has no chevron to click, so a section that
+   `ToolErrorDisplay`.** An exported document has nothing to click, so a section that
    ignores the flag exports empty. `ToolErrorDisplay` ignores it, which is why an exported
    failure shows only its truncated one-line preview.
 
@@ -55,8 +55,8 @@ Read [the realtime stream](./02-realtime-stream.md) first for how the frames arr
 | `src/modules/chat/tools/ToolRenderer.tsx` | The router. Config in, component out. Also `getToolCategory`, `deriveToolStatus`, `CLAUDE_DENIAL_MESSAGES` |
 | `src/modules/chat/tools/OneLineDisplay.tsx` | Compact single-row pattern, four layouts |
 | `src/modules/chat/tools/CollapsibleDisplay.tsx` | Expandable pattern. Owns the category border colour and the `raw params` sub-toggle |
-| `src/modules/chat/tools/CollapsibleSection.tsx` | The header, chevron and sticky behaviour every expandable tool shares |
-| `src/modules/chat/tools/BashCommandDisplay.tsx` | Bash's whole card: command, spinner, line count, expandable output |
+| `src/modules/chat/tools/CollapsibleSection.tsx` | The header (the whole header is the toggle) and sticky behaviour every expandable tool shares |
+| `src/modules/chat/tools/BashCommandDisplay.tsx` | Bash's whole card: description as the headline (command as fallback), spinner, line count; clicking the row opens the command and output |
 | `src/modules/chat/tools/ToolStatusBadge.tsx` | `STATUS_CONFIG`, one pill per `ToolStatus` |
 | `src/modules/chat/tools/ToolErrorDisplay.tsx` | Collapsed red row for a failed result |
 | `src/modules/chat/tools/ToolDiffViewer.tsx` | Inline added and removed lines for Edit, Write, ApplyPatch |
@@ -67,6 +67,8 @@ Read [the realtime stream](./02-realtime-stream.md) first for how the frames arr
 | `src/modules/chat/tools/InteractiveRenderers/AskUserQuestionPanel.tsx` | Keyboard-driven answer picker for an `AskUserQuestion` prompt |
 | `src/modules/chat/transcript/MessageComponent.tsx` | Draws one transcript row. Decides container versus tool versus error |
 | `src/modules/chat/transcript/ToolGroupContainer.tsx` | The collapsed `Read x4` row and its expanded children |
+| `src/modules/chat/utils/workVisibility.ts` | `isHiddenWork`: which messages "Show work" off hides, and which it never hides |
+| `src/modules/chat/transcript/TypingIndicator.tsx` | The three-dot "still working" mark drawn while the work is hidden |
 | `src/modules/chat/utils/toolGrouping.ts` | `groupConsecutiveTools`, `isToolGroupItem`, `buildGroupPreview` |
 | `src/modules/chat/hooks/useChatMessages.ts` | `normalizedToChatMessages`: result pairing, live subagent folding, the projection cache |
 | `src/modules/chat/context/TranscriptRenderContext.ts` | The "we are rendering a document" flag |
@@ -114,13 +116,13 @@ Three lookups happen before the switch, all inside `ToolRenderer`:
 | --- | --- | --- |
 | `type` | `'one-line' \| 'collapsible' \| 'plan' \| 'hidden'` | Picks the base pattern. `hidden` is declared but no entry uses it; it falls through the switch and renders nothing |
 | `label` | `string` | Text before the separator. Defaults to the display name |
-| `icon` | `string` | Replaces the label in `OneLineDisplay`. Only `'terminal'` is used, and every variant special-cases it |
+| `icon` | `string` | The row's mark, drawn by `ToolRowIcon` before the label: `terminal`, `file`, `pencil`, `search`, `globe`; anything else draws a wrench |
 | `style` | `string` | `'terminal'` switches `OneLineDisplay` to the dark command pill |
 | `getValue` | `(input) => string` | The main text of a one-line row |
 | `getSecondary` | `(input) => string \| undefined` | Italic trailing text, such as Grep's `in <path>` |
 | `action` | `'copy' \| 'open-file' \| 'jump-to-results' \| 'none'` | What a click does, and which of the last three layouts renders |
 | `wrapText` | `boolean` | Wrap instead of truncate the value |
-| `colorScheme` | `{primary, secondary, background, border, icon}` | Tailwind classes. `border` and `icon` are also read by `ToolGroupContainer` for the collapsed group row |
+| `colorScheme` | `{primary, secondary, background, icon}` | Tailwind classes. `icon` is also read by `ToolGroupContainer` for the collapsed group row |
 | `title` | `string \| (input) => string` | Header of a collapsible or plan card |
 | `defaultOpen` | `boolean` | Initial open state. Forced open while exporting |
 | `contentType` | `'diff' \| 'markdown' \| 'file-list' \| 'todo-list' \| 'text' \| 'task' \| 'question-answer'` | Which content renderer fills a collapsible body |
@@ -147,23 +149,28 @@ or `hideOnSuccess` config can never swallow a failure — then `true` for `hidde
 
 ### The one-line layouts
 
-`OneLineDisplay` picks its layout in this order, and only the last three are chosen by
-`action`:
+Every tool row reads in one order — icon, label, facts about the call (a group's `xN`, an
+edit's `+12 -3`), `/`, what it acted on, then the copy button and line count, with the
+outcome pill always rightmost. There is no caret, no coloured stripe and no mark beside the pill: the whole row
+is the toggle, and the pill's words carry the state. `OneLineDisplay` fills the value slot
+by `action`, and a row whose result is drawn nowhere else (`shouldHideToolResult`, e.g. a
+Read's file text) opens that result when clicked:
 
 | Condition | Renders |
 | --- | --- |
-| `style === 'terminal'` | A dark pill with a green `$` prefix and no left border. A copy button when `action` is `copy` |
 | `action === 'open-file'` | The basename as a button that calls `onFileOpen(getValue(input))` |
 | `action === 'jump-to-results'` | The value, plus — once `toolResult` exists — a down-arrow link to `#tool-result-<toolId>`, the id `MessageComponent` puts on the result wrapper |
 | otherwise | Label, separator, value, optional secondary. A copy button when `action` is `copy` |
 
-The last three carry a `border-l-2` in `colorScheme.border`. `action: 'copy'` is not a
-layout of its own — it only adds the hover copy button.
+All of them sit in the shared tool-row frame (`toolRow.ts`), the same 32px row as a Bash
+run, an Edit card and a collapsed group. `action: 'copy'` is not a layout of its own — it
+only adds the hover copy button.
 
 ### The collapsible pattern
 
 `CollapsibleDisplay` wraps `CollapsibleSection` — a `Collapsible` whose header goes sticky
-while open — inside a `border-l-2` coloured by `getToolCategory(toolName)`:
+while open. On a call it is `framed`: the shared tool-row frame, header at row height. On a
+result it sits inside a `border-l-2` coloured by `getToolCategory(toolName)`:
 
 | Category | Tools | Border |
 | --- | --- | --- |
@@ -323,7 +330,10 @@ is the `data-message-timestamp` the transcript search jump matches on.
 
 The preview is built during grouping, not during render, by `buildGroupPreview`. The first
 `PREVIEWED_TOOL_COUNT = 2` messages are named by `getToolInputPreview`, which prefers the
-config's `getValue` then its `title`; empties are filtered out. The remainder is
+config's `getValue` then its `title` — except a `style: 'terminal'` tool, named first by its
+`getSecondary` (the description), so a Bash run reads by what it did, and a file
+(`action: 'open-file'`) is named by its basename as its own row names it; empties are
+filtered out. The remainder is
 `messages.length - named.length`, so **the names printed plus the remainder always equal
 the `x{n}` badge**. That is the invariant
 `src/modules/chat/tests/toolGrouping.test.ts` is built around: a run of two where one input
@@ -331,11 +341,32 @@ yields no text reads `/a.ts, +1 more`, and a run of five that names nothing read
 `+5 more`.
 
 `ToolGroupContainer` builds the collapsed button from the same config the cards use:
-`config.label` or the tool name, `config.colorScheme.border`, `config.colorScheme.icon`
-with `terminal` mapped to `$` and anything absent to the tool's uppercased first letter,
-the `x{n}` badge, the preview, and — via `useGroupDiffStats` — the summed `+N -M` for a run
-whose config has `contentType: 'diff'`. Expanding it renders the run's real
+`config.icon` drawn by `ToolRowIcon` in `config.colorScheme.icon`, `config.label` or
+the tool name, the `x{n}` badge, the summed `+N -M` (via `useGroupDiffStats`, for a run
+whose config has `contentType: 'diff'`), the preview, and the outcome on the right — the
+same order as a single row. Expanding it renders the run's real
 `MessageComponent` rows.
+
+## Show work
+
+**RULE: "Show work" off hides the agent's work, never anything the person has to act on.**
+
+Settings → Appearance → "Show work" (`uiPreferences.showWork`, default **off**, stored in
+`auth.db` like "Show thinking", which it sits directly above). Off, `ChatMessagesPane`
+filters `visibleMessages` through `isHiddenWork` (`utils/workVisibility.ts`) **before**
+`groupConsecutiveTools`, so a hidden run never leaves an empty `x{n}` row behind. Hidden:
+every tool call, a standalone tool result (`type: 'tool'`, `isOrphanToolResult`), a task
+result, and a task notice (`isTaskNotification`, the dot-and-description line). Kept:
+`AskUserQuestion` and `ExitPlanMode` (the person answers or builds from them) and any call
+whose permission state reads `waiting` — the person has to see what they are allowing.
+Thinking stays under its own toggle; an export is a full record and ignores both.
+
+With the work hidden, a turn could look hung, so while `isProcessing` the pane appends
+`TypingIndicator` to the open Claude turn (or opens one after the operator's bubble): three
+dots, CSS-only, timed from the LottieFiles "Chat typing indicator" file — a 1.83s loop, each
+dot 178ms after the last, a dip-hop-overshoot, ink at 30% rising to 65% at the top of the
+hop. Its keyframes are `chat-typing-hop` in `src/index.css`. With "Show work" on, the
+indicator is not drawn: the rows themselves show the turn moving.
 
 ## Subagents
 
@@ -595,11 +626,27 @@ It carries one boolean, `isExporting`, defaulting to `false`, read through
 `src/modules/chat/export/TranscriptExportDocument.tsx`, which mounts the *real* transcript
 components under `renderToStaticMarkup` so an exported file cannot drift from the UI.
 
-Five components consume it, none of them a direct child of the provider:
+Seven places read it, none of them a direct child of the provider. Six are components:
 `CollapsibleSection` opens every tool section, `SubagentPanel` opens the timeline and lifts
 the 25-entry cap, `ToolGroupContainer` expands the group, `BashCommandDisplay` opens its
-output, and `MessageComponent` drops the copy and speak controls and opens reasoning.
-Prop-drilling to all five would mean threading a flag through `ChatMessagesPane`,
+output, `CollapsibleUserText` unfolds a long operator turn, and `MessageComponent` drops the
+copy and speak controls and opens reasoning. The seventh is a module,
+`transcript/shapes/useShapeCollapse.ts` — the one door every rendered markdown shape goes through,
+and the only thing under `shapes/` that reads the context at all. It exports **two** hooks over one
+read of the flag. `useShapeCollapse(collapseKey)` is for a shape that folds: it returns
+`collapsed: false` with `interactive: false` while exporting, so a shape neither folds in an
+exported document nor draws a chevron there. `useShapeInteractive()` is that second answer alone —
+*may I draw a control at all?* — for a shape body carrying controls but no fold state of its own,
+which today is `DataTable`'s copy-as-CSV action and its sort headers, `DiffBlock`'s copy action, and
+`TabbedCode`'s tab strip. With no strip, an exported tab group draws every fence stacked, so the
+export keeps the languages the reader never clicked. `CodeFence` asks it too, about what it may
+MOUNT rather than draw: in an export a mermaid fence is its source, never `MermaidDiagram` (see
+[rendered shapes](./08-rendered-shapes.md) §"Collapse and export"). Keeping both in one module is
+the point: a shape that remembers the rule for itself is a chance to ship one that exports empty,
+and the next shape gets the rule for free by calling whichever of the two fits. The `interactive`
+half is not cosmetic — an export inlines the app's stylesheets (`export/buildTranscriptHtml.tsx`),
+so a control left in one *looks* alive, paints its own hover, and does nothing when clicked.
+Prop-drilling instead would mean threading a flag through `ChatMessagesPane`,
 `LazyMessageRow`, `MessageComponent`, `ToolRenderer` and `CollapsibleDisplay` — every one
 memoized, and four with no other reason to know exports exist.
 
@@ -709,7 +756,8 @@ memoized, and four with no other reason to know exports exist.
 | Result pairing in `normalizedToChatMessages` | The `WeakMap` projection cache keys `toolResultSource` and `subagentActivitySource`, and `src/modules/chat/tests/useChatMessages.test.ts` |
 | `groupConsecutiveTools` | `src/modules/chat/tests/toolGrouping.test.ts`; `ChatMessagesPane`'s key map, which assigns keys per group member; and `useChatSessionState`'s search jump, which matches a group by its first timestamp |
 | `parentToolUseId` handling | `liveSubagentGrouping.test.ts`, and `isSubagentPromptEcho` in `claude-runtime.provider.js` — the two must agree on which rows are echoes |
-| Anything with `useState` open or closed state | Add a `useIsExportingTranscript()` read, or it exports as an empty section; `src/modules/chat/tests/transcriptExport.test.tsx` asserts this |
+| Anything with `useState` open or closed state | Add a `useIsExportingTranscript()` read, or it exports as an empty section; `src/modules/chat/tests/transcriptExport.test.tsx` asserts this. Under `transcript/shapes/` call `useShapeCollapse` instead — it is that read plus the content-addressed fold memory, and a second spelling of either there is exactly what the hook exists to prevent |
+| Any new control inside a shape — a button, a copy action, a sortable header | It must not be drawn in an export, where nothing can handle a click: gate it on `useShapeInteractive()` from `transcript/shapes/useShapeCollapse.ts`, the same module `useShapeCollapse` lives in, rather than on a fresh `useIsExportingTranscript()` read beside it. `ShapeFrame` already refuses to draw its own toggle there; a control that does not refuse with it makes the refusal decoration |
 | `PermissionPanelProps` | `AskUserQuestionPanel`, `QuestionAnswerContent` (which renders it while the request is pending), and `handlePermissionDecision` in `useChatComposerState.ts`, which is what sends the frame |
 | `toolInput` serialization in the projection | Every `getValue`, `title` and `getContentProps` in the registry, plus the `parseToolPayload` call sites in `ToolRenderer` and `ToolGroupContainer` |
 | Server-side tool renaming | `UNIFIED_TOOL_LABELS`, `getToolCategory` and the `TOOL_CONFIGS` keys all match on the post-rewrite name, and the Codex provider renames some tools that `prepareTranscriptMessages` does not |

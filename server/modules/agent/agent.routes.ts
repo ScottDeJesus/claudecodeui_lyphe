@@ -3,6 +3,7 @@ import path from 'path';
 
 import express from 'express';
 
+import { userFacingEnv } from '@/shared/child-env.js';
 import type { ProviderRunFunction } from '@/shared/types.js';
 
 import { normalizeProjectPath } from '../../shared/utils.js';
@@ -386,7 +387,7 @@ export function createAgentRouter(dependencies: AgentRouterDependencies): expres
 
         // Execute git clone
         const gitEnvironment = githubToken ? {
-          ...process.env,
+          ...userFacingEnv(),
           GIT_CONFIG_COUNT: '2',
           GIT_CONFIG_KEY_0: 'credential.helper',
           GIT_CONFIG_VALUE_0: '',

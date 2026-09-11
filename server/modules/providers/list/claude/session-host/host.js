@@ -144,7 +144,9 @@ function spawnCli(frame) {
     appSessionId: frame.appSessionId ?? null,
     userId: frame.userId ?? null,
     cwd: frame.cwd ?? null,
-    pid: child.pid
+    pid: child.pid,
+    // What the CLI was launched with, so a re-adoption can diff the next message against it.
+    profile: frame.profile && typeof frame.profile === 'object' ? frame.profile : null
   });
   // A CLI that has already gone means EPIPE on the next write; that is not a host crash.
   child.stdin.on('error', (err) => log(`stdin write failed: ${err.message}`));

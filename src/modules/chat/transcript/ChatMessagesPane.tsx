@@ -12,6 +12,7 @@ import type { ReadToolPermissionState } from '@/modules/chat/hooks/useToolPermis
 import { getIntrinsicMessageKey } from '@/modules/chat/utils/messageKeys';
 import { resolveModelLabel as labelForModelId } from '@/modules/chat/utils/modelLabels';
 import { collectRunTerminalReplies, groupConsecutiveTools, isToolGroupItem } from '@/modules/chat/utils/toolGrouping';
+import { isHiddenWork } from '@/modules/chat/utils/workVisibility';
 import { useChatFontSize } from '@/shared/hooks/useChatFontSize';
 import { useLazyRowObserver } from '@/modules/chat/hooks/useLazyRowObserver';
 import { Card } from '@/shared/ui';
@@ -19,6 +20,7 @@ import LazyMessageRow from '@/modules/chat/transcript/LazyMessageRow';
 import MessageComponent from '@/modules/chat/transcript/MessageComponent';
 import ProviderSelectionEmptyState from '@/modules/chat/transcript/ProviderSelectionEmptyState';
 import ToolGroupContainer from '@/modules/chat/transcript/ToolGroupContainer';
+import TypingIndicator from '@/modules/chat/transcript/TypingIndicator';
 import LoadAllMessagesOverlay from '@/modules/chat/transcript/LoadAllMessagesOverlay';
 import ChatExportMenu, { type ChatExportSurface } from '@/modules/chat/transcript/ChatExportMenu';
 
@@ -60,6 +62,8 @@ type ChatMessagesPaneProps = {
   visibleMessageCount: number;
   visibleMessages: ChatMessage[];
   loadEarlierMessages: () => void;
+  /** Asked after every commit: loads older history while the rows drawn here do not fill the screen. */
+  onUnderfilled?: () => void;
   loadAllMessages: () => void;
   allMessagesLoaded: boolean;
   isLoadingAllMessages: boolean;
@@ -71,6 +75,11 @@ type ChatMessagesPaneProps = {
   onGrantToolPermission: (suggestion: { entry: string; toolName: string }) => { success: boolean };
   showRawParameters?: boolean;
   showThinking?: boolean;
+  /**
+   * Draws the work between replies (tool calls, results, task notices). Off hides it and
+   * shows a typing indicator at the foot of the turn while the session is processing.
+   */
+  showWork?: boolean;
   selectedProject: Project;
   /** Loads an already-sent message back into the composer; absent when the provider cannot re-run from a point. */
   onEditMessage?: (message: ChatMessage) => void;
@@ -121,6 +130,7 @@ function ChatMessagesPane({
   visibleMessageCount,
   visibleMessages,
   loadEarlierMessages,
+  onUnderfilled,
   loadAllMessages,
   allMessagesLoaded,
   isLoadingAllMessages,
@@ -135,6 +145,7 @@ function ChatMessagesPane({
   onGrantToolPermission,
   showRawParameters,
   showThinking,
+  showWork = false,
   selectedProject,
   readToolPermissionState,
   onExportSurface,
@@ -151,10 +162,26 @@ function ChatMessagesPane({
   const lazyRows = useLazyRowObserver(scrollContainerRef);
   // The reader's own transcript size, published to every message body below as a variable.
   const { size: chatFontSize } = useChatFontSize();
-  const groupedVisibleMessages = useMemo(
-    () => groupConsecutiveTools(visibleMessages, Boolean(showThinking)),
-    [visibleMessages, showThinking],
+  // "Show work" off drops the work before grouping, so a hidden run never leaves an
+  // empty group row behind. Rows that need the person stay (see isHiddenWork).
+  const shownMessages = useMemo(
+    () => (showWork
+      ? visibleMessages
+      : visibleMessages.filter((message) => !isHiddenWork(message, readToolPermissionState))),
+    [visibleMessages, showWork, readToolPermissionState],
   );
+  const groupedVisibleMessages = useMemo(
+    () => groupConsecutiveTools(shownMessages, Boolean(showThinking)),
+    [shownMessages, showThinking],
+  );
+  // With the work hidden, this is what tells the reader the turn is still going.
+  const showTypingIndicator = isProcessing && !showWork;
+
+  // Re-measured after every commit of these rows: a page whose rows are mostly hidden
+  // work can leave the screen nearly empty, with nothing to scroll up to load more.
+  useEffect(() => {
+    onUnderfilled?.();
+  }, [onUnderfilled, groupedVisibleMessages, hasMoreMessages, isLoadingMoreMessages]);
   // The reply that closes each run carries the time it landed at its foot.
   const runTerminalReplies = useMemo(
     () => collectRunTerminalReplies(groupedVisibleMessages, isProcessing),
@@ -409,6 +436,10 @@ function ChatMessagesPane({
               } else {
                 turn.push(row.node);
               }
+            }
+            // The indicator joins the open Claude turn, or opens one after the operator's bubble.
+            if (showTypingIndicator) {
+              turn.push(<TypingIndicator key="typing-indicator" />);
             }
             closeTurn();
             return turns;

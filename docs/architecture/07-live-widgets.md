@@ -76,7 +76,9 @@ Read [the realtime stream](./02-realtime-stream.md) for how a reply arrives, and
 | `src/modules/live-bus/context/LiveBusContext.tsx` | `LiveBusProvider` and `useLiveBus` — the retained values, the listener registry, `publish`/`subscribe`/`get` |
 | `src/modules/live-bus/hooks/useLiveTopic.ts` | `useLiveTopic` — the module's ONE render trigger, for a React component reading a topic |
 | `src/modules/live-bus/index.ts` | The barrel. The provider, the bus hook, `useLiveTopic`, and the vocabulary |
-| `src/modules/chat/transcript/Markdown.tsx` | `CodeBlock`'s widget branch and the file-private `MarkdownStreamingContext` |
+| `src/modules/chat/transcript/shapes/code/index.tsx` | `CodeBlock` — the `code` override's routing decision, and the widget branch inside it |
+| `src/modules/chat/transcript/shapes/markdownStreaming.ts` | `MarkdownStreamingContext`, in its own module. `CodeBlock` is the last consumer left in the tree |
+| `src/modules/chat/transcript/Markdown.tsx` | Provides that context around its `ReactMarkdown`, and names `CodeBlock` as the `code` override in both component maps |
 | `src/modules/chat/transcript/StreamingMarkdown.tsx` | Marks the pending half streaming; the settled half is untouched |
 | `src/shared/types.ts` | `WidgetFrameMessage`, `WidgetHostMessage`, `WidgetHostHandlers`, `LiveTopic`, `LiveValue`, `LiveBus`, under `LIVE WIDGETS` |
 | `.verify/phase-22.mjs` | The fence probe: the sandbox, the opaque origin, the CSP refusal, height, theme, streaming, export, and the revoke rule from both sides |
@@ -86,11 +88,12 @@ Read [the realtime stream](./02-realtime-stream.md) for how a reply arrives, and
 
 ## The fence
 
-`CodeBlock` in `Markdown.tsx` reads the info string off the `language-*` class react-markdown puts
-on the `code` element. The widget branch matches the WHOLE word, not the `\w+` capture the label
-and the highlighter use: `\w` stops at a hyphen, so a `widget-config` fence would otherwise read
-as `widget` and mount a live scripted frame for an ordinary documentation label. Directly under
-the mermaid branch:
+`CodeBlock`, the `code` override in `shapes/code/index.tsx`, reads the info string off the
+`language-*` class react-markdown puts on the `code` element. The widget branch matches the WHOLE
+word, not the `\w+` capture the label and the highlighter use: `\w` stops at a hyphen, so a
+`widget-config` fence would otherwise read as `widget` and mount a live scripted frame for an
+ordinary documentation label. It is the first language decision `CodeBlock` makes — mermaid,
+`stats` and `diff` are `CodeFence`'s to decide, after it:
 
 ````
 ```widget
@@ -99,10 +102,18 @@ the mermaid branch:
 ````
 
 renders `<WidgetFrame code={raw} streaming={streaming} />`. `streaming` comes from
-`MarkdownStreamingContext`, a file-private context defaulting to `false`, which
-`MarkdownBodyRenderer` provides around its `ReactMarkdown`. Only `StreamingMarkdown` sets it, and
-only on the pending half — `splitStreamingMarkdown` keeps an open fence and everything after it
-in `pending`, and a finished message never carries the flag at all.
+`MarkdownStreamingContext`, a context defaulting to `false` which `MarkdownBodyRenderer` provides
+around its `ReactMarkdown`. It sits in a module of its own, `shapes/markdownStreaming.ts`, for a
+mechanical reason: `Markdown.tsx` imports `CodeBlock` and `CodeBlock` reads the context, so
+leaving the context in `Markdown.tsx` would be an import cycle. `CodeBlock` is also its ONLY
+consumer — the streaming fallback for every other element is decided once, upstream, by which
+component map `MarkdownBodyRenderer` hands `ReactMarkdown`, so nothing downstream has a streaming
+rule left to forget. The fence shapes are where the flag travels one step further: `CodeBlock`
+passes it to `CodeFence` (`shapes/code/CodeFence.tsx`) as a plain prop, and `CodeFence` returns the
+ordinary highlighted block for any streaming fence before it tries a single shape — mermaid
+included, so a half-arrived diagram is never handed to the parser. Only `StreamingMarkdown` sets it, and only on the pending half —
+`splitStreamingMarkdown` keeps an open fence and everything after it in `pending`, and a finished
+message never carries the flag at all.
 
 The consequence worth holding on to: a widget fence renders as source in three situations — while
 the reply is still being written, in an exported document, and for one tick whenever the streaming
@@ -419,7 +430,9 @@ listeners in the bus for every later publish to walk.
   create a sandboxed frame. `.verify/phase-22.mjs` filters it by message and says so.
 - **`MermaidDiagram` reads `useTheme()` unconditionally, and the HTML export provides no
   `ThemeProvider`.** That is why `WidgetFrame` keeps every context read inside `WidgetFrameLive`,
-  behind the mount gate, rather than following mermaid's shape exactly.
+  behind the mount gate, rather than following mermaid's shape exactly. The transcript export
+  never mounts `MermaidDiagram`: `CodeFence` draws a mermaid fence's source there instead (see
+  [rendered shapes](./08-rendered-shapes.md) §"Collapse and export").
 
 ## If you change this, check that
 
@@ -433,8 +446,8 @@ listeners in the bus for every later publish to walk.
 | The height clamp | A widget still SHRINKS, not just grows — gate 4 drives one widget each way, because a `min-height` (or a monotonic `setHeight`) passes every growth assertion alone |
 | `useWidgetHost`'s listener | The `event.source` identity check, the shape validation, and the `[24, 2000]` clamp on a finite number |
 | `WidgetFrame`'s mount gate | `buildTranscriptHtml` still exports a `<pre>` and no `<iframe>` — gate 9 of the probe |
-| The streaming context | `StreamingMarkdown` still marks only the pending half, and `MarkdownBody` keeps its memo |
-| The widget branch in `CodeBlock` | The opt-in is still the WHOLE info-string word `widget`. Gate 7 drives both an `html` fence and a `widget-config` one, each with a positive control — "zero iframes" is also what a container that rendered nothing reports |
+| The streaming context | `StreamingMarkdown` still marks only the pending half, `MarkdownBody` keeps its memo, and `CodeBlock` is still the only thing that reads the context — a second reader is a second place the streaming rule can be forgotten |
+| The widget branch in `CodeBlock` (`shapes/code/index.tsx`) | The opt-in is still the WHOLE info-string word `widget`. Gate 7 drives both an `html` fence and a `widget-config` one, each with a positive control — "zero iframes" is also what a container that rendered nothing reports |
 | `postToFrame` or the revoke rule | The host still stops posting after a second `load` on the element. Gate 9b navigates a widget to `about:blank`, forges the `ready` a real widget sends, and requires silence — a frame that navigated away keeps its `contentWindow`, so identity alone would go on admitting it |
 | `LIVE_TOPIC_ALLOWLIST` | Both patterns are still ANCHORED and still bounded. Gates 4 and 5 of `.verify/phase-24.mjs` drive a bare bad topic and a URL-shaped one; a prefix test passes neither |
 | `MAX_TOPICS_PER_FRAME` | The refusal is still an ANSWER, not a silence — gate 6 reads the reason out of the seventeenth topic's `onError` inside the frame |

@@ -90,6 +90,9 @@
 .vv-badge--default { background: var(--accent); color: var(--on-accent); }
 /* `outline` is a SHAPE, so it composes with any tone: no fill, a visible edge, tone ink. */
 .vv-badge--outline { background: none; border-color: var(--border); }
+/* `compact` is a SIZE, for a badge that rides inside a dense row (the tool-call outcome pill):
+ * the base badge is sized to stand alone and outweighs the row it labels. */
+.vv-badge.vv-badge--compact { padding: 0 6px; font-size: 10px; line-height: 16px; }
 /* `--secondary` and `--destructive` are emitted too, as contract markers a later phase's verify
  * script can query. They have no rule on purpose: their paint is entirely the tone. */
 

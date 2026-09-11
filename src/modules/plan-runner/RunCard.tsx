@@ -89,7 +89,12 @@ export function RunCard({
   const progress = phaseProgress(run);
   const anyBlocked = run.phases.some((phase) => phase.state === 'blocked');
   const currentPhaseId = run.position?.phase_id ?? null;
-  const spend = `${t('runner.spawns', { used: run.spawns, max: run.max_spawns })} · $${run.cost_usd.toFixed(2)}`;
+  // The PLAN's spend leads once it has run more than once: a restart opens a new run at 0, and
+  // the run's own counters alone read as a reset (operator, 2026-09-11). This run's share follows
+  // beside its ceiling, because the ceiling is per run.
+  const spend = run.plan_runs > 1
+    ? `${t('runner.planSpend', { spawns: run.plan_spawns, cost: run.plan_cost_usd.toFixed(2), count: run.plan_runs })} · ${t('runner.thisRun', { used: run.spawns, max: run.max_spawns })}`
+    : `${t('runner.spawns', { used: run.spawns, max: run.max_spawns })} · $${run.cost_usd.toFixed(2)}`;
 
   return (
     <Card

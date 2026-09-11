@@ -146,7 +146,8 @@ alias and then 404s is caught. The rest it reads on screen — a stored fenced `
 rendering in the transcript, Appearance carrying no editor section, the four legacy `codeEditor*`
 keys seeded and found untouched, and the palette's file row landing in the Files tab. It spends no
 Claude turn, and one reading is out of reach: no stored conversation carries a mermaid fence, so
-`MermaidDiagram` is proven as far as its module resolving and no further.
+`MermaidDiagram` is proven as far as its module resolving and no further. A drawn diagram is
+`probe-shapes-fences.mjs`'s reading, from a fixture rather than a stored conversation.
 
 Phase 10 photographs a panel whose whole job is to report, so most of its gates read what is on
 screen against what the server said over HTTP — the ahead count comes from
@@ -376,10 +377,10 @@ child process and a LIVE system prompt: the SDK child's own environment carries
 `CLAUDE_SURFACE=cloudcli`, and the model, asked to name what its system prompt calls the surface
 and whether it describes a widget fence, answers `SURFACE=cloudcli` and `WIDGET=yes` in its own
 words. The env half is read out of `/proc/<pid>/environ` with a 50 ms `setInterval` sweep that
-starts BEFORE the prompt is sent, never after: the SDK spawns one child per turn and that child
-exits the moment the turn ends, so a scan begun once the reply is on screen has no window left to
-read — it would find nothing and prove nothing, where a scan running the whole time the turn is in
-flight catches it. The turn is spent once: the pid it saw, the moment it saw it, the reply text and
+starts BEFORE the prompt is sent, never after. The CLI is now one process per conversation and
+outlives the turn (it closes two hours after the last message), so a later scan would find the
+environment too — but the sweep still starts first, so the pid it reports is provably the one
+that answered THIS turn rather than one that happened to be alive afterwards. The turn is spent once: the pid it saw, the moment it saw it, the reply text and
 the session it landed in are kept in `.verify/artifacts/21-surface.json`, and every later run reads
 that back — replaying both the env gate and the reply gate, the latter re-fetched from the
 session's own persisted row on disk — rather than asking the model the same question twice.
@@ -653,7 +654,9 @@ fence as TEXT, so no iframe reaches a saved file (7); a theme flip leaves `src` 
 with the flip itself asserted so the gate cannot pass by not happening — a new `src` is a
 navigation, and the reader's unsaved edit goes with it (8); `Markdown.tsx` knows nothing about
 docspace, read from the served source, because the fork belongs behind `WidgetFrame`'s two gates
-and not in `CodeBlock` (9); and the signed-in stage is clean apart from the named, measured
+and not in the markdown pipeline (9) — read that gate narrowly, though: the fence dispatcher has
+since moved to `shapes/code/index.tsx`, so gate 9 no longer reads the file a docspace fork would
+actually be written into, and widening it is a change to `phase-28.mjs`; and the signed-in stage is clean apart from the named, measured
 exceptions (10, see *What bites people*). It sends no Claude turn, creates no DocSpace page and
 sweeps no fixture. What bites: `DocSpaceFrame` gives the embed 8 s to say `ready` and then replaces
 the iframe with an error card, so every gate touching the iframe runs inside a fresh 8-second
@@ -792,6 +795,540 @@ only where the figure can no longer move. The theme gate compares the same rows'
 light and a dark session and requires them to have moved, since every rendered element has some
 colour. It sends no prompt and writes nothing but its own browser's dismissal key.
 
+**`probe-shapes-lineopen.mjs` proves a line number survives all the way to a row a reader can
+actually see.** It drives the preview route with `fetch` first — a mid-file window, and `start=0`,
+`-5`, `abc` and a start past the end all answered rather than refused — then goes through the app's
+own registered `openFileReference` op, found by walking React's fiber tree from `#root`, so the
+chain it measures is the one the chat's file chip reaches rather than a replica of it. Four of its
+gates exist because the obvious version of each passed over a real defect. **The large-file count**:
+a window near the END of a file over the 2 MB counting cap must report a true `totalLines`, while
+the same file read from the top must still answer `null` — the second half is what proves the early
+stop was not traded away for the first. It picks that subject off the FILESYSTEM rather than the
+API's tree, which honours `.gitignore` and therefore hides exactly the big text files that exist
+here (transcripts, logs, lockfiles, bundles); a machine holding none skips the gate with a `[NOTE]`
+rather than passing quietly. **The past-the-end band**: a reference 1, 20 and 9,000 lines past the
+end must EACH settle on the file's last line with the footer naming both numbers — the near cases
+are the ordinary stale reference and the ones that broke, since a window opens 40 lines up and so
+still lands inside the file. **The repeat ask**: a second open of a window already on screen must
+issue ZERO preview reads, counted on the NETWORK through a `fetch` wrapper, because "the rows never
+blanked" cannot see a redundant GET. **The viewport**: the target row must be inside the VIEWPORT at
+1440, 768 and 390 — not merely inside its pane, since below `md` the panes stack and a row revealed
+in a pane under the fold is revealed to nobody — and at 1440 the directory listing is gated to prove
+it did NOT move. It spends no Claude turn and writes nothing on the account or the server. Its
+contracts are [files-api.md](files-api.md) and [file-manager.md](file-manager.md).
+
+**`probe-shapes-detect.mjs` proves every markdown-shape trigger fires on what it is meant to fire
+on and — the half that decides whether the feature is safe — refuses the near misses.** A shape
+that MISSES its trigger renders as today's markdown and the reader loses nothing; a shape that
+fires on prose takes the author's words and lays them out as something they never wrote. So every
+parser in `src/modules/chat/transcript/shapes/detect.ts` carries POSITIVE and NEGATIVE cases, and
+each negative is a near miss that would be a real regression on its own: an almost-decision-matrix,
+a table whose second and third columns both happen to be numeric, a `stats` fence with a pasted
+markdown row in it, a URL whose path half is a perfectly valid file reference, a clock time that
+reads as `name:line`, and a sentence with a plus sign in it. It is the one script in `.verify/`
+that opens neither a browser nor a socket — `detect.ts` is a barrel over `shapes/detect/`, whose
+family modules import NOTHING, which is what lets the probe load it straight through `tsx`:
+
+```bash
+npx --no-install tsx --tsconfig tsconfig.json .verify/probe-shapes-detect.mjs
+```
+
+The `--tsconfig` flag is load-bearing. It pins the barrel's `@/` re-exports to `src/`; a shell that
+carries the dev supervisor's `TSX_TSCONFIG_PATH` (see
+[deploy/dev-supervisor/README.md](../deploy/dev-supervisor/README.md)) would otherwise resolve them
+to `server/` and the barrel would fail to load before the first case.
+
+97 cases in 0.3 s, no dev server, no Chromium, no Claude turn. It prints a `[PASS]`/`[FAIL]` line
+per case and closes with `DETECT: all gates PASS`, exiting non-zero if any case failed — the same
+contract `all.mjs` enforces, though `all.mjs` collects `phase-<n>.mjs` only, so this one is run by
+hand like every other `probe-*.mjs`. It proves the triggers and nothing else: that a matching block
+then paints as a shape is a browser question and belongs to a phase script.
+
+**`probe-shapes-baseline.mjs` proves the other half: that a shape never SWALLOWS a block nobody
+meant to convert.** A missed trigger costs a reader nothing — the block renders as today's markdown.
+A trigger that fires on ordinary prose takes the author's words and lays them out as something they
+never wrote, and the only way to see that is to render a document made entirely of NEAR MISSES and
+compare its DOM byte for byte. It mounts `MarkdownBody` from the running dev server into a second
+React root through the shared fixture `.verify/lib/shapes-fixture.mjs` — `ThemeProvider >
+LiveBusProvider > [toggle, div#probe-shapes-body > MarkdownBody]` — and reads the BODY div, never
+the host: the fixture's own theme toggle is chrome, and a ruler must stay out of what it measures.
+
+**It makes two passes, and only the first is pinned.** Pass 1 serialises `BASELINE_DOCUMENT` and
+compares it with `.verify/artifacts/shapes-elements-baseline.html`, with twenty gates beside the
+comparison asserting that the document really rendered — both lists, the blockquote, two highlighted
+fences, at least five anchors, both autolinks, inline code inside a link, the image, the rule,
+inline and display KaTeX, a loose list item's paragraph wrapper, an escaped `a &lt; b &amp;&amp; c`,
+GFM's `sr-only` footnote label, and no `data-shape` anywhere. Without them an empty render would
+serialise to an empty string, and a capture of nothing compares as identical as a capture of
+everything. Pass 2 mounts `STREAMING_DOCUMENT` with `streaming`, which selects the plain component
+map, and ASSERTS rather than serialises, in ten gates: the widget fence rendered and stayed `<pre>`
+with no iframe, no `data-shape` appeared, each of `h1`–`h6` came out as its own bare tag, and every
+`PlainTable*` class string is quoted from the component that owns it — as the DOM serialises it, so
+`PlainTableRow`'s arrives escaped (`[&amp;:last-child&gt;td]:border-b-0`) and the gate stays
+falsifiable.
+
+**Pass 1's admission rule is stricter than "looks plain": a block belongs there only if NO phase of
+the plan converts it.** A plain GFM table is a trigger HIT rather than a near miss — the `table` row
+of the precedence table ends in a plain sortable `DataTable`, so a table matching no matrix still
+becomes one — and a single root-level heading would be swallowed whole, because the grouping plugin
+wraps a heading plus every sibling after it in a section. Either would arm a gate a later phase must
+then fail, in a file those phases are forbidden to edit, so both exclusions carry gates of their
+own; the heading one reads the SOURCE text and not the render, since the footnote label is a
+legitimate generated `<h2>` and a render-side check would have to exempt `h2` — which is exactly the
+line a later hand adds "for coverage". The `h1`–`h6` property-forwarding regression that justified
+the document in the first place is still covered, by the case that actually broke: GFM's footnote
+label is built by `mdast-util-to-hast` after remark runs, so it is not a root child, the grouping
+pass cannot reach it, and it still renders through `PlainHeading`.
+
+**The artifact is never rewritten to make a comparison pass.** `--write` refuses to overwrite an
+existing one without `--force`; an absent artifact with no flag prints `BASELINE: MISSING` and stops
+rather than minting itself something to agree with; a failing gate writes nothing at all; and a
+capture that disturbs pinned bytes records `DIVERGED at offset N` in the file, which is the whole
+difference between a baseline legitimately widened and one quietly laundered. The `<!-- … -->`
+provenance lines are APPENDED, never replaced — one per capture, carrying the timestamp, the HEAD,
+the argv and any `--note=`. All 13,248 characters of the current DOM are pinned to the PRE-MOVE
+renderer: the old `Markdown.tsx` was read out of git with `git show`, swapped into the tree on its
+own and captured, then the current file was restored and reproduced it exactly, so no part of the
+artifact compares the new DOM with itself. Re-establish it the same way if it ever comes to that —
+`git show` to a temp path, swap, capture or compare, swap back — never with `git checkout`, and
+never by re-capturing from the current tree.
+
+```bash
+node .verify/probe-shapes-baseline.mjs                    # compare: the standing form
+node .verify/probe-shapes-baseline.mjs --write --force    # deliberately re-capture
+```
+
+It prints a `[PASS]`/`[FAIL]` line per gate and closes with the one `BASELINE:` line a caller reads
+with `tail -1`, exiting non-zero on any failure. Zero Claude turns, nothing written on the server or
+the account, one screenshot (`shots/probe-shapes-baseline-light.png`). `all.mjs` collects
+`phase-<n>.mjs` only, so like every other `probe-*.mjs` it is run by hand — and every later phase of
+[the shapes plan](plans/markdown-shapes.plan.md) runs it as a verify step, expecting
+`BASELINE: DOM identical`.
+
+**`probe-shapes-tables.mjs` proves the three table shapes — and the tables that must NOT become
+them.** Twelve tables in one document, mounted once through the same `shapes-fixture.mjs`, answer
+every question below. Eleven of them wear a `data-shape`, compared against a spelled-out
+`EXPECTED_KINDS` list so a table wearing the *wrong* shape fails by name rather than as a count, and
+the document's 24 body rows are asserted EXACTLY. `> 0` would be no gate at all here: `DataTable`
+renders `null` for a row index its rendered children have no entry for, and a table that dropped one
+row still leaves a document full of other tables' rows.
+
+**The sort gates measure whole rows, not a column of cells.** The workhorse table carries inline
+marks in its label column, a comma cell and a quote cell, and a numeric column whose values a text
+sort gets wrong (9, 100, 20). One click has to return the same `(label, note, count, rank)` tuples in
+numeric order with the author's `code` and `strong` still inside them — `DataTable` sorts the parsed
+TEXT and then permutes the *rendered* `tr` elements, keyed by original index, so a row coming apart
+from itself is the failure being looked for. A second click reverses it; a third gives the author's
+order back. Stability is gated in BOTH directions on a separate table with a tie in it, because a
+comparator that tiebreaks on the signed index looks stable ascending and flips descending. `aria-sort`
+is read alongside every one of those: exactly one header may claim the sort.
+
+**The expected CSV is written out as a literal rather than computed.** A gate that builds its
+expectation with the same rule the code uses proves only that the rule is self-consistent, so both
+strings — the author's order and the sorted order — are spelled in the file, quoting the comma cell
+and doubling the inner quote per RFC 4180. Reading the clipboard back needs `clipboard-read` and
+`clipboard-write` granted on the browser context, which the probe does before it mounts anything.
+
+**The bars are gated on ratio, on sign, on zero and on travel.** `aria-valuenow` and the fill's own
+`scaleX()` are both read, so a meter reporting a number it does not draw fails; a negative column
+draws from magnitude; a zero row sits on the 1 % floor instead of vanishing; an all-zero column
+divides by nothing at all. The travel gate is the one that catches this shape lying outright — a bar
+is computed from its row's ORIGINAL index and drawn into the row that moves, so a sort must carry
+each bar with its own number, and nothing else in the list would see one left behind at its old seat.
+
+**Two of the twelve are there to DECLINE.** `Option | Pros | Cons | Notes` stays a plain table and
+keeps all four columns, because a card grid has no slot for the column it was not built for; and a
+real decision matrix carrying an inline `code` span declines at the branch in
+`shapes/elements/table.tsx` and renders as today's bordered table, every cell still on screen. That
+second one is where the feature's central law is measured: a shape may never render less than the
+markdown it replaced. The same law is why the card shapes' gates read every `[data-shape-label]` as a
+whole label instead of testing the shape's text for a substring — `Options` contains `Option`, and in
+`ja` the frame's title is 選択肢 and contains nothing, so a substring test could never see a dropped
+header word.
+
+**The awkward header row is its own pair of gates.** A header that is itself a link keeps the link
+and gets its sort control *beside* it rather than around it — a button inside a button fires both on
+one click and gives a keyboard user a tab stop inside a tab stop — and a header the author left blank
+is named from a translation key of its own, so `|  | 1 | 2 |` cannot give the blank column and the
+column really called `1` the same accessible name in one header row.
+
+**The last pass is the export.** It mounts the same document inside
+`TranscriptRenderContext.Provider value={{ isExporting: true }}` — the state
+`export/TranscriptExportDocument.tsx` renders the transcript in — and requires every shape, every
+row, every header word and the bars to be present while ZERO copy, sort or toggle controls are drawn;
+see [06-tool-view.md](architecture/06-tool-view.md) §"Rendering into an exported document" for why a
+control drawn there would look alive and do nothing. It renders live rather than through
+`renderToStaticMarkup`, which is the honest measurement for what is being asked: the flag decides
+whether a control is *drawn*, and one never drawn cannot be serialised either. That mount is spelled
+out in the probe rather than in the shared fixture only because `mountShapes` takes no provider and
+the fixture was outside the phase's manifest — it is three lines of tree over the same
+`window.__mountReact` harness, and it collapses into a fixture call the first time the fixture grows
+one. The fences and groups probes spell it again, so there are three copies, and all three collapse
+together.
+
+Light and dark are two SESSIONS rather than one session and a theme toggle, for the reason the
+screenshot rule above gives: `shoot()` names its file from the flag that set the colour scheme, so
+flipping the class underneath it would write `-light` over dark pixels.
+
+```bash
+node .verify/probe-shapes-tables.mjs
+```
+
+41 gates — 39 in the light session, 2 in the dark — a `[PASS]`/`[FAIL]` line each, closing with the
+one `SHAPES TABLES:` line a caller reads with `tail -1` and exiting non-zero on any failure. Zero
+Claude turns, nothing written on the server or the account, four screenshots:
+`shots/probe-shapes-tables-{light,dark}.png`, and a `-bars` pair beside them because the document is
+taller than the viewport and the bar column — the one thing here judged by eye — sits below the fold.
+`all.mjs` collects `phase-<n>.mjs` only, so like every other `probe-*.mjs` it is run by hand.
+
+**`probe-shapes-lists.mjs` proves the callout and the four list shapes — and the quotations and
+lists that must NOT become them.** One document, mounted once through `shapes-fixture.mjs`, holds
+fifteen shaped blocks and every near miss beside them. The shapes are compared against a spelled-out
+`EXPECTED_KINDS` list, so a block wearing the wrong shape fails by name. The near misses are counted
+exactly — four quotations, fifteen plain lists — and each is held class for class against today's
+bordered blockquote or `PlainList` markup, so a declined block that changed its look still fails.
+
+**The callouts are gated on paint, not on an attribute.** Each of the five `> [!KIND]` alerts must
+carry its own translated word (`shapes.alert.<kind>` in `chat.json`). Its `data-tone` is checked
+against tones written out in the probe rather than imported from `Callout.tsx`: `note` and
+`important` are `info`, `tip` is `positive`, `warning` is `warn`, `caution` is `danger`. Each must be
+one shared `Banner` (`.vv-banner`), and its computed fill and ink must both be real colours. The dark
+session then takes the five light fills and requires every dark fill to differ from its light twin
+and every ink to differ from its fill. A hard-coded colour fails exactly there, as ink on ink. Four
+quotations must stay quotations: an ordinary one, one that opens with the bare word `NOTE:`,
+`> [!NOTE] see the runbook…` with every trailing word still on screen, and a marker with no body at all.
+
+**The list rungs are gated on what each one lifts out, and on what it leaves behind.**
+- **Tasks.** Seven items with four done must read "4 of 7 done" over a 57 % bar. Every checkbox
+  remark-gfm drew must still be an `input[type=checkbox]` in its own state — 24 are counted
+  EXACTLY across the document, declined lists included.
+- **Tasks versus checks.** A task list whose items also carry check glyphs stays a task list. That is
+  the one rung order that cannot be got wrong without taking the reader's checkboxes away.
+- **Nesting.** A real task list counts only its own items, never a sub-task, and its sub-list stays a
+  plain indented list rather than a second frame. A plain bullet holding a task sub-list is not a
+  task list at all.
+- **Checks.** Failures and passes are two toned chips, failures first. Each row keeps the author's
+  own glyph as its mark, and the glyph is lifted out of the row body so it is never printed twice.
+  An ordered check list stays an `ol`. `✓ **built**` — a glyph running straight into a bold — is
+  the case `checkGlyphLength` in `detect.ts` exists for.
+- **Timeline.** It draws a rail and one dot per entry. Each entry's time is lifted out VERBATIM:
+  `4:12 PM` and `Sep 11` must come back as written, never parsed into a `Date` and reformatted.
+- **Facts.** A `**Label:** value` list becomes a grid in the author's order, and each label keeps the
+  author's case. A label that is a link or a code span declines, and so does a value carrying a code
+  span, because a grid would flatten either one.
+
+Nine more declines are gated by name, each on a line of its own text: six boxes plus one plain bullet,
+four glyphs plus one plain line, a single check line, one untimed line among five times, version
+numbers (`1.2`), ratios (`3:2`), a leading count, a fact value holding code, and a bolded lead-in
+followed by a sentence. A list of two empty items stays a list, and nothing divides by zero.
+
+**A second mount covers user messages.** A USER message renders through `<MarkdownBody breaks>`,
+and with `remark-breaks` on, the newline after `[!NOTE]` arrives as a `<br>` AND a separate `"\n"`
+text node. So the probe mounts that form too and requires the banner to open on the author's
+words. This mount is written out in the probe for the same reason as the tables probe's export
+mount: `mountShapes` passes no `breaks`. `probe-shapes-prose.mjs` spells the same mount again, which
+makes three probe-local mounts over one `window.__mountReact` harness. When `mountShapes` gains a
+props argument, all three collapse into fixture calls.
+
+**The document switches its bullet marker between `-`, `*` and `+`, and it has to.** Two adjacent
+lists with the same marker and a blank line between them are ONE loose list in CommonMark (§5.3).
+The first draft used `-` throughout and merged every list into one fifteen-item plain list. That
+reported "no list shape at all" instead of a fault in the document. Gates also find their block by
+index into `EXPECTED_KINDS`. So if you insert a list, switch the markers around it, and if you insert
+a shaped block, every index after it moves.
+
+```bash
+node .verify/probe-shapes-lists.mjs
+```
+
+66 gates — 62 in the light session, 4 in the dark — each printing a `[PASS]`/`[FAIL]` line. The run
+closes with the one `SHAPES LISTS:` line a caller reads with `tail -1`, and exits non-zero on any
+failure. Zero Claude turns, and nothing written on the server or the account. It takes six
+screenshots, `shots/probe-shapes-lists{,-checks,-timeline}-{light,dark}.png`: the document is far
+taller than the viewport, and the callouts, the checks and the timeline are each judged by eye. Like
+every other `probe-*.mjs`, it is run by hand.
+
+**`probe-shapes-prose.mjs` proves the paragraph ladder — the verdict banner and the fact card — and
+the paragraphs that must NOT become either.** One document of eighteen paragraphs, mounted once
+through `shapes-fixture.mjs`, holds six shapes and twelve near misses. The shapes are compared
+against a spelled-out `EXPECTED_KINDS` list. Each near miss is held twice: word for word against the
+text it must still show, and class for class against today's `PlainParagraph` (`mb-2 last:mb-0`,
+written out in the probe rather than read from the component).
+
+**The verdict gates read the banner, not an attribute.** `VERDICT: PASS` and `VERDICT: FAIL — B:n
+H:n M:n L:n` must each be one shared `Banner` (`.vv-banner`), toned `positive` or `danger`, showing
+the author's own word. Chips that survive while the word does not is the failure being looked for.
+The banner's `::before` mark must be ✓ or ✕, so the tone is never carried by colour alone. The
+counts are four shared `Chip`s held against a literal expectation: each shows its label and its
+number, and a zero is `neutral` and unfilled, so `M:0` never reads as a finding. A finding's ring and
+fill must really differ from a zero's, and the dark session requires every banner to repaint rather
+than keep its light fill. A verdict wrapped in bold, `**VERDICT: FAIL**`, does become a banner: the
+banner is itself the emphasis, so nothing is lost.
+
+**The declines are the half that decides whether the feature is safe.** Each is gated by name:
+- one `**Label:** value` pair — two is the floor;
+- a bold label mid-sentence;
+- a line that opens with a label and carries a second one, `**Root cause:** … **Fix:** …`.
+  `readFactPairs` alone accepts it; `labelsOpenLines` in `elements/paragraph.tsx` refuses it,
+  because a newline is what separates pairs;
+- pairs carrying a code span or a link, which must keep the span and the `href`;
+- a lowercase `verdict: pass`, a sentence that mentions a verdict, and a verdict with half its counts;
+- a verdict whose word is a link;
+- the reviewer's own `VERDICT: BLOCKING 0 · HIGH 0 · MED 0 · LOW 0` contract line.
+
+**Two more mounts reach what a default mount cannot.** A `streaming` mount of the same document must
+draw no paragraph shape at all. That proves the ladder replaced the `ShapeParagraph` alias rather
+than growing inside `PlainParagraph`, which the plain map shares. A `<MarkdownBody breaks>` mount —
+the form of every user-typed message — must still draw a fact grid when `remark-breaks` turns the
+newline between two pairs into a real `<br>`, and still draw a verdict as a banner. It is the lists
+probe's `breaks` mount spelled once more, for the reason given there.
+
+**On a 390 px phone, nothing may overlap.** The verdict word and all four chips must stay inside the
+banner, and no box may overlap another. "Inside the banner" alone passed a first layout that drew
+the chips straight over the word.
+
+```bash
+node .verify/probe-shapes-prose.mjs
+```
+
+49 gates — 34 in the light session, 15 in the dark — each printing a `[PASS]`/`[FAIL]` line. The run
+closes with the one `SHAPES PROSE:` line a caller reads with `tail -1`, and exits non-zero on any
+failure. Zero Claude turns, and nothing written on the server or the account. It takes five
+screenshots: `shots/probe-shapes-prose{,-verdicts}-{light,dark}.png` and
+`shots/probe-shapes-prose-narrow-light.png`. Like every other `probe-*.mjs`, it is run by hand.
+
+**`probe-shapes-fences.mjs` proves the fence shapes — stat tiles, the diff, long output, the
+mermaid diagram — and the fences that must NOT become them.** One document through
+`shapes-fixture.mjs` holds eleven fences. The non-mermaid shapes are compared against a
+spelled-out `EXPECTED_KINDS`, and the blocks left plain against `EXPECTED_PLAIN_LABELS`, so a
+shape that swallows a near miss reddens a gate by name. The near misses: a `stats` fence with
+one four-cell line, which must stay an ordinary block holding EVERY line, the parsed one
+included; a 10-line and a 25-line fence, drawn whole — 25 is the threshold, and only a fence
+PAST it is long; and a `widget-config` fence, which must mount no frame.
+
+**The long-output gates read the clamp, not an attribute.** A 60-line fence opens at 12 lines
+under a `linear-gradient` mask with a control reading `Show all 60 lines`; `Show all` draws all
+60 and drops the mask; and the block's copy button, clicked while clamped, must put all 60 lines
+on the clipboard. The diff draws every line verbatim and in order, each with the kind
+`splitDiffLine` gives it, and a blank context line keeps its row. Added and removed lines must be
+tinted, tinted differently, and repainted by a live theme flip.
+
+**The mermaid gates are the route's own proof.** A valid fence must draw an `svg`, a broken one
+must keep its source under the one muted "could not be drawn" line, and BOTH must wear
+`data-shape="diagram"` — a count that only reaches two when a mermaid fence travels through
+`CodeFence`, since a dispatcher-level shortcut straight to `MermaidDiagram` draws the svg with no
+frame around it.
+
+**Three more mounts reach what the default cannot.** A `streaming` mount must draw no shape at
+all: every fence, mermaid included, is today's highlighted block, and a 4-second wait gives a
+diagram render the time to land were one attempted. An export mount, under
+`TranscriptRenderContext` with `isExporting`, must draw the long fence whole and unfaded and no
+control of any kind — no expand, no fold, no copy. That export document holds no mermaid fence;
+an exported diagram is held by `probe-shapes-groups.mjs`'s export mount, which must carry the
+fence's source inside its `diagram` frame, and by the gallery's downloaded file, which must carry
+the source and leaves the frame optional. A remount
+must keep a released block released, and its neighbour clamped.
+
+```bash
+node .verify/probe-shapes-fences.mjs
+```
+
+33 gates — 30 in the light session, 3 in the dark — each printing a `[PASS]`/`[FAIL]` line. The
+run closes with the one `SHAPES FENCES:` line a caller reads with `tail -1`, and exits non-zero on
+any failure. It grants itself clipboard read and write. Zero Claude turns, and nothing written on
+the server or the account. It takes six screenshots,
+`shots/probe-shapes-fences{,-output,-diagram}-{light,dark}.png`: the top of the document, the long
+block, and the two diagrams. Like every other `probe-*.mjs`, it is run by hand.
+
+**`probe-shapes-groups.mjs` proves the two shapes that group sibling blocks — tabbed code and
+collapsible heading sections — and the runs that must NOT be grouped.** Both are built by
+`remarkShapeGroups` (`src/modules/chat/transcript/shapes/remarkShapeGroups.ts`), the one remark
+plugin the shapes need, since a component override sees one element and never its neighbours. Two
+documents go through `shapes-fixture.mjs`. Each is compared against a spelled-out expectation, so a
+wrong group or a wrong section fails by name.
+
+**The tab groups are gated on which fence shows, not on an attribute.** Two adjacent fences in
+different languages must become one `data-shape="tabbed-code"` block showing only its first fence,
+and a click on the second tab must show that fence and only it. A language may repeat among others
+(`ts`, `py`, `ts`); every repeated label is then numbered — `Ts 1`, `Py`, `Ts 2` — so no two tabs
+share an accessible name. Six near misses must stay separate blocks, each found by its source text:
+- two fences of one language (`js` and `js{1}` are one language);
+- a run with a widget in it, whose iframe must still mount;
+- two fences a paragraph apart;
+- two fences inside a list item;
+- a run holding a mermaid fence;
+- a fence beside a `diff` fence — a diff is a shape of its own, not a language.
+
+The chosen tab must survive its row remounting, and a tab group must fold like every shape frame.
+
+**The sections are gated on their boundaries.** Every root heading with a body opens a section that
+runs to the next heading of equal or lower depth, with deeper headings nested inside. The probe
+spells out all fourteen sections, each with its depth and every heading inside it. A heading with no
+body stays bare. A `---` ending two nested sections stays outside both, between the sections it
+separates. Folding `Detail` must hide its body and nothing else. Two sections both titled `Findings`
+must fold apart, because the fold key is the heading AND its body — this app's replies repeat such
+titles within one message.
+
+**The layout gate decides whether sections can ship at all.** Tailwind Typography spaces a reply
+with rules that read DOM position — `> :first-child`, `h2 + *`, `hr + *` — and a section wrapper
+moves every one of those positions. So the probe first dresses the fixture's body in the
+transcript's own `TRANSCRIPT_PROSE` classes, with `display: flow-root` so a first or last margin
+shows inside the box. It then mounts the same document twice: as a `streaming` body, which has no
+sections, and as a settled one. All 35 blocks of the sectioned reply must sit within half a pixel of
+their unsectioned top and bottom, the opening heading flush, and the reply's height unchanged.
+`SECTION_FLOW` in `ShapeSection.tsx` restates each typography rule at the position the wrapper moved
+it to, and this gate is what holds it. A folded section that ended in a bare heading must still
+leave more than 24 px before the next heading.
+
+**Two more mounts reach what the default cannot.** An export mount, under `TranscriptRenderContext`
+with `isExporting`, must draw every section open — including sections folded on screen earlier in
+the run — and every tab group's fences stacked, with no toggle and no tab strip. That export
+document swaps its widget fence for `widget-config`, because the mount carries no
+`LiveBusProvider`. It keeps its mermaid fence, which must come out as its source inside the
+`diagram` frame: `CodeFence` never mounts `MermaidDiagram` into an export, so the missing
+`ThemeProvider` is never reached. A `streaming` mount of the fences must group nothing: all 17
+fences render as separate blocks.
+
+```bash
+node .verify/probe-shapes-groups.mjs
+```
+
+32 gates — 23 in the light session, 9 in the dark — each printing a `[PASS]`/`[FAIL]` line. The
+run closes with the one `SHAPES GROUPS:` line a caller reads with `tail -1`, and exits non-zero on
+any failure. Zero Claude turns, and nothing written on the server or the account. It takes four
+screenshots, `shots/probe-shapes-groups-{tabs,sections}-{light,dark}.png`. Like every other
+`probe-*.mjs`, it is run by hand.
+
+**`probe-shapes-inline.mjs` proves the three inline marks — file chips, colour swatches and
+keycaps — and the places a chip must NOT go.** A chip is a `<button>` decided from text alone
+(`FileChip` in `src/modules/chat/transcript/shapes/InlineMarks.tsx`), so it cannot see what it sits
+in, and the refusals are gated as hard as the hits. One document goes through `shapes-fixture.mjs`
+in each theme:
+- **Where a chip lands.** A `path:line` in a sentence, a list item, a table cell and a whole inline
+  code span each chip with the author's path and line. A reference with no line carries no
+  `data-line` at all — never `0`, which is what an empty attribute reads back as through `Number()`.
+- **Where it never lands.** No chip in a fence, a heading, a table header, a link or a bold, each of
+  which still shows the reference as written. A BACKTICKED path inside a link, a section heading or
+  a sortable header stays today's code span, its class compared whole: those are controls already,
+  and `ChipsSuppressedContext` (`shapes/chipContext.ts`) is how they say so. A URL, a clock time, a
+  version, an npm scope and digits-slash-digits (`3/4.5:1`, `2026/09/10.12:30`) never read as paths.
+- **What must not move.** Every link the link override always opened in the Files tab still does — a
+  directory, a dotfile, an anchor, a range, an extensionless file, a query, a percent-encoded name —
+  and a bare word still opens a new tab. The bold and emphasis beside a chip survive, a sorted
+  table's chip rides its row, and React logs no key warning and no nested-control warning.
+- **The other two marks.** A hex colour paints its own colour beside the code text, and a key combo
+  draws one keycap per key. A near-miss colour (`#12345`, `color: #fff`), arithmetic (`a + b`), a
+  plain word and a URL stay today's inline code span.
+
+**The click chain runs through the app's own opener.** The probe mounts `MarkdownBody` inside a
+`PaletteOpsProvider` whose `openFileReference` records its arguments and forwards them to the app's
+registered op, found in the fiber tree as `probe-shapes-lineopen.mjs` finds it. The subject is a
+real file in the project the app landed on: at least 140 lines, and a path whose tail is unique in
+the tree, because the resolver matches by suffix. Each link must forward its line once, a bare chip
+no line and a line chip its line. A backticked path in a section heading must fold the section and
+open nothing. The Files tab must end on the target row, its text matched against the file on disk.
+
+**The streaming half is gated as it is, not as the plan wrote it.** The plan says the streaming half
+never runs the scan. The `Plain*` overrides carry the seam, so it does — the reasoning is in
+`shapes/elements/inlineText.tsx`. The probe asserts a streaming body draws every settled chip, plus
+the backticked header and heading paths that nothing suppresses there. It also holds the scan under
+a frame: under 4 ms over 42,000 characters of prose holding 400 references, and under 8 ms over a
+20,000-character slash-and-plus blob. Last, it pins the link's loose policy to what the deleted
+helper accepted, `:line` kept and `:0` dropped.
+
+```bash
+node .verify/probe-shapes-inline.mjs
+```
+
+38 gates — 24 in the light session, 14 in the dark — each printing a `[PASS]`/`[FAIL]` line. Both
+themes gate the chip's ink at 4.5:1 or better on its own fill, and the dark one must have repainted
+both. The run closes with the one `SHAPES INLINE:` line a caller reads with `tail -1`, and exits
+non-zero on any failure. Zero Claude turns; it signs in only to read the project's file tree, and
+writes nothing on the server. It takes three screenshots,
+`shots/probe-shapes-inline-{light,dark}.png` and `shots/probe-shapes-inline-files-light.png`, the
+Files tab at the target line. Like every other `probe-*.mjs`, it is run by hand.
+
+**`.verify/phase-32.mjs` is the gallery: the whole markdown-shapes feature proven in one reply, through the fixture and through the app's real transcript.**
+It is a `phase-<n>` script and not a `probe-shapes-*` one on purpose, and it is **not to be renamed
+back to a probe- name**: `all.mjs` runs every phase script and no probe, so this name is what keeps
+the finished feature inside the standing gate. Under a probe- name it would still pass when run, and
+it would never be run again. One document holds every kind the feature draws — nineteen, each led
+by its own sentence so no two lists merge and no two fences touch — and the script proves six
+things. Each is listed with what its red line means:
+
+1. **Every shape draws, once.** Mounted through `shapes-fixture.mjs`, each `data-shape` appears
+   exactly once and every block's own words are on screen, which is the positive control a count
+   cannot give. The same document as a `streaming` body must draw only the three inline marks. Red
+   names the kind by count — `stats×0`, `table×2` — a trigger that stopped firing, fired twice, or a
+   shape that started nesting a second marker. A red control means the counter cannot see absence,
+   and nothing else in the run can be trusted. The mermaid fence must also be a drawn diagram:
+   mermaid's own `svg[id^="mermaid-"]` carrying the node label, on a real box, with no source `<pre>`
+   in its frame. Neither the count nor the words can see this, because a broken mermaid import or a
+   failed parse falls back to the source, which keeps the frame and the label on screen. So red here
+   is that fallback, and the gate reads mermaid's `svg` rather than any `svg`, because the frame's
+   fold chevron is one too.
+2. **A theme flip repaints without a rebuild.** The fixture's own toggle flips the theme and back.
+   The callout banner's background and ink must move one way and return exactly, measured on a real
+   box, while all nineteen shape nodes stay the nodes marked before the flip. Red on a paint line is
+   a shape painted from a literal instead of a token. Red on the node line is a theme change
+   remounting the root, which drops every fold and every selection on the page.
+3. **A fold survives scrolling.** A table, the callout, the stats tiles and the heading section are
+   folded, and the host is scrolled until each one leaves view and comes back. Red is a fold held in
+   state that a scroll-driven re-render resets.
+4. **Streaming stays plain, and a retraction keeps the fold.** `feedStreaming` feeds a reply one
+   chunk at a time through the app's own `StreamingMarkdown`. A verdict settles and is folded. A list
+   starting after it retracts the split boundary, and the verdict must drop back to plain words. A
+   half-arrived task list, table and stats fence must draw as plain markdown. When the boundary
+   settles again the verdict must come back still folded, and no tick may show less text than had
+   arrived. Red on a half-arrived line is a shape reading unfinished markdown: the one streaming
+   ternary in `Markdown.tsx` is broken. Red on the re-settle line is fold memory keyed on something
+   that changes across a remount. A retraction lasts longer than one tick: the split holds a settled
+   block back for as long as the block after it is still streaming, so a verdict followed by a list
+   reads as plain words for most of the reply. A `[NOTE]` reports that span on every run. It is not a
+   gate. Whether the span must shrink is a question for the renderer's design, not for this probe.
+5. **The real transcript draws it, and a fold survives `LazyMessageRow`.** The gallery is injected as
+   one `kind: 'text'` assistant frame into the smallest idle conversation on disk, behind
+   `phase-15.mjs`'s websocket seal, which is proven two-sided with a canary before anything is
+   injected. Every kind must draw there too, the diagram live. A long filler row goes in after it,
+   four blocks are folded, and the pane is scrolled until the gallery's wrapper holds nothing but
+   its placeholder height — the row genuinely unmounted — and back. Red on the unmount line means
+   the scroll never left the 1200 px band, so the fold line proves nothing. Red on the remount line
+   is a fold held in component state that the unmount destroyed.
+6. **The export is whole.** The app's own Export → Web page is pressed. The downloaded FILE is parsed
+   with `DOMParser`, never read off the screen, and its gallery message must hold every kind once,
+   all expanded — the four folded on screen and the clamped log included. It must also hold the lines
+   and the tab the screen was hiding, and no toggle, show-all control or tab strip anywhere. The
+   diagram, the plan's one export exception, must keep its frame and hold its source as a code
+   block. Red on the download line carries the console line `ChatExportMenu` logged, and every file
+   gate below it reddens too, because there is no file to read. Red below it with a file in hand is
+   a shape drawing a control or a fold into `renderToStaticMarkup`. Red on the diagram line alone is
+   the export frame dropped, or something other than the source drawn inside it. "Nothing folds" is
+   not "no buttons": a fence's copy button and a file chip's own `<button>` still reach the file.
+   A `[NOTE]` counts them by the shape that owns them, and no gate reads that count.
+
+**Why an exported diagram is its source.** `CodeFence` never mounts `MermaidDiagram` into an
+export. That component reads `useTheme()`, and the export mounts no `ThemeProvider`, so mounting it
+there throws and nothing downloads. The fence keeps the same frame with the source inside it, so the
+export counts the same kinds the screen does (see
+[rendered shapes](architecture/08-rendered-shapes.md) §"Collapse and export").
+
+It spends no Claude turn. The seal swallows `chat.send`, `chat.edit-send`, `chat.abort` and
+`chat.subscribe`, and the run ends by proving the seal still held and that the page never tried to
+send. The injected rows live only in the page's memory. The conversation's transcript file is hashed
+before the run and after it, and one moved byte fails the run. A React warning whose stack runs
+through the markdown renderer fails it too. One raised by another transcript component is only
+noted, with its first component frame printed beside it, so a reader can see the filter had a stack
+to read. 56 gates — 39 in the light session, 16 in the dark, and the disk check after both — and the
+count is the same when the download fails, because the file gates redden instead of dropping out. It
+closes with the one `SHAPES GALLERY:` line a caller reads with `tail -1`,
+and exits non-zero on any failure. A caller that keeps only that line learns that a gate failed but
+not which one, so every run also writes all of its lines to `.verify/artifacts/shapes-gallery-last-run.log`.
+Read that file first when the plan runner reports `a gate FAILED`. A throw during sign-in or
+conversation choice is recorded as a failed gate, so even then the run ends on that line. Run it
+alone with `node` on its path, or as part of
+`node .verify/all.mjs`. It takes five screenshots in `.verify/shots/`, named after the script: the
+fixture gallery and the transcript row in each theme, and the folded row in light.
+
 ## Standing colour baselines
 
 Measured in Phase 1 on the running app. Ratchets, like the warning count: improve, never regress.
@@ -829,6 +1366,24 @@ case that dies halfway therefore cannot print a passing line.
 | **D** | The stop switch: `systemctl stop cloudcli-sessions-tmux` takes every CLI with it, and the client is told so with an error frame rather than left hanging. |
 | **E** | The boot sweep collects a host whose tmux session is gone — planted as a dead meta file, counted as swept, no files left behind. |
 | **F** | The replay cursor's safe direction: re-subscribing with a cursor the run itself issued replays nothing twice. |
+
+One CLI per conversation has its own probe, driven the same way and printing the same shape:
+
+```bash
+node .verify/chat-process-reuse.mjs --evidence <dir> [--idle-ms 20000]
+```
+
+Its `CASE reuse` line measures, from the tmux server, the host meta and the journal: `same_pid`
+(two messages, one CLI pid); `readopt_joins` (a `touch` under `server/` between turns 2 and 3 hands
+the API over, the host is re-adopted, and turn 3 joins it — same pid, no `Replacing` line);
+`bg_reports` (a 45 s task started in turn 3 still lands its journal line and its
+`task_notification` after turn 4); `idle_deferred` (the shortened window — `options.idleCloseMs`
+on the turn — lands mid-task and the closer's own "busy, asking again" line appears, so the close
+comes a re-check later, after the task ended); `retire_on_cwd` (a turn with another working
+directory logs `Replacing the process` and answers from a new pid); and `max_hosts_at_rest` (never
+above 1, sampled every 250 ms; the retirement overlap may reach 2). Six haiku turns; it creates and
+deletes its own session. **It hands the dev API over once, by design** — every live chat is
+re-adopted while it runs and every open socket drops for a few seconds — so it, too, is run solo.
 
 Four things to know before running one:
 
@@ -936,6 +1491,7 @@ person editing `server/` is in [hosting.md](hosting.md) §"Rules that bite".
 | **A hand-written module specifier forks the module** | Vite stamps `?t=<timestamp>` on every module it has re-transformed since the server started, so an `import('/src/…')` written without that query resolves to a *second* instance — two React contexts, and a provider stops seeing its own consumer. `phase-3.mjs` reads the specifier back out of the served consumer file instead of typing one. Editing a context file with the server already up is what makes this bite. |
 | **Most registered projects answer 413, and a dead one answers 404** | `GET /api/projects` lists seven directories on this host, and the recursive tree route (`…/files`) refuses `/`, `/home/lyphe`, `/home/lyphe/.claude` and `/tmp` with a 413 at its 10,000-entry cap, while `mission-control` no longer exists on disk and 404s. Neither is a defect, and neither is a reason to re-register anything. The `…/list` route answers 200 for all four wide ones — it reads a single directory rather than a tree, which is what makes those projects browsable at all. |
 | **A colour read mid-transition is a colour between two tokens** | `.vv-button` transitions `background-color`, `border-color` and `color` over 0.2s and `.vv-tabs__tab` over 0.35s, so a `getComputedStyle` taken right after a click or hover reports the blend, not either token. Read a freshly inserted element, or wait the transition out. |
+| **A shot taken right after an unfold catches the element at half its height** | The sibling of the row above, for pixels rather than colour: `CollapsibleContent` re-opens over a 200 ms `grid-template-rows` transition (`src/shared/ui/Collapsible.tsx`), and the two-`requestAnimationFrame` settle a probe uses to wait for React is not 200 ms. `probe-shapes-tables.mjs` and `probe-shapes-lists.mjs` wait 300 ms before they shoot a shape they have just re-opened. Nothing in a gate list ever reddens for this — the DOM is complete and correct the whole time — so the only thing it damages is the picture a person judges the work by. React settled is not CSS settled. |
 | **A ratio read with the pointer on the row is the hover's ratio** | `.vv-button--ghost:hover:not(:disabled)` paints `--accent-soft`, and at `(0,3,0)` it out-specifies a call site's own `hover:bg-…` utility at `(0,2,0)` — nothing here is in a cascade layer, so specificity alone decides. A hovered project row is therefore standing on Verve's wash, not on the ground its own classes name, and `page.click()` leaves the cursor exactly where it clicked. Park it off the surface before measuring, or measure a row nothing is over. |
 | **A success-only sign-in never reaches the error branch** | `phase-5.mjs` types a wrong password first, asserts the amber `Banner`, then signs in for real — because the login route answers `{error:{code,message}}` and a screen that hands that object to JSX takes the tree down rather than showing a message. No correct password visits that branch. Verify any new screen that surfaces an API error the same way: drive the rejection. |
 | **`phase-22.mjs` expects two console errors, and neither is a defect in it** | The CSP refusal is the PROOF of gate 5, not noise — Chromium logs the one blocked call as two differently worded lines, so the probe filters on the `widget-probe=22` marker in the URL rather than on either phrasing. The second is the app's own: any sandboxed frame on this page raises one `SecurityError: Failed to read the 'serviceWorker' property from 'Navigator'`, because `'serviceWorker' in navigator` is true in a sandboxed context while *reading* the property throws (`index.html`, `src/main.tsx`). Measured, not assumed: it reproduces with an empty `srcdoc` carrying none of the widget code, does not reproduce with `about:blank` as the parent, and is unaffected by blocking `/sw.js`. The widget fence is simply the first thing in the app to create a sandboxed frame, so it is what exposes it. Both are filtered by substring; every other error still reddens the gate. |
@@ -944,7 +1500,7 @@ person editing `server/` is in [hosting.md](hosting.md) §"Rules that bite".
 | **`phase-30.mjs` measures the OPERATOR's transcript, not a gallery** | It signs in and opens a real conversation by its app session id (the host id in `~/.cloudcli/sessions/*.json` minus its `-xxxxxxxx` suffix — a deep link with the suffixed id lands on the project picker), then walks UP through the lazy band, clicking "Load" at the top for older history, and measures each widget or DocSpace frame the moment it is met — twice: as met, possibly still off-screen, and again after scrolling it into view. Measuring at the end would find nothing: rows unmount as the walk moves on. The two readings are the point. A frame whose document fits only after it is seen is reporting late (what the DocSpace embed did before `reportHeightNow` ran on every commit: 673 and 564 px of document in 101 px frames), one that never fits is not reporting at all, and one that fits both times is right. It excuses the app's serviceWorker guard by the same substring the phases above use, and nothing else. |
 | **`phase-31.mjs` measures the question panel's "Other" field, not the panel** | It mounts `QuestionAnswerContent` from the running server inside a real `PermissionContext.Provider` with a pending request (the phase-6 idiom), opens "Other", types a long answer, and reads geometry: the field must sit OUTSIDE the options scroller and wholly above the Submit button — `elementFromPoint` at its bottom edge must return the field, not whatever covers it — and its computed right padding must be at least the span from its right edge to the badge's left, with the text actually scrolled. Then six options, to prove the list still scrolls within its twelve-rem cap. Before the fix the field lived inside the scroller and, with three or more options, was clipped against the footer while the badge sat over the end of the text — the operator could not see what they were typing. |
 | **An ArchPulse restart mid-probe reads as an error card, not as a bug** | `DocSpaceFrame` gives the embed `DOCSPACE_READY_TIMEOUT_MS` (8 s) to say `ready` and then replaces the iframe with `DocSpace did not answer at …`. Another session on this box restarting `archpulse.service` inside that window therefore turns phase 29's frame gates red for a reason that is not this app's — and the full reload it forces on any open DocSpace frame also costs that frame its theme posts until the chat re-renders. Re-run the probe once; if it recurs, the restart is not incidental and belongs in the report with the journal line. |
-| **A gallery over the app must carry the app's provider stack** | The probes that mount `MarkdownBody` into a second React root — `phase-22`, `phase-24`, `phase-28`, `phase-29` — carry `ThemeProvider` and `LiveBusProvider` because `WidgetFrameLive` reaches `useWidgetBridge` → `useLiveBus`, which THROWS outside a provider and takes the whole synthetic root down with it. The only symptom is a `waitForSelector` timeout on a gallery that rendered zero children, which reads as a broken selector rather than as a missing provider. Every specifier is read back out of served source (the `?t=` rule) for the other half of the same rule: two instances of a context module is two contexts, and a provider mounted from a hand-written specifier is invisible to the hook that needs it. The app itself is never affected — it mounts both providers once, at `App.tsx`. `phase-22.mjs` sat broken on exactly this from commit `693c95d` (which introduced the live-bus module and made `useWidgetBridge` a consumer of it) until phase 29's verify block re-ran it and the provider was added back; that repair changed nothing but the provider stack, and no gate, threshold or filter in the file moved with it. |
+| **A gallery over the app must carry the app's provider stack** | The probes that mount `MarkdownBody` into a second React root — `phase-22`, `phase-24`, `phase-28`, `phase-29`, and every caller of the shared `.verify/lib/shapes-fixture.mjs` — carry `ThemeProvider` and `LiveBusProvider` because `WidgetFrameLive` reaches `useWidgetBridge` → `useLiveBus`, which THROWS outside a provider and takes the whole synthetic root down with it. The only symptom is a `waitForSelector` timeout on a gallery that rendered zero children, which reads as a broken selector rather than as a missing provider. Every specifier is read back out of served source (the `?t=` rule) for the other half of the same rule: two instances of a context module is two contexts, and a provider mounted from a hand-written specifier is invisible to the hook that needs it. The app itself is never affected — it mounts both providers once, at `App.tsx`. `phase-22.mjs` sat broken on exactly this from commit `693c95d` (which introduced the live-bus module and made `useWidgetBridge` a consumer of it) until phase 29's verify block re-ran it and the provider was added back; that repair changed nothing but the provider stack, and no gate, threshold or filter in the file moved with it. `shapes-fixture.mjs` is that rule written down once, for every `probe-shapes-*` caller — including the ones whose documents hold no widget fence, since a throw in one child takes the whole root down: the host survives, the body div never exists, and its `innerHTML` is `''`, so a single widget fence would blank every other block in the document rather than fail on its own. |
 | **A fixture run flashes in the terminal status bar** | `phase-23.mjs` and `phase-26.mjs` both write real run directories under the real state root, so for the few seconds one exists `scripts/runner_statusline.py` lists `fixture-live-widgets-<ms>` beside the operator's own runs — in the bar, and in `plan-runner status`. Expected, not a stray run: each probe removes what it wrote in a `finally`, `phase-23.mjs`'s last gate asserts the state root holds no `fixture-live-widgets-*` entry, and `phase-26.mjs` reddens its own run if a fixture will not remove. One left behind means a probe was killed mid-flight; delete it by hand. |
 | **`phase-23.mjs` notes that the socket was reopened** | The API restarted mid-probe — a save under `server/` under `tsx watch`, or the dev supervisor handing over — and the probe's chat socket healed through it rather than failing the frame gate on a closed one. A `[NOTE]`, never a failure: the gates after it are worth as much as on a run that carried no such line. The reopen contract is in the phase 23 entry of §"The browser harness". |
 | **The surface probe reads a process that only lives for one turn** | `phase-21.mjs` polls `/proc/<pid>/environ` of the SDK child spawned for its one Claude turn, and that child exists only while the turn is in flight — it is gone by the time a reply is on screen. The poll has to start before the prompt is sent and keep running through it; a reading taken after the reply arrives finds no such pid and proves nothing. |

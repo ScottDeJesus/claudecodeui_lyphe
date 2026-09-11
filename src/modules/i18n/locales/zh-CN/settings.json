@@ -51,6 +51,7 @@
     },
     "toolDisplay": {
       "title": "工具显示",
+      "showWork": "显示工作过程",
       "showThinking": "显示思考过程",
       "showRawParameters": "显示原始参数"
     },

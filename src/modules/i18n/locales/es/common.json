@@ -267,5 +267,8 @@
       "updateAvailable": "Actualización disponible",
       "closeSidebar": "Cerrar barra lateral"
     }
+  },
+  "shapes": {
+    "diagramFailed": "No se pudo dibujar este diagrama; se muestra su código fuente."
   }
 }

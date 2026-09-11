@@ -275,5 +275,46 @@
     "failed": "未发送 — {{reason}}",
     "cancel": "取消定时消息",
     "dismiss": "关闭失败提示"
+  },
+  "shapes": {
+    "collapse": "收起",
+    "expand": "展开",
+    "copyCsv": "复制为 CSV",
+    "copied": "已复制",
+    "sortBy": "按 {{column}} 排序",
+    "sortByColumnNumber": "按第 {{number}} 列排序",
+    "tasksDone": "{{total}} 项中已完成 {{done}} 项",
+    "checksPassed": "{{count}} 项通过",
+    "checksFailed": "{{count}} 项失败",
+    "blocking": "阻断",
+    "high": "高",
+    "medium": "中",
+    "low": "低",
+    "showAllLines": "显示全部 {{count}} 行",
+    "showLess": "收起部分",
+    "openFile": "打开 {{path}}",
+    "titles": {
+      "table": "表格",
+      "options": "选项",
+      "beforeAfter": "前后对比",
+      "callout": "提示框",
+      "tasks": "任务",
+      "checks": "检查",
+      "timeline": "时间线",
+      "facts": "详情",
+      "verdict": "结论",
+      "stats": "统计",
+      "diff": "差异",
+      "output": "输出",
+      "diagram": "图表",
+      "code": "代码"
+    },
+    "alert": {
+      "note": "备注",
+      "tip": "提示",
+      "important": "重要",
+      "warning": "警告",
+      "caution": "注意"
+    }
   }
 }

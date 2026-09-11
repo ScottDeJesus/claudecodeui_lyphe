@@ -217,7 +217,7 @@ re-derive during streaming rebuilds one row, not the whole list.
 
 ### What triggers a fetch
 
-**RULE: nine triggers, one gate. Every one of them hands the store a `canRequest` predicate,
+**RULE: ten triggers, one gate. Every one of them hands the store a `canRequest` predicate,
 and a hidden tab fails it — except export, which is allowed to finish.**
 
 | Trigger | Call | Notes |
@@ -227,7 +227,8 @@ and a hidden tab fails it — except export, which is allowed to finish.**
 | `complete` frame for the viewed session | `requestLatestMessages` | In `useChatRealtimeHandlers`. |
 | `websocket_reconnected` | `requestLatestMessages`, awaited, then `chat.subscribe` | `ChatInterface.tsx` `handleWebSocketReconnect`. |
 | `externalMessageUpdate` bumped by the sidebar | `requestLatestMessages` | Skipped while the session is processing. |
-| Scroll within 100 px of the top | `fetchMore` | Locked by `topLoadLockRef` until `scrollTop > 20`. |
+| Scroll within one screen (`clientHeight`) of the top | `fetchMore` | No lock: loads run one at a time behind `isLoadingMoreRef`, and the run ends once a screen of history sits above the view or a page brings nothing back. |
+| The transcript does not fill the viewport | `fetchMore` via `fillViewportWithHistory` | `ChatMessagesPane` asks after every commit. While `scrollHeight` is within `VIEWPORT_FILL_MARGIN_PX = 200` of the viewport, it widens the render window if the slot holds older rows, else fetches the next older page. One attempt per `session:length:window`, so a page that brings nothing back is not retried. Exists because a 20-row page with "Show work" (or thinking) off can leave one reply and nothing to scroll. |
 | "Load all" clicked | `fetchFromServer(limit: null)` | Also sets `visibleMessageCount = Infinity`. |
 | Search jump, unless the transcript is already fully loaded | `fetchFromServer(limit: null)` | Fetches everything; widens the window only as far as the hit needs. |
 | Export | `loadFullTranscript` → `fetchFromServer(limit: null)` | Does not touch the render window. |
@@ -274,15 +275,14 @@ flowchart TD
   C --> D["sliceTailPage returns the newest 20 rows and hasMore"]
   D --> E["slot.serverMessages set, offset set to rows held"]
   E --> F["merged recomputed, transcript renders and scrolls to bottom"]
-  F --> G{"scrollTop under 100px and the top-load lock is open"}
+  F --> G{"scrollTop within one screen of the top"}
   G -->|"no"| Z["nothing is fetched"]
   G -->|"yes"| H{"slot.hasMore"}
   H -->|"false"| K["allMessagesLoaded, pager stops"]
   H -->|"true"| I["fetchMore at offset equals rows already held"]
   I --> J["mergeOlderServerPage prepends, offset grows, window grows by 20"]
-  J --> L["layout effect re-pins the anchor row, no scroll to bottom"]
-  L --> M["top-load lock closes until scrollTop passes 20"]
-  M --> G
+  J --> L["layout effect re-pins the reader's latest anchor row, no scroll to bottom"]
+  L --> G
 ```
 
 ### Prepending an older page
@@ -566,8 +566,10 @@ of ~1 GB with seven thousand.
   reach back to or past the cached tail's newest timestamp (a rewritten transcript would
   otherwise be walked to its start). The test *"tool-result totals walk bounded bridge chunks
   until a contiguous anchor"* is that whole sequence.
-- **The top-load lock releases at `scrollTop > 20`, not on a full scroll cycle.** Requiring a
-  down-and-up cycle made repeated upward pagination lock up (`fadbcc82`).
+- **Upward paging is bounded by distance, not by a latch.** A latch that waits for the reader
+  to move away from the top strands them there whenever a page adds little on screen ("Show
+  work" off). Paging runs only within a screen of the top, and every prepend moves the reader
+  down by what it added.
 - **Hidden tabs never fetch.** `canRequest` returns false, the coordinator marks the session
   dirty, and activation flushes exactly one request (`6e8d4087`). An initial page load
   supersedes a pending refresh for an unhydrated slot via `discardPending`.
@@ -577,6 +579,19 @@ of ~1 GB with seven thousand.
 - **The store keys sessions directly, with no alias table.** The app session id is allocated by
   `POST /api/providers/sessions` before the first send — see
   [conversation handoff](./03-conversation-handoff.md) — so nothing downstream re-keys a slot.
+- **A fold the reader set by hand cannot live inside the row.** The row's whole subtree
+  unmounts once it leaves the 1200 px band, so `useState` holding an open-or-closed flag is
+  forgotten the moment the reader scrolls past it and comes back — and the row returns shorter
+  than the placeholder that stood in for it. Anything the reader toggled therefore lives in a
+  module-level store outside the component, and there are three: `CollapsibleUserText`'s
+  `openedTurns` Set, keyed by the turn's anchor id; `transcript/shapes/collapseState.ts`'s
+  Map, keyed by a hash of the block's own text rather than by a message id — one reply carries
+  three different ids before it settles, synthetic then finalised then persisted ([the realtime
+  stream](./02-realtime-stream.md) §"Text streaming"), while the text the reader folded does not
+  change at all; and `transcript/shapes/TabbedCode.tsx`'s `chosenTabs` Map, which remembers the
+  tab a code group last showed under the same content-addressed key as its fold.
+  All three are written only by a click, so they grow with human effort rather than with
+  transcript length and none needs eviction.
 - **The observer's `root` is captured on the first `observe`, not on every render.**
   `useLazyRowObserver` builds the `IntersectionObserver` lazily inside `observe` and keeps it
   until the hook unmounts, and it returns an identity-stable `{ observe }` object. Without
@@ -597,7 +612,7 @@ of ~1 GB with seven thousand.
 | `computeMerged` / `dedupeAdjacentAssistantEchoes` | `sessionStoreTruncate.test.tsx` and `sessionMessageReconciliation.test.ts`; the edit/replacement ordering is asserted there. |
 | Any mutator | It must assign a **new** `serverMessages`/`realtimeMessages` array rather than mutating one in place, or `recomputeMergedIfNeeded` sees unchanged references and skips the recompute. |
 | `normalizedToChatMessages` | The `WeakMap` projection cache invalidation keys, and `useChatMessages.test.ts` which pins object reuse across prepends and streaming. |
-| `LazyMessageRow` / `useLazyRowObserver` | Search jumps, which address rows by `data-message-timestamp` on the permanent wrapper, and scroll anchor restore, which selects `.chat-message` inside the *mounted* content ([scrolling](./05-scrolling.md)). |
+| `LazyMessageRow` / `useLazyRowObserver` | Search jumps, which address rows by `data-message-timestamp` on the permanent wrapper; scroll anchor restore, which selects `.chat-message` inside the *mounted* content ([scrolling](./05-scrolling.md)); and the three module-level stores that exist only because a row's subtree unmounts — `CollapsibleUserText`, `transcript/shapes/collapseState.ts` and `TabbedCode`'s `chosenTabs`. |
 | `INITIAL_MOUNTED_TAIL_ROWS` | The initial scroll-to-bottom, which relies on the newest rows having real measured heights. |
 | The history cache's key or validity check | `sessions.service.test.ts` and the Cursor/OpenCode bypass — their history does not live in `jsonl_path`. |
 | `prepareTranscriptMessages` | The live-vs-history divergence documented in [the realtime stream](./02-realtime-stream.md) and the tool grouping in [the tool view](./06-tool-view.md). |

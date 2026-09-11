@@ -1,7 +1,7 @@
 import React, { memo, useMemo, useCallback } from 'react';
 
 import type { DiffLine, Project,ToolStatus } from '@/shared/types';
-import { formatToolDisplayName, getToolConfig } from '@/modules/chat/tools/configs/toolConfigs';
+import { formatToolDisplayName, getToolConfig, shouldHideToolResult } from '@/modules/chat/tools/configs/toolConfigs';
 import { OneLineDisplay } from '@/modules/chat/tools/OneLineDisplay';
 import { BashCommandDisplay } from '@/modules/chat/tools/BashCommandDisplay';
 import { CollapsibleDisplay } from '@/modules/chat/tools/CollapsibleDisplay';
@@ -15,9 +15,10 @@ import { QuestionAnswerContent } from '@/modules/chat/tools/ContentRenderers/Que
 import { PlanDisplay } from '@/modules/chat/tools/PlanDisplay';
 import { ToolStatusBadge } from '@/modules/chat/tools/ToolStatusBadge';
 import { DiffStatsBadge } from '@/modules/chat/tools/DiffStatsBadge';
-import { ToolOutcomeBadge, ToolOutcomeGlyph } from '@/modules/chat/tools/ToolOutcomeBadge';
+import { ToolOutcomeBadge } from '@/modules/chat/tools/ToolOutcomeBadge';
 import { deriveToolOutcome, type ToolPermissionState } from '@/modules/chat/tools/toolOutcome';
-import { Card } from '@/shared/ui';
+import { TOOL_ROW_FRAME } from '@/modules/chat/tools/toolRow';
+import { ToolRowIcon } from '@/modules/chat/tools/ToolRowIcon';
 import { parseToolPayload, summarizeDiff } from '@/modules/chat/utils/messageTransforms';
 
 type ToolRendererProps = {
@@ -118,7 +119,6 @@ export const ToolRenderer: React.FC<ToolRendererProps> = memo(({
         permissionState,
         hasResult: Boolean(toolResult),
         isError: Boolean(toolResult?.isError),
-        isShellCommand: toolName === 'Bash',
       })
     : null;
 
@@ -152,6 +152,7 @@ export const ToolRenderer: React.FC<ToolRendererProps> = memo(({
         : '';
     return (
       <BashCommandDisplay
+        label={displayName}
         command={command}
         description={description}
         output={output}
@@ -168,6 +169,10 @@ export const ToolRenderer: React.FC<ToolRendererProps> = memo(({
   if (displayConfig.type === 'one-line') {
     const value = displayConfig.getValue?.(parsedData) || '';
     const secondary = displayConfig.getSecondary?.(parsedData);
+    // A result the transcript draws nowhere else (a Read's file text) rides behind the caret.
+    const detail = mode === 'input' && shouldHideToolResult(toolName, toolResult)
+      ? String(toolResult?.content ?? '')
+      : undefined;
 
     return (
       <OneLineDisplay
@@ -180,8 +185,8 @@ export const ToolRenderer: React.FC<ToolRendererProps> = memo(({
         secondary={secondary}
         action={displayConfig.action}
         onAction={handleAction}
-        style={displayConfig.style}
         wrapText={displayConfig.wrapText}
+        detail={detail}
         colorScheme={displayConfig.colorScheme}
         resultId={mode === 'input' ? `tool-result-${toolId}` : undefined}
         status={outcome === 'waiting' || toolStatus === 'completed' ? undefined : toolStatus}
@@ -331,19 +336,14 @@ export const ToolRenderer: React.FC<ToolRendererProps> = memo(({
     const statusBadge = toolStatus && toolStatus !== 'completed' && !outcome
       ? <ToolStatusBadge status={toolStatus} />
       : null;
+    // The counts read with the tool's name (`Edit +12 -3 / file`). The header is
+    // sticky while the section is open, so they stay visible over a long diff.
     const statsBadge = diffStats ? <DiffStatsBadge stats={diffStats} /> : null;
-    // The header is sticky while the section is open, so the counts stay
-    // visible over a long diff rather than scrolling away with it.
-    //
-    // The outcome glyph rides here rather than at the far left because the left
-    // of this header is the expander, and moving that would cost the row its
-    // one affordance.
-    const badgeElement = statusBadge || statsBadge || outcome
+    // The outcome is always the row's rightmost mark.
+    const badgeElement = statusBadge || outcome
       ? (
         <span className="inline-flex items-center gap-1.5">
-          {statsBadge}
           {statusBadge}
-          {outcome && <ToolOutcomeGlyph outcome={outcome} />}
           {outcome && <ToolOutcomeBadge outcome={outcome} />}
         </span>
       )
@@ -360,14 +360,17 @@ export const ToolRenderer: React.FC<ToolRendererProps> = memo(({
         showRawParameters={mode === 'input' && showRawParameters}
         rawContent={rawToolInput}
         toolCategory={getToolCategory(toolName)}
+        framed={mode === 'input'}
+        icon={mode === 'input' ? <ToolRowIcon icon={displayConfig.icon} className={displayConfig.colorScheme?.icon} /> : undefined}
+        meta={statsBadge}
       >
         {contentComponent}
       </CollapsibleDisplay>
     );
 
-    // The call gets the card; its result block stays a plain continuation of it,
-    // so one tool reads as one object rather than two stacked panels.
-    return mode === 'input' ? <Card className="px-3 py-1.5">{section}</Card> : section;
+    // The call gets the shared row frame; its result block stays a plain continuation
+    // of it, so one tool reads as one object rather than two stacked panels.
+    return mode === 'input' ? <div className={TOOL_ROW_FRAME}>{section}</div> : section;
   }
 
   return null;

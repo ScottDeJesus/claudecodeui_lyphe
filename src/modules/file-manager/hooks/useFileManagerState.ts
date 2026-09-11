@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { api } from '@/shared/api';
 import type { DirectoryListing, FilePreview } from '@/shared/types';
@@ -99,18 +99,37 @@ export function useFileManagerState(projectId: string, projectPath: string) {
   // was named against, and carrying it into another project would scroll to a line nobody asked for.
   const askedLine = selection.projectId === projectId ? selection.line : null;
   const targetNonce = selection.projectId === projectId ? selection.nonce : 0;
-  // The ONE ask whose line turned out to be past the end of its file. A chat reference is parsed
-  // out of model prose, so a stale or invented line is ordinary, and a window past the end answers
-  // honestly with nothing — leaving a blank pane for a file that is right there. Recording the ask
-  // falls the window back to the top; keying it by ASK keeps a later real line in the same file.
-  const [pastEndAsk, setPastEndAsk] = useState<string | null>(null);
+  // The ONE ask whose line turned out to be past the end of its file, and the line it SETTLED on.
+  // A chat reference is parsed out of model prose, so a stale or invented line is ordinary rather
+  // than exotic. Where the file's length is known the ask is clamped to its LAST line — a stale
+  // reference points near where the line used to be, so the end of the file is the honest place to
+  // land, and the footer names both numbers. `settledLine` is null only where there is no last line
+  // to name: a file holding no lines at all, or a start so far past what the file's BYTES could
+  // possibly hold that the server answered it without reading. A file's SIZE never puts it here —
+  // an overshooting window walks to the end whatever the file weighs, and comes back with a real
+  // count. Keyed by ASK, so a later real line in the same file is not held to this one's verdict.
+  const [pastEnd, setPastEnd] = useState<{ ask: string; settledLine: number | null } | null>(null);
   const askSubject = `${projectId} ${selectedPath ?? ''} ${targetNonce}`;
-  const lineMissed = pastEndAsk === askSubject;
-  const targetLine = lineMissed ? null : askedLine;
-  const missedLine = lineMissed ? askedLine : null;
+  const overshotAsk = pastEnd?.ask === askSubject ? pastEnd : null;
+  // What the pane marks and scrolls to; `missedLine` is what the READER named, which is the number
+  // the footer has to say back — never the window start derived from it.
+  const targetLine = overshotAsk ? overshotAsk.settledLine : askedLine;
+  const missedLine = overshotAsk ? askedLine : null;
   // Where the window opens. Floored at 1 so a reference to line 3 reads from the top rather than
   // asking the server for line -37 and leaning on its clamp to mean the same thing.
   const previewStart = targetLine === null ? 1 : Math.max(1, targetLine - PREVIEW_CONTEXT_LINES);
+  // Which ask a settled read should record its past-the-end verdict against. Held in a REF, not
+  // read as a dependency: the ask counter moves on every repeat open, and a fetch keyed on it
+  // re-reads a window already on screen — the second harm the plan names beside the blanked pane.
+  // A ref is sound here because nothing decides WHAT to fetch from it; it only labels the verdict,
+  // and by the time a read settles the current ask is the one that verdict belongs to.
+  // Written in an effect and never during render: a ref touched while rendering is a value the
+  // renderer cannot see change, which is what `react(refs)` refuses. Declared ABOVE the two read
+  // effects so it is already current when either of them runs, and long before either settles.
+  const askRef = useRef({ subject: askSubject, line: askedLine });
+  useEffect(() => {
+    askRef.current = { subject: askSubject, line: askedLine };
+  }, [askSubject, askedLine]);
   // Bumped by `refresh()`. A counter rather than a flag because two refreshes in a row must both
   // re-run the reads, and a boolean put back to the same value would not.
   const [reloadNonce, setReloadNonce] = useState(0);
@@ -195,11 +214,34 @@ export function useFileManagerState(projectId: string, projectPath: string) {
           return;
         }
         setPreviewRead({ key: previewKey, subject: previewSubject, body, error });
-        // An empty window that did not start at the top: the line asked for is past the end of the
-        // file. Fall back to the top so the file is READ rather than reported as nothing. The
-        // `startLine > 1` guard is what terminates it — the retry opens at 1 and cannot re-trigger.
-        if (body?.kind === 'text' && body.lines.length === 0 && body.startLine > 1) {
-          setPastEndAsk(askSubject);
+        // Did the line asked for exist? Read off `totalLines`, which is ON the answer, and NOT off
+        // the shape of the window: an empty window only ever arrives for a line more than a lead-in
+        // past the end, so a reference 1-40 lines past it came back FULL, marked nothing, scrolled
+        // nowhere, and left the footer naming `line - 40` — a number the reader never typed. That
+        // band is the ordinary stale reference, not the exotic one.
+        //
+        // A window merely SHORTER than the target is deliberately not read as past-the-end: the
+        // server also cuts a window on its character budget, so a file of very long lines can stop
+        // short of a line that genuinely exists, and calling that "past the end of this file"
+        // would tell the reader something false. `totalLines` cannot be confused that way.
+        const { subject: ask, line: asked } = askRef.current;
+        if (body?.kind === 'text' && asked !== null) {
+          const overshotCountedFile = body.totalLines !== null && asked > body.totalLines;
+          // A read that stopped early answers `null` and has no length to compare against, leaving
+          // only an empty window to go on. That one falls back to the TOP, and the `startLine > 1`
+          // guard is what terminates the retry — reopened at 1, it cannot trigger itself again.
+          const emptyWindowPastEnd = body.totalLines === null && body.lines.length === 0 && body.startLine > 1;
+          if (overshotCountedFile || emptyWindowPastEnd) {
+            // A zero-line file has no last line to land on, so it settles nowhere and reads as one.
+            const settledLine = overshotCountedFile && body.totalLines ? body.totalLines : null;
+            // The clamped re-read reports the same overshoot, so the SAME verdict must return the
+            // same object: a fresh one each time would re-render forever over an unchanged fact.
+            setPastEnd((previous) => (
+              previous?.ask === ask && previous.settledLine === settledLine
+                ? previous
+                : { ask, settledLine }
+            ));
+          }
         }
       };
 
@@ -218,7 +260,9 @@ export function useFileManagerState(projectId: string, projectPath: string) {
     return () => {
       cancelled = true;
     };
-  }, [askSubject, previewKey, previewStart, previewSubject, projectId, selectedPath]);
+    // The ASK is deliberately absent: it reaches `settle` through `askRef`, so re-opening a window
+    // already on screen re-scrolls without issuing a second read for bytes the pane is holding.
+  }, [previewKey, previewStart, previewSubject, projectId, selectedPath]);
 
   // A read that settled for exactly this request; anything else is either in flight or older.
   const settledListing = listingRead?.key === listingKey ? listingRead : null;
@@ -282,11 +326,13 @@ export function useFileManagerState(projectId: string, projectPath: string) {
     preview: shownPreview?.body ?? null,
     // The line the preview pane should mark and scroll to, or null when nobody named one. It is
     // the SELECTION's line rather than the settled read's, so it is right on the first frame the
-    // new preview renders in.
+    // new preview renders in — except where the ask overshot the file, when it is the last line the
+    // ask was clamped to, and the pane marks THAT.
     targetLine,
     // Which ASK this is: the pane re-scrolls on it, so asking twice lands the reader back on the
-    // line with no re-read. `missedLine` is a line that turned out not to exist, once the window
-    // has fallen back to the top — the pane says so rather than leaving line 1 unexplained.
+    // line with no re-read. `missedLine` is the line the reader named when it turned out not to
+    // exist — said in the footer beside the line the ask settled on, so neither number is a
+    // mystery and the pane is never left explaining itself with silence.
     targetNonce,
     missedLine,
     loading: settledListing === null,

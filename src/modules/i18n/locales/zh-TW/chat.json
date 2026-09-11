@@ -292,5 +292,46 @@
     "failed": "未傳送 — {{reason}}",
     "cancel": "取消排程訊息",
     "dismiss": "關閉失敗提示"
+  },
+  "shapes": {
+    "collapse": "收合",
+    "expand": "展開",
+    "copyCsv": "複製為 CSV",
+    "copied": "已複製",
+    "sortBy": "依 {{column}} 排序",
+    "sortByColumnNumber": "依第 {{number}} 欄排序",
+    "tasksDone": "{{total}} 項中已完成 {{done}} 項",
+    "checksPassed": "{{count}} 項通過",
+    "checksFailed": "{{count}} 項失敗",
+    "blocking": "阻斷",
+    "high": "高",
+    "medium": "中",
+    "low": "低",
+    "showAllLines": "顯示全部 {{count}} 行",
+    "showLess": "顯示較少",
+    "openFile": "開啟 {{path}}",
+    "titles": {
+      "table": "表格",
+      "options": "選項",
+      "beforeAfter": "前後對比",
+      "callout": "提示框",
+      "tasks": "任務",
+      "checks": "檢查",
+      "timeline": "時間軸",
+      "facts": "詳細資料",
+      "verdict": "結論",
+      "stats": "統計",
+      "diff": "差異",
+      "output": "輸出",
+      "diagram": "圖表",
+      "code": "程式碼"
+    },
+    "alert": {
+      "note": "備註",
+      "tip": "提示",
+      "important": "重要",
+      "warning": "警告",
+      "caution": "注意"
+    }
   }
 }

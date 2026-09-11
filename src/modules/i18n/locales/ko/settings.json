@@ -51,6 +51,7 @@
     },
     "toolDisplay": {
       "title": "도구 표시",
+      "showWork": "작업 표시",
       "showThinking": "생각 과정 표시",
       "showRawParameters": "Raw 파라미터 표시"
     },

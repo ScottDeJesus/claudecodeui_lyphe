@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import { ChevronRight } from 'lucide-react';
 
 import { cn } from '@/shared/utils';
 import { Markdown } from '@/modules/chat/transcript/Markdown';
@@ -13,8 +12,8 @@ type ToolErrorDisplayProps = {
 
 /**
  * Collapsed-by-default error row for non-Bash tool results, matching the
- * command-row (`BashCommandDisplay`) look: a compact header with a chevron
- * and a one-line preview that expands to the full error content. Errors are
+ * command-row (`BashCommandDisplay`) look: a compact header with a one-line
+ * preview; clicking the row expands it to the full error content. Errors are
  * signalled by the red styling — the details stay one click away.
  *
  * Rendered by chat's MessageComponent for failed tool results.
@@ -53,13 +52,6 @@ export const ToolErrorDisplay: React.FC<ToolErrorDisplayProps> = ({ content, lab
           hasContent && 'cursor-pointer focus-visible:ring-1 focus-visible:ring-ring',
         )}
       >
-        <ChevronRight
-          className={cn(
-            'h-3.5 w-3.5 flex-shrink-0 text-red-500/70 transition-transform duration-200 dark:text-red-400/70',
-            open && 'rotate-90',
-            !hasContent && 'opacity-0',
-          )}
-        />
         <svg
           className="h-3.5 w-3.5 flex-shrink-0 text-red-500 dark:text-red-400"
           fill="none"

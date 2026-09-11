@@ -267,5 +267,8 @@
       "updateAvailable": "有可用更新",
       "closeSidebar": "關閉側邊欄"
     }
+  },
+  "shapes": {
+    "diagramFailed": "無法繪製此圖表，已顯示其原始碼。"
   }
 }

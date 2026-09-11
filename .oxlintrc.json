@@ -67,7 +67,8 @@
           "server/shared/claude-cli-path.ts",
           "server/shared/image-attachments.ts",
           "server/shared/message-unification.ts",
-          "server/shared/local-commands.ts"
+          "server/shared/local-commands.ts",
+          "server/shared/child-env.ts"
         ],
         "mode": "file"
       },

@@ -50,6 +50,7 @@
     },
     "toolDisplay": {
       "title": "Araç Gösterimi",
+      "showWork": "Çalışmayı göster",
       "showThinking": "Düşünmeyi göster",
       "showRawParameters": "Ham parametreleri göster"
     },

@@ -51,6 +51,7 @@
     },
     "toolDisplay": {
       "title": "Visualización de herramientas",
+      "showWork": "Mostrar trabajo",
       "showThinking": "Mostrar razonamiento",
       "showRawParameters": "Mostrar parámetros sin procesar"
     },

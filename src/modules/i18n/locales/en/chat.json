@@ -38,7 +38,6 @@
     "updateTodo": "Update todo list",
     "readTodo": "Read todo list",
     "searchResults": "results",
-    "doneAutomatically": "Done automatically",
     "waitingForYou": "Waiting for you",
     "finished": "Finished",
     "allowedByYou": "Allowed by you"
@@ -325,5 +324,46 @@
     "failed": "Not sent — {{reason}}",
     "cancel": "Cancel scheduled message",
     "dismiss": "Dismiss failure notice"
+  },
+  "shapes": {
+    "collapse": "Collapse",
+    "expand": "Expand",
+    "copyCsv": "Copy as CSV",
+    "copied": "Copied",
+    "sortBy": "Sort by {{column}}",
+    "sortByColumnNumber": "Sort by column {{number}}",
+    "tasksDone": "{{done}} of {{total}} done",
+    "checksPassed": "{{count}} passed",
+    "checksFailed": "{{count}} failed",
+    "blocking": "Blocking",
+    "high": "High",
+    "medium": "Medium",
+    "low": "Low",
+    "showAllLines": "Show all {{count}} lines",
+    "showLess": "Show less",
+    "openFile": "Open {{path}}",
+    "titles": {
+      "table": "Table",
+      "options": "Options",
+      "beforeAfter": "Before and after",
+      "callout": "Callout",
+      "tasks": "Tasks",
+      "checks": "Checks",
+      "timeline": "Timeline",
+      "facts": "Details",
+      "verdict": "Verdict",
+      "stats": "Stats",
+      "diff": "Diff",
+      "output": "Output",
+      "diagram": "Diagram",
+      "code": "Code"
+    },
+    "alert": {
+      "note": "Note",
+      "tip": "Tip",
+      "important": "Important",
+      "warning": "Warning",
+      "caution": "Caution"
+    }
   }
 }
