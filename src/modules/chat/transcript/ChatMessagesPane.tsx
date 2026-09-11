@@ -64,6 +64,8 @@ type ChatMessagesPaneProps = {
   loadEarlierMessages: () => void;
   /** Asked after every commit: loads older history while the rows drawn here do not fill the screen. */
   onUnderfilled?: () => void;
+  /** A chat was just selected and is still loading or settling: hide it behind the loading wheel. */
+  isOpeningSession?: boolean;
   loadAllMessages: () => void;
   allMessagesLoaded: boolean;
   isLoadingAllMessages: boolean;
@@ -131,6 +133,7 @@ function ChatMessagesPane({
   visibleMessages,
   loadEarlierMessages,
   onUnderfilled,
+  isOpeningSession = false,
   loadAllMessages,
   allMessagesLoaded,
   isLoadingAllMessages,
@@ -244,6 +247,9 @@ function ChatMessagesPane({
   );
 
   return (
+    // Positioned wrapper so the loading wheel sits over the transcript, not inside its
+    // scroller, and stays centred while the hidden rows settle to the bottom underneath.
+    <div className="relative flex min-h-0 flex-1 flex-col">
     <div
       ref={scrollContainerRef}
       onWheel={onWheel}
@@ -264,7 +270,14 @@ function ChatMessagesPane({
           </div>
         </div>
       )}
-      <div className="mx-auto w-full max-w-[54.25rem] space-y-3 px-4 sm:space-y-4">
+      {/* Laid out but invisible while the chat opens, so the settle loop measures real
+          heights and pins the bottom before anything is seen; it then appears whole. */}
+      <div
+        className={`mx-auto w-full max-w-[54.25rem] space-y-3 px-4 sm:space-y-4 ${
+          isOpeningSession ? 'pointer-events-none opacity-0' : 'opacity-100 transition-opacity duration-150'
+        }`}
+        aria-busy={isOpeningSession || undefined}
+      >
       {(isLoadingSessionMessages || isProcessing) && chatMessages.length === 0 ? (
         <div className="mt-8 text-center text-muted-foreground">
           <div className="flex items-center justify-center space-x-2">
@@ -447,6 +460,19 @@ function ChatMessagesPane({
         </>
       )}
       </div>
+    </div>
+    {isOpeningSession && (
+      // Fades in only after a short delay (CSS), so a quick switch never flashes it.
+      <div
+        data-chat-loading
+        className="chat-loading-wheel pointer-events-none absolute inset-0 flex items-center justify-center"
+      >
+        <div className="flex items-center gap-2 text-muted-foreground">
+          <div className="h-4 w-4 animate-spin rounded-full border-b-2 border-muted-foreground" />
+          <p className="text-sm">{t('session.loading.sessionMessages')}</p>
+        </div>
+      </div>
+    )}
     </div>
   );
 }

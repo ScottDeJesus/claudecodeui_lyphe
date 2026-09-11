@@ -18,6 +18,11 @@ const INITIAL_VISIBLE_MESSAGES = 100;
  * stops loading older pages — enough that the scroll-up pager has room to fire.
  */
 const VIEWPORT_FILL_MARGIN_PX = 200;
+/**
+ * Longest a chat stays behind the loading wheel after it is selected. The wheel normally
+ * lifts when the rows have settled at the bottom; this only guards a load that never ends.
+ */
+const OPENING_REVEAL_CAP_MS = 8000;
 
 /** Messages kept below a search hit so it lands mid-viewport rather than at the edge. */
 const SEARCH_TARGET_CONTEXT_MESSAGES = 20;
@@ -215,6 +220,10 @@ export function useChatSessionState({
   const [isUserScrolledUp, setIsUserScrolledUp] = useState(false);
   const [tokenBudget, setTokenBudget] = useState<Record<string, unknown> | null>(null);
   const [visibleMessageCount, setVisibleMessageCount] = useState(INITIAL_VISIBLE_MESSAGES);
+  // True from selecting a chat until its rows are in and settled at the bottom; the
+  // transcript stays hidden behind a loading wheel meanwhile, so it appears whole.
+  const [isOpeningSession, setIsOpeningSession] = useState(false);
+  const openingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [allMessagesLoaded, setAllMessagesLoaded] = useState(false);
   const [isLoadingAllMessages, setIsLoadingAllMessages] = useState(false);
   const [loadAllJustFinished, setLoadAllJustFinished] = useState(false);
@@ -619,10 +628,19 @@ export function useChatSessionState({
     // adds little on screen (hidden work) must not strand the reader at the top. Loads run one at a time
     // (isLoadingMoreRef), and the run ends once a screen of history sits above the view —
     // each prepend moves scrollTop down by what it added — or a page brings nothing back.
-    if (!allMessagesLoadedRef.current && container.scrollTop < container.clientHeight) {
+    // Only a scrollable, loaded transcript pages up here: a short one is the fill's job, and
+    // a chat mid-switch still carries the previous chat's "more history" flag.
+    if (
+      !allMessagesLoadedRef.current
+      && !isLoadingSessionMessages
+      // While a chat settles to its bottom, the settle loop owns the scroll.
+      && !pendingInitialScrollRef.current
+      && container.scrollHeight > container.clientHeight
+      && container.scrollTop < container.clientHeight
+    ) {
       await loadOlderMessages(container);
     }
-  }, [hasMoreMessages, isActive, isNearBottom, loadOlderMessages]);
+  }, [hasMoreMessages, isActive, isLoadingSessionMessages, isNearBottom, loadOlderMessages]);
 
   const wasChatActiveRef = useRef(isActive);
   useLayoutEffect(() => {
@@ -679,6 +697,9 @@ export function useChatSessionState({
     setSearchTarget(null);
 
     pendingInitialScrollRef.current = true;
+    setIsOpeningSession(true);
+    if (openingTimerRef.current) clearTimeout(openingTimerRef.current);
+    openingTimerRef.current = setTimeout(() => setIsOpeningSession(false), OPENING_REVEAL_CAP_MS);
     setVisibleMessageCount(INITIAL_VISIBLE_MESSAGES);
     pendingScrollRestoreRef.current = null;
     liveScrollStateRef.current = null;
@@ -696,11 +717,19 @@ export function useChatSessionState({
   // This version re-scrolls every animation frame while scrollHeight is
   // still growing, capped at ~1s (60 frames) or 3 consecutive stable
   // frames. Cancels cleanly on session change via the pending flag.
-  useEffect(() => {
+  //
+  // A layout effect whose first step runs before paint, so a newly opened chat never
+  // paints at its oldest rows and then jumps. An empty list does not disarm it: on a
+  // switch the list is empty for a render before the loading flag is set.
+  useLayoutEffect(() => {
     if (!isActive) return;
     if (!pendingInitialScrollRef.current || !scrollContainerRef.current || isLoadingSessionMessages) return;
-    if (chatMessages.length === 0) { pendingInitialScrollRef.current = false; return; }
-    if (searchScrollActiveRef.current) { pendingInitialScrollRef.current = false; return; }
+    if (chatMessages.length === 0) return;
+    if (searchScrollActiveRef.current) {
+      pendingInitialScrollRef.current = false;
+      setIsOpeningSession(false);
+      return;
+    }
 
     const container = scrollContainerRef.current;
     let frame = 0;
@@ -722,9 +751,11 @@ export function useChatSessionState({
         rafId = requestAnimationFrame(tick);
       } else {
         pendingInitialScrollRef.current = false;
+        // Settled at the bottom: the chat can appear.
+        setIsOpeningSession(false);
       }
     };
-    rafId = requestAnimationFrame(tick);
+    tick();
     return () => {
       if (rafId) cancelAnimationFrame(rafId);
     };
@@ -772,6 +803,7 @@ export function useChatSessionState({
       setTotalMessages(0);
       setTokenBudget(null);
       lastLoadedSessionKeyRef.current = null;
+      setIsOpeningSession(false);
       return;
     }
 
@@ -791,6 +823,8 @@ export function useChatSessionState({
     // Returning from another tab must not reset pagination or scroll. Refresh
     // a stale hydrated session through the bounded tail path instead.
     if (isCurrentHydratedSession) {
+      // An empty chat has no rows to settle, so nothing else would lift the wheel.
+      if (sessionStore.getMessages(selectedSessionId).length === 0) setIsOpeningSession(false);
       if (sessionStore.isStale(selectedSessionId)) {
         void requestLatestMessages(selectedSessionId);
       }
@@ -842,8 +876,11 @@ export function useChatSessionState({
           setTokenBudget((slot.tokenUsage as Record<string, unknown> | null) ?? null);
         }
       }
+      // No rows (an empty chat, or a load the hidden tab refused): nothing will settle.
+      if (!slot || slot.total === 0) setIsOpeningSession(false);
       setIsLoadingSessionMessages(false);
     }).catch(() => {
+      setIsOpeningSession(false);
       setIsLoadingSessionMessages(false);
     });
   }, [
@@ -1180,7 +1217,8 @@ export function useChatSessionState({
   const lastFillAttemptRef = useRef<string | null>(null);
   const fillViewportWithHistory = useCallback(() => {
     const container = scrollContainerRef.current;
-    if (!isActive || !container || isLoadingSessionMessages || isLoadingMoreRef.current) return;
+    // Nothing loaded yet is the session load's job, not a short screen to fill.
+    if (!isActive || !container || isLoadingSessionMessages || isLoadingMoreRef.current || chatMessages.length === 0) return;
     if (container.scrollHeight > container.clientHeight + VIEWPORT_FILL_MARGIN_PX) return;
     // One attempt per state: a load that brought nothing back is not retried in a loop.
     const attemptKey = `${activeSessionId}:${chatMessages.length}:${visibleMessageCount}`;
@@ -1215,6 +1253,7 @@ export function useChatSessionState({
     setTokenBudget,
     visibleMessageCount,
     visibleMessages,
+    isOpeningSession,
     loadEarlierMessages,
     fillViewportWithHistory,
     loadAllMessages,

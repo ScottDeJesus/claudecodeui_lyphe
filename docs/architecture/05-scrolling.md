@@ -53,8 +53,8 @@ written from five places coordinated by refs and timers rather than by one owner
    drops `liveScrollStateRef` with them.
 8. **Row geometry does not change behind the user's back.** Lazy rows keep their measured
    height when their content unmounts, React keys are derived from intrinsic message fields
-   rather than object identity, and `contain-intrinsic-size: auto` lets the browser
-   remember each row's last rendered size.
+   rather than object identity, and rows are never render-skipped, so a mounted row reports
+   its real height from its first frame.
 
 ## The pieces
 
@@ -105,10 +105,12 @@ in [the file manager](../file-manager.md) §"The rules that bite".
 **RULE: one element scrolls the transcript, and the component that renders it holds no
 scroll state.**
 
-`ChatMessagesPane` renders a single `div` with `ref={scrollContainerRef}`,
-`onWheel={onWheel}`, `onTouchMove={onTouchMove}` and the classes
+`ChatMessagesPane` renders a positioned wrapper (`relative flex min-h-0 flex-1 flex-col`)
+holding a single `div` with `ref={scrollContainerRef}`, `onWheel={onWheel}`,
+`onTouchMove={onTouchMove}` and the classes
 `chat-messages-pane relative min-h-0 flex-1 overflow-y-auto overflow-x-hidden`, then a
-`max-w-[54.25rem]` inner column of rows. The export menu inside it is
+`max-w-[54.25rem]` inner column of rows. The wrapper exists only so the loading wheel can sit
+over the scroller rather than inside it; the scroller keeps the full height. The export menu inside it is
 `sticky right-4 top-3`, which is why it stays put while the list moves. The pane is
 `memo`ised, and neither it, `MessageComponent`, nor any tool view reads or writes a scroll
 offset.
@@ -369,7 +371,19 @@ nothing re-anchors — the tab opens visually "scrolled way up" with the newest 
 message off screen. The current effect runs a `requestAnimationFrame` loop that sets
 `scrollTop = scrollHeight` **every frame**, counting frames and consecutive stable heights;
 it stops at **3 consecutive stable frames or 60 frames (~1 s)**, whichever comes first, and
-then clears `pendingInitialScrollRef`. The loop is cancelled by the effect's own cleanup
+then clears `pendingInitialScrollRef`. It is a layout effect whose first step runs before
+paint, so an opened chat never paints at its oldest rows and then jumps; an empty list does
+not disarm it, because on a switch the list is empty for one render before the loading flag
+is set. While it runs, the scroll-up pager stands down — the settle loop owns the scroll.
+
+**The chat appears whole.** From the session-change effect until the settle loop finishes,
+`isOpeningSession` is true: `ChatMessagesPane` keeps the row column laid out but at
+`opacity-0` (so the loop measures real heights and pins the bottom unseen) and draws a loading
+wheel over the scroller. The wheel's CSS holds it back 150 ms (`chat-loading-appear`), so a
+quick switch to an already-loaded chat never flashes it; the column then fades in over 150 ms,
+already at the bottom. The state also clears when the chat turns out empty (a hydrated or
+freshly loaded slot with no rows), when the load fails, when a search jump takes over the
+settle, and after `OPENING_REVEAL_CAP_MS = 8000` as a guard against a load that never ends. The loop is cancelled by the effect's own cleanup
 calling `cancelAnimationFrame`; the session-change effect *re-arms*
 `pendingInitialScrollRef` to `true` rather than clearing it.
 
@@ -491,17 +505,19 @@ Three details exist purely to protect the scroll position:
 Rows never yet measured fall back to `ESTIMATED_ROW_HEIGHT_PX = 100` and rely on the
 browser's own scroll anchoring while they settle.
 
-CSS does a second pass of the same idea in `src/index.css`:
+CSS contains each row but never skips rendering one (`src/index.css`):
 
 ```css
 .chat-messages-pane { contain: layout style paint; }
-.chat-message { contain: layout style paint; content-visibility: auto; contain-intrinsic-size: auto 180px; }
-.chat-message.assistant { contain-intrinsic-size: auto 240px; }
-.chat-message.user, .chat-message.tool, .chat-message.error { contain-intrinsic-size: auto 96px; }
+.chat-message { contain: layout style paint; }
 ```
 
-The `auto` keyword in `contain-intrinsic-size` makes the browser remember each row's last
-rendered size, so skipping an off-screen row's rendering does not resize it.
+**RULE: no `content-visibility` on transcript rows.** A render-skipped row reports a stand-in
+height until the browser draws it, a frame or more later. Every geometry reader here reads a
+row on its first frame — the settle loop's stable-height check, the fill's does-it-fill-the-
+screen check, `LazyMessageRow`'s measured height — so a stand-in there ends the settle loop
+early, triggers an unneeded fill, and dips a remounted row, which pulls the rows below it into
+and out of the band. Off-screen cost is `LazyMessageRow`'s job alone.
 
 The repo **never sets `overflow-anchor`**, so the browser default (`auto`) stays in effect
 for everything the JS does not explicitly restore — which is what absorbs a tool card

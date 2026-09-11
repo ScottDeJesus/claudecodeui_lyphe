@@ -162,6 +162,7 @@ function ChatInterface({
     visibleMessages,
     loadEarlierMessages,
     fillViewportWithHistory,
+    isOpeningSession,
     loadAllMessages,
     loadFullTranscript,
     allMessagesLoaded,
@@ -549,6 +550,7 @@ function ChatInterface({
           visibleMessages={visibleMessages}
           loadEarlierMessages={loadEarlierMessages}
           onUnderfilled={fillViewportWithHistory}
+          isOpeningSession={isOpeningSession}
           loadAllMessages={loadAllMessages}
           allMessagesLoaded={allMessagesLoaded}
           isLoadingAllMessages={isLoadingAllMessages}
