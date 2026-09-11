@@ -36,9 +36,15 @@ export const WIDGET_CSP = "default-src 'none'; script-src 'unsafe-inline'; style
 /**
  * The frame's own reset. `--canvas` and `--ink` come across as copied values, so a widget that
  * draws nothing still reads as part of the page rather than as a white rectangle in a dark app.
+ *
+ * `display:flow-root` makes the body a formatting context of its own, so a first `<h2>` or a
+ * last `<p>` keeps its margin INSIDE the body instead of collapsing through it. The bridge sizes
+ * the frame from the body's box (`widgetBridgeScript.ts`), and a margin that escaped that box
+ * would be a few pixels of document the frame cannot show — a scrollbar for nothing.
  */
 const DOCUMENT_RESET =
-  'html,body{margin:0;background:var(--canvas);color:var(--ink);font-family:var(--font-body);font-size:var(--text-body)}';
+  'html,body{margin:0;background:var(--canvas);color:var(--ink);font-family:var(--font-body);font-size:var(--text-body)}' +
+  'body{display:flow-root}';
 
 /**
  * Token values come from `getComputedStyle` on our own document element, so they are CSS values

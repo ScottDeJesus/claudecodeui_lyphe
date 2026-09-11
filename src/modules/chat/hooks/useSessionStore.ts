@@ -47,6 +47,12 @@ export type SessionSlot = {
   hasMore: boolean;
   offset: number;
   tokenUsage: unknown;
+  /**
+   * The conversation's running and recently finished agents, from the whole history (the
+   * server's `collectSessionAgents`), whatever window of rows is loaded. Replaced by every
+   * latest page that carries it; the pinned strip reads it for agents older than that window.
+   */
+  agents: NormalizedMessage[];
 };
 
 const EMPTY: NormalizedMessage[] = [];
@@ -71,6 +77,7 @@ function createEmptySlot(): SessionSlot {
     // history refresh overwrote the value fetched from the token-usage
     // endpoint with it.
     tokenUsage: undefined,
+    agents: EMPTY,
     _historyMutationQueue: Promise.resolve(),
   };
 }
@@ -80,6 +87,8 @@ type SessionHistoryPage = {
   total: number;
   hasMore: boolean;
   tokenUsage?: unknown;
+  /** Present only on a latest page from a server that sends it. */
+  agents?: NormalizedMessage[];
 };
 
 function enqueueHistoryMutation<T>(
@@ -116,7 +125,24 @@ async function requestSessionHistoryPage(
         ? { tokenUsage: data.tokenUsage }
         : {}
     ),
+    ...(Array.isArray(data?.agents) ? { agents: data.agents as NormalizedMessage[] } : {}),
   };
+}
+
+/**
+ * Takes a page's agent list when it carries one; true when that changed what the slot holds.
+ *
+ * Three different facts, kept apart: a list of agents REPLACES what the slot holds, an empty list
+ * CLEARS it (a session whose agents have all aged out says so with `[]`), and no list at all
+ * leaves it alone — that is an older page, which is not asked about what is running and never
+ * answers.
+ */
+function applyPageAgents(slot: SessionSlot, page: SessionHistoryPage): boolean {
+  if (!page.agents || JSON.stringify(page.agents) === JSON.stringify(slot.agents)) {
+    return false;
+  }
+  slot.agents = page.agents.length > 0 ? page.agents : EMPTY;
+  return true;
 }
 
 /**
@@ -520,6 +546,9 @@ async function refreshLatestSlotFromServer(
     slot.tokenUsage = latestPage.tokenUsage;
     changed = true;
   }
+  if (applyPageAgents(slot, latestPage)) {
+    changed = true;
+  }
 
   if (!nextServerMessages) {
     console.warn(`[SessionStore] Could not bridge latest history for ${sessionId}; retaining cached suffix.`);
@@ -616,6 +645,7 @@ export function useSessionStore() {
         if (data.tokenUsage !== undefined) {
           slot.tokenUsage = data.tokenUsage;
         }
+        applyPageAgents(slot, data);
 
         notify(sessionId);
         return slot;
@@ -754,9 +784,24 @@ export function useSessionStore() {
       msg.sessionId === sessionId
         ? msg
         : { ...msg, sessionId };
-    let updated = [...slot.realtimeMessages, normalizedMessage];
-    if (updated.length > MAX_REALTIME_MESSAGES) {
-      updated = updated.slice(-MAX_REALTIME_MESSAGES);
+    // A row already held under this id is REPLACED, never stacked. The server replays a running
+    // turn from its buffer to every `chat.subscribe` (and from the very start after a reconnect
+    // during a later run — its cursor rule), re-sending the same records with the same ids. The
+    // merge drops a live row whose id history already has, but only history, so appending would
+    // keep every replayed row older than the loaded history page once per replay (measured: one
+    // agent drawn three times in the pinned strip). Ids are per record — the transcript uuid plus
+    // the part index — so the same id is the same record; Codex's progressive items reuse their
+    // `itemId` for successive states of one item, and the latest state is the one to keep.
+    const heldAt = slot.realtimeMessages.findIndex((held) => held.id === normalizedMessage.id);
+    let updated: NormalizedMessage[];
+    if (heldAt >= 0) {
+      updated = slot.realtimeMessages.slice();
+      updated[heldAt] = normalizedMessage;
+    } else {
+      updated = [...slot.realtimeMessages, normalizedMessage];
+      if (updated.length > MAX_REALTIME_MESSAGES) {
+        updated = updated.slice(-MAX_REALTIME_MESSAGES);
+      }
     }
     slot.realtimeMessages = updated;
     recomputeMergedIfNeeded(slot);
@@ -860,6 +905,14 @@ export function useSessionStore() {
   }, []);
 
   /**
+   * The conversation's running and recently finished agents from the whole history, for the
+   * pinned strip — including agents older than the loaded window of rows.
+   */
+  const getAgents = useCallback((sessionId: string): NormalizedMessage[] => {
+    return storeRef.current.get(sessionId)?.agents ?? EMPTY;
+  }, []);
+
+  /**
    * Get session slot (for status, pagination info, etc.).
    */
   const getSessionSlot = useCallback((sessionId: string): SessionSlot | undefined => {
@@ -877,11 +930,12 @@ export function useSessionStore() {
     updateStreaming,
     finalizeStreaming,
     getMessages,
+    getAgents,
     getSessionSlot,
   }), [
     fetchFromServer, fetchMore, appendRealtime, truncateAt, refreshLatestFromServer,
     setActiveSession, isStale, updateStreaming, finalizeStreaming,
-    getMessages, getSessionSlot,
+    getMessages, getAgents, getSessionSlot,
   ]);
 }
 

@@ -164,7 +164,7 @@ These eleven names are the whole surface `useSessionStore` returns. There is no 
 | `fetchFromServer(sessionId, {limit, offset, canRequest})` | Replaces `serverMessages` with one page. `limit: null` means the whole transcript. Sets `total`/`hasMore`/`offset`/`fetchedAt`, prunes realtime. | Session open, "Load all", search jump, `loadFullTranscript`. |
 | `fetchMore(sessionId, {limit, canRequest})` | Fetches the page at `slot.offset` and prepends it via `mergeOlderServerPage`. Returns `{slot, prependedCount}`. | `loadOlderMessages` on scroll-to-top. |
 | `refreshLatestFromServer(sessionId, {limit, canRequest})` | Re-fetches the newest page and stitches it onto the cached suffix without refetching the transcript. Returns `{slot, applied, changed, deferred}`. | Only `latestRefreshExecutorRef`, i.e. everything routed through `requestLatestMessages`: `complete`, websocket reconnect, external update, stale re-activation. |
-| `appendRealtime(sessionId, msg)` | Pushes one row onto `realtimeMessages`, re-stamping `sessionId` if the frame disagreed. Trims to `MAX_REALTIME_MESSAGES`. | `useChatRealtimeHandlers`, from its catch-all branch, plus three explicit calls. See the note below the table. |
+| `appendRealtime(sessionId, msg)` | Pushes one row onto `realtimeMessages`, re-stamping `sessionId` if the frame disagreed, or REPLACES the row already held under the same id — a `chat.subscribe` replays the running turn's buffer, and a reconnect during a second run replays it from the start (the server's cursor rule), so appending would draw every replayed row older than the loaded history page once per replay. The same rule lets Codex's progressive items (one `itemId`, successive states) update one card. Trims to `MAX_REALTIME_MESSAGES`. | `useChatRealtimeHandlers`, from its catch-all branch, plus three explicit calls. See the note below the table. |
 | `updateStreaming(sessionId, accumulatedText, provider)` | Creates or rewrites the row with id `__streaming_<sessionId>` and `kind: 'stream_delta'`. | The 100 ms stream flush timer, and the final flush on `stream_end` and on `complete` when text is still buffered. |
 | `finalizeStreaming(sessionId)` | Rewrites that row to `kind: 'text'`, `role: 'assistant'` with a fresh random id. No-op if there is no placeholder. | `stream_end`, and `complete` when a buffer is still pending. |
 | `truncateAt(sessionId, anchorId)` | Cuts `serverMessages` at the row whose `transcriptAnchorId` matches, clears `realtimeMessages` except the newest row tagged `replacesAnchorId === anchorId`, and stamps that survivor with `replacesAfterRowCount = cutIndex`. Sets `total` and `offset` to the surviving row count. | The `history_truncated` frame. |
@@ -207,10 +207,13 @@ Three steps, and nothing else stands between the store and the screen:
 `normalizedToChatMessages` (in `src/modules/chat/hooks/useChatMessages.ts` — the file is named
 for a hook it no longer contains) converts store records into render-only `ChatMessage`s: it
 attaches `tool_result` rows to their `tool_use` by `toolId`, folds rows carrying
-`parentToolUseId` into their spawning tool call's subagent timeline, and parses
-`<task-notification>` blocks. It keeps a `WeakMap` projection cache keyed by the source
-record, invalidated when the row's `toolResultSource` or newest folded subagent row changes —
-so a re-derive during streaming rebuilds one row, not the whole list.
+`parentToolUseId` into their spawning tool call's subagent timeline and token reading
+(`subagentUsage`; see the tool view's "What an agent has spent"), and parses
+`<task-notification>` blocks — and folds each live `task_notification` row onto the `Agent` call
+its `toolId` names, so a backgrounded agent's row learns it finished on the live path. It keeps a `WeakMap`
+projection cache keyed by the source record, invalidated when the row's `toolResultSource`, its
+newest folded subagent row, or the notification that finishes it (`finishSource`) changes — so a
+re-derive during streaming rebuilds one row, not the whole list.
 
 ### What triggers a fetch
 

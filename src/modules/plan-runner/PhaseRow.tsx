@@ -61,9 +61,9 @@ export function PhaseRow({
     : (
       <ul className="flex flex-col gap-0.5 py-1 font-mono text-xs text-muted-foreground">
         {timeline.map((entry, index) => (
-          // `whitespace-pre` so the two spaces after the clock survive: they are what keeps a
-          // column of stage words aligned under each other in a monospaced list.
-          <li key={`${entry.at}-${entry.stage}-${index}`} className="truncate whitespace-pre px-2" data-timeline-row>
+          // `whitespace-pre-wrap` keeps the two spaces after the clock, which align the stage words
+          // under each other while rows fit; a row long enough to wrap continues under the clock.
+          <li key={`${entry.at}-${entry.stage}-${index}`} className="whitespace-pre-wrap break-words px-2" data-timeline-row>
             {`${clockOf(entry.at)}  ${entry.stage}${entry.detail ? ` ${entry.detail}` : ''}`}
           </li>
         ))}
@@ -72,11 +72,16 @@ export function PhaseRow({
 
   return (
     <Collapsible className="min-w-0" data-phase-id={phase.id}>
-      <CollapsibleTrigger className="flex w-full min-w-0 items-center gap-2 rounded-lg px-2 py-1.5 text-left hover:bg-muted">
+      {/* Nothing here truncates: the title wraps, and the badge wraps onto the next line when the
+          row is too tight to hold both — a phase name or a block reason cut short is unreadable
+          on a phone, which is where this list is read. */}
+      <CollapsibleTrigger className="flex w-full min-w-0 flex-wrap items-center gap-x-2 gap-y-1 rounded-lg px-2 py-1.5 text-left hover:bg-muted">
         <span className="flex-none font-mono text-xs" aria-hidden="true">{PHASE_GLYPH[phase.state]}</span>
         <span className="flex-none font-mono text-xs text-muted-foreground">{phase.rank}</span>
-        <span className="min-w-0 flex-1 truncate text-sm">{phase.title}</span>
-        <Badge tone={phaseStateTone(phase.state)}>{suffix ? `${stateWord} · ${suffix}` : stateWord}</Badge>
+        <span className="min-w-0 flex-1 basis-40 break-words text-sm leading-snug">{phase.title}</span>
+        <Badge tone={phaseStateTone(phase.state)} className="min-w-0 break-words">
+          {suffix ? `${stateWord} · ${suffix}` : stateWord}
+        </Badge>
       </CollapsibleTrigger>
       <CollapsibleContent>{rows}</CollapsibleContent>
     </Collapsible>

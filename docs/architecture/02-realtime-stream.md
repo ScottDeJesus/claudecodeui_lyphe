@@ -324,7 +324,12 @@ Three surprises, all of them intended:
   into the transcript for a tick, and reloads it when the reply ends. That is measured,
   not inferred, and nothing in the widget module can prevent it — the cure, if it is ever
   wanted, is to keep a block in ONE slot across the boundary, which is this component's
-  shape to change. See [live widgets](./07-live-widgets.md) §"The fence".
+  shape to change. The cost is highest for the fence's DocSpace body shape, where the
+  reload is a navigation of a frame the reader can type into, so what a retraction discards
+  there is an unsaved edit rather than a tick. In practice a reply is done writing a fence
+  before a reader has reached it, and the streaming gate keeps the frame from mounting at
+  all until the fence is closed. See [live widgets](./07-live-widgets.md) §"The fence" and
+  §"The DocSpace kind".
 - **The same component renders finished replies**, with `isStreaming: false` and no split.
   That is deliberate. `MessageComponent` used to swap `<StreamingMarkdown>` for
   `<Markdown>` at that position, and React treats a different element type in the same

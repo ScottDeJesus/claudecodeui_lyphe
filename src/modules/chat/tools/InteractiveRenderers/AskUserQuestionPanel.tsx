@@ -6,6 +6,24 @@ import type { PermissionPanelProps,Question } from '@/shared/types';
  *  render by a fresh `[]` literal when a request carries no questions. */
 const NO_QUESTIONS: Question[] = [];
 
+/** A text field: input, textarea, or anything contenteditable. */
+const isTextEntry = (element: Element | null): boolean =>
+  element instanceof HTMLInputElement ||
+  element instanceof HTMLTextAreaElement ||
+  (element instanceof HTMLElement && element.isContentEditable);
+
+/**
+ * A text field with something typed in it. The hazard of taking focus is the
+ * sentence a person is mid-way through, not the field itself: after they send a
+ * prompt the composer keeps focus but holds nothing, and a panel that deferred to
+ * an EMPTY field would leave every shortcut it advertises inert until clicked.
+ */
+const holdsDraft = (element: Element | null): boolean => {
+  if (element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement) return element.value.trim().length > 0;
+  if (element instanceof HTMLElement && element.isContentEditable) return (element.textContent ?? '').trim().length > 0;
+  return false;
+};
+
 /**
  * Registered by chat's PermissionRequestsBanner as the permission panel for
  * AskUserQuestion requests, so the user answers the model's questions inline.
@@ -30,11 +48,19 @@ export const AskUserQuestionPanel: React.FC<PermissionPanelProps> = ({
     requestAnimationFrame(() => setMounted(true));
   }, []);
 
-  // Focus the container for keyboard events when step changes
+  // Focus the container for keyboard events when the panel mounts and when the step changes —
+  // unless a person is mid-sentence in a text field. The panel mounts inside the transcript
+  // while the composer stays on screen, and pulling focus out of a draft would turn their next
+  // digits into option toggles and their Enter into an answer they never chose. An empty field
+  // is not a draft: the panel takes focus, so `1`, `Enter` and `Esc` work as its chips promise.
+  // `preventScroll`: the panel lives inside the transcript, whose scroll position has one owner
+  // (`useChatSessionState`, docs/architecture/05-scrolling.md). A bare focus() on a row 900px
+  // down dragged the pane to it — the same silent jump the owner's own writers guard against
+  // — so the pane's follow logic decides whether the new row is brought into view, never this.
   useEffect(() => {
-    if (!otherActive.get(currentStep)) {
-      containerRef.current?.focus();
-    }
+    if (otherActive.get(currentStep)) return;
+    if (holdsDraft(document.activeElement)) return;
+    containerRef.current?.focus({ preventScroll: true });
   }, [currentStep, otherActive]);
 
   useEffect(() => {
@@ -129,14 +155,26 @@ export const AskUserQuestionPanel: React.FC<PermissionPanelProps> = ({
       else setCurrentStep(s => s + 1);
       return;
     }
+  }, [currentStep, questions, toggleOption, toggleOther, handleSubmit]);
 
-    // Escape to skip
-    if (e.key === 'Escape') {
-      e.preventDefault();
+  // Escape skips — from a window-level CAPTURE listener, the shape the accounts panel uses
+  // (docs/accounts.md). ChatInterface aborts the running turn from a document-level capture
+  // listener gated on `defaultPrevented`, and window capture runs first: marking the event here
+  // is what keeps "Skip all — Esc" from killing the run instead. Only a key pressed INSIDE the
+  // panel is the panel's: elsewhere Escape keeps its app-wide meaning. And inside the "Other"
+  // field it is "back out of this field", never "skip every question and discard what I typed"
+  // — marked, so the run survives, and nothing more.
+  useEffect(() => {
+    const onEscape = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape' || event.repeat) return;
+      if (!containerRef.current?.contains(document.activeElement)) return;
+      event.preventDefault();
+      if (isTextEntry(document.activeElement)) return;
       handleSkip();
-      return;
-    }
-  }, [currentStep, questions, toggleOption, toggleOther, handleSubmit, handleSkip]);
+    };
+    window.addEventListener('keydown', onEscape, { capture: true });
+    return () => window.removeEventListener('keydown', onEscape, { capture: true });
+  }, [handleSkip]);
 
   if (questions.length === 0) return null;
 
@@ -224,8 +262,9 @@ export const AskUserQuestionPanel: React.FC<PermissionPanelProps> = ({
           )}
         </div>
 
-        {/* Options — tight spacing */}
-        <div className="scrollbar-thin max-h-48 overflow-y-auto px-4 pb-2" role={multi ? 'group' : 'radiogroup'} aria-label={q.question}>
+        {/* Options — tight spacing. Only the LIST scrolls past twelve rem; the "Other" row and its
+            field sit in their own block below, so nothing a person types into is ever clipped. */}
+        <div className="scrollbar-thin max-h-48 overflow-y-auto px-4" role={multi ? 'group' : 'radiogroup'} aria-label={q.question}>
           <div className="space-y-1">
             {q.options.map((opt, optIdx) => {
               const isSelected = selected.has(opt.label);
@@ -277,7 +316,14 @@ export const AskUserQuestionPanel: React.FC<PermissionPanelProps> = ({
                 </button>
               );
             })}
+          </div>
+        </div>
 
+        {/* "Other" — outside the scroller above. Inside it, with three or more options, the field
+            landed below the twelve-rem fold and was clipped against the footer's Submit button,
+            hiding the lower half of what was being typed. Measured 2026-09-10. */}
+        <div className="px-4 pb-2 pt-1">
+          <div className="space-y-1">
             {/* "Other" option */}
             <button
               type="button"
@@ -328,7 +374,9 @@ export const AskUserQuestionPanel: React.FC<PermissionPanelProps> = ({
                       e.stopPropagation();
                     }}
                     placeholder="Type your answer..."
-                    className="w-full rounded-lg border-0 bg-gray-50 px-3 py-1.5 text-[13px] text-gray-900 outline-none ring-1 ring-gray-200 transition-shadow duration-200 placeholder:text-gray-400 focus:ring-2 focus:ring-blue-400 dark:bg-gray-900/60 dark:text-gray-100 dark:ring-gray-700 dark:placeholder:text-gray-600 dark:focus:ring-blue-500"
+                    // pr-14 reserves the badge's width on the right, so typed text never runs
+                    // under the "Enter" hint that sits inside the field.
+                    className="w-full rounded-lg border-0 bg-gray-50 py-1.5 pl-3 pr-14 text-[13px] text-gray-900 outline-none ring-1 ring-gray-200 transition-shadow duration-200 placeholder:text-gray-400 focus:ring-2 focus:ring-blue-400 dark:bg-gray-900/60 dark:text-gray-100 dark:ring-gray-700 dark:placeholder:text-gray-600 dark:focus:ring-blue-500"
                   />
                   <kbd className="absolute right-2 top-1/2 -translate-y-1/2 rounded border border-gray-200 bg-gray-100 px-1 py-0.5 font-mono text-[9px] text-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-600">
                     Enter

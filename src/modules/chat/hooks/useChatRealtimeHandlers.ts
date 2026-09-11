@@ -161,7 +161,9 @@ export function useChatRealtimeHandlers({
             // the run never started (or was rejected), so no `complete` follows.
             onSessionIdle?.(sid);
             sessionStore.appendRealtime(sid, {
-              id: `protocol_error_${Date.now()}`,
+              // Random suffix: the store replaces a row held under the same id, so two errors in
+              // one millisecond must not share one.
+              id: `protocol_error_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
               sessionId: sid,
               timestamp: new Date().toISOString(),
               provider,

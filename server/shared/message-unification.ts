@@ -343,7 +343,23 @@ function truncateNestedOutput(value: unknown): unknown {
   return truncated;
 }
 
-function capToolResult(message: NormalizedMessage): void {
+/**
+ * Shared with the live path (`claude-runtime.provider.js`), which caps each tool result as it
+ * streams. Two shapes: a history row carries the result under `toolResult`, attached to its call
+ * by the transcript pass; a live `tool_result` row IS the result — content and `toolUseResult` on
+ * the row itself. Until 2026-09-10 only the first was looked at, so the live door was the one
+ * without a cap after all (measured: the call was a no-op on every streamed result).
+ */
+export function capToolResult(message: NormalizedMessage): void {
+  if (message.kind === 'tool_result') {
+    if (typeof message.content === 'string') {
+      message.content = truncateOutput(message.content);
+    }
+    if (message.toolUseResult !== undefined) {
+      message.toolUseResult = truncateNestedOutput(message.toolUseResult);
+    }
+  }
+
   const result = message.toolResult;
   if (!result) {
     return;

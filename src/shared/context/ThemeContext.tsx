@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 
 import {
@@ -79,7 +79,17 @@ export const ThemeProvider = ({ children }: { children: ReactNode }) => {
   // separate. Persisting from here would also fire on mount — before the stored
   // theme had been fetched — writing this device's system default over the
   // theme the user actually chose on another one.
-  useEffect(() => {
+  //
+  // A LAYOUT effect, so `dark` is on <html> before any ordinary (passive) effect of
+  // the same update runs. React runs a child's effects before its parent's, and this
+  // provider is everyone's parent: as a plain effect it would run after every
+  // consumer's effect keyed on `isDarkMode`, and a consumer reading the computed
+  // tokens there would read the theme being left behind (measured on a live HTML
+  // widget: the dark flag with all 89 colour readings still light). All layout
+  // effects run before any passive one, so a PASSIVE effect reads the new theme. A
+  // reader in its own layout effect, or at render time, still would not — read the
+  // tokens in an ordinary effect.
+  useLayoutEffect(() => {
     if (isDarkMode) {
       document.documentElement.classList.add('dark');
 

@@ -3,7 +3,7 @@
  * Converts NormalizedMessage[] from the session store into ChatMessage[] for the UI.
  */
 
-import type { ChatMessage,NormalizedMessage,SubagentActivity } from '@/shared/types';
+import type { ChatMessage,NormalizedMessage,SubagentActivity, SubagentUsage } from '@/shared/types';
 import { formatUsageLimitText } from '@/modules/chat/utils/chatFormatting';
 
 function formatToolResultContent(content: unknown): string {
@@ -20,11 +20,71 @@ type ParsedTaskNotification = {
 
 type ToolResultSource = NormalizedMessage['toolResult'] | NormalizedMessage | null;
 
+/**
+ * The live fold of one agent's usage: its newest context reading and the ids of the API
+ * messages seen. No reply count — a live row's usage is the snapshot taken when the row was cut,
+ * a few tokens into the reply (measured 2026-09-10: 69 "written" live against 3,298 on the
+ * transcript for the same run), and a figure that wrong is worse than none. The transcript's
+ * reading, which has the whole reply, arrives with the next history load.
+ */
+type LiveUsageFold = { contextTokens: number; messageIds: Set<string> };
+
+const readLiveUsage = (fold: LiveUsageFold | undefined): SubagentUsage | undefined => (
+  fold && fold.messageIds.size > 0
+    ? { contextTokens: fold.contextTokens, outputTokens: 0, requests: fold.messageIds.size }
+    : undefined
+);
+
+/**
+ * One reading from up to three: the server's (the whole transcript as of the history load, and
+ * the only one that knows what the agent wrote), the live fold's (what this page has seen since),
+ * and the CLI's exact total at finish. Context is monotonic within a run (verified on 23 real
+ * transcripts) and so is the request count, so the largest of each is the newest, and the reply
+ * total is the server's or nothing. Never a CHOICE between them: choosing by request count froze
+ * the figure at its page-load value while the server was ahead, hid the written total once the
+ * live fold was, and threw the exact total away at finish (Athena, 2026-09-10).
+ */
+const combineSubagentUsage = (
+  server: SubagentUsage | undefined,
+  live: SubagentUsage | undefined,
+  finishedContextTokens: number | undefined,
+): SubagentUsage | undefined => {
+  if (!server && !live && !finishedContextTokens) {
+    return undefined;
+  }
+  return {
+    contextTokens: Math.max(server?.contextTokens ?? 0, live?.contextTokens ?? 0, finishedContextTokens ?? 0),
+    outputTokens: server?.outputTokens ?? 0,
+    requests: Math.max(server?.requests ?? 0, live?.requests ?? 0),
+  };
+};
+
+/**
+ * The CLI's own total for a finished agent, its context as of its last request. The live fold
+ * stops one request short of it (the closing reply never streams as a subagent row), so without
+ * this the finished figure lagged the terminal's until a reload.
+ *
+ * Two sources, in this order. `totalTokens` on the `Agent` tool's result is exact. `tokens` on
+ * the live finish row is the notification's count, which the CLI takes before the closing
+ * reply's own request is in — one request short, every time (measured 2026-09-10: 39,735
+ * against the result's 39,913; 21,751 against 21,997). A foreground agent has both, and the
+ * result wins; a backgrounded one has only the notification, its launch receipt carrying no
+ * total at all.
+ */
+const readFinishedContextTokens = (toolResult: ToolResultSource, finish: NormalizedMessage | null): number | undefined => {
+  const fromResult = Number((toolResult as { toolUseResult?: { totalTokens?: unknown } } | null)?.toolUseResult?.totalTokens);
+  const fromNotification = Number(finish?.tokens);
+  const total = Number.isFinite(fromResult) && fromResult > 0 ? fromResult : fromNotification;
+  return Number.isFinite(total) && total > 0 ? total : undefined;
+};
+
 type CachedMessageProjection = {
   /** A tool-use row also depends on a separately received tool-result row. */
   toolResultSource: ToolResultSource;
   /** A live subagent container also depends on the newest row folded into its timeline. */
   subagentActivitySource: NormalizedMessage | null;
+  /** …and on the `<task-notification>` turn that declares its background agent finished. */
+  finishSource: NormalizedMessage | null;
   messages: ChatMessage[];
 };
 
@@ -90,15 +150,41 @@ export function normalizedToChatMessages(messages: NormalizedMessage[]): ChatMes
   const toolUseIds = new Set<string>();
   const liveSubagentActivity = new Map<string, SubagentActivity[]>();
   const liveSubagentToolsById = new Map<string, SubagentActivity>();
+  /** What each live agent has spent so far, by container (see `LiveUsageFold`). */
+  const liveSubagentUsage = new Map<string, LiveUsageFold>();
   /** Newest folded row per container, so its cached projection knows to rebuild. */
   const lastSubagentSourceByParent = new Map<string, NormalizedMessage>();
+  /**
+   * The row that finished each background agent, by the `Agent` call it names. On a history
+   * load the server folds the transcript's `<task-notification>` turn onto the container
+   * (`subagent.status`, the finish time). On the LIVE path that turn never streams; the
+   * runtime provider forwards the SDK's `task_notification` event as a `task_notification`
+   * row carrying `toolId`, and without this fold a finished agent stayed "running" — and
+   * pinned above the transcript — until the next reload.
+   */
+  const finishByToolUseId = new Map<string, { status: string; source: NormalizedMessage }>();
   for (const msg of messages) {
+    if (msg.kind === 'task_notification' && msg.toolId) {
+      finishByToolUseId.set(msg.toolId, { status: typeof msg.status === 'string' ? msg.status : 'completed', source: msg });
+    }
     if (msg.parentToolUseId) {
       const parentId = msg.parentToolUseId;
       let activity = liveSubagentActivity.get(parentId);
       if (!activity) {
         activity = [];
         liveSubagentActivity.set(parentId, activity);
+      }
+
+      if (msg.usage && msg.usageMessageId) {
+        let fold = liveSubagentUsage.get(parentId);
+        if (!fold) {
+          fold = { contextTokens: 0, messageIds: new Set() };
+          liveSubagentUsage.set(parentId, fold);
+        }
+        fold.contextTokens = msg.usage.contextTokens;
+        fold.messageIds.add(msg.usageMessageId);
+        // A figure that moved is a reason to redraw the container, whatever the row said.
+        lastSubagentSourceByParent.set(parentId, msg);
       }
 
       switch (msg.kind) {
@@ -170,14 +256,18 @@ export function normalizedToChatMessages(messages: NormalizedMessage[]): ChatMes
     const subagentActivitySource = msg.kind === 'tool_use' && msg.toolId
       ? lastSubagentSourceByParent.get(msg.toolId) ?? null
       : null;
+    const finish = msg.kind === 'tool_use' && msg.toolId ? finishByToolUseId.get(msg.toolId) : undefined;
+    const finishSource = finish?.source ?? null;
     const cachedProjection = projectionCache.get(msg);
 
     // A tool-use projection must be rebuilt when a matching result arrives,
     // even though the original tool-use record itself is unchanged. The same
-    // holds for a subagent container when its live timeline grows.
+    // holds for a subagent container when its live timeline grows, and when
+    // the notification that finishes its agent lands.
     if (
       cachedProjection?.toolResultSource === toolResultSource
       && cachedProjection.subagentActivitySource === subagentActivitySource
+      && cachedProjection.finishSource === finishSource
     ) {
       converted.push(...cachedProjection.messages);
       continue;
@@ -283,6 +373,32 @@ export function normalizedToChatMessages(messages: NormalizedMessage[]): ChatMes
           ? liveActivity
           : serverActivity;
 
+        // What the agent has spent, from every reading there is (`combineSubagentUsage`).
+        const subagentUsage = isSubagentContainer
+          ? combineSubagentUsage(
+            msg.subagent?.usage,
+            msg.toolId ? readLiveUsage(liveSubagentUsage.get(msg.toolId)) : undefined,
+            readFinishedContextTokens(tr, finish?.source ?? null),
+          )
+          : undefined;
+
+        // A live finish: the row names the agent's status and, being the event that ended the
+        // run, the honest finish time — the receipt's own stamp is the LAUNCH. Only on the
+        // container itself: a resumed agent notifies under the `SendMessage` call that resumed
+        // it, and that row is not the agent.
+        const launchReceipt = tr as { toolUseResult?: { agentId?: unknown } } | null;
+        const finishedHere = finish && isSubagentContainer ? finish : undefined;
+        const subagent = finishedHere
+          ? {
+              ...(msg.subagent ?? { id: String(launchReceipt?.toolUseResult?.agentId ?? msg.toolId ?? '') }),
+              status: finishedHere.status === 'completed'
+                ? ('completed' as const)
+                : finishedHere.status === 'stopped'
+                  ? ('stopped' as const)
+                  : ('failed' as const),
+            }
+          : msg.subagent;
+
         converted.push({
           type: 'assistant',
           content: '',
@@ -297,11 +413,12 @@ export function normalizedToChatMessages(messages: NormalizedMessage[]): ChatMes
           // and it stops before the closing reply that ends the run.
           // Only the separately-delivered result row carries a time; a result attached inline
           // to the tool call has none, and no stamp is better than the call's own start time.
-          toolResultAt: tr && 'timestamp' in tr ? tr.timestamp : undefined,
+          toolResultAt: finishedHere ? finishedHere.source.timestamp : (tr && 'timestamp' in tr ? tr.timestamp : undefined),
           toolStatus: typeof msg.status === 'string' ? msg.status : undefined,
           isSubagentContainer,
-          subagent: msg.subagent,
+          subagent,
           subagentActivity,
+          subagentUsage,
           memoryCitations: msg.memoryCitations,
           ...sharedMetadata,
         });
@@ -402,6 +519,7 @@ export function normalizedToChatMessages(messages: NormalizedMessage[]): ChatMes
     projectionCache.set(msg, {
       toolResultSource,
       subagentActivitySource,
+      finishSource,
       // One source record can produce zero, one, or two UI messages (task
       // notifications with a result produce two), so cache the whole slice.
       messages: converted.slice(convertedStart),

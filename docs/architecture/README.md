@@ -49,7 +49,7 @@ one of those two paths disagreeing with the other.
 | 4 | [The message store and lazy loading](./04-message-store-and-lazy-loading.md) | Where messages live in the client, and how a huge transcript loads without freezing the tab. |
 | 5 | [Scrolling](./05-scrolling.md) | Where the view sits, and why five different pieces of code move it. |
 | 6 | [Tool views](./06-tool-view.md) | How a tool call becomes UI. Needs the message model from 2 and 4. |
-| 7 | [Live widgets](./07-live-widgets.md) | How a `widget` fence becomes a sandboxed live frame. Last, because it needs the streaming markdown pipeline from 2 — and the transport from 1 once a widget can subscribe to live data. |
+| 7 | [Live widgets](./07-live-widgets.md) | How a `widget` fence becomes a live frame — two of them, chosen by the body: a sandboxed HTML document, or one DocSpace block embedded from ArchPulse's own origin. Last, because it needs the streaming markdown pipeline from 2 — and the transport from 1 once a widget can subscribe to live data. |
 
 **In a hurry?** Read 1 and 2.
 **Debugging something a user can see?** Start at 5 or 6.

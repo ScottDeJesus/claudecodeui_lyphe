@@ -34,6 +34,12 @@ type LazyMessageRowProps = {
    * placeholder and mounts when scrolled toward.
    */
   initiallyNearViewport: boolean;
+  /**
+   * Keeps the content mounted however far the row scrolls. A row the run is blocked on holds
+   * the live answer panel, whose half-made choices live in component state and would not
+   * survive a placeholder swap.
+   */
+  pinned?: boolean;
   children: ReactNode;
 };
 
@@ -41,6 +47,7 @@ export default function LazyMessageRow({
   lazyRows,
   timestamp,
   initiallyNearViewport,
+  pinned = false,
   children,
 }: LazyMessageRowProps) {
   const [isNearViewport, setIsNearViewport] = useState(initiallyNearViewport);
@@ -65,7 +72,7 @@ export default function LazyMessageRow({
     return lazyRows.observe(element, handleNearViewportChange);
   }, [lazyRows, handleNearViewportChange]);
 
-  const isMounted = lazyRows === null || isNearViewport;
+  const isMounted = lazyRows === null || pinned || isNearViewport;
 
   return (
     <div

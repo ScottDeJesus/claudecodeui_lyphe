@@ -19,10 +19,12 @@ type UseTerminalGroundOptions = {
  * xterm.js holds a COPY of the colours it was built with, so a terminal left alone here keeps
  * its light background through a switch to dark. This re-reads the tokens on every flip.
  *
- * The read is deferred one frame on purpose. ThemeProvider puts `dark` on `<html>` from its
- * OWN effect, and React runs a child's effects BEFORE its parent's — so reading the tokens
- * synchronously would read the theme being left behind, and the terminal would sit one flip
- * out of step for the rest of the session.
+ * The tokens are current by the time this effect runs: ThemeProvider puts `dark` on `<html>` in
+ * a layout effect, ahead of every ordinary effect of the same update. The write is still
+ * deferred one frame, for xterm's sake rather than the theme's: on the render that marks the
+ * terminal initialized its renderer has not measured itself yet, and assigning a theme then
+ * throws inside xterm ("Cannot read properties of undefined (reading 'dimensions')" — measured
+ * 2026-09-10 by phase 16 with the write made synchronous).
  */
 export function useTerminalGround({ terminalRef, isInitialized, baseTheme }: UseTerminalGroundOptions): void {
   const { isDarkMode } = useTheme();

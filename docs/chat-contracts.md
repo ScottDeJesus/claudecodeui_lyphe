@@ -76,7 +76,27 @@ as `widget-config` stays an ordinary documentation label and runs nothing. Nothi
 plain `html` fence, or any other language tag, stays a code block, because that fence does not
 exist anywhere `CLAUDE_SURFACE` is not `cloudcli`.
 
-What a widget is allowed to do is narrower still: its sandbox is `allow-scripts` and nothing else —
-no `allow-same-origin`, no network of any kind — and it reaches the rest of the app only by naming
-a TOPIC through `live.subscribe`, never a URL. The full shape of the fence, the sandbox and the bus
-it talks to is [architecture/07-live-widgets.md](architecture/07-live-widgets.md).
+What a widget is allowed to do is narrower still, and it is the BODY that decides — the tag admits,
+it never widens. Raw HTML is the default and is what it has always been: its sandbox is
+`allow-scripts` and nothing else — no `allow-same-origin`, no network of any kind — and it reaches
+the rest of the app only by naming a TOPIC through `live.subscribe`, never a URL. The one other
+shape is a body that parses as JSON naming a DocSpace block
+(`{ "kind": "docspace", "pageId": …, "blockId": … }`), and it is a DIFFERENT frame rather than a
+loosened one: it navigates to ArchPulse's own origin so the block can save what the reader edits,
+it subscribes to no topics at all, and the origin it lands on must differ from this app's before
+any iframe is rendered. Everything else — a body that fails to parse, one whose `kind` is something
+else, one that merely contains the word — is HTML, so nothing that renders today can change shape.
+The full shape of the fence, both sandboxes, the origin invariant and the bus it talks to is
+[architecture/07-live-widgets.md](architecture/07-live-widgets.md) §"The DocSpace kind".
+
+That second body shape — a fence whose content is the JSON naming a DocSpace block — renders
+through `DocSpaceFrame`, an iframe pointed at ArchPulse's own origin and never at this app's:
+`isForeignOrigin` refuses to mount it at all when the two origins are equal, which is what makes
+the ORIGIN itself the invariant rather than any flag read off the fence. That is also why this is
+the one frame whose sandbox carries `allow-same-origin` — a real origin with its own document and
+a login-free API, so a grant the HTML widget's `srcDoc` sandbox never may hold is safe here
+precisely because the origin differs. The surface sentence (`surface-signal.ts`) carries this in
+its own clause now: anything that should persist, be edited by the reader, or be read back on a
+later turn is steered toward a DocSpace block instead of a one-off HTML fence. The full protocol
+both frames speak is still [architecture/07-live-widgets.md](architecture/07-live-widgets.md)
+§"The DocSpace kind".

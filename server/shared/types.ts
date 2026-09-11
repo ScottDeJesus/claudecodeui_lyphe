@@ -351,6 +351,8 @@ export type NormalizedMessage = {
     content?: string;
     isError?: boolean;
     toolUseResult?: unknown;
+    /** When the result landed — for an agent, when it finished. Absent when the transcript does not say. */
+    timestamp?: string;
   };
   isError?: boolean;
   text?: string;
@@ -364,6 +366,15 @@ export type NormalizedMessage = {
   status?: string;
   summary?: string;
   tokenBudget?: unknown;
+  /**
+   * What this assistant row's request cost, reduced to the two figures a subagent's row is
+   * read by (see `SubagentUsage`). Every row cut from one API message carries the same
+   * `usageMessageId`, and a streamed message reaches the transcript as several records whose
+   * `outputTokens` grows — so a reader keeps the LAST value per id, never a sum of rows.
+   * Absent when the provider reports no usage, or an all-zero one (Claude's synthetic rows).
+   */
+  usage?: { contextTokens: number; outputTokens: number };
+  usageMessageId?: string;
   /**
    * Timeline of everything a subagent did, attached to the `tool_use` that
    * spawned it. Present for Claude `Agent`/`Task` calls and Codex
@@ -437,7 +448,8 @@ export type SubagentInfo = {
   type?: string;
   /** One-line task summary shown in the collapsed header. */
   description?: string;
-  status: 'running' | 'completed' | 'failed';
+  /** `stopped` is the reader's own Stop, an interrupt or a teardown — not a failure. */
+  status: 'running' | 'completed' | 'failed' | 'stopped';
   /** Model the subagent ran on, when the provider records it. */
   model?: string;
   /**
@@ -446,6 +458,28 @@ export type SubagentInfo = {
    * lets the UI say so instead of silently showing a partial timeline.
    */
   activityCount?: number;
+  /** What the agent has spent so far, when the provider records usage (today: Claude). */
+  usage?: SubagentUsage;
+};
+
+/**
+ * A subagent's token reading, in the two figures that describe a run.
+ *
+ * `contextTokens` is the agent's context window as of its LATEST request — input, cache
+ * creation, cache read and reply of that one request, summed. It is the number Claude Code
+ * itself calls the agent's tokens (`totalTokens` on the `Agent` tool's result; equal on every
+ * real result measured 2026-09-10), so the two never disagree. It is not a running total
+ * across requests: that sum re-bills the same cached prompt every turn and reads ten times
+ * the window for a long run.
+ *
+ * `outputTokens` is everything the agent wrote, summed over its requests — the work it has
+ * actually done, which the context figure alone hides behind a large read-in prompt.
+ * `requests` counts the API messages behind both figures.
+ */
+export type SubagentUsage = {
+  contextTokens: number;
+  outputTokens: number;
+  requests: number;
 };
 
 /**
@@ -528,6 +562,12 @@ export type FetchHistoryResult = {
   offset: number;
   limit: number | null;
   tokenUsage?: unknown;
+  /**
+   * The conversation's running and recently finished agents, from the WHOLE history whatever
+   * page was asked for — compact container rows for the pinned strip
+   * (`collectSessionAgents`). Only on a latest page (offset 0).
+   */
+  agents?: NormalizedMessage[];
 };
 
 // ---------------------------

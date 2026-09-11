@@ -5,10 +5,6 @@ import type { PendingPermissionRequest } from '@/shared/types';
 import { Banner, Button } from '@/shared/ui';
 import { buildClaudeToolPermissionEntry, formatToolInputForDisplay } from '@/modules/chat/utils/chatPermissions';
 import { getClaudeSettings } from '@/shared/userSettings';
-import { getPermissionPanel, registerPermissionPanel } from '@/modules/chat/tools/configs/permissionPanelRegistry';
-import { AskUserQuestionPanel } from '@/modules/chat/tools/InteractiveRenderers/AskUserQuestionPanel';
-
-registerPermissionPanel('AskUserQuestion', AskUserQuestionPanel);
 
 type PermissionRequestsBannerProps = {
   pendingPermissionRequests: PendingPermissionRequest[];
@@ -35,9 +31,10 @@ export default function PermissionRequestsBanner({
 }: PermissionRequestsBannerProps) {
   const { t } = useTranslation('chat');
 
-  // Filter out plan tool requests — they are handled inline by PlanDisplay
+  // Plan and question prompts are answered inline in the transcript — PlanDisplay and
+  // QuestionAnswerContent — so they are not offered a second time here.
   const filteredRequests = pendingPermissionRequests.filter(
-    (r) => r.toolName !== 'ExitPlanMode' && r.toolName !== 'exit_plan_mode'
+    (r) => r.toolName !== 'ExitPlanMode' && r.toolName !== 'exit_plan_mode' && r.toolName !== 'AskUserQuestion'
   );
 
   if (!filteredRequests.length) {
@@ -45,18 +42,8 @@ export default function PermissionRequestsBanner({
   }
 
   return (
-    <div className="mb-3 space-y-2">
+    <div className="mx-auto mb-3 max-w-[54.25rem] space-y-2">
       {filteredRequests.map((request) => {
-        const CustomPanel = getPermissionPanel(request.toolName);
-        if (CustomPanel) {
-          return (
-            <CustomPanel
-              key={request.requestId}
-              request={request}
-              onDecision={handlePermissionDecision}
-            />
-          );
-        }
 
         const rawInput = formatToolInputForDisplay(request.input);
         const permissionEntry = buildClaudeToolPermissionEntry(request.toolName, rawInput);

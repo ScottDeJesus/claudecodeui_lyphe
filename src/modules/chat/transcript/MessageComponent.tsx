@@ -270,6 +270,7 @@ const MessageComponent = memo(({ message, prevMessage, isRunTerminal, createDiff
                 toolResultAt={message.toolResultAt as string | number | Date | undefined}
                 subagent={message.subagent}
                 activity={message.subagentActivity}
+                usage={message.subagentUsage}
                 onFileOpen={onFileOpen}
                 createDiff={createDiff}
                 selectedProject={selectedProject}

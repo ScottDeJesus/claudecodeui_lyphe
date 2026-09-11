@@ -80,8 +80,8 @@ export function RunnerPanel() {
         <ScrollArea className="flex-1">
           {/* A measured column, centred, the way the memory queue's is: these are short cards, and
               letting one run the full width of a desktop workspace strands a line of text in a
-              field of empty surface. `min-w-0` is what lets the titles inside truncate at 390px
-              instead of pushing the card wider than the pane. */}
+              field of empty surface. What lets a title wrap at 390px is `w-full break-words` on the
+              card's own heading (`RunCard`), not anything here. */}
           <ul className="mx-auto flex w-full min-w-0 max-w-2xl flex-col gap-3 px-4 py-5">
             {ordered.map((run) => (
               <li key={run.run_id} className="min-w-0">

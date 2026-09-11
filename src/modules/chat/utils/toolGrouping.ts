@@ -13,8 +13,12 @@ export function isToolGroupItem(item: MessageListItem): item is ToolGroupItem {
   return '_isGroup' in item && (item as ToolGroupItem)._isGroup === true;
 }
 
+// A question row stands alone: while the run waits on it, it carries the live answer panel
+// (QuestionAnswerContent), and a collapsed group would hide the only way to answer.
 function isGroupableToolMessage(message: ChatMessage): message is ChatMessage & { toolName: string } {
-  return Boolean(message.isToolUse && message.toolName && !message.isSubagentContainer);
+  return Boolean(
+    message.isToolUse && message.toolName && message.toolName !== 'AskUserQuestion' && !message.isSubagentContainer,
+  );
 }
 
 // Messages that render nothing (e.g. reasoning hidden when showThinking is off)

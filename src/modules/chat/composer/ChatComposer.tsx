@@ -67,6 +67,13 @@ type ChatComposerProps = {
   tokenBudget: Record<string, unknown> | null;
   onShowTokenUsage: () => void;
   onToggleCommandMenu: () => void;
+  /**
+   * The pinned-agents strip, seated at the top of this shell so it sits between the
+   * transcript and the input: the transcript's scroller ends above it, so the last message
+   * is never under it, and the activity tab still floats above it as it floats above the
+   * transcript today. The composer knows nothing about agents; it only holds the seat.
+   */
+  pinnedAgents?: ReactNode;
   /** Every message goes out under `/plain` while this is on. */
   plainMode: boolean;
   onTogglePlainMode: () => void;
@@ -150,6 +157,7 @@ export default function ChatComposer({
   tokenBudget,
   onShowTokenUsage,
   onToggleCommandMenu,
+  pinnedAgents,
   plainMode,
   onTogglePlainMode,
   hasInput,
@@ -315,8 +323,16 @@ export default function ChatComposer({
 
   return (
     <div className="chat-composer-shell relative flex-shrink-0 px-2 pb-2 pt-0 sm:px-4 sm:pb-4 md:px-4 md:pb-6">
+      {pinnedAgents}
+      {/* The activity tab is anchored HERE, not on the shell: it floats above the input and
+          below the pinned agents, whose work it does not describe — the tab is this
+          conversation's own thinking, and a subagent above it is not thinking. */}
+      <div className="relative">
+      {/* `w-full`, not the shell-padding calc it had on the shell: this wrapper IS the shell's
+          content box, so 100% is already the input's width — the calc took the padding off a
+          second time and floated both tabs inside the input's corners (Athena, 2026-09-10). */}
       {!hasPendingPermissions && (
-        <div className="pointer-events-none absolute bottom-full left-1/2 z-10 w-[calc(100%-1rem)] max-w-[54.25rem] -translate-x-1/2 translate-y-px bg-transparent sm:w-[calc(100%-2rem)]">
+        <div className="pointer-events-none absolute bottom-full left-1/2 z-10 w-full max-w-[54.25rem] -translate-x-1/2 translate-y-px bg-transparent">
           <ActivityIndicator activity={activity} onAbort={onAbortSession} isInputFocused={isInputFocused} />
         </div>
       )}
@@ -632,6 +648,7 @@ export default function ChatComposer({
 
         </PromptInputFooter>
       </PromptInput>
+      </div>
       </div>
     </div>
   );

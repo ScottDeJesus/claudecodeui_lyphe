@@ -34,6 +34,23 @@ Ports live in `.env` and are deliberately not upstream's defaults: the backend i
 on **5183** rather than 5173. `.env` also pins `HOST=127.0.0.1`, `CLAUDE_CLI_PATH`, and the
 context-window values.
 
+**One phase needs a THIRD service, and it is not this repo's.** `phase-29.mjs` embeds a real
+DocSpace block and then reads the same block back in ArchPulse's own studio, so it needs
+`archpulse.service` answering on :8005 — the house's unit, at
+`~/.claude/ArchPulse/archpulse.service`:
+
+```bash
+systemctl is-active archpulse                                    # active = phase 29 can run
+curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8005/    # 200 = it is answering
+```
+
+With it down `node .verify/all.mjs` still runs to the end and every other phase is unaffected —
+phase 28 stays green because it deliberately requires nothing of ArchPulse — while phase 29 fails
+on its first call with `[FAIL] the run reached its end (fetch failed)` and no gate after it runs.
+That line means the service is down, not that the embed regressed. Its entry in §"The browser
+harness" says what the gates are; §"What bites people" says what a restart *mid-run* looks like,
+which is a different and less obvious failure.
+
 ## Mechanical checks
 
 ```bash
@@ -370,9 +387,11 @@ session's own persisted row on disk — rather than asking the model the same qu
 Phase 22 is the widget fence, and it is the gallery technique again for the oldest reason: nothing in
 the app mounts a widget, because the fence only exists when a model writes one. So it mounts
 `MarkdownBody` from the running dev server over the signed-in page and feeds it fences built in the
-probe as strings — both module specifiers read back out of served source rather than typed, the `?t=`
+probe as strings — three module specifiers read back out of served source rather than typed, the `?t=`
 rule, with `ThemeContext` taken from what `useWidgetHost` itself imports so the gallery's own
-`ThemeProvider` and the component reading it are the same instance. Fourteen gates, in order: a `widget`
+`ThemeProvider` and the component reading it are the same instance, and `LiveBusProvider` mounted
+inside it because the frame's own hook chain now reaches `useLiveBus` (§"What bites people", *A
+gallery over the app must carry the app's provider stack*). Fourteen gates, in order: a `widget`
 fence yields exactly one iframe whose `sandbox` attribute is the string `allow-scripts`, with a
 `srcdoc` and no `src` (1); inside that frame the origin reads `null` and both the parent document and
 `localStorage` throw `SecurityError`, which is the invariant the whole feature rests on and the reason
@@ -616,6 +635,66 @@ reload waits for the server to acknowledge it (the probe polls `GET /api/user/pr
 the id) rather than reloading on the click; and the fixture ids it dismisses stay in the operator's
 list until the next dismissal prunes them — harmless, capped, and noted.
 
+Phase 28 is the docspace widget kind, and it is phase 22's gallery technique copied rather than
+re-invented — the same fixed div over the app, the same fences built by concatenation so the file
+carries none of its own, the same two module specifiers read back out of served source under the
+`?t=` rule. What it proves is the SEAM and not the embed: that the right kind is chosen, that the
+two frames stay two frames, and that the raw path is untouched. It deliberately does not require
+ArchPulse to answer — every gate reads CloudCLI's own DOM, modules and exports, and both ids it
+names (`fixture-p`, `fixture-b`) are well-formed and intentionally name nothing. Ten gates, in
+order: a docspace fence yields exactly one iframe whose `sandbox` is EXACTLY the three tokens —
+compared with `===` and never `includes`, so a quietly added `allow-popups` reddens it — with the
+embed URL as its `src`, no inline document and no referrer (1); that `src` is on a FOREIGN origin,
+the invariant `allow-same-origin` rests on (2); a docspace body with unusable ids draws the error
+card and NO frame (3); non-docspace JSON still takes the raw path — one frame, `allow-scripts`,
+inline document (4); a plain HTML widget fence is untouched, the same (5); an unterminated docspace
+fence in the streaming half is source rather than a frame (6); `buildTranscriptExport` renders the
+fence as TEXT, so no iframe reaches a saved file (7); a theme flip leaves `src` byte-identical,
+with the flip itself asserted so the gate cannot pass by not happening — a new `src` is a
+navigation, and the reader's unsaved edit goes with it (8); `Markdown.tsx` knows nothing about
+docspace, read from the served source, because the fork belongs behind `WidgetFrame`'s two gates
+and not in `CodeBlock` (9); and the signed-in stage is clean apart from the named, measured
+exceptions (10, see *What bites people*). It sends no Claude turn, creates no DocSpace page and
+sweeps no fixture. What bites: `DocSpaceFrame` gives the embed 8 s to say `ready` and then replaces
+the iframe with an error card, so every gate touching the iframe runs inside a fresh 8-second
+window — which is why gate 8 remounts the gallery before it flips. Gate 8 also writes the `theme`
+preference and puts it straight back; no other preference is touched. Shots are `28-docspace-light`,
+`28-docspace-dark` and `28-docspace-390-light`. Its contract is at
+[architecture/07-live-widgets.md](architecture/07-live-widgets.md) §"The DocSpace kind".
+
+Phase 29 is the same block read from both ends at once, and it is the only probe here that writes
+into the REAL DocSpace store. Where phase 28 required nothing of ArchPulse, this one stands a
+page up through ArchPulse's stateless JSON-RPC door (`POST /api/mcp` — no `initialize` handshake,
+the result a JSON string inside the envelope), embeds one of its blocks in a CloudCLI transcript
+with phase 22's gallery technique, edits it from inside the frame, and watches that edit arrive
+in a SECOND browser page showing the same block in ArchPulse's own studio. Two surfaces, one
+store, one write, which is the whole claim the feature makes. Twelve readings across nine gates,
+in order: a docspace fence naming a REAL block reaches `[data-embed-state="ready"]` inside its
+frame with the block's own text painted in it (1); the frame wears the session's theme, read as
+`body.vv-dark` INSIDE the frame in a light session and again in a dark one, never off the URL's
+`?theme=`, which is what CloudCLI asked for rather than what the embed did — and the `--canvas`
+each frame RESOLVES is carried between those two sessions and required to differ, because an
+absent class is the default state of any document and an embed that applied no theme at all would
+satisfy the light half on its own (2, read off `document.body`, where `verve-tokens.css` puts the
+override); a mid-probe flip through `writeUserPreference('theme', …)` reaches the LIVING frame
+and leaves `src` byte-identical, with the flip itself asserted so the gate cannot pass by not
+happening (3); a click on a checklist item inside the frame lands on the server and moves the
+page's `rev` (4); and ArchPulse's studio — opened on the fixture BEFORE that click, with its
+unticked before-state asserted — adopts it within two poll cadences, read from
+`TaskChecklistCard`'s own rendered row rather than from a request, with the untouched second item
+read alongside it (5, measured at ~750 ms); at 390 the frame fits its column and the document
+inside it does not scroll sideways (6); the height the host holds is the inside document's
+`scrollHeight` to within 8 px, and not a floor or a ceiling that any bug would satisfy (7); a
+well-formed block id naming nothing draws the embed's own *Not here* card at a readable height
+rather than a blank frame (8); and the signed-in stage is clean apart from phase 28's named
+exceptions (9). It sends no Claude turn. Its fixture page is titled
+`fixture-docspace-embed-<ms>`, swept at the start if a crashed run left one, and deleted in an
+OUTERMOST `finally` by the id the probe minted and no other — DocSpace holds the operator's real
+pages, so the title prefix is the fence at both ends and a cleanup that fails reddens the run.
+Shots are `29-docspace-light`, `29-docspace-dark` and `29-docspace-390-light`. Its two contracts
+are [architecture/07-live-widgets.md](architecture/07-live-widgets.md) §"The DocSpace kind" for
+this half and ArchPulse's own `README.md` §"Embedding one block" for the other.
+
 Keepalive survival is the one proof here that is not a phase and is not in `all.mjs`, because what
 is under test is the API's own death. `.verify/keepalive-turn.mjs` is the client every case
 spawns — a driver whose socket keeps dying, which re-subscribes with the seq it remembers and
@@ -676,6 +755,42 @@ And the one file the two instances share is the local server marker `~/.cloudcli
 the child clobbers it on boot and removes its own on the way out, so the probe puts the original
 back in a `finally` — except where the live API restarted mid-probe and wrote a fresher one, a
 marker naming a living process being better truth than a snapshot naming a dead pid.
+
+**`probe-widget-theme.mjs` proves a live widget is REDRESSED by a theme flip, not merely told about
+it.** `useWidgetHost` posts `{ dark, tokens }` from an ordinary effect keyed on `isDarkMode`, and
+reads those token values off `<html>`; React runs a child's effects before its parent's, so a
+ThemeProvider that wrote the `dark` class from an ordinary effect would have every widget post the
+new flag with the old colours and keep them for the frame's life — invisible on a reload, because
+the document is then built in the new theme. The probe mounts the app's own Markdown renderer over
+the page, under its own ThemeProvider (the same module instance, read out of served source) with
+one widget fence and one button calling `useTheme().toggleDarkMode`, so the flip goes through the
+same commit ordering the app's switch does without touching the stored theme. It stamps a value
+inside the frame's document, flips, and checks: the page flipped, the stamp survived (redressed,
+not rebuilt), every compared token in the frame equals the page's own, and the tile's painted
+colour moved. Then it flips back and checks again — with the defect present the second flip is the
+one that fails, which is why both are measured. It unmounts the fixture and puts the `dark` class
+back as found.
+
+**`probe-pinned-agents.mjs` proves the strip above the chat box shows the conversation's agents,
+not the loaded window's.** A page loads history from the tail, twenty rows at a time, so the rows a
+page holds are the wrong source for a strip that must keep a running agent in view: an agent
+launched early in a long turn drops out of the loaded window exactly while it is working. It reads
+a latest history page over the API and checks that it carries `agents` while an older page does
+not, that at least one listed agent is beyond the loaded rows (otherwise the run proves nothing and
+says so), then opens the conversation and holds the strip against that list: every listed agent
+inside the strip's own windows drawn, none drawn twice, each row's token chip equal to the figure
+the server reported for that agent, a dismissal written before the page loads still gone after a
+reload, and the rows painted by the dark theme in a dark session. It picks its subject from the
+TRANSCRIPT, never from the list under test — the newest recent conversation holding an agent inside
+the strip's windows, preferring one whose agent sits behind the rows a page loads first — so a list
+that regressed to empty fails the first gate instead of reporting that there is nothing to measure
+(verified by returning `[]` from `collectSessionAgents`: three gates go red). `PROBE_SESSION_ID`
+overrides the pick; a host that has run no agent inside the windows is BLOCKED rather than passed.
+The token gate allows a running agent's chip to sit ABOVE the list's snapshot, because the client
+keeps the largest of the server's reading, its live fold and the finish total, and demands equality
+only where the figure can no longer move. The theme gate compares the same rows' colours across a
+light and a dark session and requires them to have moved, since every rendered element has some
+colour. It sends no prompt and writes nothing but its own browser's dismissal key.
 
 ## Standing colour baselines
 
@@ -824,6 +939,12 @@ person editing `server/` is in [hosting.md](hosting.md) §"Rules that bite".
 | **A ratio read with the pointer on the row is the hover's ratio** | `.vv-button--ghost:hover:not(:disabled)` paints `--accent-soft`, and at `(0,3,0)` it out-specifies a call site's own `hover:bg-…` utility at `(0,2,0)` — nothing here is in a cascade layer, so specificity alone decides. A hovered project row is therefore standing on Verve's wash, not on the ground its own classes name, and `page.click()` leaves the cursor exactly where it clicked. Park it off the surface before measuring, or measure a row nothing is over. |
 | **A success-only sign-in never reaches the error branch** | `phase-5.mjs` types a wrong password first, asserts the amber `Banner`, then signs in for real — because the login route answers `{error:{code,message}}` and a screen that hands that object to JSX takes the tree down rather than showing a message. No correct password visits that branch. Verify any new screen that surfaces an API error the same way: drive the rejection. |
 | **`phase-22.mjs` expects two console errors, and neither is a defect in it** | The CSP refusal is the PROOF of gate 5, not noise — Chromium logs the one blocked call as two differently worded lines, so the probe filters on the `widget-probe=22` marker in the URL rather than on either phrasing. The second is the app's own: any sandboxed frame on this page raises one `SecurityError: Failed to read the 'serviceWorker' property from 'Navigator'`, because `'serviceWorker' in navigator` is true in a sandboxed context while *reading* the property throws (`index.html`, `src/main.tsx`). Measured, not assumed: it reproduces with an empty `srcdoc` carrying none of the widget code, does not reproduce with `about:blank` as the parent, and is unaffected by blocking `/sw.js`. The widget fence is simply the first thing in the app to create a sandboxed frame, so it is what exposes it. Both are filtered by substring; every other error still reddens the gate. |
+| **`phase-28.mjs` forgives console errors on EVIDENCE, not on sight** | Its embed frame really does navigate to ArchPulse and really does name a block that does not exist, so its own answer arrives on this page's console — and that answer has two shapes. With ArchPulse **down** the line names the URL, and a substring test on the DocSpace origin plus a `fixture-` id catches it. With ArchPulse **up** the same event is ANONYMOUS: Chromium logs exactly `Failed to load resource: the server responded with a status of 404 (Not Found)` with no URL in the text, and forgiving that wording on sight would forgive every 404 anywhere in CloudCLI forever. So the probe records every non-2xx response with its URL, and each one from the DocSpace origin buys the right to excuse exactly ONE anonymous line — a budget, never a flag, so an unrelated CloudCLI failure cannot redden the embed's lines too, and a CloudCLI 404 buys nothing and reddens the gate. `net::ERR_ABORTED` on ArchPulse's own modules is a separate list that grants no budget: it is what an in-flight module graph does when the frame under it is torn out, and this probe tears one out three times. The counts and the distinct URLs both print, so the artifact says what was excused and on what. The app's own `serviceWorker` guard fires here too (row above), raised by gates 4 and 5's ordinary HTML widgets rather than by anything this change did. |
+| **`phase-29.mjs` writes a real page into the real DocSpace store** | It is the one probe here that does, and the fence is the TITLE: every page it makes is `fixture-docspace-embed-<ms>`, it sweeps leftovers carrying that prefix before it starts, and it deletes its own in an outermost `finally` by the id it minted — never by a title match, and never any other page. A failed cleanup sets the exit code, so a page left behind is a red run rather than a quiet one. `scripts/probe_embed_block.mjs` in ArchPulse uses the same prefix and `scripts/probe_block_card_lift.mjs` uses `fixture-docspace-lift-`: two prefixes, so neither probe can ever delete the other's page. Sweep any survivor of a killed run by hand — DocSpace holds the operator's real work. |
+| **`phase-30.mjs` measures the OPERATOR's transcript, not a gallery** | It signs in and opens a real conversation by its app session id (the host id in `~/.cloudcli/sessions/*.json` minus its `-xxxxxxxx` suffix — a deep link with the suffixed id lands on the project picker), then walks UP through the lazy band, clicking "Load" at the top for older history, and measures each widget or DocSpace frame the moment it is met — twice: as met, possibly still off-screen, and again after scrolling it into view. Measuring at the end would find nothing: rows unmount as the walk moves on. The two readings are the point. A frame whose document fits only after it is seen is reporting late (what the DocSpace embed did before `reportHeightNow` ran on every commit: 673 and 564 px of document in 101 px frames), one that never fits is not reporting at all, and one that fits both times is right. It excuses the app's serviceWorker guard by the same substring the phases above use, and nothing else. |
+| **`phase-31.mjs` measures the question panel's "Other" field, not the panel** | It mounts `QuestionAnswerContent` from the running server inside a real `PermissionContext.Provider` with a pending request (the phase-6 idiom), opens "Other", types a long answer, and reads geometry: the field must sit OUTSIDE the options scroller and wholly above the Submit button — `elementFromPoint` at its bottom edge must return the field, not whatever covers it — and its computed right padding must be at least the span from its right edge to the badge's left, with the text actually scrolled. Then six options, to prove the list still scrolls within its twelve-rem cap. Before the fix the field lived inside the scroller and, with three or more options, was clipped against the footer while the badge sat over the end of the text — the operator could not see what they were typing. |
+| **An ArchPulse restart mid-probe reads as an error card, not as a bug** | `DocSpaceFrame` gives the embed `DOCSPACE_READY_TIMEOUT_MS` (8 s) to say `ready` and then replaces the iframe with `DocSpace did not answer at …`. Another session on this box restarting `archpulse.service` inside that window therefore turns phase 29's frame gates red for a reason that is not this app's — and the full reload it forces on any open DocSpace frame also costs that frame its theme posts until the chat re-renders. Re-run the probe once; if it recurs, the restart is not incidental and belongs in the report with the journal line. |
+| **A gallery over the app must carry the app's provider stack** | The probes that mount `MarkdownBody` into a second React root — `phase-22`, `phase-24`, `phase-28`, `phase-29` — carry `ThemeProvider` and `LiveBusProvider` because `WidgetFrameLive` reaches `useWidgetBridge` → `useLiveBus`, which THROWS outside a provider and takes the whole synthetic root down with it. The only symptom is a `waitForSelector` timeout on a gallery that rendered zero children, which reads as a broken selector rather than as a missing provider. Every specifier is read back out of served source (the `?t=` rule) for the other half of the same rule: two instances of a context module is two contexts, and a provider mounted from a hand-written specifier is invisible to the hook that needs it. The app itself is never affected — it mounts both providers once, at `App.tsx`. `phase-22.mjs` sat broken on exactly this from commit `693c95d` (which introduced the live-bus module and made `useWidgetBridge` a consumer of it) until phase 29's verify block re-ran it and the provider was added back; that repair changed nothing but the provider stack, and no gate, threshold or filter in the file moved with it. |
 | **A fixture run flashes in the terminal status bar** | `phase-23.mjs` and `phase-26.mjs` both write real run directories under the real state root, so for the few seconds one exists `scripts/runner_statusline.py` lists `fixture-live-widgets-<ms>` beside the operator's own runs — in the bar, and in `plan-runner status`. Expected, not a stray run: each probe removes what it wrote in a `finally`, `phase-23.mjs`'s last gate asserts the state root holds no `fixture-live-widgets-*` entry, and `phase-26.mjs` reddens its own run if a fixture will not remove. One left behind means a probe was killed mid-flight; delete it by hand. |
 | **`phase-23.mjs` notes that the socket was reopened** | The API restarted mid-probe — a save under `server/` under `tsx watch`, or the dev supervisor handing over — and the probe's chat socket healed through it rather than failing the frame gate on a closed one. A `[NOTE]`, never a failure: the gates after it are worth as much as on a run that carried no such line. The reopen contract is in the phase 23 entry of §"The browser harness". |
 | **The surface probe reads a process that only lives for one turn** | `phase-21.mjs` polls `/proc/<pid>/environ` of the SDK child spawned for its one Claude turn, and that child exists only while the turn is in flight — it is gone by the time a reply is on screen. The poll has to start before the prompt is sent and keep running through it; a reading taken after the reply arrives finds no such pid and proves nothing. |

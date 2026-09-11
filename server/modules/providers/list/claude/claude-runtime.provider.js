@@ -37,6 +37,7 @@ import {
   notifyUserIfEnabled
 } from '@/modules/notifications/index.js';
 import { createCompleteMessage, createNormalizedMessage } from '@/shared/utils.js';
+import { capToolResult } from '@/shared/message-unification.js';
 import { armKeepaliveSpawn, keepaliveReadopt } from './session-host/index.js';
 import { SURFACE_ENV, SURFACE_PROMPT_APPEND } from './surface-signal.js';
 
@@ -382,16 +383,28 @@ function getSession(sessionId) {
  * Transforms SDK messages to WebSocket format expected by frontend
  * @param {Object} sdkMessage - SDK message object
  * @returns {Object} Transformed message ready for WebSocket
+ *
+ * The SDK's live envelope spells two fields in snake_case that the transcript on disk — and
+ * therefore `normalizeMessage`, which serves both — spells in camelCase. `parent_tool_use_id`
+ * was mapped from the start. `tool_use_result` was not, and the cost was invisible until
+ * measured: a backgrounded agent's launch receipt carries `isAsync: true` INSIDE it, the only
+ * evidence that a tool result is a receipt rather than a finish, so on the live path every
+ * background agent read as finished the moment it launched and was never pinned above the
+ * transcript (`PinnedSubagents.tsx`); the same row read correctly after a reload, because the
+ * history reader takes the field from the JSONL. Measured 2026-09-10 with a live agent: the
+ * pin strip empty, the row already stamped "4 tools". Both spellings are mapped here so the
+ * normalizer sees one shape from either door.
  */
 function transformMessage(sdkMessage) {
+  const mapped = { ...sdkMessage };
   // Extract parent_tool_use_id for subagent tool grouping
   if (sdkMessage.parent_tool_use_id) {
-    return {
-      ...sdkMessage,
-      parentToolUseId: sdkMessage.parent_tool_use_id
-    };
+    mapped.parentToolUseId = sdkMessage.parent_tool_use_id;
   }
-  return sdkMessage;
+  if (sdkMessage.tool_use_result !== undefined && mapped.toolUseResult === undefined) {
+    mapped.toolUseResult = sdkMessage.tool_use_result;
+  }
+  return mapped;
 }
 
 /**
@@ -1002,6 +1015,30 @@ async function queryClaudeSDK(command, options = {}, ws, context) {
         // session_id already captured
       }
 
+      // The finish of a background task, as the LIVE stream tells it. The transcript on disk
+      // records the same fact as a `<task-notification>` user turn, which the history reader
+      // folds onto the `Agent` call by tool-use id; the stream never carries that turn (measured
+      // 2026-09-10: 17 of these events, zero such user turns), so this row is the only way a
+      // live transcript learns an agent ended — and releases its pin. Sent whenever the event
+      // arrives, turn complete or not: a backgrounded agent usually outlives the turn that
+      // launched it, and while the process is held open for it `turnCompleteSent` is already
+      // true. Inside that guard (as first written) the row was dropped for exactly that case
+      // — measured by Athena the same day: four background completions in the journal, no row
+      // for any. Ambient tasks (watchers, skip-transcript work) are not activity and get no row.
+      if (message.type === 'system' && message.subtype === 'task_notification' && message.ambient !== true) {
+        ws.send(createNormalizedMessage({
+          kind: 'task_notification',
+          sessionId: capturedSessionId || sessionId || '',
+          provider: 'claude',
+          toolId: typeof message.tool_use_id === 'string' ? message.tool_use_id : undefined,
+          status: typeof message.status === 'string' ? message.status : 'completed',
+          summary: typeof message.summary === 'string' ? message.summary : 'Background task finished',
+          // The CLI's own total for the agent (its context as of its last request), so the
+          // pinned row's finished figure is the terminal's figure without a reload.
+          tokens: readNumber(message.usage?.total_tokens) || undefined,
+        }));
+      }
+
       if (message.type === 'system' && !turnCompleteSent) {
         if (message.subtype === 'task_notification') {
           reconciliationPending = true;
@@ -1050,6 +1087,11 @@ async function queryClaudeSDK(command, options = {}, ws, context) {
         // Preserve parentToolUseId from SDK wrapper for subagent tool grouping
         if (transformedMessage.parentToolUseId && !msg.parentToolUseId) {
           msg.parentToolUseId = transformedMessage.parentToolUseId;
+        }
+        // The same cap history applies: a structured result can carry a whole file body
+        // beside the content string, and the live frame must not be the one door without it.
+        if (msg.kind === 'tool_result') {
+          capToolResult(msg);
         }
         if (isSubagentPromptEcho(msg)) {
           continue;

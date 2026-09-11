@@ -445,6 +445,9 @@ the expanded height first.
 `data-message-timestamp`. The expensive subtree mounts only while the row is within
 `LAZY_ROW_VIEWPORT_MARGIN_PX = 1200` of the viewport, tracked by one shared
 `IntersectionObserver` per pane rooted at the scroll container (`useLazyRowObserver.ts`).
+One exception: a row the run is blocked on — a tool call the permission layer reports as
+`waiting` — is `pinned` and stays mounted at any distance, because it holds the live answer
+panel, whose half-made choices live in component state and would not survive the swap.
 
 Three details exist purely to protect the scroll position:
 

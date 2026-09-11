@@ -2,6 +2,7 @@ import { memo } from 'react';
 import { CoinsIcon } from 'lucide-react';
 
 import { cn } from '@/shared/utils';
+import { formatTokenCount } from '@/modules/chat/utils/chatFormatting';
 
 /**
  * What a surface needs to draw the count somewhere other than the composer: the session's
@@ -17,26 +18,6 @@ type TokenUsageSummaryProps = {
   usage: Record<string, unknown> | null;
   onClick?: () => void;
   className?: string;
-};
-
-const formatTokenCount = (value: number) => {
-  if (!Number.isFinite(value) || value <= 0) {
-    return '0';
-  }
-
-  if (value >= 1_000_000) {
-    return `${(value / 1_000_000).toFixed(value >= 10_000_000 ? 0 : 1)}M`;
-  }
-
-  if (value >= 10_000) {
-    return `${Math.round(value / 1_000)}K`;
-  }
-
-  if (value >= 1_000) {
-    return `${(value / 1_000).toFixed(1)}K`;
-  }
-
-  return value.toLocaleString();
 };
 
 const readUsageNumber = (value: unknown) => {

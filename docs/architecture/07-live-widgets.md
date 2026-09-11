@@ -49,6 +49,13 @@ Read [the realtime stream](./02-realtime-stream.md) for how a reply arrives, and
 9. **The bus knows no producer.** It retains values, dispatches them and admits topics — that is
    all it does. What fills it is a FEED, a headless component owned by the module whose data it
    carries, and the first is `RunnerFeed` in `src/modules/plan-runner/`.
+10. **Two body shapes, two fences.** The info string says *widget*; the BODY says which kind. Raw
+    HTML is the default and everything above describes it — an opaque-origin frame carrying a
+    document this app composed inline. A body that parses as JSON naming a DocSpace block instead
+    renders as a `src` frame on ArchPulse's OWN origin, which is never this app's. They are not
+    variations on one frame: the first is untrusted output that must be able to reach nothing, the
+    second is another of the operator's services that must be able to reach itself. **The DocSpace
+    kind** below is the whole of it, and `isForeignOrigin` is the line between them.
 
 ## The pieces
 
@@ -61,6 +68,10 @@ Read [the realtime stream](./02-realtime-stream.md) for how a reply arrives, and
 | `src/modules/widgets/readVerveTokens.ts` | `WIDGET_TOKEN_NAMES` (the contract) and `readVerveTokens` (the live read) |
 | `src/modules/widgets/hooks/useWidgetHost.ts` | `useWidgetHost` — the page's half: one message listener, the height, the theme post, and the `load` counter that revokes a frame which navigated itself away |
 | `src/modules/widgets/hooks/useWidgetBridge.ts` | `useWidgetBridge` — one frame's subscriptions: the two refusals, the per-frame cap, and the unmount sweep |
+| `src/modules/widgets/classifyWidgetBody.ts` | `DOCSPACE_ID_RE` and `classifyWidgetBody` — which KIND a settled fence body is. The raw path is the default |
+| `src/modules/widgets/docspaceOrigin.ts` | `DOCSPACE_EMBED_DEFAULT_PORT`, `resolveDocSpaceOrigin`, `docspaceEmbedUrl`, and `isForeignOrigin` — the gate on `allow-same-origin` |
+| `src/modules/widgets/DocSpaceFrame.tsx` | `DOCSPACE_SANDBOX`, `DOCSPACE_READY_TIMEOUT_MS` and `DocSpaceFrame` — the second frame: a `src` on ArchPulse's origin, the latched theme, and the ready timer |
+| `src/modules/widgets/WidgetErrorCard.tsx` | `WidgetErrorCard` — the two-sentence card shown where a widget was asked for and cannot be drawn |
 | `src/modules/live-bus/topics.ts` | `LIVE_TOPIC_ALLOWLIST`, `isAllowedTopic`, `RUNNER_ALL_TOPIC`, `runnerTopic` — the whole vocabulary |
 | `src/modules/live-bus/context/LiveBusContext.tsx` | `LiveBusProvider` and `useLiveBus` — the retained values, the listener registry, `publish`/`subscribe`/`get` |
 | `src/modules/live-bus/hooks/useLiveTopic.ts` | `useLiveTopic` — the module's ONE render trigger, for a React component reading a topic |
@@ -70,6 +81,8 @@ Read [the realtime stream](./02-realtime-stream.md) for how a reply arrives, and
 | `src/shared/types.ts` | `WidgetFrameMessage`, `WidgetHostMessage`, `WidgetHostHandlers`, `LiveTopic`, `LiveValue`, `LiveBus`, under `LIVE WIDGETS` |
 | `.verify/phase-22.mjs` | The fence probe: the sandbox, the opaque origin, the CSP refusal, height, theme, streaming, export, and the revoke rule from both sides |
 | `.verify/phase-24.mjs` | The bus probe: a stage written to disk read back inside a sandboxed widget, both refusals, the cap, the unmount sweep, the REST seed and the retirement |
+| `.verify/phase-28.mjs` | The kind probe: the exact sandbox, the foreign origin, the error card, the raw path left alone, the streaming gate, the exports, and that a theme flip never rewrites `src` |
+| `.verify/phase-29.mjs` | The end-to-end probe, and the only one in this repo that needs ArchPulse up: a real block embedded, edited from inside the frame, that edit read back in ArchPulse's own studio, plus the theme flip on a LIVING frame, the height, and the not-found card |
 
 ## The fence
 
@@ -175,7 +188,9 @@ to navigate itself away to use it, and a widget that vanishes is one the reader 
 `document.documentElement` and omits any that resolve to nothing, so a widget's own
 `var(--x, fallback)` still gets its fallback. The values are interpolated into the `<style>`
 block only, declared on `:root`, alongside a reset that gives the body `var(--canvas)`,
-`var(--ink)` and `var(--font-body)`. The fence body is never interpolated into a script, an
+`var(--ink)`, `var(--font-body)` and `display:flow-root` — the last so a first or last child's
+margin stays inside the body box the bridge measures, instead of collapsing through it into a
+few pixels the frame cannot show. The fence body is never interpolated into a script, an
 attribute or the CSP.
 
 **The theme.** The document's opening theme is read off the `dark` class on `<html>` at build
@@ -183,6 +198,17 @@ time, the same instant and the same source the tokens come from. Every change af
 `theme` message: `useWidgetHost` posts one when the frame says `ready` and again whenever
 `useTheme().isDarkMode` changes, and the bridge toggles the `dark` class and calls
 `style.setProperty` for each token on the frame's own document element.
+
+That repost reads the tokens off `<html>` inside an ordinary effect, so it depends on the page
+having switched already. ThemeProvider (`src/shared/context/ThemeContext.tsx`) guarantees it by
+putting `dark` on `<html>` in a LAYOUT effect, which runs before every ordinary (passive) effect of
+the same update. A plain effect there would run after the widget host's, because React runs a
+child's effects before its parent's, and every live flip would send the new `dark` flag with the
+old theme's colours — measured on the living frame: 89 of 89 colour readings stale after a flip
+to dark with the plain effect, 0 with the layout effect (`/tmp/widget-theme-probe.mjs` shape: flip
+through the app's own switch, no reload, diff against a fresh dark load). Any other reader of the
+computed tokens gets the same guarantee only from an ordinary effect; one in its own layout effect,
+or at render time, would still read the old theme.
 
 ## The bridge protocol
 
@@ -218,6 +244,89 @@ unsubscribe of a topic clears its entry and a topic never subscribed has no unsu
 an in-frame replay can never predate the subscription it answers. On the page, the bus retains a
 topic's value whether or not anyone is listening, which is the entire point: it is what lets a
 widget mounted ten minutes into a run start with a picture instead of a blank box.
+
+## The DocSpace kind
+
+The second body shape. A `widget` fence whose body is exactly JSON of this shape embeds one
+DocSpace block from ArchPulse, live and editable in place:
+
+```json
+{ "kind": "docspace", "pageId": "<id>", "blockId": "<id>" }
+```
+
+`classifyWidgetBody` decides, and it decides conservatively. A body that does not start with `{`,
+one that fails to parse, and one whose `kind` is anything else are all `html` — so **the raw path
+is the default and nothing that renders today can change**. A body that merely CONTAINS the word
+docspace is HTML too; the test is the parsed `kind` field, never a substring. Only a body that
+says `kind: "docspace"` and then names ids that cannot be embedded is `invalid`, and that one
+draws `WidgetErrorCard` rather than falling back, because a block of JSON painted at the reader
+with no explanation is worse than a sentence saying what is wrong. Both ids must match
+`DOCSPACE_ID_RE`, an allowlist of letters, digits, dot, underscore, colon and hyphen that may not
+LEAD with a dot — which refuses `../x` and `a/b` without either being named as a special case.
+`DOCSPACE_ID_RE` is deliberately the same pattern as `EMBED_ID_RE` in ArchPulse's own
+`src/embed/embedRoute.ts`, so an id one side accepts is an id the other accepts.
+
+**The origin is the invariant, and it is not the same invariant as the HTML widget's.**
+`resolveDocSpaceOrigin` returns `VITE_DOCSPACE_EMBED_ORIGIN` when it is set AND is an absolute
+`http:`/`https:` URL, and otherwise the page's own hostname on port 8005 — right on the LAN and
+over Tailscale alike, because both services live on one box and whatever name reached CloudCLI
+reaches ArchPulse. The scheme is checked THERE rather than at the origin gate below, because a
+scheme with no host (`javascript:`, `data:`, `blob:`) has the opaque origin `"null"`, which is
+truthfully not this app's origin and so passes a foreign-ness test while being exactly the URL
+that should never reach a frame. A value that fails the check falls back to the default and is
+`console.warn`ed naming the value: a silently ignored setting is its own bug, because the timeout
+card would then name the DERIVED origin — a host the operator never typed — and point the
+investigation away from the setting that was dropped. Whatever it returns, `isForeignOrigin` is
+consulted BEFORE the iframe is rendered: if the resolved URL lands
+on this app's own origin, `DocSpaceFrame` draws the error card and no frame at all. Origins are
+compared, never hostnames — CloudCLI and ArchPulse share a hostname here and differ only by port,
+so a hostname test would refuse the normal case. A URL that will not parse is treated as NOT
+foreign, so an address nobody can reason about is never embedded.
+
+That gate is what makes `DOCSPACE_SANDBOX` safe. It is `allow-scripts allow-same-origin
+allow-forms`, and the extra two tokens next to the HTML widget's lone `allow-scripts` are not a
+relaxation of the same rule — they answer a different question. `allow-same-origin` does not give
+the frame OUR origin; it lets the frame keep the origin of the document it loads, which for a
+DocSpace page is `http://<host>:8005`. The block needs it to reach its own API and save what the
+reader typed; forced onto an opaque origin the embed would be a picture of a block. What must
+hold is only that the origin is not CloudCLI's, because CloudCLI's login JWT sits in
+`localStorage['auth-token']` (`src/shared/authToken.ts`) and a frame on this origin reads it as
+easily as the page does. **Never proxy port 8005 through this app's Express or Vite** to reach a
+phone: proxying is precisely how the frame becomes same-origin. The phone reaches ArchPulse
+directly. `allow-forms` is there because a block's inputs are how it is edited; nothing else is
+granted, and the absence of `allow-modals` is why the embed answers a delete with its own inline
+confirm strip rather than a browser dialog, which a frame without that token answers `false` in
+silence.
+
+**A frame that never answers is a fault the reader cannot see**, so `DocSpaceFrame` arms a timer
+for `DOCSPACE_READY_TIMEOUT_MS` at mount and replaces the iframe with `WidgetErrorCard` naming the
+origin if no `ready` arrives. The timer is cleared two ways — by the `ready` the host accepts, and
+by the effect's cleanup on unmount, which is what stops it setting state on a component that is
+gone. ArchPulse down, restarted mid-read, or simply not at the resolved origin all land there
+instead of on an iframe that looks identical to one still loading.
+
+**The theme travels as a message, never as a `src`.** The URL's `?theme=` describes the FIRST
+paint only: `DocSpaceFrame` latches the mount-time value in a ref and memoises the URL on the ids
+alone, so a flip cannot rewrite `src`. It must not, because a new `src` is a navigation — the
+frame reloads and whatever the reader had typed into the block is gone. Later flips reach the
+document through the host's ordinary `theme` post; the embed reads `dark` and ignores `tokens`,
+since it has a stylesheet of its own.
+
+What crosses this frame's boundary is deliberately thin. The embed posts `ready` and `resize`, and
+that is all: `DocSpaceFrame` passes no `onSubscribe`/`onUnsubscribe`, so a `subscribe` from it is
+answered `topic not allowed` exactly as it is for any widget with no bridge. **No topics reach a
+DocSpace block** — it has its own server to ask.
+
+**"Editable in place" is a claim about two surfaces, and it is measured as one.**
+`.verify/phase-29.mjs` stands a real page up in the DocSpace store, embeds one of its blocks in a
+transcript here, edits it from inside the frame, and watches that edit arrive in a SECOND browser
+showing the same block in ArchPulse's own studio — the round trip, rather than either end of it.
+It is the one probe in this repo that needs `archpulse.service` up; the gates it reads, the
+title-prefixed fixture it creates and deletes, and what an ArchPulse restart mid-run looks like are
+in [verification.md](../verification.md) §"The browser harness" and §"What bites people". The other
+half of this contract — the embed route, the two block types that behave differently there, the
+`resize` height being the body's border box rather than the document's `scrollHeight` — is
+`~/.claude/ArchPulse/README.md` §"Embedding one block", which points back here for this half.
 
 ## The live bus
 
@@ -332,4 +441,7 @@ listeners in the bus for every later publish to walk.
 | `useWidgetBridge`'s cleanup | Gate 8 drops the WIDGETS while the bus and the feed stay mounted and publishing, and requires every subscription they held to have been released — counted at the bus through a wrapper over `subscribe`, which a leaked listener never calls back. Not console silence: a listener left behind posts into a dead `contentWindow`, and `postToFrame`'s `?.` makes that raise nothing at all |
 | `publish`'s equal-value skip | It must remain a COMPLETE no-op. Replace the retained entry on an equal reading and `useLiveTopic` re-renders forever, because its snapshot is compared by reference |
 | The feed's retirement or its seed guard | Gate 9 drives the REST seed into a fresh bus and gate 10 ends a run and requires it to leave `runner:*`. Both live in `RunnerFeed.tsx`, never in `live-bus/` |
-| The `key` on `WidgetFrameLive` | It is the revoke rule's premise, not a reconciliation nicety: without it a changed fence body reassigns `srcDoc` in place, fires a second `load`, and silently revokes a healthy widget forever. Gate 9c rebuilds a body and requires `live.theme` to be set inside the new document — the sentinel half of that gate passes either way, because an in-place swap is also a new document, so `live.theme` is the read that matters |
+| `DOCSPACE_SANDBOX` | It still carries EXACTLY `allow-scripts allow-same-origin allow-forms` and the frame still has no inline document. Gate 1 of `.verify/phase-28.mjs` compares the attribute with `===`, never `includes`, so a quietly added `allow-popups` or `allow-top-navigation` reddens it |
+| `isForeignOrigin` | It still compares ORIGINS (not hostnames — the two services differ only by port here), still treats an unparseable URL as not-foreign, and is still consulted BEFORE the iframe renders. It is the only thing standing between a same-origin `VITE_DOCSPACE_EMBED_ORIGIN` and `localStorage['auth-token']`; gate 2 of the probe asserts the rendered frame's origin is not the page's |
+| The `src` memo in `DocSpaceFrame` | It is keyed on the ids ALONE and the theme is still read from a ref latched at mount. Adding anything theme-shaped to that key turns every flip into a reload that discards the reader's unsaved edit — gate 8 of `phase-28.mjs` flips the theme and requires `src` to come back byte-identical, with the flip itself asserted so the gate cannot pass by not happening. Gate 3 of `phase-29.mjs` flips it again on a frame holding a REAL block, where a reload is a fault the reader would see and not only an attribute that changed |
+| The `key` on `WidgetFrameLive` OR on `DocSpaceFrame` | BOTH forks carry `key={code}` and both rest on the same premise — the revoke rule, not a reconciliation nicety. Without it a changed fence body is applied to the SAME element: `srcDoc` reassigned in place for an HTML widget, a new `src` for a DocSpace block. Either fires a second `load`, which the host cannot tell from the frame navigating itself away, and it silently revokes a healthy frame forever. Gate 9c rebuilds a body and requires `live.theme` to be set inside the new document — the sentinel half of that gate passes either way, because an in-place swap is also a new document, so `live.theme` is the read that matters |

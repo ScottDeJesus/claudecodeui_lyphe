@@ -327,10 +327,25 @@ export type SubagentInfo = {
   name?: string;
   type?: string;
   description?: string;
-  status: 'running' | 'completed' | 'failed';
+  /** `stopped` is the reader's own Stop, an interrupt or a teardown — not a failure. */
+  status: 'running' | 'completed' | 'failed' | 'stopped';
   model?: string;
   /** Total entries the agent recorded, which exceeds the received timeline when a long run was truncated for transport. */
   activityCount?: number;
+  /** What the agent has spent so far, when the provider records usage (today: Claude). */
+  usage?: SubagentUsage;
+};
+
+/**
+ * A subagent's token reading. `contextTokens` is its context window as of its latest request
+ * (input, cache creation, cache read and reply of that request, summed — the figure Claude Code
+ * reports as the agent's `totalTokens`); `outputTokens` is everything it wrote across its
+ * `requests`. Mirrors the server's `SubagentUsage` in server/shared/types.ts.
+ */
+export type SubagentUsage = {
+  contextTokens: number;
+  outputTokens: number;
+  requests: number;
 };
 
 /** One rendered entry in a chat transcript — user turn, assistant turn, tool call and result, local command output, or subagent container — and the shape the chat message list and message components consume. */
@@ -378,6 +393,12 @@ export type ChatMessage = {
   subagent?: SubagentInfo;
   /** What that agent did, in order. Empty while the agent is still starting up. */
   subagentActivity?: SubagentActivity[];
+  /**
+   * What that agent has spent, from the fresher of the server's reading and the live fold —
+   * separate from `subagent` because a live spawn has no server metadata at all, and a
+   * synthesized `subagent` would have to invent the status that field is read for.
+   */
+  subagentUsage?: SubagentUsage;
   /** Stored memory this reply drew on, shown as a footnote beneath it. */
   memoryCitations?: MemoryCitation[];
   /** Lifecycle the provider reported for this tool call, when it reports one; otherwise the status is inferred from whether a result has arrived. */
@@ -529,7 +550,7 @@ export type NormalizedMessage = {
   toolName?: string;
   toolInput?: unknown;
   toolId?: string;
-  toolResult?: { content: string; isError: boolean; toolUseResult?: unknown } | null;
+  toolResult?: { content: string; isError: boolean; toolUseResult?: unknown; timestamp?: string } | null;
   isError?: boolean;
   text?: string;
   tokens?: number;
@@ -544,6 +565,13 @@ export type NormalizedMessage = {
   exitCode?: number;
   actualSessionId?: string;
   parentToolUseId?: string;
+  /**
+   * This assistant row's request, reduced to the two figures a subagent is read by. Rows cut
+   * from one API message share a `usageMessageId`, and a streamed message arrives as several
+   * rows whose `outputTokens` grows — keep the LAST value per id, never a sum of rows.
+   */
+  usage?: { contextTokens: number; outputTokens: number };
+  usageMessageId?: string;
   /** Timeline of a spawned subagent's work, attached by the backend to the tool call that spawned it. */
   subagentTools?: SubagentActivity[];
   /** Identity and lifecycle of that subagent. */
@@ -1854,7 +1882,18 @@ export type WidgetHostMessage =
 export type WidgetHostHandlers = {
   onSubscribe?: (topic: string, send: (message: WidgetHostMessage) => void) => void;
   onUnsubscribe?: (topic: string) => void;
+  /** Called once per `ready` the host ACCEPTS — after its identity check, so a stray post never fires it. */
+  onReady?: () => void;
 };
+
+/** A widget fence whose body is JSON naming one DocSpace block — the chat embeds it from ArchPulse instead of rendering HTML. */
+export type DocSpaceBlockRef = { pageId: string; blockId: string };
+
+/** What a widget fence body turned out to be: raw HTML (the default), a DocSpace reference, or a DocSpace reference that does not parse. */
+export type WidgetBodyShape =
+  | { kind: 'html' }
+  | { kind: 'docspace'; ref: DocSpaceBlockRef }
+  | { kind: 'invalid'; reason: string };
 
 /**
  * A topic is a NAME, never an address. The host owns the vocabulary and `isAllowedTopic`

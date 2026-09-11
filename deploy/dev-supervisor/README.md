@@ -160,8 +160,20 @@ cloudcli-server-dev)` prints one line. Two is the handover window and lasts abou
 ## SO_REUSEPORT
 
 The overlap is possible because both children bind with `reusePort: true`, so the kernel lets two
-sockets share `:3011` and load-balances new connections across them. **Linux-only** — as is the
-recursive `fs.watch` in `watch.mjs`. This whole package targets this host's systemd unit.
+sockets share `:3011` and load-balances new connections across them. **Linux-only** — as are the
+inotify semantics `watch.mjs` assumes. This whole package targets this host's systemd unit.
+
+## The watcher is per directory, not `recursive: true`
+
+`watch.mjs` keeps one plain `fs.watch` per directory under `server/` and adds one for each
+directory that appears. It does not use Node's `recursive: true`: on Linux that is Node's own
+walker with one watch per file, and an editor's atomic save (temp name, rename over the file)
+replaces the inode and races that watch away — after which every in-place save of that file is
+invisible until it is renamed again. Measured 2026-09-10: 343 watches held, none on a file an
+editor had replaced an hour earlier, and three saves of it unseen while `touch` on a neighbour
+handed over at once. A directory watch reports its children by name whatever their inode, so this
+cannot recur. The journal says how many directories are watched on start:
+`[supervisor] watching <n> directories under …/server`.
 
 One rough edge: a connection already queued on the retiring listener's accept queue when it closes
 can see a reset instead of being served. The host-level cure is `net.ipv4.tcp_migrate_req=1`, which

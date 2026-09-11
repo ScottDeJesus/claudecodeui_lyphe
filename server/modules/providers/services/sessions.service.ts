@@ -6,6 +6,7 @@ import { projectsDb, sessionsDb } from '@/modules/database/index.js';
 import { broadcastSessionUpserted, chatRunRegistry } from '@/modules/websocket/index.js';
 import { providerRegistry } from '@/modules/providers/provider.registry.js';
 import { sessionHistoryCache } from '@/modules/providers/services/session-history-cache.service.js';
+import { collectSessionAgents, readSubagentStamp } from '@/modules/providers/services/session-agents.service.js';
 import type {
   FetchHistoryOptions,
   FetchHistoryResult,
@@ -479,6 +480,9 @@ export const sessionsService = {
         hasMore: false,
         offset: options.offset ?? 0,
         limit: options.limit ?? null,
+        // Stated, not omitted: an absent list means "this page says nothing about agents" (an
+        // older page), and a session with no transcript must not leave a stale strip behind.
+        agents: [],
       };
     }
 
@@ -506,6 +510,12 @@ export const sessionsService = {
         projectPath,
         providerSessionId,
       }),
+      // A Claude history read also parses each subagent's own sidechain, and those move while the
+      // parent file does not. Without this the cached entry would hold a running agent's timeline,
+      // tokens and status frozen until the main thread wrote again.
+      readCompanionStamp: transcriptPath
+        ? () => readSubagentStamp(transcriptPath, providerSessionId)
+        : undefined,
     });
 
     let result: FetchHistoryResult;
@@ -529,12 +539,22 @@ export const sessionsService = {
       });
     }
 
+    // The pinned strip's agents come from the full history, so an agent launched before the page's
+    // first row is still pinned. On the latest page only — an older page never changes what is
+    // running — and only where there IS a full history: a provider read without the cache (Cursor,
+    // OpenCode) could offer nothing but the page's own rows, which the client already has and
+    // would discard as loaded.
+    const agents = requestedOffset === 0 && fullHistory
+      ? collectSessionAgents(fullHistory.messages)
+      : undefined;
+
     return {
       ...result,
       messages: result.messages.map((message) => ({
         ...message,
         sessionId,
       })),
+      ...(agents ? { agents: agents.map((agent) => ({ ...agent, sessionId })) } : {}),
     };
   },
 

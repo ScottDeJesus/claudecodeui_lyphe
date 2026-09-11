@@ -70,6 +70,19 @@ Applications Hub (`~/.claude/hub/apps.json`, `http://{host}:5183`).
   rule could neither cover a 16th network nor be widened. The watchdog re-inserts the two rules
   every minute, so a `ufw enable`, an `iptables-restore` or a Docker daemon restart reopens the
   port for at most 60 s.
+- **ArchPulse's port 8005 must never be proxied through this app.** The chat can embed a live
+  DocSpace block, and that iframe is the one frame here that carries `allow-same-origin` — it has
+  to, or the block cannot write the reader's edit back through ArchPulse's own API. What keeps
+  that safe is only that the frame's origin is not this app's, because CloudCLI's login JWT sits
+  in `localStorage['auth-token']` (`src/shared/authToken.ts`) and a same-origin frame reads it as
+  easily as the page does. Adding an `/archpulse` entry beside the four proxies above — the
+  obvious-looking way to "reach it from the phone" — is exactly what collapses the two origins
+  into one and hands the frame the token. The phone reaches `http://<this host>:8005` directly,
+  which is the default the embed resolves to on the LAN and over Tailscale alike; `.env.example`
+  documents the `VITE_DOCSPACE_EMBED_ORIGIN` override for an ArchPulse on another host, and a
+  value that resolves back onto this app's own origin draws an error card instead of a frame. The
+  invariant and the gate that enforces it are at
+  [architecture/07-live-widgets.md](architecture/07-live-widgets.md) §"The DocSpace kind".
 - **A server heal no longer kills an in-flight Claude session, and the API that comes back
   re-adopts it.** A turn's CLI is now exec'd inside the `cloudcli-sessions` tmux server rather
   than as a child of the API, so `systemctl restart cloudcli-server-dev` tears down only the
@@ -99,6 +112,11 @@ Applications Hub (`~/.claude/hub/apps.json`, `http://{host}:5183`).
   sessions, the sealed `/git` press, the login modal. Run them only when nobody is using the
   app, and always solo (`ps -eo cmd | grep '^node .verify/'` empty first). The app is
   single-operator; a second port pair for the harness was judged not worth two Vite optimizers.
+  **One probe now reaches outside this app.** `phase-29.mjs` creates and deletes a real page in
+  ArchPulse's DocSpace store on :8005, so the harness needs `archpulse.service` up and the state
+  at risk is no longer only this app's — the check is in
+  [verification.md](verification.md) §"The dev server", the page's title fence and what an
+  ArchPulse restart mid-run does are in its §"What bites people".
 - **Never kill the client by pattern.** `pkill -f 'sleep infinity'` reaches every such process
   on the box, and two tmux keepalives now hold one each: Descent's `/pm` server
   (`descent-pm-tmux.service` — its own `descent-pm-tmux-watchdog.timer` restores it, but the

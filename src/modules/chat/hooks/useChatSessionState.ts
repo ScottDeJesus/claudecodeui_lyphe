@@ -411,6 +411,33 @@ export function useChatSessionState({
     return all;
   }, [storeMessages, pendingUserMessage]);
 
+  /**
+   * Every agent the pinned strip can show: the containers among the loaded rows, plus the ones the
+   * server listed from the whole history (`getAgents`) that lie before the loaded window. A page
+   * loads history from the tail, so an agent launched early in a long turn is not among the loaded
+   * rows once the main thread has moved on — the moment it most needs pinning. The unloaded ones
+   * are projected together with the live rows that concern agents (their own streamed rows and
+   * finish rows), so they fold live exactly as a loaded container does.
+   */
+  const storeAgents = activeSessionId ? sessionStore.getAgents(activeSessionId) : NO_MESSAGES;
+  const agentMessages = useMemo(() => {
+    const loadedContainers = chatMessages.filter((message) => message.isSubagentContainer);
+    if (storeAgents.length === 0) {
+      return loadedContainers;
+    }
+    const loadedToolIds = new Set(
+      storeMessages.filter((message) => message.kind === 'tool_use' && message.toolId).map((message) => message.toolId),
+    );
+    const unloaded = storeAgents.filter((agent) => agent.toolId && !loadedToolIds.has(agent.toolId));
+    if (unloaded.length === 0) {
+      return loadedContainers;
+    }
+    const liveAgentRows = storeMessages.filter((message) => message.parentToolUseId || message.kind === 'task_notification');
+    const unloadedContainers = normalizedToChatMessages([...unloaded, ...liveAgentRows])
+      .filter((message) => message.isSubagentContainer);
+    return [...unloadedContainers, ...loadedContainers];
+  }, [chatMessages, storeAgents, storeMessages]);
+
   /* ---------------------------------------------------------------- */
   /*  addMessage                                                       */
   /* ---------------------------------------------------------------- */
@@ -1100,6 +1127,7 @@ export function useChatSessionState({
 
   return {
     chatMessages,
+    agentMessages,
     addMessage,
     sessionActivity,
     isProcessing,

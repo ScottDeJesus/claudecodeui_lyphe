@@ -1,7 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { buildWidgetDocument } from '@/modules/widgets/buildWidgetDocument';
+import { classifyWidgetBody } from '@/modules/widgets/classifyWidgetBody';
+import { DocSpaceFrame } from '@/modules/widgets/DocSpaceFrame';
 import { readVerveTokens } from '@/modules/widgets/readVerveTokens';
+import { WidgetErrorCard } from '@/modules/widgets/WidgetErrorCard';
 import { useWidgetBridge } from '@/modules/widgets/hooks/useWidgetBridge';
 import { useWidgetHost } from '@/modules/widgets/hooks/useWidgetHost';
 
@@ -67,8 +70,32 @@ export function WidgetFrame({ code, streaming }: { code: string; streaming?: boo
     setMounted(true);
   }, []);
 
+  // WHICH KIND of widget this body is. Read once per body, and read HERE — above the gate below
+  // rather than beside the fork it feeds — because a hook may not sit after a conditional return:
+  // the first render takes the `<pre>` path, so a `useMemo` placed below would be skipped on that
+  // render and called on the next, which is a changed hook count and a React error. Where it is
+  // CONSUMED is what the fork's placement is really about, and that is still after the gates.
+  const shape = useMemo(() => classifyWidgetBody(code), [code]);
+
   if (!mounted || streaming) {
     return <pre className={FALLBACK_CLASSES}>{code.trim()}</pre>;
+  }
+
+  // The fork sits BEHIND both gates, and that is the whole reason it is in this file rather than
+  // in `CodeBlock`. Forking upstream would put it in front of them: the HTML transcript export
+  // runs no effects, so it would carry a live `<iframe>` into a saved file, and a docspace fence
+  // still being streamed would mount — and start fetching — on a body that is a fragment. Behind
+  // the gates, every kind inherits the same two promises the HTML widget already makes.
+  if (shape.kind === 'docspace') {
+    // Keyed on the body for the same reason `WidgetFrameLive` is: a different body is a different
+    // block, and it must arrive as a NEW element rather than as a new `src` on this one. The host
+    // treats a second load on an element as a frame navigating itself away and revokes it
+    // permanently, so an in-place swap would silently kill a healthy embed.
+    return <DocSpaceFrame key={code} pageId={shape.ref.pageId} blockId={shape.ref.blockId} />;
+  }
+
+  if (shape.kind === 'invalid') {
+    return <WidgetErrorCard reason={shape.reason} />;
   }
 
   // Keyed on the body, so a DIFFERENT fence body is a different widget and gets a different
@@ -113,19 +140,26 @@ function WidgetFrameLive({ code }: { code: string }) {
   );
 
   return (
-    <iframe
-      ref={frameRef}
-      sandbox="allow-scripts"
-      srcDoc={doc}
-      title="Live widget"
-      referrerPolicy="no-referrer"
-      // The first load is this document; any later one means a widget navigated the frame away
-      // from it, and the host must stop posting into whatever replaced it. Wired here rather
-      // than from an effect so React attaches it before the srcdoc can finish loading — an
-      // effect could attach after the first load and would then never see it. See useWidgetHost.
-      onLoad={onFrameLoad}
-      className="my-3 block w-full rounded-xl border border-border bg-card"
-      style={{ height }}
-    />
+    // The border sits on a wrapper, never on the frame. Every box in this app is sized
+    // border-box (`* { box-sizing: border-box }` in index.css), so a border on the iframe itself
+    // comes out of `height` — the height the widget reported for its own content — and leaves
+    // the viewport two pixels shorter than the document: a scrollbar for a two-pixel scroll, on
+    // every widget. Measured 2026-09-10. DocSpaceFrame carries the same wrapper for the same reason.
+    <div className="my-3 overflow-hidden rounded-xl border border-border bg-card">
+      <iframe
+        ref={frameRef}
+        sandbox="allow-scripts"
+        srcDoc={doc}
+        title="Live widget"
+        referrerPolicy="no-referrer"
+        // The first load is this document; any later one means a widget navigated the frame away
+        // from it, and the host must stop posting into whatever replaced it. Wired here rather
+        // than from an effect so React attaches it before the srcdoc can finish loading — an
+        // effect could attach after the first load and would then never see it. See useWidgetHost.
+        onLoad={onFrameLoad}
+        className="block w-full"
+        style={{ height }}
+      />
+    </div>
   );
 }

@@ -12,33 +12,22 @@ import { Chip, Shimmer } from '@/shared/ui';
 const STAGE_WALKED_GLYPH = '✅';
 
 /**
- * The stages of the phase a run is standing in, as one scrolling row.
+ * The stages of the phase a run is standing in, drawn as chips that WRAP onto as many rows as the
+ * width needs.
  *
- * ✅ COMES FROM THE TIMELINE, NEVER FROM POSITION. `seen` is `seenStages(run)` — the distinct
- * stage words the runner actually LOGGED for this phase — so a chip is marked walked because a
- * line in `runner.log` names it, not because it sits left of the active one. The difference is
- * the whole point of the strip: the runner skips `fix-pass` whenever Athena finds nothing, and a
- * strip that marked every chip before the active one would report a review that never ran on the
- * most common outcome there is.
+ * Every stage of the run's chain is drawn: the ones already walked carry the walked glyph, the one in
+ * flight shimmers, and a stage word outside the chain (a re-run builder, a stage the runner grew
+ * later) is shown after a separator rather than dropped. `seen` is read from the timeline the runner
+ * wrote, never inferred from position — a fix-pass that never ran sits left of `checks` and must not
+ * read as done.
  *
- * It is built from `Chip` because a chip with no `onClick` renders a static `<span>`
- * (`src/shared/ui/Chip.tsx`) — which is what a stage is. The toggle primitive beside it in the
- * barrel is a real `<button>` that demands an `onClick`, so drawing this with it would mean
- * handing every stage a no-op handler and a focus stop that leads nowhere.
- *
- * THE ACTIVE WORD IS NOT ALWAYS ONE OF THE SIX. `hooks/plan_runner/progress.py::_stage` falls back
- * to the RUN's own status — `running`, `complete`, `all-blocked`, `budget`, `halted`, `dry-run` —
- * whenever no phase holds a stage, which is every start-up and every gap between phases (measured:
- * `all-blocked`, `complete`, `halted` and `budget` are all on disk under `~/.claude/state/runner`
- * right now). Dropped, that word selects nothing and the card's one "what is happening now" signal
- * goes blank; drawn as a seventh chip it would claim to be a link in a chain it is not part of. So
- * it is drawn AFTER the chain, behind a separator, as what it is: the run's own word.
- *
- * Phone-first: the row scrolls sideways rather than wrapping. Six stages do not fit at 390px, and
- * a wrapped strip changes the card's HEIGHT as a run moves, which would shove the transcript
- * underneath it up and down while somebody is reading. Because it scrolls, it is also a FOCUSABLE
- * region with a name: the chips are static spans by design, so without a tab stop of its own a
- * keyboard-only reader has no way to reach the stages that start off-screen.
+ * It wraps, and the card's height moves with the run. That is accepted: this strip lives only in the
+ * Runner tab's own card list (`RunCard` → `RunnerPanel`, nothing else renders it), never under a chat
+ * transcript, so a taller card shoves nothing a reader is following. A single scrolling row was tried
+ * first and hid every stage past the fourth at 390px with nothing on screen saying more existed —
+ * the operator could not read the strip at all (2026-09-10). It holds no tab stop of its own: it no
+ * longer scrolls, and the chips are static spans by design (`Chip.tsx`), so there is nothing inside
+ * it for focus to land on.
  */
 export function PipelineStrip({
   stages,
@@ -60,19 +49,18 @@ export function PipelineStrip({
 
   return (
     <div
-      className="flex items-center gap-1.5 overflow-x-auto"
+      className="flex flex-wrap items-center gap-1.5"
       data-runner-pipeline
       role="group"
       aria-label={t('runner.pipeline')}
-      tabIndex={0}
     >
       {stages.map((stage) => {
         const isActive = stage === active;
         const walked = !isActive && seen.includes(stage);
 
         return (
-          // `flex-none` on the wrapper, not the chip: a flex child of a scrolling row shrinks to
-          // fit by default, which would squash six stages into the width instead of scrolling.
+          // `flex-none` on the wrapper, not the chip: a flex child shrinks to fit by default, which
+          // would squash six stages into one row instead of letting them wrap whole.
           <span key={stage} className="flex-none">
             <Chip size="sm" selected={isActive}>
               {walked && <span aria-hidden="true">{STAGE_WALKED_GLYPH}</span>}

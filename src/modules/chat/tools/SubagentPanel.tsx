@@ -1,12 +1,13 @@
 import { memo, useMemo, useState } from 'react';
 import { Bot, Brain, ChevronRight, CircleAlert, CircleCheck, MessageSquareText } from 'lucide-react';
 
-import type { DiffLine, Project, SubagentActivity, SubagentInfo, ToolResult } from '@/shared/types';
+import type { DiffLine, Project, SubagentActivity, SubagentInfo, SubagentUsage, ToolResult } from '@/shared/types';
 import { cn } from '@/shared/utils';
 import { ToolRenderer } from '@/modules/chat/tools/ToolRenderer';
 import { useIsExportingTranscript } from '@/modules/chat/context/TranscriptRenderContext';
 import { MarkdownContent } from '@/modules/chat/tools/ContentRenderers/MarkdownContent';
 import {
+  describeSubagentUsage,
   formatSubagentFinishTime,
   parseSubagentToolInput,
   readSubagentSummary,
@@ -20,6 +21,8 @@ type SubagentPanelProps = {
   toolResultAt?: string | number | Date;
   subagent?: SubagentInfo;
   activity?: SubagentActivity[];
+  /** What the agent has spent, when its provider records usage. */
+  usage?: SubagentUsage;
   onFileOpen?: (filePath: string, diffInfo?: unknown) => void;
   createDiff: (oldStr: string, newStr: string) => DiffLine[];
   selectedProject?: Project | null;
@@ -61,6 +64,8 @@ const STATUS_STYLES: Record<SubagentInfo['status'], string> = {
   running: 'text-purple-600 dark:text-purple-300',
   completed: 'text-muted-foreground',
   failed: 'text-red-600 dark:text-red-400',
+  // The reader's own Stop or an interrupt: nothing went wrong, so not red.
+  stopped: 'text-amber-700 dark:text-amber-400',
 };
 
 /** One prose or reasoning entry from the agent's own narration. */
@@ -99,6 +104,7 @@ export const SubagentPanel = memo(({
   toolResultAt,
   subagent,
   activity,
+  usage,
   onFileOpen,
   createDiff,
   selectedProject,
@@ -120,14 +126,17 @@ export const SubagentPanel = memo(({
   // The same reading the pinned bar takes, so the two can never disagree about whether this
   // agent is still going. Claude names its agent presets (Explore, Plan); Codex has none, so
   // the neutral label carries and the assigned nickname shows alongside it.
-  const { status, label, nickname, description, toolCount, finishedAt } = readSubagentSummary({
+  const summary = readSubagentSummary({
     toolInput,
     toolResult,
     toolResultAt,
     subagent,
     activity,
+    usage,
   });
+  const { status, label, nickname, description, toolCount, finishedAt } = summary;
   const finishTime = formatSubagentFinishTime(finishedAt);
+  const tokens = describeSubagentUsage(summary.usage);
   const prompt = String(parsedInput.prompt ?? '');
   // The backend truncates very long timelines for transport; say so rather
   // than implying the agent stopped where the list does.
@@ -160,11 +169,17 @@ export const SubagentPanel = memo(({
             <>
               <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-purple-500 dark:bg-purple-400" />
               running
+              {tokens && (
+                <span className="text-muted-foreground/70" title={tokens.long}>· {tokens.short}</span>
+              )}
             </>
-          ) : status === 'failed' ? (
+          ) : status === 'failed' || status === 'stopped' ? (
             <>
               <CircleAlert className="h-3 w-3" />
-              failed
+              {status}
+              {tokens && (
+                <span className="text-muted-foreground/70" title={tokens.long}>· {tokens.short}</span>
+              )}
             </>
           ) : (
             <>
@@ -172,6 +187,9 @@ export const SubagentPanel = memo(({
               {toolCount > 0 ? `${toolCount} ${toolCount === 1 ? 'tool' : 'tools'}` : 'done'}
               {/* When it ended, once it is no longer pinned above the transcript. Absent
                 * rather than guessed when the stored timeline carried no stamps. */}
+              {tokens && (
+                <span className="text-muted-foreground/70" title={tokens.long}>· {tokens.short}</span>
+              )}
               {finishTime && (
                 <span className="text-muted-foreground/70">· {finishTime}</span>
               )}

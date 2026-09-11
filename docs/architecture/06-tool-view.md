@@ -35,7 +35,9 @@ Read [the realtime stream](./02-realtime-stream.md) first for how the frames arr
    to `ToolErrorDisplay`. The one exception is `Bash`, whose failure is already inside its
    command card.
 6. **Anything that is not a plain tool row is decided before `ToolRenderer` sees it.**
-   `groupConsecutiveTools` turns runs into `ToolGroupItem`s in the message array;
+   `groupConsecutiveTools` turns runs into `ToolGroupItem`s in the message array — never an
+   `AskUserQuestion` row, which stands alone because it may carry the live answer panel and a
+   collapsed group would hide the only way to answer;
    `MessageComponent` routes `isSubagentContainer` to `SubagentPanel`. `ToolRenderer` does
    not know either exists.
 7. **`Bash` is one card, not two.** Its input render owns the command and the output, and
@@ -63,7 +65,6 @@ Read [the realtime stream](./02-realtime-stream.md) first for how the frames arr
 | `src/modules/chat/tools/PlanDisplay.tsx` | ExitPlanMode card with the inline Build and Revise buttons |
 | `src/modules/chat/tools/ContentRenderers/` | The bodies a collapsible can contain |
 | `src/modules/chat/tools/InteractiveRenderers/AskUserQuestionPanel.tsx` | Keyboard-driven answer picker for an `AskUserQuestion` prompt |
-| `src/modules/chat/tools/configs/permissionPanelRegistry.ts` | `registerPermissionPanel` and `getPermissionPanel`, tool name to panel |
 | `src/modules/chat/transcript/MessageComponent.tsx` | Draws one transcript row. Decides container versus tool versus error |
 | `src/modules/chat/transcript/ToolGroupContainer.tsx` | The collapsed `Read x4` row and its expanded children |
 | `src/modules/chat/utils/toolGrouping.ts` | `groupConsecutiveTools`, `isToolGroupItem`, `buildGroupPreview` |
@@ -360,8 +361,30 @@ included", because the backend truncates long timelines for transport; that line
 only once nothing is left to expand locally.
 
 **Live nesting.** A running subagent's rows arrive stamped with `parentToolUseId` — Claude's
-`parent_tool_use_id`, preserved by `transformMessage` in `claude-runtime.provider.js`. The
-first pass of `normalizedToChatMessages` folds them into a per-parent `SubagentActivity[]`:
+`parent_tool_use_id`, preserved by `transformMessage` in `claude-runtime.provider.js`, which
+maps the SDK's other snake-case field the same way: `tool_use_result` becomes `toolUseResult`,
+so a backgrounded agent's launch receipt carries its `isAsync` flag on the live path and not
+only after a reload (before 2026-09-10 it did not, and no live background agent was ever
+pinned). Each live tool result is capped by `capToolResult`, as history's are. The
+first pass of `normalizedToChatMessages` folds them into a per-parent `SubagentActivity[]`. The
+same pass collects every live `task_notification` row by the `toolId` it carries — the runtime
+provider forwards the SDK's `system/task_notification` event as that row, because the
+`<task-notification>` user turn the transcript records never streams (measured 2026-09-10) — and
+folds it onto that container: `subagent.status` from its status, `toolResultAt` from the row's own
+time (the launch receipt's stamp is the launch, not the finish). So a backgrounded agent is released
+from the pin the moment it ends, without a reload; the projection cache treats that row as a third
+dependency of the container (`finishSource`). The runtime sends that row whenever the event
+arrives, turn complete or not — an agent usually outlives the turn that launched it, and the
+first cut, inside the `!turnCompleteSent` guard, dropped the row for exactly that case (Athena,
+2026-09-10: four background completions in the journal, no row for any). On the history path the
+`<task-notification>` turn's own time is carried onto the result as `toolResult.timestamp`, so a
+reopened conversation names when the agent finished. Those turns are matched by `<tool-use-id>`
+or, when a turn names none (a stop, a resume), by `<task-id>` — which is the agent id. Most
+backgrounded agents get no such turn at all (one that ends while a turn is running is delivered
+to the model in-context and never written; measured: 13 background launches, one notification
+turn), so for them the finish is the last record of the agent's own transcript once it has
+reached its closing reply (`finishedAt` in `readClaudeSubagentTranscript`). A launch receipt
+alone carries no time.
 
 | Folded row | Becomes |
 | --- | --- |
@@ -369,7 +392,67 @@ first pass of `normalizedToChatMessages` folds them into a per-parent `SubagentA
 | `tool_result` | `toolResult` on the already-indexed entry. Never a new entry, and dropped entirely if its call was not seen |
 | `thinking`, or `text` with `role: 'assistant'` | A note entry, unless its content is blank |
 | `text` with any other role | Nothing. A user-role row there is the echoed task prompt, which the card already shows |
+| any row carrying `usage` + `usageMessageId` | The container's live token reading: `contextTokens` from the newest row, one request per distinct id. Never the reply count — a live row's usage is the snapshot taken when the row was cut, a few tokens into the reply (measured: 69 live against 3,298 on the transcript for one run) |
 | anything else | Nothing |
+
+**What an agent has spent.** Every assistant row the Claude provider normalizes carries `usage`
+(`{ contextTokens, outputTokens }`, reduced from the Anthropic payload by `readClaudeMessageUsage`
+in `claude-sessions.provider.ts`) and the API message id as `usageMessageId`. `contextTokens` is
+that request's whole window — input, both cache kinds and the reply — which is the sum Claude Code
+reports as an agent's `totalTokens` (equal on every real `Agent` result measured 2026-09-10). The
+history reader folds a subagent's transcript into `subagent.usage` (`SubagentUsage`: context as of
+the latest request, the reply summed over distinct message ids — a streamed message is several
+records whose count grows, so the last per id wins — and the request count). The projection
+COMBINES every reading there is into `ChatMessage.subagentUsage` (`combineSubagentUsage`): context
+and request count are monotonic within a run, so the largest of the server's, the live fold's and
+the finish total is the newest, and the written total is the server's or nothing. It is never a
+choice between readings: neither is a prefix of the other, so picking one (by request count, say)
+freezes the figure at its page-load value while the server is ahead and hides the written total
+once the live fold is. The finish total exists
+because the closing reply never streams as a subagent row and the live fold stops one request
+short: `toolUseResult.totalTokens` on the `Agent` result first (exact), else `tokens` on the live
+`task_notification` row — the notification's count, which the CLI takes before the closing
+reply's request is in and which is therefore one request short itself (measured: 39,735 against
+the result's 39,913). A foreground agent has both; a backgrounded one only the notification, its
+launch receipt carrying no total. The notification's status is three-valued — `completed`,
+`failed`, `stopped` — and `stopped` (the reader's Stop, an interrupt) is painted amber, never as a
+failure; on the live path the fold applies only to the `Agent` container itself, because a
+resumed agent notifies under the `SendMessage` call that resumed it. `readSubagentSummary` carries it and `describeSubagentUsage`
+prints it (`36K tokens · 3.3K out`; a live reading has no `out`), on the pinned strip's second
+line and the agent card's header.
+
+**The pinned strip's agents come from the whole history.** The strip above the chat box
+(`PinnedSubagents.tsx`) keeps an agent in view while it runs and after it finishes, until the reader
+dismisses it. A page loads history from the tail, twenty rows at a time, so the rows a page holds
+cannot be its source: an agent launched early in a long turn would leave the strip once the main
+thread had done twenty rows of work since. Every latest page (offset 0) therefore carries `agents`
+— the conversation's running and recently finished containers read from the full cached history
+(`collectSessionAgents` in `server/modules/providers/services/session-agents.service.ts`), compacted
+to what the strip reads: the launch description and type, the receipt's `isAsync`/`totalTokens`,
+the finish time, `subagent` with its usage, and a timeline that keeps every entry's kind and tool
+name (the tool count) but content only on the newest tool call and prose (the latest-activity line).
+The store holds it per slot (`getAgents`); `useChatSessionState` hands the strip the loaded
+containers plus any listed agent the loaded rows do not hold, projecting those together with the
+live rows that concern agents (their own streamed rows and finish rows) so they fold live exactly
+like a loaded container.
+
+**How history reads an agent's end.** From the agent's own transcript, last record first: Claude
+Code's interruption marker (`[Request interrupted by user…]`, a user record) means `stopped`; a
+synthetic API-error reply (`isApiErrorMessage`, a rate limit or an overload, which ends on
+`stop_sequence` and would otherwise read as a closing reply) means `failed`; a closing reply
+(`end_turn`, `stop_sequence` or `max_tokens`) means `completed`; anything else within four hours of
+the file's last write is still running. A `<task-notification>` turn in the parent transcript, when
+there is one, overrides all of these. A BACKGROUNDED agent's finish time is that last record's,
+when no notification gives one; a foreground agent's is its own `tool_result` row's stamp in the
+parent, which is the better source and the one used.
+
+Those sidechain files are also why the full-history cache takes a second freshness value. It is
+keyed on the parent transcript's stat, and an agent writes its own file continuously while the
+parent is quiet — so the cached parse would hold a running agent's timeline, tokens and status
+still, and a backgrounded agent that ended during a quiet stretch would read `running` until the
+main thread wrote again. `readSubagentStamp` (the newest write across the session's sidechains,
+with their count) rides into the cache key as `readCompanionStamp`; a sidechain write costs one
+re-parse, measured at 189 ms against 7 ms for a hit.
 
 Every folded row is skipped by the second pass, so it never renders top-level. When a
 history load later attaches the server-indexed `subagentTools`, **the longer of the two
@@ -439,12 +522,12 @@ optimistic prune only covers the answering tab; the server's `permission_resolve
 does the same removal everywhere else — other tabs, and the replay a refreshed tab
 receives mid-run. A `permission_cancelled` frame removes a prompt with no decision at all.
 
-Three consumers pick a panel three different ways:
+Three prompts, two placements:
 
 | Prompt | Panel | How it is chosen |
 | --- | --- | --- |
 | `ExitPlanMode` or `exit_plan_mode` | `PlanDisplay`, inline in the transcript | `PlanDisplay` calls `usePermission()` and searches the pending list itself, by tool name. `PermissionRequestsBanner` filters those two names out so the prompt is not offered twice |
-| `AskUserQuestion` | `AskUserQuestionPanel`, above the composer input | `getPermissionPanel(request.toolName)` from `permissionPanelRegistry.ts` |
+| `AskUserQuestion` | `AskUserQuestionPanel`, inline in the transcript, inside the question's own tool card | `QuestionAnswerContent` calls `usePermission()` and takes the pending request whose `permissionKey` equals the row's — the identity the permission layer uses for every row — and shows the answers this conversation sent — kept in a module map by session and row identity, so a lazily remounted card still shows them — until the server folds them in on the next history load. That memory is consulted only AFTER the pending search: a new request with a different id gets its panel on a fresh card even when the question is byte-identical to one already answered, and a request replayed under the SAME id (a decision whose socket frame was dropped, re-sent on reconnect) is offered again by the card that answered it. `PermissionRequestsBanner` filters the name out so the question is asked once |
 | anything else | The generic `Confirmation` banner | Fallback in `PermissionRequestsBanner` |
 
 `PlanDisplay` shows its footer only while a plan request is pending, and sends
@@ -459,18 +542,20 @@ no entry can be derived — and then answers *every* pending request that comput
 entry in one call. That batch is why `handlePermissionDecision` takes an array of ids.
 
 `AskUserQuestionPanel` is a keyboard-first stepper: number keys pick options, `0` toggles a
-free-text "Other", `Enter` advances or submits on the last question, `Escape` skips. It
+free-text "Other", `Enter` advances or submits on the last question, `Escape` skips — from a
+window-level capture listener that acts only when the key was pressed inside the panel: it marks
+the event so `ChatInterface`'s document-level abort gate, gated on `defaultPrevented`, leaves the
+run alive, and skips unless the focus was in the panel's own "Other" field, where Escape is
+"back out of this field" and nothing more. Elsewhere on the page Escape keeps its app-wide
+meaning. On mount the panel takes focus unless a text field holds a draft, so a person mid-sentence
+in the composer keeps it, while an empty composer (the usual state after sending) yields to the
+shortcuts the panel's chips advertise. It
 always answers `allow: true`; the content of the answer rides in
 `updatedInput: {...input, answers: {[question]: 'a, b'}}`, and skipping sends
 `answers: {}`. On a later history load the server folds those answers back into the tool
 input (`unifyAskCall` in `server/shared/message-unification.ts`), which is why
 `AskUserQuestion`'s config reads `input.answers` and its title can say
 `Approach — Rewrite it`.
-
-The registry is one `Record<string, ComponentType<PermissionPanelProps>>` with two
-functions. Registration is a module-scope side effect in
-`src/modules/chat/composer/PermissionRequestsBanner.tsx` — the same file that reads it. One
-panel is registered today.
 
 ## Content renderers
 
@@ -625,6 +710,6 @@ memoized, and four with no other reason to know exports exist.
 | `groupConsecutiveTools` | `src/modules/chat/tests/toolGrouping.test.ts`; `ChatMessagesPane`'s key map, which assigns keys per group member; and `useChatSessionState`'s search jump, which matches a group by its first timestamp |
 | `parentToolUseId` handling | `liveSubagentGrouping.test.ts`, and `isSubagentPromptEcho` in `claude-runtime.provider.js` — the two must agree on which rows are echoes |
 | Anything with `useState` open or closed state | Add a `useIsExportingTranscript()` read, or it exports as an empty section; `src/modules/chat/tests/transcriptExport.test.tsx` asserts this |
-| `PermissionPanelProps` | `permissionPanelRegistry.ts`, `AskUserQuestionPanel`, and `handlePermissionDecision` in `useChatComposerState.ts`, which is what sends the frame |
+| `PermissionPanelProps` | `AskUserQuestionPanel`, `QuestionAnswerContent` (which renders it while the request is pending), and `handlePermissionDecision` in `useChatComposerState.ts`, which is what sends the frame |
 | `toolInput` serialization in the projection | Every `getValue`, `title` and `getContentProps` in the registry, plus the `parseToolPayload` call sites in `ToolRenderer` and `ToolGroupContainer` |
 | Server-side tool renaming | `UNIFIED_TOOL_LABELS`, `getToolCategory` and the `TOOL_CONFIGS` keys all match on the post-rewrite name, and the Codex provider renames some tools that `prepareTranscriptMessages` does not |

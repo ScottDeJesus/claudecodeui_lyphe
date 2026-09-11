@@ -29,6 +29,12 @@ import {
 } from '@/shared/ui';
 import type { RunnerRunSnapshot } from '@/shared/types';
 
+/** The last path segment of the plan the run walks — `cloudcli-docspace-embed.plan.md` — or the whole string when it has no slash. */
+function planFileName(planPath: string): string {
+  const cut = planPath.lastIndexOf('/');
+  return cut === -1 ? planPath : planPath.slice(cut + 1);
+}
+
 /**
  * One plan-runner run, whole: what it is, how far it has got, where it is standing, and the one
  * verb that applies to it.
@@ -94,10 +100,21 @@ export function RunCard({
       data-run-outcome={ended ? outcomeWord : undefined}
     >
       <CardHeader className="gap-2 p-3 pb-2">
-        {/* Wraps rather than truncating the badge away: at 390px the state word is the one thing
-            on this row that must survive, so the title gives up its width first. */}
         <div className="flex min-w-0 flex-wrap items-center gap-2">
-          <CardTitle className="min-w-0 flex-1 truncate text-sm">{run.plan_title}</CardTitle>
+          {/* The PLAN FILE is the name (operator, 2026-09-10): it is what `/execute` was given, what
+              `plan-runner status` prints and what the ship logs are filed under, so it is the one
+              name every surface shares. The plan's own H1 sits beneath it as the description. */}
+          <CardTitle className="w-full min-w-0 break-words font-mono text-sm leading-snug">
+            {planFileName(run.plan_path)}
+          </CardTitle>
+          {run.plan_title && (
+            // Three lines at most: a plan H1 on this host runs to 370 characters, and the file name above is the
+            // title that must always read whole. The clamp clips the box only — the whole text stays in the
+            // DOM and the accessibility tree.
+            <p className="line-clamp-3 w-full min-w-0 break-words text-xs leading-snug text-muted-foreground">
+              {run.plan_title}
+            </p>
+          )}
           {ended ? (
             // The runner's word, uppercased as a last resort when it is one this app has no string for.
             <Badge tone={runOutcomeTone(run)}>

@@ -64,3 +64,28 @@ export function formatUsageLimitText(text: string) {
     return text;
   }
 }
+
+/**
+ * A token count as the chat prints it: exact under a thousand, then K and M, with one decimal
+ * only while it still means something. Shared by the session counter in the composer and the
+ * per-agent readings in the pinned strip, so one figure is never spelled two ways.
+ */
+export function formatTokenCount(value: number): string {
+  if (!Number.isFinite(value) || value <= 0) {
+    return '0';
+  }
+
+  if (value >= 1_000_000) {
+    return `${(value / 1_000_000).toFixed(value >= 10_000_000 ? 0 : 1)}M`;
+  }
+
+  if (value >= 10_000) {
+    return `${Math.round(value / 1_000)}K`;
+  }
+
+  if (value >= 1_000) {
+    return `${(value / 1_000).toFixed(1)}K`;
+  }
+
+  return value.toLocaleString();
+}

@@ -19,6 +19,14 @@ import type { FetchHistoryResult } from '@/shared/types.js';
  * and invalidates naturally; no explicit invalidation hooks exist or are
  * needed.
  *
+ * One thing a history read draws on does NOT live in that file: a subagent's own sidechain
+ * transcript, which the Claude reader parses for the agent's status, its timeline and its token
+ * figures. An agent writes its sidechain continuously while its parent writes nothing, so the
+ * parent's stat alone would hold a running agent's reading — and a backgrounded agent's `running`
+ * — frozen for as long as the main thread stayed quiet (measured 2026-09-10: 22 activity entries
+ * and 88,713 context tokens served while the sidechain held 38 and 115,446). Callers therefore
+ * pass `companionStamp`: a value that moves when those files move. It is compared like the stat.
+ *
  * Only history readers that read `jsonl_path` itself may use this cache —
  * callers pass `transcriptPath: null` for providers whose messages live
  * elsewhere (Cursor's store.db, OpenCode's shared SQLite), which bypasses
@@ -30,6 +38,8 @@ type CacheEntry = {
   mtimeMs: number;
   /** File size in bytes; doubles as the entry's cost against the byte budget. */
   size: number;
+  /** The caller's freshness value for whatever else the parse read (see `companionStamp`). */
+  companionStamp: string;
   full: FetchHistoryResult;
 };
 
@@ -39,6 +49,12 @@ type GetFullHistoryArgs = {
   transcriptPath: string | null | undefined;
   /** Loads the complete transcript (`limit: null, offset: 0`) from the provider. */
   loadFull: () => Promise<FetchHistoryResult>;
+  /**
+   * Freshness of the files the parse reads BESIDES the transcript — today the session's subagent
+   * sidechains. A changed value invalidates the entry exactly as a changed stat does. Resolved
+   * per request, so keep it cheap; omitted means "nothing else was read".
+   */
+  readCompanionStamp?: () => Promise<string> | string;
 };
 
 /**
@@ -77,7 +93,7 @@ export function createSessionHistoryCache(
      * the session is not cacheable (no transcript path, or the file cannot be
      * stat'ed) — the caller then falls back to a plain provider read.
      */
-    async getFullHistory({ sessionId, transcriptPath, loadFull }: GetFullHistoryArgs): Promise<FetchHistoryResult | null> {
+    async getFullHistory({ sessionId, transcriptPath, loadFull, readCompanionStamp }: GetFullHistoryArgs): Promise<FetchHistoryResult | null> {
       if (!transcriptPath) {
         return null;
       }
@@ -94,12 +110,22 @@ export function createSessionHistoryCache(
         return null;
       }
 
+      let companionStamp = '';
+      try {
+        companionStamp = (await readCompanionStamp?.()) ?? '';
+      } catch {
+        // Unreadable companions are treated as "changed": a parse is cheaper than serving a
+        // reading whose freshness cannot be established.
+        companionStamp = `unreadable:${Date.now()}`;
+      }
+
       const cached = entries.get(sessionId);
       if (
         cached
         && cached.transcriptPath === transcriptPath
         && cached.mtimeMs === stat.mtimeMs
         && cached.size === stat.size
+        && cached.companionStamp === companionStamp
       ) {
         // Re-insert to mark as most recently used.
         entries.delete(sessionId);
@@ -121,6 +147,7 @@ export function createSessionHistoryCache(
           transcriptPath,
           mtimeMs: stat.mtimeMs,
           size: stat.size,
+          companionStamp,
           full,
         });
         evictOverBudget();

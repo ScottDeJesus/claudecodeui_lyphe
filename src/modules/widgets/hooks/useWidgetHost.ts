@@ -92,7 +92,18 @@ export function useWidgetHost(
   const postToFrame = useCallback(
     (message: WidgetHostMessage) => {
       if (revokedRef.current) return;
-      // '*' for the same reason the frame uses it: an opaque origin has no name to address.
+      // '*', and the reason differs by which frame this host is driving.
+      //
+      // For an HTML widget it is the only option there is: the document sits on an opaque origin,
+      // which has no name to address. For a `DocSpaceFrame` the origin IS nameable, so '*' is a
+      // choice rather than a necessity — one made because this hook is shared and threading a
+      // per-frame target origin through it would buy nothing here. What '*' risks is delivering
+      // to a document other than the one intended, and both halves of that are already closed:
+      // the message goes only to THIS element's `contentWindow`, and the `load` counter above
+      // revokes the frame the moment it holds a second document, so a frame that navigated away
+      // is never posted into again. The payload is the theme flag and the app's CSS token values
+      // — nothing addressed to a widget is a secret. If either of those ever stops being true,
+      // this is where the DocSpace frame's real origin has to start being named.
       frameRef.current?.contentWindow?.postMessage(message, '*');
     },
     [frameRef],
@@ -136,6 +147,15 @@ export function useWidgetHost(
         // The document was built with the theme of the moment it was built; this is what keeps
         // it current afterwards, and it is the only theme path — a flip never rebuilds srcDoc.
         postThemeRef.current();
+        // The embedder's own hook on the SAME accepted `ready`, and deliberately AFTER the theme
+        // post: everything this listener already did has happened, so a handler that throws
+        // cannot cost the frame its theme. It fires only for a ready this listener ADMITTED —
+        // right frame, not revoked — which is what lets `DocSpaceFrame` treat it as proof of
+        // life and disarm its timeout; a post from any other window has returned far above.
+        // Reached through the ref for the reason the ref exists: `handlers` is a fresh object on
+        // most renders, and naming it in the dependency list would re-install this listener
+        // underneath a message already in flight.
+        handlersRef.current.onReady?.();
         return;
       }
 

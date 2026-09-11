@@ -30,6 +30,7 @@ import { useCliVersion } from '@/shared/hooks/useCliVersion';
 import { usePlainModePreference } from '@/shared/hooks/usePlainModePreference';
 import { Banner, Button } from '@/shared/ui';
 import ChatMessagesPane from '@/modules/chat/transcript/ChatMessagesPane';
+import PinnedSubagents from '@/modules/chat/transcript/PinnedSubagents';
 import ChatComposer from '@/modules/chat/composer/ChatComposer';
 import CommandResultModal from '@/modules/chat/modals/CommandResultModal';
 
@@ -139,6 +140,7 @@ function ChatInterface({
 
   const {
     chatMessages,
+    agentMessages,
     addMessage,
     sessionActivity,
     isProcessing,
@@ -579,6 +581,7 @@ function ChatInterface({
           )}
 
           <ChatComposer
+          pinnedAgents={<PinnedSubagents messages={agentMessages} />}
           pendingPermissionRequests={pendingPermissionRequests}
           handlePermissionDecision={handlePermissionDecision}
           handleGrantToolPermission={handleGrantToolPermission}

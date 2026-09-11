@@ -10,6 +10,7 @@ import type {
   FetchHistoryResult,
   NormalizedMessage,
   SubagentActivity,
+  SubagentUsage,
   SubagentInfo,
 } from '@/shared/types.js';
 import { parseFilesInputTag } from '@/shared/image-attachments.js';
@@ -41,6 +42,8 @@ type ClaudeToolResult = {
   subagentTools?: SubagentActivity[];
   subagent?: SubagentInfo;
   toolUseResult?: unknown;
+  /** When the result landed. For a backgrounded agent, its notification's time — the launch receipt's own stamp is the launch. */
+  timestamp?: string;
 };
 
 type ClaudeHistoryResult =
@@ -72,6 +75,15 @@ const IN_FLIGHT_BELIEVED_FOR_MS = 4 * 60 * 60 * 1000;
 type ClaudeSubagentTranscript = {
   activity: SubagentActivity[];
   model?: string;
+  /** Present once one assistant record carried a non-zero usage. */
+  usage?: SubagentUsage;
+  /**
+   * The last record's time, once the transcript has reached its closing reply: when the agent
+   * finished. The only finish time a backgrounded agent usually has — one that ends while a turn
+   * is running gets no `<task-notification>` turn in the parent transcript at all (measured
+   * 2026-09-10: 13 background launches, one notification turn naming one of them).
+   */
+  finishedAt?: string;
   /**
    * True while the transcript has not reached its closing reply. The evidence is the last
    * ASSISTANT record's `stop_reason`: a finished agent ends on `end_turn` (its report — measured
@@ -84,7 +96,51 @@ type ClaudeSubagentTranscript = {
    * last write.
    */
   inFlight: boolean;
+  /**
+   * True when the transcript's last record is Claude Code's interruption marker — the agent was
+   * stopped (Esc, a stopped task, a teardown), not finished and not still going. Without this a
+   * stopped agent read as in flight for the four-hour window, because it never reached a closing
+   * reply (measured 2026-09-10: a stopped review pinned as running 222 minutes after its last
+   * write; 30 agent transcripts on this machine end on the marker).
+   */
+  interrupted: boolean;
+  /**
+   * True when the transcript's last record is Claude Code's synthetic API-error reply
+   * (`isApiErrorMessage`: a rate limit, an overload) — the agent died, it did not finish. That
+   * record ends on `stop_sequence`, which reads as a closing reply, so without this a dead agent
+   * was marked completed (measured 2026-09-10: 64 agent transcripts on this machine end on one).
+   */
+  failed: boolean;
 };
+
+/** Claude Code's own marker for a stopped turn, written as a user record: "[Request interrupted by user]" and "… for tool use". */
+const INTERRUPTION_MARKER = /^\[Request interrupted by user/;
+
+/**
+ * Reduces one Anthropic-shaped usage payload to the two figures a row is read by.
+ *
+ * `contextTokens` is that request's whole window — input, both cache kinds and the reply —
+ * which is exactly the sum Claude Code reports as an agent's `totalTokens` (measured equal on
+ * every real `Agent` result, 2026-09-10). Null for a payload with nothing in it: Claude writes
+ * synthetic assistant records (`model: "<synthetic>"`, a rate-limit refusal, say) with an
+ * all-zero usage, and counting one would read an agent's window as 0 the moment it was refused.
+ */
+function readClaudeMessageUsage(usage: unknown): { contextTokens: number; outputTokens: number } | null {
+  const record = readObjectRecord(usage);
+  if (!record) {
+    return null;
+  }
+  const count = (value: unknown): number => {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
+  };
+  const outputTokens = count(record.output_tokens);
+  const contextTokens = count(record.input_tokens)
+    + count(record.cache_creation_input_tokens)
+    + count(record.cache_read_input_tokens)
+    + outputTokens;
+  return contextTokens > 0 ? { contextTokens, outputTokens } : null;
+}
 
 /**
  * Flattens one subagent transcript into the shared activity timeline.
@@ -95,10 +151,21 @@ type ClaudeSubagentTranscript = {
  */
 async function readClaudeSubagentTranscript(filePath: string): Promise<ClaudeSubagentTranscript> {
   const activity: SubagentActivity[] = [];
-  const transcript: ClaudeSubagentTranscript = { activity, inFlight: false };
+  const transcript: ClaudeSubagentTranscript = { activity, inFlight: false, interrupted: false, failed: false };
   const toolsById = new Map<string, SubagentActivity>();
   // The stop reason of the last assistant record seen — `undefined` until one carries it.
   let lastStopReason: string | null | undefined;
+  // The reply so far of each API message, by its id. One message reaches the transcript as
+  // several records — one per content block, and more while it streams — every one carrying
+  // the usage as it stood, so the reply count GROWS across records of one id (measured: 3, 3,
+  // 269 on one message). The last record per id is the whole reply; a sum of records is not.
+  const outputByMessageId = new Map<string, number>();
+  let latestContextTokens = 0;
+  let lastRecordTimestamp: string | undefined;
+  // Whether the newest record so far is the interruption marker; any later record clears it (a
+  // stopped agent resumed with SendMessage writes on after the marker).
+  let lastRecordIsInterruption = false;
+  let lastRecordIsApiError = false;
 
   try {
     const fileStream = fs.createReadStream(filePath);
@@ -115,12 +182,28 @@ async function readClaudeSubagentTranscript(filePath: string): Promise<ClaudeSub
       try {
         const entry = JSON.parse(line) as AnyRecord;
         const timestamp = typeof entry.timestamp === 'string' ? entry.timestamp : undefined;
+        if (timestamp) {
+          lastRecordTimestamp = timestamp;
+        }
+        if (entry.type === 'user' || entry.type === 'assistant') {
+          lastRecordIsApiError = entry.type === 'assistant' && entry.isApiErrorMessage === true;
+          const content = entry.message?.content;
+          lastRecordIsInterruption = entry.type === 'user' && Array.isArray(content) && content.some(
+            (part: AnyRecord) => part?.type === 'text' && typeof part.text === 'string' && INTERRUPTION_MARKER.test(part.text),
+          );
+        }
 
         if (entry.message?.role === 'assistant' && Array.isArray(entry.message?.content)) {
           if (typeof entry.message.model === 'string') {
             transcript.model = entry.message.model;
           }
           lastStopReason = typeof entry.message.stop_reason === 'string' ? entry.message.stop_reason : null;
+
+          const usage = readClaudeMessageUsage(entry.message.usage);
+          if (usage) {
+            latestContextTokens = usage.contextTokens;
+            outputByMessageId.set(String(entry.message.id ?? entry.uuid ?? ''), usage.outputTokens);
+          }
 
           for (const part of entry.message.content as AnyRecord[]) {
             if (part.type === 'tool_use') {
@@ -186,7 +269,20 @@ async function readClaudeSubagentTranscript(filePath: string): Promise<ClaudeSub
   } catch {
     // An unreadable stat leaves the age at zero: the transcript is believed until it is not.
   }
-  transcript.inFlight = !reachedClosingReply && lastWriteAgeMs < IN_FLIGHT_BELIEVED_FOR_MS;
+  transcript.interrupted = lastRecordIsInterruption;
+  transcript.failed = lastRecordIsApiError;
+  transcript.inFlight = !reachedClosingReply && !lastRecordIsInterruption && lastWriteAgeMs < IN_FLIGHT_BELIEVED_FOR_MS;
+  if (reachedClosingReply || lastRecordIsInterruption) {
+    transcript.finishedAt = lastRecordTimestamp;
+  }
+
+  if (outputByMessageId.size > 0) {
+    let outputTokens = 0;
+    for (const count of outputByMessageId.values()) {
+      outputTokens += count;
+    }
+    transcript.usage = { contextTokens: latestContextTokens, outputTokens, requests: outputByMessageId.size };
+  }
 
   return transcript;
 }
@@ -243,6 +339,8 @@ async function findClaudeSubagentTranscript(
 type ClaudeTaskNotification = {
   /** `uuid` of the transcript row the notification came from, so it can be dropped. */
   sourceUuid: string;
+  /** The notification turn's own time: when the agent actually finished. */
+  timestamp?: string;
   toolUseId: string;
   status: string;
   summary: string;
@@ -261,8 +359,13 @@ function readTaggedValue(content: string, tagName: string): string {
  * Only notifications that name a tool-use id are collected: without one there
  * is no card to fold them into, and they must keep rendering on their own.
  */
-function collectTaskNotifications(messages: AnyRecord[]): Map<string, ClaudeTaskNotification> {
-  const notifications = new Map<string, ClaudeTaskNotification>();
+function collectTaskNotifications(messages: AnyRecord[]): {
+  byToolUseId: Map<string, ClaudeTaskNotification>;
+  /** By `<task-id>`, which is the agent id: the turns that name no tool-use id (a stop, a resume) still say which agent. */
+  byTaskId: Map<string, ClaudeTaskNotification>;
+} {
+  const byToolUseId = new Map<string, ClaudeTaskNotification>();
+  const byTaskId = new Map<string, ClaudeTaskNotification>();
 
   for (const message of messages) {
     if (message.message?.role !== 'user') {
@@ -277,27 +380,48 @@ function collectTaskNotifications(messages: AnyRecord[]): Map<string, ClaudeTask
         : [];
 
     for (const text of texts) {
-      if (!text.trimStart().startsWith('<task-notification>')) {
+      // Anywhere in the turn, not only at its start: a harness wraps some of these in a preamble.
+      if (!text.includes('<task-notification>')) {
         continue;
       }
 
       const toolUseId = readTaggedValue(text, 'tool-use-id');
-      if (!toolUseId) {
+      const taskId = readTaggedValue(text, 'task-id');
+      if (!toolUseId && !taskId) {
         continue;
       }
 
-      // A resumed agent notifies more than once; the last word wins.
-      notifications.set(toolUseId, {
+      const notification: ClaudeTaskNotification = {
         sourceUuid: String(message.uuid ?? ''),
-        toolUseId,
+        timestamp: typeof message.timestamp === 'string' ? message.timestamp : undefined,
+        toolUseId: toolUseId ?? '',
         status: readTaggedValue(text, 'status') || 'completed',
         summary: readTaggedValue(text, 'summary'),
         result: readTaggedValue(text, 'result'),
-      });
+      };
+      // A resumed agent notifies more than once; the last word wins.
+      if (toolUseId) {
+        byToolUseId.set(toolUseId, notification);
+      }
+      if (taskId) {
+        byTaskId.set(taskId, notification);
+      }
     }
   }
 
-  return notifications;
+  return { byToolUseId, byTaskId };
+}
+
+/**
+ * The SDK's three finishes as the card's status. `stopped` — the reader's Stop, an interrupt,
+ * a teardown — is the most common of them in a working session (4 of 10 notifications in one
+ * measured transcript) and is not a failure; painting it red said something had gone wrong.
+ */
+function readNotificationStatus(notification: ClaudeTaskNotification | undefined): SubagentInfo['status'] {
+  if (!notification || notification.status === 'completed') {
+    return 'completed';
+  }
+  return notification.status === 'stopped' ? 'stopped' : 'failed';
 }
 
 /** Reads the `tool_use_id` off the tool-result row that launched an agent. */
@@ -465,6 +589,9 @@ async function getSessionMessages(
       activity: SubagentActivity[];
       info: SubagentInfo;
       inFlight: boolean;
+      interrupted: boolean;
+      failed: boolean;
+      finishedAt?: string;
     }>();
     for (const agentId of agentIds) {
       const located = await findClaudeSubagentTranscript(projectDir, providerSessionId, agentId);
@@ -479,6 +606,9 @@ async function getSessionMessages(
 
       subagentsById.set(agentId, {
         inFlight: transcript.inFlight,
+        interrupted: transcript.interrupted,
+        failed: transcript.failed,
+        finishedAt: transcript.finishedAt,
         activity: transcript.activity
           .slice(0, MAX_TRANSMITTED_SUBAGENT_ACTIVITIES)
           .map(truncateSubagentActivity),
@@ -490,6 +620,7 @@ async function getSessionMessages(
           model: transcript.model,
           status: 'completed',
           activityCount: transcript.activity.length,
+          usage: transcript.usage,
         },
       });
     }
@@ -499,7 +630,7 @@ async function getSessionMessages(
     // `<task-notification>` turn. Folding the notification back onto the tool
     // call that started the agent keeps one card per agent instead of a card,
     // an unrelated status line, and a stray markdown reply.
-    const notificationsByToolUseId = collectTaskNotifications(messages);
+    const notifications = collectTaskNotifications(messages);
     const foldedNotificationUuids = new Set<string>();
 
     for (const message of messages) {
@@ -510,7 +641,8 @@ async function getSessionMessages(
 
       const subagent = subagentsById.get(String(agentId));
       const toolUseId = readAgentToolUseId(message);
-      const notification = toolUseId ? notificationsByToolUseId.get(toolUseId) : undefined;
+      const notification = (toolUseId ? notifications.byToolUseId.get(toolUseId) : undefined)
+        ?? notifications.byTaskId.get(String(agentId));
       // An async agent's launch row never tells you it finished — only the
       // later notification does. When that notification is missing (a live run,
       // or one compacted out of the transcript), the agent's own transcript is
@@ -532,19 +664,28 @@ async function getSessionMessages(
             ?? (typeof message.toolUseResult?.resolvedModel === 'string' ? message.toolUseResult.resolvedModel : undefined),
           status: isAwaitingAsyncAgent
             ? 'running'
-            : notification && notification.status !== 'completed'
-              ? 'failed'
-              : 'completed',
+            : notification
+              ? readNotificationStatus(notification)
+              : subagent.failed ? 'failed' : subagent.interrupted ? 'stopped' : 'completed',
         };
       }
 
       if (notification) {
         replaceAgentToolResultContent(message, notification.result || notification.summary);
+        // The finish time the row can show: the notification's, not the launch receipt's.
+        if (notification.timestamp) {
+          message.toolResultAt = notification.timestamp;
+        }
         foldedNotificationUuids.add(notification.sourceUuid);
       } else if (message.toolUseResult?.isAsync === true) {
         // Without a notification there is no answer to show, and the launch
         // acknowledgement is internal bookkeeping the user must never read.
         replaceAgentToolResultContent(message, '');
+      }
+      // No notification turn, but the agent's own transcript reached its closing reply: that
+      // record's time is the finish. The usual case for a backgrounded agent (see `finishedAt`).
+      if (!message.toolResultAt && !isAwaitingAsyncAgent && message.toolUseResult?.isAsync === true && subagent?.finishedAt) {
+        message.toolResultAt = subagent.finishedAt;
       }
     }
 
@@ -938,6 +1079,12 @@ export class ClaudeSessionsProvider implements IProviderSessions {
       // is drawn by whichever of them comes first. Naming only the last one leaves
       // every turn that thought or used a tool captioned "Claude".
       const model = typeof raw.message.model === 'string' ? raw.message.model : undefined;
+      // What the request behind this turn cost, on every part for the same reason as the model:
+      // a subagent's rows are folded by the client, which reads the usage off whichever part
+      // arrives (`useChatMessages.ts`), keeping the last value per `usageMessageId`. Undefined
+      // (not zero) for a synthetic row, so the fold never counts a refusal as a request.
+      const usage = readClaudeMessageUsage(raw.message.usage) ?? undefined;
+      const usageMessageId = usage ? String(raw.message.id ?? baseId) : undefined;
 
       if (Array.isArray(raw.message.content)) {
         let partIndex = 0;
@@ -952,6 +1099,8 @@ export class ClaudeSessionsProvider implements IProviderSessions {
               role: 'assistant',
               content: part.text,
               model,
+              usage,
+              usageMessageId,
             }));
           } else if (part.type === 'tool_use') {
             messages.push(createNormalizedMessage({
@@ -964,6 +1113,8 @@ export class ClaudeSessionsProvider implements IProviderSessions {
               toolInput: part.input,
               toolId: part.id,
               model,
+              usage,
+              usageMessageId,
             }));
           } else if (part.type === 'thinking' && part.thinking) {
             messages.push(createNormalizedMessage({
@@ -974,6 +1125,8 @@ export class ClaudeSessionsProvider implements IProviderSessions {
               kind: 'thinking',
               content: part.thinking,
               model,
+              usage,
+              usageMessageId,
             }));
           }
           partIndex++;
@@ -988,6 +1141,8 @@ export class ClaudeSessionsProvider implements IProviderSessions {
           role: 'assistant',
           content: raw.message.content,
           model,
+          usage,
+          usageMessageId,
         }));
       }
       return messages;
@@ -1081,6 +1236,13 @@ export class ClaudeSessionsProvider implements IProviderSessions {
               subagentTools: raw.subagentTools,
               subagent: raw.subagent,
               toolUseResult: raw.toolUseResult,
+              // A backgrounded agent's receipt row is stamped at the LAUNCH; its finish is the
+              // notification's time, folded above. Without one there is no finish to name.
+              timestamp: typeof raw.toolResultAt === 'string'
+                ? raw.toolResultAt
+                : raw.toolUseResult?.isAsync === true
+                  ? undefined
+                  : (typeof raw.timestamp === 'string' ? raw.timestamp : undefined),
             });
           }
         }
@@ -1105,6 +1267,7 @@ export class ClaudeSessionsProvider implements IProviderSessions {
             : JSON.stringify(toolResult.content),
           isError: toolResult.isError,
           toolUseResult: toolResult.toolUseResult,
+          timestamp: toolResult.timestamp,
         };
         msg.subagentTools = toolResult.subagentTools;
         msg.subagent = toolResult.subagent;
