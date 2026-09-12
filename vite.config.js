@@ -1,4 +1,4 @@
-import { createRequire } from 'node:module'
+import { readFileSync } from 'node:fs'
 import { fileURLToPath, URL } from 'node:url'
 import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
@@ -7,7 +7,9 @@ import { getConnectableHost, normalizeLoopbackHost } from './shared/networkHosts
 // The client shows the installed package version so it can be compared against the
 // version the server process is actually running. Reading package.json here and
 // injecting it keeps the frontend free of imports that reach outside src/.
-const pkg = createRequire(import.meta.url)('./package.json')
+// Read from disk rather than require()d: the require cache outlives a dev-server config
+// restart, which would keep serving the old version after a bump.
+const pkg = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8'))
 
 export default defineConfig(({ mode }) => {
   // Load env file based on `mode` in the current working directory.
