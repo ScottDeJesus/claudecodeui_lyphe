@@ -21,6 +21,7 @@ import { useScheduledMessages } from '@/modules/chat/composer/useScheduledMessag
 import { useChatSessionState } from '@/modules/chat/hooks/useChatSessionState';
 import { useChatRealtimeHandlers } from '@/modules/chat/hooks/useChatRealtimeHandlers';
 import { useChatComposerState } from '@/modules/chat/hooks/useChatComposerState';
+import { useSessionPresence } from '@/modules/chat/hooks/useSessionPresence';
 import { useSessionStore } from '@/modules/chat/hooks/useSessionStore';
 import {
   useProcessingSessions,
@@ -86,7 +87,8 @@ function ChatInterface({
   onChatExportSurface,
 }: ChatInterfaceProps) {
   const { tasksEnabled, isTaskMasterInstalled } = useTasksSettings();
-  const { subscribe } = useWebSocket();
+  const { subscribe, isConnected } = useWebSocket();
+  useSessionPresence({ sessionId: isActive ? selectedSession?.id ?? null : null, sendMessage, isConnected });
   const { t } = useTranslation('chat');
   const processingSessions = useProcessingSessions();
   const {

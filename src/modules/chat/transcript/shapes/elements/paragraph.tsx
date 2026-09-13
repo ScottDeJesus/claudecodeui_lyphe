@@ -34,8 +34,6 @@ export function PlainParagraph({ children }: PlainElementProps) {
  * stands, the answer would be `true` for every fact paragraph that can exist and the rung would be
  * dead code. Asked of it with exactly those elements unwrapped, a link or a code span anywhere —
  * value, label or verdict — still reads `true`, and the rung declines.
- *
- * `elements/list.tsx`'s `factItemIsFormatted` asks the list rung's form of the same question.
  */
 const unwrapped = (node: HastNode, unwrap: (element: HastNode) => boolean): HastNode => ({
   ...node,
@@ -61,9 +59,7 @@ const isEmphasis = (element: HastNode): boolean => element.tagName === 'strong' 
  * Asked only of a paragraph `readFactPairs` already accepted, where every `strong` child is a
  * label and every other child is text or a `<br>`. A label follows a line break when the sibling
  * before it is a `<br>` (`remark-breaks`, or a hard break) or a text node whose last non-blank
- * character is the newline. It lives here rather than in `readFactPairs` because the list rung
- * reads a list's items as one concatenated run with NO newlines between them, and that reader is
- * shared.
+ * character is the newline.
  */
 const labelsOpenLines = (node: HastNode): boolean => {
   const children = node.children ?? [];
@@ -122,8 +118,7 @@ export function ShapeParagraph({ node, children }: PlainElementProps) {
   // 2 — a fact card: two pairs at the least, one per line, and nothing in the paragraph but them.
   const pairs = readFactPairs(node);
   if (pairs && labelsOpenLines(node) && !hasInlineFormatting(unwrapped(node, isFactScaffold))) {
-    // The facts payload is "the item texts joined by newlines"; a paragraph's items are its pairs,
-    // spelled the way a fact LIST's items read, so the two keys follow one rule.
+    // The facts payload is the pairs, one `Label: value` per line.
     const payload = pairs.map((pair) => `${pair.label}: ${pair.value}`).join('\n');
     return <FactCard pairs={pairs} collapseKey={shapeKey('facts', payload)} />;
   }

@@ -114,7 +114,28 @@
       "title": "Etkinlik Türleri",
       "actionRequired": "Aksiyon gerekli",
       "stop": "Çalıştırma durduruldu",
-      "error": "Çalıştırma başarısız"
+      "error": "Çalıştırma başarısız",
+      "limits": "Kullanım limitleri"
+    },
+    "ntfy": {
+      "title": "Telefon bildirimi (ntfy)",
+      "description": "Her bildirimi telefonundaki ntfy uygulamasına gönder.",
+      "server": "Sunucu URL’si",
+      "topic": "Konu",
+      "topicHint": "Konuyu bilen herkes okuyabilir — ona bir parola gibi davran.",
+      "token": "Erişim jetonu",
+      "tokenKept": "Kayıtlı — değiştirmek için yaz",
+      "appUrl": "CloudCLI URL’si",
+      "appUrlHint": "Bildirime dokununca nerenin açılacağı — telefonunun CloudCLI’ye ulaştığı adres.",
+      "longRun": "Yalnızca şundan uzun çalıştırmaları bildir (dakika)",
+      "enabled": "Etkin",
+      "save": "Kaydet",
+      "test": "Test gönder",
+      "remove": "Kaldır",
+      "saved": "Kaydedildi",
+      "tested": "Test bildirimi gönderildi",
+      "testFailed": "Test bildirimi başarısız",
+      "configured": "{{topic}} konusuna gönderiliyor"
     }
   },
   "appearanceSettings": {

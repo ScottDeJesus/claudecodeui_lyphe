@@ -59,7 +59,7 @@ const fileTreeFileSystem: FileTreeFileSystem = {
     destinationPath,
     exclusive ? fs.constants.COPYFILE_EXCL : 0,
   ),
-  createReadStream: (filePath) => fs.createReadStream(filePath),
+  createReadStream: (filePath, range) => fs.createReadStream(filePath, range),
 };
 
 /**

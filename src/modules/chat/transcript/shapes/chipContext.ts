@@ -12,9 +12,12 @@ import { createContext } from 'react';
  *   * `ShapeSection`, around a section's heading — the heading's words are the fold button, and a
  *     heading is a label, never a place for a chip;
  *   * `DataTable`, around its header row — a header's words are the sort button, and a header is a
- *     label too.
+ *     label too;
+ *   * `PlainHeading` and `PlainTableHeaderCell`, the same two labels before a reply settles into a
+ *     section or a sortable table.
  *
- * Read by `FileChip` alone, which then draws the plain form it was handed instead. It lives in its
+ * Read by `FileChip`, which then draws the plain form it was handed instead and loads no preview —
+ * a picture or a PDF inside a control or a label is the same wrong thing. It lives in its
  * own module because `InlineMarks.tsx` exports components, and a context beside them would cost the
  * file its Fast Refresh.
  */

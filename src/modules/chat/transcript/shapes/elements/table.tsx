@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import { classifyTable, soleNumericColumn } from '@/modules/chat/transcript/shapes/detect';
 import type { HastNode } from '@/modules/chat/transcript/shapes/hast';
 import { hasInlineFormatting, readTable } from '@/modules/chat/transcript/shapes/hast';
+import { ChipsSuppressedContext } from '@/modules/chat/transcript/shapes/chipContext';
 import { shapeKey } from '@/modules/chat/transcript/shapes/collapseState';
 import { dataTableKind, tablePayload } from '@/modules/chat/transcript/shapes/tableData';
 import { BeforeAfter } from '@/modules/chat/transcript/shapes/BeforeAfter';
@@ -43,10 +44,15 @@ export function PlainTableRow({ children }: PlainElementProps) {
  * The `th` override, moved out of `Markdown.tsx` unchanged. Used through `elements/index.ts`.
  *
  * It does NOT call `renderInline`: a header is a label, never prose, and linkifying one would turn
- * a column named `src/foo.ts` into a chip nobody asked for.
+ * a column named `src/foo.ts` into a chip nobody asked for. A code span in it is suppressed too, so
+ * a header holding `` `shots/a.png` `` gets neither a chip nor a picture.
  */
 export function PlainTableHeaderCell({ children }: PlainElementProps) {
-  return <th className="border-b border-border px-3 py-2 text-left font-semibold text-foreground">{children}</th>;
+  return (
+    <th className="border-b border-border px-3 py-2 text-left font-semibold text-foreground">
+      <ChipsSuppressedContext.Provider value={true}>{children}</ChipsSuppressedContext.Provider>
+    </th>
+  );
 }
 
 /** The `td` override, moved out of `Markdown.tsx` unchanged. Used through `elements/index.ts`. */

@@ -41,6 +41,22 @@ export const APP_VERSION: string = typeof __APP_VERSION__ === 'string' ? __APP_V
 
 // ---------------------------
 
+//----------------- GIT TAB ------------
+
+/**
+ * The repositories the git tab's strip tabs through, in strip order, by absolute path. The git
+ * tab matches them to registered projects; the command palette offers its commit and branch rows
+ * only for a project on this list, since those rows bring the git tab forward on it.
+ */
+export const GIT_REPO_PATHS: readonly string[] = [
+  '/opt/shadow-connector',
+  '/home/lyphe/.claude/claudecodeui_lyphe',
+  '/home/lyphe/.claude',
+  '/opt/eis-app',
+];
+
+// ---------------------------
+
 //----------------- SETTINGS NAVIGATION ------------
 
 /** Shape of one entry in `SETTINGS_MAIN_TABS`; only that constant needs it. */

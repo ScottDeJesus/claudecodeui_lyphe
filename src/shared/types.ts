@@ -117,6 +117,13 @@ export type Project = {
   [key: string]: unknown;
 };
 
+/**
+ * One repository the git tab's strip carries: the registered project behind it, narrowed to the
+ * three fields the tab reads. Built by the project-workspace state provider and memoised on those
+ * fields, so a project-list refresh that changes none of them re-renders nothing in the tab.
+ */
+export type GitRepository = Pick<Project, 'projectId' | 'fullPath' | 'displayName'>;
+
 /** Progress payload streamed while the backend enumerates projects, used to drive the sidebar loading bar. */
 export type LoadingProgress = {
   kind?: 'loading_progress';
@@ -963,8 +970,8 @@ export type GitRemoteStatus = {
  * Where the current branch stands against its upstream — ONE fact the git panel decides once
  * (`describeUpstreamPosition`, from the server's own `hasUpstream` / `hasCommits` flags, never
  * from the TYPE of `ahead`) and hands to its header and its Changes view together, so the two
- * cannot disagree. Three of the four kinds are unknowns, and none of them may render as
- * "everything is pushed" (design handoff §5: "we don't know" never looks like zero).
+ * cannot disagree. Three of the four kinds are unknowns, and none of them may render as a
+ * branch with nothing left to push (design handoff §5: "we don't know" never looks like zero).
  */
 export type UpstreamPosition =
   /** The remote-status read failed: nothing about the upstream is known, not even whether there is one. */
@@ -1373,7 +1380,30 @@ export type NotificationPreferencesState = {
     actionRequired: boolean;
     stop: boolean;
     error: boolean;
+    /** The usage-limit family: limit reached, reset, warning, overage, out of credits. */
+    limits: boolean;
   };
+};
+
+/** The ntfy phone-push settings as a client is allowed to see them: the topic masked to its first and last two characters and the access token reduced to whether one is stored, never the credentials themselves; rendered by the notifications settings card. */
+export type NtfySettingsView = {
+  configured: boolean;
+  enabled: boolean;
+  serverUrl: string;
+  topicMasked: string | null;
+  hasToken: boolean;
+  longRunMinutes: number;
+  appUrl: string | null;
+};
+
+/** One ntfy settings save. Every field is optional and an absent one keeps what is stored — which is how a form that never shows the access token cannot erase it; `''` or `null` clears it deliberately. Sent by the notifications settings card. */
+export type NtfySettingsInput = {
+  serverUrl?: string;
+  topic?: string;
+  token?: string | null;
+  longRunMinutes?: number;
+  enabled?: boolean;
+  appUrl?: string | null;
 };
 
 /** Cursor's persisted permission settings: the allowed and disallowed command patterns and whether permission prompts are skipped; read and written as one unit by the settings controller. */
@@ -1944,8 +1974,8 @@ export type RunnerPhaseRow = { rank: number; id: string; title: string; state: R
 export type RunnerTimelineEntry = { at: string; phase_id: string; stage: string; detail: string };
 /** Where the run stands, from `progress.json.position`. `stage_since` is epoch SECONDS, like every timestamp inside a snapshot. */
 export type RunnerPosition = { rank: number; total: number; phase_id: string; title: string; remain: number; pipeline: string; stage: string; stage_detail: string; stage_since: number };
-/** One run as the lane reads it off disk. `position` is `null` while the runner has not composed one yet, which a live run does show in its first seconds. */
-export type RunnerRunSnapshot = { run_id: string; plan_path: string; plan_title: string; state: RunnerRunState; status: string; started_at: number; heartbeat_at: number; stopped_at: number | null; outcome: string | null; ended_at: number | null; pid: number | null; position: RunnerPosition | null; phases: RunnerPhaseRow[]; spawns: number; max_spawns: number; cost_usd: number; plan_runs: number; plan_spawns: number; plan_cost_usd: number; line: string; timeline: RunnerTimelineEntry[] };
+/** One run as the lane reads it off disk. `position` is `null` while the runner has not composed one yet, which a live run does show in its first seconds. `blocked_causes` is the receipt's phase id → cause map, `{}` until the run ends — the only record of a phase halted on a crash or a budget, whose row never turns `blocked`. */
+export type RunnerRunSnapshot = { run_id: string; plan_path: string; plan_title: string; state: RunnerRunState; status: string; started_at: number; heartbeat_at: number; stopped_at: number | null; outcome: string | null; ended_at: number | null; blocked_causes: Record<string, string>; pid: number | null; position: RunnerPosition | null; phases: RunnerPhaseRow[]; spawns: number; max_spawns: number; cost_usd: number; plan_runs: number; plan_spawns: number; plan_cost_usd: number; plan_planning_usd: number; plan_review_usd: number; plan_scouts_usd: number; plan_total_usd: number; tokens: number; plan_tokens: number; line: string; timeline: RunnerTimelineEntry[] };
 /** The whole picture, pushed on change over `/ws`. `runs` is ordered by `started_at` ascending. `at` is epoch MILLISECONDS, unlike every field inside a snapshot. */
 export type RunnerStateEvent = { kind: 'runner_state'; runs: RunnerRunSnapshot[]; at: number };
 /** The two verbs the server may relay. Starting a run is `/execute`'s act, never a button's. */

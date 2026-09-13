@@ -131,7 +131,11 @@
       "dry-run": "DRY RUN",
       "unknown": "ENDED",
       "incomplete": "INCOMPLETE"
-    }
+    },
+    "planTotal": "plan ${{total}}",
+    "planSplit_one": "planning ${{planning}} · review ${{review}} · scouts ${{scouts}} · build ${{build}} in {{count}} run",
+    "planSplit": "planning ${{planning}} · review ${{review}} · scouts ${{scouts}} · build ${{build}} in {{count}} runs",
+    "tokens": "⛁ {{n}} tok"
   },
   "navigation": {
     "settings": "Settings",

@@ -1,6 +1,7 @@
 import { Bell, BellOff, BellRing, Loader2, Play, Volume2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
+import NtfySettingsCard from '@/modules/settings/NtfySettingsCard';
 import { Button } from '@/shared/ui';
 import { playChatCompletionSound } from '@/shared/utils';
 import type { NotificationPreferencesState } from '@/shared/types';
@@ -144,6 +145,8 @@ export default function NotificationsSettingsTab({
         </div>
       )}
 
+      <NtfySettingsCard />
+
       <div className="space-y-4 rounded-lg border border-border bg-card p-4">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="space-y-1">
@@ -247,6 +250,24 @@ export default function NotificationsSettingsTab({
               className="h-4 w-4"
             />
             {t('notifications.events.error')}
+          </label>
+
+          <label className="flex items-center gap-2 text-sm text-foreground">
+            <input
+              type="checkbox"
+              checked={notificationPreferences.events.limits}
+              onChange={(event) =>
+                onNotificationPreferencesChange({
+                  ...notificationPreferences,
+                  events: {
+                    ...notificationPreferences.events,
+                    limits: event.target.checked,
+                  },
+                })
+              }
+              className="h-4 w-4"
+            />
+            {t('notifications.events.limits')}
           </label>
         </div>
       </div>

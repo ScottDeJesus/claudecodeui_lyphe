@@ -8,6 +8,7 @@ import rehypeKatex from 'rehype-katex';
 
 import { normalizeInlineCodeFences } from '@/modules/chat/utils/chatFormatting';
 import { CodeBlock, CodePre } from '@/modules/chat/transcript/shapes/code';
+import { MarkdownImage } from '@/modules/chat/transcript/shapes/MarkdownImage';
 import { MarkdownLink } from '@/modules/chat/transcript/shapes/MarkdownLink';
 import { MarkdownStreamingContext } from '@/modules/chat/transcript/shapes/markdownStreaming';
 import { remarkShapeGroups } from '@/modules/chat/transcript/shapes/remarkShapeGroups';
@@ -65,6 +66,7 @@ const PLAIN_COMPONENTS = {
   th: PlainTableHeaderCell,
   td: PlainTableCell,
   a: MarkdownLink,
+  img: MarkdownImage,
   h1: PlainHeading,
   h2: PlainHeading,
   h3: PlainHeading,

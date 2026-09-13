@@ -98,7 +98,7 @@ it by absolute path from `/opt/shadow-connector/node_modules/playwright/index.js
 Chromium build 1208 already cached), so `npm install` here pulls no browser stack.
 
 Screenshots land in `.verify/shots/` as `<phase>-<screen>[-<width>]-<light|dark>.png`;
-`0-git-390-dark.png` is the Source Control tab at 390px wide in dark mode. The mode suffix
+`0-git-390-dark.png` is the git panel at 390px wide in dark mode. The mode suffix
 comes from the same flag that set the colour scheme, so it cannot disagree with the pixels.
 View a shot before citing it.
 
@@ -160,7 +160,7 @@ word `branches`, so a literal text scan would redden on the phase's own spec. Fo
 registered project on this host is in are replayed verbatim from `git.routes.ts` — a branch with
 no tracking ref (**no `ahead` key at all**), a repository with no commits (`hasUpstream:false`
 *with* `ahead:0`), a failed remote-status read and a failed commits read — because each must be
-told apart from "everything is pushed" and none of them can be produced here. So is an empty
+told apart from a branch with nothing to push and none of them can be produced here. So is an empty
 commit diff, which the route cannot produce at all: §7c proves that by reading a real merge commit
 over HTTP and finding a header with no patch, and notes in passing that a merge row still draws a
 zeroed stats card above it. The shots are `10-git-pending-{light,dark}`, `-history`, `-390`,
@@ -981,11 +981,11 @@ Claude turns, nothing written on the server or the account, four screenshots:
 taller than the viewport and the bar column — the one thing here judged by eye — sits below the fold.
 `all.mjs` collects `phase-<n>.mjs` only, so like every other `probe-*.mjs` it is run by hand.
 
-**`probe-shapes-lists.mjs` proves the callout and the four list shapes — and the quotations and
+**`probe-shapes-lists.mjs` proves the callout and the three list shapes — and the quotations and
 lists that must NOT become them.** One document, mounted once through `shapes-fixture.mjs`, holds
-fifteen shaped blocks and every near miss beside them. The shapes are compared against a spelled-out
+thirteen shaped blocks and every near miss beside them. The shapes are compared against a spelled-out
 `EXPECTED_KINDS` list, so a block wearing the wrong shape fails by name. The near misses are counted
-exactly — four quotations, fifteen plain lists — and each is held class for class against today's
+exactly — four quotations, seventeen plain lists — and each is held class for class against today's
 bordered blockquote or `PlainList` markup, so a declined block that changed its look still fails.
 
 **The callouts are gated on paint, not on an attribute.** Each of the five `> [!KIND]` alerts must
@@ -1013,14 +1013,16 @@ quotations must stay quotations: an ordinary one, one that opens with the bare w
   the case `checkGlyphLength` in `detect.ts` exists for.
 - **Timeline.** It draws a rail and one dot per entry. Each entry's time is lifted out VERBATIM:
   `4:12 PM` and `Sep 11` must come back as written, never parsed into a `Date` and reformatted.
-- **Facts.** A `**Label:** value` list becomes a grid in the author's order, and each label keeps the
-  author's case. A label that is a link or a code span declines, and so does a value carrying a code
-  span, because a grid would flatten either one.
+- **Label lists.** A list of `**Label:** value` bullets stays a bulleted list — plain bold labels,
+  labels that are links or code spans, and a value carrying a code span alike — and no list in the
+  document becomes a fact grid. Label-value LINES in a paragraph are the fact card's, gated in the
+  prose probe.
 
-Nine more declines are gated by name, each on a line of its own text: six boxes plus one plain bullet,
+Ten more declines are gated by name, each on a line of its own text: six boxes plus one plain bullet,
 four glyphs plus one plain line, a single check line, one untimed line among five times, version
-numbers (`1.2`), ratios (`3:2`), a leading count, a fact value holding code, and a bolded lead-in
-followed by a sentence. A list of two empty items stays a list, and nothing divides by zero.
+numbers (`1.2`), ratios (`3:2`), a leading count, a label list, a label list whose value holds code,
+and a bolded lead-in followed by a sentence. A list of two empty items stays a list, and nothing
+divides by zero.
 
 **A second mount covers user messages.** A USER message renders through `<MarkdownBody breaks>`,
 and with `remark-breaks` on, the newline after `[!NOTE]` arrives as a `<br>` AND a separate `"\n"`
@@ -1041,7 +1043,7 @@ a shaped block, every index after it moves.
 node .verify/probe-shapes-lists.mjs
 ```
 
-66 gates — 62 in the light session, 4 in the dark — each printing a `[PASS]`/`[FAIL]` line. The run
+67 gates — 63 in the light session, 4 in the dark — each printing a `[PASS]`/`[FAIL]` line. The run
 closes with the one `SHAPES LISTS:` line a caller reads with `tail -1`, and exits non-zero on any
 failure. Zero Claude turns, and nothing written on the server or the account. It takes six
 screenshots, `shots/probe-shapes-lists{,-checks,-timeline}-{light,dark}.png`: the document is far
@@ -1049,8 +1051,8 @@ taller than the viewport, and the callouts, the checks and the timeline are each
 every other `probe-*.mjs`, it is run by hand.
 
 **`probe-shapes-prose.mjs` proves the paragraph ladder — the verdict banner and the fact card — and
-the paragraphs that must NOT become either.** One document of eighteen paragraphs, mounted once
-through `shapes-fixture.mjs`, holds six shapes and twelve near misses. The shapes are compared
+the paragraphs that must NOT become either.** One document of twenty paragraphs, mounted once
+through `shapes-fixture.mjs`, holds six shapes and fourteen near misses. The shapes are compared
 against a spelled-out `EXPECTED_KINDS` list. Each near miss is held twice: word for word against the
 text it must still show, and class for class against today's `PlainParagraph` (`mb-2 last:mb-0`,
 written out in the probe rather than read from the component).
@@ -1091,7 +1093,7 @@ the chips straight over the word.
 node .verify/probe-shapes-prose.mjs
 ```
 
-49 gates — 34 in the light session, 15 in the dark — each printing a `[PASS]`/`[FAIL]` line. The run
+51 gates — 36 in the light session, 15 in the dark — each printing a `[PASS]`/`[FAIL]` line. The run
 closes with the one `SHAPES PROSE:` line a caller reads with `tail -1`, and exits non-zero on any
 failure. Zero Claude turns, and nothing written on the server or the account. It takes five
 screenshots: `shots/probe-shapes-prose{,-verdicts}-{light,dark}.png` and
@@ -1230,8 +1232,8 @@ open nothing. The Files tab must end on the target row, its text matched against
 
 **The streaming half is gated as it is, not as the plan wrote it.** The plan says the streaming half
 never runs the scan. The `Plain*` overrides carry the seam, so it does — the reasoning is in
-`shapes/elements/inlineText.tsx`. The probe asserts a streaming body draws every settled chip, plus
-the backticked header and heading paths that nothing suppresses there. It also holds the scan under
+`shapes/elements/inlineText.tsx`. The probe asserts a streaming body draws exactly the settled chips:
+a streaming header and heading suppress a backticked path the way the settled ones do. It also holds the scan under
 a frame: under 4 ms over 42,000 characters of prose holding 400 references, and under 8 ms over a
 20,000-character slash-and-plus blob. Last, it pins the link's loose policy to what the deleted
 helper accepted, `:line` kept and `:0` dropped.
@@ -1467,6 +1469,237 @@ failure table — is in
 [`deploy/dev-supervisor/README.md`](../deploy/dev-supervisor/README.md), and the rule it puts on a
 person editing `server/` is in [hosting.md](hosting.md) §"Rules that bite".
 
+## The ntfy probes
+
+The ntfy phone-push channel is proven the way a phone sees it: the real server publishes to a real
+topic on `ntfy.sh`, and the probe reads back what landed there. What the channel does, and why, is
+in [notifications.md](notifications.md); this section is how to prove it. Like the cases above,
+the probes are **not part of `all.mjs`**.
+
+Everything goes through `.verify/lib/ntfy.mjs`. It signs in as the dev account through the real
+`POST /api/auth/login` (no hand-minted token), drives the real notification routes on `:3011`, and
+reads a topic back with ntfy's `json?poll=1`. Its topic is a **scratch topic**, minted once per box
+as `cloudcli-verify-<12 hex>` and kept in `/tmp/cloudcli-ntfy-verify/topic` (mode 600), so every
+run publishes to and reads from the same throwaway topic — a verification credential, never the
+operator's. Run directly, it is a small CLI:
+
+```bash
+node .verify/lib/ntfy.mjs whoami                 # verve
+node .verify/lib/ntfy.mjs topic                  # the scratch topic
+node .verify/lib/ntfy.mjs configure [minutes]    # configured=true topicMasked=… hasToken=false enabled=true appUrl=http://100.103.222.79:5183
+node .verify/lib/ntfy.mjs test                   # ok=true status=200
+node .verify/lib/ntfy.mjs prefs                  # limits=true
+node .verify/lib/ntfy.mjs endpoints              # GET /api/notifications/endpoints?channel=ntfy, raw JSON
+node .verify/lib/ntfy.mjs appconfig-set <key> <value>   # or: appconfig-del <key>
+curl -s "https://ntfy.sh/$(cat /tmp/cloudcli-ntfy-verify/topic)/json?poll=1"   # what landed
+```
+
+One real-event probe, under plain `node`:
+
+```bash
+node .verify/ntfy/run-failed-probe.mjs
+```
+
+It creates a **Cursor** session in `/tmp/cloudcli-ntfy-probe` and sends one chat turn. The Cursor
+CLI is not installed on this box, so the runtime's spawn fails and its exit path raises `run.failed`
+through the real orchestrator — a real crash event for zero model turns. It passes on exactly
+`PROBE OK run.failed pushed priority=4 click-session=match`: a push titled "Session crashed" whose
+tap opens that session, at priority 4 with the `rotating_light` tag. Anything else prints
+`PROBE FAILED`, the reason, and the API journal's last 40 lines, and exits 1. It deletes the session
+row it created, and the project row as well when the probe registered that project and no other
+session stands on it.
+
+One question probe — the whole loop, as a phone walks it — also under plain `node`:
+
+```bash
+node .verify/ntfy/question-probe.mjs
+```
+
+It is the end-to-end proof that a question reaches a phone and the phone's answer reaches the
+model, and it spends **two real Claude turns**. It runs the same script twice, once with
+`permissionMode: 'bypassPermissions'` and once with `default`, because those are the two doors
+into `promptForToolDecision` ([architecture/02-realtime-stream.md](architecture/02-realtime-stream.md)
+§"Permission requests"): in the bypassing mode the `PreToolUse` hook is the only way to a human,
+in `default` `canUseTool` asks and the hook must stand aside. Each run creates a Claude session
+in `/tmp/cloudcli-ntfy-probe`, asks the model for one `AskUserQuestion` with two options, waits
+for the `permission_request` frame, then reads the push off the scratch topic — its title, its
+question body, the session its tap opens, priority 4, and its two answer buttons — and POSTs the
+`Blue` button's url with a **bare `fetch`, no headers at all**, which is the only honest proof
+that the signed token needs no CloudCLI session. Then it waits for `permission_resolved` and the
+turn's `complete`, counts the `permission_request` frames for that session (two would mean the
+hook and `canUseTool` both asked), and reads the model's last words for the answer the phone
+sent. It passes on exactly:
+
+```
+PROBE OK bypass: frames=1 push=question actions=2 answered=Blue reply=Blue | default: frames=1 push=question actions=2 answered=Blue reply=Blue
+```
+
+Anything else prints `PROBE FAILED <mode> <step>`, the detail, and every frame kind the socket
+saw, and exits 1. It sends `skipPermissions: false` explicitly, so a stored "skip permissions"
+cannot quietly turn the `default` run into a second bypass run. It deletes the session rows it
+created, and the project row on the same terms as the run-failed probe.
+
+One stall probe — a run that goes quiet — also under plain `node`:
+
+```bash
+node .verify/ntfy/stall-probe.mjs
+```
+
+It is the proof that silence itself reaches the phone, and it spends **one real Claude turn**. It
+writes `run_stall_ms = 30000` into `app_config` — the same row an operator would set, and the
+watchdog re-reads it on every sweep, which is the only reason an override can apply mid-run —
+creates a Claude session in `/tmp/cloudcli-ntfy-probe`, and asks the model to wait in Bash. The
+wait is an `until` loop over a release file, not `sleep 80`: the Claude Code harness blocks a
+standalone foreground `sleep` at the tool level, so a sleeping turn comes back as a tool error in
+seconds and is never silent (measured 2026-09-12, and the loop is the form that block's own
+message names). It also makes the silence the probe's to end — it touches the release file once
+the push has landed, and the turn stops waiting. It passes on exactly `PROBE OK stuck-push=seen
+priority=4 click-session=match override-cleared=yes`: a push titled "Session silent" whose tap
+opens that session, at priority 4, with the override read back out of the database to prove it is
+gone. On a missing push it prints `PROBE FAILED`, the run's `lastSeq` sampled every 10 s through
+the wait — one that climbed means the run was never silent, one that stood still means the
+watchdog was — the frame kinds, and the API journal's last 40 lines. It waits for the released
+turn to settle before deleting its session row, and drops the project row on the same terms as
+the run-failed probe.
+
+One signals probe, under `tsx` because it imports the detector's own TypeScript module:
+
+```bash
+node_modules/.bin/tsx --tsconfig server/tsconfig.json .verify/ntfy/signals-probe.mjs
+```
+
+Nothing is mocked but the stream. It drives the real `detectRuntimeSignals`
+(`claude-runtime-signals.ts`, described in [notifications.md](notifications.md) §"Where the
+Claude runtime's error and limit signals come from") with one real `SignalState` and the
+SDK-shaped messages a run would hand it: a usage window climbing through its warning steps,
+hitting its limit, resetting, going into overage and running out of credits; a retried request
+that finally fails; an expired sign-in; and the three ways a result can end badly. It passes on
+exactly this one line — the emitted codes themselves, with no `PROBE OK` prefix:
+
+```
+limit.warning:80 limit.warning:95 limit.reached limit.reset limit.overage limit.out_of_credits api.error:overloaded login.expired run.limit:turns run.limit:budget run.failed
+```
+
+Eleven signals from thirteen messages: the third `allowed_warning` is silent because it has not
+left the 95 step, and the `api_retry` is silent because it is only recorded — the `api.error`
+that follows is the push, and it names the retries. It also asserts the `run.failed` body is
+`boom` and not the CLI's `[ede_diagnostic]` instrumentation line, printing `PROBE FAILED
+run.failed` if not. The rate-limit memory it drives is module-level and account-wide by design,
+so the probe's window name carries a random suffix: no earlier run, in this process or a previous
+one, can swallow a signal this one should emit. It touches no server, no database and no topic.
+
+One token probe, under `tsx` because it imports the server's own TypeScript modules:
+
+```bash
+node_modules/.bin/tsx --tsconfig server/tsconfig.json .verify/ntfy/token-probe.mjs
+```
+
+It runs the real token, flood-control and presence services in its own process, and posts forged
+and altered tokens to the real `POST /api/ntfy/act` on `:3011`. It imports `server/load-env.ts`
+first, so its database is the server's (`~/.cloudcli/auth.db`), and it creates the shared signing
+secret `app_config.ntfy_action_secret` when absent, so both processes sign with one key. A genuine
+token for a request the server never registered must answer 410. The same token with a flipped
+signature, re-signed with an expiry in the past, or edited from `deny` to `allow` must each answer
+401. Those three 401s prove their check runs before the pending lookup: a check that is missing
+answers 410. In-process, one token spent twice answers 410 the second time, four admits of one key
+give one push and one window close counting three, and presence holds for the same user and fails
+for another user, after `clearPresence` and past freshness. It passes on exactly
+`PROBE OK unknown-request=410 tamper=401 expired=401 swap=401 replay=410 flood=1+1 presence=ok`.
+It needs no live permission request (the end-to-end tap is proven with the Claude runtime's hook)
+and leaves nothing behind but the secret row. Only two of its four route calls cost the guess
+counter anything — the flipped signature and the swapped decision. The two that carry a genuine
+signature, the unknown request and the expired payload, *clear* this client's record instead, so
+the probe can neither lock itself out nor stand between a phone and its own button. The rule
+behind that is in [notifications.md](notifications.md) §"Answering from the phone".
+
+One audit probe, under `tsx` for the same reason — the whole tap-to-answer surface, attacked:
+
+```bash
+node_modules/.bin/tsx --tsconfig server/tsconfig.json .verify/ntfy/argus-probe.mjs
+```
+
+It is three files cut by cohesion: `argus-probe.mjs` holds the claims and the one summary line,
+`argus-harness.mjs` every way it reaches the system (HTTP to the act route, tokens minted in its
+own process, the journal, the raw endpoint row, and a stand-in ntfy server that quotes a refused
+message back), and `argus-secrets.mjs` the three checks on what must never leak. Every claim
+carries a positive control — proof that the thing it reports absent was really sent, really
+logged, really stored — so no check can pass by doing nothing. Nine ways in were looked for: a
+CloudCLI login changes no answer on the public route; a token minted for another user cannot
+answer its owner's request; a 64 KB token is refused without a 500; `forgetPendingAction` retires
+a request's buttons unspent; the guess counter refuses the 21st guess, cannot be shaken off with a
+rotating `X-Forwarded-For`, and still answers a signed token mid-lockout; the publisher's scrubber
+keeps the topic, the access token and every tap URL out of the line it logs when an ntfy server
+quotes the message back; two hours of journal hold none of those either; `GET /ntfy` and the
+generic endpoints listing both mask; and metadata written around `PUT /ntfy` reads as an
+unconfigured channel rather than as a throw. It passes on exactly `ARGUS OK jwt-ignored=401
+cross-user=410 oversize=no-500 limiter=429 journal-secrets=0 masked=ok junk-metadata=200`;
+anything else prints `ARGUS FAILED <which>` and exits 1.
+
+One settings probe — the card, and the tab that mutes it — under plain `node`, in Chromium:
+
+```bash
+node .verify/ntfy/settings-probe.mjs
+```
+
+It proves the two things only a browser can. First, that **the card is the whole setup path**: it
+`DELETE`s the channel so the card starts empty, opens Settings → Notifications, and fills and
+saves by typing and clicking — never by an API call. Then `GET /ntfy` has to answer `configured:
+true` with the topic masked and `hasToken: false`, because the token box was deliberately left
+alone; an untouched token field that sent `''` would have wiped a stored token. It also checks
+`appUrl` is the tailnet address the probe TYPED, not the `127.0.0.1` origin the card prefills from
+the browser it runs in — a card that saved its own prefill would leave every tap-through link
+opening an address no phone can reach. Send test then has to put a new "CloudCLI test" on the
+scratch topic, and the card is photographed at 1440 and 390 px into
+`.verify/artifacts/ntfy-settings-{desktop,mobile}.png`.
+
+Second, that **presence mutes the channel**, which costs **two real Claude turns** on one session.
+The same one-word turn is finished twice: once with a tab open on `/session/<id>`, when no
+finished-run push may appear on the topic for 15 s, and once with the tab closed, when one must —
+at priority 2. Between them it waits out the orchestrator's 20 s dedupe window, or the second
+event would be dropped for being the first one's twin and the muting would look permanent. Every
+"did a push land" question is asked against the message ids the topic already held, never against
+the title alone: `ntfy.sh` caches for hours, and an earlier phase's "CloudCLI test" would
+otherwise answer for this one. It passes on exactly `PROBE OK card=visible saved=masked
+test-push=seen shots=2 watched=skipped unwatched=pushed`; anything else prints `PROBE FAILED`, the
+step, and what was seen instead. It deletes its session row, and the project row on the same terms
+as the run-failed probe.
+
+Eight things to know before running one:
+
+- **It leaves the dev account's ntfy channel on**, pointed at the scratch topic with a long-run
+  threshold of 0, so every later event for `verve` pushes there. Harmless — the topic is
+  throwaway — but `DELETE /api/notifications/ntfy` as the dev user switches it off.
+- **The settings probe re-selects the Notifications tab after every resize.** Crossing the 768px
+  breakpoint re-runs the Settings dialog's open effect, which puts the tab back to Agents — a
+  standing behaviour of `useSettingsController`, not of the ntfy card — so a probe that resizes
+  and then reaches for a card it left on screen finds an empty locator. Tap the tab again; that is
+  what a person at that width does anyway.
+- **The question probe spends real model turns** — two, one per permission mode, each reaching a
+  tool call and then answering after the tap. It needs the Claude CLI signed in on this box, and
+  it, the stall probe and the settings probe are the three ntfy probes with a bill; the other four
+  cost nothing. Its per-mode waits are
+  generous (180 s for a turn, 60 s for the push), so a failure is reported rather than hidden by
+  a short timeout, and a hung run holds the terminal for minutes before it says so.
+- **`configure` writes the instance-wide `public_app_url`** as `http://100.103.222.79:5183`, the
+  value this box uses anyway. On another host it would change every user's tap-through.
+- **The run-failed probe depends on the Cursor CLI being absent** (`which cursor-agent` and
+  `which agent` both empty). Install it and the turn runs for real, no crash arrives, and the probe
+  times out after 45 s: the premise is gone, not the channel.
+- **`appconfig-set` and `appconfig-del` write the live `~/.cloudcli/auth.db`** directly, the same
+  file the running server holds open.
+- **The stall probe lowers the stall threshold for the whole box while it runs.** `run_stall_ms`
+  in `app_config` is instance-wide, so a run killed between the write and its `finally` would
+  leave every run on this host called stuck after 30 seconds. Its last line says
+  `override-cleared=yes` only when the row is really gone; if it never got there,
+  `node .verify/lib/ntfy.mjs appconfig-del run_stall_ms` puts the box back.
+- **The audit probe rewrites the dev account's ntfy row and puts it back.** Reading `configured:
+  false` honestly means the row has to really go, so it reads the raw metadata first — including an
+  access token the API will not show — deletes the row, writes junk over it, and writes the
+  original back verbatim at the end. A run killed part-way therefore leaves junk metadata behind,
+  which one `node .verify/lib/ntfy.mjs configure` repairs. It also stores a throwaway access token
+  when the box has none (clearing it again), and reads `journalctl -u cloudcli-server-dev` back two
+  hours, so the unit's log must be readable by whoever runs it.
+
 ## What bites people
 
 | | |
@@ -1476,9 +1709,9 @@ person editing `server/` is in [hosting.md](hosting.md) §"Rules that bite".
 | **Onboarding writes real git config** | Its first step arrives pre-filled from the host's global git identity and the harness submits it unchanged. It never types one: an empty field stops the run rather than writing a fabricated identity into `git config --global`. |
 | **The Runner tab comes and goes** | It is DATA-gated: it is on the bar only while the plan runner is actually carrying a run, so a workspace with a quiet lane has no Runner tab and nothing is wrong. It is also STICKY — once it is the selected tab it stays at a count of zero, so a run ending under you empties the panel instead of moving you. A probe that asserts the tab's absence will fail on this box, where the plan runner is usually running something; and its count is read from the tab's `title`, never from a `.vv-tabs__count` pill, which icon-only tabs do not render. |
 | **One stored theme per user** | The theme is saved server-side against the account, so every run leaves the dev user on whichever mode ran last. `ensureTheme` therefore forces it in both directions by driving Settings → **Appearance** → **Dark Mode**. Those are English labels — a phase that restyles or re-labels Settings must re-point them. |
-| **Settings is driven by its English labels** | Beyond `ensureTheme`'s two above, `phase-4.mjs` clicks the **Appearance** rail row and then finds its controls by the strings `Tabs in the workspace`, `Hide the Shell tab` and `Hide the Tasks tab` — the last two as `aria-label` on the switches. Re-word one in `en/settings.json` and the phase stops finding a control rather than reporting one wrong, so re-point it in the same change. |
+| **Settings is driven by its English labels** | Beyond `ensureTheme`'s two above, `phase-4.mjs` clicks the **Appearance** rail row and then finds its controls by the strings `Tabs in the workspace`, `Hide the Shell tab` and `Hide the Tasks tab` — the last two as `aria-label` on the switches. Re-word one in `en/settings.json` and the phase stops finding a control rather than reporting one wrong, so re-point it in the same change. `.verify/ntfy/settings-probe.mjs` has one such string too: it opens the rail's **Notifications** row by that text. The card's own controls it finds by `data-testid`, and the "Saved" line it expects is read from `en/settings.json` at run time, so re-wording those costs it nothing. |
 | **12 console errors before sign-in** | `App.tsx` mounts the plugins, tasks and TaskMaster providers above `ProtectedRoute`, so the login and post-logout screens call authenticated endpoints with no token and the browser logs the 401s. A pre-existing upstream defect, measured rather than budgeted: the signed-in stage is held to zero errors, the unauthenticated ones to exactly this count. |
-| **The git tab reads "Source Control"** | Tabs are selected by `[role=tab][aria-label]`, and that is the label on it. |
+| **The git tab reads "Git"** | Tabs are selected by `[role=tab][aria-label]`, and that is the label on it. |
 | **The Shell tab is off the bar by default** | `hideShellTab` defaults to `true` in `src/shared/uiPreferences.ts`, so a fresh account opens with no Shell tab and no "Go to Shell" in the command palette — an absence to reveal, not a fault to chase. Reveal it the way a person does: Settings → **Appearance** → *Tabs in the workspace* → **Hide the Shell tab**, off. Hiding a tab disconnects nothing; a running shell keeps going exactly as it does while another tab is selected, and the server ends it 30 minutes after nothing is attached (`PTY_SESSION_TIMEOUT`). |
 | **The Shell tab prints `bash: claude: command not found`** | The PTY spawns `bash -c "claude …"` — a bare `PATH` lookup — and the server process on this host carries no `~/.npm-global/bin`, which is where the CLI is. `.env`'s `CLAUDE_CLI_PATH` does not reach it: that is read by the SDK providers through `server/shared/claude-cli-path.ts`, never by the PTY. Nor does upstream's `prioritizeUserNpmGlobalBin`, which only re-*orders* entries already on `PATH` and hands it back untouched when none of its candidates are there — `npm_config_prefix` being set is not enough. An environment fact rather than a fork defect, and the fix belongs at deploy time: whatever runs the server must have the CLI's directory on its own `PATH`. |
 | **`uiPreferences` is one stored key, not six** | The preference store keeps a row per name, and all six workspace booleans live inside the single `uiPreferences` value. A `PATCH /api/user/preferences` carrying `{"uiPreferences":{"hideShellTab":false}}` therefore *replaces* the blob and silently drops the other five. Click the switch, or send the whole object back. A flat key is its own row and patches safely alone — which is why `phase-4.mjs` patches `tasksEnabled` directly and clicks for the rest. |

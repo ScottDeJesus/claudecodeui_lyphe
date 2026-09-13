@@ -99,6 +99,13 @@ export const userDb = {
       .get() as UserPublicRow | undefined;
   },
 
+  /** Returns every active user's id. Used by events that belong to no one login, such as a plan-runner run ending. */
+  getActiveUserIds(): number[] {
+    const db = getConnection();
+    const rows = db.prepare('SELECT id FROM users WHERE is_active = 1 ORDER BY id').all() as { id: number }[];
+    return rows.map((row) => row.id);
+  },
+
   /** Stores the user's preferred git name and email. */
   updateGitConfig(
     userId: number,

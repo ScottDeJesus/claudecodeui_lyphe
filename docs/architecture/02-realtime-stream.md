@@ -76,12 +76,13 @@ it.
 | `src/modules/chat/hooks/useChatMessages.ts` | `normalizedToChatMessages` — the projection from store records to UI objects. Pairs `tool_use` with `tool_result`, folds subagent rows into their container, and memoises through a `WeakMap`. |
 | `src/modules/chat/hooks/useChatSessionState.ts` | Sends `chat.subscribe` on session open and on reconnect, owns `requestLatestMessages` and `resetStreamingState`, and memoises `chatMessages`. |
 | `src/modules/chat/hooks/useChatComposerState.ts` | The outbound side: `chat.send`, `chat.edit-send`, `chat.abort`, `chat.permission-response`, plus the optimistic user echo. |
+| `src/modules/chat/hooks/useSessionPresence.ts` | Sends `chat.presence`: which session this tab is showing, restated on reconnect, on `visibilitychange` and every 30 s, and cleared on the way out — so the notification channels skip a session you are watching. |
 | `src/shared/hooks/useSessionProtection.ts` | The per-session activity map that the indicator and the abort button derive from. |
 | `src/modules/chat/transcript/StreamingMarkdown.tsx` | Renders an assistant reply, streaming or finished, as a settled half plus a pending half. |
 | `src/modules/chat/utils/streamingMarkdown.ts` | `splitStreamingMarkdown` — where it is safe to cut a partially-written markdown document in two. |
 | `src/shared/types.ts` | `ServerEvent` at `:204`, the client's view of a frame. Every field the handler reads is optional here. |
-| `server/modules/websocket/services/chat-websocket.service.ts` | Handles `chat.send`, `chat.edit-send`, `chat.abort`, `chat.subscribe`, `chat.permission-response`. Registers the run, then hands the turn to the provider runtime. |
-| `server/modules/websocket/services/chat-run-registry.service.ts` | One entry per app session. `decorateAndRecordEvent` at `:84` is the choke point: session-id rewrite, `seq` assignment, replay buffering, terminal-`complete` de-duplication. |
+| `server/modules/websocket/services/chat-websocket.service.ts` | Handles `chat.send`, `chat.edit-send`, `chat.abort`, `chat.subscribe`, `chat.permission-response`, `chat.presence`. Registers the run, then hands the turn to the provider runtime. |
+| `server/modules/websocket/services/chat-run-registry.service.ts` | One entry per app session. `decorateAndRecordEvent` at `:94` is the choke point: session-id rewrite, `seq` assignment, replay buffering, terminal-`complete` de-duplication, and the `lastEventAt` stamp that makes a run's silence measurable from outside (`:107`). |
 | `server/modules/websocket/services/chat-session-writer.service.ts` | The object provider runtimes think is their socket. Swallows `session_created`; `forward` at `:160` fans out to every watching connection and collects dead ones. |
 | `server/shared/utils.ts` | `createNormalizedMessage` at `:348` and `createCompleteMessage` — the envelope every provider event is built with. **Not** `message-unification.ts`; that file exports only `prepareTranscriptMessages`, which runs on REST history reads and never on the live path. |
 | `server/shared/types.ts` | `MessageKind` at `:178` — the fifteen kinds a provider can emit. `GatewayEventKind` at `:204` — the four the gateway adds. |
@@ -421,15 +422,32 @@ change, and do not assume the status text you see in the UI came from it.
 
 ## Permission requests
 
-Claude is the only provider with interactive tool approvals. Its runtime's `canUseTool`
-callback emits `permission_request` with a `requestId` and blocks until the client answers
-with `chat.permission-response`. When an answer arrives it emits `permission_resolved`
-with the same id; if the run ends or the request times out it emits `permission_cancelled`
-instead. The distinction matters because the answer itself travels only on the inbound
-socket: without the outbound `permission_resolved`, the `permission_request` sitting in
-the replay buffer had nothing to retract it, so a mid-run page refresh resurrected an
+Claude is the only provider with interactive tool approvals. Asking a human is one function,
+`promptForToolDecision` in `claude-runtime.provider.js`: it emits `permission_request` with a
+`requestId`, raises the `permission.required` notification that can carry the question to a
+phone ([../notifications.md](../notifications.md) §"Answering from the phone"), and blocks
+until the client answers with `chat.permission-response`. When an answer arrives it emits
+`permission_resolved` with the same id; if the run ends or the request times out it emits
+`permission_cancelled` instead. The distinction matters because the answer itself travels only
+on the inbound socket: without the outbound `permission_resolved`, the `permission_request`
+sitting in the replay buffer had nothing to retract it, so a mid-run page refresh resurrected an
 already-answered prompt — and a second tab kept it forever. `permissionPromptReplay.test.tsx`
 pins the replayed request-then-resolution netting out to nothing.
+
+**Two callers ask, and exactly one of them asks per mode.** `canUseTool` is the ordinary door.
+But the SDK resolves approval at the permission-mode step and never calls `canUseTool` in
+`bypassPermissions`, `auto` or `dontAsk`. On its own that means an `AskUserQuestion` or
+`ExitPlanMode` in those modes is auto-approved and the model acts on an answer it generated
+itself, with nobody asked — so the runtime also registers a **`PreToolUse` hook** matching
+`AskUserQuestion|ExitPlanMode`, which runs *before* the mode check and calls the same
+`promptForToolDecision`, returning the decision as `hookSpecificOutput.permissionDecision`.
+The hook reads `sdkOptions.permissionMode` at call time — a live settings change is seen — and
+stands aside in every other mode, because there `canUseTool` is already asking and answering in
+both would put one question on the wire twice. The matcher declares `timeout: 86_400` — the
+SDK reads that field in **seconds**, so a day, which is what keeps the SDK from killing a hook
+that is deliberately waiting on a person. The wait itself has no timeout for an interactive tool,
+through either caller; an ordinary tool's wait is `CLAUDE_TOOL_APPROVAL_TIMEOUT_MS` and the
+runtime denies the tool when it runs out.
 
 The client keeps the pending list in `ChatInterface` state, not in the store — permission
 kinds are among the five that are never persisted as rows. The rules:

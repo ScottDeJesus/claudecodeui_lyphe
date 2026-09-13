@@ -15,7 +15,7 @@ import {
     providerRuntimeService,
     readoptKeepaliveSessions,
 } from '@/modules/providers/index.js';
-import { createWebSocketServer } from '@/modules/websocket/index.js';
+import { createWebSocketServer, startRunStallWatchdog } from '@/modules/websocket/index.js';
 
 import { getConnectableHost } from '../shared/networkHosts.js';
 
@@ -57,7 +57,7 @@ import { worktreesRoutes } from './modules/worktrees/index.js';
 import browserUseMcpRoutes from './modules/browser-use/browser-use-mcp.routes.js';
 import { browserUseService } from './modules/browser-use/browser-use.service.js';
 import { initializeDatabase, sessionsDb } from './modules/database/index.js';
-import { configureWebPush } from './modules/notifications/index.js';
+import { configureWebPush, createNtfyActionRoutes } from './modules/notifications/index.js';
 
 const __dirname = getModuleDirectory(import.meta.url);
 // The server source runs from /server, while the compiled output runs from /dist-server/server.
@@ -192,6 +192,7 @@ const planRunner = createPlanRunnerModule();
 app.use('/api/plan-runner', authenticateToken, planRunner.router);
 
 app.use('/api/notifications', authenticateToken, notificationRoutes);
+app.use('/api/ntfy/act', createNtfyActionRoutes({ runtime: providerRuntimeService })); // Public: ntfy buttons authenticate by signed token, not JWT.
 
 // User API Routes (protected)
 app.use('/api/user', authenticateToken, userRoutes);
@@ -359,6 +360,11 @@ async function soleServerDuties() {
     });
 }
 
+// Stops the stall watchdog on shutdown. Assigned inside the `listen` callback that
+// starts it, named out here because the shutdown path below has to reach it — the
+// same reason `planRunner` is built at module scope.
+let stopRunStallWatchdog: (() => void) | null = null;
+
 // Initialize database and start server
 async function startServer() {
     try {
@@ -407,6 +413,10 @@ async function startServer() {
             // Start polling the plan runner's state directory. After `listen`, because the
             // frames it broadcasts are for sockets this server is only now able to accept.
             planRunner.start();
+
+            // Watch live runs for silence. Same placement and the same reason: the
+            // notification it sends is about runs this server is now able to host.
+            stopRunStallWatchdog = startRunStallWatchdog();
         });
         if (handover) onTakeover(soleServerDuties);
 
@@ -416,6 +426,7 @@ async function startServer() {
             // process new connections. Never awaited — open WebSockets keep it from resolving.
             server.close();
             planRunner.stop();
+            stopRunStallWatchdog?.();
             try {
                 await browserUseService.stopAllSessions();
             } catch (err) {

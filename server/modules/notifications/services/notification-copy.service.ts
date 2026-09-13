@@ -1,0 +1,311 @@
+/**
+ * The wording of every notification CloudCLI sends.
+ *
+ * One function turns a notification event into the headline and body that
+ * every channel shows — web push, the desktop client and the ntfy phone push
+ * all read the same two strings — so a code's copy changes here and nowhere
+ * else. Nothing in this file touches the database: the orchestrator resolves
+ * the session name and hands it in.
+ */
+
+/** The slice of an orchestrator event this service reads. */
+type NotificationEventLike = {
+  provider?: string | null;
+  code?: string | null;
+  meta?: Record<string, unknown> | null;
+  /**
+   * The display name the orchestrator resolved (meta first, then the sessions
+   * table). When absent, `meta.sessionName` is used as given.
+   */
+  sessionName?: string | null;
+};
+
+type NotificationText = { title: string; body: string };
+
+type CodeCopy = (context: { meta: Record<string, unknown>; providerLabel: string }) => {
+  headline: string;
+  body: string;
+};
+
+const PROVIDER_LABELS: Record<string, string> = {
+  claude: 'Claude',
+  cursor: 'Cursor',
+  codex: 'Codex',
+  system: 'System',
+};
+
+/** The SDK's `rateLimitType` values, as a person says them. */
+const WINDOW_LABELS: Record<string, string> = {
+  five_hour: '5-hour',
+  seven_day: '7-day',
+  seven_day_opus: '7-day Opus',
+  seven_day_sonnet: '7-day Sonnet',
+  overage: 'overage',
+};
+
+/** Tools whose approval body is the path they touch. */
+const FILE_PATH_TOOLS = new Set(['Edit', 'Write', 'Read', 'MultiEdit', 'NotebookEdit']);
+
+const PLAN_EXCERPT_CHARS = 600;
+const TOOL_INPUT_JSON_CHARS = 300;
+
+/**
+ * Every body's ceiling. Web push refuses a payload over ~4 KB and the
+ * orchestrator settles those refusals silently, so a long Bash command or a
+ * many-option question must never be the reason a push does not arrive.
+ */
+const MAX_BODY_CHARS = 1000;
+
+const FALLBACK_COPY = { headline: 'CloudCLI', body: 'You have a new notification' };
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+/** A non-blank string, or a number/boolean rendered as one; null otherwise. */
+function readText(value: unknown): string | null {
+  if (value == null || typeof value === 'object') return null;
+  const text = String(value);
+  return text.trim() ? text : null;
+}
+
+function readNumber(value: unknown): number | null {
+  return typeof value === 'number' && Number.isFinite(value) ? value : null;
+}
+
+/** Own-property lookup, so a code like `constructor` never reaches Object.prototype. */
+function lookup(table: Record<string, string>, key: unknown): string | null {
+  return typeof key === 'string' && Object.hasOwn(table, key) ? table[key] : null;
+}
+
+function providerLabel(provider: unknown): string {
+  return lookup(PROVIDER_LABELS, provider) || 'Assistant';
+}
+
+function windowLabel(meta: Record<string, unknown>): string {
+  return lookup(WINDOW_LABELS, meta.rateLimitType) ?? 'usage';
+}
+
+/** `resetsAt` arrives as the SDK's epoch number: seconds below 1e12, milliseconds above. */
+function resetsAtText(resetsAt: unknown): string {
+  const epoch = readNumber(resetsAt);
+  if (epoch === null || epoch <= 0) return 'soon';
+  const date = new Date(epoch < 1e12 ? epoch * 1000 : epoch);
+  return date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+}
+
+/** `45s`, `3m 12s`, `1h 5m` — the precision a person reads at a glance. */
+function humanDuration(ms: number): string {
+  const totalSeconds = Math.max(1, Math.round(ms / 1000));
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  if (hours > 0) return minutes > 0 ? `${hours}h ${minutes}m` : `${hours}h`;
+  if (minutes > 0) return seconds > 0 ? `${minutes}m ${seconds}s` : `${minutes}m`;
+  return `${seconds}s`;
+}
+
+function stringifyToolInput(toolInput: Record<string, unknown>): string | null {
+  try {
+    return JSON.stringify(toolInput).slice(0, TOOL_INPUT_JSON_CHARS);
+  } catch {
+    return null;
+  }
+}
+
+/** One question's block: `[header] question (choose any)`, then `1. label` per option. */
+function renderQuestion(question: Record<string, unknown>): string | null {
+  const text = readText(question.question);
+  if (!text) return null;
+
+  const header = readText(question.header);
+  const lines = [`${header ? `[${header}] ` : ''}${text}${question.multiSelect === true ? ' (choose any)' : ''}`];
+  const options = Array.isArray(question.options) ? question.options : [];
+  // Numbered by the option's own index, so the number matches the answer a phone action sends back.
+  options.forEach((option, index) => {
+    const label = isRecord(option) ? readText(option.label) : null;
+    if (label) lines.push(`${index + 1}. ${label}`);
+  });
+  return lines.join('\n');
+}
+
+function questionBody(toolInput: Record<string, unknown> | null): string {
+  const questions = Array.isArray(toolInput?.questions) ? toolInput.questions.filter(isRecord) : [];
+  const blocks = questions.map(renderQuestion).filter((block): block is string => block !== null);
+  return blocks.length ? blocks.join('\n\n') : 'Claude has a question — open the session to answer.';
+}
+
+function toolApprovalBody(toolName: string | null, toolInput: Record<string, unknown> | null): string {
+  const fallback = 'A tool is waiting for your approval.';
+  if (!toolInput || Object.keys(toolInput).length === 0) return fallback;
+
+  if (toolName === 'Bash') {
+    const command = readText(toolInput.command);
+    if (command) return command;
+  }
+  if (toolName && FILE_PATH_TOOLS.has(toolName)) {
+    // NotebookEdit names its target `notebook_path`; every other file tool says `file_path`.
+    const filePath = readText(toolInput.file_path) ?? readText(toolInput.notebook_path);
+    if (filePath) return filePath;
+  }
+  return stringifyToolInput(toolInput) ?? fallback;
+}
+
+function permissionCopy(meta: Record<string, unknown>): { headline: string; body: string } {
+  const toolName = readText(meta.toolName);
+  const toolInput = isRecord(meta.toolInput) ? meta.toolInput : null;
+
+  if (toolName === 'AskUserQuestion') {
+    return { headline: 'Claude has a question', body: questionBody(toolInput) };
+  }
+  if (toolName === 'ExitPlanMode') {
+    const plan = readText(toolInput?.plan);
+    return {
+      headline: 'Plan ready for approval',
+      body: plan ? plan.slice(0, PLAN_EXCERPT_CHARS) : 'Claude has a plan ready to review.',
+    };
+  }
+  return {
+    headline: toolName ? `Approve ${toolName}` : 'Approve a tool',
+    body: toolApprovalBody(toolName, toolInput),
+  };
+}
+
+/**
+ * A plan-runner ending that wants a hand, by the runner's own outcome word. `complete` here means
+ * phases were left: a clean `complete` is `runner.finished`, never this code.
+ */
+const RUNNER_STOP_HEADLINES: Record<string, string> = {
+  complete: 'Plan incomplete',
+  'all-blocked': 'Plan blocked',
+  halted: 'Plan halted',
+  budget: 'Plan out of budget',
+  'flag-off': 'Plan stopped: flag off',
+};
+
+/** `3 of 4 phases shipped`, or `No phases` for a plan that had none. */
+function runnerShippedText(meta: Record<string, unknown>): string {
+  const total = readNumber(meta.total) ?? 0;
+  if (total === 0) return 'No phases';
+  return `${readNumber(meta.shipped) ?? 0} of ${total} phase${total === 1 ? '' : 's'} shipped`;
+}
+
+const COPY_BY_CODE = new Map<string, CodeCopy>([
+  ['permission.required', ({ meta }) => permissionCopy(meta)],
+  ['agent.notification', ({ meta }) => ({
+    headline: 'Claude needs you',
+    body: readText(meta.message) ?? FALLBACK_COPY.body,
+  })],
+  ['run.stopped', ({ meta, providerLabel: label }) => {
+    const durationMs = readNumber(meta.durationMs);
+    return {
+      headline: meta.stopReason === 'aborted' ? 'Run aborted' : 'Run finished',
+      body: `${label} finished${durationMs && durationMs > 0 ? ` in ${humanDuration(durationMs)}` : ''}`,
+    };
+  }],
+  ['run.background_completed', ({ providerLabel: label }) => ({
+    headline: 'Background agent finished',
+    body: `${label}: a background task completed`,
+  })],
+  ['run.failed', ({ meta }) => ({
+    headline: 'Session crashed',
+    body: readText(meta.error) ?? 'The run encountered an error',
+  })],
+  ['run.limit', ({ meta }) => {
+    if (meta.limit === 'budget') {
+      const cost = readNumber(meta.totalCostUsd);
+      return {
+        headline: 'Max budget reached',
+        body: cost === null ? 'The run stopped at its budget limit' : `The run stopped at $${cost.toFixed(2)}`,
+      };
+    }
+    const turns = readNumber(meta.numTurns);
+    return {
+      headline: 'Max turns reached',
+      body: turns === null ? 'The run stopped at its turn limit' : `The run stopped after ${turns} turns`,
+    };
+  }],
+  ['api.error', ({ meta }) => ({
+    headline: 'API error',
+    body: `${readText(meta.reason) ?? 'unknown'} after ${readNumber(meta.attempts) ?? 0} retries`,
+  })],
+  ['session.stuck', ({ meta }) => ({
+    headline: 'Session silent',
+    body: `No output for ${Math.max(1, Math.round((readNumber(meta.silentForMs) ?? 0) / 60_000))} min while a run is in flight`,
+  })],
+  ['login.expired', ({ meta }) => {
+    const detail = readText(meta.detail);
+    return { headline: 'Login needed', body: `Claude needs you to sign in again${detail ? `: ${detail}` : ''}` };
+  }],
+  ['limit.reached', ({ meta }) => ({
+    headline: 'Rate limit reached',
+    body: `${windowLabel(meta)} limit hit — resets ${resetsAtText(meta.resetsAt)}`,
+  })],
+  ['limit.reset', ({ meta }) => ({
+    headline: 'Limit reset',
+    body: `${windowLabel(meta)} window reset — you can resume`,
+  })],
+  ['limit.warning', ({ meta }) => {
+    const pct = readNumber(meta.pct);
+    const usage = pct === null ? 'nearly used' : `at ${pct}%`;
+    return {
+      headline: pct === null ? 'Usage warning' : `Usage at ${pct}%`,
+      body: `${windowLabel(meta)} window ${usage} — resets ${resetsAtText(meta.resetsAt)}`,
+    };
+  }],
+  ['limit.overage', ({ meta }) => ({
+    headline: 'Overage started',
+    body: `You are now using overage on the ${windowLabel(meta)} window`,
+  })],
+  ['limit.out_of_credits', () => ({ headline: 'Out of credits', body: 'Overage is disabled: out of credits' })],
+  ['runner.finished', ({ meta }) => {
+    const durationMs = readNumber(meta.durationMs);
+    const cost = readNumber(meta.costUsd);
+    return {
+      headline: 'Plan finished',
+      body: [
+        runnerShippedText(meta),
+        // "since start", not "in": a resumed run keeps its first start, parked hours included.
+        durationMs && durationMs > 0 ? `${humanDuration(durationMs)} since start` : null,
+        cost === null ? null : `$${cost.toFixed(2)} on this plan`,
+      ].filter((part): part is string => part !== null).join(' · '),
+    };
+  }],
+  ['runner.blocked', ({ meta }) => {
+    const blocked = readNumber(meta.blocked) ?? 0;
+    const left = readNumber(meta.left) ?? 0;
+    const phase = readText(meta.blockedPhase);
+    const cause = readText(meta.blockCause);
+    const counts = [
+      runnerShippedText(meta),
+      blocked > 0 ? `${blocked} blocked` : null,
+      left > 0 ? `${left} left` : null,
+    ].filter((part): part is string => part !== null).join(' · ');
+    return {
+      headline: lookup(RUNNER_STOP_HEADLINES, meta.outcome) ?? 'Plan stopped',
+      body: phase && cause ? `${counts}\nPhase ${phase}: ${cause}` : counts,
+    };
+  }],
+  ['push.enabled', () => ({ headline: 'Push notifications enabled', body: 'Push notifications are now enabled!' })],
+]);
+
+/**
+ * Renders one notification event as the title and body every channel shows.
+ *
+ * Consumed by the notification orchestrator's `buildNotificationPayload` (web
+ * push, desktop and ntfy all send its output) and exported from the module
+ * barrel for any caller that must show an event's wording. The title is the
+ * code's headline followed by ` · <session name>` when one is known; an
+ * unknown code renders the generic CloudCLI copy rather than nothing.
+ */
+export function buildNotificationText(event: NotificationEventLike): NotificationText {
+  const meta = isRecord(event.meta) ? event.meta : {};
+  const copy = typeof event.code === 'string' ? COPY_BY_CODE.get(event.code) : undefined;
+  const { headline, body } = copy ? copy({ meta, providerLabel: providerLabel(event.provider) }) : FALLBACK_COPY;
+  const sessionName = event.sessionName ?? readText(meta.sessionName);
+
+  return {
+    title: `${headline}${sessionName ? ` · ${sessionName}` : ''}`,
+    body: body.slice(0, MAX_BODY_CHARS),
+  };
+}

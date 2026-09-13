@@ -13,6 +13,8 @@ type CheckResultsProps = {
   glyphs: ('pass' | 'fail')[];
   /** True when the author wrote an `ol`. The shape re-emits the element they chose. */
   ordered: boolean;
+  /** The author's first number on an `ol` that did not open at 1, from `listStart`. */
+  start?: number;
   collapseKey: string;
   /** The rendered `li` elements. Their words are what gets drawn; `glyphs` only decides the tone. */
   children: ReactNode;
@@ -39,7 +41,7 @@ const TONE_BY_GLYPH: Record<'pass' | 'fail', Tone> = { pass: 'positive', fail: '
  * The counts are the shared `Chip` with a `tone`, not a hand-rolled pill: `data-tone` is what
  * paints them and what a verify script reads to prove they painted.
  */
-export function CheckResults({ glyphs, ordered, collapseKey, children }: CheckResultsProps) {
+export function CheckResults({ glyphs, ordered, start, collapseKey, children }: CheckResultsProps) {
   const { t } = useTranslation('chat');
   const items = renderedListItems(children);
   const passed = glyphs.filter((glyph) => glyph === 'pass').length;
@@ -60,10 +62,10 @@ export function CheckResults({ glyphs, ordered, collapseKey, children }: CheckRe
           {t('shapes.checksPassed', { count: passed })}
         </Chip>
       </div>
-      {/* The author's own element. A check list written `1) ✓ …` is an ordered sequence, and
-          re-emitting it as a `ul` tells assistive tech it never was one. The visible marker is
-          replaced by the glyph either way — that is what this shape is for. */}
-      <List className="m-0 flex list-none flex-col gap-1 p-0">
+      {/* The author's own element and first number. A check list written `1) ✓ …` is an ordered
+          sequence, and re-emitting it as a `ul` tells assistive tech it never was one. The visible
+          marker is replaced by the glyph either way — that is what this shape is for. */}
+      <List start={start} className="m-0 flex list-none flex-col gap-1 p-0">
         {items.map((item, index) => {
           // Fails CLOSED. A row the parsed walk and the rendered walk could not pair has no
           // verdict, and no tone is the only harmless default on a list whose whole job is naming

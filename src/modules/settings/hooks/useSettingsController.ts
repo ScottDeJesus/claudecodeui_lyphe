@@ -99,6 +99,7 @@ const createDefaultNotificationPreferences = (): NotificationPreferencesState =>
     actionRequired: true,
     stop: true,
     error: true,
+    limits: true,
   },
 });
 
@@ -118,6 +119,7 @@ const normalizeNotificationPreferences = (
       actionRequired: preferences?.events?.actionRequired ?? defaults.events.actionRequired,
       stop: preferences?.events?.stop ?? defaults.events.stop,
       error: preferences?.events?.error ?? defaults.events.error,
+      limits: preferences?.events?.limits ?? defaults.events.limits,
     },
   };
 };

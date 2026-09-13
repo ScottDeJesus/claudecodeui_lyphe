@@ -3,6 +3,7 @@ import {
   getStoredAuthToken,
   storeAuthToken,
 } from '@/shared/authToken';
+import type { NtfySettingsInput } from '@/shared/types';
 import { IS_PLATFORM } from '@/shared/utils';
 import { readVoiceConfig, voiceConfigHeaders } from '@/shared/voiceConfig';
 
@@ -517,6 +518,19 @@ export const api = {
       subscribe: (subscription: { endpoint?: string; keys?: unknown }) =>
         post('/api/settings/push/subscribe', subscription),
       unsubscribe: (endpoint: string) => post('/api/settings/push/unsubscribe', { endpoint }),
+    },
+  },
+
+  // The ntfy phone-push channel. It sits here rather than under `settings` because its
+  // routes are the notifications module's own, mounted on /api/notifications — and because
+  // its topic and access token never come back: `get` answers a masked view, and `save`
+  // omits what the user did not type so an untouched form cannot erase a stored token.
+  notifications: {
+    ntfy: {
+      get: () => get('/api/notifications/ntfy'),
+      save: (input: NtfySettingsInput) => put('/api/notifications/ntfy', input),
+      remove: () => del('/api/notifications/ntfy'),
+      test: () => post('/api/notifications/ntfy/test'),
     },
   },
 

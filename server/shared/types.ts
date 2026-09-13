@@ -281,8 +281,10 @@ export type RunnerPosition = { rank: number; total: number; phase_id: string; ti
  * last announced — a fact to show, never something to signal: this server does not own that process.
  * `position` is `null` while the runner has not composed one yet, which a live run does show in its first seconds.
  * `line` is the composed status-bar line the terminal bar renders, carried through unaltered.
+ * `blocked_causes` is the receipt's `blocked` map, phase id → the cause the runner wrote (`crash`, `budget`, `athena: …`), `{}` until
+ * the run ends. It is the only record of a phase the runner halted on a crash or a budget: that phase's row never turns `blocked`.
  */
-export type RunnerRunSnapshot = { run_id: string; plan_path: string; plan_title: string; state: RunnerRunState; status: string; started_at: number; heartbeat_at: number; stopped_at: number | null; outcome: string | null; ended_at: number | null; pid: number | null; position: RunnerPosition | null; phases: RunnerPhaseRow[]; spawns: number; max_spawns: number; cost_usd: number; plan_runs: number; plan_spawns: number; plan_cost_usd: number; line: string; timeline: RunnerTimelineEntry[] };
+export type RunnerRunSnapshot = { run_id: string; plan_path: string; plan_title: string; state: RunnerRunState; status: string; started_at: number; heartbeat_at: number; stopped_at: number | null; outcome: string | null; ended_at: number | null; blocked_causes: Record<string, string>; pid: number | null; position: RunnerPosition | null; phases: RunnerPhaseRow[]; spawns: number; max_spawns: number; cost_usd: number; plan_runs: number; plan_spawns: number; plan_cost_usd: number; plan_planning_usd: number; plan_review_usd: number; plan_scouts_usd: number; plan_total_usd: number; tokens: number; plan_tokens: number; line: string; timeline: RunnerTimelineEntry[] };
 /** The whole picture, pushed on change over `/ws`. `runs` is ordered by `started_at` ascending, oldest first, the order the terminal bar uses. `at` is epoch MILLISECONDS (`Date.now()`), unlike every field inside a snapshot. */
 export type RunnerStateEvent = { kind: 'runner_state'; runs: RunnerRunSnapshot[]; at: number };
 /** The two verbs this server may relay. Starting a run needs a plan and an intent lock and is `/execute`'s act, never a button's. */
@@ -1268,7 +1270,8 @@ export type FileTreeFileSystem = {
   // overwriting. Uploads pass it, which is the only thing that makes the "pick a
   // free name" check hold when two of them race for the same free name.
   copyFile(sourcePath: string, destinationPath: string, exclusive?: boolean): Promise<void>;
-  createReadStream(filePath: string): Readable;
+  /** `end` is inclusive, as in `fs.createReadStream`: `{ end: size - 1 }` reads exactly `size` bytes. */
+  createReadStream(filePath: string, range?: { start?: number; end?: number }): Readable;
 };
 
 /**
@@ -1346,7 +1349,7 @@ export type FileTreeServices = {
   }>;
   createWorkspaceFolder(folderPath: string): Promise<{ success: true; path: string }>;
   readTextFile(projectId: string, filePath: string): Promise<{ content: string; path: string }>;
-  openFile(projectId: string, filePath: string): Promise<{ contentType: string; stream: Readable }>;
+  openFile(projectId: string, filePath: string): Promise<{ contentType: string; size: number; stream: Readable }>;
   saveTextFile(projectId: string, filePath: string, content: string): Promise<{
     success: true;
     path: string;

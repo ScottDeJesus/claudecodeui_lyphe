@@ -39,7 +39,7 @@ const flatten = (nodes: FileNode[], out: FlatFile[]): void => {
 // References inside chat messages are often bare basenames (`foo.ts`) or partial
 // paths (`utils/foo.ts`) rather than full paths, so match by path suffix and
 // fall back to filename equality.
-const findBestMatch = (files: FlatFile[], ref: string): string | null => {
+const findBestMatch = (files: FlatFile[], ref: string, allowBasename = true): string | null => {
   const target = normalize(ref).replace(/^\.\//, '').replace(/^\/+/, '');
   if (!target) {
     return null;
@@ -53,23 +53,33 @@ const findBestMatch = (files: FlatFile[], ref: string): string | null => {
     return suffixMatch.path;
   }
 
+  if (!allowBasename) {
+    return null;
+  }
   const base = target.split('/').pop() || target;
   return files.find((file) => file.name === base)?.path ?? null;
 };
 
 /**
- * Wraps an "open at a line" handler so a possibly bare/partial file reference is
- * resolved against the project's file tree (cached per project) before the file
- * is opened.
+ * Resolves a possibly bare/partial file reference against the project's file tree (cached per
+ * project), and wraps an "open at a line" handler so the reference is resolved before the file is
+ * opened.
  *
- * The LINE is carried straight through: resolving a reference answers WHICH file it meant and
- * says nothing about where inside it to look, so the line the caller named survives the lookup
- * unchanged — including when no match is found and the reference is opened as it came.
+ * `resolve` answers the matched project path, or the reference as it came when nothing matched — a
+ * file the tree listing leaves out (a git-ignored one) is still addressed by the path the author
+ * wrote. `resolve(path, { allowBasename: false })` refuses the filename-only guess, for a caller that
+ * shows the file's CONTENT (a picture), where a same-named file elsewhere would be presented as the
+ * one the author meant. `open` carries the LINE straight through: resolving a reference answers WHICH file it
+ * meant and says nothing about where inside it to look, so the line the caller named survives the
+ * lookup unchanged.
+ *
+ * Both come out of one hook because they share one cache: the workspace opens references and reads
+ * them for the chat's inline pictures, and two hooks would list the project tree twice.
  */
 export function useFileOpenResolver(
   selectedProject: Project | null | undefined,
   onFileOpen: FileOpenAtHandler,
-): FileOpenAtHandler {
+): { open: FileOpenAtHandler; resolve: (path: string, options?: { allowBasename?: boolean }) => Promise<string> } {
   const projectId = selectedProject?.projectId;
   const cacheRef = useRef<{ projectId?: string; files: Promise<FlatFile[]> | null }>({
     projectId: undefined,
@@ -104,14 +114,18 @@ export function useFileOpenResolver(
     return filesPromise;
   }, [projectId]);
 
-  return useCallback<FileOpenAtHandler>(
-    (filePath, line) => {
-      const ref = normalize(filePath).trim();
-      void loadFiles().then((files) => {
-        const match = findBestMatch(files, ref);
-        onFileOpen(match ?? filePath, line);
-      });
-    },
-    [loadFiles, onFileOpen],
+  const resolve = useCallback(
+    async (filePath: string, options: { allowBasename?: boolean } = {}): Promise<string> =>
+      findBestMatch(await loadFiles(), normalize(filePath).trim(), options.allowBasename ?? true) ?? filePath,
+    [loadFiles],
   );
+
+  const open = useCallback<FileOpenAtHandler>(
+    (filePath, line) => {
+      void resolve(filePath).then((resolved) => onFileOpen(resolved, line));
+    },
+    [resolve, onFileOpen],
+  );
+
+  return { open, resolve };
 }

@@ -11,9 +11,10 @@ import { armProbeDeadline, armSilence, clearWatchdog } from '@/modules/git-panel
 /**
  * The delegated run, kept OUTSIDE React.
  *
- * The workspace mounts the git panel with `{activeTab === 'git' && <GitPanel …/>}`, so leaving the
- * tab unmounts the panel and everything a component held with it — while the agent carries on
- * committing and pushing every repository in the checkpoint. The run's identity, its subscription,
+ * The workspace mounts the git tab only while it is selected, and the tab keys one GitPanel per
+ * repository, so leaving the tab — or switching repository — unmounts the panel and everything a
+ * component held with it, while the agent carries on committing and pushing every repository in
+ * the checkpoint. The run's identity, its subscription,
  * its watchdog and the card's state therefore live here, at module scope.
  *
  * ⚠ Module scope is per DOCUMENT, so this is memory, not truth: a reload, a second tab and an HMR

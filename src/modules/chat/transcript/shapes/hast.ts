@@ -90,7 +90,7 @@ export function readListItems(node: HastNode): { text: string; checked: boolean 
  * bolded lead-in and a sentence after it is prose, and laying it out as a fact grid would read as
  * a table the author never wrote.
  *
- * **This function IS FactCard's decline rule, for both of its callers.** A fact card draws labels
+ * **This function IS FactCard's decline rule.** A fact card draws labels
  * and values from TEXT, so it may only ever be built from pairs where text is all there was: the
  * "nothing else in the subtree" clause returns null for a `code`, a link, an `em` or a math span
  * sitting among the values, and the label clause returns null for a bold that holds ANY element —
@@ -100,7 +100,7 @@ export function readListItems(node: HastNode): { text: string; checked: boolean 
  *
  * Asking `hasInlineFormatting` of a fact paragraph NAIVELY would decline every input that can reach
  * here, because the `**Label:**` bold that defines a pair is itself a mark that function counts.
- * `elements/list.tsx` asks it with the label bolds UNWRAPPED, which is the one form in which it is
+ * `elements/paragraph.tsx` asks it with the label bolds UNWRAPPED, which is the one form in which it is
  * a real question; see `hasInlineFormatting` below.
  */
 export function readFactPairs(node: HastNode): { label: string; value: string }[] | null {
@@ -179,16 +179,14 @@ const STRUCTURAL_TAGS = new Set(['table', 'thead', 'tbody', 'tfoot', 'tr', 'th',
  *
  * Its callers are the two TABLE shapes, `DecisionMatrix` and `BeforeAfter` — a matrix of plain
  * sentences reads `false` and becomes cards, one with inline code in a cell reads `true` and stays
- * a readable table — the list ladder's FACT rung, and BOTH rungs of the paragraph ladder in
- * `elements/paragraph.tsx`, the verdict and the fact card, each of which the plan requires to
- * decline on it too.
+ * a readable table — and BOTH rungs of the paragraph ladder in `elements/paragraph.tsx`, the
+ * verdict and the fact card, each of which the plan requires to decline on it too.
  * `strong` deliberately counts as a mark here, which makes it the right question for a table cell
- * and a vacuous one for a fact pair, whose `**Label:**` bold is what defines it. So the fact rungs
- * ask it with the label bolds UNWRAPPED (their text kept, their element removed): a link or code
- * span anywhere — value or label — still reads `true`. The list rung unwraps per item; the
- * paragraph rungs unwrap through their own `unwrapped` helper — the fact rung the label bolds and
- * the `<br>` between pairs, the verdict rung the `strong`/`em` a model wraps the line in.
- * `readFactPairs` above rejects the same fact inputs on its own; both fact rungs' questions are a
+ * and a vacuous one for a fact pair, whose `**Label:**` bold is what defines it. So the paragraph
+ * rungs ask it through their own `unwrapped` helper (the element removed, its text kept) — the fact
+ * rung the label bolds and the `<br>` between pairs, the verdict rung the `strong`/`em` a model
+ * wraps the line in — and a link or code span anywhere, value or label, still reads `true`.
+ * `readFactPairs` above rejects the same fact inputs on its own; the fact rung's question is a
  * second lock that agrees with it, not a different rule.
  */
 export function hasInlineFormatting(node: HastNode | undefined): boolean {

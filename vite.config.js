@@ -3,6 +3,7 @@ import { fileURLToPath, URL } from 'node:url'
 import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
 import { getConnectableHost, normalizeLoopbackHost } from './shared/networkHosts.js'
+import keepPageOnReconnect from './vite-plugins/keepPageOnReconnect.js'
 
 // The client shows the installed package version so it can be compared against the
 // version the server process is actually running. Reading package.json here and
@@ -27,7 +28,8 @@ export default defineConfig(({ mode }) => {
   const serverPort = env.SERVER_PORT || env.PORT || 3001
 
   return {
-    plugins: [react()],
+    // keepPageOnReconnect: a phone waking a sleeping tab keeps its page instead of reloading it.
+    plugins: [react(), keepPageOnReconnect()],
     define: {
       __APP_VERSION__: JSON.stringify(pkg.version)
     },

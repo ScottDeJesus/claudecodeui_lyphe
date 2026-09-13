@@ -12,6 +12,7 @@ function ProjectMainRegion({
   navigate,
 }: ProjectWorkspaceShellProps) {
   const {
+    gitRepositories,
     selectedProject,
     selectedSession,
     activeTab,
@@ -44,6 +45,7 @@ function ProjectMainRegion({
 
   return (
     <WorkspaceMain
+      gitRepositories={gitRepositories}
       selectedProject={selectedProject}
       selectedSession={selectedSession}
       activeTab={activeTab}

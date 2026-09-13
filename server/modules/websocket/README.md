@@ -22,6 +22,8 @@ Live-run registry; the providers module's `sessionsService` reads it for `listRu
 The `session_upserted` delta builders; the providers module's sessions watcher fans its re-indexed rows out through them.
 5. `runDetachedChatTurn` (and the `ProviderRuntimeGateway` type)  
 Runs one chat turn with no socket attached. Two consumers: the scheduled-messages module drives it from a timer, and keepalive re-adoption (`session-host/readopt.ts`) composes it on boot to give each CLI that outlived the API its run back (`beforeRun` exists for that caller — it settles a run whose turn already finished before the provider is asked for anything). Both compose it rather than re-implementing the dispatch, which is what keeps the session row lookup, the busy check and the run-completion safety net in one place.
+6. `startRunStallWatchdog()`  
+Starts the sweep that turns a silent run into one `session.stuck` notification, and returns the function that stops it. Called once by `server/index.ts` inside the `listen` callback and stopped on shutdown, for the same reason the plan runner is: the notification is about runs this process is only now able to host. It lives in this module because the registry it reads owns runs — no provider knows it exists. What counts as silence, and which runs are deliberately never announced, is [docs/notifications.md](../../../docs/notifications.md) §"A silent run is noticed from outside".
 
 ## Why Dependency Injection Is Used
 
@@ -39,9 +41,10 @@ Benefits:
 |---|---|
 | `services/websocket-server.service.ts` | Creates `WebSocketServer`, binds `verifyClient`, routes connection by pathname |
 | `services/websocket-auth.service.ts` | Authenticates upgrade requests and attaches `request.user` |
-| `services/chat-websocket.service.ts` | Handles the `/ws` chat protocol (`chat.send` / `chat.abort` / `chat.subscribe` / `chat.permission-response`) |
-| `services/chat-run-registry.service.ts` | Tracks live provider runs per app session id: seq numbering, event replay buffer, provider-id mapping, completion state |
+| `services/chat-websocket.service.ts` | Handles the `/ws` chat protocol (`chat.send` / `chat.edit-send` / `chat.abort` / `chat.subscribe` / `chat.permission-response` / `chat.presence`) |
+| `services/chat-run-registry.service.ts` | Tracks live provider runs per app session id: seq numbering, event replay buffer, provider-id mapping, completion state, and `lastEventAt` — the silence clock every recorded event resets |
 | `services/chat-session-writer.service.ts` | Gateway writer handed to provider runtimes: remaps provider session ids to app ids, swallows `session_created`, assigns `seq` |
+| `services/run-stall-watchdog.service.ts` | Polls the registry's running runs and announces one that has gone quiet past the threshold. A poller rather than a timer per run, so a run that ended cannot leak one |
 | `services/shell-websocket.service.ts` | Handles `/shell` PTY lifecycle, reconnect buffering, auth URL detection |
 | `services/plugin-websocket-proxy.service.ts` | Bridges client socket to plugin socket |
 | `services/websocket-writer.service.ts` | Adapts raw WebSocket to writer interface (`send`, `setSessionId`, `getSessionId`) for non-chat writer consumers |
@@ -114,8 +117,8 @@ When a chat socket connects:
 
 1. Add socket to `connectedClients`.
 2. Parse each incoming message with `parseIncomingJsonObject`.
-3. Dispatch by `data.type` (four message types, none provider-specific).
-4. On close, remove socket from `connectedClients`.
+3. Dispatch by `data.type` (six message types, none provider-specific).
+4. On close, remove socket from `connectedClients` and drop this socket's presence record.
 
 ### Session identity model
 
@@ -136,9 +139,11 @@ flowchart TD
   B -->|ok| D{data.type}
 
   D -->|chat.send| E[resolve session row -> startRun -> providerRuntimeService.run]
+  D -->|chat.edit-send| J[history_truncated -> rewind at anchor -> dispatch]
   D -->|chat.abort| F[providerRuntimeService.abort + synthetic complete]
   D -->|chat.subscribe| G[chat_subscribed ack + attach socket + replay events seq > lastSeq]
   D -->|chat.permission-response| H[providerRuntimeService.resolveToolApproval]
+  D -->|chat.presence| K[markPresence for this socket]
   D -->|other| I[send kind:protocol_error]
 ```
 

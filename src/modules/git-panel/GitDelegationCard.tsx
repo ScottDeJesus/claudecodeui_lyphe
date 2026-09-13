@@ -193,18 +193,12 @@ export default function GitDelegationCard({
 
   return (
     <Card>
-      <CardHeader className="space-y-1.5">
+      {/* The title alone: the card sits under the changes list, and every line it spends on
+          explaining itself is a line of that list pushed off the screen. */}
+      <CardHeader>
         <CardTitle className="font-serif text-[20px] font-normal leading-tight">
           Claude writes and <span className="italic text-accent-ink">pushes</span> the commits
         </CardTitle>
-        <p className="max-w-[520px] text-[13px] leading-relaxed text-muted-foreground">
-          One button starts a Sonnet conversation and runs{' '}
-          {/* The command as the app will actually send it — the one place its configured value
-              is legible, so what this card promises and what the run receives are one string. */}
-          <span data-delegation-command className="font-mono text-xs">{GIT_DELEGATION_COMMAND}</span>
-          {' '}— the checkpoint that commits and pushes every repository, not only this one. It ends
-          when the last push finishes. You are told when it is done; there is nothing to fill in.
-        </p>
       </CardHeader>
 
       <CardContent className="flex flex-col gap-3">

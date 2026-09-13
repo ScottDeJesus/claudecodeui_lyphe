@@ -49,7 +49,7 @@ const describeProject = (name: string | null): string => name ?? 'another projec
  * pushed. A run going in any project refuses a press in every panel — adopted and narrated where it
  * belongs, named and refused everywhere else.
  *
- * The run does NOT live here: the panel is unmounted whenever the workspace shows another tab, so
+ * The run does NOT live here: the panel is unmounted whenever the workspace shows another tab or the git tab another repository, so
  * the run, its subscription and its watchdog live in `runStore` at module scope. This hook binds a
  * mounted panel to whatever is going on there — which is why coming back to the tab shows the run in
  * flight rather than an armed button.

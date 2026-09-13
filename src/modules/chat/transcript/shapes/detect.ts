@@ -43,7 +43,7 @@ export {
   timeTokenLength,
 } from '@/modules/chat/transcript/shapes/detect/listMarks';
 
-export type { FileRef } from '@/modules/chat/transcript/shapes/detect/fileRefs';
-export { FILE_REF_SCAN, KNOWN_EXTENSIONS, parseFileRef } from '@/modules/chat/transcript/shapes/detect/fileRefs';
+export type { FileRef, PreviewKind } from '@/modules/chat/transcript/shapes/detect/fileRefs';
+export { FILE_REF_SCAN, IMAGE_EXTENSIONS, KNOWN_EXTENSIONS, parseFileRef, previewKindOf } from '@/modules/chat/transcript/shapes/detect/fileRefs';
 
 export { parseHexColor, parseKeyCombo } from '@/modules/chat/transcript/shapes/detect/inlineMarks';

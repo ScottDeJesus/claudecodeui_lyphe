@@ -274,8 +274,9 @@ draws `WidgetErrorCard` rather than falling back, because a block of JSON painte
 with no explanation is worse than a sentence saying what is wrong. Both ids must match
 `DOCSPACE_ID_RE`, an allowlist of letters, digits, dot, underscore, colon and hyphen that may not
 LEAD with a dot — which refuses `../x` and `a/b` without either being named as a special case.
-`DOCSPACE_ID_RE` is deliberately the same pattern as `EMBED_ID_RE` in ArchPulse's own
-`src/embed/embedRoute.ts`, so an id one side accepts is an id the other accepts.
+`DOCSPACE_ID_RE` is deliberately the same pattern as `LINK_ID_RE` in ArchPulse's own
+`src/data/links.ts` — the one its embed route exports as `EMBED_ID_RE` and its deep links are
+held to — so an id one side accepts is an id the other accepts.
 
 **The origin is the invariant, and it is not the same invariant as the HTML widget's.**
 `resolveDocSpaceOrigin` returns `VITE_DOCSPACE_EMBED_ORIGIN` when it is set AND is an absolute

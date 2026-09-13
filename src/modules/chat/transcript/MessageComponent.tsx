@@ -11,6 +11,8 @@ import { ToolRenderer, ToolErrorDisplay, SubagentPanel, shouldHideToolResult } f
 import type { ReadToolPermissionState } from '@/modules/chat/hooks/useToolPermissionState';
 import { Reasoning, ReasoningContent, ReasoningTrigger } from '@/modules/chat/transcript/Reasoning';
 import ChatMessageImages from '@/modules/chat/transcript/ChatMessageImages';
+import { shapeKey } from '@/modules/chat/transcript/shapes/collapseState';
+import { PreviewScopeContext } from '@/modules/chat/transcript/shapes/previewScope';
 import ChatMessageFiles from '@/modules/chat/transcript/ChatMessageFiles';
 import { Markdown, TRANSCRIPT_PROSE } from '@/modules/chat/transcript/Markdown';
 import StreamingMarkdown from '@/modules/chat/transcript/StreamingMarkdown';
@@ -23,6 +25,8 @@ import { MemoryCitations } from '@/modules/chat/transcript/MemoryCitations';
 type MessageComponentProps = {
   message: ChatMessage;
   prevMessage: ChatMessage | null;
+  /** This row's turn anchor from the full message order, which its file previews are scoped by (`shapes/previewScope.ts`). */
+  previewAnchor?: string;
   /** This message is the prose reply that closes its run; it ends with the time it landed. */
   isRunTerminal?: boolean;
   createDiff: (oldStr: string, newStr: string) => DiffLine[];
@@ -63,7 +67,7 @@ const COPY_HIDDEN_TOOL_NAMES = new Set(['Bash', 'Edit', 'Write', 'ApplyPatch']);
  * Rendered by chat's ChatMessagesPane and ToolGroupContainer to draw one
  * transcript entry — user turn, assistant turn, or a tool call and its result.
  */
-const MessageComponent = memo(({ message, prevMessage, isRunTerminal, createDiff, onFileOpen, showRawParameters, showThinking, selectedProject, provider, onEditMessage, onForkFromMessage, resolveModelLabel, readToolPermissionState }: MessageComponentProps) => {
+const MessageComponent = memo(({ message, prevMessage, previewAnchor = '', isRunTerminal, createDiff, onFileOpen, showRawParameters, showThinking, selectedProject, provider, onEditMessage, onForkFromMessage, resolveModelLabel, readToolPermissionState }: MessageComponentProps) => {
   const { t, i18n } = useTranslation('chat');
   const isGrouped = prevMessage && prevMessage.type === message.type &&
     ((prevMessage.type === 'assistant') ||
@@ -81,6 +85,18 @@ const MessageComponent = memo(({ message, prevMessage, isRunTerminal, createDiff
     },
     [message.content, message.isThinking, message.type, provider]
   );
+  // The scope this row's file previews are read and folded in (`shapes/previewScope.ts`), built only from
+  // what survives the id changes a finishing reply goes through: a tool row's own `toolId`, or a reply's
+  // trimmed text together with its turn anchor (the last tool call before it, else the prompt), so the
+  // same words in two turns are two scopes. A row with neither shares nothing (`null`), and a reply
+  // still streaming previews nothing yet (`false`).
+  const previewScope = useMemo(() => {
+    if (message.isStreaming) return false;
+    if (message.isToolUse) return message.toolId ? `tool:${message.toolId}` : null;
+    const text = String(message.content || message.displayText || '').trim();
+    if (!text) return null;
+    return shapeKey('reply', `${previewAnchor}\n${text}`);
+  }, [message.content, message.displayText, message.isStreaming, message.isToolUse, message.toolId, previewAnchor]);
   const assistantCopyContent = message.isToolUse
     ? String(message.displayText || message.content || '')
     : formattedMessageContent;
@@ -150,6 +166,7 @@ const MessageComponent = memo(({ message, prevMessage, isRunTerminal, createDiff
     return null;
   }
   return (
+    <PreviewScopeContext.Provider value={previewScope}>
     <div
       ref={messageRef}
       data-message-timestamp={message.timestamp || undefined}
@@ -451,6 +468,7 @@ const MessageComponent = memo(({ message, prevMessage, isRunTerminal, createDiff
         </div>
       )}
     </div>
+    </PreviewScopeContext.Provider>
   );
 });
 

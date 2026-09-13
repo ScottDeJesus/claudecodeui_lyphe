@@ -256,12 +256,16 @@ rows never carry one, so their status is always inferred.
 | `error` | red `Error` | Codex reported `failed`, or the result has `isError` |
 | `denied` | orange `Denied` | `isError` and the lowercased, trimmed content **contains** one of `CLAUDE_DENIAL_MESSAGES`: `user denied tool use`, `tool disallowed by settings`, `permission request timed out`, `permission request cancelled` |
 
-The four phrases are the deny messages `canUseTool` returns in
-`claude-runtime.provider.js`. They are capitalized at the source, so the check lowercases,
-and it is a substring test rather than equality so it survives the SDK wrapping the message
-in error text. A deny carrying a different message does not match — `canUseTool` returns
-the client's `decision.message` verbatim when one is supplied — so a custom deny reason
-lands on `error`, not `denied`.
+The four phrases are the deny messages the Claude runtime returns in
+`claude-runtime.provider.js`. Three of them — timed out, cancelled, and the default
+`User denied tool use` — come from `promptForToolDecision`, the one function that asks a human,
+so they read the same whether `canUseTool` or the `PreToolUse` hook did the asking
+([02-realtime-stream.md](02-realtime-stream.md) §"Permission requests"). `Tool disallowed by
+settings` comes from `canUseTool`'s own pre-check, above the prompt. They are capitalized at the
+source, so the check lowercases, and it is a substring test rather than equality so it survives
+the SDK wrapping the message in error text. A deny carrying a different message does not match —
+the runtime returns the client's `decision.message` verbatim when one is supplied — so a custom
+deny reason lands on `error`, not `denied`.
 
 Two rows spell "running" their own way. `BashCommandDisplay` draws a spinning ring and
 suppresses the pill; `PlanDisplay` shimmers its title while `mode === 'input' &&

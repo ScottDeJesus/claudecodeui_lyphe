@@ -171,6 +171,7 @@ export function createFileTreeRouter(
     const filePath = readRequiredString(request.query.path, 'path', 'Invalid file path');
     const file = await services.openFile(readProjectId(request), filePath);
     response.setHeader('Content-Type', file.contentType);
+    response.setHeader('Content-Length', String(file.size));
     file.stream.pipe(response);
     file.stream.on('error', (error) => {
       logger.error('Error streaming File Tree content', error);

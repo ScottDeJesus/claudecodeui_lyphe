@@ -4,14 +4,15 @@ import { useTranslation } from 'react-i18next';
 import { ChatInterface, type ChatExportSurface, type TokenUsageSurface } from '@/modules/chat';
 import { FileManager } from '@/modules/file-manager';
 import { StandaloneShell } from '@/modules/standalone-shell';
-import { GitPanel } from '@/modules/git-panel';
+import { GitRepositoriesPanel } from '@/modules/git-panel';
 import { PluginTabContent } from '@/modules/plugins';
 import { BrowserUsePanel } from '@/modules/browser-use';
 import { usePaletteOpsRegister } from '@/modules/command-palette';
 import { MemoryIntakePanel } from '@/modules/memory-intake';
 import { RunnerPanel } from '@/modules/plan-runner';
 import { TaskMasterPanel, useTaskMasterProjectSync } from '@/modules/task-master';
-import type { AppTab, Project, ProjectSession, SessionEstablishedContext, SessionNavigationOptions, SettingsMainTab } from '@/shared/types';
+import type { AppTab, GitRepository, Project, ProjectSession, SessionEstablishedContext, SessionNavigationOptions, SettingsMainTab } from '@/shared/types';
+import { api } from '@/shared/api';
 import { useUiPreferences } from '@/shared/context/UiPreferencesContext';
 import { useFileOpenResolver } from '@/modules/project-workspace/hooks/useFileOpenResolver';
 import { useWorkspaceTabGates } from '@/modules/project-workspace/hooks/useWorkspaceTabGates';
@@ -20,6 +21,8 @@ import WorkspaceStateView from '@/modules/project-workspace/WorkspaceStateView';
 import WorkspaceErrorBoundary from '@/modules/project-workspace/WorkspaceErrorBoundary';
 
 type WorkspaceMainProps = {
+  /** The git tab's repositories, in strip order — memoised upstream, so its identity is stable. */
+  gitRepositories: GitRepository[];
   selectedProject: Project | null;
   selectedSession: ProjectSession | null;
   activeTab: AppTab;
@@ -36,8 +39,36 @@ type WorkspaceMainProps = {
   newSessionTrigger: number;
 };
 
+/** The largest file the chat previews inline, and how many reads — and bytes — it holds at once. */
+const MAX_PREVIEW_BYTES = 25 * 1024 * 1024;
+const MAX_PREVIEW_READS = 64;
+const MAX_PREVIEW_CACHE_BYTES = 150 * 1024 * 1024;
+
+/**
+ * A response's body, refused once it passes `cap` bytes. For a response with no `Content-Length` —
+ * a compressing proxy strips it — where the size is only known by counting what arrives.
+ */
+async function readCapped(response: Response, cap: number): Promise<Blob | null> {
+  const reader = response.body?.getReader();
+  if (!reader) return null;
+  const chunks: BlobPart[] = [];
+  let total = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > cap) {
+      void reader.cancel();
+      return null;
+    }
+    chunks.push(value);
+  }
+  return new Blob(chunks, { type: response.headers.get('content-type') ?? '' });
+}
+
 /** Rendered by ProjectMainRegion to show the selected project's active tab: chat, files, shell, git, tasks, browser or a plugin. */
 function WorkspaceMain({
+  gitRepositories,
   selectedProject,
   selectedSession,
   activeTab,
@@ -119,7 +150,76 @@ function WorkspaceMain({
 
   // Resolves bare/partial file references (e.g. links inside chat messages) to real project files
   // before opening them in the file manager — at the line the reference named, when it named one.
-  const resolvedFileOpen = useFileOpenResolver(selectedProject, openFileAt);
+  const { open: resolvedFileOpen, resolve: resolveFileReference } = useFileOpenResolver(selectedProject, openFileAt);
+
+  // The chat's file previews read their bytes through the SAME resolver a chip click opens through,
+  // so the preview under a chip and the file the chip opens are one file — except that a preview never
+  // takes the resolver's filename-only guess: a chip that opens a same-named file is noticed on the
+  // click, a preview of it is presented as the file the author meant.
+  //
+  // One read per project, path and SCOPE — the reply that names the file (`previewScope.ts`). A row
+  // unmounting outside its band reuses its reply's read; a later reply naming the same path reads the
+  // file again, so a screenshot overwritten between two replies shows each reply the bytes its chip
+  // opens. A read that found nothing is not kept. Bounded in entries and in bytes held — a read counts
+  // its declared size from the moment its headers arrive — and each file in its size: over the cap it
+  // is refused on `Content-Length`, or, where a proxy stripped that header, part-way through its body.
+  const projectId = selectedProject?.projectId;
+  const previewReadsRef = useRef(new Map<string, { read: Promise<Blob | null>; bytes: number }>());
+  const readFileReference = useCallback((filePath: string, scope: string | null): Promise<Blob | null> => {
+    if (!projectId) return Promise.resolve(null);
+    const reads = previewReadsRef.current;
+    // A row with no scope is read and not kept: a key per mount would never be asked for again, and
+    // each would hold a slot and its bytes until evicted.
+    const key = scope === null ? null : `${projectId}\u0000${scope}\u0000${filePath}`;
+    const held = key === null ? undefined : reads.get(key);
+    if (held) return held.read;
+
+    // Oldest out first (a Map iterates in insertion order), until both bounds hold.
+    const evict = () => {
+      let heldBytes = 0;
+      for (const item of reads.values()) heldBytes += item.bytes;
+      while (reads.size > MAX_PREVIEW_READS || heldBytes > MAX_PREVIEW_CACHE_BYTES) {
+        const oldest = reads.entries().next().value as [string, { bytes: number }] | undefined;
+        if (!oldest) break;
+        reads.delete(oldest[0]);
+        heldBytes -= oldest[1].bytes;
+      }
+    };
+
+    const entry = { read: Promise.resolve<Blob | null>(null), bytes: 0 };
+    entry.read = (async () => {
+      try {
+        const response = await api.readFileBlob(projectId, await resolveFileReference(filePath, { allowBasename: false }));
+        if (!response.ok) {
+          void response.body?.cancel();
+          return null;
+        }
+        const declared = response.headers.get('content-length');
+        if (declared === null) return await readCapped(response, MAX_PREVIEW_BYTES);
+        const size = Number(declared);
+        if (!(size <= MAX_PREVIEW_BYTES)) {
+          void response.body?.cancel();
+          return null;
+        }
+        entry.bytes = size;
+        evict();
+        return await response.blob();
+      } catch {
+        return null;
+      }
+    })();
+    if (key === null) return entry.read;
+    reads.set(key, entry);
+    void entry.read.then((blob) => {
+      if (!blob) {
+        if (reads.get(key) === entry) reads.delete(key);
+        return;
+      }
+      entry.bytes = blob.size;
+      evict();
+    });
+    return entry.read;
+  }, [projectId, resolveFileReference]);
 
   // The three effects below snap a PREFERENCE-gated tab back to chat when its gate turns off:
   // tasks, shell and browser vanish the moment a person switches them off, and leaving the
@@ -183,7 +283,7 @@ function WorkspaceMain({
   //
   // Stable arguments keep usePaletteOpsRegister's effect from tearing down and
   // rewriting the whole palette registry on every render.
-  usePaletteOpsRegister({ openFile: handleFileOpen, openFileReference: resolvedFileOpen });
+  usePaletteOpsRegister({ openFile: handleFileOpen, openFileReference: resolvedFileOpen, readFileReference });
 
   if (isLoading) {
     return <WorkspaceStateView mode="loading" isMobile={isMobile} onMenuClick={onMenuClick} />;
@@ -255,8 +355,9 @@ function WorkspaceMain({
 
         {activeTab === 'git' && (
           <div className="h-full overflow-hidden">
-            <GitPanel
-              selectedProject={selectedProject}
+            <GitRepositoriesPanel
+              repositories={gitRepositories}
+              selectedProjectPath={selectedProject.fullPath}
               isMobile={isMobile}
               onFileOpen={handleFileOpen}
             />

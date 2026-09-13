@@ -1,5 +1,6 @@
 import type { ComponentPropsWithoutRef } from 'react';
 
+import { ChipsSuppressedContext } from '@/modules/chat/transcript/shapes/chipContext';
 import type { HastNode } from '@/modules/chat/transcript/shapes/hast';
 import { ShapeSection } from '@/modules/chat/transcript/shapes/ShapeSection';
 import { TabbedCode } from '@/modules/chat/transcript/shapes/TabbedCode';
@@ -47,7 +48,13 @@ export function PlainHeading({ node, children, ...props }: HeadingProps) {
   // react-markdown always passes `node`, so the fallback is unreachable in this tree; it exists so
   // the tag is a checked literal rather than a cast.
   const Tag: HeadingTag = isHeadingTag(tagName) ? tagName : 'h2';
-  return <Tag {...props}>{children}</Tag>;
+  // A heading is a label: a code-span path in it stays a code span, with no chip and no picture —
+  // the same answer `ShapeSection` gives a settled section heading, so a streaming heading agrees.
+  return (
+    <Tag {...props}>
+      <ChipsSuppressedContext.Provider value={true}>{children}</ChipsSuppressedContext.Provider>
+    </Tag>
+  );
 }
 
 /**

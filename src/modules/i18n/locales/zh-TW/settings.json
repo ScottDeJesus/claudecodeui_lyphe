@@ -114,7 +114,28 @@
       "title": "事件類型",
       "actionRequired": "需要處理",
       "stop": "執行已停止",
-      "error": "執行失敗"
+      "error": "執行失敗",
+      "limits": "用量上限"
+    },
+    "ntfy": {
+      "title": "手機推播 (ntfy)",
+      "description": "把每則通知傳送到手機上的 ntfy 應用程式。",
+      "server": "伺服器 URL",
+      "topic": "主題",
+      "topicHint": "知道主題的人都能讀取，請像對待密碼一樣保管。",
+      "token": "存取權杖",
+      "tokenKept": "已儲存 — 輸入即可取代",
+      "appUrl": "CloudCLI 網址",
+      "appUrlHint": "點按推播時開啟的位置 — 手機連上 CloudCLI 的網址。",
+      "longRun": "僅通知長於此時間的執行（分鐘）",
+      "enabled": "已啟用",
+      "save": "儲存",
+      "test": "傳送測試",
+      "remove": "移除",
+      "saved": "已儲存",
+      "tested": "測試推播已傳送",
+      "testFailed": "測試推播失敗",
+      "configured": "正在傳送到 {{topic}}"
     }
   },
   "appearanceSettings": {

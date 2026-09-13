@@ -52,7 +52,7 @@ type GitReadController = {
  * it is opened rather than a preload of the list: this repository's own working tree carries
  * 307 changed paths, measured, and a diff apiece is 307 requests for rows nobody has clicked.
  */
-export function useGitReadController(project: Project | null): GitReadController {
+export function useGitReadController(project: Pick<Project, 'projectId'> | null): GitReadController {
   // The DB primary key is what every git route takes as its `project` param, and it is a
   // STRING: keying the load on it (rather than on the project object) is what stops a new
   // object identity from the projects context re-fetching on an unrelated render.
@@ -168,7 +168,10 @@ export function useGitReadController(project: Project | null): GitReadController
     status: current?.status ?? null,
     remoteStatus: current?.remoteStatus ?? null,
     commits: current?.commits ?? null,
-    loading: projectId !== null && loadingProjectId === projectId,
+    // True from the very first render. `loadingProjectId` is set by the mount effect, which runs
+    // AFTER the first paint — so keyed on it alone, a freshly mounted panel painted one frame of
+    // "Couldn't read upstream" over an empty list before its read had even started.
+    loading: projectId !== null && (loadingProjectId === projectId || current === null),
     error: current?.error ?? null,
     diffFor,
     refresh,

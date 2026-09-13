@@ -34,6 +34,7 @@ const INLINE_CODE_CLASS =
  * the chip, carrying the span's text as its label, so the author still reads what they typed. This
  * module cannot see what the span sits in, so it hands the chip the span itself as `plain`: inside a
  * link, a section heading or a table header the chip draws that instead (`ChipsSuppressedContext`).
+ * A picture or a PDF also shows its preview under the chip, which the chip folds (`FileChip`).
  *
  * It is a behaviour-identical move rather than a literal one, and the three differences all rest on
  * ONE fact — an inline `code` in this pipeline has exactly one text child and no hast properties:

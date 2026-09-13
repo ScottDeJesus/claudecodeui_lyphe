@@ -4,11 +4,11 @@ import type { ReactNode } from 'react';
 import { shapeKey } from '@/modules/chat/transcript/shapes/collapseState';
 import { checkGlyph, isTimeToken } from '@/modules/chat/transcript/shapes/detect';
 import type { HastNode } from '@/modules/chat/transcript/shapes/hast';
-import { hasInlineFormatting, readFactPairs, readListItems, textOf } from '@/modules/chat/transcript/shapes/hast';
+import { readListItems } from '@/modules/chat/transcript/shapes/hast';
+import { listStart } from '@/modules/chat/transcript/shapes/listItems';
 import { InsideListContext } from '@/modules/chat/transcript/shapes/listNesting';
 import { renderInline } from '@/modules/chat/transcript/shapes/elements/inlineText';
 import { CheckResults } from '@/modules/chat/transcript/shapes/CheckResults';
-import { FactCard } from '@/modules/chat/transcript/shapes/FactCard';
 import { TaskProgress } from '@/modules/chat/transcript/shapes/TaskProgress';
 import { Timeline } from '@/modules/chat/transcript/shapes/Timeline';
 
@@ -21,12 +21,13 @@ type PlainElementProps = { node?: HastNode; children?: ReactNode };
  *
  * One component for both, because `SHAPE_COMPONENTS` points `ul` and `ol` at one `ShapeList` and a
  * list shape reads the same items either way. Which tag to emit is read from `node`, which is the
- * only thing that distinguishes them — the two class strings are today's, byte for byte.
+ * only thing that distinguishes them — the two class strings are today's, byte for byte. An `ol`
+ * carries the author's first number through `listStart`, which is absent for a list that opens at 1.
  */
 export function PlainList({ node, children }: PlainElementProps) {
   if (node?.tagName === 'ol') {
     return (
-      <ol className="mb-2 list-outside list-decimal space-y-1 pl-5 marker:text-current last:mb-0">{children}</ol>
+      <ol start={listStart(node)} className="mb-2 list-outside list-decimal space-y-1 pl-5 marker:text-current last:mb-0">{children}</ol>
     );
   }
   return (
@@ -38,53 +39,6 @@ export function PlainList({ node, children }: PlainElementProps) {
 export function PlainListItem({ children }: PlainElementProps) {
   return <li className="[&>div:last-child]:mb-0 [&>div]:mb-1">{renderInline(children)}</li>;
 }
-
-/**
- * The fact rung's decline: did the author mark up anything the grid would have to flatten?
- *
- * The rule is that a shape which re-lays-out its cells declines when the author marked those cells
- * up, because it cannot carry rendered children across the move — and the grid re-lays-out BOTH
- * halves of a pair, drawing the label and the value from text. Asking `hasInlineFormatting` of the
- * item as it stands would decline every fact list that could ever exist: a pair is DEFINED by a
- * `**Label:**` bold, `strong` is exactly what that function counts, and `li` is transparent to it,
- * so the answer would be `true` for every input and the rung dead code.
- *
- * So each label bold is UNWRAPPED — its element removed, its children kept in its place — and the
- * question is asked of the result. Unwrapping, not deleting: a first draft dropped the label bold
- * WITH its contents, so `**[PR 12](url):**` passed, the link inside the label was never looked at,
- * and the grid drew `PR 12` with its target silently gone. `readFactPairs` now rejects that label on
- * its own (a bold holding any element), which is the rule Phase 5's paragraph rung relies on; this
- * is a second lock on the same door, and the two agree on every input.
- */
-const factItemIsFormatted = (item: HastNode): boolean =>
-  hasInlineFormatting({
-    type: 'element',
-    tagName: 'li',
-    children: (item.children ?? []).flatMap((child) =>
-      child.type === 'element' && child.tagName === 'strong' && textOf(child).trim().endsWith(':')
-        ? (child.children ?? [])
-        : [child]
-    ),
-  });
-
-/**
- * Every `li` of a list, flattened into ONE subtree for `readFactPairs` to walk.
- *
- * A fact list writes one pair per bullet — `- **Owner:** ana` — and `readFactPairs` wants two pairs
- * before it will believe any of them. Concatenating the items is what lets this rung and Phase 5's
- * paragraph rung share one reader and one grammar, instead of growing a second, looser copy for
- * bullets. Every rejection survives the concatenation: an item holding prose, a nested list, or a
- * value that is not plain text still returns `null` for the ENTIRE list, because the reader walks
- * one flat sequence and a single stray child ends the walk.
- *
- * The one thing it relaxes, stated rather than discovered later: a pair may span two bullets, so
- * `- **A:**` followed by `- one` reads as the pair `A: one`. It is an odd way to write a list and
- * the grid still shows both the label and the value, so nothing is lost when it happens — which is
- * why it is accepted here rather than fenced off with a per-item walk that would need its own
- * grammar.
- */
-const factPairsOfList = (items: HastNode[]) =>
-  readFactPairs({ type: 'element', tagName: 'ul', children: items.flatMap((item) => item.children ?? []) });
 
 /** The direct `li` children of a list — the same walk, in the same order, `readListItems` uses. */
 const listItemNodes = (node: HastNode): HastNode[] =>
@@ -126,17 +80,17 @@ const ownCheckbox = (item: HastNode): boolean | null => {
 };
 
 /**
- * The `ul`/`ol` entry of `SHAPE_COMPONENTS`: the whole list ladder, in the plan's precedence.
+ * The `ul`/`ol` entry of `SHAPE_COMPONENTS`: the whole list ladder.
  *
  * Used through `elements/index.ts` by `Markdown.tsx`'s shape map, and reached only on a settled
  * body — the streaming half renders through `PLAIN_COMPONENTS`, decided once by the ternary in
  * `Markdown.tsx`. Nothing here reads the streaming context, so a half-arrived list cannot become a
  * timeline for a frame and then change its mind.
  *
- * **Task list, then check results, then timeline, then fact list, then today's list.** The order is
- * load-bearing rather than arbitrary. A task list whose items ALSO open with ✓ is still a task
- * list: swapping those two rungs would take the reader's checkboxes away and hand them a static
- * pass/fail read-out of the list they were using to track work.
+ * **Task list, then check results, then timeline, then today's list.** The order is load-bearing
+ * rather than arbitrary. A task list whose items ALSO open with ✓ is still a task list: swapping
+ * those two rungs would take the reader's checkboxes away and hand them a static pass/fail read-out
+ * of the list they were using to track work.
  *
  * Every rung demands its trigger of EVERY item, which is what keeps a near-miss plain:
  *   * one ordinary bullet among the checkboxes and the progress line would be counting something
@@ -146,6 +100,12 @@ const ownCheckbox = (item: HastNode): boolean | null => {
  *   * one item without a leading time and it is not a timeline, again with two as the floor;
  *   * `isTimeToken` is what keeps `3:2`, `1.2` and `4 items changed` out. A ratio, a version and a
  *     bare count are not times, and that grammar lives in `detect.ts`, gated on its own.
+ *
+ * **A list of `**Label:** value` bullets is a list.** The author wrote bullets, and those are the
+ * commonest lists this app's replies carry; a label-value grid in their place takes the bullets
+ * away, shrinks the bold labels to muted captions and drops their colons, so the reader sees their
+ * list replaced by a card. Label-value LINES in a paragraph are what `FactCard` draws, from
+ * `elements/paragraph.tsx`.
  *
  * An empty list falls through to the plain rendering before any rung runs, which is also what stops
  * `every()` answering `true` for a list with nothing in it and handing `TaskProgress` a zero total.
@@ -170,16 +130,17 @@ export function ShapeList({ node, children }: PlainElementProps) {
   if (items.length === 0) return inList(fallback);
 
   const texts = items.map((item) => item.text);
-  // The plan's payload for all four list kinds: the item texts joined by newlines.
+  // The plan's payload for every list kind: the item texts joined by newlines.
   const payload = texts.join('\n');
-  const itemNodes = listItemNodes(node);
-  // The author's own element, carried into every shape below. A shape replaces the MARKER with its
-  // glyph or its time — that is what it is for — but the element the author chose is structure, and
-  // an `<ol>` re-emitted as a `<ul>` tells a screen reader the sequence was never ordered.
+  // The author's own element and first number, carried into every shape below. A shape replaces the
+  // MARKER with its glyph or its time — that is what it is for — but the element the author chose is
+  // structure, and an `<ol>` re-emitted as a `<ul>` tells a screen reader the sequence was never
+  // ordered.
   const ordered = node.tagName === 'ol';
+  const start = listStart(node);
 
   // 1 — a task list: every item carries a checkbox OF ITS OWN, not one borrowed from a sub-list.
-  const boxes = itemNodes.map(ownCheckbox);
+  const boxes = listItemNodes(node).map(ownCheckbox);
   if (boxes.length === items.length && boxes.every((box) => box !== null)) {
     const done = boxes.filter((box) => box === true).length;
     // The list itself is handed down as the body, already wrapped in today's `PlainList`, so the
@@ -198,6 +159,7 @@ export function ShapeList({ node, children }: PlainElementProps) {
       <CheckResults
         glyphs={glyphs as ('pass' | 'fail')[]}
         ordered={ordered}
+        start={start}
         collapseKey={shapeKey('checks', payload)}
       >
         {children}
@@ -208,16 +170,10 @@ export function ShapeList({ node, children }: PlainElementProps) {
   // 3 — a timeline: a leading time on every item, and at least two of them.
   if (items.length >= 2 && texts.every(isTimeToken)) {
     return inList(
-      <Timeline ordered={ordered} collapseKey={shapeKey('timeline', payload)}>
+      <Timeline ordered={ordered} start={start} collapseKey={shapeKey('timeline', payload)}>
         {children}
       </Timeline>
     );
-  }
-
-  // 4 — a fact list: `**Label:** value` on every bullet, two pairs at the least.
-  const pairs = factPairsOfList(itemNodes);
-  if (pairs && !itemNodes.some(factItemIsFormatted)) {
-    return inList(<FactCard pairs={pairs} collapseKey={shapeKey('facts', payload)} />);
   }
 
   return inList(fallback);

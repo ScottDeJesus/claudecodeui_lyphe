@@ -49,6 +49,7 @@ import {
   planLiveChanges,
   resolveIdleCloseMs
 } from './chat-process.js';
+import { createSignalState, detectRuntimeSignals } from './claude-runtime-signals.js';
 import { SURFACE_ENV, SURFACE_PROMPT_APPEND } from './surface-signal.js';
 
 const activeSessions = new Map();
@@ -81,6 +82,9 @@ const BG_WAIT_CEILING_MS = 30 * 60 * 1000;
 const RECONCILIATION_WINDOW_MS = 10 * 1000;
 
 const TOOLS_REQUIRING_INTERACTION = new Set(['AskUserQuestion', 'ExitPlanMode']);
+// The permission modes in which the SDK answers for the user and never calls `canUseTool`:
+// there, the PreToolUse hook is the only door an interactive tool can reach a human through.
+const HOOK_MODES = new Set(['bypassPermissions', 'auto', 'dontAsk']);
 
 // Ultracode is a session-scoped setting rather than an SDK effort level: it pairs xhigh
 // effort with standing dynamic-workflow orchestration, and the CLI only honours it when
@@ -808,6 +812,10 @@ async function spawnProcess(command, options, initialWs, context) {
       event
     });
   };
+  // Limits, retries and failed results, watched for the life of this process. `runUserId` is a
+  // VALUE taken at spawn, never a read of `ws`: a reset timer fires up to a day later.
+  const signalState = createSignalState();
+  const runUserId = ws?.userId || null;
 
   // The turn a client is waiting on, or null between turns. `uuid` is stamped on the user
   // message and echoed on the `result` that answers it (`user_message_uuids`) — the only way
@@ -1031,56 +1039,10 @@ async function spawnProcess(command, options, initialWs, context) {
         openTurn(reattach ? null : (promptMessages[0]?.uuid ?? null)).then(settleFirstTurn);
       }
 
-      sdkOptions.hooks = {
-        Notification: [{
-          matcher: '',
-          hooks: [async (input) => {
-            const message = typeof input?.message === 'string' ? input.message : 'Claude requires your attention.';
-            // Notifications are app-facing, so they carry the app session id.
-            emitNotification(createNotificationEvent({
-              provider: 'claude',
-              sessionId: sessionId || capturedSessionId || null,
-              kind: 'action_required',
-              code: 'agent.notification',
-              meta: { message, sessionName: sessionSummary },
-              severity: 'warning',
-              requiresUserAction: true,
-              dedupeKey: `claude:hook:notification:${sessionId || capturedSessionId || 'none'}:${message}`
-            }));
-            return {};
-          }]
-        }]
-      };
-
-      // Caveat: in 'auto' and 'bypassPermissions' modes the SDK resolves approval
-      // at the permission-mode step and skips this callback, so interactive tools
-      // (AskUserQuestion, ExitPlanMode) won't reach the UI — the classifier/bypass
-      // auto-approves them and the model acts on a generated answer. Move these
-      // tools to a PreToolUse hook (runs before the mode check) if we need them
-      // to work in those modes.
-      sdkOptions.canUseTool = async (toolName, input, toolContext) => {
-        const requiresInteraction = TOOLS_REQUIRING_INTERACTION.has(toolName);
-
-        if (!requiresInteraction) {
-          if (sdkOptions.permissionMode === 'bypassPermissions') {
-            return { behavior: 'allow', updatedInput: input };
-          }
-
-          const isDisallowed = (sdkOptions.disallowedTools || []).some(entry =>
-            matchesToolPermission(entry, toolName, input)
-          );
-          if (isDisallowed) {
-            return { behavior: 'deny', message: 'Tool disallowed by settings' };
-          }
-
-          const isAllowed = (sdkOptions.allowedTools || []).some(entry =>
-            matchesToolPermission(entry, toolName, input)
-          );
-          if (isAllowed) {
-            return { behavior: 'allow', updatedInput: input };
-          }
-        }
-
+      // Asking a human, in one place: the `permission_request` frame, the push that carries it to
+      // a phone, the wait, the `permission_resolved` that retracts it. Two callers — `canUseTool`,
+      // and the PreToolUse hook for the modes that never reach it.
+      const promptForToolDecision = async (toolName, input, { signal, requiresInteraction }) => {
         const requestId = createRequestId();
         ws.send(createNormalizedMessage({ kind: 'permission_request', requestId, toolName, input, sessionId: capturedSessionId || sessionId || null, provider: 'claude' }));
         emitNotification(createNotificationEvent({
@@ -1088,7 +1050,8 @@ async function spawnProcess(command, options, initialWs, context) {
           sessionId: sessionId || capturedSessionId || null,
           kind: 'action_required',
           code: 'permission.required',
-          meta: { toolName, sessionName: sessionSummary },
+          // The request id and the raw input are what a push needs to be answerable from the phone.
+          meta: { toolName, sessionName: sessionSummary, requestId, toolInput: input },
           severity: 'warning',
           requiresUserAction: true,
           dedupeKey: `claude:permission:${sessionId || capturedSessionId || 'none'}:${requestId}`
@@ -1096,7 +1059,7 @@ async function spawnProcess(command, options, initialWs, context) {
 
         const decision = await waitForToolApproval(requestId, {
           timeoutMs: requiresInteraction ? 0 : undefined,
-          signal: toolContext?.signal,
+          signal,
           metadata: {
             // Keyed by the app session id so `chat.subscribe` can look pending
             // approvals up directly; provider id only for legacy callers.
@@ -1137,6 +1100,66 @@ async function spawnProcess(command, options, initialWs, context) {
         }
 
         return { behavior: 'deny', message: decision.message ?? 'User denied tool use' };
+      };
+
+      sdkOptions.hooks = {
+        PreToolUse: [{
+          // Runs BEFORE the permission-mode check, so an interactive tool still reaches a human
+          // in a HOOK_MODES mode. The mode is read at call time — a live settings change mutates
+          // it in place — and every other mode is left to `canUseTool`, which asks already:
+          // answering in both would put one question on the wire twice.
+          matcher: 'AskUserQuestion|ExitPlanMode',
+          timeout: 86_400,
+          hooks: [async (input, _toolUseId, hookOptions) => {
+            if (!HOOK_MODES.has(sdkOptions.permissionMode)) return {};
+            const result = await promptForToolDecision(input.tool_name, input.tool_input, { signal: hookOptions?.signal, requiresInteraction: true });
+            return { hookSpecificOutput: { hookEventName: 'PreToolUse', permissionDecision: result.behavior, permissionDecisionReason: result.message, updatedInput: result.behavior === 'allow' ? result.updatedInput : undefined } };
+          }]
+        }],
+        Notification: [{
+          matcher: '',
+          hooks: [async (input) => {
+            const message = typeof input?.message === 'string' ? input.message : 'Claude requires your attention.';
+            // Notifications are app-facing, so they carry the app session id.
+            emitNotification(createNotificationEvent({
+              provider: 'claude',
+              sessionId: sessionId || capturedSessionId || null,
+              kind: 'action_required',
+              code: 'agent.notification',
+              meta: { message, sessionName: sessionSummary },
+              severity: 'warning',
+              requiresUserAction: true,
+              dedupeKey: `claude:hook:notification:${sessionId || capturedSessionId || 'none'}:${message}`
+            }));
+            return {};
+          }]
+        }]
+      };
+
+      sdkOptions.canUseTool = async (toolName, input, toolContext) => {
+        const requiresInteraction = TOOLS_REQUIRING_INTERACTION.has(toolName);
+
+        if (!requiresInteraction) {
+          if (sdkOptions.permissionMode === 'bypassPermissions') {
+            return { behavior: 'allow', updatedInput: input };
+          }
+
+          const isDisallowed = (sdkOptions.disallowedTools || []).some(entry =>
+            matchesToolPermission(entry, toolName, input)
+          );
+          if (isDisallowed) {
+            return { behavior: 'deny', message: 'Tool disallowed by settings' };
+          }
+
+          const isAllowed = (sdkOptions.allowedTools || []).some(entry =>
+            matchesToolPermission(entry, toolName, input)
+          );
+          if (isAllowed) {
+            return { behavior: 'allow', updatedInput: input };
+          }
+        }
+
+        return promptForToolDecision(toolName, input, { signal: toolContext?.signal, requiresInteraction });
       };
 
       queue = createPromptQueue(promptMessages);
@@ -1222,6 +1245,18 @@ async function spawnProcess(command, options, initialWs, context) {
             if (typeof message.tool_use_id === 'string') deferredTools.delete(message.tool_use_id);
           }
         }
+
+        // Rate limits, API errors and failed results become pushes of their own, carrying the user
+        // id captured at spawn: a reset timer emits through this callback long after the run ended.
+        // An instance we ourselves ended is silent — a Stop makes the CLI answer `interrupt()` with
+        // `error_during_execution`, and a crash alarm is the last thing that turn deserves.
+        if (!abortedInstances.has(queryInstance) && !supersededInstances.has(queryInstance)) detectRuntimeSignals(message, signalState, {
+          sessionId: sessionId || capturedSessionId || null,
+          emit: (signal) => notifyUserIfEnabled({
+            userId: runUserId,
+            event: createNotificationEvent({ provider: 'claude', sessionId: sessionId || capturedSessionId || null, requiresUserAction: false, ...signal })
+          })
+        });
 
         // The finish of a background task, as the LIVE stream tells it. The transcript on disk
         // records the same fact as a `<task-notification>` user turn, which the history reader
@@ -1333,16 +1368,20 @@ async function spawnProcess(command, options, initialWs, context) {
             || message.user_message_uuids.includes(turn.uuid)
           );
           const abortPending = abortedInstances.has(queryInstance);
+          // A failed result already went out as its own signal; neither "finished" nor
+          // "background agent finished" beside it would be true.
+          const failedResult = message.is_error === true;
           if (answersTurn) {
             if (!abortPending) {
               // (An aborted turn's terminal `complete` was sent by the abort handler.)
               ws.send(createCompleteMessage({ provider: 'claude', sessionId: capturedSessionId || sessionId || null, exitCode: 0 }));
-              notifyRunStopped({
+              if (!failedResult) notifyRunStopped({
                 userId: ws?.userId || null,
                 provider: 'claude',
                 sessionId: sessionId || capturedSessionId || null,
                 sessionName: sessionSummary,
-                stopReason: 'completed'
+                stopReason: 'completed',
+                durationMs: typeof message.duration_ms === 'number' ? message.duration_ms : null
               });
             }
             settleTurn();
@@ -1350,7 +1389,7 @@ async function spawnProcess(command, options, initialWs, context) {
             // A result no client is waiting on: work started in an earlier turn has finished
             // and pushed a follow-up turn of its own.
             console.log('[Claude SDK] Background work completed for session ' + (sessionKey() || 'NEW'));
-            notifyBackgroundWorkCompleted({
+            if (!failedResult) notifyBackgroundWorkCompleted({
               userId: ws?.userId || null,
               provider: 'claude',
               sessionId: sessionId || capturedSessionId || null,
@@ -1389,7 +1428,8 @@ async function spawnProcess(command, options, initialWs, context) {
           provider: 'claude',
           sessionId: sessionId || capturedSessionId || null,
           sessionName: sessionSummary,
-          stopReason: wasAborted ? 'aborted' : 'completed'
+          stopReason: wasAborted ? 'aborted' : 'completed',
+          durationMs: null
         });
       }
 

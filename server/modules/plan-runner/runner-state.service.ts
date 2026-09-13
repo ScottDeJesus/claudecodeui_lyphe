@@ -14,6 +14,8 @@ import {
   readRunFiles,
   readRunLockBeat,
   readStringOrNull,
+  readPlanLedger,
+  type PlanLedger,
   type RunnerRunFiles,
 } from './runner-state.transport.js';
 
@@ -66,6 +68,18 @@ function readEnding(receipt: unknown, fallbackAt: number): { outcome: string; at
     outcome: readString(field(receipt, 'status')) || 'unknown',
     at: readNumber(field(receipt, 'ended_at'), fallbackAt),
   };
+}
+
+/**
+ * The receipt's `blocked` map — phase id → cause — keeping string causes only. It is the one record of a
+ * phase the runner halted on a crash or a budget, whose `progress.json` row never turns `blocked`.
+ */
+function readBlockedCauses(receipt: unknown): Record<string, string> {
+  const raw = field(receipt, 'blocked');
+  if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) return {};
+  return Object.fromEntries(
+    Object.entries(raw as Record<string, unknown>).filter((entry): entry is [string, string] => typeof entry[1] === 'string'),
+  );
 }
 
 /** A record's field, without asserting the record is one. */
@@ -212,6 +226,7 @@ export function classifyRun(
     stopped_at: stoppedAt,
     outcome: ending?.outcome ?? null,
     ended_at: ending?.at ?? null,
+    blocked_causes: ending !== null ? readBlockedCauses(files.receipt) : {},
     pid: readNumberOrNull(field(progress, 'pid')),
     position: readPosition(field(progress, 'position')),
     phases: Array.isArray(phases) ? phases.map(readPhaseRow) : [],
@@ -222,6 +237,13 @@ export function classifyRun(
     plan_runs: 1,
     plan_spawns: readNumber(field(progress, 'spawns'), 0),
     plan_cost_usd: readNumber(field(progress, 'cost_usd'), 0),
+    // The ledger's kinds land in `withPlanTotals`; alone, a run's plan total is its own cost.
+    plan_planning_usd: 0,
+    plan_review_usd: 0,
+    plan_scouts_usd: 0,
+    plan_total_usd: readNumber(field(progress, 'cost_usd'), 0),
+    tokens: readNumber(field(progress, 'tokens'), 0),
+    plan_tokens: readNumber(field(progress, 'tokens'), 0),
     line: readString(field(progress, 'line')),
     timeline: parseTimeline(files.logLines),
   };
@@ -261,6 +283,7 @@ export function snapshotRuns(
 ): RunnerRunSnapshot[] {
   const runs: RunnerRunSnapshot[] = [];
   const books = new Map<string, PlanBooks>();
+  ledgers.clear();   // a fresh read of every plan's ledger, once per sweep
 
   for (const dir of listRunDirs(stateDir)) {
     try {
@@ -282,7 +305,17 @@ export function snapshotRuns(
 }
 
 /** One plan's spend, summed over the `run.json` of every run of it. */
-type PlanBooks = { runs: number; spawns: number; cost: number };
+type PlanBooks = { runs: number; spawns: number; cost: number; tokens: number };
+
+/** One plan's ledger, read once per sweep however many of its runs are on the lane. */
+const ledgers = new Map<string, PlanLedger>();
+function ledgerFor(planPath: string): PlanLedger {
+  const held = ledgers.get(planPath);
+  if (held !== undefined) return held;
+  const read = readPlanLedger(planPath);
+  ledgers.set(planPath, read);
+  return read;
+}
 
 /**
  * One run's books into its plan's totals.
@@ -298,18 +331,30 @@ type PlanBooks = { runs: number; spawns: number; cost: number };
 function tally(books: Map<string, PlanBooks>, run: unknown): void {
   const planPath = readStringOrNull(field(run, 'plan_path'));
   if (planPath === null || field(run, 'status') === 'dry-run') return;
-  const held = books.get(planPath) ?? { runs: 0, spawns: 0, cost: 0 };
+  const held = books.get(planPath) ?? { runs: 0, spawns: 0, cost: 0, tokens: 0 };
   books.set(planPath, {
     runs: held.runs + 1,
     spawns: held.spawns + Math.max(0, readNumber(field(run, 'spawns'), 0)),
     cost: held.cost + Math.max(0, readNumber(field(run, 'cost_usd'), 0)),
+    tokens: held.tokens + Math.max(0, readNumber(field(run, 'tokens'), 0)),
   });
 }
 
 /** The snapshot with its plan's totals, or with its own counters when no book of its plan was read. */
 function withPlanTotals(run: RunnerRunSnapshot, books: Map<string, PlanBooks>): RunnerRunSnapshot {
   const plan = books.get(run.plan_path);
-  return plan === undefined ? run : { ...run, plan_runs: plan.runs, plan_spawns: plan.spawns, plan_cost_usd: plan.cost };
+  const build = plan === undefined ? run.plan_cost_usd : plan.cost;
+  const ledger = ledgerFor(run.plan_path);
+  const outside = ledger.planning + ledger.review + ledger.scouts;
+  return {
+    ...run,
+    ...(plan === undefined ? {} : { plan_runs: plan.runs, plan_spawns: plan.spawns, plan_cost_usd: plan.cost }),
+    plan_planning_usd: ledger.planning,
+    plan_review_usd: ledger.review,
+    plan_scouts_usd: ledger.scouts,
+    plan_total_usd: build + outside,
+    plan_tokens: (plan === undefined ? run.tokens : plan.tokens) + ledger.tokens,
+  };
 }
 
 /**

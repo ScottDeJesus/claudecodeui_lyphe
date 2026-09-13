@@ -2,7 +2,8 @@
 
 Four routes under `/api/plan-runner`, behind `authenticateToken` in `server/index.ts`, wired in
 `plan-runner.module.ts`, plus one websocket frame — `kind: 'runner_state'` — pushed to every open
-`/ws` socket whenever the picture changes.
+`/ws` socket whenever the picture changes, and one notification each time a run ends (§"Pushes on an
+ending").
 
 The plan runner is a separate program. It writes `~/.claude/state/runner/<run_id>/` and it may be
 executing right now; this lane only ever READS those files and shells out to the runner's own two
@@ -25,6 +26,8 @@ is not a directory is skipped. Four files per run are this lane's:
 | `run.json` | The run's own state. This lane reads exactly one field: `stopped_at`. |
 | `receipt.json` | Its PRESENCE is the whole signal: the run is over. A resume renames it, so a continued run returns. |
 | `runner.log` | One appended line per stage change, in the ◆ shape with a local ISO timestamp in front. |
+
+A fifth file lives OUTSIDE the run directory and belongs to the PLAN, not the run: `~/.claude/state/plan_costs/<slug>.json`, the hooks tree's plan-cost ledger (`hooks/plan_runner/costs.py`; `plan-runner cost <plan>` prints it). It books what no receipt ever carried — the planner (Odysseus), the reviewer (Eupalinos) and every scout wave — and `readPlanLedger` folds those three kinds into the snapshot as `plan_planning_usd`, `plan_review_usd`, `plan_scouts_usd`; `plan_total_usd` is their sum plus the build spend the receipts already tallied over every run of the plan; `plan_tokens` is the same fold in tokens (the ledger's `tokens` per entry plus `run.json`'s `tokens` over every run), printed on the card as `⛁ 94.9M tok`, Descent's unit and shape. The card leads with that total the moment anything outside the run was spent (operator, 2026-09-12: "I'd like to see totals"). Absent ledger, unreadable ledger, a `build` row in it: all read as zero here, never as an error.
 
 A run directory holds more than those four, and the rest are ignored on purpose rather than missed.
 `progress.txt` is the same ◆ line plus one row per phase, rendered for a human reading it in a
@@ -201,6 +204,52 @@ never handed a blank refusal — and the timeout sentence does NOT claim nothing
 `resume` takes the lock, clears `stopped_at` and saves `run.json` before it detaches
 (`hooks/plan_runner/cmd/launch.py:209-223`), so a ceiling that lands late can land after the run is
 already un-parked.
+
+## Pushes on an ending
+
+When a run ends, the lane says so once, through the same notification orchestrator every chat run
+uses ([notifications.md](notifications.md)), so web push, the desktop app and the ntfy phone push
+all hear it under each user's own switches. `runner-endings.service.ts` decides;
+`plan-runner.module.ts` hands it the watcher's frame, so an ending is read off the exact picture the
+tabs receive, and only when that picture changed.
+
+| The ending | Code | Kind — the switch it rides | ntfy |
+|---|---|---|---|
+| `complete`, no phase blocked or pending | `runner.finished` | `stop` — Run stopped | priority 3, ✅ |
+| `complete` with phases left, `all-blocked`, `halted`, `budget`, `flag-off` | `runner.blocked` | `error` — Run failed | priority 4, ⚠️ |
+| `rate-limited`, `dry-run`, a receipt caught mid-write (`unknown`) | none | — | — |
+
+"Phases left" is the card's own `runUnfinished` rule — a blocked or pending phase — read off the
+phases, never off the receipt's word. A rate-limited park says nothing because nothing is wrong with
+the plan: `runner_watchdog.py` resumes the same run when its window lifts. The title is the headline
+and the plan's title (`Plan blocked · <plan title>`); the body counts shipped of total. A finish adds
+the time since the run first started — a resumed run keeps its original `started_at`, so parked hours
+count — and the plan's spend over every run of it. Anything else adds how many phases are blocked and
+left, and names the first blocked phase with its cause. Blocked means the row says `blocked` OR the
+receipt's `blocked` map names the phase (`blocked_causes` on the snapshot): a phase the runner halted
+on a crash or a budget is in that map while its row still reads `running` or `pending`. A tap opens
+the app root: a run belongs to no chat session.
+
+**A run belongs to no login, so every active user is told**, each through their own event switches
+and channels. The dedupe key carries the user id, because the orchestrator's 20-second dedupe is
+process-wide and would otherwise drop the second user's push as a repeat. One user's failure is
+logged and costs that user's push only: the mark still advances, because a retry would push again to
+every user already told.
+
+**Once is a watermark in the database, not a memory in the process.**
+`app_config.plan_runner_announced_through` holds the newest `ended_at` already announced, in epoch
+seconds. The dev server restarts on every edit through a handover that runs two servers side by
+side: a set held in memory would re-announce every ending of the last day on each boot, or, seeded
+at boot, lose the ending that landed during the restart. The mark is read again just before anything
+is sent, so the two servers of a handover do not both push one ending, and advanced after each
+announcement, so a failure leaves the rest due instead of marked. On a database that has never held
+the key, the first picture seeds it with the current time and announces nothing — the receipts
+already on disk are history.
+
+**A watchdog restart is a new ending.** `runner_watchdog.py` restarts a run whose every block is
+transient (`crash`, `timeout`, `budget`, …); if the restart blocks again, the run ends again with a
+later `ended_at`, and that is another push. The watchdog's own cap on restarts that ship nothing
+bounds how many.
 
 ## The fixture
 

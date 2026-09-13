@@ -41,6 +41,16 @@ Applications Hub (`~/.claude/hub/apps.json`, `http://{host}:5183`).
   `bash -c 'exec node_modules/.bin/vite … < <(sleep infinity)'` — the bin itself, not `npx`, so
   the main PID is node running Vite and `Restart=` sees Vite die; the `sleep` is a sibling in the
   cgroup and dies with it on stop. The EIS dev unit needs none of this because it runs Vite 5.
+- **A dropped HMR socket does not reload the page unless it has to.** Vite's client reloads the
+  whole page whenever its socket drops and the server answers again, and a phone drops that
+  socket every time it puts a background tab to sleep. `vite-plugins/keepPageOnReconnect.js`
+  gives the dev server a run id and a count of `src/` changes (`GET /__dev-state`) and rewrites
+  that one reload in the served client: after the reconnect the page reloads only if the server
+  restarted or code changed since the page last applied an update; otherwise it stays, and the
+  app's own socket reconnect catches the data up. A kept page has no HMR socket, so it re-checks
+  each time the reader returns to the tab and reloads then if code changed — never on a timer,
+  where another session's edit would reload it mid-read. If a Vite upgrade changes the client
+  text it rewrites, the plugin warns and Vite's own reload stands.
 - **A client edit is instant** (HMR over the page's own host); **a server edit hands the API
   over.** The supervisor boots the edited server *beside* the running one and retires the old one
   only once the new one reports READY, so `:3011` is never unanswered: the journal reads

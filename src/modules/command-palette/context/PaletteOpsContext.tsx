@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useMemo, useRef } from 'react';
+import { createContext, useContext, useLayoutEffect, useMemo, useRef } from 'react';
 import type { MutableRefObject, ReactNode } from 'react';
 
 export type PaletteOps = {
@@ -8,6 +8,12 @@ export type PaletteOps = {
   // `line` is the line the reference named (`foo.ts:42`); the preview opens a window
   // around it and scrolls to it. Absent means the top of the file, as it always did.
   openFileReference: (path: string, line?: number) => void;
+  // Reads the bytes of the same kind of reference, resolved against the project the way
+  // `openFileReference` resolves it, so a preview drawn in chat and the file its chip opens are one
+  // file. Reads are shared within `scope` (one row) and never across scopes, so a later reply naming
+  // an overwritten file reads it again; a `null` scope is read and not kept. Answers `null` when there
+  // is no project to read from or the file cannot be read.
+  readFileReference: (path: string, scope: string | null) => Promise<Blob | null>;
   openSettings: (tab?: string) => void;
   refreshProjects: () => Promise<void> | void;
 };
@@ -19,6 +25,7 @@ const PaletteOpsContext = createContext<Registry | null>(null);
 const defaultOps: PaletteOps = {
   openFile: () => undefined,
   openFileReference: () => undefined,
+  readFileReference: () => Promise.resolve(null),
   openSettings: () => undefined,
   refreshProjects: () => undefined,
 };
@@ -36,6 +43,8 @@ export function usePaletteOps(): PaletteOps {
       openFile: (path) => (ref?.current.openFile ?? defaultOps.openFile)(path),
       openFileReference: (path, line) =>
         (ref?.current.openFileReference ?? defaultOps.openFileReference)(path, line),
+      readFileReference: (path, scope) =>
+        (ref?.current.readFileReference ?? defaultOps.readFileReference)(path, scope),
       openSettings: (tab) => (ref?.current.openSettings ?? defaultOps.openSettings)(tab),
       refreshProjects: () => (ref?.current.refreshProjects ?? defaultOps.refreshProjects)(),
     }),
@@ -45,9 +54,12 @@ export function usePaletteOps(): PaletteOps {
 
 export function usePaletteOpsRegister(partial: Partial<PaletteOps>) {
   const ref = useContext(PaletteOpsContext);
-  const { openFile, openFileReference, openSettings, refreshProjects } = partial;
+  const { openFile, openFileReference, readFileReference, openSettings, refreshProjects } = partial;
 
-  useEffect(() => {
+  // A LAYOUT effect: every layout effect of a commit runs before any passive one, so an op whose
+  // identity changed (a project switch) is back in the registry before a row mounted in the same
+  // commit calls it from its own effect — and does not read the default in between.
+  useLayoutEffect(() => {
     if (!ref) return undefined;
     // The provider creates `ref.current` once and only ever mutates its fields,
     // so capturing the registry object here is equivalent to reading
@@ -56,13 +68,15 @@ export function usePaletteOpsRegister(partial: Partial<PaletteOps>) {
     const prev = { ...registry };
     if (openFile) registry.openFile = openFile;
     if (openFileReference) registry.openFileReference = openFileReference;
+    if (readFileReference) registry.readFileReference = readFileReference;
     if (openSettings) registry.openSettings = openSettings;
     if (refreshProjects) registry.refreshProjects = refreshProjects;
     return () => {
       if (openFile && registry.openFile === openFile) registry.openFile = prev.openFile;
       if (openFileReference && registry.openFileReference === openFileReference) registry.openFileReference = prev.openFileReference;
+      if (readFileReference && registry.readFileReference === readFileReference) registry.readFileReference = prev.readFileReference;
       if (openSettings && registry.openSettings === openSettings) registry.openSettings = prev.openSettings;
       if (refreshProjects && registry.refreshProjects === refreshProjects) registry.refreshProjects = prev.refreshProjects;
     };
-  }, [ref, openFile, openFileReference, openSettings, refreshProjects]);
+  }, [ref, openFile, openFileReference, readFileReference, openSettings, refreshProjects]);
 }

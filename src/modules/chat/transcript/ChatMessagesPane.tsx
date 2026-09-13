@@ -177,6 +177,25 @@ function ChatMessagesPane({
     () => groupConsecutiveTools(shownMessages, Boolean(showThinking)),
     [shownMessages, showThinking],
   );
+  // Each row's turn anchor, which its file previews are scoped by (`shapes/previewScope.ts`): the last
+  // tool call before it in its turn, else the turn's prompt. Read from the FULL message order, never
+  // from the rows on screen — "Show work", the loaded window and a tool row leaving its waiting state
+  // all change which row is displayed before a reply, and none of them changes the reply.
+  const previewAnchors = useMemo(() => {
+    const anchors = new Map<ChatMessage, string>();
+    let prompt = '';
+    let lastToolId = '';
+    for (const message of chatMessages) {
+      if (message.type === 'user') {
+        prompt = String(message.content || '').trim();
+        lastToolId = '';
+      } else if (message.isToolUse && message.toolId) {
+        lastToolId = message.toolId;
+      }
+      anchors.set(message, lastToolId || prompt);
+    }
+    return anchors;
+  }, [chatMessages]);
   // With the work hidden, this is what tells the reader the turn is still going.
   const showTypingIndicator = isProcessing && !showWork;
 
@@ -404,6 +423,7 @@ function ChatMessagesPane({
                   <MessageComponent
                     message={item}
                     prevMessage={messagePrevMessage}
+                    previewAnchor={previewAnchors.get(item) ?? ''}
                     isRunTerminal={runTerminalReplies.has(item)}
                     createDiff={createDiff}
                     onFileOpen={onFileOpen}

@@ -26,6 +26,10 @@ type ChatRunStatus = 'running' | 'completed';
  *   stale comparison's only input. `null` until the init message arrives, and
  *   `null` for a provider that reports none; it is never filled in from the
  *   installed binary, which is a different process and may be a newer build.
+ * - `lastEventAt`: when this run last showed a sign of life. Starts at
+ *   `startedAt` and moves with every recorded event, so "has this gone quiet?"
+ *   is answerable from outside without the registry knowing who asks or what
+ *   they do about the answer.
  */
 type ChatRun = {
   appSessionId: string;
@@ -37,6 +41,7 @@ type ChatRun = {
   events: NormalizedMessage[];
   writer: ChatSessionWriter;
   startedAt: number;
+  lastEventAt: number;
   completedAt: number | null;
 };
 
@@ -96,6 +101,10 @@ function decorateAndRecordEvent(run: ChatRun, message: NormalizedMessage): Norma
   }
 
   run.lastSeq += 1;
+  // The silence clock, reset by every event the run produces: a watcher asking
+  // how long this has been quiet measures from the last sign of life, not from
+  // the start.
+  run.lastEventAt = Date.now();
 
   const outbound: NormalizedMessage = {
     ...message,
@@ -197,6 +206,7 @@ export const chatRunRegistry = {
       events: [],
       writer: null as unknown as ChatSessionWriter,
       startedAt: Date.now(),
+      lastEventAt: Date.now(),
       completedAt: null,
     };
 
@@ -230,8 +240,10 @@ export const chatRunRegistry = {
     sessionId: string;
     provider: LLMProvider;
     startedAt: number;
+    lastEventAt: number;
     lastSeq: number;
     cliVersion: string | null;
+    userId: string | number | null;
   }> {
     return Array.from(runs.values())
       .filter((run) => run.status === 'running')
@@ -239,8 +251,12 @@ export const chatRunRegistry = {
         sessionId: run.appSessionId,
         provider: run.provider,
         startedAt: run.startedAt,
+        lastEventAt: run.lastEventAt,
         lastSeq: run.lastSeq,
         cliVersion: run.cliVersion,
+        // Whose run this is, carried as the value the run started with: a
+        // watcher notifying about it may fire long after the socket is gone.
+        userId: run.writer.userId,
       }));
   },
 

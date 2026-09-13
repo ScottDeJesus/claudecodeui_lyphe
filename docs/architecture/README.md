@@ -107,6 +107,7 @@ Handled by `server/modules/websocket/services/chat-websocket.service.ts`.
 | `chat.abort` | Stop the running run. |
 | `chat.subscribe` | Watch one or more sessions, replaying from `lastSeq`. |
 | `chat.permission-response` | Answer a `permission_request`. |
+| `chat.presence` | Which session this socket is watching, and whether its tab is visible. |
 
 Note the asymmetry, which trips people up: **server frames are discriminated by `kind`,
 client frames by `type`.**

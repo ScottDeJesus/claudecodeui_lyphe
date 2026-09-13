@@ -1,11 +1,29 @@
 # The git panel
 
-The Source Control tab: which branch this is, how it stands against its upstream, what is
-waiting to be pushed, what each change looks like, and the one button that asks Claude to commit
-and push it. `src/modules/git-panel/` is `GitStatusHeader`, `changes/ChangesReadOnlyView`,
-`history/HistoryView` (with `CommitHistoryItem` and `CommitGraphStrip`), `GitDiffViewer`,
-`GitFailureBanner`, `GitRepositoryErrorState` and `GitDelegationCard` (with its
-`StartRefusalBanner`) under the one `GitPanel` its barrel exports, with
+The Git tab: which branch this is, how it stands against its upstream, what is waiting to be
+pushed, what each change looks like, and the one button that asks Claude to commit and push it.
+
+**It is not tied to the session.** The tab sits in the workspace beside Chat and Files, but its
+own strip of repositories decides what is on screen: four, in a fixed order — `/opt/shadow-connector`,
+`/home/lyphe/.claude/claudecodeui_lyphe`, `/home/lyphe/.claude`, `/opt/eis-app` (`GIT_REPO_PATHS` in
+`src/shared/constants.ts`) — each matched by path to a registered project from the workspace's own
+project list, since every git route reads a project by its database id. A path the app has not
+registered is left off the strip. The match is made once, in the workspace's state provider, and
+memoised on the three fields the tab reads (`GitRepository`), so the background refreshes that
+rebuild the project list do not re-render the tab.
+
+Changing session or project leaves the tab on the repository it was showing. The choice lives at
+module scope in `hooks/useSelectedGitRepository.ts` (the tab is unmounted whenever another tab is
+showing) and in `localStorage` under `gitTab.selectedRepoPath`, so a reload lands on it too. The
+palette's commit and branch rows call `selectGitRepository` with the selected project's path and
+bring the tab forward; they are offered only for a project on the strip, since a row for any other
+would bring forward a repository other than the one it named.
+
+`src/modules/git-panel/` is `GitRepositoriesPanel` (the component its barrel exports, beside
+`selectGitRepository`), the `GitPanel` it renders per repository, `GitStatusHeader`,
+`changes/ChangesReadOnlyView`, `history/HistoryView`
+(with `CommitHistoryItem` and `CommitGraphStrip`), `GitDiffViewer`, `GitFailureBanner`,
+`GitRepositoryErrorState` and `GitDelegationCard` (with its `StartRefusalBanner`), with
 `hooks/useGitReadController` holding everything the panel knows, `hooks/git-delegation/` holding
 the run, and `utils/gitPanelUtils` deciding how each of those facts reads.
 
@@ -26,15 +44,15 @@ none of them may render as good news:
 
 | The read said | Badge | Changes tab |
 |---|---|---|
-| tracked, `ahead: 0` | `✓ Everything is pushed` (positive) | on a clean tree, *Nothing waiting to be pushed*, naming the ref it was measured against |
+| tracked, `ahead: 0` | no badge | on a clean tree, *Nothing waiting to be pushed*, naming the ref it was measured against |
 | tracked, `ahead: N` | `N of yours are not pushed` (info) | a section headed **Already committed, not pushed · N** |
 | `hasCommits: false` | `— No commits yet` (neutral) | on a clean tree, *No commits yet* — a known zero |
 | `hasUpstream: false` | `— No upstream yet` (neutral) | a section headed **· —** saying the branch tracks no remote — the same sentence as an empty state when the tree is clean |
 | the read failed | `— Couldn't read upstream` (warn) | the same **· —** section, amber, git's own words one hover away |
 
 The em dash is load-bearing: "0 not pushed", "nothing committed", "no tracking ref" and "the read
-failed" are four different facts and only one of them is *everything is pushed*. A failed read is
-the only one that is an error, so it alone is amber.
+failed" are four different facts, and a missing badge must only ever mean the first. A failed read
+is the only one that is an error, so it alone is amber.
 
 ## The rules that bite
 
@@ -83,9 +101,10 @@ the only one that is an error, so it alone is amber.
 
 8. **Opening a row shows a diff; the only way out is Files.** One row at a time, a second click
    closes it, and `Open in Files` hands the path to the workspace's file manager — see
-   [file-manager.md](file-manager.md). `GitDiffViewer` bounds what it paints at 200,000
-   characters and 1,500 lines and says so when it has cut something, so a huge diff cannot freeze
-   the tab.
+   [file-manager.md](file-manager.md). It is offered only while the repository on screen is the
+   workspace's own project, because Files browses that project and no other. `GitDiffViewer`
+   bounds what it paints at 200,000 characters and 1,500 lines and says so when it has cut
+   something, so a huge diff cannot freeze the tab.
 
 ## Push my changes
 
@@ -100,10 +119,10 @@ created. The literal has to *begin* with `/git` or the estate's push guard
 so a trailing space, a newline, or the command's expanded text each cost it the push.
 
 **What it starts is the estate's checkpoint, not this repository's.** `/git` commits and pushes
-all four repositories `~/.claude/commands/git.md` lists, three of which this panel never draws.
-The card says so on its face — *the checkpoint that commits and pushes every repository, not only
-this one* — while the caption under the button counts only what is here: *N files here · commits
-are grouped by intent, then pushed to main*. Having nothing waiting in this repository is
+all four repositories `~/.claude/commands/git.md` lists — the same four the tab's strip carries.
+The card is headed by its title alone, so the list above it keeps the room; the caption under the
+button counts only what is here: *N files here · commits are grouped by intent, then pushed to
+main*. Having nothing waiting in this repository is
 therefore never a reason to disable the button, and the caption says so in its own words rather
 than going quiet (*Nothing waiting here — the run still covers every other repository*).
 
@@ -129,10 +148,11 @@ Everything but the pushed receipt is a warn Banner — amber, never red — and 
 offers *Read the conversation*.
 
 **The run lives outside React; the one-run guard lives on the server.** The workspace unmounts the
-panel whenever another tab is selected, so the run's identity, its subscription and its watchdog
-sit at module scope in `hooks/git-delegation/runStore.ts`, and a mounted panel binds to them
-through `useSyncExternalStore` — which is why leaving the tab and coming back shows the run in
-flight rather than an armed button. Module scope is per document, though, so a reload, a second
+tab whenever another tab is selected, and the tab remounts its panel whenever another repository is,
+so the run's identity, its subscription and its watchdog sit at module scope in
+`hooks/git-delegation/runStore.ts`, and a mounted panel
+binds to them through `useSyncExternalStore` — which is why leaving the tab and coming back shows
+the run in flight rather than an armed button. Module scope is per document, though, so a reload, a second
 window and an HMR update each get an empty one: `findLiveRun.ts` asks the SERVER instead, reading
 `/api/providers/sessions/running` fresh at the press rather than trusting the 5-second poll behind
 the sidebar's activity chip. A running session IS a delegation run when its `summary` is the
@@ -175,8 +195,8 @@ such a value only as long as the run that needs it.
 ### The delegation's own
 
 - **`agent-error` outranks a clean read.** The plan's order is explicit, so a run that errored,
-  recovered and pushed anyway would be called a failure while the lists above it read *everything
-  is pushed*. Moving that test below `ahead === 0` is the whole fix; the combination has not turned up.
+  recovered and pushed anyway would be called a failure while the lists above it read *Nothing
+  waiting to be pushed*. Moving that test below `ahead === 0` is the whole fix; the combination has not turned up.
 - **The tree is tested before the upstream.** A run that pushed what it committed and still left
   something uncommitted reads *not committed* — the more useful of the two true things, by plan order.
 - **"Opens with the command" is the identity key, host-wide.** A conversation somebody starts by
@@ -218,9 +238,10 @@ such a value only as long as the run that needs it.
 - **The guard's truth is one server process's memory.** `listRunningRuns` reads a `Map` held in the
   running server (`server/modules/websocket/services/chat-run-registry.service.ts`), so a restart
   empties it and a press after that has nothing left to be refused by.
-- **"Read the conversation" keeps the workspace's tab.** The workspace restores the tab it was last
-  on, so arriving from Source Control lands on Source Control and the conversation is one click
-  away rather than on screen. Selecting the Chat tab on arrival is workspace state, and a follow-up.
+- **"Read the conversation" keeps the Git tab.** It navigates the workspace to the session, and
+  the workspace stays on the tab it was on — so arriving from Git lands on Git, on the same
+  repository, and the conversation is one click away rather than on screen. Selecting the Chat tab
+  on arrival is workspace state, and a follow-up.
 - **The rehearsal minted a push grant it never used.** `/git-rehearsal` matches the push guard's
   `/git` + word-boundary pattern, so the one real verification run's own CLI session was granted a
   push it did not take. Measured and reported rather than worked around — the hook is the estate's,

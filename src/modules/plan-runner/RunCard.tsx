@@ -68,6 +68,13 @@ function planFileName(planPath: string): string {
  * on screen at the same time and must never be acted on. `phase-25.mjs` asserts their ABSENCE from
  * the chat view; the Runner tab's probe is what reads them on a card.
  */
+/** Byte-for-byte Descent's `dom.humanizeTokens` (`descent/ui/dom.js`): "94.9M", "1M", "12.5k". */
+function humanizeTokens(n: number): string {
+  if (n < 1000) return String(n);
+  if (n < 999_950) return `${(n / 1e3).toFixed(1).replace(/\.0$/, '')}k`;   // dom.js's cut
+  return `${(n / 1e6).toFixed(1).replace(/\.0$/, '')}M`;
+}
+
 export function RunCard({
   run,
   defaultOpen,
@@ -92,9 +99,16 @@ export function RunCard({
   // The PLAN's spend leads once it has run more than once: a restart opens a new run at 0, and
   // the run's own counters alone read as a reset (operator, 2026-09-11). This run's share follows
   // beside its ceiling, because the ceiling is per run.
-  const spend = run.plan_runs > 1
-    ? `${t('runner.planSpend', { spawns: run.plan_spawns, cost: run.plan_cost_usd.toFixed(2), count: run.plan_runs })} · ${t('runner.thisRun', { used: run.spawns, max: run.max_spawns })}`
-    : `${t('runner.spawns', { used: run.spawns, max: run.max_spawns })} · $${run.cost_usd.toFixed(2)}`;
+  // The PLAN's whole bill leads once anything outside this run was spent on it — the planner,
+  // the review, a scout wave, an earlier run (operator, 2026-09-12: "I'd like to see totals").
+  const outside = run.plan_planning_usd + run.plan_review_usd + run.plan_scouts_usd;
+  // Tokens in Descent's unit and shape ("⛁ 94.9M tok"): every token billed on the plan, all kinds.
+  const tokens = run.plan_tokens > 0 ? ` · ${t('runner.tokens', { n: humanizeTokens(run.plan_tokens) })}` : '';
+  const spend = (run.plan_runs > 1 || outside > 0
+    ? `${t('runner.planTotal', { total: run.plan_total_usd.toFixed(2) })} · ${t('runner.planSplit', {
+        planning: run.plan_planning_usd.toFixed(2), review: run.plan_review_usd.toFixed(2),
+        scouts: run.plan_scouts_usd.toFixed(2), build: run.plan_cost_usd.toFixed(2), count: run.plan_runs })} · ${t('runner.thisRun', { used: run.spawns, max: run.max_spawns })}`
+    : `${t('runner.spawns', { used: run.spawns, max: run.max_spawns })} · $${run.cost_usd.toFixed(2)}`) + tokens;
 
   return (
     <Card

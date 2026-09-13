@@ -9,6 +9,8 @@ import { ShapeFrame } from '@/modules/chat/transcript/shapes/ShapeFrame';
 type TimelineProps = {
   /** True when the author wrote an `ol`. The shape re-emits the element they chose. */
   ordered: boolean;
+  /** The author's first number on an `ol` that did not open at 1, from `listStart`. */
+  start?: number;
   collapseKey: string;
   /** The rendered `li` elements. Every one of them opens with a time — that is the rung's trigger. */
   children: ReactNode;
@@ -33,7 +35,7 @@ type TimelineProps = {
  * Tailwind names mapped to the Verve tokens: a timeline is one of the two shapes `src/shared/ui/`
  * has not built yet, so it is drawn from tokens here and moves the day a second module wants one.
  */
-export function Timeline({ ordered, collapseKey, children }: TimelineProps) {
+export function Timeline({ ordered, start, collapseKey, children }: TimelineProps) {
   const { t } = useTranslation('chat');
   const items = renderedListItems(children);
   // The author's own element, not the one a timeline "ought" to be. A `-` list read as a timeline
@@ -45,7 +47,7 @@ export function Timeline({ ordered, collapseKey, children }: TimelineProps) {
     <ShapeFrame kind="timeline" title={t('shapes.titles.timeline')} collapseKey={collapseKey}>
       {/* The rail is the list's own left border, so it can never fall out of step with the entries
           it runs beside — no absolute track to measure, and it grows with the content. */}
-      <List data-timeline-rail className="m-0 ml-1 list-none border-l border-border p-0 pl-4">
+      <List data-timeline-rail start={start} className="m-0 ml-1 list-none border-l border-border p-0 pl-4">
         {items.map((item, index) => {
           const lifted = liftLeadingToken(item.props.children, timeTokenLength);
           return (

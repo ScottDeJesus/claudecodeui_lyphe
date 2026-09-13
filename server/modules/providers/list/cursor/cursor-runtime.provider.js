@@ -31,6 +31,10 @@ function isWorkspaceTrustPrompt(text = '') {
 }
 
 async function spawnCursor(command, options = {}, ws, context) {
+  // Wall clock for this run, read before any provider work begins: the stop
+  // notification reports how long the turn took.
+  const runStartedAt = Date.now();
+
   // Callers pass the stable app session id; the CLI resumes with the
   // provider-native id recorded on the session row. Both lookups run before the
   // promise is created: inside an async executor a rejected `resolveResumeModel`
@@ -139,7 +143,8 @@ async function spawnCursor(command, options = {}, ws, context) {
             provider: 'cursor',
             sessionId: finalSessionId,
             sessionName: sessionSummary,
-            stopReason: 'completed'
+            stopReason: 'completed',
+            durationMs: Date.now() - runStartedAt
           });
           return;
         }

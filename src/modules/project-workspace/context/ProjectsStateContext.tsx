@@ -3,7 +3,8 @@ import type { ReactNode } from 'react';
 import type { NavigateFunction } from 'react-router-dom';
 
 import { useProjectsState } from '@/modules/project-workspace/hooks/useProjectsState';
-import type { IsSessionProcessing,ServerEvent } from '@/shared/types';
+import { GIT_REPO_PATHS } from '@/shared/constants';
+import type { GitRepository, IsSessionProcessing,ServerEvent } from '@/shared/types';
 
 type ProjectsState = ReturnType<typeof useProjectsState>;
 
@@ -26,7 +27,10 @@ type ProjectMainState = Pick<
   | 'registerOptimisticSession'
   | 'handleProjectSelect'
   | 'refreshProjectsSilently'
->;
+> & {
+  /** The git tab's repositories in strip order, memoised on the fields the tab reads. */
+  gitRepositories: GitRepository[];
+};
 
 type ProjectCommandState = Pick<
   ProjectsState,
@@ -93,8 +97,26 @@ export function ProjectsStateProvider({
     ],
   );
 
+  // The git tab's repositories, matched by path and narrowed to the three fields the tab reads.
+  // `state.projects` is rebuilt on every background session upsert, and handing it to the main tree
+  // would wake it on each one — the very thing the `session_upserted` handler in useProjectsState
+  // is written to avoid. So the list is keyed on a string of just those fields, and its identity
+  // moves only when one of them does.
+  const gitRepositoriesKey = JSON.stringify(
+    GIT_REPO_PATHS.flatMap((repoPath) => {
+      const project = state.projects.find((candidate) => candidate.fullPath === repoPath);
+      return project ? [[project.projectId, project.fullPath, project.displayName]] : [];
+    }),
+  );
+  const gitRepositories = useMemo<GitRepository[]>(
+    () => (JSON.parse(gitRepositoriesKey) as [string, string, string][])
+      .map(([projectId, fullPath, displayName]) => ({ projectId, fullPath, displayName })),
+    [gitRepositoriesKey],
+  );
+
   const mainState = useMemo<ProjectMainState>(
     () => ({
+      gitRepositories,
       selectedProject: state.selectedProject,
       selectedSession: state.selectedSession,
       activeTab: state.activeTab,
@@ -114,6 +136,7 @@ export function ProjectsStateProvider({
       state.handleProjectSelect,
       state.isLoadingProjects,
       state.newSessionTrigger,
+      gitRepositories,
       state.openSettings,
       state.refreshProjectsSilently,
       state.registerOptimisticSession,

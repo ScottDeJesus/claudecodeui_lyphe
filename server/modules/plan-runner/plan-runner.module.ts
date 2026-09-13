@@ -3,11 +3,15 @@ import path from 'node:path';
 
 import type { Router } from 'express';
 
+import { appConfigDb, userDb } from '@/modules/database/index.js';
+import { createNotificationEvent, notifyUserIfEnabled } from '@/modules/notifications/index.js';
 import { WS_OPEN_STATE, connectedClients } from '@/modules/websocket/index.js';
 import type { RunnerStateEvent, RunnerVerb } from '@/shared/types.js';
 import { resolveClaudeCodeExecutablePath } from '@/shared/claude-cli-path.js';
 
 import { createPlanRunnerRouter } from './plan-runner.routes.js';
+import { createRunnerEndingsNotifier } from './runner-endings.service.js';
+import type { RunnerEnding } from './runner-endings.service.js';
 import { snapshotRuns } from './runner-state.service.js';
 import { runRunnerVerb } from './runner-verb.service.js';
 import { createRunnerWatcher } from './runner-watcher.service.js';
@@ -49,6 +53,23 @@ const POLL_MS = 2000;
  */
 const VERB_TIMEOUT_MS = 20000;
 
+/** The `app_config` key holding the newest `ended_at` already announced — durable on purpose, see `runner-endings.service.ts`. */
+const ANNOUNCED_THROUGH_KEY = 'plan_runner_announced_through';
+
+/**
+ * The orchestrator is JavaScript, so TypeScript reads `dedupeKey = null` as a parameter that
+ * accepts only `null`. This alias states the contract it actually implements, the same way
+ * `run-stall-watchdog.service.ts` does.
+ */
+const buildEndingEvent = createNotificationEvent as (input: {
+  provider: 'system';
+  kind: 'stop' | 'error';
+  code: RunnerEnding['code'];
+  meta: RunnerEnding['meta'];
+  severity: 'info' | 'warning';
+  dedupeKey: string | null;
+}) => object;
+
 /** `~` at the front becomes this user's home. Anywhere else it is an ordinary character. */
 function expandHome(value: string): string {
   if (value === '~') return os.homedir();
@@ -76,7 +97,8 @@ export type PlanRunnerModule = {
 };
 
 /**
- * Builds the plan-runner lane for the server entrypoint: the poll, the frame, and the two verbs.
+ * Builds the plan-runner lane for the server entrypoint: the poll, the frame, the two verbs, and
+ * the notification each ending earns.
  *
  * The composition root is the only place here that reads the environment, names a path, spawns
  * anything or touches a socket. Everything under it takes what it needs as an argument, which is
@@ -116,6 +138,40 @@ export function createPlanRunnerModule(): PlanRunnerModule {
     console.error(message);
   };
 
+  const endings = createRunnerEndingsNotifier({
+    readMark: () => {
+      const raw = appConfigDb.get(ANNOUNCED_THROUGH_KEY);
+      const mark = raw === null ? Number.NaN : Number(raw);
+      return Number.isFinite(mark) ? mark : null;
+    },
+    writeMark: (endedAt) => appConfigDb.set(ANNOUNCED_THROUGH_KEY, String(endedAt)),
+    // A run belongs to no login, so every active user is told and each user's own event switches
+    // and channels decide what reaches them. The dedupe key carries the user because the
+    // orchestrator's dedupe is process-wide: without it the second user's push reads as a repeat.
+    announce: (ending) => {
+      const finished = ending.code === 'runner.finished';
+      for (const userId of userDb.getActiveUserIds()) {
+        // One user's failure costs that user's push and nothing more. Letting it throw would leave
+        // the ending due, and its retry would push again to every user already told.
+        try {
+          notifyUserIfEnabled({
+            userId,
+            event: buildEndingEvent({
+              provider: 'system',
+              kind: finished ? 'stop' : 'error',
+              code: ending.code,
+              meta: ending.meta,
+              severity: finished ? 'info' : 'warning',
+              dedupeKey: `runner:${userId}:${ending.key}`,
+            }),
+          });
+        } catch (error) {
+          logErrorOnce(`[PlanRunner] could not announce an ending to user ${userId}: ${error instanceof Error ? error.message : String(error)}`);
+        }
+      }
+    },
+  });
+
   const watcher = createRunnerWatcher({
     // Epoch SECONDS: every timestamp the runner writes comes from Python's `time.time()`, and a
     // millisecond clock compared against one of them makes every run on the host read live.
@@ -127,7 +183,16 @@ export function createPlanRunnerModule(): PlanRunnerModule {
         (dir, message) => logErrorOnce(`[PlanRunner] could not read run directory ${dir}: ${message}`),
         ENDED_KEEP_S,
       ),
-    broadcast,
+    // Endings are read off the same picture the tabs receive, and only when it changed — which an
+    // ending always is. A failure to announce never costs the tabs their frame.
+    broadcast: (frame) => {
+      try {
+        endings.observe(frame.runs, frame.at / 1000);
+      } catch (error) {
+        logErrorOnce(`[PlanRunner] could not announce an ending: ${error instanceof Error ? error.message : String(error)}`);
+      }
+      broadcast(frame);
+    },
     pollMs: POLL_MS,
     logError: logErrorOnce,
   });

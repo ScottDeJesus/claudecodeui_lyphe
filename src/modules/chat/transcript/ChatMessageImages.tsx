@@ -86,9 +86,10 @@ function useChatImageSrc(image: ChatImage, projectId?: string | null): { src: st
  * image, closes on backdrop click, close button, or Escape.
  *
  * Used by chat's ChatMessageImages and ComposerAttachment to expand a
- * thumbnail to full size.
+ * thumbnail to full size, and by the chat's file previews (`shapes/FilePreview.tsx`), which pass
+ * `square`: a screenshot's corners are content, and a rounded enlargement would clip them.
  */
-export function ImageLightbox({ src, alt, onClose }: { src: string; alt: string; onClose: () => void }) {
+export function ImageLightbox({ src, alt, square = false, onClose }: { src: string; alt: string; square?: boolean; onClose: () => void }) {
   useEffect(() => {
     const handleKeyDown = (event: globalThis.KeyboardEvent) => {
       if (event.key === 'Escape') {
@@ -120,7 +121,7 @@ export function ImageLightbox({ src, alt, onClose }: { src: string; alt: string;
         src={src}
         alt={alt}
         onClick={(event) => event.stopPropagation()}
-        className="max-h-[90vh] max-w-[92vw] rounded-lg object-contain shadow-2xl"
+        className={`max-h-[90vh] max-w-[92vw] object-contain shadow-2xl ${square ? '' : 'rounded-lg'}`}
       />
     </div>,
     document.body,

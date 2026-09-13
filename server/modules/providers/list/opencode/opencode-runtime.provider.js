@@ -125,6 +125,10 @@ function readOpenCodeTokenUsage(sessionId) {
 }
 
 async function spawnOpenCode(command, options = {}, ws, context) {
+  // Wall clock for this run, read before any provider work begins: the stop
+  // notification reports how long the turn took.
+  const runStartedAt = Date.now();
+
   return new Promise((resolve, reject) => {
     const {
       sessionId,
@@ -168,6 +172,7 @@ async function spawnOpenCode(command, options = {}, ws, context) {
           sessionId: finalSessionId,
           sessionName: sessionSummary,
           stopReason: 'completed',
+          durationMs: Date.now() - runStartedAt,
         });
         return;
       }

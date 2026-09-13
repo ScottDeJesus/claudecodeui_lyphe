@@ -4,30 +4,27 @@ import { ShapeFrame } from '@/modules/chat/transcript/shapes/ShapeFrame';
 
 type FactCardProps = {
   /**
-   * The pairs `readFactPairs` parsed, and nothing element-shaped.
-   *
-   * The props are the PARSED data on purpose: this shape has two callers in two different phases —
-   * the list ladder here and Phase 5's paragraph ladder — and the one thing a `p` of facts and a
-   * `ul` of facts have in common is the pairs. Taking a node or rendered children instead would
-   * make the second caller reshape the component rather than call it.
+   * The pairs `readFactPairs` parsed, and nothing element-shaped: a paragraph of facts hands over
+   * its pairs, and the grid is drawn from them.
    */
   pairs: { label: string; value: string }[];
   collapseKey: string;
 };
 
 /**
- * `**Label:** value` pairs as a key-value grid.
+ * `**Label:** value` lines as a key-value grid.
  *
- * Used by `elements/list.tsx`, and by `elements/paragraph.tsx` from Phase 5.
+ * Used by `elements/paragraph.tsx` and nothing else. A bulleted list of the same pairs stays the
+ * list the author wrote (`elements/list.tsx`).
  *
  * It draws from the parsed TEXT, which everywhere else in this feature would be a regression — and
  * here is safe only because `readFactPairs` is the decline rule for BOTH halves of a pair. It
  * returns `null` unless every value is plain text AND every label is a bold holding plain text and
  * nothing else, so `**[PR 12](url):** merged` and `` **`detect.ts`:** 327 lines `` never reach this
- * component; they fall back to today's list with the link and the code span intact. The only mark
- * that CAN be here is the bare `**Label:**` bold that defines a pair, and it is redrawn as the
- * grid's own label. That — and not the value check alone, which is what this sentence used to rest
- * on — is why this shape cannot render less than the markdown it replaced.
+ * component; they fall back to today's paragraph with the link and the code span intact. The only
+ * mark that CAN be here is the bare `**Label:**` bold that defines a pair, and it is redrawn as the
+ * grid's own label. That — and not the value check alone — is why this shape cannot render less
+ * than the markdown it replaced.
  *
  * The label keeps the author's CASE. No `uppercase` eyebrow here, unlike the table cards' fixed
  * header words: a fact label is whatever the author bolded, often a file or an identifier, and
@@ -35,7 +32,7 @@ type FactCardProps = {
  *
  * It is a grid rather than one of the shared card shells because the pairs are a single block of
  * data, not n independent things: aligning every value on one column is the whole reason a reader
- * scans a fact list faster than the sentence it came from.
+ * scans these lines faster than the sentence they came from.
  */
 export function FactCard({ pairs, collapseKey }: FactCardProps) {
   const { t } = useTranslation('chat');

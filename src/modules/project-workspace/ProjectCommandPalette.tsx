@@ -1,8 +1,10 @@
 import { memo, useMemo } from 'react';
 
 import { CommandPalette } from '@/modules/command-palette';
+import { selectGitRepository } from '@/modules/git-panel';
 import { useProjectCommandState } from '@/modules/project-workspace/context/ProjectsStateContext';
 import { useWorkspaceTabGates } from '@/modules/project-workspace/hooks/useWorkspaceTabGates';
+import { GIT_REPO_PATHS } from '@/shared/constants';
 import type { AppTab } from '@/shared/types';
 
 /** Rendered by ProjectWorkspaceShell to bind this module's project state to the command-palette module. */
@@ -22,6 +24,21 @@ function ProjectCommandPalette() {
     shouldShowMemoryTab,
     shouldShowRunnerTab,
   } = useWorkspaceTabGates(activeTab);
+
+  // The commit and branch rows lead to the git tab on this project's repository, so they are
+  // offered only for a project that tab carries — a row for any other would bring forward a
+  // repository other than the one it named. Keyed on the path STRING so a new project object with
+  // the same path does not hand the palette a new function.
+  const selectedRepoPath = selectedProject?.fullPath ?? null;
+  const showSelectedRepoInGitTab = useMemo(
+    () => (selectedRepoPath && GIT_REPO_PATHS.includes(selectedRepoPath)
+      ? () => {
+        selectGitRepository(selectedRepoPath);
+        setActiveTab('git');
+      }
+      : null),
+    [selectedRepoPath, setActiveTab],
+  );
 
   // Every gate comes off the one hook the tab strip reads, so the palette can never disagree
   // with the bar about which tabs exist — it used to recompute three of them from the same
@@ -47,6 +64,7 @@ function ProjectCommandPalette() {
       onStartNewChat={handleNewSession}
       onOpenSettings={openSettings}
       onShowTab={setActiveTab}
+      onShowRepoInGitTab={showSelectedRepoInGitTab}
       visibleTabs={visibleTabs}
     />
   );

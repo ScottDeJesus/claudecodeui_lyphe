@@ -161,7 +161,28 @@
       "title": "Event Types",
       "actionRequired": "Action required",
       "stop": "Run stopped",
-      "error": "Run failed"
+      "error": "Run failed",
+      "limits": "Usage limits"
+    },
+    "ntfy": {
+      "title": "Phone push (ntfy)",
+      "description": "Send every notification to the ntfy app on your phone.",
+      "server": "Server URL",
+      "topic": "Topic",
+      "topicHint": "Anyone who knows the topic can read it — treat it like a password.",
+      "token": "Access token",
+      "tokenKept": "Stored — type to replace",
+      "appUrl": "CloudCLI URL",
+      "appUrlHint": "Where a tap on a push opens — the address your phone reaches CloudCLI at.",
+      "longRun": "Only notify runs longer than (minutes)",
+      "enabled": "Enabled",
+      "save": "Save",
+      "test": "Send test",
+      "remove": "Remove",
+      "saved": "Saved",
+      "tested": "Test push sent",
+      "testFailed": "Test push failed",
+      "configured": "Sending to {{topic}}"
     }
   },
   "appearanceSettings": {

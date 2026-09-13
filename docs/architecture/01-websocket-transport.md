@@ -13,7 +13,7 @@ serves the app, and it decides what a connection is by looking at the pathname �
 no second server and no socket.io-style namespacing. Every path authenticates once, at the
 HTTP upgrade, before any handler runs. The path that matters is `/ws`, the chat socket: a
 browser tab opens exactly one, and every feature that needs live data subscribes to that
-one socket rather than opening its own. The protocol on it is deliberately small — five
+one socket rather than opening its own. The protocol on it is deliberately small — six
 inbound message types, every outbound frame tagged with a `kind` — so the client needs one
 switch statement and no provider-specific branching. The server trusts the client for the
 session id and the prompt text and nothing else: provider, project path and the
@@ -65,7 +65,7 @@ every open `/ws` socket in the process. A run's writer holds only the sockets wa
 | `server/modules/websocket/services/websocket-auth.service.ts` | `verifyWebSocketClient` — the upgrade-time gate for every path |
 | `server/modules/auth/auth.middleware.ts` | `authenticateWebSocket` — first DB user in platform mode, JWT verification in OSS mode |
 | `server/modules/websocket/services/websocket-state.service.ts` | `connectedClients`, the set of open `/ws` sockets, and `WS_OPEN_STATE` |
-| `server/modules/websocket/services/chat-websocket.service.ts` | The `/ws` protocol: the five inbound handlers, `protocol_error`, the attachment trust boundary, `runDetachedChatTurn` |
+| `server/modules/websocket/services/chat-websocket.service.ts` | The `/ws` protocol: the six inbound handlers, `protocol_error`, the attachment trust boundary, `runDetachedChatTurn` |
 | `server/modules/websocket/services/chat-run-registry.service.ts` | `chatRunRegistry` — one run per session, `seq` stamping, the replay buffer, the exactly-one-`complete` contract |
 | `server/modules/websocket/services/chat-session-writer.service.ts` | `ChatSessionWriter` — the object runtimes write into; swallows `session_created`, fans out to every attached socket |
 | `server/modules/websocket/services/session-upsert-broadcast.service.ts` | The only builder of `session_upserted`, and the batched broadcast helper |
@@ -79,6 +79,7 @@ every open `/ws` socket in the process. A run's writer holds only the sockets wa
 | `src/modules/chat/hooks/useChatRealtimeHandlers.ts` | The one `kind` switch on the client, and `lastSeqRef` bookkeeping |
 | `src/modules/chat/ChatInterface.tsx`, `src/modules/chat/hooks/useChatSessionState.ts` | The two places that send `chat.subscribe` |
 | `src/modules/chat/hooks/useChatComposerState.ts` | Builds `chat.send`, `chat.edit-send`, `chat.abort`, `chat.permission-response` |
+| `src/modules/chat/hooks/useSessionPresence.ts` | Builds `chat.presence` — the one place, called once from `ChatInterface.tsx` |
 
 ## Routing: pathname, not namespace
 
@@ -182,7 +183,7 @@ frame with no `kind` at all (`:96-98`), which is how the Task Master frames pass
 
 ## The chat protocol going up
 
-**RULE: five `type` values, dispatched by one switch (`chat-websocket.service.ts:603-622`).
+**RULE: six `type` values, dispatched by one switch (`chat-websocket.service.ts:649-671`).
 Anything else is answered with `protocol_error` / `UNKNOWN_MESSAGE_TYPE`; anything that
 throws is answered with `INTERNAL_ERROR`.**
 
@@ -193,11 +194,20 @@ throws is answered with `INTERNAL_ERROR`.**
 | `chat.abort` | `sessionId` | Aborts the runtime and emits the terminal `complete` on its behalf (`:415-438`) |
 | `chat.subscribe` | `sessions: [{ sessionId, lastSeq }]` | Acks with `chat_subscribed`, attaches this socket to a running run, replays what was missed (`:448-504`) |
 | `chat.permission-response` | `requestId`, `allow`, `updatedInput?`, `message?`, `rememberEntry?` | Resolves one pending tool approval (`:511-522`) |
+| `chat.presence` | `sessionId`, `visible` | Records which session this socket is showing, for the notification channels' watched-session check (`:538-544`) |
 
-All five are built in exactly two client files: the composer builds sends, aborts and
-permission answers (`useChatComposerState.ts:825-837`, `:1121-1124`, `:1149-1156`), and
-`chat.subscribe` is built in `useChatSessionState.ts:668-674` and
-`ChatInterface.tsx:267-273`.
+Five of the six are built in exactly two client files: the composer builds sends, aborts and
+permission answers (`useChatComposerState.ts:877`, `:1183`, `:1225`), and
+`chat.subscribe` is built in `useChatSessionState.ts:773` and
+`ChatInterface.tsx:305`. `chat.presence` has a third home of its own,
+`src/modules/chat/hooks/useSessionPresence.ts`, called once from `ChatInterface.tsx`, which
+passes the session only while the chat tab is the one showing (a hidden chat behind Files,
+Shell or Git reports `null`): it announces at mount, on every session or connection change,
+on `websocket_reconnected`, on `visibilitychange` and every 30 s while the tab is visible, and
+announces `sessionId: null` on the way out — which is how an event about a session you are
+already watching goes unpushed
+([notifications.md](../notifications.md) §"What gets pushed, and how loud", *Not while you are
+watching*).
 
 ### The client is not trusted past the session id
 
@@ -243,16 +253,18 @@ Every code that exists, with the line that emits it:
 | `ANCHOR_LOOKUP_FAILED` | `:351` | Reading the transcript threw |
 | `EDIT_REWIND_FAILED` | `:400` | The rewind itself failed; the run is ended too |
 | `NO_ACTIVE_RUN` | `:428` | `chat.abort` for a session with nothing running |
-| `UNKNOWN_MESSAGE_TYPE` | `:620` | Unrecognised `type` |
-| `INTERNAL_ERROR` | `:626` | Anything thrown out of a handler |
+| `UNKNOWN_MESSAGE_TYPE` | `:669` | Unrecognised `type` |
+| `INTERNAL_ERROR` | `:675` | Anything thrown out of a handler |
 
 On the client, `protocol_error` both surfaces an error row and clears the spinner
 (`useChatRealtimeHandlers.ts:157-173`) — correct precisely because no `complete` will
 follow a request that never became a run.
 
-**Two inbound frames fail silently by design.** `chat.permission-response` returns without
-an answer when `requestId` is missing or empty (`:512-514`), and `chat.subscribe` with no
-`sessions` array does nothing at all (`:453`) — no ack, no error.
+**Three inbound frames fail silently by design.** `chat.permission-response` returns without
+an answer when `requestId` is missing or empty (`:516-518`), `chat.subscribe` with no
+`sessions` array does nothing at all (`:456`), and `chat.presence` never answers at all — a
+missing or non-string `sessionId` is recorded as "watching nothing" rather than refused
+(`:538-544`). No ack, no error, in all three.
 
 ## The chat protocol coming down
 
@@ -609,7 +621,9 @@ Electron main process registers a device. A connection with no authenticated use
 with 1008 (`:47-50`); the client then sends one `register` frame carrying `deviceId`
 (`:65-99`), gets `registered` back, and `notification_ack` frames are accepted and ignored
 (`:61-63`). The socket-to-device registry itself lives in
-`server/modules/notifications/services/desktop-notification-clients.service.ts`.
+`server/modules/notifications/services/desktop-notification-clients.service.ts`. What the server
+sends down that socket — the notification payload, and the web push and ntfy channels beside it —
+is in [notifications.md](../notifications.md).
 
 ## Gotchas and why the code looks like this
 

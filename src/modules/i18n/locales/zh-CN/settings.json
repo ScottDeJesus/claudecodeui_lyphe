@@ -138,7 +138,28 @@
       "title": "事件类型",
       "actionRequired": "需要处理",
       "stop": "运行已停止",
-      "error": "运行失败"
+      "error": "运行失败",
+      "limits": "用量上限"
+    },
+    "ntfy": {
+      "title": "手机推送 (ntfy)",
+      "description": "把每条通知发送到手机上的 ntfy 应用。",
+      "server": "服务器 URL",
+      "topic": "主题",
+      "topicHint": "知道主题的人都能读取，请像对待密码一样保管。",
+      "token": "访问令牌",
+      "tokenKept": "已保存 — 输入即可替换",
+      "appUrl": "CloudCLI 地址",
+      "appUrlHint": "点按推送时打开的位置 — 手机访问 CloudCLI 的地址。",
+      "longRun": "仅通知长于此时长的运行（分钟）",
+      "enabled": "已启用",
+      "save": "保存",
+      "test": "发送测试",
+      "remove": "移除",
+      "saved": "已保存",
+      "tested": "测试推送已发送",
+      "testFailed": "测试推送失败",
+      "configured": "正在发送到 {{topic}}"
     }
   },
   "appearanceSettings": {

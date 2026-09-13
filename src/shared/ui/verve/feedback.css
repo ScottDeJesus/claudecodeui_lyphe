@@ -227,6 +227,28 @@
   color: var(--ink);
   font-weight: 700;
 }
+/* Equal shares for a fixed set of word tabs (`equal`): every tab takes the same slice of the row
+ * whatever its label, and a label longer than its slice ends in an ellipsis instead of widening
+ * its tab — so long and short names sit evenly and the last tab never leaves a phone screen.
+ * After the underline rules on purpose: it overrides their `1 1 auto` at the same specificity.
+ * `min-width: 0` is what lets a flex item shrink below its own text.
+ *
+ * The strip itself must be exactly as wide as its container. As `inline-flex` it sizes to its
+ * content — every label at full length — and `min-width: 100%` is only a floor, so at 390px the
+ * strip measured 403px inside a 374px box and its tabs were never asked to shrink. Two classes,
+ * so it outranks the `inline-flex` utility the component also carries, in either load order. */
+.vv-tabs.vv-tabs--equal {
+  display: flex;
+  width: 100%;
+}
+.vv-tabs--equal .vv-tabs__tab {
+  flex: 1 1 0;
+  min-width: 0;
+  padding-inline: 6px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 
 /* ---------------------------------------------------------------- EmptyState */
 /* Dashed, because a solid card says "here is a thing" and the point is that there is not one. */

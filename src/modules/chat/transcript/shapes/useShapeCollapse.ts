@@ -6,7 +6,7 @@ import { clearCollapsed, isCollapsed, setCollapsed } from '@/modules/chat/transc
 /**
  * The two cross-cutting rules every collapsible shape obeys, in one place.
  *
- * Used by `ShapeFrame`, `ShapeSection` and `LongOutput`. Three components each remembering to
+ * Used by `ShapeFrame`, `ShapeSection`, `LongOutput` and `useFilePreview` (a chip's preview fold). Three components each remembering to
  * call `useIsExportingTranscript()` themselves would be three chances to ship a shape that exports
  * EMPTY — the failure `docs/architecture/06-tool-view.md` §"Rendering into an exported document"
  * warns about — so this is the only place under `shapes/` that reads the export context. A fourth

@@ -24,6 +24,21 @@ import {
 import { notifyRunFailed, notifyRunStopped } from '@/modules/notifications/index.js';
 import type { AnyRecord, ProviderRuntimeContext, ProviderRuntimeWriter } from '@/shared/index.js';
 
+/**
+ * The notification orchestrator is JavaScript, so TypeScript reads each optional
+ * parameter's type from its default value: `durationMs = null` is inferred as
+ * `null | undefined` and rejects the real number the function is documented to
+ * accept. This alias states the contract the orchestrator actually implements.
+ */
+const notifyRunStoppedWithDuration = notifyRunStopped as (input: {
+  userId: string | number | null;
+  provider: string;
+  sessionId: string | null;
+  sessionName: string | null;
+  stopReason: string;
+  durationMs: number | null;
+}) => void;
+
 type ActiveCodexSession = {
   thread: Thread;
   codex: Codex;
@@ -270,6 +285,10 @@ async function queryCodex(
     permissionMode = 'default'
   } = options;
 
+  // Wall clock for this run, read before any provider work begins: the stop
+  // notification reports how long the turn took.
+  const runStartedAt = Date.now();
+
   // Callers pass the stable app session id; the SDK resumes threads with the
   // provider-native id recorded on the session row.
   const providerSessionId = context.resolveProviderSessionId(sessionId);
@@ -436,12 +455,13 @@ async function queryCodex(
         exitCode: terminalFailure ? 1 : 0,
       }));
       if (!terminalFailure) {
-        notifyRunStopped({
+        notifyRunStoppedWithDuration({
           userId: ws?.userId || null,
           provider: 'codex',
           sessionId: sessionId || capturedSessionId || null,
           sessionName: sessionSummary,
-          stopReason: 'completed'
+          stopReason: 'completed',
+          durationMs: Date.now() - runStartedAt
         });
       }
     }

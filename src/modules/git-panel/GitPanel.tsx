@@ -2,7 +2,7 @@ import { useCallback, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import { Spinner, Tabs } from '@/shared/ui';
-import type { FileOpenHandler, GitPanelView, Project } from '@/shared/types';
+import type { FileOpenHandler, GitPanelView, GitRepository } from '@/shared/types';
 import { useGitReadController } from '@/modules/git-panel/hooks/useGitReadController';
 import { useGitDelegation } from '@/modules/git-panel/hooks/git-delegation';
 import { describeUpstreamPosition } from '@/modules/git-panel/utils/gitPanelUtils';
@@ -20,21 +20,22 @@ const GIT_TABS: { id: GitPanelView; label: string }[] = [
 const DEFAULT_BRANCH = 'main';
 
 type GitPanelProps = {
-  selectedProject: Project | null;
+  repository: GitRepository;
   isMobile?: boolean;
+  /** Absent when the repository on screen is not the workspace's project, which is all Files browses. */
   onFileOpen?: FileOpenHandler;
 };
 
 /**
- * Exported through the git-panel barrel; the project-workspace module renders it as the
- * source-control tab.
+ * Rendered by GitRepositoriesPanel for whichever repository's strip tab is selected, keyed on it so
+ * nothing read for one repository outlives a switch to another.
  *
  * The panel READS. It shows which branch this is, how it stands against the upstream, what
  * is waiting to be pushed and what each change looks like — and it has no verb for any of
  * it. Committing and pushing happen in the agent run this panel delegates to, so the one
  * place a person can start a git write is a conversation, not a button here.
  */
-export default function GitPanel({ selectedProject, isMobile = false, onFileOpen }: GitPanelProps) {
+export default function GitPanel({ repository, isMobile = false, onFileOpen }: GitPanelProps) {
   // Which of the two views is on screen. Nothing else depends on it — both read the same
   // controller — so it lives here rather than in the controller.
   const [activeView, setActiveView] = useState<GitPanelView>('changes');
@@ -44,7 +45,7 @@ export default function GitPanel({ selectedProject, isMobile = false, onFileOpen
   // ONE controller for the whole panel. The lists read its payloads and the delegation card
   // takes the controller itself, so the answer a finished run reports and the rows on screen
   // come from the same refreshed read and cannot contradict each other.
-  const controller = useGitReadController(selectedProject);
+  const controller = useGitReadController(repository);
   const { status, remoteStatus, commits, loading, error, diffFor, refresh } = controller;
 
   // Decided ONCE, here, from the server's own flags, and handed to the header and the Changes
@@ -56,14 +57,16 @@ export default function GitPanel({ selectedProject, isMobile = false, onFileOpen
   // conversation is started in. Keyed on the two STRINGS rather than the project object, which
   // arrives with a new identity on renders that changed nothing about either — and null rather
   // than an empty path, because a conversation cannot be started in a directory we cannot name.
-  const projectPath = selectedProject?.fullPath || selectedProject?.path || null;
-  const projectId = selectedProject?.projectId ?? null;
+  const projectPath = repository.fullPath || null;
+  const projectId = repository.projectId;
   const delegationProject = useMemo(
     () => (projectId && projectPath ? { id: projectId, path: projectPath } : null),
     [projectId, projectPath],
   );
   const delegation = useGitDelegation(delegationProject, controller);
 
+  // Opening the conversation changes the workspace's session and nothing about this tab: the
+  // repository on screen is the git tab's own choice, not the session's.
   const openConversation = useCallback(
     (sessionId: string) => navigate(`/session/${sessionId}`),
     [navigate],
@@ -84,14 +87,6 @@ export default function GitPanel({ selectedProject, isMobile = false, onFileOpen
     />
   );
 
-  if (!selectedProject) {
-    return (
-      <div className="flex h-full items-center justify-center text-muted-foreground">
-        <p>Select a project to view source control</p>
-      </div>
-    );
-  }
-
   // Nothing is drawn until the first read lands. The header would otherwise have to name a
   // branch it has not been told yet, and the only name available to guess with is "main" —
   // which would be a value standing in for an unknown, on the one screen whose whole job is
@@ -102,7 +97,7 @@ export default function GitPanel({ selectedProject, isMobile = false, onFileOpen
         <div className="flex flex-1 items-center justify-center">
           <Spinner label="Reading this project's git state" />
         </div>
-        {/* A run in flight is not waiting on this read, and coming back to its project starts one:
+        {/* A run in flight is not waiting on this read, and coming back to its repository starts one:
             the card keeps narrating through it rather than being replaced by a spinner. */}
         {delegation.state.phase !== 'idle' && (
           <div className="flex-none border-t border-border p-4">{delegationSlot}</div>
@@ -154,7 +149,7 @@ export default function GitPanel({ selectedProject, isMobile = false, onFileOpen
 
       {activeView === 'changes' && (
         <ChangesReadOnlyView
-          key={selectedProject.fullPath}
+          key={repository.fullPath}
           status={status}
           commits={commits}
           upstream={upstream}
@@ -167,12 +162,12 @@ export default function GitPanel({ selectedProject, isMobile = false, onFileOpen
       {activeView === 'history' && (
         <HistoryView
           // Keyed for the same reason the sibling above is: the per-row diffs this view opens
-          // belong to ONE repository, and without a key they would outlive a project change —
-          // an in-flight read for the old project resolving into the new one's map.
-          key={selectedProject.projectId}
+          // belong to ONE repository, and without a key they would outlive a switch to another —
+          // an in-flight read for the old repository resolving into the new one's map.
+          key={repository.projectId}
           isMobile={isMobile}
           commits={commits}
-          projectId={selectedProject.projectId}
+          projectId={repository.projectId}
         />
       )}
 

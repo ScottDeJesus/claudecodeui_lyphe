@@ -113,7 +113,28 @@
       "title": "Tipi di evento",
       "actionRequired": "Azione richiesta",
       "stop": "Esecuzione interrotta",
-      "error": "Esecuzione fallita"
+      "error": "Esecuzione fallita",
+      "limits": "Limiti di utilizzo"
+    },
+    "ntfy": {
+      "title": "Push sul telefono (ntfy)",
+      "description": "Invia ogni notifica all’app ntfy sul tuo telefono.",
+      "server": "URL del server",
+      "topic": "Argomento",
+      "topicHint": "Chiunque conosca l’argomento può leggerlo: trattalo come una password.",
+      "token": "Token di accesso",
+      "tokenKept": "Salvato — digita per sostituirlo",
+      "appUrl": "URL di CloudCLI",
+      "appUrlHint": "Dove porta un tocco su una notifica: l’indirizzo con cui il telefono raggiunge CloudCLI.",
+      "longRun": "Notifica solo le esecuzioni più lunghe di (minuti)",
+      "enabled": "Attivato",
+      "save": "Salva",
+      "test": "Invia test",
+      "remove": "Rimuovi",
+      "saved": "Salvato",
+      "tested": "Notifica di test inviata",
+      "testFailed": "Notifica di test non riuscita",
+      "configured": "Invio a {{topic}}"
     }
   },
   "appearanceSettings": {

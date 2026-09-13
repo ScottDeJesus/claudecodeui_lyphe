@@ -2,18 +2,14 @@ import webPush from 'web-push';
 
 import { notificationPreferencesDb, pushSubscriptionsDb, sessionsDb } from '@/modules/database/index.js';
 import { sendDesktopNotification as sendDesktopNotificationToClients } from '@/modules/notifications/services/desktop-notification-clients.service.js';
+import { buildNotificationText } from '@/modules/notifications/services/notification-copy.service.js';
+import { ntfyChannel } from '@/modules/notifications/services/ntfy-channel.service.js';
 
 const KIND_TO_PREF_KEY = {
   action_required: 'actionRequired',
   stop: 'stop',
-  error: 'error'
-};
-
-const PROVIDER_LABELS = {
-  claude: 'Claude',
-  cursor: 'Cursor',
-  codex: 'Codex',
-  system: 'System'
+  error: 'error',
+  limit: 'limits'
 };
 
 const recentEventKeys = new Map();
@@ -150,23 +146,12 @@ function resolveSessionName(event) {
 
 function buildNotificationPayload(event) {
   const normalizedEvent = normalizeNotificationSession(event);
-  const CODE_MAP = {
-    'permission.required': normalizedEvent.meta?.toolName
-      ? `Action Required: Tool "${normalizedEvent.meta.toolName}" needs approval`
-      : 'Action Required: A tool needs your approval',
-    'run.stopped': normalizedEvent.meta?.stopReason || 'Run Stopped: The run has stopped',
-    'run.background_completed': 'Background work finished',
-    'run.failed': normalizedEvent.meta?.error ? `Run Failed: ${normalizedEvent.meta.error}` : 'Run Failed: The run encountered an error',
-    'agent.notification': normalizedEvent.meta?.message ? String(normalizedEvent.meta.message) : 'You have a new notification',
-    'push.enabled': 'Push notifications are now enabled!'
-  };
-  const providerLabel = PROVIDER_LABELS[normalizedEvent.provider] || 'Assistant';
   const sessionName = resolveSessionName(normalizedEvent);
-  const message = CODE_MAP[normalizedEvent.code] || 'You have a new notification';
+  const { title, body } = buildNotificationText({ ...normalizedEvent, sessionName });
 
   return {
-    title: sessionName || 'CloudCLI',
-    body: `${providerLabel}: ${message}`,
+    title,
+    body,
     data: {
       sessionId: normalizedEvent.sessionId || null,
       code: normalizedEvent.code,
@@ -219,7 +204,8 @@ const notificationChannels = [
     id: 'desktop',
     isEnabled: (preferences) => Boolean(preferences?.channels?.desktop),
     send: ({ userId, payload }) => sendDesktopNotificationToClients(userId, payload)
-  }
+  },
+  ntfyChannel
 ];
 
 function notifyUserIfEnabled({ userId, event }) {
@@ -238,7 +224,7 @@ function notifyUserIfEnabled({ userId, event }) {
 
   const payload = buildNotificationPayload(normalizedEvent);
   for (const channel of notificationChannels) {
-    if (!channel.isEnabled(preferences)) {
+    if (!channel.isEnabled(preferences, userId)) {
       continue;
     }
     Promise.resolve(channel.send({ userId, event: normalizedEvent, payload })).catch((err) => {
@@ -247,7 +233,7 @@ function notifyUserIfEnabled({ userId, event }) {
   }
 }
 
-function notifyRunStopped({ userId, provider, sessionId = null, stopReason = 'completed', sessionName = null }) {
+function notifyRunStopped({ userId, provider, sessionId = null, stopReason = 'completed', sessionName = null, durationMs = null }) {
   notifyUserIfEnabled({
     userId,
     event: createNotificationEvent({
@@ -255,7 +241,7 @@ function notifyRunStopped({ userId, provider, sessionId = null, stopReason = 'co
       sessionId,
       kind: 'stop',
       code: 'run.stopped',
-      meta: { stopReason, sessionName },
+      meta: { stopReason, sessionName, durationMs },
       severity: 'info',
       dedupeKey: `${provider}:run:stop:${sessionId || 'none'}:${stopReason}`
     })

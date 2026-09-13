@@ -171,7 +171,15 @@ export const sessionsService = {
       }
 
       return {
-        ...run,
+        // Named field by field rather than spread: the registry's projection is
+        // an internal view of a run (it carries the run's `userId`, among other
+        // things) and this object is an HTTP response body. A spread ships every
+        // field the registry ever grows, past a type that does not declare it.
+        sessionId: run.sessionId,
+        provider: run.provider,
+        startedAt: run.startedAt,
+        lastSeq: run.lastSeq,
+        cliVersion: run.cliVersion,
         projectId: project?.project_id ?? null,
         projectPath,
         projectDisplayName: resolveProjectDisplayName(projectPath, project?.custom_project_name),

@@ -49,7 +49,7 @@ export type GitReads = {
 export function deriveFinishedState(run: FinishedRun, reads: GitReads): GitDelegationState {
   const upstream = describeUpstreamPosition(reads.remoteStatus, reads.status);
   // A number only a TRACKED branch has. Every other shape is an unknown, and an unknown may
-  // never render as "everything is pushed" (design handoff §5).
+  // never render as pushed (design handoff §5).
   const ahead = upstream.kind === 'tracked' ? upstream.ahead : null;
   // Null when this branch's own commits cannot be told apart from the window's — carried through
   // to the receipt, which then counts nothing rather than counting zero.
@@ -76,7 +76,7 @@ export function deriveFinishedState(run: FinishedRun, reads: GitReads): GitDeleg
 
   // A run that reported an error of its own is named as one FIRST, as the integration plan
   // specifies. ⚠ The one case where that outranks git: a run that errored, recovered, and pushed
-  // anyway would be called a failure while the lists above it read "everything is pushed". Moving
+  // anyway would be called a failure while the lists above it read "Nothing waiting to be pushed". Moving
   // this line below the `ahead === 0` test is the whole fix if that combination ever turns up —
   // it has not, and the plan's rule is explicit, so it stays where the plan puts it.
   if (run.agentError) return { ...receipt, outcome: 'agent-error', reason: null };

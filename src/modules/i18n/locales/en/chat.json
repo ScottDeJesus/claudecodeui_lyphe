@@ -342,6 +342,8 @@
     "showAllLines": "Show all {{count}} lines",
     "showLess": "Show less",
     "openFile": "Open {{path}}",
+    "expandFile": "Show the preview of {{path}}",
+    "collapseFile": "Hide the preview of {{path}}",
     "titles": {
       "table": "Table",
       "options": "Options",

@@ -59,6 +59,14 @@ type TabsProps = {
    * would read as a card floating on a card.
    */
   variant?: 'segmented' | 'underline';
+  /**
+   * Every tab takes an equal share of the row, and a label too long for its share ends in an
+   * ellipsis, with the full name kept as its title. For a strip with a fixed set of tabs whose
+   * labels vary in length — the git tab's repositories — where sizing each tab by its label reads
+   * as uneven and pushes the last one off a phone screen. Off by default: the workspace strip
+   * sizes its tabs by content and scrolls.
+   */
+  equal?: boolean;
 };
 
 /**
@@ -66,8 +74,9 @@ type TabsProps = {
  * and a flat rule-and-underline row (`underline`).
  *
  * Used by the project-workspace module for the Chat / Files / Git strip — `underline`, since it
- * sits in the sidebar under the wordmark — and by the git-panel module for its own two views.
- * The same shape twice, so neither hand-rolls it.
+ * sits in the sidebar under the wordmark — and by the git-panel module for the git tab's
+ * repository strip (`underline` + `equal`) and each panel's own two views. The same shape each
+ * time, so none hand-rolls it.
  *
  * The `underline` register slides ONE indicator between tabs; the `segmented` one still paints
  * its own background and moves nothing. The objection this file used to record — that an
@@ -82,7 +91,7 @@ type TabsProps = {
  * pill, an icon tab a single accent dot on the glyph's shoulder. The accessible name stays
  * the bare label regardless.
  */
-export function Tabs({ tabs, active, onChange, ariaLabel, variant = 'segmented' }: TabsProps) {
+export function Tabs({ tabs, active, onChange, ariaLabel, variant = 'segmented', equal = false }: TabsProps) {
   // Which tab holds the strip's single Tab stop. It falls back to the FIRST tab when `active`
   // names no tab in the list, because `tab.id === active` alone would then give the strip zero
   // stops and put it out of reach of the keyboard entirely — worse than no roving at all. That
@@ -131,7 +140,7 @@ export function Tabs({ tabs, active, onChange, ariaLabel, variant = 'segmented' 
   return (
     <div
       ref={listRef}
-      className={cn('vv-tabs inline-flex items-center', isUnderline && 'vv-tabs--underline')}
+      className={cn('vv-tabs inline-flex items-center', isUnderline && 'vv-tabs--underline', equal && 'vv-tabs--equal')}
       role="tablist"
       aria-label={ariaLabel}
     >
@@ -161,8 +170,9 @@ export function Tabs({ tabs, active, onChange, ariaLabel, variant = 'segmented' 
             // a div between `role="tablist"` and `role="tab"` breaks the relationship a screen
             // reader announces the strip by. An icon-only tab still has to be nameable on hover,
             // and it carries the count in words there, since the dot says only THAT something
-            // waits and never how much.
-            title={tab.icon ? (hasCount ? `${tab.label} (${tab.count})` : tab.label) : undefined}
+            // waits and never how much. An equal-share tab carries its label there too, since its
+            // share of the row may have cut the word short.
+            title={tab.icon ? (hasCount ? `${tab.label} (${tab.count})` : tab.label) : equal ? tab.label : undefined}
             // Roving: exactly one tab is a Tab stop, and the arrows walk the rest.
             tabIndex={index === stopIndex ? 0 : -1}
             onClick={() => onChange(tab.id)}

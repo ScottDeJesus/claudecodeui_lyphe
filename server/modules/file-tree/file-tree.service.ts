@@ -432,15 +432,23 @@ export function createFileTreeService(dependencies: FileTreeServiceDependencies)
     async openFile(projectId, filePath) {
       const projectRoot = await resolveProjectRoot(projectId);
       const resolvedPath = resolvePathInsideProject(projectRoot, filePath);
+      let size: number;
       try {
         await fileSystem.access(resolvedPath);
+        // The size travels as `Content-Length`, so a reader can refuse a file it will not hold (the
+        // chat's file previews cap at 25 MB) before a byte of the body arrives.
+        size = (await fileSystem.stat(resolvedPath)).size;
       } catch {
         throw createFileTreeError('File not found', 404, 'FILE_NOT_FOUND');
       }
 
       return {
         contentType: dependencies.resolveMimeType(resolvedPath),
-        stream: fileSystem.createReadStream(resolvedPath),
+        size,
+        // Exactly the bytes the declared length promised. A file that grows during the read would
+        // otherwise put its extra bytes on the keep-alive socket after the body, and one that shrinks
+        // ends short of `Content-Length` either way.
+        stream: fileSystem.createReadStream(resolvedPath, { start: 0, end: Math.max(0, size - 1) }),
       };
     },
 

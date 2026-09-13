@@ -124,6 +124,45 @@ function readCached(filePath: string, parse: (raw: string) => unknown): unknown 
   return value;
 }
 
+/**
+ * The PLAN's spend OUTSIDE its runs — planner, reviewer, scout waves — booked by the hooks tree at
+ * `~/.claude/state/plan_costs/<slug>.json` (`plan_runner/costs.py`; `plan-runner cost <plan>` prints
+ * the same book). Summed by kind; a `build` row there is ignored because the receipts are that
+ * kind's source and `tally` already folds them. Operator, 2026-09-12: "add the planning and
+ * architecture into the plan cost as well … I'd like to see totals" — a "$93 run" had cost a third
+ * of the weekly budget once the planner, his scouts and the review were counted.
+ */
+export type PlanLedger = { planning: number; review: number; scouts: number; tokens: number };
+
+const PLAN_COST_DIR = path.join(os.homedir(), '.claude', 'state', 'plan_costs');
+
+export function readPlanLedger(planPath: string): PlanLedger {
+  const out: PlanLedger = { planning: 0, review: 0, scouts: 0, tokens: 0 };
+  const base = path.basename(planPath);
+  // `costs.slug` + `costs._path`: the `.md` off, then only [A-Za-z0-9._-], at most 120 chars.
+  const slug = (base.toLowerCase().endsWith('.md') ? base.slice(0, -3) : base).replace(/[^A-Za-z0-9._-]/g, '').slice(0, 120);
+  if (slug.length === 0) return out;
+  const rows = readCached(path.join(PLAN_COST_DIR, `${slug}.json`), parseJsonArray);
+  if (!Array.isArray(rows)) return out;
+  for (const row of rows) {
+    if (row === null || typeof row !== 'object') continue;
+    const kind = (row as Record<string, unknown>).kind;
+    const cost = Number((row as Record<string, unknown>).cost_usd);
+    if (kind !== 'planning' && kind !== 'review' && kind !== 'scouts') continue;
+    if (Number.isFinite(cost) && cost > 0) out[kind] += cost;
+    // Every token billed on the outing (in + out + cache read + cache write) — Descent's "⛁ tok" unit.
+    const tokens = Number((row as Record<string, unknown>).tokens);
+    if (Number.isFinite(tokens) && tokens > 0) out.tokens += tokens;
+  }
+  return out;
+}
+
+/** A JSON array, or `null` for anything else. */
+function parseJsonArray(raw: string): unknown {
+  const parsed: unknown = JSON.parse(raw);
+  return Array.isArray(parsed) ? parsed : null;
+}
+
 /** A JSON object, or `null` for anything else — an array or a bare number is not a record. */
 function parseJsonRecord(raw: string): unknown {
   const parsed: unknown = JSON.parse(raw);

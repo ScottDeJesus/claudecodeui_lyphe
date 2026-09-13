@@ -16,12 +16,26 @@ import type { HastNode } from '@/modules/chat/transcript/shapes/hast';
  * `tableData.ts` gives: a `.tsx` file that exports a helper beside its component loses Fast
  * Refresh for the component, which oxlint reports and this repo's warning ratchet does not allow
  * to rise. It holds no JSX and imports no shape. Used by `CheckResults.tsx` and `Timeline.tsx`
- * (both helpers), and by `elements/blockquote.tsx`, which lifts an alert's `[!KIND]` marker off
- * the front of the quote with `liftLeadingToken`.
+ * (both helpers), by `elements/blockquote.tsx`, which lifts an alert's `[!KIND]` marker off the
+ * front of the quote with `liftLeadingToken`, and by `elements/list.tsx` for `listStart`.
  */
 
 /** What react-markdown hands an override: the hast node beside the already-rendered children. */
 type RenderedElement = ReactElement<{ node?: HastNode; children?: ReactNode }>;
+
+/**
+ * The number an ordered list starts from, or `undefined` when it starts at 1.
+ *
+ * `mdast-util-to-hast` puts `start` on an `ol` only when the author's first number was not 1, so a
+ * list that opens at 1 carries no attribute and renders as it always has. A numbered sequence
+ * interrupted by a code block is the case this is for: `1.`, a fence, then `2.` and `3.` is a
+ * second list that starts at 2, and an `ol` without `start` numbers it from 1 again — the reader
+ * sees a step go missing.
+ */
+export const listStart = (node: HastNode | undefined): number | undefined => {
+  const start = node?.properties?.start;
+  return typeof start === 'number' && Number.isFinite(start) ? start : undefined;
+};
 
 /**
  * The tag a rendered child stands for. An element react-markdown routed through one of our own

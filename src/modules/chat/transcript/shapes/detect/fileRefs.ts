@@ -6,14 +6,36 @@
 
 export type FileRef = { path: string; line: number | null; column: number | null };
 
+/**
+ * Extensions of a picture. A reference carrying one is a file like any other — it chips — and its
+ * chip also shows the picture itself under it, which the chip folds (`shapes/useFilePreview.ts`).
+ */
+export const IMAGE_EXTENSIONS: readonly string[] = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'avif', 'bmp', 'ico', 'svg'];
+const IMAGE_EXTENSION_SET = new Set<string>(IMAGE_EXTENSIONS);
+
 /** Extensions a bare `name.ext` may carry and still be treated as a file, with no `:line` to vouch for it. */
 export const KNOWN_EXTENSIONS: readonly string[] = [
   'ts', 'tsx', 'js', 'jsx', 'mjs', 'cjs', 'mts', 'json', 'md', 'mdx', 'py', 'rs', 'go', 'java',
   'rb', 'php', 'c', 'h', 'cpp', 'hpp', 'cs', 'sh', 'bash', 'zsh', 'yml', 'yaml', 'toml', 'sql',
-  'css', 'scss', 'html', 'htm', 'txt', 'lock', 'conf', 'ini', 'xml', 'svg', 'vue', 'svelte',
-  'kt', 'swift', 'dart', 'ex', 'exs',
+  'css', 'scss', 'html', 'htm', 'txt', 'lock', 'conf', 'ini', 'xml', 'vue', 'svelte',
+  'kt', 'swift', 'dart', 'ex', 'exs', 'pdf', ...IMAGE_EXTENSIONS,
 ];
 const KNOWN_EXTENSION_SET = new Set<string>(KNOWN_EXTENSIONS);
+
+/** What a file reference's chip can preview under it. */
+export type PreviewKind = 'image' | 'pdf';
+
+/**
+ * What this reference's file can be previewed as — a picture or a PDF — or `null`. Decided on the
+ * extension alone: whether the bytes really are one is the server's content type to say, and the
+ * preview draws nothing when it is not.
+ */
+export function previewKindOf(path: string): PreviewKind | null {
+  const extension = /\.([A-Za-z0-9]+)$/.exec(path)?.[1]?.toLowerCase();
+  if (extension === undefined) return null;
+  if (IMAGE_EXTENSION_SET.has(extension)) return 'image';
+  return extension === 'pdf' ? 'pdf' : null;
+}
 
 // `-` is escaped and kept escaped: this class is concatenated into others below, where a trailing
 // bare `-` would silently become a character RANGE and throw at module load.
@@ -125,6 +147,8 @@ export const FILE_REF_SCAN = new RegExp(
     // last gap between the two readers: without it, a run the whole-text parser rejects for its
     // suffix (`src/a.ts:0`, `src/a.ts:007`) would still be scanned here as the bare path, and the
     // same characters would become a chip in prose while staying plain in an inline code span.
-    `(?![A-Za-z0-9_])(?!:\\d)`,
+    // `(?!\.[A-Za-z0-9])` refuses a run that is only the front of a longer name: `src/logo.png.bak`
+    // and `src/a.ts.map` are other files, and the whole-text parser already reads them that way.
+    `(?![A-Za-z0-9_])(?!:\\d)(?!\\.[A-Za-z0-9])`,
   'gi'
 );

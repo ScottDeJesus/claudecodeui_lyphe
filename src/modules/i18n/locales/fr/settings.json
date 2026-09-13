@@ -113,7 +113,28 @@
       "title": "Types d'événements",
       "actionRequired": "Action requise",
       "stop": "Exécution arrêtée",
-      "error": "Exécution échouée"
+      "error": "Exécution échouée",
+      "limits": "Limites d'usage"
+    },
+    "ntfy": {
+      "title": "Push mobile (ntfy)",
+      "description": "Envoyer chaque notification vers l'application ntfy de votre téléphone.",
+      "server": "URL du serveur",
+      "topic": "Sujet",
+      "topicHint": "Quiconque connaît le sujet peut le lire — traitez-le comme un mot de passe.",
+      "token": "Jeton d'accès",
+      "tokenKept": "Enregistré — saisissez pour le remplacer",
+      "appUrl": "URL de CloudCLI",
+      "appUrlHint": "Ce qu'ouvre un appui sur une notification — l'adresse à laquelle votre téléphone joint CloudCLI.",
+      "longRun": "Notifier seulement les exécutions plus longues que (minutes)",
+      "enabled": "Activé",
+      "save": "Enregistrer",
+      "test": "Envoyer un test",
+      "remove": "Supprimer",
+      "saved": "Enregistré",
+      "tested": "Notification de test envoyée",
+      "testFailed": "Échec de la notification de test",
+      "configured": "Envoi vers {{topic}}"
     }
   },
   "appearanceSettings": {

@@ -113,7 +113,28 @@
       "title": "Ereignistypen",
       "actionRequired": "Aktion erforderlich",
       "stop": "Lauf gestoppt",
-      "error": "Lauf fehlgeschlagen"
+      "error": "Lauf fehlgeschlagen",
+      "limits": "Nutzungslimits"
+    },
+    "ntfy": {
+      "title": "Handy-Push (ntfy)",
+      "description": "Sende jede Benachrichtigung an die ntfy-App auf deinem Handy.",
+      "server": "Server-URL",
+      "topic": "Thema",
+      "topicHint": "Wer das Thema kennt, kann mitlesen — behandle es wie ein Passwort.",
+      "token": "Zugriffstoken",
+      "tokenKept": "Gespeichert — tippen zum Ersetzen",
+      "appUrl": "CloudCLI-URL",
+      "appUrlHint": "Wohin ein Tippen auf eine Push-Nachricht führt — die Adresse, unter der dein Handy CloudCLI erreicht.",
+      "longRun": "Nur bei Läufen länger als (Minuten)",
+      "enabled": "Aktiviert",
+      "save": "Speichern",
+      "test": "Test senden",
+      "remove": "Entfernen",
+      "saved": "Gespeichert",
+      "tested": "Test-Push gesendet",
+      "testFailed": "Test-Push fehlgeschlagen",
+      "configured": "Sendet an {{topic}}"
     }
   },
   "appearanceSettings": {

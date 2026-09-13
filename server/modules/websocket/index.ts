@@ -8,4 +8,7 @@ export { broadcastSessionUpserted, broadcastSessionUpsertedBatch } from './servi
 // runDetachedChatTurn: used by the scheduled-messages module to run a turn
 // from a timer, with no socket to stream to or report errors on.
 export { runDetachedChatTurn } from './services/chat-websocket.service.js';
+// Started once by the server entrypoint after `listen`: the registry owns runs,
+// so the check for one that has gone silent lives beside it.
+export { startRunStallWatchdog } from './services/run-stall-watchdog.service.js';
 export type { ProviderRuntimeGateway } from './services/chat-websocket.service.js';

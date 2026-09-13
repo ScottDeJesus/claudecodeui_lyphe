@@ -89,7 +89,7 @@ export function describeGitFailure(error: string, details?: string): {
  * `/api/git/remote-status` has three shapes that are not "tracked": a repository with no
  * commits (`hasUpstream: false` WITH `ahead: 0`), a branch with no tracking ref
  * (`hasUpstream: false`, no `ahead` key at all), and a read that failed (`error` only). Two of
- * those carry a zero or nothing, and none of them may ever be shown as "everything is pushed".
+ * those carry a zero or nothing, and none of them may ever be shown as nothing left to push.
  */
 export function describeUpstreamPosition(
   remoteStatus: GitRemoteStatus | null,

@@ -18,6 +18,7 @@ type NotificationPreferences = {
     actionRequired: boolean;
     stop: boolean;
     error: boolean;
+    limits: boolean;
   };
 };
 
@@ -32,6 +33,7 @@ const DEFAULT_NOTIFICATION_PREFERENCES: NotificationPreferences = {
     actionRequired: true,
     stop: true,
     error: true,
+    limits: true,
   },
 };
 
@@ -57,6 +59,7 @@ function normalizeNotificationPreferences(value: unknown): NotificationPreferenc
       actionRequired: source.events?.actionRequired !== false,
       stop: source.events?.stop !== false,
       error: source.events?.error !== false,
+      limits: source.events?.limits !== false,
     },
   };
 }

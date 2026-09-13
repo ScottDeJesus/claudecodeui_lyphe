@@ -1,11 +1,13 @@
 import { Fragment, useContext } from 'react';
 import type { ReactNode } from 'react';
-import { FileTextIcon } from 'lucide-react';
+import { ExternalLinkIcon, FileTextIcon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 import { usePaletteOps } from '@/modules/command-palette';
 import { ChipsSuppressedContext } from '@/modules/chat/transcript/shapes/chipContext';
-import { FILE_REF_SCAN, parseFileRef } from '@/modules/chat/transcript/shapes/detect';
+import { FILE_REF_SCAN, parseFileRef, previewKindOf } from '@/modules/chat/transcript/shapes/detect';
+import { FilePreviewFrame } from '@/modules/chat/transcript/shapes/FilePreview';
+import { useFilePreview } from '@/modules/chat/transcript/shapes/useFilePreview';
 
 type FileChipProps = {
   path: string;
@@ -18,6 +20,8 @@ type FileChipProps = {
    * span, for a reference written in backticks. Defaults to `children`, the author's bare text.
    */
   plain?: ReactNode;
+  /** What the file is, when the author said so (`![alt](path)`) — the preview's label. */
+  alt?: string;
 };
 
 /**
@@ -38,32 +42,61 @@ type FileChipProps = {
  * `data-line` is written only when there IS a line. An empty attribute would read back as `0`
  * through `Number()`, which is exactly the "opens at line 0" failure the chip must never have.
  *
- * Inside a link, a section heading or a table header it draws `plain` instead: those are controls
- * or labels already, and a button inside one is a click that fires twice.
+ * Inside a link, a heading or a table header it draws `plain` instead: those are controls or labels
+ * already, and a button inside one is a click that fires twice.
+ *
+ * **A picture or a PDF is previewed under its chip, and the chip folds the preview.** Once the
+ * preview has loaded (`useFilePreview`), a click on the chip folds or unfolds it — the reader asked
+ * for the reference itself to be the switch — and opening the file moves to a small button beside
+ * the chip, which stays there while the preview is folded and is never drawn over the preview. Until
+ * the preview loads, and when it never does, the chip opens the file as every other chip does, so a
+ * chip is never a button that does nothing.
  */
-export function FileChip({ path, line, children, plain }: FileChipProps) {
+export function FileChip({ path, line, children, plain, alt }: FileChipProps) {
   const { t } = useTranslation('chat');
   const { openFileReference } = usePaletteOps();
   const suppressed = useContext(ChipsSuppressedContext);
+  const { preview, collapsed, toggle } = useFilePreview(path, previewKindOf(path) !== null && !suppressed);
   if (suppressed) return <>{plain ?? children}</>;
-  const label = t('shapes.openFile', { path: line === null ? path : `${path}:${line}` });
+  const open = () => openFileReference(path, line ?? undefined);
+  const openLabel = t('shapes.openFile', { path: line === null ? path : `${path}:${line}` });
+  const label = preview ? t(collapsed ? 'shapes.expandFile' : 'shapes.collapseFile', { path }) : openLabel;
 
-  return (
+  const chip = (
     <button
       type="button"
       data-shape="chip"
-      data-collapsed="false"
+      data-collapsed={preview ? String(collapsed) : 'false'}
       data-file-chip=""
       data-path={path}
       data-line={line ?? undefined}
+      data-preview-toggle={preview ? '' : undefined}
+      aria-expanded={preview ? !collapsed : undefined}
       title={label}
       aria-label={label}
-      onClick={() => openFileReference(path, line ?? undefined)}
+      onClick={preview ? toggle : open}
       className="inline max-w-full cursor-pointer rounded-md border border-border/70 bg-card px-1.5 py-0.5 text-left align-baseline font-mono text-[0.875em] text-accent-ink [overflow-wrap:anywhere] hover:border-accent-ink/50 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
     >
       <FileTextIcon aria-hidden="true" className="mr-1 inline-block h-[1em] w-[1em] align-[-0.125em]" />
       {children}
     </button>
+  );
+  if (!preview) return chip;
+  return (
+    <>
+      {chip}
+      <button
+        type="button"
+        data-preview-open=""
+        title={openLabel}
+        aria-label={openLabel}
+        onClick={open}
+        className="ml-0.5 inline-flex h-[1.6em] w-[1.6em] items-center justify-center rounded-md align-middle text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      >
+        <ExternalLinkIcon aria-hidden="true" className="h-[0.9em] w-[0.9em]" />
+      </button>
+      {collapsed ? null : <FilePreviewFrame path={path} kind={preview.kind} url={preview.url} alt={alt} />}
+    </>
   );
 }
 

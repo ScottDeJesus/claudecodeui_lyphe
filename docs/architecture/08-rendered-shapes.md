@@ -33,7 +33,8 @@ one fence this feature routes around.
    twin whose every declining branch returns that `Plain*`. `.verify/probe-shapes-baseline.mjs`
    holds a document made entirely of near misses to a DOM captured from the pre-move renderer.
 3. **Two component maps and one ternary.** `PLAIN_COMPONENTS` in `Markdown.tsx` is today's DOM,
-   apart from the three inline marks — file chips, colour swatches and keycaps — which it draws too
+   apart from the inline marks — file chips (with the preview under a picture's or a PDF's chip),
+   colour swatches and keycaps — which it draws too
    (see **Streaming**).
    `SHAPE_COMPONENTS` spreads it and replaces exactly eight entries — `table td ul ol li blockquote p
    div` — with their `Shape*` twins. `MarkdownBodyRenderer` hands a streaming body the plain map and
@@ -76,7 +77,7 @@ one fence this feature routes around.
 | --- | --- |
 | `Markdown.tsx` | `PLAIN_COMPONENTS`, `SHAPE_COMPONENTS`, and `MarkdownBodyRenderer` — the ternary between them, `remarkShapeGroups` added only when not streaming, and the `MarkdownStreamingContext` provider. `MarkdownBody`, `Markdown` and `TRANSCRIPT_PROSE` are its exports |
 | `StreamingMarkdown.tsx` | Renders a reply as a settled `<MarkdownBody>` and a pending `<MarkdownBody streaming>` |
-| `shapes/detect.ts` | Every trigger, behind the one import path every consumer uses: `classifyTable`, `soleNumericColumn`, `parseNumber`, `parseStatsFence`, `deltaTone`, `parseAlertKind`, `parseVerdict`, `isTimeToken`/`timeTokenLength`, `checkGlyph`/`checkGlyphLength`, `parseFileRef`, `FILE_REF_SCAN`, `KNOWN_EXTENSIONS`, `parseHexColor`, `parseKeyCombo`, `splitDiffLine`, `LONG_OUTPUT_LINES`, `LONG_OUTPUT_PREVIEW_LINES`. A barrel with no logic of its own — a new trigger goes in its family's module and gets its name added here |
+| `shapes/detect.ts` | Every trigger, behind the one import path every consumer uses: `classifyTable`, `soleNumericColumn`, `parseNumber`, `parseStatsFence`, `deltaTone`, `parseAlertKind`, `parseVerdict`, `isTimeToken`/`timeTokenLength`, `checkGlyph`/`checkGlyphLength`, `parseFileRef`, `FILE_REF_SCAN`, `KNOWN_EXTENSIONS`, `IMAGE_EXTENSIONS`/`previewKindOf`, `parseHexColor`, `parseKeyCombo`, `splitDiffLine`, `LONG_OUTPUT_LINES`, `LONG_OUTPUT_PREVIEW_LINES`. A barrel with no logic of its own — a new trigger goes in its family's module and gets its name added here |
 | `shapes/detect/` | The grammars, one pure module per family: `tables`, `fences`, `prose`, `listMarks`, `fileRefs`, `inlineMarks` (which name lives where is the barrel's header). None imports anything, a sibling included, so `tsx` loads the barrel with no browser |
 | `shapes/hast.ts` | `HastNode` and the text readers: `textOf`, `readTable`, `readListItems`, `readFactPairs`, `readCodeChildren`, `hasInlineFormatting` |
 | `shapes/tableData.ts` | What happens after a table trigger fires: `tablePayload`, `dataTableKind`, `compareCells`, `sortedOrder`, `toCsv`, `barPercents` |
@@ -100,6 +101,10 @@ one fence this feature routes around.
 | `shapes/code/InlineCode.tsx` | Today's inline code span, or a colour swatch, keycaps or a file chip |
 | `shapes/MarkdownLink.tsx` | The `a` override. Asks `parseFileRef` under its loose link policy and forwards the `:line` |
 | `shapes/InlineMarks.tsx` | `FileChip`, `ColorSwatch`, `KeyCaps`, and `linkifyChildren`, the prose scan |
+| `shapes/useFilePreview.ts` | `useFilePreview` — a file chip's preview: reads a picture's or a PDF's bytes through the workspace's `readFileReference` palette op, shared within the reply, and keeps its fold in the shapes' own fold memory. Nothing while loading, when unreadable or mistyped, in an export, where chips are suppressed, in a reply still streaming, or for a PDF unless `navigator.pdfViewerEnabled` is true and the pointer is fine (a phone gets none). An SVG is shown from a `data:` URL, never a `blob:` one a new tab would run in this origin |
+| `shapes/previewScope.ts` | `PreviewScopeContext` — the row a preview belongs to: `MessageComponent` provides a tool row's `toolId`, or a finished reply's trimmed text hashed with its turn anchor — the last tool call before it in its turn, else the prompt, read by `ChatMessagesPane` from the full message order (never an id, which changes as a reply finalises, and never the rows on screen, which "Show work" changes), `false` while a reply streams, and `null` — this mount alone — where neither exists |
+| `shapes/FilePreview.tsx` | `FilePreviewFrame` — the preview under a chip: the picture (a click opens `ImageLightbox`, square as well) or the PDF in an `iframe` at most 32rem or 60vh tall, in a square-cornered hairline frame with nothing drawn over it, so a screenshot's corners and edges all show. The chip beside it carries the open-in-Files button. A loaded preview fires `TRANSCRIPT_GREW_EVENT` (`transcript/transcriptGrew.ts`), which `useChatSessionState` answers by re-pinning a chat left at its bottom |
+| `shapes/MarkdownImage.tsx` | `MarkdownImage`, the `img` override in both maps: a relative `src` with a picture's extension is drawn as that file's chip (labelled with the alt text), which previews it; any other `src` is react-markdown's own `<img>` with the props it was given |
 | `shapes/DataTable.tsx` | Every table that is not a matrix or a before/after pair: three-state sort, CSV copy, and a `Meter` bar down the one numeric column |
 | `shapes/DecisionMatrix.tsx` | `Option \| Pros \| Cons [\| Verdict]` as one `Card` per option, verdict as a `Badge` toned by its glyph |
 | `shapes/BeforeAfter.tsx` | `Before \| After` (optionally after a label column) as a pair of `Card`s per row |
@@ -142,7 +147,7 @@ rung that matches wins, and a block no rung matches takes the fallback.
 | Element | Order tried | Fallback |
 | --- | --- | --- |
 | `table` | decision matrix → before/after → data bars → sortable table | today's bordered table |
-| `ul` / `ol` | task list → check results → timeline → fact list | today's list |
+| `ul` / `ol` | task list → check results → timeline | today's list |
 | `p` | verdict → fact card | today's paragraph, with file chips |
 | `blockquote` | alert | today's bordered blockquote |
 | fence | widget → mermaid → `stats` → `diff` → long output | today's highlighted block |
@@ -163,11 +168,13 @@ What "matches" means, rung by rung:
   needs a checkbox of the item's OWN on every item — one borrowed from a sub-list does not count.
   Check results need a leading `✓`/`✅` or `✗`/`❌` followed by a space on every item, and at least
   two items. A timeline needs a clock time (`4:12 PM`, `14:05`, `09:30:11`), an ISO date with an
-  optional time, or a month-day (`Sep 10`) opening every item, again at least two. A fact list is
-  `**Label:** value` on every bullet, two pairs at the least, with no other mark anywhere — a link or
-  code span in a label or a value declines it.
+  optional time, or a month-day (`Sep 10`) opening every item, again at least two. A list of
+  `**Label:** value` bullets is a list: the author wrote bullets, and a grid in their place takes the
+  bullets away, shrinks the labels to captions and drops their colons.
   Task list precedes check results on purpose: a task list whose items also carry glyphs keeps its
-  checkboxes.
+  checkboxes. An ordered list keeps the author's first number (`listStart` in `shapes/listItems.ts`)
+  in today's list and in every shape, so a numbered sequence split by a code block continues at 2
+  after the fence instead of starting again at 1.
 - **Paragraphs**: a verdict is the WHOLE text matching `^VERDICT:\s+(PASS|FAIL)` with an optional
   `— B:n H:n M:n L:n` (em dash, en dash or hyphen), uppercase. The line may be wrapped in bold or
   italic, because the banner is itself the emphasis; a link or code span declines it. A fact card
@@ -185,7 +192,22 @@ What "matches" means, rung by rung:
   fence of more than `LONG_OUTPUT_LINES` (25) lines is clamped.
 - **Inline code** is tried against its whole text: `#fff`, `#ffffff` or `#ffffffff` gets a swatch;
   two or more keys joined by `+` with at least one modifier becomes keycaps (`a + b` is arithmetic);
-  a strict file reference becomes a chip.
+  a strict file reference becomes a chip. A reference `previewKindOf` names a picture (an extension
+  in `IMAGE_EXTENSIONS`) or a PDF also shows that file under the chip, in a code span and in prose
+  alike, and once the preview has loaded a click on the chip folds and unfolds it instead of opening
+  the file — a small button beside the chip opens it, folded or not. The bytes are read
+  through the `readFileReference` palette op, which `WorkspaceMain` registers on the same resolver
+  a chip click opens through — minus its filename-only guess, so a picture is never a same-named file
+  from elsewhere. Reads are shared per project, path and row (`PreviewScopeContext`: a tool row's id,
+  or a reply's text with its turn anchor); a row with neither is read and not kept: a remount of the same reply reuses its read, a later reply naming an overwritten
+  screenshot reads it again. A found-nothing read is not kept; at most 64 reads and 150 MB are held,
+  a read counting its declared size from its headers on. A file over 25 MB is refused on its
+  `Content-Length` — which the content route sends, streaming exactly that many bytes — or, where a
+  proxy stripped the header, part-way through its body. A markdown image, `![alt](src)`, with a RELATIVE `src` and a picture's extension is
+  drawn the same way; one with a scheme, `//`, or a leading `/` stays react-markdown's own `<img>` —
+  `/favicon.ico`, served by the app, is pinned in the baseline document. A heading and a plain table
+  header suppress chips and pictures, streaming or settled. The prose scan refuses a run that is
+  only the front of a longer name (`src/logo.png.bak`, `src/a.ts.map`).
 - **File references** have one grammar and two policies. `parseFileRef` with its defaults is the
   strict prose grammar: at least one `/`, a final segment with an extension, and either a
   `:line[:col]` suffix or an extension in `KNOWN_EXTENSIONS`. `FILE_REF_SCAN` is meant to be the
@@ -219,7 +241,8 @@ table stays here and in `detect.ts`, never in the prompt.
 | --- | --- |
 | `table`, `data-bars`, `decision-matrix`, `before-after` | headers joined by `\|`, then each row, one per line (`tablePayload`) |
 | `callout` | the kind word, a newline, the quote's whole text |
-| `tasks`, `checks`, `timeline`, `facts` | the item texts joined by newlines (a fact paragraph spells its pairs `Label: value`) |
+| `tasks`, `checks`, `timeline` | the item texts joined by newlines |
+| `facts` | the paragraph's pairs, one `Label: value` per line |
 | `verdict` | the whole trimmed paragraph |
 | `stats`, `diff`, `output`, `diagram` | the fence body verbatim |
 | `tabbed-code` | every fence's language and body, joined |
@@ -284,7 +307,8 @@ the streaming half never runs the scan. Two routes carry them there. `renderInli
 `PlainParagraph`, `PlainListItem` and `PlainTableCell`, which are in both maps, so moving the call
 into the `Shape*` twins would have reopened modules other phases own. And the `code` entry of both
 maps is `CodeBlock`, which sends every inline code span to `InlineCode`, so a streaming span also
-becomes a colour swatch, keycaps or a file chip. The cost is one regex pass over the rendered text per render,
+becomes a colour swatch, keycaps or a file chip — except in a heading or a table header, which
+suppress chips and pictures whether streaming or settled. The cost is one regex pass over the rendered text per render,
 which `probe-shapes-inline.mjs` holds under 4 ms for 42,000 characters holding 400 references
 (measured at 0.4 ms on 2026-09-11), and a reference then looks
 the same on both sides of the settle boundary. The reasoning lives in `elements/inlineText.tsx`.
@@ -342,7 +366,7 @@ unchanged.
 | `PLAIN_COMPONENTS` or any `Plain*` component | `probe-shapes-baseline.mjs` still prints `BASELINE: DOM identical`, and its streaming pass still finds no `data-shape`. Never re-capture the artifact to make it pass |
 | `SHAPE_COMPONENTS` | It still spreads the plain map and replaces only elements that have a `Shape*` twin. An element with no shape (`thead`, `tr`, `th`, `hr`, `h1`–`h6`) names its `Plain*` in both maps |
 | The streaming ternary, or where `remarkShapeGroups` is added | The prose, fences and groups probes' streaming mounts still draw no shape and no group. It is the one site the streaming rule is enforced |
-| `hasInlineFormatting` or `readFactPairs` | The tables probe's marked-up matrix still declines, the lists probe's linked and code-span fact labels still decline, and the prose probe's fact declines still keep their span and `href`. These are what stop a shape rendering less than the markdown |
+| `hasInlineFormatting` or `readFactPairs` | The tables probe's marked-up matrix still declines, and the prose probe's fact declines — marks in a value, and labels that are links or code spans — still keep their span and `href`. These are what stop a shape rendering less than the markdown |
 | `DataTable`'s sort | It still permutes the RENDERED `tr` elements keyed by original index. The tables probe reads whole `(label, note, count, rank)` tuples with their `code` and `strong` inside, stability in both directions, the third click, the CSV order, and each bar travelling with its row |
 | A `shapeKey` payload | Two kinds never share a payload shape, and `section` still includes the body — the groups probe folds two "Findings" sections apart |
 | `isCollapsed`'s default | It stays expanded. A default of folded turns a 32-bit collision into content that disappears |

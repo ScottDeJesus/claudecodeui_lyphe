@@ -15,14 +15,15 @@ type GitStatusHeaderProps = {
 };
 
 /**
- * How far ahead of the upstream this branch is, said in words.
+ * How far ahead of the upstream this branch is, said in words — or null when it tracks its
+ * upstream with nothing ahead, the one position that needs no badge at all.
  *
  * "We don't know" never looks like zero. Without an upstream, or without an answer from the
- * read at all, the badge carries the em dash and says WHICH, because "0 not pushed", "nothing
- * committed", "no tracking ref" and "the read failed" are four different facts and only one
- * of them is good news. A failed read is the one that is an error, so it alone is amber.
+ * read at all, the badge carries the em dash and says WHICH, because "nothing committed", "no
+ * tracking ref" and "the read failed" are three different facts, and a missing badge must only
+ * ever mean the good one. A failed read is the one that is an error, so it alone is amber.
  */
-function describeUpstream(upstream: UpstreamPosition): { tone: Tone; label: string } {
+function describeUpstream(upstream: UpstreamPosition): { tone: Tone; label: string } | null {
   switch (upstream.kind) {
     case 'unread':
       return { tone: 'warn', label: "— Couldn't read upstream" };
@@ -31,9 +32,7 @@ function describeUpstream(upstream: UpstreamPosition): { tone: Tone; label: stri
     case 'no-upstream':
       return { tone: 'neutral', label: '— No upstream yet' };
     case 'tracked':
-      if (upstream.ahead === 0) {
-        return { tone: 'positive', label: '✓ Everything is pushed' };
-      }
+      if (upstream.ahead === 0) return null;
       return { tone: 'info', label: `${upstream.ahead} of yours ${upstream.ahead === 1 ? 'is' : 'are'} not pushed` };
   }
 }
@@ -55,7 +54,7 @@ export default function GitStatusHeader({ branch, upstream, loading, onRefresh }
 
       {/* GitPanel draws nothing until the first read lands, so this is always a landed
           answer — and a refresh keeps the previous one on screen rather than blinking it out. */}
-      <Badge tone={position.tone}>{position.label}</Badge>
+      {position && <Badge tone={position.tone}>{position.label}</Badge>}
 
       <span className="ml-auto text-xs text-ink-faint">
         Claude handles commits and pushes for this project

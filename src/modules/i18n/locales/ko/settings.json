@@ -138,7 +138,28 @@
       "title": "이벤트 유형",
       "actionRequired": "작업 필요",
       "stop": "실행 중지",
-      "error": "실행 실패"
+      "error": "실행 실패",
+      "limits": "사용량 한도"
+    },
+    "ntfy": {
+      "title": "휴대폰 푸시 (ntfy)",
+      "description": "모든 알림을 휴대폰의 ntfy 앱으로 보냅니다.",
+      "server": "서버 URL",
+      "topic": "토픽",
+      "topicHint": "토픽을 아는 사람은 누구나 읽을 수 있습니다. 비밀번호처럼 다루세요.",
+      "token": "액세스 토큰",
+      "tokenKept": "저장됨 — 입력하면 교체됩니다",
+      "appUrl": "CloudCLI URL",
+      "appUrlHint": "푸시를 눌렀을 때 열리는 주소 — 휴대폰이 CloudCLI에 접속하는 주소입니다.",
+      "longRun": "이 시간보다 긴 실행만 알림 (분)",
+      "enabled": "사용",
+      "save": "저장",
+      "test": "테스트 보내기",
+      "remove": "제거",
+      "saved": "저장됨",
+      "tested": "테스트 푸시를 보냈습니다",
+      "testFailed": "테스트 푸시 실패",
+      "configured": "{{topic}}(으)로 전송 중"
     }
   },
   "appearanceSettings": {

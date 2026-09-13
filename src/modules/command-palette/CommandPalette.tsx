@@ -49,6 +49,12 @@ type CommandPaletteProps = {
   onOpenSettings: (tab?: string) => void;
   onShowTab?: (tab: AppTab) => void;
   /**
+   * Brings the git tab forward on the selected project's repository, or null when the git tab does
+   * not carry that repository — which hides the commit and branch rows, since leading there is all
+   * they do.
+   */
+  onShowRepoInGitTab: (() => void) | null;
+  /**
    * The built-in tabs currently on the workspace tab bar. The Navigate group offers exactly the
    * NAV_TABS rows this list names, so a row added below without a matching gate never appears.
    */
@@ -77,6 +83,7 @@ function CommandPalette({
   onStartNewChat,
   onOpenSettings,
   onShowTab,
+  onShowRepoInGitTab,
   visibleTabs,
 }: CommandPaletteProps) {
   const [open, setOpen] = React.useState(false);
@@ -117,8 +124,11 @@ function CommandPalette({
   const sessions = useSessionsSource(projectId, open && showSessions);
   const messageMatches = useSessionMessageSearch(projectId, search, open && showSessions);
   const files = useFilesSource(projectId, open && showFiles);
-  const commits = useCommitsSource(projectId, open && showCommits);
-  const branches = useBranchesSource(projectId, open && showBranches);
+  // Commit and branch rows exist only to bring the git tab forward on this repository, so they are
+  // not even read for a project that tab does not carry.
+  const gitRowsOffered = onShowRepoInGitTab !== null;
+  const commits = useCommitsSource(projectId, open && showCommits && gitRowsOffered);
+  const branches = useBranchesSource(projectId, open && showBranches && gitRowsOffered);
 
   const sessionRows = React.useMemo(() => {
     if (!showSessions) return [];
@@ -302,13 +312,13 @@ function CommandPalette({
               </CommandGroup>
             )}
 
-            {showCommits && projectId && commitsShown.length > 0 && (
+            {showCommits && gitRowsOffered && projectId && commitsShown.length > 0 && (
               <CommandGroup heading="Commits">
                 {commitsShown.map((c) => (
                   <CommandItem
                     key={c.hash}
                     value={`${c.message} ${c.author} ${c.shortHash}`}
-                    onSelect={() => run(() => onShowTab?.('git'))}
+                    onSelect={() => run(() => onShowRepoInGitTab?.())}
                   >
                     <GitCommit className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
                     <span className="font-mono text-xs text-muted-foreground">{c.shortHash}</span>
@@ -322,13 +332,13 @@ function CommandPalette({
               </CommandGroup>
             )}
 
-            {showBranches && projectId && branchesShown.length > 0 && (
+            {showBranches && gitRowsOffered && projectId && branchesShown.length > 0 && (
               <CommandGroup heading="Branches">
                 {branchesShown.map((b) => (
                   <CommandItem
                     key={`branch-${b.name}`}
                     value={b.name}
-                    onSelect={() => run(() => onShowTab?.('git'))}
+                    onSelect={() => run(() => onShowRepoInGitTab?.())}
                   >
                     <GitMerge className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
                     <span className="flex-1 truncate">{b.name}</span>

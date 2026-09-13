@@ -3,6 +3,7 @@ import type { MutableRefObject } from 'react';
 
 import { api } from '@/shared/api';
 import type { MarkSessionIdle, SessionActivityMap,Project,ProjectSession,LLMProvider,NormalizedMessage,ChatMessage,DiffCalculator } from '@/shared/types';
+import { TRANSCRIPT_GREW_EVENT } from '@/modules/chat/transcript/transcriptGrew';
 import type { SessionStore } from '@/modules/chat/hooks/useSessionStore';
 import { SESSION_MESSAGES_PAGE_SIZE } from '@/modules/chat/utils/sessionMessagePagination';
 import { createMessageHistoryRefreshCoordinator } from '@/modules/chat/utils/messageHistoryRefreshCoordinator';
@@ -599,6 +600,10 @@ export function useChatSessionState({
 
     const nearBottom = isNearBottom();
     setIsUserScrolledUp(!nearBottom);
+    // Written here as well as by the syncing effect: a picture that finishes loading between this
+    // scroll and the next commit reads the ref to decide whether to re-pin, and a flag one render
+    // behind would snap a reader who just scrolled up back to the bottom.
+    isUserScrolledUpRef.current = !nearBottom;
     scrollPositionRef.current = {
       height: container.scrollHeight,
       top: container.scrollTop,
@@ -1117,6 +1122,22 @@ export function useChatSessionState({
     container.addEventListener('scroll', handleScroll);
     return () => container.removeEventListener('scroll', handleScroll);
   }, [handleScroll]);
+
+  // A block that grew after it painted — a picture whose bytes landed late — re-pins a chat the
+  // reader left at its bottom. The open-session settle loop has stopped by then, and the effect above
+  // follows new MESSAGES, not a row that grew, so without this a screenshot at the end of the last
+  // reply sits under the fold. Growth does not fire `scroll`, so `isUserScrolledUp` still says where
+  // the reader was; one who scrolled away, or a search or older-message load, is left where it is.
+  useEffect(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+    const repin = () => {
+      if (isUserScrolledUpRef.current || searchScrollActiveRef.current || isLoadingMoreRef.current) return;
+      scrollToBottom();
+    };
+    container.addEventListener(TRANSCRIPT_GREW_EVENT, repin);
+    return () => container.removeEventListener(TRANSCRIPT_GREW_EVENT, repin);
+  }, [scrollToBottom]);
 
   // "Load all" overlay visibility is driven by scroll-to-top in handleScroll;
   // timers are cleared on session change via the reset effect above.

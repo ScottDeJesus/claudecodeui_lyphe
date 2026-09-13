@@ -13,14 +13,18 @@ export default function TypingIndicator() {
   const { t } = useTranslation('chat');
 
   return (
-    <div
-      className="chat-typing-indicator"
-      role="status"
-      aria-label={t('claudeStatus.actions.working', { defaultValue: 'Working' })}
-    >
-      <span className="chat-typing-dot" />
-      <span className="chat-typing-dot" />
-      <span className="chat-typing-dot" />
+    // The same inset a reply row takes (`px-3 sm:px-0`): on a phone the turn card has no side
+    // padding of its own, so without it the dots ride the card's edge.
+    <div className="px-3 sm:px-0">
+      <div
+        className="chat-typing-indicator"
+        role="status"
+        aria-label={t('claudeStatus.actions.working', { defaultValue: 'Working' })}
+      >
+        <span className="chat-typing-dot" />
+        <span className="chat-typing-dot" />
+        <span className="chat-typing-dot" />
+      </div>
     </div>
   );
 }

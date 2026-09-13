@@ -3,6 +3,9 @@ import path from 'node:path';
 import type { WebSocket } from 'ws';
 
 import { sessionsDb } from '@/modules/database/index.js';
+// Presence is recorded here and read by the notification channels, so a push is
+// never sent about the session the user is looking at right now.
+import { clearPresence, markPresence } from '@/modules/notifications/index.js';
 import { providerModelsService, sessionsService } from '@/modules/providers/index.js';
 import { chatRunRegistry } from '@/modules/websocket/services/chat-run-registry.service.js';
 import { connectedClients, WS_OPEN_STATE } from '@/modules/websocket/services/websocket-state.service.js';
@@ -523,6 +526,24 @@ function handlePermissionResponse(data: AnyRecord, dependencies: ChatWebSocketDe
 }
 
 /**
+ * Handles `chat.presence`: records which session this socket is showing and
+ * whether its tab is in the foreground.
+ *
+ * The notification channels read it to stay quiet about a session the user is
+ * already watching. Presence is keyed by the connection, never by the user — a
+ * laptop and a phone on the same account are two records, and one of them
+ * switching sessions must not speak for the other. Leaving a session is this
+ * same frame with `sessionId: null`; there is no `chat.unsubscribe`.
+ */
+function handleChatPresence(ws: WebSocket, userId: string | number | null, data: AnyRecord): void {
+  markPresence(ws, {
+    userId,
+    sessionId: typeof data.sessionId === 'string' && data.sessionId.length > 0 ? data.sessionId : null,
+    visible: data.visible === true,
+  });
+}
+
+/**
  * Handles authenticated chat websocket messages used by the main chat panel.
  *
  * Inbound protocol (client to server):
@@ -530,6 +551,7 @@ function handlePermissionResponse(data: AnyRecord, dependencies: ChatWebSocketDe
  * - `chat.abort`               { sessionId }
  * - `chat.subscribe`           { sessions: [{ sessionId, lastSeq? }] }
  * - `chat.permission-response` { requestId, allow, updatedInput?, message?, rememberEntry? }
+ * - `chat.presence`            { sessionId, visible }
  *
  * Outbound protocol (server to client): every frame is `kind`-based — either
  * a provider `NormalizedMessage` (with `seq`) or a gateway event
@@ -640,6 +662,9 @@ export function handleChatConnection(
         case 'chat.permission-response':
           handlePermissionResponse(data, dependencies);
           return;
+        case 'chat.presence':
+          handleChatPresence(ws, userId, data);
+          return;
         default:
           sendProtocolError(ws, 'UNKNOWN_MESSAGE_TYPE', `Unknown message type "${messageType}".`);
           return;
@@ -654,5 +679,6 @@ export function handleChatConnection(
   ws.on('close', () => {
     console.log('[INFO] Chat client disconnected');
     connectedClients.delete(ws);
+    clearPresence(ws);
   });
 }

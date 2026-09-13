@@ -113,7 +113,28 @@
       "title": "イベント種別",
       "actionRequired": "対応が必要",
       "stop": "実行停止",
-      "error": "実行失敗"
+      "error": "実行失敗",
+      "limits": "使用量の上限"
+    },
+    "ntfy": {
+      "title": "スマホ通知 (ntfy)",
+      "description": "すべての通知をスマホの ntfy アプリに送信します。",
+      "server": "サーバー URL",
+      "topic": "トピック",
+      "topicHint": "トピックを知っている人は誰でも購読できます。パスワードと同じように扱ってください。",
+      "token": "アクセストークン",
+      "tokenKept": "保存済み — 入力すると置き換わります",
+      "appUrl": "CloudCLI の URL",
+      "appUrlHint": "通知をタップしたときに開く場所 — スマホから CloudCLI に届くアドレスです。",
+      "longRun": "この分数より長い実行のみ通知（分）",
+      "enabled": "有効",
+      "save": "保存",
+      "test": "テスト送信",
+      "remove": "削除",
+      "saved": "保存しました",
+      "tested": "テスト通知を送信しました",
+      "testFailed": "テスト通知に失敗しました",
+      "configured": "{{topic}} に送信中"
     }
   },
   "appearanceSettings": {
