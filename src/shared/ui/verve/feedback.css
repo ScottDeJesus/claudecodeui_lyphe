@@ -30,12 +30,12 @@
   border-radius: 10px;
   background: var(--tone-soft);
   color: var(--tone-ink);
-  font-size: 13.5px;
+  font-size: var(--vv-text-body, 13.5px);
   line-height: 1.55;
 }
 /* Doctrine §6: the tone's own mark, straight out of tokens.css. A banner that said "warn" in
  * amber alone would say nothing at all with the colour drained out. */
-.vv-banner__mark { margin-top: 2px; font-size: 11px; font-weight: 700; }
+.vv-banner__mark { margin-top: 2px; font-size: var(--vv-text-meta, 11px); font-weight: 700; }
 .vv-banner__mark::before { content: var(--tone-glyph); }
 .vv-banner__close {
   padding: 2px;
@@ -43,7 +43,7 @@
   border-radius: 6px;
   background: none;
   color: inherit;
-  font-size: 11px;
+  font-size: var(--vv-text-meta, 11px);
   line-height: 1;
   cursor: pointer;
   opacity: 0.7;
@@ -108,7 +108,7 @@
   box-shadow: none;
   color: var(--ink-muted);
   font-family: var(--font-body);
-  font-size: 14px;
+  font-size: var(--vv-text-meta, 14px);
   font-weight: 500;
   cursor: pointer;
   /* Only `background-color` and `color` are animated, so no tab's BOX ever moves — which is
@@ -215,7 +215,7 @@
   border-radius: 0;
   border-bottom: 2px solid transparent;
   /* On the scale (--text-small), not a hand-picked 13px. */
-  font-size: var(--text-small);
+  font-size: var(--vv-text-meta, var(--text-small));
   transition: color 0.2s, border-color 0.2s;
 }
 /* 700, not 600: only the 400 / 500 / 700 cuts of Schibsted Grotesk are loaded, so a 600 here is

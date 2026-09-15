@@ -270,5 +270,35 @@
   },
   "shapes": {
     "diagramFailed": "Bu diyagram çizilemedi; kaynağı gösteriliyor."
+  },
+  "gutters": {
+    "runner": {
+      "title": "Çalıştırmalar"
+    },
+    "memory": {
+      "title": "Bellek",
+      "pending": "İnceleme bekliyor",
+      "recent": "Son kaydedilenler",
+      "recentEmpty": "Henüz bir şey kaydedilmedi",
+      "pendingEmpty": "Bekleyen bir şey yok"
+    },
+    "subagents": {
+      "title": "Alt ajanlar",
+      "empty": "Bu sohbette alt ajan yok",
+      "back": "Alt ajanlara dön",
+      "loading": "Transkript yükleniyor…",
+      "notFound": "Diskte henüz transkript yok",
+      "failed": "Transkript okunamadı",
+      "live": "Canlı",
+      "showEarlier": "Önceki adımları göster",
+      "openRow": "{{name}} transkriptini oku"
+    },
+    "open": "{{name}} aç",
+    "collapse": "Daralt",
+    "dragHint": "Başka bir yuvaya sürükleyin",
+    "pin": {
+      "label": "Bu oturum",
+      "title": "Açık olan sohbet tarafından oluşturuldu"
+    }
   }
 }

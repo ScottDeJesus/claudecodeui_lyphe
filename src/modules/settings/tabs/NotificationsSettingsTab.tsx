@@ -269,6 +269,23 @@ export default function NotificationsSettingsTab({
             />
             {t('notifications.events.limits')}
           </label>
+          <label className="flex items-center gap-2 text-sm text-foreground">
+            <input
+              type="checkbox"
+              checked={notificationPreferences.events.background}
+              onChange={(event) =>
+                onNotificationPreferencesChange({
+                  ...notificationPreferences,
+                  events: {
+                    ...notificationPreferences.events,
+                    background: event.target.checked,
+                  },
+                })
+              }
+              className="h-4 w-4"
+            />
+            {t('notifications.events.background')}
+          </label>
         </div>
       </div>
     </div>

@@ -270,5 +270,35 @@
   },
   "shapes": {
     "diagramFailed": "No se pudo dibujar este diagrama; se muestra su código fuente."
+  },
+  "gutters": {
+    "runner": {
+      "title": "Ejecuciones"
+    },
+    "memory": {
+      "title": "Memoria",
+      "pending": "Esperando revisión",
+      "recent": "Archivados recientemente",
+      "recentEmpty": "Aún no se ha archivado nada",
+      "pendingEmpty": "Nada en espera"
+    },
+    "subagents": {
+      "title": "Subagentes",
+      "empty": "No hay subagentes en este chat",
+      "back": "Volver a los subagentes",
+      "loading": "Cargando la transcripción…",
+      "notFound": "Todavía no hay transcripción en el disco",
+      "failed": "No se pudo leer la transcripción",
+      "live": "En vivo",
+      "showEarlier": "Mostrar pasos anteriores",
+      "openRow": "Leer la transcripción de {{name}}"
+    },
+    "open": "Abrir {{name}}",
+    "collapse": "Contraer",
+    "dragHint": "Arrastra a otra posición",
+    "pin": {
+      "label": "Esta sesión",
+      "title": "Creado por el chat que tienes abierto"
+    }
   }
 }

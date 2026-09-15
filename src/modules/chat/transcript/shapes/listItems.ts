@@ -1,15 +1,18 @@
 import { Children, cloneElement, isValidElement } from 'react';
 import type { ReactElement, ReactNode } from 'react';
 
+import { checkGlyph, isTimeToken } from '@/modules/chat/transcript/shapes/detect';
 import type { HastNode } from '@/modules/chat/transcript/shapes/hast';
+import { readListItems } from '@/modules/chat/transcript/shapes/hast';
 
 /**
  * What the list shapes do to the RENDERED children of a list, once `detect.ts` has decided which
- * shape it is.
+ * shape it is — and the rung the list ladder lands on, so a second caller can ask the same question
+ * the renderer answers.
  *
- * It exists because `CheckResults` and `Timeline` both have to lift one leading token out of an
- * item and then draw everything that is left — and "everything that is left" has to be the
- * author's own rendered children, marks intact, not a re-render of the parsed text. That is the
+ * The token helpers exist because `CheckResults` and `Timeline` both have to lift one leading token
+ * out of an item and then draw everything that is left — and "everything that is left" has to be
+ * the author's own rendered children, marks intact, not a re-render of the parsed text. That is the
  * plan's central rule applied to a list: decide from `node`, render from `children`.
  *
  * It is a `.ts` module rather than a helper hanging off one of its consumers for the reason
@@ -17,7 +20,9 @@ import type { HastNode } from '@/modules/chat/transcript/shapes/hast';
  * Refresh for the component, which oxlint reports and this repo's warning ratchet does not allow
  * to rise. It holds no JSX and imports no shape. Used by `CheckResults.tsx` and `Timeline.tsx`
  * (both helpers), by `elements/blockquote.tsx`, which lifts an alert's `[!KIND]` marker off the
- * front of the quote with `liftLeadingToken`, and by `elements/list.tsx` for `listStart`.
+ * front of the quote with `liftLeadingToken`, and by `elements/list.tsx` for `listStart`, `listRung`
+ * and the task count — and by `LeadIn.tsx`, which asks `listRung` what the list under a lead-in line
+ * would draw.
  */
 
 /** What react-markdown hands an override: the hast node beside the already-rendered children. */
@@ -141,4 +146,75 @@ export function liftLeadingToken(
   }
 
   return null;
+}
+
+/** The direct `li` children of a list — the same walk, in the same order, `readListItems` uses. */
+export const listItemNodes = (node: HastNode): HastNode[] =>
+  (node.children ?? []).filter((child) => child.type === 'element' && child.tagName === 'li');
+
+/**
+ * Is THIS item a task — does it carry a checkbox of its very own?
+ *
+ * `readListItems` answers `checked` from the first checkbox ANYWHERE beneath the item
+ * (`hast.ts`'s `findCheckbox` recurses, and the plan fixes that reader's contract as
+ * "a first-descendant `input[type=checkbox]`"), which is the right answer for the shape that owns
+ * an item and the wrong one for the rung that decides whether the item is a task at all. A plain
+ * bullet that merely CONTAINS a task sub-list would inherit the sub-task's state:
+ *
+ *     - Setup
+ *       - [x] a
+ *       - [ ] b
+ *     - [ ] Deploy
+ *
+ * read as two tasks, one of them done — "1 of 2 done" over a list where nothing at the top level
+ * is done at all, and "Setup" drawn with neither a bullet nor a box.
+ *
+ * So this walk descends only where the item's own first line can be: through a `p`, which is where
+ * a LOOSE list puts it. It never enters a `ul` or an `ol`, which is exactly the boundary the
+ * shared reader cannot draw without breaking its own sealed contract.
+ */
+export const ownCheckbox = (item: HastNode): boolean | null => {
+  for (const child of item.children ?? []) {
+    if (child.type !== 'element') continue;
+    if (child.tagName === 'input' && child.properties?.type === 'checkbox') {
+      return child.properties?.checked === true;
+    }
+    if (child.tagName === 'p') {
+      const inParagraph = ownCheckbox(child);
+      if (inParagraph !== null) return inParagraph;
+    }
+  }
+  return null;
+};
+
+/**
+ * Which rung of the list ladder this node lands on, moved here out of `ShapeList` so a second
+ * caller asks the same question the renderer answers.
+ *
+ * Used by `elements/list.tsx`, which switches on it, and by `LeadIn.tsx`, which needs to know
+ * whether the list under a lead-in line frames itself and with what title. The conditions are the
+ * renderer's own, in the renderer's order — task list, then check results, then timeline — because
+ * that order is load-bearing rather than arbitrary: a task list whose items ALSO open with ✓ is
+ * still a task list, and swapping those two rungs would take the reader's checkboxes away and hand
+ * them a static pass/fail read-out of the list they were using to track work.
+ *
+ * `'none'` covers the empty list too: `every()` is vacuously true of nothing, and a list with no
+ * items is not a task list, a result set or a timeline. `ShapeList` gates that case itself before
+ * any rung runs; this module states it once so no caller can forget it.
+ */
+export function listRung(node: HastNode): 'tasks' | 'checks' | 'timeline' | 'none' {
+  const items = readListItems(node);
+  if (items.length === 0) return 'none';
+
+  const boxes = listItemNodes(node).map(ownCheckbox);
+  // Both halves are load-bearing. `every()` is vacuously true of nothing, so the length test is what
+  // keeps a node whose items this walk could not read — a list that `readListItems` counts and
+  // `listItemNodes` does not — from being called a task list on no evidence at all.
+  if (boxes.length === items.length && boxes.every((box) => box !== null)) return 'tasks';
+
+  const texts = items.map((item) => item.text);
+  if (items.length >= 2 && texts.every((text) => checkGlyph(text) !== null)) return 'checks';
+  if (items.length >= 2 && texts.every(isTimeToken)) return 'timeline';
+
+  return 'none';
 }

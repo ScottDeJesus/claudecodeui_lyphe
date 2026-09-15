@@ -36,6 +36,7 @@ import TokenUsageSummary from '@/modules/chat/composer/TokenUsageSummary';
 import QueuedMessageCard from '@/modules/chat/composer/QueuedMessageCard';
 import { ScheduleMessagePopover } from '@/modules/chat/composer/ScheduleMessagePopover';
 import { ScheduledMessageList } from '@/modules/chat/composer/ScheduledMessageList';
+import ComposerDeepSeekSwitch from '@/modules/chat/composer/ComposerDeepSeekSwitch';
 import ComposerModelMenu from '@/modules/chat/composer/ComposerModelMenu';
 import ComposerPermissionMenu from '@/modules/chat/composer/ComposerPermissionMenu';
 
@@ -272,6 +273,11 @@ export default function ChatComposer({
   );
   const isRecording = voiceState === 'recording';
   const isTranscribing = voiceState === 'transcribing';
+  // Named because TWO things in the footer turn on it: the mic is rendered by it, and the
+  // DeepSeek chip stands down on a narrow row by it. The row's room is decided by what the row
+  // actually holds, so the chip asks this question rather than assuming the mic is always here —
+  // an account with voice off has no mic, and on that phone the chip's 36px are free.
+  const voiceShown = Boolean(onVoiceTranscript && voiceAvailable);
 
   // A hold is only an alternate for SEND. While a turn is running the button means stop, while
   // a recording is live it means finish, and with nothing typed there is nothing to schedule —
@@ -487,7 +493,13 @@ export default function ChatComposer({
         </PromptInputBody>
 
         <PromptInputFooter className="flex-wrap gap-y-1">
-          <PromptInputTools className="min-w-0">
+          {/* At 320px with the voice button in the row, the widest of the operator's model labels
+              (Haiku 4.5, an 80px pill) leaves these two clusters 2px short of the track — and the
+              last thing on this row that can give ground is the space between the controls
+              themselves, so below the width the DeepSeek chip is offered from the gaps tighten
+              from 4px to 2px and the row stays one line. At 352 and up it is the 4px it always
+              was. Measured, not guessed. */}
+          <PromptInputTools className="min-w-0 gap-0.5 min-[352px]:gap-1">
             {/* The paperclip at every width. The desktop half of this used to spell "Attach a
                 file" in full, which was the widest thing in a row of icons and said no more
                 than the clip does. */}
@@ -499,7 +511,7 @@ export default function ChatComposer({
               <PaperclipIcon />
             </PromptInputButton>
 
-            {onVoiceTranscript && voiceAvailable && (
+            {voiceShown && (
               <VoiceInputButton state={voiceState} onToggle={voiceToggle} errorMsg={voiceError} />
             )}
 
@@ -537,14 +549,28 @@ export default function ChatComposer({
               {t('input.plainMode')}
             </Chip>
 
+            {/* Beside Plain because it is the same kind of thing — a mode the reader flips and then
+                looks at again later to remember which side it is on — and because the two are read
+                together. It carries its own server read; see ComposerDeepSeekSwitch, and is told
+                what the row holds rather than assuming it. */}
+            <ComposerDeepSeekSwitch yieldsToVoice={voiceShown} />
+
+            {/* The width rule lives on this wrapper, not on the button, because the button is not
+                what the row lays out: a tooltipped PromptInputButton puts a div of its own around
+                it, and a `display:none` button inside a live div still counts as a flex item — it
+                took a `gap-1` of 4px of the row at every width below `sm`, invisible and
+                unclickable, which is what tipped a 320px row onto a second line once the box had
+                text in it. `contents` at `sm` hands the tooltip's own div back to the flex row,
+                exactly where the button used to sit. */}
             {hasInput && (
-              <PromptInputButton
-                tooltip={{ content: t('input.clearInput', { defaultValue: 'Clear input' }) }}
-                onClick={onClearInput}
-                className="hidden sm:flex"
-              >
-                <XIcon />
-              </PromptInputButton>
+              <span className="hidden sm:contents">
+                <PromptInputButton
+                  tooltip={{ content: t('input.clearInput', { defaultValue: 'Clear input' }) }}
+                  onClick={onClearInput}
+                >
+                  <XIcon />
+                </PromptInputButton>
+              </span>
             )}
 
           </PromptInputTools>

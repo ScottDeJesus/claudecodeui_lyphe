@@ -16,7 +16,10 @@ import path from 'node:path';
  *   a per-write `mkstemp` scratch plus `os.replace`), called at `progress.py:151`, so a read
  *   caught mid-rewrite is a decode error on the old bytes or a clean read of the new ones —
  *   never a half-record with plausible fields.
- * - `run.json` — the run's own state. This lane reads exactly one field from it: `stopped_at`.
+ * - `run.json` — the run's own state. This lane reads two fields from it: `stopped_at`, and
+ *   `launched_by_session` — the Claude transcript uuid whose turn launched the run, kept RAW here
+ *   and resolved to an app session id by `plan-runner.module.ts` (`sessionsDb.resolveAppSessionId`).
+ *   This lane names no database, so the id it carries out is the disk's own spelling.
  * - `receipt.json` — its PRESENCE means the run is over; its `status` and `ended_at` say how and when,
  *   which the lane carries for a while so the operator sees the ending before it leaves the tab.
  * - `runner.log` — one appended line per stage change (`progress.py:155`).

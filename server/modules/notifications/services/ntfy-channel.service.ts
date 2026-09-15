@@ -108,6 +108,7 @@ function priorityFor(event: ChannelEvent): NtfyMessage['priority'] {
     case 'limit':
       return HARD_LIMIT_CODES.has(event.code ?? '') ? 4 : 3;
     case 'stop':
+    case 'background':
       return 2;
     default:
       return 3;

@@ -55,13 +55,13 @@ export function StatTiles({ tiles, collapseKey }: StatTilesProps) {
               {/* Wrapped, never truncated: an ellipsis would render less than the author wrote. */}
               <span
                 data-stat-label
-                className="break-words text-[11px] font-medium uppercase tracking-wide text-muted-foreground"
+                className="break-words text-md-body font-medium uppercase tracking-wide text-muted-foreground"
               >
                 {tile.label}
               </span>
               <span
                 data-stat-value
-                className="break-words font-serif text-3xl tabular-nums leading-none text-foreground"
+                className="break-words font-serif text-md-stat tabular-nums leading-none text-foreground"
               >
                 {tile.value}
               </span>
@@ -69,7 +69,7 @@ export function StatTiles({ tiles, collapseKey }: StatTilesProps) {
                 <span
                   data-stat-delta
                   data-tone={tone}
-                  className="inline-flex items-center gap-0.5 text-xs font-medium tabular-nums text-[color:var(--tone-ink)]"
+                  className="inline-flex items-center gap-0.5 text-md-meta font-medium tabular-nums text-[color:var(--tone-ink)]"
                 >
                   {Arrow ? <Arrow aria-hidden="true" className="h-3.5 w-3.5 flex-none" /> : null}
                   <span className="break-words">{tile.delta}</span>

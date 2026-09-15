@@ -248,3 +248,17 @@ export const LLM_PROVIDER_LABELS: Record<LLMProvider, string> = {
   codex: 'Codex',
   opencode: 'OpenCode',
 };
+
+// ---------------------------
+
+//----------------- CHAT MARKDOWN CARDS ------------
+
+/**
+ * The class a markdown surface carries to opt into the element cards painted by
+ * `src/modules/chat/transcript/markdownCards.css`. `Plain*` renders every markdown surface and
+ * only the wrapper knows which one, so the opt-in lives on the wrapper as one class.
+ *
+ * Applied by MessageComponent's reply, thinking and tool-text bodies, and by MarkdownContent for
+ * every tool markdown body. User message bubbles and tool errors deliberately do not carry it.
+ */
+export const MARKDOWN_CARDS_CLASS = 'chat-md-cards';

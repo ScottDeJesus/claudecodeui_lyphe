@@ -63,8 +63,10 @@ owns the fan-out:
 
 1. **Event preference.** The event's `kind` maps to one switch in the user's notification
    preferences (`KIND_TO_PREF_KEY`): `action_required` → `events.actionRequired`, `stop` →
-   `events.stop`, `error` → `events.error`, `limit` → `events.limits`. A kind with no switch
-   (`info`) always passes. All four default to on, and `events.limits` counts as on unless it is
+   `events.stop`, `error` → `events.error`, `limit` → `events.limits`, `background` →
+   `events.background`. A kind with no switch (`info`) always passes. The first four default to on;
+   `background` (a wait or a subagent finishing after the turn ended) defaults to off, because one
+   session's pipeline raises it on every return and it was 64 of 91 phone pushes in four hours, and `events.limits` counts as on unless it is
    stored as `false`, so a preferences save that omits it cannot turn it off.
 2. **Dedupe.** The same event key inside 20 seconds is dropped (`isDuplicate`).
 3. **Wording.** `buildNotificationPayload` resolves the session's display name and takes the title
@@ -81,7 +83,7 @@ The events raised today:
 | `permission.required` | `action_required` | The Claude runtime, when a tool waits for approval. Its `meta` carries the `requestId` and the raw `toolInput`, which is what lets the push carry answer buttons (§"Answering from the phone") |
 | `agent.notification` | `action_required` | The Claude runtime's Notification hook |
 | `run.stopped` | `stop` | All four runtimes (Claude, Codex, Cursor, OpenCode) when a run ends |
-| `run.background_completed` | `stop` | The Claude runtime, when background work finishes after its turn |
+| `run.background_completed` | `background` | The Claude runtime, when background work finishes after its turn |
 | `run.failed` | `error` | All four runtimes, when a run crashes; and the Claude runtime again for a `result` message that carries an error |
 | `run.limit` | `error` | The Claude runtime, when a run ends on its max-turns or max-budget ceiling |
 | `api.error` | `error` | The Claude runtime, when the assistant reports a request it could not make — after the SDK has spent its retries |
@@ -151,8 +153,9 @@ The screen for all of it is **Settings → Notifications → Phone push (ntfy)**
 (`src/modules/settings/NtfySettingsCard.tsx` over `useNtfySettings.ts`). It saves a patch, not
 the form: only fields the user actually changed are sent, which is what lets a card that can
 never see the stored token leave it alone. Which *kinds* reach any channel is the same screen's
-"Event Types" checkboxes — Action required, Run stopped, Run failed, Usage limits — which write
-`events.actionRequired`, `events.stop`, `events.error` and `events.limits`.
+"Event Types" checkboxes — Action required, Run stopped, Run failed, Usage limits, Background agents
+finished — which write `events.actionRequired`, `events.stop`, `events.error`, `events.limits` and
+`events.background`.
 
 | Field | Default | Accepted |
 | --- | --- | --- |
@@ -202,7 +205,7 @@ pushed, because "it finished" without "how long" is noise. All four runtimes pas
 Claude reports the SDK's own `duration_ms` for a turn that ended on a `result`, and Codex, Cursor
 and OpenCode measure the wall clock from the moment they spawned the run. The one path that
 passes none is a Claude run that ends without a `result`, so that finished run reaches web push
-and the desktop app but not ntfy. `run.background_completed` is not gated.
+and the desktop app but not ntfy. `run.background_completed` is gated by `events.background`, off by default.
 
 **Not while you are watching.** An event about a session one of your browser tabs has on screen
 is not pushed. The channel asks `isSessionWatched(userId, sessionId)`

@@ -1,11 +1,11 @@
 import type { ReactNode } from 'react';
 
-import { classifyTable, soleNumericColumn } from '@/modules/chat/transcript/shapes/detect';
+import { soleNumericColumn } from '@/modules/chat/transcript/shapes/detect';
 import type { HastNode } from '@/modules/chat/transcript/shapes/hast';
-import { hasInlineFormatting, readTable } from '@/modules/chat/transcript/shapes/hast';
+import { readTable } from '@/modules/chat/transcript/shapes/hast';
 import { ChipsSuppressedContext } from '@/modules/chat/transcript/shapes/chipContext';
 import { shapeKey } from '@/modules/chat/transcript/shapes/collapseState';
-import { dataTableKind, tablePayload } from '@/modules/chat/transcript/shapes/tableData';
+import { dataTableKind, tablePayload, tableRung } from '@/modules/chat/transcript/shapes/tableData';
 import { BeforeAfter } from '@/modules/chat/transcript/shapes/BeforeAfter';
 import { DataTable } from '@/modules/chat/transcript/shapes/DataTable';
 import { DecisionMatrix } from '@/modules/chat/transcript/shapes/DecisionMatrix';
@@ -74,27 +74,29 @@ export function PlainTableCell({ children }: PlainElementProps) {
  * pair whose cells carry inline marks. The second is the decline `hasInlineFormatting` exists for:
  * those two shapes re-lay-out cells into cards and cannot carry rendered children across that move,
  * so a table of `code` spans stays a readable table rather than becoming a lossy card grid.
+ *
+ * Both of those decisions are `tableRung`, in `shapes/tableData.ts` — this component draws the rung
+ * it is handed rather than deciding again, because `LeadIn` has to ask the same question of the
+ * table beneath a lead-in line.
  */
 export function ShapeTable({ node, children }: PlainElementProps) {
-  const table = node ? readTable(node) : null;
+  const rung = tableRung(node);
+  const table = rung === 'none' || !node ? null : readTable(node);
   if (!table) return <PlainTable>{children}</PlainTable>;
 
-  const classification = classifyTable(table);
   const payload = tablePayload(table);
 
-  if (classification === 'decision-matrix' || classification === 'before-after') {
-    if (hasInlineFormatting(node)) return <PlainTable>{children}</PlainTable>;
-    return classification === 'decision-matrix' ? (
-      <DecisionMatrix data={table} collapseKey={shapeKey('decision-matrix', payload)} />
-    ) : (
-      <BeforeAfter data={table} collapseKey={shapeKey('before-after', payload)} />
-    );
+  if (rung === 'decision-matrix') {
+    return <DecisionMatrix data={table} collapseKey={shapeKey('decision-matrix', payload)} />;
+  }
+  if (rung === 'before-after') {
+    return <BeforeAfter data={table} collapseKey={shapeKey('before-after', payload)} />;
   }
 
-  // Every other table — `data-bars` and `plain` alike — is the same sortable, copyable table; the
+  // Every other table — `data-bars` and `table` alike — is the same sortable, copyable table; the
   // only difference is whether one column earned a bar. `DataTable` renders `children`'s own rows,
   // so this arm needs no formatting decline: nothing is re-laid-out and nothing can be flattened.
-  const barColumn = classification === 'data-bars' ? soleNumericColumn(table) : null;
+  const barColumn = rung === 'data-bars' ? soleNumericColumn(table) : null;
   return (
     <DataTable data={table} barColumn={barColumn} collapseKey={shapeKey(dataTableKind(barColumn), payload)}>
       {children}

@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState, type Dispatch, type Se
 import { useTranslation } from 'react-i18next';
 
 import { ChatInterface, type ChatExportSurface, type TokenUsageSurface } from '@/modules/chat';
+import { ChatGutterLayout } from '@/modules/chat-gutters';
 import { FileManager } from '@/modules/file-manager';
 import { StandaloneShell } from '@/modules/standalone-shell';
 import { GitRepositoriesPanel } from '@/modules/git-panel';
@@ -308,26 +309,33 @@ function WorkspaceMain({
       <div className="flex min-h-0 min-w-[200px] flex-1 flex-col overflow-hidden">
         <div className={`h-full ${activeTab === 'chat' ? 'block' : 'hidden'}`}>
           <WorkspaceErrorBoundary showDetails>
-            <ChatInterface
-              isActive={activeTab === 'chat'}
-              selectedProject={selectedProject}
-              selectedSession={selectedSession}
-              ws={ws}
-              sendMessage={sendMessage}
-              onFileOpen={handleFileOpen}
-              onNavigateToSession={onNavigateToSession}
-              onSessionEstablished={onSessionEstablished}
-              onShowSettings={onShowSettings}
-              showRawParameters={showRawParameters}
-              showThinking={showThinking}
-              showWork={showWork}
-              sendByCtrlEnter={sendByCtrlEnter}
-              externalMessageUpdate={externalMessageUpdate}
-              newSessionTrigger={newSessionTrigger}
-              onTokenUsageSurface={setTokenUsageSurface}
-              onChatExportSurface={setChatExportSurface}
-              onShowAllTasks={shouldShowTasksTab ? showAllTasks : null}
-            />
+            {/* The gutters wrap the chat from OUTSIDE, so the transcript and the composer keep
+                their own column untouched. The boundary is handed down rather than imported
+                there: each widget body gets its own, and a crashing widget cannot blank the
+                chat tab. */}
+            <ChatGutterLayout enabled={!isMobile} sessionId={selectedSession?.id ?? null}
+              boundary={WorkspaceErrorBoundary}>
+              <ChatInterface
+                isActive={activeTab === 'chat'}
+                selectedProject={selectedProject}
+                selectedSession={selectedSession}
+                ws={ws}
+                sendMessage={sendMessage}
+                onFileOpen={handleFileOpen}
+                onNavigateToSession={onNavigateToSession}
+                onSessionEstablished={onSessionEstablished}
+                onShowSettings={onShowSettings}
+                showRawParameters={showRawParameters}
+                showThinking={showThinking}
+                showWork={showWork}
+                sendByCtrlEnter={sendByCtrlEnter}
+                externalMessageUpdate={externalMessageUpdate}
+                newSessionTrigger={newSessionTrigger}
+                onTokenUsageSurface={setTokenUsageSurface}
+                onChatExportSurface={setChatExportSurface}
+                onShowAllTasks={shouldShowTasksTab ? showAllTasks : null}
+              />
+            </ChatGutterLayout>
           </WorkspaceErrorBoundary>
         </div>
 

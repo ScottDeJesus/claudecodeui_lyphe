@@ -240,5 +240,35 @@
   },
   "shapes": {
     "diagramFailed": "Dieses Diagramm konnte nicht gezeichnet werden – der Quelltext wird angezeigt."
+  },
+  "gutters": {
+    "runner": {
+      "title": "Läufe"
+    },
+    "memory": {
+      "title": "Erinnerungen",
+      "pending": "Warten auf Prüfung",
+      "recent": "Zuletzt abgelegt",
+      "recentEmpty": "Noch nichts abgelegt",
+      "pendingEmpty": "Nichts wartet"
+    },
+    "subagents": {
+      "title": "Subagenten",
+      "empty": "Keine Subagenten in diesem Chat",
+      "back": "Zurück zu den Subagenten",
+      "loading": "Transkript wird geladen…",
+      "notFound": "Noch kein Transkript auf der Festplatte",
+      "failed": "Das Transkript konnte nicht gelesen werden",
+      "live": "Live",
+      "showEarlier": "Frühere Schritte anzeigen",
+      "openRow": "Transkript von {{name}} lesen"
+    },
+    "open": "{{name}} öffnen",
+    "collapse": "Einklappen",
+    "dragHint": "In einen anderen Bereich ziehen",
+    "pin": {
+      "label": "Diese Sitzung",
+      "title": "Von dem Chat erstellt, den du geöffnet hast"
+    }
   }
 }

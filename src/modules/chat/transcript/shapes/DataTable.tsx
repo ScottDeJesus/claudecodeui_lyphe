@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { ArrowDownIcon, ArrowUpDownIcon, ArrowUpIcon, CheckIcon, CopyIcon } from 'lucide-react';
 
 import { Meter } from '@/shared/ui';
-import { copyTextToClipboard } from '@/shared/utils';
+import { cn, copyTextToClipboard } from '@/shared/utils';
 import { ChipsSuppressedContext } from '@/modules/chat/transcript/shapes/chipContext';
 import type { TableData } from '@/modules/chat/transcript/shapes/detect';
 import type { HastNode } from '@/modules/chat/transcript/shapes/hast';
@@ -184,10 +184,13 @@ export function DataTable({ data, barColumn, collapseKey, children }: DataTableP
       title={t('shapes.copyCsv')}
       className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 transition-colors hover:bg-muted hover:text-foreground"
     >
+      {/* Sized in `em`, like the frame's own chevron and icon: the actions slot reads
+          `text-md-meta`, so `1em` is today's 14px at the default chat size and grows with the
+          label beside it when the reader raises that setting, instead of staying 14px. */}
       {copied ? (
-        <CheckIcon aria-hidden="true" className="h-3.5 w-3.5 text-accent-ink" />
+        <CheckIcon aria-hidden="true" className="h-[1em] w-[1em] text-accent-ink" />
       ) : (
-        <CopyIcon aria-hidden="true" className="h-3.5 w-3.5" />
+        <CopyIcon aria-hidden="true" className="h-[1em] w-[1em]" />
       )}
       <span className="hidden sm:inline">{copied ? t('shapes.copied') : t('shapes.copyCsv')}</span>
     </button>
@@ -211,8 +214,11 @@ export function DataTable({ data, barColumn, collapseKey, children }: DataTableP
       {/* The frame's own inset is cancelled so the header band reaches the border, and the table
           scrolls sideways on a phone instead of squeezing every column down to nothing. */}
       <div className="-mx-3 -my-2 overflow-x-auto">
-        <table className="my-0 min-w-full border-collapse text-sm">
-          <thead className="bg-muted/60">
+        {/* The body rows are `PlainTableRow`'s own element and this module cannot reach their
+            className, so the row hover is hung off the TABLE as a descendant variant: the same
+            `bg-primary/[0.04]` wash, painted on whichever `tr` the pointer is over. */}
+        <table className="my-0 min-w-full border-collapse text-md-body [&_tbody_tr:hover]:bg-primary/[0.04]">
+          <thead className="bg-primary/[0.05]">
             {/* A header is a label and, when sortable, the sort button: an inline code path in it
                 stays a code span rather than a chip, which would be a button inside that button. */}
             <ChipsSuppressedContext.Provider value={true}>
@@ -239,7 +245,7 @@ export function DataTable({ data, barColumn, collapseKey, children }: DataTableP
                     key={column}
                     scope="col"
                     aria-sort={direction === 'asc' ? 'ascending' : direction === 'desc' ? 'descending' : 'none'}
-                    className="border-b border-border px-3 py-2 text-left font-semibold text-foreground"
+                    className={cn('border-b border-border px-3 py-2 text-left font-semibold', direction ? 'text-accent-ink' : 'text-foreground')}
                   >
                     {!interactive ? (
                       label

@@ -22,6 +22,19 @@ export const KNOWN_EXTENSIONS: readonly string[] = [
 ];
 const KNOWN_EXTENSION_SET = new Set<string>(KNOWN_EXTENSIONS);
 
+/**
+ * Names a dotfile may have and still be treated as a file, with no `:line` to vouch for it. A
+ * dotfile has no name before its dot, so the grammar reads its whole name into the extension slot;
+ * this list is that slot's `KNOWN_EXTENSIONS`. Letters and digits only — the slot admits nothing
+ * else, so `.bash_profile` is not a candidate and does not belong here.
+ */
+export const KNOWN_DOTFILES: readonly string[] = [
+  'env', 'envrc', 'gitignore', 'gitattributes', 'gitmodules', 'editorconfig', 'npmrc', 'nvmrc',
+  'prettierrc', 'eslintrc', 'babelrc', 'dockerignore', 'htaccess', 'bashrc', 'zshrc', 'profile',
+  'zprofile', 'vimrc',
+];
+const KNOWN_DOTFILE_SET = new Set<string>(KNOWN_DOTFILES);
+
 /** What a file reference's chip can preview under it. */
 export type PreviewKind = 'image' | 'pdf';
 
@@ -106,15 +119,22 @@ export function parseFileRef(
   const match = FILE_REF_RE.exec(trimmed);
   if (!match) return null;
   const [, stemPath, extension, lineText, columnText] = match;
-  // The final segment needs a real name: `src/.ts` and `src/..ts` are not files.
+  // The final segment is a name (`src/a.ts`) or empty, which makes the reference a dotfile
+  // (`src/.env`) whose whole name sits in the extension slot. `src/..ts` is neither: a segment of
+  // only dots is not a file.
   const finalSegment = stemPath.slice(stemPath.lastIndexOf('/') + 1);
-  if (!/[A-Za-z0-9_+@~-]/.test(finalSegment)) return null;
+  const dotfile = finalSegment === '';
+  if (!dotfile && !/[A-Za-z0-9_+@~-]/.test(finalSegment)) return null;
   // A suffix outside `LINE_NUMBER` fails the anchored match above, so the WHOLE reference is
   // rejected rather than quietly dropped to `line: null`: the text then stays plain and the reader
   // keeps every character the author wrote, where returning the bare path would render a chip
   // missing the `:0` or `:007` it was written with.
   if (requireSeparator && !stemPath.includes('/')) return null;
-  if (requireKnownExtension && lineText === undefined && !KNOWN_EXTENSION_SET.has(extension.toLowerCase())) {
+  // A dotfile is vouched for the way an unknown extension is: by a name on the known list, or by a
+  // `:line`. `src/.ts` therefore stays plain (`ts` names no dotfile) while `src/.ts:12` chips.
+  if (dotfile) {
+    if (lineText === undefined && !KNOWN_DOTFILE_SET.has(extension.toLowerCase())) return null;
+  } else if (requireKnownExtension && lineText === undefined && !KNOWN_EXTENSION_SET.has(extension.toLowerCase())) {
     return null;
   }
   return {
@@ -141,8 +161,15 @@ export function parseFileRef(
  */
 export const FILE_REF_SCAN = new RegExp(
   `(?<![${SEGMENT_CHARS}:/])` +
-    `(?:[${SEGMENT_CHARS}]+/)+[${SEGMENT_CHARS}]*[A-Za-z0-9_+@~-]` +
+    // A leading `/` is allowed — an absolute path starts with one — and the lookbehind still refuses
+    // every `/` inside a URL, where the character before it is a letter, a `/` or a `:`.
+    `/?(?:[${SEGMENT_CHARS}]+/)+` +
+    // The final segment: a name with its extension, or a dotfile, whose whole name is vouched for
+    // the way an unknown extension is — by `KNOWN_DOTFILES` or by a `:line`. `parseFileRef` reads
+    // both the same way; `src/..ts` fits neither branch.
+    `(?:[${SEGMENT_CHARS}]*[A-Za-z0-9_+@~-]` +
     `\\.(?:(?:${KNOWN_EXTENSIONS.join('|')})(?:${LINE_SUFFIX})?|${EXTENSION}${LINE_SUFFIX})` +
+    `|\\.(?:(?:${KNOWN_DOTFILES.join('|')})(?:${LINE_SUFFIX})?|${EXTENSION}${LINE_SUFFIX}))` +
     // Both halves of the suffix grammar are the shared `LINE_SUFFIX`, and `(?!:\d)` closes the
     // last gap between the two readers: without it, a run the whole-text parser rejects for its
     // suffix (`src/a.ts:0`, `src/a.ts:007`) would still be scanned here as the bare path, and the

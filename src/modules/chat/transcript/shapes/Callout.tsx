@@ -1,5 +1,7 @@
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Info, Lightbulb, MessageSquareWarning, OctagonAlert, TriangleAlert } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 
 import type { Tone } from '@/shared/types';
 import { Banner } from '@/shared/ui';
@@ -34,6 +36,22 @@ const TONE_BY_KIND: Record<AlertKind, Tone> = {
 };
 
 /**
+ * The icon each alert kind wears in its frame's header, and the whole of the mapping.
+ *
+ * `ShapeFrame`'s registry carries one icon per KIND, and all five alerts are the one `callout`
+ * kind — so the frame would draw `Info` five times over and the kind's word would become the only
+ * channel telling a `tip` from a `caution`. The icon is the kind's own, drawn beside the tone the
+ * map above picked, which is what lets an alert be recognised before its word is read.
+ */
+const ICON_BY_KIND: Record<AlertKind, LucideIcon> = {
+  note: Info,
+  tip: Lightbulb,
+  important: MessageSquareWarning,
+  warning: TriangleAlert,
+  caution: OctagonAlert,
+};
+
+/**
  * A `> [!NOTE]` alert as a titled, toned banner.
  *
  * Used by `elements/blockquote.tsx` and nothing else. The title is the kind's own translated word
@@ -50,7 +68,13 @@ export function Callout({ kind, collapseKey, children }: CalloutProps) {
   const { t } = useTranslation('chat');
 
   return (
-    <ShapeFrame kind="callout" title={t(`shapes.alert.${kind}`)} collapseKey={collapseKey}>
+    <ShapeFrame
+      kind="callout"
+      title={t(`shapes.alert.${kind}`)}
+      collapseKey={collapseKey}
+      tone={TONE_BY_KIND[kind]}
+      icon={ICON_BY_KIND[kind]}
+    >
       {/* The banner keeps the frame's own inset rather than bleeding to the border, so a callout
           sits in the transcript the way `DecisionMatrix`'s cards do — one shape vocabulary, not
           two. `Banner` draws its own 10px radius, which a flush strip would clip against the

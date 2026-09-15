@@ -2,6 +2,7 @@ import { memo, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { GitBranchIcon, PencilIcon } from 'lucide-react';
 
+import { MARKDOWN_CARDS_CLASS } from '@/shared/constants';
 import { LLMProviderLogo } from '@/shared/ui';
 import { cn } from '@/shared/utils';
 
@@ -296,7 +297,7 @@ const MessageComponent = memo(({ message, prevMessage, previewAnchor = '', isRun
               <>
                 <div className="flex flex-col">
                   <div className="flex flex-col">
-                    <Markdown className={TRANSCRIPT_PROSE}>
+                    <Markdown className={cn(TRANSCRIPT_PROSE, MARKDOWN_CARDS_CLASS)}>
                       {String(message.displayText || '')}
                     </Markdown>
                   </div>
@@ -363,7 +364,7 @@ const MessageComponent = memo(({ message, prevMessage, previewAnchor = '', isRun
                   )}
                 />
                 <ReasoningContent>
-                  <Markdown className={cn(TRANSCRIPT_PROSE, 'prose-gray')}>
+                  <Markdown className={cn(TRANSCRIPT_PROSE, 'prose-gray', MARKDOWN_CARDS_CLASS)}>
                     {message.content}
                   </Markdown>
                   {!isExporting && (
@@ -427,7 +428,7 @@ const MessageComponent = memo(({ message, prevMessage, previewAnchor = '', isRun
                     <StreamingMarkdown
                       content={content}
                       isStreaming={Boolean(message.isStreaming)}
-                      className={cn(TRANSCRIPT_PROSE, 'prose-gray')}
+                      className={cn(TRANSCRIPT_PROSE, 'prose-gray', MARKDOWN_CARDS_CLASS)}
                     />
                   ) : (
                     <div className="whitespace-pre-wrap">

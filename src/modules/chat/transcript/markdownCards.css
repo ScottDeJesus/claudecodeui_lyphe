@@ -1,0 +1,116 @@
+/*
+ * Chat markdown element cards. Plain* renders every markdown surface and only the
+ * wrapper knows which one, so a surface opts in by carrying chat-md-cards.
+ * On a carded surface this file overrides PlainList's padding, list style and
+ * marker colour, and PlainRule's border, by specificity alone; it changes no DOM.
+ *
+ * The card's marks are the accent INK (`text-accent-ink`), and its washes are the
+ * accent FILL at low alpha (`bg-primary/…`) — the pair Verve draws between a green
+ * word and a green shape. The frame itself stays the neutral hairline it was.
+ */
+
+/* R1 — a plain list becomes a card: framed, filled, rounded, and room kept for the numbers.
+   The one list it skips is the one a lead-in frame already wrapped: that frame is the card, and the
+   paragraph above it is the card's header, so painting the list again would nest border in border. */
+.chat-md-cards :is(ul, ol):not(li *, blockquote *, section.footnotes *, .not-prose, .not-prose *, [data-shape="list"] *):not(:has(input[type='checkbox'])) {
+  @apply rounded-xl border border-border bg-card/50 py-2.5 pr-4;
+}
+
+/* R2 — a carded bullet list's markers keep room inside the card's left edge. */
+.chat-md-cards ul:not(li *, blockquote *, section.footnotes *, .not-prose, .not-prose *):not(:has(input[type='checkbox'])) {
+  @apply pl-9;
+}
+
+/* R3 — a carded numbered list drops its native markers and widens the gutter for the badges. */
+.chat-md-cards ol:not(li *, blockquote *, section.footnotes *, .not-prose, .not-prose *):not(:has(input[type='checkbox'])) {
+  @apply list-none pl-11;
+}
+
+/* R4 — the anchor each number badge is positioned against. */
+.chat-md-cards ol:not(li *, blockquote *, section.footnotes *, .not-prose, .not-prose *):not(:has(input[type='checkbox'])) > li {
+  @apply relative;
+}
+
+/* R5 — the number, a pill in the gutter; counter(list-item) is the browser's own, so start holds. */
+.chat-md-cards ol:not(li *, blockquote *, section.footnotes *, .not-prose, .not-prose *):not(:has(input[type='checkbox'])) > li::before {
+  content: counter(list-item);
+  @apply absolute right-full top-1 mr-2 flex h-5 min-w-5 items-center justify-center rounded-full border border-primary/30 bg-primary/10 px-1 text-md-meta font-semibold leading-none tabular-nums text-accent-ink;
+}
+
+/* R6 — every marker on a carded surface is the accent ink, not the item's own colour. */
+.chat-md-cards :is(ul, ol):not(.not-prose *) > li::marker {
+  @apply text-accent-ink;
+}
+
+/* R7 — a list nested inside a card keeps the card it sits in and returns to circle bullets. */
+.chat-md-cards li ul:not(.not-prose *) {
+  @apply list-[circle];
+}
+
+/* R8 — a quotation takes a wash and a rounded corner, against a bar of the accent. */
+.chat-md-cards blockquote:not(.not-prose, .not-prose *) {
+  @apply rounded-r-lg border-l-primary bg-primary/5 py-2 pr-4;
+}
+
+/* R9 — a rule becomes a hairline that fades out at both ends. */
+.chat-md-cards hr:not(.not-prose *) {
+  @apply h-px border-0 bg-gradient-to-r from-transparent via-border to-transparent;
+}
+
+/* R10 — a visible h1/h2 is underlined; the screen reader's footnote heading is not. */
+.chat-md-cards :is(h1, h2):not(.sr-only, .not-prose *) {
+  @apply border-b border-border pb-1;
+}
+
+/* R11 — the footnotes block is itself a card, and its own list is not a card inside it. */
+.chat-md-cards section.footnotes {
+  @apply rounded-xl border border-border bg-card/50 px-4 py-3 text-md-meta;
+}
+
+/* R12 — a footnote reference is a small chip in the accent ink, on the accent's own wash. The
+   `:not()` is load-bearing in dark: `MarkdownLink` inks every anchor `text-blue-600
+   dark:text-blue-400`, and Tailwind's `dark:` variant is `.dark .…`, which outranks a two-token
+   selector. Naming the NOT-PROSE scope here is also what keeps the chip off a shape's own anchor. */
+.chat-md-cards sup > a:not(.not-prose *) {
+  @apply rounded bg-primary/10 px-1 text-md-meta no-underline text-accent-ink;
+}
+
+/* R13 — an inline image is framed and rounded. */
+.chat-md-cards img:not(.not-prose *) {
+  @apply rounded-lg border border-border;
+}
+
+/* R14 — struck-through words take the muted ink. The NOT-PROSE scope is not decoration: these two
+   are the only rules that paint an element a shape may also render (`del` and display maths appear
+   inside a callout or a checking panel), and without it the thinking panel — a `.not-prose` subtree
+   that carries the cards class (`Reasoning.tsx`) — would have a struck word and a full-width maths
+   block painted while its lists, quotes and headings stay plain. */
+.chat-md-cards del:not(.not-prose *) {
+  @apply text-muted-foreground;
+}
+
+/* R15 — display maths scrolls sideways rather than overflowing, on a wash of its own. Same scope,
+   same reason as R14. */
+.chat-md-cards .katex-display:not(.not-prose *) {
+  @apply overflow-x-auto rounded-lg bg-muted/50 px-3 py-2;
+}
+
+/* R16 — an item that opens with a bold label draws that label as the card's own title: its own
+   line, in the accent ink, with the item's words beneath it. `**Root cause:** …` is the form the
+   author writes such a label in, and a browser cannot read a colon out of a text node — so the
+   gate is the bold lead-in itself, which is what carries the label. Both spellings are here: a
+   tight item's label is the `li`'s first child, and a loose one's sits first inside the paragraph
+   the renderer spells as a `div` (`li > p > strong` matches nothing in this tree). The cost is
+   named rather than hidden: the trigger is ANY bold lead-in, colon or not, so an item that opens
+   `**Important** and then the rest` is titled too, and so is an item that is bold from end to end.
+   A label with a body, a bold word at the head of a sentence, and a wholly bold item are the same
+   element with the same element siblings — the only difference is a text node, and no selector
+   reads one of those, nor a colon inside one. */
+.chat-md-cards :is(li > strong:first-child, li > div:first-child > strong:first-child):not(.not-prose *) {
+  @apply block text-accent-ink;
+}
+
+/* R17: a table outside a shape (the streaming half) takes the body size over PlainTable's own smaller one. */
+.chat-md-cards table:not(.not-prose *) {
+  @apply text-md-body;
+}

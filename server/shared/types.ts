@@ -206,6 +206,7 @@ export type GatewayEventKind =
   | 'session_upserted'
   | 'loading_progress'
   | 'runner_state'
+  | 'soul_launch_state'
   | 'protocol_error';
 
 /**
@@ -276,6 +277,10 @@ export type RunnerPosition = { rank: number; total: number; phase_id: string; ti
  * One run as this lane reads it off disk. Every field but `state` and `timeline` is `progress.json`'s own;
  * `state` is this lane's classification and `timeline` is `runner.log` parsed.
  *
+ * `launched_by_session` is the APP session id of the chat whose turn launched the run. `run.json`'s raw
+ * `launched_by_session` (a Claude transcript uuid) is resolved through `sessionsDb.resolveAppSessionId` by
+ * `plan-runner.module.ts` before any snapshot leaves the server. `null` when absent or not a non-empty string.
+ *
  * `stopped_at` is `run.json`'s, `null` when the run was never parked. `outcome` and `ended_at` are the receipt's `status` and
  * `ended_at`, `null` until the run ends; `outcome` is the runner's own word (`complete`, `halted`, `all-blocked`, `budget`, `flag-off`) and is shown, never branched on beyond its tone. `pid` is the runner process the run
  * last announced — a fact to show, never something to signal: this server does not own that process.
@@ -284,13 +289,36 @@ export type RunnerPosition = { rank: number; total: number; phase_id: string; ti
  * `blocked_causes` is the receipt's `blocked` map, phase id → the cause the runner wrote (`crash`, `budget`, `athena: …`), `{}` until
  * the run ends. It is the only record of a phase the runner halted on a crash or a budget: that phase's row never turns `blocked`.
  */
-export type RunnerRunSnapshot = { run_id: string; plan_path: string; plan_title: string; state: RunnerRunState; status: string; started_at: number; heartbeat_at: number; stopped_at: number | null; outcome: string | null; ended_at: number | null; blocked_causes: Record<string, string>; pid: number | null; position: RunnerPosition | null; phases: RunnerPhaseRow[]; spawns: number; max_spawns: number; cost_usd: number; plan_runs: number; plan_spawns: number; plan_cost_usd: number; plan_planning_usd: number; plan_review_usd: number; plan_scouts_usd: number; plan_total_usd: number; tokens: number; plan_tokens: number; line: string; timeline: RunnerTimelineEntry[] };
+export type RunnerRunSnapshot = { run_id: string; plan_path: string; plan_title: string; state: RunnerRunState; status: string; started_at: number; heartbeat_at: number; stopped_at: number | null; launched_by_session: string | null; outcome: string | null; ended_at: number | null; blocked_causes: Record<string, string>; pid: number | null; position: RunnerPosition | null; phases: RunnerPhaseRow[]; spawns: number; max_spawns: number; cost_usd: number; plan_runs: number; plan_spawns: number; plan_cost_usd: number; plan_planning_usd: number; plan_review_usd: number; plan_scouts_usd: number; plan_total_usd: number; tokens: number; plan_tokens: number; line: string; timeline: RunnerTimelineEntry[] };
 /** The whole picture, pushed on change over `/ws`. `runs` is ordered by `started_at` ascending, oldest first, the order the terminal bar uses. `at` is epoch MILLISECONDS (`Date.now()`), unlike every field inside a snapshot. */
 export type RunnerStateEvent = { kind: 'runner_state'; runs: RunnerRunSnapshot[]; at: number };
 /** The two verbs this server may relay. Starting a run needs a plan and an intent lock and is `/execute`'s act, never a button's. */
 export type RunnerVerb = 'stop' | 'resume';
 /** What one relayed verb did. `ok` is the runner's own exit being 0 — a refusal is a RESULT, not an error, and `stderr` carries the runner's own line whole so the reader sees the verdict rather than our paraphrase. `reason` is present only when the runner never got to answer: it timed out, or its binary could not be spawned. */
 export type RunnerVerbResult = { ok: boolean; verb: RunnerVerb; run_id: string; exit: number | null; stdout: string; stderr: string; reason?: 'timeout' | 'spawn-failed' };
+/**
+ * How a launcher soul is going while it is out, and how it ended once its receipt landed.
+ *
+ * `stopped` is a cap, not a fault — the wrapper's own hour or its idle bound ended the child — and
+ * it is kept apart from `failed` for the same reason the pinned agents keep them apart: the
+ * reader's next move differs. These are the pinned strip's own words, one lane down the app.
+ */
+export type SoulLaunchState = 'running' | 'completed' | 'failed' | 'stopped';
+/**
+ * One launcher soul — a `/dispatch` hand started through `plan-runner soul` — as its pin draws it.
+ *
+ * `provider` is the one the pin PAINTS, and it is settled the way a bill is: `result.json`'s word
+ * once that landed, and `spec.json`'s pin before then, because that is the only reading there is.
+ * `blocked` marks a launch DeepSeek refused or never answered: it did no work, and the launcher
+ * never re-routes a soul to Claude.
+ *
+ * Every timestamp is epoch SECONDS, which is what the launcher's Python wrote with `time.time()`.
+ * `cost_usd`, `tokens` and `duration_s` are `null` until the receipt lands: a live soul's spend is
+ * not knowable from here, and a zero would read as "free" rather than as "not yet".
+ */
+export type SoulLaunchSnapshot = { launch_id: string; role: string; agent: string; brief: string; provider: 'deepseek' | 'claude'; blocked: boolean; state: SoulLaunchState; status: string; cause: string; started_at: number; ended_at: number | null; duration_s: number | null; cost_usd: number | null; tokens: number | null };
+/** The whole picture, pushed on change over `/ws`. `launches` is ordered by `started_at` ascending, oldest first. `at` is epoch MILLISECONDS (`Date.now()`), unlike every field inside a snapshot. */
+export type SoulLaunchStateEvent = { kind: 'soul_launch_state'; launches: SoulLaunchSnapshot[]; at: number };
 // ---------------------------
 
 /**
@@ -570,6 +598,13 @@ export type FetchHistoryResult = {
    * (`collectSessionAgents`). Only on a latest page (offset 0).
    */
   agents?: NormalizedMessage[];
+  /**
+   * The launcher souls this conversation STARTED, from the WHOLE history whatever page was asked
+   * for (`collectSessionSoulLaunches`), as launch ids the pinned strip joins against the
+   * dispatch-souls lane. Only on a latest page (offset 0). An empty list is a real answer — this
+   * history started no soul — and never a missing one.
+   */
+  soulLaunches?: string[];
 };
 
 // ---------------------------
@@ -1584,11 +1619,11 @@ export type DescentUsage =
   | { reachable: true; windows: DescentUsageWindow[]; degraded: boolean; reason: string; staleSince: number | null; checkedAt: number }
   | { reachable: false; reason: string };
 /** One row of Descent's memory-intake list, camelCased from its snake_case (`asserted_path`, `created_at`, `reviewed_at`). LEAN: no `body`, no `rationale` — enough to decide, not to read (`store_memory.py:88-106`); the body arrives from the by-id read for the ONE card the operator expands.
- *  `refusal` is the cap guard's own plain-English text, recorded on the row when an approve was refused — it stays on a PENDING card and is cleared on the next approve, so a non-null `refusal` means "still waiting, and here is what to trim", never "gone". `status` is Descent's word (`pending` while it is listed here); `assertedPath` is the file an approved card landed in and is `null` until then. */
-export type MemoryCandidateLean = { id: string; name: string; target: string; project: string | null; status: string; source: string | null; assertedPath: string | null; refusal: string | null; createdAt: string | null; reviewedAt: string | null };
-/** One candidate read whole. `body` is the memory's proposed text and is REQUIRED — a full read without one is not a reading, so it fails the read rather than arriving empty. `indexLine`, `rationale` and `sessionId` are `null` when the staging never supplied them. Operator-authored free text throughout: it reaches the DOM as a text node, never as markup. */
-export type MemoryCandidateFull = MemoryCandidateLean & { body: string; indexLine: string | null; rationale: string | null; sessionId: string | null };
-/** The pending list, or the calm reason it is unknown — a read never fails. `reason` is one of this proxy's three words (`unreachable`|`timeout`|`bad-response`) and never Descent's text. `candidates` is whole or absent: one row missing `id`, `name` or `target` fails the WHOLE read as `bad-response`, because a silently shortened queue reads as "nothing to review". Descent caps the list at 100 rows. */
+ *  `refusal` is the cap guard's own plain-English text, recorded on the row when an approve was refused — it stays on a PENDING card and is cleared on the next approve, so a non-null `refusal` means "still waiting, and here is what to trim", never "gone". One LEAN shape serves BOTH list reads, so `status` is Descent's word for which one the row came back under (`pending` in the review queue, `approved` on the filed list); `assertedPath` is the file an approved card landed in, `null` while the card is still pending. `sessionId` is the APP session id of the chat that proposed the memory — Descent's unverified provenance column, resolved through `sessionsDb.resolveAppSessionId`, display only, and `null` when the staging never supplied one. */
+export type MemoryCandidateLean = { id: string; name: string; target: string; project: string | null; status: string; source: string | null; assertedPath: string | null; refusal: string | null; createdAt: string | null; reviewedAt: string | null; sessionId: string | null };
+/** One candidate read whole. `body` is the memory's proposed text and is REQUIRED — a full read without one is not a reading, so it fails the read rather than arriving empty. `indexLine` and `rationale` are `null` when the staging never supplied them. Operator-authored free text throughout: it reaches the DOM as a text node, never as markup. */
+export type MemoryCandidateFull = MemoryCandidateLean & { body: string; indexLine: string | null; rationale: string | null };
+/** One memory list — the review queue, or the filed memories when the read asked for them — or the calm reason it is unknown; a read never fails. `reason` is one of this proxy's three words (`unreachable`|`timeout`|`bad-response`) and never Descent's text. `candidates` is whole or absent: one row missing `id`, `name` or `target` fails the WHOLE read as `bad-response`, because a silently shortened queue reads as "nothing to review". Descent caps the list at 100 rows. */
 export type MemoryPending =
   | { reachable: true; candidates: MemoryCandidateLean[] }
   | { reachable: false; reason: string };
@@ -1606,3 +1641,32 @@ export type MemoryCandidateRead =
 export type CliVersionRun = { sessionId: string; startedAt: number; cliVersion: string | null };
 /** What `GET /api/cli-version` answers. `installed` is `null` when no version could be read, with `reason` saying so in plain words — never `0.0.0`, which would compare equal to nothing and stale to everything. `binaryPath` is the binary actually probed, resolved the same way the SDK spawn resolves it; `null` when the file is only chosen once a run starts (a bare or relative `CLAUDE_CLI_PATH`), which is a "we don't know", not a fault. */
 export type CliVersionReport = { installed: string | null; reason: string | null; binaryPath: string | null; running: CliVersionRun[] };
+
+// ---------------------------
+//----------------- DEEPSEEK CONTRACTS ------------
+// The DeepSeek account this host spends on — the one Heph and Athena's builds ride. Read straight
+// from the vendor with the key this host holds, never from Descent, which knows nothing about it.
+// Unknown is never zero and never an error wall: a key that is absent, refused, slow or answered
+// with the wrong shape all arrive as `{reachable:false, reason}`, and the route stays 200.
+/** One balance reading, or the calm reason there is none.
+ *  `total` is the vendor's OWN decimal string (`"99.63"`), carried through unconverted: money is never put through a
+ *  float on this side, and the client decides how to draw it. `available` is the vendor's `is_available` — whether the
+ *  account can still serve requests; it is a FACT about a reading that came back, never a reason to refuse one.
+ *  `checkedAt` is epoch MILLISECONDS (`Date.now()`) — NOT seconds like `DescentUsage.checkedAt`, since this stamp is
+ *  ours rather than a vendor's.
+ *  `reason` is one of five words: `unconfigured` (no key in the process env or in `.env`), `auth` (the vendor refused
+ *  the key), `timeout`, `unreachable`, `bad-response` (a non-2xx status other than a refusal, a body that is not JSON,
+ *  or a body this side cannot read — including an empty `balance_infos`, which names no amount and so is not a
+ *  reading). Never the vendor's own error text: its 401 body echoes part of the key back. */
+export type DeepseekBalance =
+  | { reachable: true; available: boolean; currency: string; total: string; checkedAt: number }
+  | { reachable: false; reason: string };
+
+// ---------------------------
+//----------------- SUBAGENT TRANSCRIPTS ------------
+// ONE subagent's own transcript, as the widget's transcript read answers it. Read from the file on
+// demand and never off the history path, whose subagent activities are head-capped at 200
+// (`MAX_TRANSMITTED_SUBAGENT_ACTIVITIES`) and belong to the rows they hang from — this read
+// tail-slices instead.
+/** What one subagent transcript read answers. `found` is `false` when the session, provider, file or launch cannot be resolved — then `activity` is empty, `total` is 0, `inFlight` is `false` and `finishedAt` is `null`, and "not found" is never an HTTP error but this shape with a 200. `activity` is the LAST `SUBAGENT_TRANSCRIPT_LIMIT` (1000) entries, each truncated for transport, and `total` is the untruncated entry count. */
+export type SubagentTranscriptResult = { found: boolean; activity: SubagentActivity[]; total: number; inFlight: boolean; finishedAt: string | null };

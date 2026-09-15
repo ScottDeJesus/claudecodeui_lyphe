@@ -489,6 +489,55 @@ export const sessionsDb = {
   },
 
   /**
+   * One id of ANY spelling → the app session id it belongs to.
+   *
+   * The plan runner writes the Claude transcript uuid into `run.json` and
+   * Descent records whatever id its staging was handed; both are provider-side
+   * names for a conversation whose app row is keyed differently. The browser
+   * never learns a provider id, so the translation has to happen server-side,
+   * and this is the one method that does it.
+   *
+   * Three lookups, in order, first hit wins: the session that currently owns
+   * the provider id; the session that owned it before an edit superseded it (a
+   * rewind on a branching provider moves the conversation and leaves the old
+   * transcript behind); and finally a plain app id, which is what a
+   * disk-discovered session's own id is.
+   *
+   * An id no row carries comes back UNCHANGED rather than as `null` — the
+   * caller asked to be handed a session id, and the id its writer recorded is
+   * still the honest answer. Returns `id` unchanged on a database error too:
+   * a lookup that throws must not cost a snapshot its launching session.
+   */
+  resolveAppSessionId(id: string): string {
+    try {
+      // Named through the receiver rather than `this`, like the callers that chain this same pair
+      // (`sessions.service.ts:589`): a detached `resolveAppSessionId` must not quietly degrade to
+      // "unknown id" because its `this` went missing.
+      const byProvider = sessionsDb.getSessionByProviderSessionId(id);
+      if (byProvider) return byProvider.session_id;
+
+      const superseded = getConnection()
+        .prepare(
+          `SELECT session_id FROM superseded_provider_sessions
+           WHERE provider_session_id = ?
+           ORDER BY created_at DESC
+           LIMIT 1`
+        )
+        .get(id) as { session_id: string } | undefined;
+      if (superseded) return superseded.session_id;
+
+      const byAppId = sessionsDb.getSessionById(id);
+      if (byAppId) return byAppId.session_id;
+    } catch (err) {
+      console.error('Could not resolve a session id', {
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+
+    return id;
+  },
+
+  /**
    * Finds the newest app-created session for a project that is still waiting
    * for its provider-native id to be recorded.
    *

@@ -62,6 +62,7 @@ Read [the realtime stream](./02-realtime-stream.md) first for how the frames arr
 | `src/modules/chat/tools/ToolDiffViewer.tsx` | Inline added and removed lines for Edit, Write, ApplyPatch |
 | `src/modules/chat/tools/DiffStatsBadge.tsx` | The `+12 -3` counts on a diff header and on a collapsed group |
 | `src/modules/chat/tools/SubagentPanel.tsx` | The whole card for a call that spawned an agent |
+| `src/modules/chat/tools/SubagentNote.tsx` | One prose or reasoning entry from an agent's own narration. Extracted out of `SubagentPanel.tsx` so it can be shared, verbatim, with the gutter's read-on-demand transcript view (§Subagents) |
 | `src/modules/chat/tools/PlanDisplay.tsx` | ExitPlanMode card with the inline Build and Revise buttons |
 | `src/modules/chat/tools/ContentRenderers/` | The bodies a collapsible can contain |
 | `src/modules/chat/tools/InteractiveRenderers/AskUserQuestionPanel.tsx` | Keyboard-driven answer picker for an `AskUserQuestion` prompt |
@@ -453,14 +454,25 @@ launch receipt carrying no total. The notification's status is three-valued — 
 `failed`, `stopped` — and `stopped` (the reader's Stop, an interrupt) is painted amber, never as a
 failure; on the live path the fold applies only to the `Agent` container itself, because a
 resumed agent notifies under the `SendMessage` call that resumed it. `readSubagentSummary` carries it and `describeSubagentUsage`
-prints it (`36K tokens · 3.3K out`; a live reading has no `out`), on the pinned strip's second
+prints it (`36K tokens · 3.3K out`; a live reading has no `out`), on the pinned row's second
 line and the agent card's header.
 
-**The pinned strip's agents come from the whole history.** The strip above the chat box
-(`PinnedSubagents.tsx`) keeps an agent in view while it runs and after it finishes, until the reader
-dismisses it. A page loads history from the tail, twenty rows at a time, so the rows a page holds
-cannot be its source: an agent launched early in a long turn would leave the strip once the main
-thread had done twenty rows of work since. Every latest page (offset 0) therefore carries `agents`
+**A chat's pinned rows come from the whole history.** They are drawn in the strip above the chat box
+whenever the desktop chat gutters are NOT showing, and in the chat gutter's Subagents widget
+(`SubagentWidgetBody.tsx`) while they are — the same rows from the same derivation, so either
+surface keeps an agent in view while it runs and after it finishes, until the reader dismisses it.
+The rows are derived by `src/modules/chat/hooks/usePinnedSubagentRows.ts`, which `PinnedSubagents.tsx`
+is only the drawing and the memo boundary for. `ChatInterface` also publishes that same derivation's
+inputs — tagged with the open chat's own session id — through
+`src/modules/chat/subagents/subagentSource.ts`, a module-scope store built because the session state
+those rows come from is a `useRef` private to `ChatInterface` and nothing outside it can otherwise
+ask for them; a reader names a session id and gets `null` for any other chat. The same module holds
+a claim counter (`useClaimSubagentStrip` / `useSubagentStripClaimed`): while any outside reader —
+the gutter's Subagents widget — holds the claim, `ChatInterface` stops rendering `PinnedSubagents`
+at all rather than draw the same rows twice. A page loads history from the tail, twenty rows at a
+time, so the rows a page holds cannot be its source: an agent launched early in a long turn would
+leave the strip once the main thread had done twenty rows of work since. Every latest page
+(offset 0) therefore carries `agents`
 — the conversation's running and recently finished containers read from the full cached history
 (`collectSessionAgents` in `server/modules/providers/services/session-agents.service.ts`), compacted
 to what the strip reads: the launch description and type, the receipt's `isAsync`/`totalTokens`,
@@ -470,6 +482,55 @@ The store holds it per slot (`getAgents`); `useChatSessionState` hands the strip
 containers plus any listed agent the loaded rows do not hold, projecting those together with the
 live rows that concern agents (their own streamed rows and finish rows) so they fold live exactly
 like a loaded container.
+
+**A pin is not always an `Agent` tool call.** The pinned rows hold TWO KINDS OF ROW, sorted into one list
+— running first by oldest launch, then finished by newest finish — because the reader is asking it
+one question, *what is working for me right now*, and the answer would be a lie if half of it were
+somewhere else. The second kind is a LAUNCHER SOUL: a `/dispatch` hand started as a detached
+`plan-runner soul` child, which streams nothing into this transcript at all. Only the drawing
+differs, and only in the mark — an `Agent` subagent carries the robot, a soul carries
+`LLMProviderLogo` on the endpoint that is paying for it (the DeepSeek whale, or Claude's).
+
+That row is a JOIN, and it is the reason the two halves are in different modules. **Ownership comes
+from this transcript**: the launcher's receipt, `SOUL LAUNCHED launch=<id> …`, read off the result of
+the `Bash` call that produced it — never off prose, a pasted transcript or a `grep`, because a tool
+result that dumped another conversation carries that conversation's receipts (measured: one session
+anchoring seven ids it never launched). The same test is applied twice, by
+`src/modules/chat/utils/soulLaunchAnchors.ts` over the loaded rows and by `collectSessionSoulLaunches`
+over the WHOLE history, for the same tail-window reason `agents` exists; the ids ride a latest page as
+`soulLaunches` and merge. **Liveness comes from the dispatch-souls lane**, polled server-side and
+pushed as `soul_launch_state` — an id the lane does not answer for draws nothing at all.
+
+The soul row's own contract — what a launch directory holds, how a soul's state and provider are
+decided, the six-hour lane window, and why a soul needs none of the four-hour "still believed
+running" discount an agent does — is [dispatch-souls.md](../dispatch-souls.md). Dismissals are shared:
+one `localStorage` list for both kinds (`pinnedDismissals.ts`), because a pin's id is unique on its own
+and the reader's act is the same either way. The list is read through a module-scope store
+(`useDismissedPins()` / `dismissPin()`, over `useSyncExternalStore`) rather than a private `useState`,
+so every copy of the rows — the strip and the gutter widget alike, whichever has the claim above —
+drops a dismissed row in the same frame; a `storage` listener folds in another tab's dismissal too.
+
+**Click to read, live.** Both row components accept optional `onOpen`/`openLabel` props, unused by
+the strip, which has nowhere to open a transcript TO: given them, the row's root becomes a
+keyboard-and-mouse button, and its dismiss control calls `event.stopPropagation()` first so a press
+on the X cannot also open the row. `src/modules/chat/subagents/SubagentWidgetBody.tsx` is the one
+caller that supplies them. It draws the exact same rows the strip does — through
+`useSubagentWidgetRows` (`hooks/useSubagentWidgetRows.ts`), which layers `usePinnedSubagentRows` over
+`useSubagentSource` the same way `PinnedSubagents.tsx` does — then, on a click, swaps its own body for
+`subagents/SubagentTranscriptView.tsx`, tagged with the chat it was opened in so a chat switch can
+never leave another conversation's transcript on screen. The view reads the subagent's own file on
+disk — never `ChatMessage.subagentActivity`, which the history path caps at 200 entries from the head
+and a launcher soul carries none of at all — through `useSubagentTranscript`
+(`hooks/useSubagentTranscript.ts`), which re-reads it every two seconds while the row is running or
+the server reports the file still growing (`inFlight`), and stops re-reading once it is finished. An
+`Agent` row resolves through `GET
+/api/providers/sessions/:sessionId/subagents/:toolUseId/transcript`; a soul row through `GET
+/api/dispatch-souls/launches/:launchId/transcript` ([dispatch-souls.md](../dispatch-souls.md)
+§"The routes and the frame"). Only the newest 100 entries draw at first, with a "show earlier" step
+of 100 more, because a single entry can expand into a diff and mounting all 1000 the server may hold
+at once would be a thousand tool renderers the moment the row opens. The entries reuse the same
+drawing the panel uses: `tools/SubagentNote.tsx` for prose and reasoning, `ToolRenderer` in
+`mode="input"` for everything else.
 
 **How history reads an agent's end.** From the agent's own transcript, last record first: Claude
 Code's interruption marker (`[Request interrupted by user…]`, a user record) means `stopped`; a
@@ -638,8 +699,9 @@ copy and speak controls and opens reasoning. The seventh is a module,
 `transcript/shapes/useShapeCollapse.ts` — the one door every rendered markdown shape goes through,
 and the only thing under `shapes/` that reads the context at all. It exports **two** hooks over one
 read of the flag. `useShapeCollapse(collapseKey)` is for a shape that folds: it returns
-`collapsed: false` with `interactive: false` while exporting, so a shape neither folds in an
-exported document nor draws a chevron there. `useShapeInteractive()` is that second answer alone —
+`collapsed: false` with `interactive: false` and `enter: false` while exporting, so a shape neither
+folds, draws a chevron nor plays its entrance in an exported document.
+`useShapeInteractive()` is that second answer alone —
 *may I draw a control at all?* — for a shape body carrying controls but no fold state of its own,
 which today is `DataTable`'s copy-as-CSV action and its sort headers, `DiffBlock`'s copy action, and
 `TabbedCode`'s tab strip. With no strip, an exported tab group draws every fence stacked, so the
@@ -683,6 +745,23 @@ memoized, and four with no other reason to know exports exist.
   mounted while closed; for an agent that ran a hundred tools that is a hundred tool
   renderers behind a collapsed header. The timeline mounts only while open, in pages of 25
   (commit `7113270e`).
+- **A soul pin that does not appear has THREE possible causes, and only one of them is a bug.**
+  The row is a join, so it is drawn only when the id was anchored in this transcript AND the lane
+  carries that launch. Walk it in that order: is there a `SOUL LAUNCHED` line in a `Bash` *result*
+  whose command segment opens with `plan-runner soul` (a quoted receipt, or one printed by a
+  `grep`, deliberately anchors nothing); does
+  `GET /api/dispatch-souls/launches` list the id; and has it been more than six hours since that
+  launch ended, which drops it from the lane while the receipt stays in the transcript forever.
+  A dismissal is the fourth and it is per browser — `localStorage`, key
+  `cloudcli.pinned-agents.dismissed`.
+- **The soul entries in the pinned rows are not memoized, and that is not an oversight.** Their
+  windows are measured against a clock read at RENDER time, so a memo keyed on that clock would
+  either recompute every render anyway or key on a stale reading. The derivation
+  (`src/modules/chat/hooks/usePinnedSubagentRows.ts`) is called by both surfaces that draw it —
+  the strip and the gutter's Subagents widget — and `PinnedSubagents.tsx` is the strip's memo
+  boundary. The one timer it does hold fires at the next row's own
+  expiry: without it a finished row sat on screen until some unrelated repaint, up to four hours
+  past its window — and it still only helps while the tab is awake.
 - **A running subagent's rows used to render as the session's own calls** and jump inside
   the panel only after a refresh. They are now folded live by `parentToolUseId`, with the
   longer of the live and server timelines winning a mid-run history refresh (commit
@@ -755,6 +834,9 @@ memoized, and four with no other reason to know exports exist.
 | --- | --- |
 | `TOOL_CONFIGS` entry shape | `ToolRenderer`'s three `type` branches and its `contentType` switch; the `input` and `result` unions differ, so a field valid on one may not be on the other; `ToolGroupContainer` reads `label`, `colorScheme` and `contentType` off the same config |
 | `getToolConfig` fallback | `toolGrouping.ts` → `getToolInputPreview` calls it for the collapsed line, so an unmapped tool must still name what it did |
+| The soul-launch ownership rule (the receipt regex, the marker, the chain-segment test) | It is written TWICE and the two trees cannot import each other: `src/modules/chat/utils/soulLaunchAnchors.ts` and `server/modules/providers/services/session-soul-launches.service.ts`. Loosen one alone and one half pins souls the other will not. The line itself is the launcher's — `~/.claude/hooks/GOTCHAS.md` #36 |
+| Anything the pinned rows render | Both row components, not one: `PinnedAgentRow.tsx` and `SoulLaunchPinRow.tsx` are deliberately the same shape, and `usePinnedSubagentRows.ts` feeds TWO surfaces — the strip above the composer when the desktop chat gutters are not showing, and the gutter's Subagents widget (`SubagentWidgetBody.tsx`) while they are — so a change to the left rule, the two-line layout or the status column that lands in only one component, or in only one surface, makes the same rows read as two different lists |
+| The click-to-open affordance (`onOpen`/`openLabel`) | Both row components again: their keyboard handling and their dismiss button's `stopPropagation()` must stay identical, since `SubagentWidgetBody.tsx` is the only caller that supplies the props and a divergence there breaks the widget silently while the strip, which supplies neither, looks unchanged |
 | `deriveToolStatus` | `ToolStatusBadge`'s `STATUS_CONFIG` needs a key for every `ToolStatus`; `BashCommandDisplay` and `OneLineDisplay` both special-case `running`; every caller filters out `completed` |
 | `CLAUDE_DENIAL_MESSAGES` | The exact strings the Claude runtime adapter emits. The test is `includes` on lowercased content, so a rewording silently downgrades `denied` to `error` |
 | Result pairing in `normalizedToChatMessages` | The `WeakMap` projection cache keys `toolResultSource` and `subagentActivitySource`, and `src/modules/chat/tests/useChatMessages.test.ts` |

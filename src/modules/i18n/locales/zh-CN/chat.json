@@ -119,6 +119,11 @@
     "showAllCommands": "显示所有命令",
     "plainMode": "简洁",
     "plainModeTooltip": "每条消息都附带 /plain 发送：简短、易读的回复",
+    "deepseekFlash": "DeepSeek Flash",
+    "deepseekFlashShort": "Flash",
+    "deepseekFlashTooltip": "开启期间，plan runner 的构建之魂（构建者、修复轮与 Athena）在 DeepSeek Flash 上运行。Prometheus 与侦察者仍留在 Claude。",
+    "deepseekFlashReading": "正在读取开关…",
+    "deepseekFlashUnreadable": "无法读取开关——按下以重试。",
     "clearInput": "清空输入",
     "scrollToBottom": "滚动到底部",
     "queue": {
@@ -293,6 +298,7 @@
     "showAllLines": "显示全部 {{count}} 行",
     "showLess": "收起部分",
     "openFile": "打开 {{path}}",
+    "openInArchPulse": "在 ArchPulse 中打开",
     "titles": {
       "table": "表格",
       "options": "选项",
@@ -307,7 +313,9 @@
       "diff": "差异",
       "output": "输出",
       "diagram": "图表",
-      "code": "代码"
+      "code": "代码",
+      "widget": "小组件",
+      "docspace": "DocSpace 区块"
     },
     "alert": {
       "note": "备注",

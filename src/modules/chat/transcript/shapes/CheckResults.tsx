@@ -49,7 +49,12 @@ export function CheckResults({ glyphs, ordered, start, collapseKey, children }: 
   const List = ordered ? 'ol' : 'ul';
 
   return (
-    <ShapeFrame kind="checks" title={t('shapes.titles.checks')} collapseKey={collapseKey}>
+    <ShapeFrame
+      kind="checks"
+      title={t('shapes.titles.checks')}
+      collapseKey={collapseKey}
+      tone={failed > 0 ? 'danger' : 'positive'}
+    >
       {/* Failures first. A reader scanning a check list is looking for what broke, and the thing
           they came for should not sit behind the good news. */}
       <div data-check-counts className="mb-2 flex flex-wrap items-center gap-1.5">

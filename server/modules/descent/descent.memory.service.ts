@@ -9,13 +9,13 @@ import { readObjectRecord } from '@/shared/utils.js';
 import { readStringOrNull, type DescentTransport } from './descent.transport.js';
 
 /**
- * The memory-intake lane of the Descent proxy: the pending queue, one candidate
+ * The memory-intake lane of the Descent proxy: the candidate lists, one candidate
  * read whole, and the two review writes.
  *
  * Three rules govern everything here.
  *
  * A READ IS WHOLE OR IT IS NONE. One row missing a string `id`, `name` or
- * `target` fails the ENTIRE `pending()` read as `bad-response` — never a list
+ * `target` fails the ENTIRE list read as `bad-response` — never a list
  * with the bad row quietly dropped. A shortened queue reads as "nothing left to
  * review", and the operator can act on "Descent is not reachable" while they can
  * do nothing at all about a proposal that was never drawn. This is the accounts
@@ -26,6 +26,12 @@ import { readStringOrNull, type DescentTransport } from './descent.transport.js'
  * told — it names what to trim — and the card stays PENDING with the same text
  * recorded on its `refusal`. So the writes here hand Descent's answer back
  * untouched and map nothing; only a Descent that gave NO verdict throws.
+ *
+ * ONE LIST VERB, TWO STATUSES. Pending and approved are the same lean read one
+ * query apart, so they share `list(status)` rather than a cloned body. Descent's
+ * `session_id` is an UNVERIFIED provenance claim, and it is resolved to an app
+ * session id through the resolver this service is handed — display only, gating
+ * nothing.
  *
  * This file never imports the accounts lane. That lane is a sibling, not a
  * dependency: the shared wire and its three failure words come from the
@@ -45,10 +51,18 @@ import { readStringOrNull, type DescentTransport } from './descent.transport.js'
  * an absent key, a `null`, a blank and a non-string alike. Descent always sends
  * it, so this is a shape guarantee rather than a judgement about a value: on the
  * list read the fallback cannot mislead, because the query that produced the row
- * WAS `?status=pending`; on the by-id read it only papers over a field Descent
- * does not omit.
+ * asked for a status and the row came back under it; on the by-id read it only
+ * papers over a field Descent does not omit.
+ *
+ * `sessionId` is Descent's UNVERIFIED provenance claim, translated here through
+ * `resolveSessionId` into the app session id the client can compare against the
+ * chat it has open. It is display only — nothing below gates on it — and a row
+ * that names none maps to `null` without troubling the resolver.
  */
-function toLeanCandidate(row: unknown): MemoryCandidateLean | null {
+function toLeanCandidate(
+  row: unknown,
+  resolveSessionId: (id: string) => string,
+): MemoryCandidateLean | null {
   const record = readObjectRecord(row);
   if (!record) return null;
 
@@ -56,6 +70,8 @@ function toLeanCandidate(row: unknown): MemoryCandidateLean | null {
   const name = readStringOrNull(record.name);
   const target = readStringOrNull(record.target);
   if (id === null || name === null || target === null) return null;
+
+  const sessionId = readStringOrNull(record.session_id);
 
   return {
     id,
@@ -69,6 +85,7 @@ function toLeanCandidate(row: unknown): MemoryCandidateLean | null {
     refusal: readStringOrNull(record.refusal),
     createdAt: readStringOrNull(record.created_at),
     reviewedAt: readStringOrNull(record.reviewed_at),
+    sessionId: sessionId === null ? null : resolveSessionId(sessionId),
   };
 }
 
@@ -77,9 +94,16 @@ function toLeanCandidate(row: unknown): MemoryCandidateLean | null {
  * `body`: the proposed memory text is the entire point of reading a card whole,
  * so a full read without one is not a reading and fails rather than arriving as
  * an empty panel the operator would have to interpret.
+ *
+ * `sessionId` is NOT set here: the full shape inherits it from the lean row, so
+ * the list read and the by-id read of one card can never disagree about which
+ * chat proposed it.
  */
-function toFullCandidate(row: unknown): MemoryCandidateFull | null {
-  const lean = toLeanCandidate(row);
+function toFullCandidate(
+  row: unknown,
+  resolveSessionId: (id: string) => string,
+): MemoryCandidateFull | null {
+  const lean = toLeanCandidate(row, resolveSessionId);
   const record = readObjectRecord(row);
   if (!lean || !record) return null;
 
@@ -91,7 +115,6 @@ function toFullCandidate(row: unknown): MemoryCandidateFull | null {
     body,
     indexLine: readStringOrNull(record.index_line),
     rationale: readStringOrNull(record.rationale),
-    sessionId: readStringOrNull(record.session_id),
   };
 }
 
@@ -103,13 +126,16 @@ function toFullCandidate(row: unknown): MemoryCandidateFull | null {
  * is redundant against the Descent that exists — and it is exactly what stops a
  * future `{ok:false, candidates:[…]}` being served as a healthy queue.
  */
-function toPendingCandidates(payload: unknown): MemoryCandidateLean[] | null {
+function toListCandidates(
+  payload: unknown,
+  resolveSessionId: (id: string) => string,
+): MemoryCandidateLean[] | null {
   const envelope = readObjectRecord(payload);
   if (envelope?.ok !== true || !Array.isArray(envelope.candidates)) return null;
 
   const candidates: MemoryCandidateLean[] = [];
   for (const entry of envelope.candidates) {
-    const candidate = toLeanCandidate(entry);
+    const candidate = toLeanCandidate(entry, resolveSessionId);
     if (candidate === null) return null;
     candidates.push(candidate);
   }
@@ -121,22 +147,43 @@ function toPendingCandidates(payload: unknown): MemoryCandidateLean[] | null {
  * Builds the memory lane over an already-built transport, so both lanes speak to
  * Descent through one wire with one ceiling and one failure vocabulary.
  *
+ * `resolveSessionId` is handed in rather than imported: this module names no
+ * database, which is what lets it be proven against a closed port. The
+ * composition root supplies `sessionsDb.resolveAppSessionId`.
+ *
  * The reads never throw: an unreachable Descent is a fact the panel states, not
  * an error wall. The writes throw `DescentUnreachable` and only that, and only
  * when Descent gave no verdict — the route turns it into a 503 carrying one word.
  */
-export function createDescentMemoryService(transport: DescentTransport) {
-  return {
-    /** The pending queue, or the calm one-word reason it is unknown. Never throws. */
-    async pending(): Promise<MemoryPending> {
-      const result = await transport.readJson('/api/memory?status=pending');
-      if ('failure' in result) return { reachable: false, reason: result.failure };
+export function createDescentMemoryService(
+  transport: DescentTransport,
+  resolveSessionId: (id: string) => string,
+) {
+  /**
+   * The ONE list read, by the status Descent files the rows under. Never throws.
+   *
+   * A row's `sessionId` has already been translated by the time it is returned:
+   * the resolver is applied in the mapper, so every list this lane serves carries
+   * app ids and no caller has to remember to translate.
+   */
+  const list = async (status: 'pending' | 'approved'): Promise<MemoryPending> => {
+    const result = await transport.readJson(`/api/memory?status=${status}`);
+    if ('failure' in result) return { reachable: false, reason: result.failure };
 
-      const candidates = toPendingCandidates(result.body);
-      return candidates === null
-        ? { reachable: false, reason: 'bad-response' }
-        : { reachable: true, candidates };
-    },
+    const candidates = toListCandidates(result.body, resolveSessionId);
+    return candidates === null
+      ? { reachable: false, reason: 'bad-response' }
+      : { reachable: true, candidates };
+  };
+
+  return {
+    list,
+
+    /**
+     * The review queue — the list this lane had first, kept as its callers' own
+     * name for it. It is the same read as `list('pending')`, not a second one.
+     */
+    pending: () => list('pending'),
 
     /**
      * One candidate read whole. Never throws, and never 404s: an id no row
@@ -148,7 +195,7 @@ export function createDescentMemoryService(transport: DescentTransport) {
      *
      * A body that is not an envelope at all is a different fact from an envelope
      * saying `ok:false`, and is reported as such — `bad-response` for the first,
-     * a calm `null` for the second, exactly as `pending()` separates them.
+     * a calm `null` for the second, exactly as `list` separates them.
      */
     async candidate(id: string): Promise<MemoryCandidateRead> {
       const result = await transport.readJson(`/api/memory/${encodeURIComponent(id)}`);
@@ -158,7 +205,7 @@ export function createDescentMemoryService(transport: DescentTransport) {
       if (!envelope) return { reachable: false, reason: 'bad-response' };
       if (envelope.ok !== true) return { reachable: true, candidate: null };
 
-      const candidate = toFullCandidate(envelope.candidate);
+      const candidate = toFullCandidate(envelope.candidate, resolveSessionId);
       return candidate === null
         ? { reachable: false, reason: 'bad-response' }
         : { reachable: true, candidate };

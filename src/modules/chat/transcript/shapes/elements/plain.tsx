@@ -2,6 +2,7 @@ import type { ComponentPropsWithoutRef } from 'react';
 
 import { ChipsSuppressedContext } from '@/modules/chat/transcript/shapes/chipContext';
 import type { HastNode } from '@/modules/chat/transcript/shapes/hast';
+import { LeadIn } from '@/modules/chat/transcript/shapes/LeadIn';
 import { ShapeSection } from '@/modules/chat/transcript/shapes/ShapeSection';
 import { TabbedCode } from '@/modules/chat/transcript/shapes/TabbedCode';
 
@@ -14,7 +15,12 @@ type HeadingProps = { node?: HastNode } & ComponentPropsWithoutRef<'h2'>;
 /** `data-shape` is named so `ShapeDiv` can read it; a `data-*` attribute is otherwise untyped. */
 type DivProps = { node?: HastNode; 'data-shape'?: string } & ComponentPropsWithoutRef<'div'>;
 
-/** The `hr` override, moved out of `Markdown.tsx` unchanged. Used through `elements/index.ts`. */
+/**
+ * The `hr` override, moved out of `Markdown.tsx` unchanged. Used through `elements/index.ts`.
+ *
+ * On a surface carrying MARKDOWN_CARDS_CLASS, markdownCards.css overrides this rule's border with a
+ * fading hairline; see 08-rendered-shapes.md §Element cards.
+ */
 export function PlainRule() {
   return <hr className="my-4 border-t border-border" />;
 }
@@ -76,9 +82,10 @@ export function PlainDiv({ node: _node, children, ...props }: DivProps) {
  * The `div` entry of `SHAPE_COMPONENTS`. Used through `elements/index.ts`.
  *
  * `remarkShapeGroups` is the only thing that puts a `div` into this tree, and it marks each one
- * with the shape it groups: a run of fences in different languages reaches `TabbedCode`, a heading
- * and its body reach `ShapeSection`. Every other `div` — none today, but whatever a future plugin
- * emits — is `PlainDiv`, exactly as the plain map draws it.
+ * with the shape it groups: a run of fences in different languages reaches `TabbedCode`, a
+ * paragraph and the list or table under it reach `LeadIn`, a heading and its body reach
+ * `ShapeSection`. Every other `div` — none today, but whatever a future plugin emits — is
+ * `PlainDiv`, exactly as the plain map draws it.
  *
  * It routes on the RENDERED prop and passes `node` through untouched: each shape decides from the
  * hast subtree and renders from `children`, and this dispatcher decides nothing else.
@@ -86,6 +93,7 @@ export function PlainDiv({ node: _node, children, ...props }: DivProps) {
 export function ShapeDiv(props: DivProps) {
   const shape = props['data-shape'];
   if (shape === 'tabbed-code') return <TabbedCode node={props.node}>{props.children}</TabbedCode>;
+  if (shape === 'lead-in') return <LeadIn node={props.node}>{props.children}</LeadIn>;
   if (shape === 'section') return <ShapeSection node={props.node}>{props.children}</ShapeSection>;
   return <PlainDiv {...props} />;
 }

@@ -4,6 +4,7 @@ import type { ReactNode } from 'react';
 import { WidgetFrame } from '@/modules/widgets';
 import { MarkdownStreamingContext } from '@/modules/chat/transcript/shapes/markdownStreaming';
 import { CodeFence } from '@/modules/chat/transcript/shapes/code/CodeFence';
+import { EmbedFrame } from '@/modules/chat/transcript/shapes/code/EmbedFrame';
 import { InlineCode } from '@/modules/chat/transcript/shapes/code/InlineCode';
 
 export type CodeBlockProps = {
@@ -51,8 +52,14 @@ export function CodeBlock({ node: _node, className, children, forceBlock }: Code
   // nothing was cut off the end. `language` is left alone: it also feeds the block's label and
   // the highlighter, where stopping at the hyphen is what makes ```js{1,3} still highlight as js.
   const fenceToken = /language-(\S+)/.exec(className || '')?.[1] ?? '';
+  // The live embed wears the same card header every other shape wears, and this is where that card
+  // is named: `EmbedFrame` is a `frame` FUNCTION, not a wrapper around `WidgetFrame`, because the
+  // mount and streaming gates live inside `WidgetFrame` and only it knows whether a live element
+  // exists to be wrapped at all. See that file's fork comment.
   if (language === 'widget' && fenceToken === language) {
-    return <WidgetFrame code={raw} streaming={streaming} />;
+    return (
+      <WidgetFrame code={raw} streaming={streaming} frame={(embed, live) => <EmbedFrame {...embed} code={raw}>{live}</EmbedFrame>} />
+    );
   }
 
   return <CodeFence raw={raw} language={language} streaming={streaming} />;

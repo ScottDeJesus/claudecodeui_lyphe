@@ -1,5 +1,6 @@
 /**
- * Which shapes the reader has folded, for the life of the page.
+ * Two page-lifetime memories about a shape: the fold the reader made, and the entrance it has
+ * already played. Both are module-level and both are keyed on `shapeKey`, for the reason below.
  *
  * A module-level Map and not component state, for the reason `CollapsibleUserText.tsx:18` keeps a
  * module-level Set: `LazyMessageRow.tsx:83` unmounts a row's whole subtree once it leaves a
@@ -14,6 +15,17 @@
  * transcript length — no eviction is needed and none is added.
  */
 const foldedShapes = new Map<string, boolean>();
+
+/**
+ * Every block that has already risen, for the life of the page.
+ *
+ * The entrance's memory, beside the fold's and under the same key. A mount is NOT the moment a card
+ * first appears: `LazyMessageRow` unmounts a row as it scrolls away, and a streaming retraction
+ * remounts a settled block, so without this every scroll back would replay every card. Nothing
+ * removes an entry — it lives for the page and grows by one key per card that rose, the way the
+ * fold map above grows by one key per block the reader folded.
+ */
+const enteredShapes = new Set<string>();
 
 /**
  * The identity of one block: its kind and a hash of its whole text. `payload` is defined per kind
@@ -61,4 +73,23 @@ export function setCollapsed(key: string, next: boolean): void {
  */
 export function clearCollapsed(key: string): void {
   foldedShapes.delete(key);
+}
+
+/**
+ * Has this block already played its entrance? Asked once per mount, by `useShapeCollapse`.
+ *
+ * False means the card is new to this page and may rise; true means the reader has seen it, so it
+ * arrives still. A mount is not an arrival, which is the whole reason this is remembered at all.
+ */
+export function hasEntered(key: string): boolean {
+  return enteredShapes.has(key);
+}
+
+/**
+ * Records that a block has entered. Written on commit by `useShapeCollapse`'s effect, never during
+ * render: marking it while rendering would mark the key before the first appearance could rise,
+ * and the entrance would never play for anyone.
+ */
+export function markEntered(key: string): void {
+  enteredShapes.add(key);
 }

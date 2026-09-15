@@ -61,18 +61,18 @@ export function DecisionMatrix({ data, collapseKey }: DecisionMatrixProps) {
                 <div className="min-w-0">
                   <div
                     data-shape-label
-                    className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground"
+                    className="text-md-body font-semibold uppercase tracking-wide text-muted-foreground"
                   >
                     {data.headers[0]}
                   </div>
                   {/* The option's own name is the card's headline: it is what the reader scans for. */}
-                  <div className="text-sm font-semibold text-foreground">{row[0]}</div>
+                  <div className="text-md-body font-semibold text-foreground">{row[0]}</div>
                 </div>
                 {verdict ? (
                   <div className="flex-none text-right">
                     <div
                       data-shape-label
-                      className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground"
+                      className="text-md-body font-semibold uppercase tracking-wide text-muted-foreground"
                     >
                       {data.headers[verdictColumn ?? 3]}
                     </div>
@@ -86,20 +86,20 @@ export function DecisionMatrix({ data, collapseKey }: DecisionMatrixProps) {
                 <div>
                   <div
                     data-shape-label
-                    className="text-[11px] font-medium uppercase tracking-wide text-accent-ink"
+                    className="text-md-body font-semibold uppercase tracking-wide text-accent-ink"
                   >
                     {data.headers[1]}
                   </div>
-                  <div className="mt-0.5 text-sm text-foreground">{row[1]}</div>
+                  <div className="mt-0.5 text-md-body text-foreground">{row[1]}</div>
                 </div>
                 <div>
                   <div
                     data-shape-label
-                    className="text-[11px] font-medium uppercase tracking-wide text-warn-ink"
+                    className="text-md-body font-semibold uppercase tracking-wide text-warn-ink"
                   >
                     {data.headers[2]}
                   </div>
-                  <div className="mt-0.5 text-sm text-foreground">{row[2]}</div>
+                  <div className="mt-0.5 text-md-body text-foreground">{row[2]}</div>
                 </div>
               </div>
             </Card>

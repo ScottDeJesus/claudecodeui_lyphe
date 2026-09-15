@@ -270,5 +270,35 @@
   },
   "shapes": {
     "diagramFailed": "この図を描画できませんでした。ソースを表示しています。"
+  },
+  "gutters": {
+    "runner": {
+      "title": "実行"
+    },
+    "memory": {
+      "title": "メモリ",
+      "pending": "レビュー待ち",
+      "recent": "最近の記録",
+      "recentEmpty": "まだ何も記録されていません",
+      "pendingEmpty": "待機中のものはありません"
+    },
+    "subagents": {
+      "title": "サブエージェント",
+      "empty": "このチャットにサブエージェントはいません",
+      "back": "サブエージェントに戻る",
+      "loading": "トランスクリプトを読み込み中…",
+      "notFound": "ディスク上にまだトランスクリプトがありません",
+      "failed": "トランスクリプトを読み取れませんでした",
+      "live": "ライブ",
+      "showEarlier": "以前のステップを表示",
+      "openRow": "{{name}} のトランスクリプトを読む"
+    },
+    "open": "{{name}} を開く",
+    "collapse": "折りたたむ",
+    "dragHint": "別のスロットへドラッグ",
+    "pin": {
+      "label": "このセッション",
+      "title": "開いているチャットで作成されました"
+    }
   }
 }

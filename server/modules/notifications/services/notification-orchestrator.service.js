@@ -9,7 +9,11 @@ const KIND_TO_PREF_KEY = {
   action_required: 'actionRequired',
   stop: 'stop',
   error: 'error',
-  limit: 'limits'
+  limit: 'limits',
+  // Background work that finished after its turn ended: one push per Monitor wait or subagent
+  // return, so it has its own switch, OFF by default (operator, 2026-09-14: 64 of 91 phone pushes
+  // in four hours were this one line).
+  background: 'background'
 };
 
 const recentEventKeys = new Map();
@@ -251,8 +255,9 @@ function notifyRunStopped({ userId, provider, sessionId = null, stopReason = 'co
 /**
  * Reports background work that finished after its turn had already completed.
  *
- * Uses the `stop` kind so it rides the existing "run stopped" preference rather
- * than needing a new opt-in that would default to off. No explicit dedupeKey, so
+ * Raised as the `background` kind, which has its own switch in the user's preferences and is OFF by
+ * default (operator, 2026-09-14): one session's pipeline raises this on every wait or subagent that
+ * returns, and it was 64 of 91 phone pushes in four hours. No explicit dedupeKey, so
  * the default composite key collapses repeats inside the dedupe window.
  */
 function notifyBackgroundWorkCompleted({ userId, provider, sessionId = null, sessionName = null }) {
@@ -261,7 +266,7 @@ function notifyBackgroundWorkCompleted({ userId, provider, sessionId = null, ses
     event: createNotificationEvent({
       provider,
       sessionId,
-      kind: 'stop',
+      kind: 'background',
       code: 'run.background_completed',
       meta: { sessionName },
       severity: 'info'

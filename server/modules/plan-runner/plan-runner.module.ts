@@ -3,10 +3,10 @@ import path from 'node:path';
 
 import type { Router } from 'express';
 
-import { appConfigDb, userDb } from '@/modules/database/index.js';
+import { appConfigDb, sessionsDb, userDb } from '@/modules/database/index.js';
 import { createNotificationEvent, notifyUserIfEnabled } from '@/modules/notifications/index.js';
 import { WS_OPEN_STATE, connectedClients } from '@/modules/websocket/index.js';
-import type { RunnerStateEvent, RunnerVerb } from '@/shared/types.js';
+import type { RunnerRunSnapshot, RunnerStateEvent, RunnerVerb } from '@/shared/types.js';
 import { resolveClaudeCodeExecutablePath } from '@/shared/claude-cli-path.js';
 
 import { createPlanRunnerRouter } from './plan-runner.routes.js';
@@ -97,6 +97,24 @@ export type PlanRunnerModule = {
 };
 
 /**
+ * The ONE place a run's launching session becomes an app id.
+ *
+ * `run.json` records the Claude transcript uuid whose turn launched the run, and no browser ever
+ * learns a provider id — translation belongs on this side of the wire, and it belongs in exactly
+ * one place so the lanes cannot drift. BOTH readers pass through here: `GET /runs` (through
+ * `current()`) and the `runner_state` broadcast (through the same snapshot callback), so no path
+ * can ship the raw uuid by going around it. A run that names no launching session stays `null` —
+ * "no chat launched this" is an answer, and `resolveAppSessionId` is never asked about it.
+ */
+function resolveLaunchingSessions(runs: RunnerRunSnapshot[]): RunnerRunSnapshot[] {
+  return runs.map((run) => ({
+    ...run,
+    launched_by_session:
+      run.launched_by_session === null ? null : sessionsDb.resolveAppSessionId(run.launched_by_session),
+  }));
+}
+
+/**
  * Builds the plan-runner lane for the server entrypoint: the poll, the frame, the two verbs, and
  * the notification each ending earns.
  *
@@ -175,13 +193,17 @@ export function createPlanRunnerModule(): PlanRunnerModule {
   const watcher = createRunnerWatcher({
     // Epoch SECONDS: every timestamp the runner writes comes from Python's `time.time()`, and a
     // millisecond clock compared against one of them makes every run on the host read live.
+    // Every run leaves here with its launching session already an app id (`resolveLaunchingSessions`),
+    // because this callback is what both the REST read and the broadcast are given.
     snapshot: () =>
-      snapshotRuns(
-        stateDir,
-        Date.now() / 1000,
-        STALE_AFTER_S,
-        (dir, message) => logErrorOnce(`[PlanRunner] could not read run directory ${dir}: ${message}`),
-        ENDED_KEEP_S,
+      resolveLaunchingSessions(
+        snapshotRuns(
+          stateDir,
+          Date.now() / 1000,
+          STALE_AFTER_S,
+          (dir, message) => logErrorOnce(`[PlanRunner] could not read run directory ${dir}: ${message}`),
+          ENDED_KEEP_S,
+        ),
       ),
     // Endings are read off the same picture the tabs receive, and only when it changed — which an
     // ending always is. A failure to announce never costs the tabs their frame.

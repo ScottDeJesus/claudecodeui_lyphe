@@ -3,7 +3,7 @@ import {
   getStoredAuthToken,
   storeAuthToken,
 } from '@/shared/authToken';
-import type { NtfySettingsInput } from '@/shared/types';
+import type { NtfySettingsInput, SubagentTranscriptResult } from '@/shared/types';
 import { IS_PLATFORM } from '@/shared/utils';
 import { readVoiceConfig, voiceConfigHeaders } from '@/shared/voiceConfig';
 
@@ -513,6 +513,11 @@ export const api = {
     saveNotificationPreferences: (preferences: unknown) =>
       put('/api/settings/notification-preferences', preferences),
 
+    // The plan runner's DeepSeek switch — a file on this host, not a per-user preference, so it
+    // is the same answer for anyone signed in and both calls return the state read back off disk.
+    deepseekFlash: () => get('/api/settings/deepseek-flash'),
+    saveDeepseekFlash: (enabled: boolean) => put('/api/settings/deepseek-flash', { enabled }),
+
     push: {
       vapidPublicKey: () => get('/api/settings/push/vapid-public-key'),
       subscribe: (subscription: { endpoint?: string; keys?: unknown }) =>
@@ -598,6 +603,7 @@ export const api = {
     capture: () => post('/api/descent/accounts/capture', {}),
     memory: {
       pending: () => get('/api/descent/memory'),
+      approved: () => get('/api/descent/memory?status=approved'),
       candidate: (id: string) => get(`/api/descent/memory/${encodeURIComponent(id)}`),
       approve: (id: string) => post(`/api/descent/memory/${encodeURIComponent(id)}/approve`, {}),
       reject: (id: string) => post(`/api/descent/memory/${encodeURIComponent(id)}/reject`, {}),
@@ -617,10 +623,43 @@ export const api = {
     resume: (id: string) => post(`/api/plan-runner/runs/${encodeURIComponent(id)}/resume`, {}),
   },
 
+  // The launcher souls a `/dispatch` started with `plan-runner soul`, read off the launcher's own
+  // state root. One plain read, for the seed the `soul_launch_state` frame cannot cover: the frame
+  // is sent only on a CHANGE, so a page mounting while nothing moves has nothing to paint.
+  dispatchSouls: {
+    launches: () => get('/api/dispatch-souls/launches'),
+  },
+
+  // The transcript of ONE subagent — an `Agent`-tool row addressed by the tool call that spawned it,
+  // or a launcher soul addressed by its launch id — read on demand for the Subagents widget's
+  // transcript view. Both methods resolve to a BARE `SubagentTranscriptResult`, so no hook and no
+  // component knows that one route wraps its answer in the `{ success, data }` envelope and the
+  // other answers raw. `get` hands back the raw Response (it is `authenticatedFetch`), so the body
+  // is read and unwrapped here; a transcript that is not on disk yet is a `found: false` RESULT,
+  // never a failed request.
+  subagentTranscripts: {
+    agent: async (sessionId: string, toolUseId: string): Promise<SubagentTranscriptResult> => {
+      const path = `/api/providers/sessions/${encodeURIComponent(sessionId)}/subagents/${encodeURIComponent(toolUseId)}/transcript`;
+      const body = await readApiJson<{ data: SubagentTranscriptResult }>(await get(path));
+      return body.data;
+    },
+    soul: async (launchId: string): Promise<SubagentTranscriptResult> => readApiJson<SubagentTranscriptResult>(
+      await get(`/api/dispatch-souls/launches/${encodeURIComponent(launchId)}/transcript`),
+    ),
+  },
+
   // The installed Claude CLI and the version each LIVE run is on (docs/cli-version.md). It
   // answers 200 even when no version could be read — an unreadable binary is a fact in words,
   // so the caller reads the body's `installed`/`reason` rather than the status.
   cliVersion: () => get('/api/cli-version'),
+
+  // The money left on this host's DeepSeek account (docs/deepseek-balance.md). A different account
+  // from the Claude slots Descent holds, and a different origin: the server reads it from the
+  // vendor with the key it holds, so the key never reaches this side. Answers 200 always, for the
+  // same reason `descent.usage` does — no reading is a reading in words, never an error wall.
+  deepseek: {
+    balance: () => get('/api/deepseek/balance'),
+  },
 };
 
 // ---------------------------

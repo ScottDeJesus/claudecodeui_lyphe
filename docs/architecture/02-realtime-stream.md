@@ -31,9 +31,13 @@ it.
    touches a raw frame. It does not branch on provider, does not navigate, and does not
    translate session ids — the backend has already done all three. A frame with no `kind`
    is dropped on the first line, which is what makes Task Master's `type`-keyed
-   broadcasts invisible to chat. A `runner_state` frame is the other case: it HAS a kind,
-   so it is returned early by name, the same way `session_upserted` and `loading_progress`
-   are — a box-wide picture owned by a reader outside the transcript.
+   broadcasts invisible to chat. The two state lanes are the other case: `runner_state` and
+   `soul_launch_state` HAVE a kind, so they are returned early by name — one shared `case`
+   group — the same way `session_upserted` and `loading_progress` are. Each is a box-wide
+   picture owned by a reader outside the transcript, republished into the live bus by its own
+   feed. Returning rather than breaking is the whole of it: without the case a lane frame falls
+   through to the `default`, inherits the viewed session's id, and lands in the open transcript
+   as a message row.
 2. **The default action is "append to the store".** Read the switch as a filter, not a
    dispatcher: gateway kinds and the two streaming kinds are handled specially, five
    kinds are control events that are deliberately *not* stored, and everything else —

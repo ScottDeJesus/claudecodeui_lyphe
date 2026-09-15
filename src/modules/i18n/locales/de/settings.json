@@ -114,7 +114,8 @@
       "actionRequired": "Aktion erforderlich",
       "stop": "Lauf gestoppt",
       "error": "Lauf fehlgeschlagen",
-      "limits": "Nutzungslimits"
+      "limits": "Nutzungslimits",
+      "background": "Background agents finished"
     },
     "ntfy": {
       "title": "Handy-Push (ntfy)",
@@ -322,6 +323,11 @@
       }
     },
     "connectionStatus": "Verbindungsstatus",
+    "runnerModel": {
+      "label": "DeepSeek Flash für Build-Souls verwenden",
+      "description": "Der Plan-Runner schickt seinen Builder, dessen Fix-Durchlauf und Athena auf DeepSeeks deepseek-flash statt auf Claude Opus. Prometheus, die Scouts und der Replanner bleiben auf Claude. Wirkt ab der nächsten Phase.",
+      "unreadable": "Der Schalter konnte nicht vom Server gelesen werden, seine Stellung ist also unbekannt — das ist nicht dasselbe wie aus. Bei jedem Fokuswechsel wird erneut gelesen."
+    },
     "login": {
       "title": "Anmelden",
       "reAuthenticate": "Erneut authentifizieren",

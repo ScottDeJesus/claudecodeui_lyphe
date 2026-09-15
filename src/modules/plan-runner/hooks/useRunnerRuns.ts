@@ -25,10 +25,12 @@ import type { RunnerRunSnapshot } from '@/shared/types';
  * offers Resume. Stale DOES take the slot: a run whose heartbeat lapsed may need a hand, which is
  * exactly what a single-card slot is for.
  *
- * NOTHING RENDERS THIS OVER THE CHAT TRANSCRIPT (operator ruling 2026-09-09). A card pinned above
- * the conversation took half a phone screen and left one transcript line with the keyboard open;
- * the Runner tab is the card's one home. `pinned` and `others` survive that ruling because the tab
- * itself wants them — which run heads the list, and how many follow it.
+ * THE CARD HAS TWO HOMES, AND NEITHER IS OVER THE TRANSCRIPT. The Runner tab lists every run on
+ * the lane; the desktop chat gutter (`src/modules/chat-gutters`) draws the open chat's runs BESIDE
+ * the conversation, never over it. A card pinned above the transcript took half a phone screen and
+ * left one transcript line with the keyboard open (operator ruling 2026-09-09), and that is the
+ * whole rule: beside is fine, over is not. `pinned` and `others` survive it because the tab itself
+ * wants them — which run heads the list, and how many follow it.
  *
  * ENDED RUNS ARE CARRIED UNTIL THE OPERATOR DISMISSES THEM (2026-09-09): the server keeps a
  * receipted run on the lane for a day, and this is where a dismissal takes effect — an ended run

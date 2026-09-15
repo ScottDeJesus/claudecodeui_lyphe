@@ -10,6 +10,7 @@ import { TaskMasterProvider,TasksSettingsProvider } from '@/modules/task-master'
 import { MemoryIntakeProvider } from '@/modules/memory-intake';
 import { LiveBusProvider } from '@/modules/live-bus';
 import { RunnerFeed } from '@/modules/plan-runner';
+import { SoulLaunchFeed } from '@/modules/dispatch-souls';
 import { WebSocketProvider } from '@/shared/context/WebSocketContext';
 import { PluginsProvider } from '@/modules/plugins';
 import { ProjectWorkspaceRoute } from '@/modules/project-workspace';
@@ -133,6 +134,10 @@ export default function App() {
                       WebSocketProvider above, because the feed subscribes to the one socket. */}
                   <LiveBusProvider>
                     <RunnerFeed>
+                      {/* Nested rather than chained because a feed is a wrapper, not a sibling: each
+                          one subscribes to the one socket and renders what it wraps, so the innermost
+                          thing here is still the router. One feed per lane, in the lane's own module. */}
+                      <SoulLaunchFeed>
                       {/* Inside the auth gate, so the memory poll never fires against the login screen. */}
                       <MemoryIntakeProvider>
                         <Router basename={routerBasename}>
@@ -142,6 +147,7 @@ export default function App() {
                           </Routes>
                         </Router>
                       </MemoryIntakeProvider>
+                      </SoulLaunchFeed>
                     </RunnerFeed>
                   </LiveBusProvider>
                 </ProtectedRoute>

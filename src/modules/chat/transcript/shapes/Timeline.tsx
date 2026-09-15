@@ -20,7 +20,7 @@ type TimelineProps = {
  * A list whose every item opens with a time, drawn as a vertical rail with one dot per entry.
  *
  * Used by `elements/list.tsx` and nothing else. The leading token is lifted out of the item's FIRST
- * text node and set above the entry as a muted label; everything after it is the item's own
+ * text node and set above the entry in the accent ink; everything after it is the item's own
  * rendered children, so an entry naming a `code` span or a link keeps it. An item this walk cannot
  * open is drawn whole, with no label above it — its time is still on screen, in the author's own
  * sentence, which is the only outcome the no-swallow promise allows.
@@ -31,9 +31,10 @@ type TimelineProps = {
  * the text never carried, and it would silently normalise away the one detail — a bare clock with
  * no date — that tells the reader these entries are all from the same day.
  *
- * The rail and the dot are painted from `border-border` and `bg-muted-foreground`, which are the
- * Tailwind names mapped to the Verve tokens: a timeline is one of the two shapes `src/shared/ui/`
- * has not built yet, so it is drawn from tokens here and moves the day a second module wants one.
+ * The rail is painted from `border-border` and the dot from `bg-accent-ink` — the mark the card's
+ * own ink uses, and the fill that clears the 3:1 graphics floor the accent FILL does not
+ * (`src/shared/ui/verve/README.md`). A timeline is one of the two shapes `src/shared/ui/` has not
+ * built yet, so it is drawn from tokens here and moves the day a second module wants one.
  */
 export function Timeline({ ordered, start, collapseKey, children }: TimelineProps) {
   const { t } = useTranslation('chat');
@@ -57,15 +58,15 @@ export function Timeline({ ordered, start, collapseKey, children }: TimelineProp
               <span
                 data-timeline-dot
                 aria-hidden="true"
-                className="absolute -left-[1.3125rem] top-1.5 h-2 w-2 rounded-full bg-muted-foreground ring-2 ring-card"
+                className="absolute -left-[1.3125rem] top-1.5 h-2 w-2 rounded-full bg-accent-ink ring-2 ring-card"
               />
               {lifted ? (
-                <div className="text-xs font-medium tabular-nums text-muted-foreground">{lifted.token}</div>
+                <div className="text-md-meta font-semibold tabular-nums text-accent-ink">{lifted.token}</div>
               ) : null}
               {/* Through `renderInline` for the reason `CheckResults` gives: this shape draws its
                   own entry instead of letting `ShapeListItem` draw the `li`, so the Phase 9 seam
                   would otherwise never run on a timeline entry. */}
-              <div className="text-sm text-foreground">
+              <div className="text-md-body text-foreground">
                 {renderInline(lifted ? lifted.rest : item.props.children)}
               </div>
             </li>

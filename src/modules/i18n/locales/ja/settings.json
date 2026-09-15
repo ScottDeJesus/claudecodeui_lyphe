@@ -114,7 +114,8 @@
       "actionRequired": "対応が必要",
       "stop": "実行停止",
       "error": "実行失敗",
-      "limits": "使用量の上限"
+      "limits": "使用量の上限",
+      "background": "Background agents finished"
     },
     "ntfy": {
       "title": "スマホ通知 (ntfy)",
@@ -322,6 +323,11 @@
       }
     },
     "connectionStatus": "接続状態",
+    "runnerModel": {
+      "label": "ビルド担当ソウルに DeepSeek Flash を使う",
+      "description": "plan runner はビルダー・修正パス・Athena を Claude Opus ではなく DeepSeek の deepseek-flash で実行します。Prometheus・スカウト・リプランナーは Claude のままです。次のフェーズから有効になります。",
+      "unreadable": "サーバーからスイッチを読み取れなかったため、位置は不明です — オフとは異なります。このページがフォーカスを取り戻すたびに再試行します。"
+    },
     "login": {
       "title": "ログイン",
       "reAuthenticate": "再認証",

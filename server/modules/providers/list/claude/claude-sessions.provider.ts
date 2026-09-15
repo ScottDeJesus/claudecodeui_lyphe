@@ -72,7 +72,7 @@ type ClaudeHistoryMessagesResult =
  */
 const IN_FLIGHT_BELIEVED_FOR_MS = 4 * 60 * 60 * 1000;
 
-type ClaudeSubagentTranscript = {
+export type ClaudeSubagentTranscript = {
   activity: SubagentActivity[];
   model?: string;
   /** Present once one assistant record carried a non-zero usage. */
@@ -148,8 +148,14 @@ function readClaudeMessageUsage(usage: unknown): { contextTokens: number; output
  * Assistant prose and reasoning are kept alongside the tool calls so the
  * transcript can replay what the agent actually did rather than listing tool
  * names with no narrative.
+ *
+ * The history path is its FIRST consumer, and caps what it transmits
+ * (`MAX_TRANSMITTED_SUBAGENT_ACTIVITIES`). Its second is
+ * `claude-transcript-activity.ts`, which reads one transcript on demand for the
+ * chat's Subagents widget and tail-slices it instead — the same reader, a
+ * different window.
  */
-async function readClaudeSubagentTranscript(filePath: string): Promise<ClaudeSubagentTranscript> {
+export async function readClaudeSubagentTranscript(filePath: string): Promise<ClaudeSubagentTranscript> {
   const activity: SubagentActivity[] = [];
   const transcript: ClaudeSubagentTranscript = { activity, inFlight: false, interrupted: false, failed: false };
   const toolsById = new Map<string, SubagentActivity>();

@@ -19,6 +19,8 @@ type NotificationPreferences = {
     stop: boolean;
     error: boolean;
     limits: boolean;
+    /** Background work that finished after its turn ended. Off unless the user turns it on. */
+    background: boolean;
   };
 };
 
@@ -34,6 +36,7 @@ const DEFAULT_NOTIFICATION_PREFERENCES: NotificationPreferences = {
     stop: true,
     error: true,
     limits: true,
+    background: false,
   },
 };
 
@@ -60,6 +63,7 @@ function normalizeNotificationPreferences(value: unknown): NotificationPreferenc
       stop: source.events?.stop !== false,
       error: source.events?.error !== false,
       limits: source.events?.limits !== false,
+      background: source.events?.background === true,
     },
   };
 }

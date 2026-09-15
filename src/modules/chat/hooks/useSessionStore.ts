@@ -53,9 +53,17 @@ export type SessionSlot = {
    * latest page that carries it; the pinned strip reads it for agents older than that window.
    */
   agents: NormalizedMessage[];
+  /**
+   * The launcher souls this conversation started, from the whole history (the server's
+   * `collectSessionSoulLaunches`), whatever window of rows is loaded. The pinned strip joins these
+   * ids against the dispatch-souls lane, so a launch whose receipt has scrolled out of the loaded
+   * page stays pinned while the soul is out. Replaced by every latest page that carries it.
+   */
+  soulLaunches: string[];
 };
 
 const EMPTY: NormalizedMessage[] = [];
+const NO_IDS: string[] = [];
 const SESSION_HISTORY_REQUEST_TIMEOUT_MS = 30_000;
 
 function createEmptySlot(): SessionSlot {
@@ -78,6 +86,7 @@ function createEmptySlot(): SessionSlot {
     // endpoint with it.
     tokenUsage: undefined,
     agents: EMPTY,
+    soulLaunches: NO_IDS,
     _historyMutationQueue: Promise.resolve(),
   };
 }
@@ -89,6 +98,8 @@ type SessionHistoryPage = {
   tokenUsage?: unknown;
   /** Present only on a latest page from a server that sends it. */
   agents?: NormalizedMessage[];
+  /** Present only on a latest page from a server that sends it: the ids this history's own launcher calls printed. */
+  soulLaunches?: string[];
 };
 
 function enqueueHistoryMutation<T>(
@@ -126,6 +137,7 @@ async function requestSessionHistoryPage(
         : {}
     ),
     ...(Array.isArray(data?.agents) ? { agents: data.agents as NormalizedMessage[] } : {}),
+    ...(Array.isArray(data?.soulLaunches) ? { soulLaunches: data.soulLaunches as string[] } : {}),
   };
 }
 
@@ -142,6 +154,18 @@ function applyPageAgents(slot: SessionSlot, page: SessionHistoryPage): boolean {
     return false;
   }
   slot.agents = page.agents.length > 0 ? page.agents : EMPTY;
+  return true;
+}
+
+/**
+ * The same three facts for the soul ids, and the same rule — with one difference the counts make
+ * plain: the list is short enough that comparing it costs less than deciding not to.
+ */
+function applyPageSoulLaunches(slot: SessionSlot, page: SessionHistoryPage): boolean {
+  if (!page.soulLaunches || page.soulLaunches.join(',') === slot.soulLaunches.join(',')) {
+    return false;
+  }
+  slot.soulLaunches = page.soulLaunches.length > 0 ? page.soulLaunches : NO_IDS;
   return true;
 }
 
@@ -549,6 +573,9 @@ async function refreshLatestSlotFromServer(
   if (applyPageAgents(slot, latestPage)) {
     changed = true;
   }
+  if (applyPageSoulLaunches(slot, latestPage)) {
+    changed = true;
+  }
 
   if (!nextServerMessages) {
     console.warn(`[SessionStore] Could not bridge latest history for ${sessionId}; retaining cached suffix.`);
@@ -646,6 +673,7 @@ export function useSessionStore() {
           slot.tokenUsage = data.tokenUsage;
         }
         applyPageAgents(slot, data);
+        applyPageSoulLaunches(slot, data);
 
         notify(sessionId);
         return slot;
@@ -913,6 +941,14 @@ export function useSessionStore() {
   }, []);
 
   /**
+   * The launcher souls this conversation started, from the whole history, for the pinned strip —
+   * including a launch whose receipt is older than the loaded window of rows.
+   */
+  const getSoulLaunchIds = useCallback((sessionId: string): string[] => {
+    return storeRef.current.get(sessionId)?.soulLaunches ?? NO_IDS;
+  }, []);
+
+  /**
    * Get session slot (for status, pagination info, etc.).
    */
   const getSessionSlot = useCallback((sessionId: string): SessionSlot | undefined => {
@@ -931,11 +967,12 @@ export function useSessionStore() {
     finalizeStreaming,
     getMessages,
     getAgents,
+    getSoulLaunchIds,
     getSessionSlot,
   }), [
     fetchFromServer, fetchMore, appendRealtime, truncateAt, refreshLatestFromServer,
     setActiveSession, isStale, updateStreaming, finalizeStreaming,
-    getMessages, getAgents, getSessionSlot,
+    getMessages, getAgents, getSoulLaunchIds, getSessionSlot,
   ]);
 }
 

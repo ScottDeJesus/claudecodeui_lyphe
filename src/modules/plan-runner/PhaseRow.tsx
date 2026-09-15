@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next';
 
-import { useElapsed } from '@/modules/plan-runner/hooks/useElapsed';
+import { useElapsed } from '@/shared/hooks/useElapsed';
 import { PHASE_GLYPH, phaseStateTone } from '@/modules/plan-runner/runState';
 import { Badge, Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/shared/ui';
 import type { RunnerPhaseRow, RunnerTimelineEntry } from '@/shared/types';
@@ -29,7 +29,7 @@ function clockOf(at: string): string {
  * `timeline` is ALREADY this phase's — the card filters it, so a row never scans the run's whole
  * log to draw itself. The elapsed clock runs only for the phase that is genuinely in flight:
  * every other row passes `null` and buys no interval at all, so a five-phase card holds one timer
- * here rather than five (`hooks/useElapsed.ts`).
+ * here rather than five (`@/shared/hooks/useElapsed`).
  */
 export function PhaseRow({
   phase,

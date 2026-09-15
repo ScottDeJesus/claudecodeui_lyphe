@@ -1,9 +1,10 @@
+import { DeepseekBalanceReadout } from '@/modules/accounts/DeepseekBalanceReadout';
 import { UsageMeters } from '@/modules/accounts/UsageMeters';
 import { accountInitials } from '@/modules/accounts/utils/accountInitials';
 import { useMinuteTick } from '@/modules/accounts/hooks/useMinuteTick';
 import { weeklyResetInWords } from '@/modules/accounts/utils/weeklyReset';
 import { Avatar, Banner, Button, Card } from '@/shared/ui';
-import type { DescentAccounts, DescentSlot, DescentUsage } from '@/shared/types';
+import type { DescentAccounts, DescentSlot, DescentUsage, DeepseekBalance } from '@/shared/types';
 
 /** The line that closes the switcher, because "will this lose my work?" is the only question a switch actually raises. */
 const SWITCH_REASSURANCE =
@@ -94,6 +95,8 @@ function AccountRow({ slot, hue, busy, onSwitch, now }: AccountRowProps) {
 type AccountPopoverProps = {
   accounts: DescentAccounts | null;
   usage: DescentUsage | null;
+  /** The DeepSeek reading, held by the row. Not part of `usage`: a different account, from a route Descent never touches. */
+  balance: DeepseekBalance | null;
   busy: boolean;
   error: string | null;
   onSwitch: (slug: string) => void;
@@ -113,6 +116,7 @@ type AccountPopoverProps = {
 export function AccountPopover({
   accounts,
   usage,
+  balance,
   busy,
   error,
   onSwitch,
@@ -141,6 +145,11 @@ export function AccountPopover({
       className="absolute bottom-full left-0 right-0 z-50 mb-2 flex max-h-[70vh] flex-col gap-3 overflow-y-auto p-3"
     >
       {unknown ? <p className="text-xs leading-relaxed text-muted-foreground">{UNREACHABLE_LINE}</p> : <UsageMeters usage={usage} />}
+
+      {/* OUTSIDE that branch on purpose. This reading does not come from Descent, so a Descent
+          outage must not take it down with the meters — the two fail independently, and the
+          panel is where a person checks the money precisely when something else has stopped. */}
+      <DeepseekBalanceReadout balance={balance} />
 
       <div className="flex flex-col gap-1.5">
         <div className="text-[11px] uppercase tracking-[0.14em] text-ink-faint">

@@ -139,7 +139,8 @@
       "actionRequired": "Acción requerida",
       "stop": "Ejecución detenida",
       "error": "Ejecución fallida",
-      "limits": "Límites de uso"
+      "limits": "Límites de uso",
+      "background": "Background agents finished"
     },
     "ntfy": {
       "title": "Push al móvil (ntfy)",
@@ -350,6 +351,11 @@
       }
     },
     "connectionStatus": "Estado de la conexión",
+    "runnerModel": {
+      "label": "Usar DeepSeek Flash para los souls de construcción",
+      "description": "El plan runner envía su builder, su pasada de corrección y Athena a deepseek-flash de DeepSeek en lugar de Claude Opus. Prometheus, los scouts y el replanner siguen en Claude. Se aplica en la siguiente fase.",
+      "unreadable": "No se pudo leer el interruptor del servidor, así que su posición es desconocida — no es lo mismo que apagado. Se reintenta cada vez que esta página recupera el foco."
+    },
     "login": {
       "title": "Iniciar sesión",
       "reAuthenticate": "Volver a autenticar",

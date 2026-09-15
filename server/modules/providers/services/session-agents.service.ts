@@ -7,22 +7,32 @@ import type { AnyRecord, NormalizedMessage, SubagentActivity } from '@/shared/ty
  * The agents of one conversation that its pinned strip must be able to show, read from the
  * WHOLE history rather than from the page a client asked for.
  *
- * The strip above the chat box (`src/modules/chat/transcript/PinnedSubagents.tsx`) keeps an
- * agent in view while it runs and after it finishes, until the reader dismisses it. It used to
- * take its agents from the transcript rows the page had loaded, and a page loads history from the
- * tail, twenty rows at a time — so an agent launched early in a long turn left the strip as soon
- * as the main thread had done twenty rows of work since, which is the exact moment it needs
- * pinning (measured 2026-09-10: a planner still running, sixty rows back, not pinned). This list
- * rides on every latest-page response so the strip no longer depends on what is loaded.
+ * The chat's pinned rows (`src/modules/chat/transcript/PinnedSubagents.tsx`) keep an agent in view
+ * while it runs and after it finishes, until the reader dismisses it. They are drawn in the strip
+ * above the chat box when the desktop chat gutters are not showing and in the gutter's Subagents
+ * widget while they are. They used to take their agents from the transcript rows the page had
+ * loaded, and a page loads history from the tail, twenty rows at a time — so an agent launched
+ * early in a long turn left the rows as soon as the main thread had done twenty rows of work
+ * since, which is the exact moment it needs pinning (measured 2026-09-10: a planner still running,
+ * sixty rows back, not pinned). This list rides on every latest-page response so the rows no
+ * longer depend on what is loaded.
  *
  * Rows are COMPACT copies of the container rows: enough for the strip's reading
  * (`readSubagentSummary`, `describeLatestActivity`, the token figures) and nothing it does not
  * draw — no result text, no prompt, no tool results in the timeline.
  */
 
-/** Mirrors `RUNNING_BELIEVED_FOR_MS` in PinnedSubagents.tsx: a "running" row older than this is not believed. */
+/**
+ * Mirrors `RUNNING_BELIEVED_FOR_MS` in the chat's pinned rows (`PinnedSubagents.tsx`), drawn in the
+ * strip above the chat box when the desktop chat gutters are not showing and in the gutter's
+ * Subagents widget while they are: a "running" row older than this is not believed.
+ */
 const RUNNING_BELIEVED_FOR_MS = 4 * 60 * 60 * 1000;
-/** Mirrors `FINISHED_SHOWN_FOR_MS` in PinnedSubagents.tsx: how long a finished agent stays offered. */
+/**
+ * Mirrors `FINISHED_SHOWN_FOR_MS` in the chat's pinned rows (`PinnedSubagents.tsx`), drawn in the
+ * strip above the chat box when the desktop chat gutters are not showing and in the gutter's
+ * Subagents widget while they are: how long a finished agent stays offered.
+ */
 const FINISHED_SHOWN_FOR_MS = 2 * 60 * 60 * 1000;
 /** A bound on the payload, newest first; a fan-out larger than this has scrolled out of any strip. */
 const MAX_AGENTS = 30;

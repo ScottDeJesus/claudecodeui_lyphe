@@ -68,8 +68,13 @@ export const DOCSPACE_READY_TIMEOUT_MS = 8000;
  *
  * Keyed on the fence body by its caller, so `pageId`/`blockId` cannot change under an instance
  * and every latch below holds for the element's whole life.
+ *
+ * `framed` is set by `WidgetFrame` when the chat has handed it a frame to draw: the element is then
+ * placed inside a card that is already the border, so this wrapper keeps only the clipping and the
+ * fill. It changes no attribute on the frame itself — the sandbox, the `src` and the ready timer are
+ * the same either way.
  */
-export function DocSpaceFrame({ pageId, blockId }: DocSpaceBlockRef) {
+export function DocSpaceFrame({ pageId, blockId, framed }: DocSpaceBlockRef & { framed?: boolean }) {
   const frameRef = useRef<HTMLIFrameElement>(null);
   const { isDarkMode } = useTheme();
 
@@ -144,7 +149,16 @@ export function DocSpaceFrame({ pageId, blockId }: DocSpaceBlockRef) {
   return (
     // Border on a wrapper, not on the frame — border-box sizing would take it out of the
     // reported height and leave a two-pixel scrollbar. The reason is spelled out in WidgetFrame.
-    <div className="my-3 overflow-hidden rounded-xl border border-border bg-card">
+    //
+    // `framed` drops the border, the radius and the margin, and nothing else: the caller has drawn
+    // all three around this element already, and an embed that kept its own would be a frame inside
+    // a frame. Folding is unaffected — `CollapsibleContent` never unmounts its children, so a
+    // collapsed block keeps its iframe, its scroll position and anything typed into the block.
+    <div
+      className={
+        framed ? 'overflow-hidden bg-card' : 'my-3 overflow-hidden rounded-xl border border-border bg-card'
+      }
+    >
       <iframe
         ref={frameRef}
         src={url}

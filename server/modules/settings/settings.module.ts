@@ -10,6 +10,7 @@ import {
   notifyUserIfEnabled,
 } from '@/modules/notifications/index.js';
 
+import { readDeepseekFlashSwitch, writeDeepseekFlashSwitch } from './deepseek-flash-switch.js';
 import { createSettingsRouter } from './settings.routes.js';
 import { createSettingsService } from './settings.service.js';
 
@@ -42,6 +43,10 @@ const settingsService = createSettingsService({
     save: (userId, endpoint, p256dh, auth) =>
       pushSubscriptionsDb.saveSubscription(userId, endpoint, p256dh, auth),
     remove: (endpoint) => pushSubscriptionsDb.removeSubscription(endpoint),
+  },
+  deepseekFlash: {
+    read: () => readDeepseekFlashSwitch(),
+    write: (enabled) => writeDeepseekFlashSwitch(enabled),
   },
   getVapidPublicKey: getPublicKey,
 });

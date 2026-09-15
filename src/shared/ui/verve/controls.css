@@ -80,7 +80,7 @@
   border-radius: var(--radius-pill);
   background: var(--tone-soft);
   color: var(--tone-ink);
-  font-size: 12.5px;
+  font-size: var(--vv-text-meta, 12.5px);
   font-weight: 500;
 }
 /* `default` is the filled MARKER — the "Custom" pill that must stand out from the neutral
@@ -92,7 +92,7 @@
 .vv-badge--outline { background: none; border-color: var(--border); }
 /* `compact` is a SIZE, for a badge that rides inside a dense row (the tool-call outcome pill):
  * the base badge is sized to stand alone and outweighs the row it labels. */
-.vv-badge.vv-badge--compact { padding: 0 6px; font-size: 10px; line-height: 16px; }
+.vv-badge.vv-badge--compact { padding: 0 6px; font-size: var(--vv-text-meta, 10px); line-height: 16px; }
 /* `--secondary` and `--destructive` are emitted too, as contract markers a later phase's verify
  * script can query. They have no rule on purpose: their paint is entirely the tone. */
 
@@ -176,14 +176,36 @@
   background: none;
   color: var(--ink-mid);
   font-family: var(--font-body);
-  font-size: 13.5px;
+  font-size: var(--vv-text-meta, 13.5px);
   font-weight: 500;
   transition: border-color 0.2s, background-color 0.2s, color 0.2s;
 }
-.vv-chip:hover { border-color: var(--accent); }
+.vv-chip:hover:not([aria-disabled='true']) { border-color: var(--accent); }
+/* Its flip cannot be taken yet — the answer it acts on is still crossing the wire. Quieter, not
+ * gone: the position it shows is the last one the server confirmed, and a reader who cannot read
+ * that is being lied to more cheaply than before.
+ *
+ * `aria-disabled`, never the `disabled` attribute. A real disabled button is blurred by the
+ * browser the instant the attribute lands — measured: focus moves to <body> within 60ms of the
+ * press and never comes back — so a keyboard reader got exactly one flip per Tab, and the next
+ * Tab restarted at the top of the page. This node keeps focus and announces itself as unavailable
+ * instead; the press is refused in the handler. */
+.vv-chip[aria-disabled='true'] { opacity: 0.6; cursor: not-allowed; }
 /* Not colour alone: the outline goes and a fill arrives, so the states differ in greyscale. */
 .vv-chip[data-selected='true'] { background: var(--accent-soft); color: var(--accent-ink); border-color: transparent; }
-.vv-chip--sm { padding: 5px 12px; font-size: 12.5px; }
+/* The position could not be read. That is not OFF and it must not be painted as off: the ring goes
+ * dashed — a channel that survives greyscale, and that no other chip state uses — and no fill
+ * arrives, so an unknown chip can never be mistaken for a pressed one. */
+.vv-chip[data-state='unknown'] { border-style: dashed; }
+.vv-chip--sm { padding: 5px 12px; font-size: var(--vv-text-meta, 12.5px); }
+/* The composer's DeepSeek chip on a phone: the mark alone in a 32px square, the footprint of the
+ * icon buttons it sits among, because that footer row has no width to give it a word. Measured —
+ * the row is 10px short at 344 and 36px short at 320 with the voice button present, so the chip's
+ * 42px `--sm` self is what tips it onto a second line. From `sm` up the word is back and the chip
+ * is its ordinary `--sm` self again. See ComposerDeepSeekSwitch. */
+@media (max-width: 639.98px) {
+  .vv-chip--compact { width: 32px; padding: 0; justify-content: center; }
+}
 /* A chip whose RING carries a tone — the composer's edit-mode pill, where the words cost more
  * of the row than a phone has to give. Colour comes from the tone block (§5, a token swap and
  * never a rule of its own), and `--tone-ink` rather than `--tone-dot` because this has to be
@@ -304,8 +326,8 @@
 
 /* ---------------------------------------------------------------- Meter */
 .vv-meter__row { align-items: baseline; }
-.vv-meter__label { font-size: 13px; font-weight: 500; color: var(--ink); }
-.vv-meter__value { margin-left: auto; font-size: 12.5px; color: var(--ink-muted); font-variant-numeric: tabular-nums; }
+.vv-meter__label { font-size: var(--vv-text-meta, 13px); font-weight: 500; color: var(--ink); }
+.vv-meter__value { margin-left: auto; font-size: var(--vv-text-meta, 12.5px); color: var(--ink-muted); font-variant-numeric: tabular-nums; }
 .vv-meter__track { height: 6px; border-radius: var(--radius-pill); background: var(--surface2); overflow: hidden; }
 .vv-meter__fill {
   height: 100%;
@@ -319,14 +341,14 @@
 .vv-meter--warn .vv-meter__fill { background: var(--warn-dot); }
 .vv-meter--warn .vv-meter__value { color: var(--warn-ink); }
 .vv-meter--warn .vv-meter__value::before { content: '▲ '; }
-.vv-meter__sub { font-size: 12px; color: var(--ink-faint); }
+.vv-meter__sub { font-size: var(--vv-text-meta, 12px); color: var(--ink-faint); }
 
 /* Inline register — label, track and figure on one baseline, for chrome with a single line to
  * spare (the sidebar's account row). The track is the only thing that flexes, so two meters set
  * side by side keep their figures aligned however long the labels are. */
-.vv-meter--inline .vv-meter__label { flex: none; font-size: 10.5px; color: var(--ink-faint); }
+.vv-meter--inline .vv-meter__label { flex: none; font-size: var(--vv-text-meta, 10.5px); color: var(--ink-faint); }
 .vv-meter--inline .vv-meter__track { flex: 1 1 auto; min-width: 16px; height: 4px; }
-.vv-meter--inline .vv-meter__value { flex: none; margin-left: 0; font-size: 10.5px; }
+.vv-meter--inline .vv-meter__value { flex: none; margin-left: 0; font-size: var(--vv-text-meta, 10.5px); }
 /* The stacked register spends a whole line on '▲'; one line has no room for it, and the amber
  * fill plus the amber figure already carry the warning in two channels. */
 .vv-meter--inline.vv-meter--warn .vv-meter__value::before { content: none; }

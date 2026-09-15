@@ -119,6 +119,11 @@
     "showAllCommands": "Mostrar todos los comandos",
     "plainMode": "Simple",
     "plainModeTooltip": "Enviar cada mensaje con /plain: respuestas cortas y fáciles de leer",
+    "deepseekFlash": "DeepSeek Flash",
+    "deepseekFlashShort": "Flash",
+    "deepseekFlashTooltip": "Mientras esto está activo, las almas constructoras del plan runner — el builder, su pase de correcciones y Athena — corren en DeepSeek Flash. Prometheus y los scouts siguen en Claude.",
+    "deepseekFlashReading": "Leyendo el interruptor…",
+    "deepseekFlashUnreadable": "No se pudo leer el interruptor: pulsa para reintentar.",
     "clearInput": "Limpiar entrada",
     "scrollToBottom": "Ir al final",
     "queue": {
@@ -299,6 +304,7 @@
     "showAllLines": "Mostrar las {{count}} líneas",
     "showLess": "Mostrar menos",
     "openFile": "Abrir {{path}}",
+    "openInArchPulse": "Abrir en ArchPulse",
     "titles": {
       "table": "Tabla",
       "options": "Opciones",
@@ -313,7 +319,9 @@
       "diff": "Diff",
       "output": "Salida",
       "diagram": "Diagrama",
-      "code": "Código"
+      "code": "Código",
+      "widget": "Widget",
+      "docspace": "Bloque de DocSpace"
     },
     "alert": {
       "note": "Nota",

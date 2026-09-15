@@ -31,8 +31,28 @@ the error; fix the edit and it hands over. Chat sessions ride the keepalive thro
 
 Ports live in `.env` and are deliberately not upstream's defaults: the backend is on
 **3011** because a Caddy container for another local service already owns 3001, and Vite is
-on **5183** rather than 5173. `.env` also pins `HOST=127.0.0.1`, `CLAUDE_CLI_PATH`, and the
-context-window values.
+on **5183** rather than 5173. `.env` also pins `HOST=127.0.0.1`, `CLAUDE_CLI_PATH`, the
+context-window values, and `DEEPSEEK_API_KEY`.
+
+**An `.env` edit is NOT a code change: nothing above reloads for it.** `server/load-env.ts` copies
+that file into `process.env` once, at process start, so a value edited under a running server is
+invisible to every reader that consults the environment for the whole life of that process —
+commenting a key out and re-reading a route proves nothing. Make the edit, then make the process
+BOOT from it: any write under `server/` hands over (`touch server/index.ts` is enough), and only
+the new child carries the new value. More than one parser reads this file and they do not agree:
+`load-env.ts` keeps the FIRST assignment of a name and copies the value verbatim, quotes and all,
+while the readers that go to the file directly — `server/modules/deepseek/deepseek-key.ts` and the
+plan runner's own — keep the LAST and take the quotes off, as systemd's `EnvironmentFile=` does. So
+a value that behaves differently in two places is a parser difference before it is a bug
+([deepseek-balance.md](deepseek-balance.md) §"The rules that bite").
+
+**And never print `.env` to a terminal.** It now holds a live credential — `DEEPSEEK_API_KEY`, the
+only one in the file — and `cat`, `grep`, `sed -n` and a diff all write it into whatever is
+recording the session, where a masking regex is one commented-out line away from missing the line it
+was written to hide. Count instead of printing (`grep -c '^DEEPSEEK_API_KEY='`), edit with `sed -i`,
+and prove the restore with `md5sum -c` against a checksum taken first. A key that has reached a
+transcript is live until it is ROTATED at the vendor; deleting the file that recorded it is not the
+cure.
 
 **One phase needs a THIRD service, and it is not this repo's.** `phase-29.mjs` embeds a real
 DocSpace block and then reads the same block back in ArchPulse's own studio, so it needs
@@ -886,12 +906,20 @@ rather than minting itself something to agree with; a failing gate writes nothin
 capture that disturbs pinned bytes records `DIVERGED at offset N` in the file, which is the whole
 difference between a baseline legitimately widened and one quietly laundered. The `<!-- … -->`
 provenance lines are APPENDED, never replaced — one per capture, carrying the timestamp, the HEAD,
-the argv and any `--note=`. All 13,248 characters of the current DOM are pinned to the PRE-MOVE
-renderer: the old `Markdown.tsx` was read out of git with `git show`, swapped into the tree on its
-own and captured, then the current file was restored and reproduced it exactly, so no part of the
-artifact compares the new DOM with itself. Re-establish it the same way if it ever comes to that —
-`git show` to a temp path, swap, capture or compare, swap back — never with `git checkout`, and
-never by re-capturing from the current tree.
+the argv and any `--note=`. The first 13,248 characters are pinned to the PRE-MOVE renderer: the
+old `Markdown.tsx` was read out of git with `git show`, swapped into the tree on its own and
+captured, then the current file was restored and reproduced it exactly, so no part of that layer
+compares the new DOM with itself. All 13,563 characters of today's artifact add one further,
+deliberate widening on top: the rendered-markdown-verve plan's Phase 8 re-toned `MarkdownLink` and
+`code/CodeFence.tsx`'s class strings, and the DIVERGED capture that produced is held to
+`.verify/artifacts/verve-life-retone.sed` — one line per class or style string the phase touched,
+each commented with the file:line it came from — which, applied to the pre-change copy
+(`.verify/artifacts/verve-life-before/shapes-elements-baseline.html`), must reproduce today's
+artifact byte for byte, provenance comments aside. Re-establish either layer the way it was made:
+the pre-move layer with `git show` to a temp path, swap, capture or compare, swap back; a
+class-string widening like Phase 8's with a sed script proving the same substitution both ways.
+Never `git checkout`, and never re-capture the whole artifact from the current tree without one of
+those two proofs behind it.
 
 ```bash
 node .verify/probe-shapes-baseline.mjs                    # compare: the standing form
@@ -899,8 +927,9 @@ node .verify/probe-shapes-baseline.mjs --write --force    # deliberately re-capt
 ```
 
 It prints a `[PASS]`/`[FAIL]` line per gate and closes with the one `BASELINE:` line a caller reads
-with `tail -1`, exiting non-zero on any failure. Zero Claude turns, nothing written on the server or
-the account, one screenshot (`shots/probe-shapes-baseline-light.png`). `all.mjs` collects
+with `tail -1`, exiting non-zero on any failure. Zero Claude turns; `openConsole` writes the dev
+account's own preferences on the way in, and no other account (§"What bites people"). One screenshot
+(`shots/probe-shapes-baseline-light.png`). `all.mjs` collects
 `phase-<n>.mjs` only, so like every other `probe-*.mjs` it is run by hand — and every later phase of
 [the shapes plan](plans/markdown-shapes.plan.md) runs it as a verify step, expecting
 `BASELINE: DOM identical`.
@@ -976,7 +1005,8 @@ node .verify/probe-shapes-tables.mjs
 
 41 gates — 39 in the light session, 2 in the dark — a `[PASS]`/`[FAIL]` line each, closing with the
 one `SHAPES TABLES:` line a caller reads with `tail -1` and exiting non-zero on any failure. Zero
-Claude turns, nothing written on the server or the account, four screenshots:
+Claude turns; `openConsole` writes the dev account's own preferences, and no other account
+(§"What bites people"). It takes four screenshots:
 `shots/probe-shapes-tables-{light,dark}.png`, and a `-bars` pair beside them because the document is
 taller than the viewport and the bar column — the one thing here judged by eye — sits below the fold.
 `all.mjs` collects `phase-<n>.mjs` only, so like every other `probe-*.mjs` it is run by hand.
@@ -1045,8 +1075,9 @@ node .verify/probe-shapes-lists.mjs
 
 67 gates — 63 in the light session, 4 in the dark — each printing a `[PASS]`/`[FAIL]` line. The run
 closes with the one `SHAPES LISTS:` line a caller reads with `tail -1`, and exits non-zero on any
-failure. Zero Claude turns, and nothing written on the server or the account. It takes six
-screenshots, `shots/probe-shapes-lists{,-checks,-timeline}-{light,dark}.png`: the document is far
+failure. Zero Claude turns; `openConsole` writes the dev account's own preferences, and no other
+account (§"What bites people"). It takes six screenshots,
+`shots/probe-shapes-lists{,-checks,-timeline}-{light,dark}.png`: the document is far
 taller than the viewport, and the callouts, the checks and the timeline are each judged by eye. Like
 every other `probe-*.mjs`, it is run by hand.
 
@@ -1095,8 +1126,8 @@ node .verify/probe-shapes-prose.mjs
 
 51 gates — 36 in the light session, 15 in the dark — each printing a `[PASS]`/`[FAIL]` line. The run
 closes with the one `SHAPES PROSE:` line a caller reads with `tail -1`, and exits non-zero on any
-failure. Zero Claude turns, and nothing written on the server or the account. It takes five
-screenshots: `shots/probe-shapes-prose{,-verdicts}-{light,dark}.png` and
+failure. Zero Claude turns; `openConsole` writes the dev account's own preferences, and no other
+account (§"What bites people"). It takes five screenshots: `shots/probe-shapes-prose{,-verdicts}-{light,dark}.png` and
 `shots/probe-shapes-prose-narrow-light.png`. Like every other `probe-*.mjs`, it is run by hand.
 
 **`probe-shapes-fences.mjs` proves the fence shapes — stat tiles, the diff, long output, the
@@ -1137,8 +1168,8 @@ node .verify/probe-shapes-fences.mjs
 
 33 gates — 30 in the light session, 3 in the dark — each printing a `[PASS]`/`[FAIL]` line. The
 run closes with the one `SHAPES FENCES:` line a caller reads with `tail -1`, and exits non-zero on
-any failure. It grants itself clipboard read and write. Zero Claude turns, and nothing written on
-the server or the account. It takes six screenshots,
+any failure. It grants itself clipboard read and write. Zero Claude turns; `openConsole` writes the
+dev account's own preferences, and no other account (§"What bites people"). It takes six screenshots,
 `shots/probe-shapes-fences{,-output,-diagram}-{light,dark}.png`: the top of the document, the long
 block, and the two diagrams. Like every other `probe-*.mjs`, it is run by hand.
 
@@ -1197,8 +1228,9 @@ node .verify/probe-shapes-groups.mjs
 
 32 gates — 23 in the light session, 9 in the dark — each printing a `[PASS]`/`[FAIL]` line. The
 run closes with the one `SHAPES GROUPS:` line a caller reads with `tail -1`, and exits non-zero on
-any failure. Zero Claude turns, and nothing written on the server or the account. It takes four
-screenshots, `shots/probe-shapes-groups-{tabs,sections}-{light,dark}.png`. Like every other
+any failure. Zero Claude turns; `openConsole` writes the dev account's own preferences, and no other
+account (§"What bites people"). It takes four screenshots,
+`shots/probe-shapes-groups-{tabs,sections}-{light,dark}.png`. Like every other
 `probe-*.mjs`, it is run by hand.
 
 **`probe-shapes-inline.mjs` proves the three inline marks — file chips, colour swatches and
@@ -1246,9 +1278,71 @@ node .verify/probe-shapes-inline.mjs
 themes gate the chip's ink at 4.5:1 or better on its own fill, and the dark one must have repainted
 both. The run closes with the one `SHAPES INLINE:` line a caller reads with `tail -1`, and exits
 non-zero on any failure. Zero Claude turns; it signs in only to read the project's file tree, and
-writes nothing on the server. It takes three screenshots,
-`shots/probe-shapes-inline-{light,dark}.png` and `shots/probe-shapes-inline-files-light.png`, the
+what that sign-in writes is the dev account's own preferences (§"What bites people"). It takes three
+screenshots, `shots/probe-shapes-inline-{light,dark}.png` and `shots/probe-shapes-inline-files-light.png`, the
 Files tab at the target line. Like every other `probe-*.mjs`, it is run by hand.
+
+**`probe-markdown-cards.mjs` proves the element cards — the paint a markdown surface opts into by
+carrying `chat-md-cards` — and the pixels it must not touch.** One document, mounted through
+`shapes-fixture.mjs` in each theme, is read twice: once with `TRANSCRIPT_PROSE` on
+`#probe-shapes-body` alone (OFF) and once with `chat-md-cards` appended (ON). Of the three strings in
+that class list, ONE is read and two are spelled out: `TRANSCRIPT_PROSE` comes out of `Markdown.tsx`
+by regex, while the tone (`prose-gray`) and the scope class under test (`chat-md-cards`) are literals
+in the probe — the class now also lives as `MARKDOWN_CARDS_CLASS` in `src/shared/constants.ts`
+(added in Phase 2), but neither Phase 2 nor Phase 3 may edit this probe, so the literal stays. The
+two states are written onto the fixture's body from the probe — `mountShapes` passes no className,
+and React never set one there, so nothing resets it. Each write lands two animation frames before the
+read, then waits out the page's running animations, capped at 400 ms each: `MarkdownLink` gives every
+anchor `transition: all 0.15s`, and a chip read mid-transition measures the transition rather than the
+theme. The cap is there because the app's own endless animations never finish.
+- **Frames, fills and radii come from reference elements, never from a literal.** Each session
+  appends one element per Tailwind class a gate compares against (`text-muted-foreground`,
+  `text-accent-ink`, `bg-card/50`, `bg-muted`, `bg-muted/50`, `bg-primary/5`, `bg-primary/10`,
+  `border-l-primary`, `border-border`, `rounded-xl`, `rounded-lg`) outside the prose body, reads them
+  back in that theme and removes them. A card passes only by matching the colour the theme actually
+  paints, so a token edit moves both sides together.
+- **A card's marks are the accent ink and its washes are the accent fill.** The bullet and every
+  `::marker` read `text-accent-ink`, the number pill `bg-primary/10`, the quotation `bg-primary/5`
+  against a `border-l-primary` bar, and the footnote reference the pill's own fill and ink. The
+  frame stays the neutral hairline, which is why the frame gate reads a different reference. Two
+  rules spend no accent at all: a struck word outside a shape takes `text-muted-foreground`, and
+  display maths outside one sits on `bg-muted/50`.
+- **What must move.** A plain list is framed, filled and rounded; a carded `ol` keeps its
+  `start="3"` and lifts its numbers into themed `::before` pills opening on the browser's own
+  `counter(list-item)`; a list under a heading section is carded too, because a section carries no
+  `not-prose`; a nested list stays inside its parent's frame, unframed and circled.
+- **The title is read in both spellings at once.** The document carries a tight list (`li > strong`)
+  and a loose one (`li > div > strong` — the renderer spells a loose item's paragraph as a `div`, so
+  `li > p > strong` matches nothing here), and each label must be `display: block` in the accent ink
+  while the item's own words under it are NOT — a rule that inked the whole item would pass a gate
+  that read the label alone. OFF, that lead-in must not be a block.
+- **What must not.** Every list inside a `not-prose` shape — a callout's body, a task list — must
+  have identical border and fill ON and OFF, and at least two must have been found, so the gate
+  cannot pass on an empty match. The same gate holds the two marks a card paints that a shape also
+  renders for itself: a struck word and a display sum inside the callout's frame keep their colour,
+  their fill and their padding ON and OFF, and both must have been found. `no rule moves a margin`
+  covers ten boxes or more, each held to the same top and bottom margin in both states.
+- **The class changes no DOM.** The body's bytes with its OWN `class` attribute stripped — a
+  `cloneNode(true)` whose `class` is removed, serialised by `outerHTML` — must be byte-identical OFF
+  and ON, AND the body's raw `className` must DIFFER between the two reads. Both halves are load
+  bearing: without the second the gate is unfalsifiable, because the cards add one attribute to the
+  body and change nothing beneath it, and without the first two reads taken in one state would pass.
+  The run reports both lengths and the first differing offset for the bytes, and the one shared
+  `className` when the attribute is the half that gave way.
+- **Dark.** The card's fill, its markers and its title must be the dark session's own readings, and
+  the light fill must differ from them.
+
+```bash
+node .verify/probe-markdown-cards.mjs
+```
+
+21 gates — seventeen in the light session (the console gate last, after its teardown), three in the
+dark, and the last one, both screenshots, read after both sessions have closed — each printing a
+`[PASS]`/`[FAIL]` line. The run closes with the one `MARKDOWN CARDS: all gates PASS` line a caller
+reads with `tail -1` (`MARKDOWN CARDS: a gate FAILED` otherwise), and exits non-zero on any failure.
+Zero Claude turns; `openConsole` writes the dev account's own preferences, and no other account
+(§"What bites people"). It takes two element screenshots of the carded body,
+`shots/markdown-cards-{light,dark}.png`. Like every other `probe-*.mjs`, it is run by hand.
 
 **`.verify/phase-32.mjs` is the gallery: the whole markdown-shapes feature proven in one reply, through the fixture and through the app's real transcript.**
 It is a `phase-<n>` script and not a `probe-shapes-*` one on purpose, and it is **not to be renamed
@@ -1330,6 +1424,94 @@ conversation choice is recorded as a failed gate, so even then the run ends on t
 alone with `node` on its path, or as part of
 `node .verify/all.mjs`. It takes five screenshots in `.verify/shots/`, named after the script: the
 fixture gallery and the transcript row in each theme, and the folded row in light.
+
+**`.verify/phase-33.mjs` is the carded gallery: every element card and all twenty shapes in one
+reply, shot WHOLE at the width a reply is really read at, in two themes.** It exists because neither
+of the other two proves the *surface*: `probe-markdown-cards.mjs` measures computed styles over a
+small fixture document and writes an element shot of it, and `phase-32.mjs`'s shots are viewport crops
+of one scroll position, so "show me all of it" had no artifact to point at. **The width is the app's
+own, measured — a reply is not read at 1440 px.** The transcript column is `max-w-[54.25rem] px-4`
+inside `.chat-messages-pane` (`ChatMessagesPane.tsx`), which is 836 px of markdown body at a 1440 px
+viewport and 358 px at 390: the run reads that max-width out of the pane source, finds the column in
+the live pane by that very computed value, and sets the fixture host's padding so each shot comes out
+at exactly that width. The shot gate is therefore an equality, not a floor — a gallery shot at a width
+no reply has answers a different question than "what will the reader see". One document carries the
+cards first and the shapes after them, in the reading order of a reply that answers and then shows its
+work — a tight list whose items open with a label, a loose list, an `ol` starting at three, a
+paragraph whose colon titles the list below it (the block that puts the `list` kind into the
+census), a quotation, an alert holding a list, a task list, a rule, a heading section (h1, h2 and h3)
+with struck words, a footnote, a picture and display maths — then every kind the renderer draws, the
+callout carrying a struck word and a display sum inside its own `.not-prose` frame. It gates what no
+standing proof held: all twenty kinds on screen and nothing unexpected beside them, every block's own words
+present, the paint read off reference elements in that session and theme (the frame neutral and the
+marks accent, in light AND dark; the hairline on h1/h2 and off h3), the cards moving no DOM and no
+margin, and nothing inside a `.not-prose` shape moving — down to that struck word and that sum, the
+two marks a card rule would otherwise reach in and paint. One gate is not a DOM read and cannot be:
+every shot here sets the scope class by hand, so no measurement below can see a call site dropping it,
+and the four call sites (`MessageComponent`'s import and three bodies, `MarkdownContent`'s import and
+one) are counted in the source the dev server serves instead. The four files are the deliverable —
+`shots/phase-33-gallery-{light,dark}.png` and `-phone-{light,dark}.png`, each of them the WHOLE
+gallery, taller than any viewport this app is used at — and they are taken with the fixture's host
+un-fixed and `#root` hidden, so the body is the whole, unclipped box. 66 gates — 28 in the light
+session, 28 in the dark, and ten read once for the document (the measured column width, the
+class-stripped bytes, the margins, the rule's height, the not-prose marks, the four call sites still
+carrying the scope class off the served source, the dark repaint, the four shots' own sizes, the theme
+the run left behind, and the console) — each printing a `[PASS]`/`[FAIL]` line and closing on the one
+`SHAPES GALLERY 33:` line a caller reads with `tail -1`. Like `phase-32.mjs` it is a `phase-` script so
+`node .verify/all.mjs` runs it; it spends no Claude turn; it signs in as the dev account only.
+
+**`.verify/phase-34.mjs` is the falsifiable probe for the rendered-markdown verve: every gate that
+says what a rendered reply should LOOK like, in one corpus, in four sessions.** It exists before any
+of the change it measures, and it must FAIL at first — `L1`, `T1`, `C1`, `M1`, `E1` and `F2` are the
+six reds that prove a group can fail, and none of what they read exists yet: no lead-in frame, no
+`data-shape-title`, no header wash, no `data-vv-enter`, no framed embed, and links still blue. It is
+a `phase-` script so `node .verify/all.mjs` runs it. The corpus is one document held verbatim in
+`.verify/lib/verve-life.mjs`; the mounts are `lib/shapes-fixture.mjs`'s, so the probe measures the
+renderer the app is actually running and never a second copy of it, and every colour it expects comes
+from `readRefs` in that session's own theme — no colour is a literal in the file, which is why the
+one red group that is about colour fails on a measured mismatch and not on a name. Four sessions,
+one at a time: A light reads every `L` and `T` gate, `C1`–`C4`, `C7`, `E1`–`E6`, `F1`, `F2`'s light
+half and `X1`; B dark reads `C5`, `C6`, `F3` and `F2`'s dark half; C light reads `M1`–`M4` and `M7`
+on its FIRST settled mount — the entrance memory lives for the page, so an earlier mount would hide
+`data-vv-enter` from `M1` — then `M8` and `M5`; D light emulates reduced motion before its first
+mount for `M6`. `E6` is the one gate the plan's pinned technique could not express: it renders the
+corpus through the app's own export path, `buildTranscriptHtml`'s `renderToStaticMarkup`, because a
+client mount frames both embeds whatever the export flag says — the fence's source is only its first
+render — and the static path runs no effects, which is exactly the property the gate asserts. It is
+41 gates — `L` 9, `T` 6, `C` 7, `M` 8, `E` 6, `F` 3, `X` 2 — each printing a `[PASS]`/`[FAIL]` line
+in table order and closing on the one `VERVE LIFE 34:` line a caller reads with `tail -1`. Its two
+artifacts are `.verify/shots/phase-34-light.png` and `-dark.png`, the WHOLE element surface at the
+chat size, taller than any viewport this app is used at; the library-sizes JSON it shares with `T6`
+is written only when absent, so a later run compares the tree against that first reading rather than
+against itself. It spends no Claude turn and signs in as the dev account only.
+
+```bash
+node .verify/phase-34.mjs                    # the whole probe: 41 gates, then the VERVE LIFE 34 line
+```
+
+**`.verify/verve-life-compare.sh <script>` is the standing gate the fourteen recorded probes are
+held to.** It runs one probe exactly the way that probe's own usage line says — `npx --no-install
+tsx --tsconfig tsconfig.json .verify/<script>` when the file carries `// Usage: npx --no-install
+tsx` (`probe-shapes-detect.mjs` is the only one today, because it loads app TypeScript through the
+tsconfig-only `@/` alias bare `node` cannot resolve), `node .verify/<script>` otherwise — and writes
+stdout and stderr together to `.verify/artifacts/verve-life-after/<script>.txt`. It then keys every
+`[FAIL]` line there AND in the Phase 1 recording under `.verify/artifacts/verve-life-before/`, taking
+the text before the first ` — ` as the gate's identity (the separator the harness's `report()` uses),
+and prints exactly one line: `SAME-OR-BETTER <script>` when no after-key is new, `NEW-FAIL <script>:
+<key>` otherwise, `NO-BEFORE <script>` when the before file is missing, and `NO-GATES <script>` when
+the after file holds no `[PASS]`/`[FAIL]` line at all — a probe that crashed before its first gate,
+whose zero failures would otherwise read as a pass. `NO-BEFORE` is checked first, and the script
+always exits 0: the printed line IS the verdict. Keying on gate lines rather than on a final PASS
+line is what lets the ratchet run while another session's in-flight work already has a probe red
+before the plan started — it blocks on no red it did not cause, and hides none it did.
+
+**Two standing probes' documents carry the near misses this change must leave alone.**
+`probe-markdown-cards.mjs`'s document opens with a paragraph directly above a list and no blank line
+between them; the line ends in a full stop and is not bold, so no lead-in pass groups it, and its
+`G6` and `G7` lists — one under a heading section, one inside a `.not-prose` callout — are what the
+R1 exclusion's new `[data-shape="list"]` clause must still not reach. `phase-33.mjs`'s gallery corpus
+gained the paragraph whose colon titles the list below it, the block that puts the `list` kind into
+its census (its entry above).
 
 ## Standing colour baselines
 
@@ -1706,6 +1888,7 @@ Eight things to know before running one:
 |---|---|
 | **Dev account** | `verve` / `verve-dev-2026`, created through the real setup form on the first run. To start over, delete `~/.cloudcli/auth.db` (an operator act) and run the harness again. |
 | **One dev user, so two runs collide** | Every phase signs in as that one account, and `phase-4.mjs` changes its *server-side* preferences mid-run — hiding and revealing the Shell tab, toggling `tasksEnabled` — then restores them inline and asserts it did. Two `all.mjs` runs at once therefore read and overwrite each other's half-done state, which surfaces as a regression rather than as the collision it is: run the harness solo. The restore being inline rather than in a `finally` also means a run that dies part-way leaves the dev user non-default — re-run the phase, or put the switches back by hand. |
+| **Every probe that calls `openConsole` writes the dev account's preferences** | Two writes, both against the dev account `verve`, before any probe's first gate. `parkOnProjectTree` (`.verify/lib/console.mjs:222`) PATCHes `/api/user/preferences` with `simpleChatList: false` through the page's own token, because that view hides the `PROJECT_ROW` every probe waits on. `ensureTheme` (`:266`) drives Settings → **Appearance** → **Dark Mode** whenever the stored theme disagrees with the run's, which rewrites the stored theme — so each run leaves the dev user on whichever mode ran last. No other account is touched: no probe signs in as anything but `verve`. A preference read back after a probe signs in is therefore a value the harness itself set, and a probe that asserts a default it never set is reading the harness's write as the app's. |
 | **Onboarding writes real git config** | Its first step arrives pre-filled from the host's global git identity and the harness submits it unchanged. It never types one: an empty field stops the run rather than writing a fabricated identity into `git config --global`. |
 | **The Runner tab comes and goes** | It is DATA-gated: it is on the bar only while the plan runner is actually carrying a run, so a workspace with a quiet lane has no Runner tab and nothing is wrong. It is also STICKY — once it is the selected tab it stays at a count of zero, so a run ending under you empties the panel instead of moving you. A probe that asserts the tab's absence will fail on this box, where the plan runner is usually running something; and its count is read from the tab's `title`, never from a `.vv-tabs__count` pill, which icon-only tabs do not render. |
 | **One stored theme per user** | The theme is saved server-side against the account, so every run leaves the dev user on whichever mode ran last. `ensureTheme` therefore forces it in both directions by driving Settings → **Appearance** → **Dark Mode**. Those are English labels — a phase that restyles or re-labels Settings must re-point them. |
@@ -1732,12 +1915,17 @@ Eight things to know before running one:
 | **`phase-29.mjs` writes a real page into the real DocSpace store** | It is the one probe here that does, and the fence is the TITLE: every page it makes is `fixture-docspace-embed-<ms>`, it sweeps leftovers carrying that prefix before it starts, and it deletes its own in an outermost `finally` by the id it minted — never by a title match, and never any other page. A failed cleanup sets the exit code, so a page left behind is a red run rather than a quiet one. `scripts/probe_embed_block.mjs` in ArchPulse uses the same prefix and `scripts/probe_block_card_lift.mjs` uses `fixture-docspace-lift-`: two prefixes, so neither probe can ever delete the other's page. Sweep any survivor of a killed run by hand — DocSpace holds the operator's real work. |
 | **`phase-30.mjs` measures the OPERATOR's transcript, not a gallery** | It signs in and opens a real conversation by its app session id (the host id in `~/.cloudcli/sessions/*.json` minus its `-xxxxxxxx` suffix — a deep link with the suffixed id lands on the project picker), then walks UP through the lazy band, clicking "Load" at the top for older history, and measures each widget or DocSpace frame the moment it is met — twice: as met, possibly still off-screen, and again after scrolling it into view. Measuring at the end would find nothing: rows unmount as the walk moves on. The two readings are the point. A frame whose document fits only after it is seen is reporting late (what the DocSpace embed did before `reportHeightNow` ran on every commit: 673 and 564 px of document in 101 px frames), one that never fits is not reporting at all, and one that fits both times is right. It excuses the app's serviceWorker guard by the same substring the phases above use, and nothing else. |
 | **`phase-31.mjs` measures the question panel's "Other" field, not the panel** | It mounts `QuestionAnswerContent` from the running server inside a real `PermissionContext.Provider` with a pending request (the phase-6 idiom), opens "Other", types a long answer, and reads geometry: the field must sit OUTSIDE the options scroller and wholly above the Submit button — `elementFromPoint` at its bottom edge must return the field, not whatever covers it — and its computed right padding must be at least the span from its right edge to the badge's left, with the text actually scrolled. Then six options, to prove the list still scrolls within its twelve-rem cap. Before the fix the field lived inside the scroller and, with three or more options, was clipped against the footer while the badge sat over the end of the text — the operator could not see what they were typing. |
+| **`phase-33.mjs` forgives the same `serviceWorker` line, and only that one** | Its gallery corpus gained a `widget` fence in the rendered-markdown-verve plan's Phase 7, the first OPAQUE-ORIGIN iframe this probe mounts, so the app's registration guard (`phase-22.mjs` row above) fires once per sandboxed frame here too — 2 of the run's console errors, both this one message, per the `[NOTE]` it prints. The gate filters by that exact substring (`SANDBOX_SW_NOISE` in the script) and nothing else, so a CSP refusal, a fetch failure or any other error still reddens `the run raised no console error and no page error while signed in`. |
 | **An ArchPulse restart mid-probe reads as an error card, not as a bug** | `DocSpaceFrame` gives the embed `DOCSPACE_READY_TIMEOUT_MS` (8 s) to say `ready` and then replaces the iframe with `DocSpace did not answer at …`. Another session on this box restarting `archpulse.service` inside that window therefore turns phase 29's frame gates red for a reason that is not this app's — and the full reload it forces on any open DocSpace frame also costs that frame its theme posts until the chat re-renders. Re-run the probe once; if it recurs, the restart is not incidental and belongs in the report with the journal line. |
 | **A gallery over the app must carry the app's provider stack** | The probes that mount `MarkdownBody` into a second React root — `phase-22`, `phase-24`, `phase-28`, `phase-29`, and every caller of the shared `.verify/lib/shapes-fixture.mjs` — carry `ThemeProvider` and `LiveBusProvider` because `WidgetFrameLive` reaches `useWidgetBridge` → `useLiveBus`, which THROWS outside a provider and takes the whole synthetic root down with it. The only symptom is a `waitForSelector` timeout on a gallery that rendered zero children, which reads as a broken selector rather than as a missing provider. Every specifier is read back out of served source (the `?t=` rule) for the other half of the same rule: two instances of a context module is two contexts, and a provider mounted from a hand-written specifier is invisible to the hook that needs it. The app itself is never affected — it mounts both providers once, at `App.tsx`. `phase-22.mjs` sat broken on exactly this from commit `693c95d` (which introduced the live-bus module and made `useWidgetBridge` a consumer of it) until phase 29's verify block re-ran it and the provider was added back; that repair changed nothing but the provider stack, and no gate, threshold or filter in the file moved with it. `shapes-fixture.mjs` is that rule written down once, for every `probe-shapes-*` caller — including the ones whose documents hold no widget fence, since a throw in one child takes the whole root down: the host survives, the body div never exists, and its `innerHTML` is `''`, so a single widget fence would blank every other block in the document rather than fail on its own. |
 | **A fixture run flashes in the terminal status bar** | `phase-23.mjs` and `phase-26.mjs` both write real run directories under the real state root, so for the few seconds one exists `scripts/runner_statusline.py` lists `fixture-live-widgets-<ms>` beside the operator's own runs — in the bar, and in `plan-runner status`. Expected, not a stray run: each probe removes what it wrote in a `finally`, `phase-23.mjs`'s last gate asserts the state root holds no `fixture-live-widgets-*` entry, and `phase-26.mjs` reddens its own run if a fixture will not remove. One left behind means a probe was killed mid-flight; delete it by hand. |
 | **`phase-23.mjs` notes that the socket was reopened** | The API restarted mid-probe — a save under `server/` under `tsx watch`, or the dev supervisor handing over — and the probe's chat socket healed through it rather than failing the frame gate on a closed one. A `[NOTE]`, never a failure: the gates after it are worth as much as on a run that carried no such line. The reopen contract is in the phase 23 entry of §"The browser harness". |
 | **The surface probe reads a process that only lives for one turn** | `phase-21.mjs` polls `/proc/<pid>/environ` of the SDK child spawned for its one Claude turn, and that child exists only while the turn is in flight — it is gone by the time a reply is on screen. The poll has to start before the prompt is sent and keep running through it; a reading taken after the reply arrives finds no such pid and proves nothing. |
 | **Three sidebar readings are only as good as this host's data** | "↳ Show N older conversations" is *asserted*, and needs a project whose first page of sessions is not its whole history — a host without one reports a failure where there is an absence. The other two can only be noted: `messageCount` is `0` on every session server-side, so the "N messages" segment never renders, and no plugin is installed here — the registry reads `~/.claude-code-ui/plugins`, not this repo's `plugins/`, and it is empty — so the plugin tabs draw nothing to read. |
+| **Every signed-in page spends a real DeepSeek call, and no `page.route` can reach it** | `AccountFooterRow` mounts in the sidebar on every probe that signs in, and `useDeepseekBalance` reads on mount, every 180 s, and on each panel open — so each run makes the SERVER call `api.deepseek.com` with the host's own key. It is a read that moves nothing and costs no tokens, but it is a third-party origin that the browser-context stubs above do not and cannot cover: the page only ever sees the same-origin `/api/deepseek/balance`. A probe that needs the figure to be a known value — or needs the vendor left alone — fulfils **that path**, never the vendor's. Its contract is at [deepseek-balance.md](deepseek-balance.md). |
+| **Nothing in `all.mjs` measures the DeepSeek balance** | It is the one surface here with no `phase-<n>.mjs`: `phase-13.mjs` predates it and asserts nothing about it, so the figure could vanish from the row and the panel with the standing gate still green — and the shots `13-footer` and `13-popover` would carry the change without a gate reading it. The procedure that does prove it, and the vendor-body table that seeds the missing script, are [deepseek-balance.md](deepseek-balance.md) §"Proving it". |
+| **Nothing in `all.mjs` measures the soul pin either** | The second such surface: the launcher-soul row among the chat's pinned rows was proven once by hand, in headless Chromium against the live client and a REAL `plan-runner soul` launch, and no phase holds it. A probe cannot fake it cheaply, which is why — the row is a JOIN, so it needs BOTH a transcript carrying a `SOUL LAUNCHED` receipt inside a `Bash` **result** whose command segment opens with `plan-runner soul`, AND a matching directory under `~/.claude/state/dispatch-souls/`. `DISPATCH_SOULS_STATE_DIR` looks like the way out and is not: the server reads it once at composition, so pointing it at a fixture tree means restarting the API. Writing a fixture launch dir under the REAL root is the workable path, with phase-23/26's discipline — one clearly-prefixed name, removed in a `finally`, and the launcher's own 14-day sweep behind it. The row carries `data-testid="pinned-soul-row"` with `data-status`, `data-provider` and `data-launch-id`; the hand procedure is [dispatch-souls.md](dispatch-souls.md) §"Proving it". |
+| **Nothing in `all.mjs` measures the DeepSeek Flash switch either** | Two client surfaces read and write it — the Settings row (`RunnerModelContent.tsx`) and the composer's own chip (`ComposerDeepSeekSwitch.tsx`) — sharing one coordinator, `useDeepSeekFlashSwitch`, and no `phase-<n>.mjs` drives either. Proven by hand instead, in headless Chromium against the running dev server signed in as the operator's own account, at viewport widths from 320px to 430px: both surfaces' filled/outlined/unknown positions, the composer chip standing down where its row has no room (with and without the voice button present), and a flip made on one surface reaching the other while both are mounted. Its contract is at [plan-runner.md](plan-runner.md) §"The DeepSeek switch". |
 
 ## Hosted instance
 

@@ -1,0 +1,47 @@
+/* The transcript's entrances. FRAMES ONLY — never an element card: a plain list, a quotation and
+   the footnotes render identically in the streaming and the settled half and carry no key, so a
+   CSS entrance on one would play while it streams and again when it settles, while a frame exists
+   only in the settled half. Every rule keys on `[data-vv-enter]`, the marker `ShapeFrame` writes
+   while the entrance memory says the card has never been seen. The meter's grow-in is the
+   library's own and lives in tokens.css. */
+@media screen and (prefers-reduced-motion: no-preference) {
+  /* M1 — a frame the reader has never watched arrive rises once, on Verve's own vv-rise. */
+  [data-vv-enter] {
+    @apply animate-shape-rise [animation-fill-mode:backwards];
+  }
+
+  /* M2 — the rows, items and tiles inside it follow, each on the library's page-in. */
+  [data-vv-enter] :is(tbody > tr, li:not(li li), [data-stat-tile], .vv-card) {
+    @apply animate-shape-item;
+  }
+
+  /* M2b — the stagger: the second item waits one 30 ms step, and each position after it one more. */
+  [data-vv-enter] :is(tbody > tr:nth-child(2), li:not(li li):nth-child(2), [data-stat-tile]:nth-child(2), .vv-card:nth-child(2)) {
+    @apply [animation-delay:30ms];
+  }
+
+  /* M2b — the third item. */
+  [data-vv-enter] :is(tbody > tr:nth-child(3), li:not(li li):nth-child(3), [data-stat-tile]:nth-child(3), .vv-card:nth-child(3)) {
+    @apply [animation-delay:60ms];
+  }
+
+  /* M2b — the fourth item. */
+  [data-vv-enter] :is(tbody > tr:nth-child(4), li:not(li li):nth-child(4), [data-stat-tile]:nth-child(4), .vv-card:nth-child(4)) {
+    @apply [animation-delay:90ms];
+  }
+
+  /* M2b — the fifth item. */
+  [data-vv-enter] :is(tbody > tr:nth-child(5), li:not(li li):nth-child(5), [data-stat-tile]:nth-child(5), .vv-card:nth-child(5)) {
+    @apply [animation-delay:120ms];
+  }
+
+  /* M2b — the sixth item. */
+  [data-vv-enter] :is(tbody > tr:nth-child(6), li:not(li li):nth-child(6), [data-stat-tile]:nth-child(6), .vv-card:nth-child(6)) {
+    @apply [animation-delay:150ms];
+  }
+
+  /* M2b — the seventh item and every one after it, so the tail never runs past 390 ms. */
+  [data-vv-enter] :is(tbody > tr:nth-child(n+7), li:not(li li):nth-child(n+7), [data-stat-tile]:nth-child(n+7), .vv-card:nth-child(n+7)) {
+    @apply [animation-delay:150ms];
+  }
+}

@@ -206,6 +206,10 @@ export function classifyRun(
   const heartbeatAt = ending !== null ? writtenBeat : (lockBeatFor?.(planPath, runId) ?? writtenBeat);
 
   const stoppedAt = readNumberOrNull(field(files.run, 'stopped_at'));
+  // Kept RAW: `run.json` carries a Claude transcript uuid, and translating it to an app session id
+  // is the composition root's one job (`plan-runner.module.ts`). A disk reader that resolved ids
+  // would need the database, and this lane is proven against a fixture directory with none.
+  const launchedBySession = readStringOrNull(field(files.run, 'launched_by_session'));
   const state: RunnerRunState =
     ending !== null ? 'ended'
     : stoppedAt !== null ? 'paused'
@@ -224,6 +228,7 @@ export function classifyRun(
     started_at: readNumber(field(progress, 'started_at'), writtenBeat),
     heartbeat_at: heartbeatAt,
     stopped_at: stoppedAt,
+    launched_by_session: launchedBySession,
     outcome: ending?.outcome ?? null,
     ended_at: ending?.at ?? null,
     blocked_causes: ending !== null ? readBlockedCauses(files.receipt) : {},

@@ -270,5 +270,35 @@
   },
   "shapes": {
     "diagramFailed": "Impossible de dessiner ce diagramme — sa source est affichée."
+  },
+  "gutters": {
+    "runner": {
+      "title": "Exécutions"
+    },
+    "memory": {
+      "title": "Mémoire",
+      "pending": "En attente de révision",
+      "recent": "Récemment classés",
+      "recentEmpty": "Rien de classé pour l'instant",
+      "pendingEmpty": "Rien en attente"
+    },
+    "subagents": {
+      "title": "Sous-agents",
+      "empty": "Aucun sous-agent dans cette conversation",
+      "back": "Retour aux sous-agents",
+      "loading": "Chargement de la transcription…",
+      "notFound": "Pas encore de transcription sur le disque",
+      "failed": "Impossible de lire la transcription",
+      "live": "En direct",
+      "showEarlier": "Afficher les étapes précédentes",
+      "openRow": "Lire la transcription de {{name}}"
+    },
+    "open": "Ouvrir {{name}}",
+    "collapse": "Réduire",
+    "dragHint": "Glisser vers un autre emplacement",
+    "pin": {
+      "label": "Cette session",
+      "title": "Créé par la conversation que vous avez ouverte"
+    }
   }
 }

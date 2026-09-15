@@ -109,7 +109,12 @@
     "clickToChangeMode": "クリックで権限モードを変更（または入力欄でTab）",
     "showAllCommands": "すべてのコマンドを表示",
     "plainMode": "簡潔",
-    "plainModeTooltip": "すべてのメッセージを /plain 付きで送信: 短く読みやすい返答"
+    "plainModeTooltip": "すべてのメッセージを /plain 付きで送信: 短く読みやすい返答",
+    "deepseekFlash": "DeepSeek Flash",
+    "deepseekFlashShort": "Flash",
+    "deepseekFlashTooltip": "これがオンの間、plan runner のビルド担当ソウル（ビルダー・修正パス・Athena）は DeepSeek Flash で実行されます。Prometheus とスカウトは Claude のままです。",
+    "deepseekFlashReading": "スイッチを読み取り中…",
+    "deepseekFlashUnreadable": "スイッチを読み取れませんでした — 押して再試行してください。"
   },
   "providerSelection": {
     "title": "AIアシスタントを選択",
@@ -261,6 +266,7 @@
     "showAllLines": "{{count}} 行すべて表示",
     "showLess": "表示を減らす",
     "openFile": "{{path}} を開く",
+    "openInArchPulse": "ArchPulse で開く",
     "titles": {
       "table": "テーブル",
       "options": "選択肢",
@@ -275,7 +281,9 @@
       "diff": "差分",
       "output": "出力",
       "diagram": "図",
-      "code": "コード"
+      "code": "コード",
+      "widget": "ウィジェット",
+      "docspace": "DocSpace ブロック"
     },
     "alert": {
       "note": "ノート",

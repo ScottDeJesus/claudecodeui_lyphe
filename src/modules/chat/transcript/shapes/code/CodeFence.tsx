@@ -113,10 +113,10 @@ function FenceBlock({ raw, language, clamp }: FenceBlockProps) {
   const languageLabel = language.charAt(0).toUpperCase() + language.slice(1);
 
   return (
-    <div className="group my-3 overflow-hidden rounded-xl border border-border bg-muted/50 shadow-sm dark:bg-zinc-900">
+    <div className="group my-3 overflow-hidden rounded-xl border border-border bg-muted/50 shadow-sm">
       {/* Label row shares the block's background — no divider, ChatGPT-style */}
       <div className="flex items-center justify-between px-4 pt-2">
-        <span className="select-none text-xs text-muted-foreground">{languageLabel}</span>
+        <span className="select-none text-md-meta text-muted-foreground">{languageLabel}</span>
         <button
           type="button"
           onClick={() =>
@@ -128,7 +128,7 @@ function FenceBlock({ raw, language, clamp }: FenceBlockProps) {
             })
           }
           className={`rounded-md p-1 transition-opacity focus-visible:opacity-100 ${copied
-            ? 'text-green-600 opacity-100 dark:text-green-500'
+            ? 'text-accent-ink opacity-100'
             : 'text-muted-foreground opacity-0 hover:text-foreground group-hover:opacity-100'
             }`}
           title={copied ? t('codeBlock.copied') : t('codeBlock.copyCode')}
@@ -180,7 +180,7 @@ function highlight(language: string, text: string) {
       customStyle={{
         margin: 0,
         borderRadius: 0,
-        fontSize: '0.8125rem',
+        fontSize: '0.875em',
         lineHeight: 1.6,
         padding: '0.5rem 1rem 1rem',
         // The container owns the background so the label row and code read as one panel.

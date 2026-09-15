@@ -115,7 +115,8 @@
       "actionRequired": "Aksiyon gerekli",
       "stop": "Çalıştırma durduruldu",
       "error": "Çalıştırma başarısız",
-      "limits": "Kullanım limitleri"
+      "limits": "Kullanım limitleri",
+      "background": "Background agents finished"
     },
     "ntfy": {
       "title": "Telefon bildirimi (ntfy)",
@@ -323,6 +324,11 @@
       }
     },
     "connectionStatus": "Bağlantı Durumu",
+    "runnerModel": {
+      "label": "Yapı ruhları için DeepSeek Flash kullan",
+      "description": "plan runner; builder, düzeltme turu ve Athena'yı Claude Opus yerine DeepSeek'in deepseek-flash'inde çalıştırır. Prometheus, izciler ve yeniden planlayıcı Claude'da kalır. Sonraki aşamada geçerli olur.",
+      "unreadable": "Anahtar sunucudan okunamadı, bu yüzden konumu bilinmiyor — kapalı olmakla aynı şey değil. Bu sayfa odağı her geri aldığında yeniden denenir."
+    },
     "login": {
       "title": "Giriş Yap",
       "reAuthenticate": "Yeniden Kimlik Doğrula",

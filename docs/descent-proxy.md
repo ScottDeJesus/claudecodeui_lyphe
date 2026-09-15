@@ -2,7 +2,9 @@
 
 Eight routes in two lanes, mounted under `/api/descent` behind `authenticateToken` in
 `server/index.ts`, wired in `descent.module.ts`: four back the account switcher and the usage meter,
-four back Descent's memory-intake review queue. Descent answers in snake_case and this proxy only
+four back Descent's memory intake — the review queue by default, the filed list on
+`?status=approved`, both served by the memory service's one `list(status)` verb
+([memory-intake.md](memory-intake.md) §"Where the shapes live"). Descent answers in snake_case and this proxy only
 camelCases it, unwrapping the `{ok, accounts}` / `{ok, usage}` / `{ok, candidates}` envelope. Nothing
 caches here — Descent already does, and a second cache would age its figures a second time.
 
@@ -12,7 +14,7 @@ caches here — Descent already does, and a second cache would age its figures a
 | `GET …/usage` | 200 always, the same way. |
 | `POST …/accounts/switch` | Body `{slug}`. Descent's own status and body, passed through. |
 | `POST …/accounts/capture` | No body. Descent's own status and body, passed through. |
-| `GET …/memory` | 200 always: the pending queue, or `{reachable:false, reason}` when it is unknown. |
+| `GET …/memory` | 200 always: the pending queue, or the filed list on `?status=approved`, or `{reachable:false, reason}` when it is unknown. |
 | `GET …/memory/:id` | 200 always: one candidate read whole, or `candidate:null` when no row carries that id. |
 | `POST …/memory/:id/approve` | No body. Descent's own status and body, passed through. |
 | `POST …/memory/:id/reject` | No body, the same way. |
@@ -36,9 +38,12 @@ One lane, one screen, one poller — and there are two of each. Both pollers are
 app's whole life, so no amount of opening and closing panels multiplies them.
 
 The accounts lane's screen is `src/modules/accounts/`. Its `AccountFooterRow` holds the single
-instance of both hooks — 60 s for the picture, 180 s for usage, and one extra reading the moment the
-panel opens. What the screen makes of each of these bodies, and why an expiry sitting in the past
-raises nothing there, is [accounts.md](accounts.md).
+instance of both of this lane's hooks — 60 s for the picture, 180 s for usage, and one extra usage
+reading the moment the panel opens. A third hook sits beside them on that same row and is NOT this
+proxy's: `useDeepseekBalance` reads a different vendor through a route Descent never touches, which
+is why a Descent outage leaves the money on screen ([deepseek-balance.md](deepseek-balance.md)).
+What the screen makes of each of these bodies, and why an expiry sitting in the past raises nothing
+there, is [accounts.md](accounts.md).
 
 The memory lane's screen is `src/modules/memory-intake/`, reached by the workspace's **Memory** tab.
 `MemoryIntakeProvider` is mounted once in `App.tsx` inside the auth gate and polls the queue at 60 s,
@@ -88,11 +93,13 @@ declarations above are the source, and a change to either shape belongs in both 
    reading rather than a queue of overlapping requests. The account picture arrives over HTTP: nothing
    here opens a credential file, and no token byte enters this process.
 
-8. **The memory queue is whole or it is none, and a 422 on approve is a verdict.** One row missing a
-   string `id`, `name` or `target` fails the WHOLE `GET …/memory` read as `bad-response` — rule 1's
-   slot discipline again, because a silently shortened queue reads as "nothing left to review", and
-   the operator can act on "Descent is not reachable" while they can do nothing about a proposal that
-   was never drawn. The list is LEAN (no `body`, no `rationale`); the body arrives from the by-id read
+8. **Either list is whole or it is none, and a 422 on approve is a verdict.** One row missing a
+   string `id`, `name` or `target` fails the WHOLE `GET …/memory` read as `bad-response`, on either
+   status — rule 1's slot discipline again, because a silently shortened queue reads as "nothing left
+   to review", and the operator can act on "Descent is not reachable" while they can do nothing about
+   a proposal that was never drawn. Each row's `sessionId` is Descent's unverified provenance column,
+   resolved to the app session id server-side (`sessionsDb.resolveAppSessionId`) — display only, gates
+   nothing. The list is LEAN (no `body`, no `rationale`); the body arrives from the by-id read
    for the one card that is expanded. A `null` from that read means one thing — no row carries that id
    — and never "reviewed since you last looked": Descent's by-id read has no status filter, so an
    already-approved card still reads whole with its `status` saying so. A consumer that tests only for

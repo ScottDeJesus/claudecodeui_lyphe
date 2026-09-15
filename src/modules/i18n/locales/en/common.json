@@ -361,5 +361,35 @@
   },
   "shapes": {
     "diagramFailed": "This diagram could not be drawn — showing its source."
+  },
+  "gutters": {
+    "runner": {
+      "title": "Runs"
+    },
+    "memory": {
+      "title": "Memory",
+      "pending": "Waiting for review",
+      "recent": "Recently filed",
+      "recentEmpty": "Nothing filed yet",
+      "pendingEmpty": "Nothing waiting"
+    },
+    "subagents": {
+      "title": "Subagents",
+      "empty": "No subagents in this chat",
+      "back": "Back to subagents",
+      "loading": "Loading transcript…",
+      "notFound": "No transcript on disk yet",
+      "failed": "Could not read the transcript",
+      "live": "Live",
+      "showEarlier": "Show earlier steps",
+      "openRow": "Read {{name}}'s transcript"
+    },
+    "open": "Open {{name}}",
+    "collapse": "Collapse",
+    "dragHint": "Drag to another slot",
+    "pin": {
+      "label": "This session",
+      "title": "Created by the chat you have open"
+    }
   }
 }

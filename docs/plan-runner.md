@@ -11,6 +11,9 @@ verbs. Nothing here writes a state file, takes a lock, signals a process or star
 writer would race the runner's own atomic rewrite, and starting a run needs a plan and an intent
 lock, which is `/execute`'s act and not a button's.
 
+**One file under `~/.claude/state/` IS written from this server, and it is not this lane's and not a
+run's** (§"The DeepSeek switch" below).
+
 ## What the runner writes, and where
 
 The root is `$PLAN_RUNNER_STATE_DIR` when set, else `~/.claude/state/runner` — the same name
@@ -23,7 +26,7 @@ is not a directory is skipped. Four files per run are this lane's:
 | File | What it is |
 |---|---|
 | `progress.json` | The whole picture: position, phases, spend, and the composed ◆ line. REPLACED whole through `atomic_write` (`hooks/plan_runner/state_lock.py:72-90`, a per-write `mkstemp` scratch plus `os.replace`), called at `progress.py:151`, so a read caught mid-write is a decode error on the old bytes or a clean read of the new ones — never half a record. |
-| `run.json` | The run's own state. This lane reads exactly one field: `stopped_at`. |
+| `run.json` | The run's own state. This lane reads two fields: `stopped_at`, and `launched_by_session` — the Claude transcript uuid whose turn launched the run, which `plan-runner.module.ts` resolves to the app session id (`sessionsDb.resolveAppSessionId`) before any snapshot leaves the server; the chat gutter's Runner widget pins on it. |
 | `receipt.json` | Its PRESENCE is the whole signal: the run is over. A resume renames it, so a continued run returns. |
 | `runner.log` | One appended line per stage change, in the ◆ shape with a local ISO timestamp in front. |
 
@@ -50,6 +53,98 @@ notice emit no usable watch event: a whole-file replacement arrives as a rename 
 being recreated; a new run directory can appear at any moment under a root that would need its own
 recursive watch; and a run going stale is a *lapsed* heartbeat — the absence of a write, which no
 filesystem event can ever report.
+
+**The poll itself is no longer this lane's own.** `server/shared/polled-lane.service.ts`
+(`createPolledLane`) is the read-picture / compare / broadcast-on-change loop both of this server's
+state lanes run, and `runner-watcher.service.ts` is now a thin adapter over it that supplies this
+lane's `snapshot` and its `runner_state` frame and nothing else. The reasoning above, the
+broadcast-after-send dedup order, and why a failing tick never takes the interval down with it live
+there, in one copy. The sibling is the launcher-souls lane
+([dispatch-souls.md](dispatch-souls.md)), which reads `~/.claude/state/dispatch-souls/` on the same
+cadence — a different root, a different frame, the same loop.
+
+## The DeepSeek switch — the one state file this server writes
+
+`~/.claude/state/deepseek_flash.flag` is written by `server/modules/settings/deepseek-flash-switch.ts`,
+reached through `GET`/`PUT /api/settings/deepseek-flash` (`{"enabled": boolean}`; anything else is
+400, unauthenticated is 401 — the whole `/api/settings` mount is behind `authenticateToken`). Both
+verbs answer with what was READ BACK off the file, never with the input: the file belongs to another
+daemon, and the position the UI draws should be the one on disk.
+
+Two client surfaces draw it, and neither holds a fetch of its own: **Settings → Agents → Claude** —
+`RunnerModelContent.tsx`, a `SettingsRow` + `SettingsToggle` — and the chat composer's own footer,
+immediately after the Plain chip — `ComposerDeepSeekSwitch.tsx`, a `Chip` wearing the DeepSeek mark,
+icon-only below `sm` and mark-plus-"Flash" from `sm` up, standing down entirely on a row too narrow
+to hold it beside the model pill at its widest label (the composer's own layout, measured rather
+than guessed). Both compose `src/shared/hooks/useDeepSeekFlashSwitch.ts`, the one client reader and
+writer of the switch: a MODULE-level coordinator rather than a store, because the file on disk is
+the only truth and this carries nothing but the last answer from it. One epoch counts every
+authoritative position established — a write issued, an answer published — so a read still crossing
+the wire when a flip lands elsewhere is retired rather than drawn: a measured defect before this
+existed, where the composer's own re-read landed after a flip made in Settings and put the chip back
+on for seven straight samples while the file read `off`. At most one read is ever in flight for the
+whole tab; a second ask arriving while one is out is folded into the run already under way rather
+than firing a request of its own. A write is optimistic, then corrected by whatever the server read
+back off the file — never inverted on failure, since the switch is host-wide and a failed write can
+perfectly well have landed on a file another operator had already set to the same side. `enabled:
+null` means no read has yet succeeded; `unreadable` marks a read that came back with nothing,
+distinct from an on-disk OFF, so neither surface paints "unknown" as "off" — the Settings row says so
+in words with a Retry button, the composer chip draws a dashed ring with `aria-pressed="mixed"`. A
+window `focus` re-read covers the one gap the epoch cannot: a second tab, left open since before a
+flip made elsewhere. It belongs to the settings module and the chat module, not to this lane: no
+run's file is ever written, and this lane still reads and shells out and nothing more.
+
+**Host-wide, not per-user.** The routes read no `userId`, because the switch steers one plan-runner
+daemon and there is only one of it. It is a file rather than a row in `auth.db` for the same reason
+the lane shells out instead of importing: the runner is a separate program that must be able to read
+the switch from cron, with no database and no HTTP.
+
+**The write is a rename, and each of its three parts answers a measured failure.** A plain
+`writeFile` is a truncate followed by a write, and the runner reads this file from another process —
+a reader landing between the two sees an empty file and reads OFF, a phantom flip in the log of a run
+nobody touched. So: write a scratch, then `rename` (atomic within one directory). The scratch name
+carries a UUID and not just the pid, because `writeFile` yields and two concurrent PUTs in ONE node
+process interleaved on a single per-process scratch path — measured, 4 of 20 concurrent PUTs returned
+500 ENOENT; the rename was atomic with respect to its destination, and it was the SOURCE that had to
+be unique. The destination is resolved through `realpath` first, because `rename` onto a symlink
+replaces the link with a regular file and a flag the operator had symlinked elsewhere would silently
+stop being shared after the first toggle. The `finally` unlinks the scratch, which only still exists
+when the rename failed.
+
+**Both readers must answer the same question.** `readDeepseekFlashSwitch` is the runner's own
+predicate — present, at most 256 bytes (`state._FLAG_MAX_BYTES`; a longer file is OFF rather than
+read as a prefix), trimmed content exactly `on`. `String.trim()` and Python's `str.strip()` are
+different sets and were measured diverging in BOTH directions: `trim()` drops the UTF-8 BOM that
+`strip()` keeps — the reachable half, since a flag saved by a Windows editor or PowerShell `Out-File`
+carries one, and this reader then said ON while the runner went on spending Claude — and `strip()`
+drops the C0 separators `\x1c`–`\x1f` that `trim()` keeps. Closed on both sides: an explicit trim
+class here, `utf-8-sig` there. Change either and change the other.
+
+**What the switch DOES is the runner's rule and lives there**, not in this repository: while it reads
+`on`, the plan runner dispatches its builder, that builder's fix-pass and Athena on DeepSeek's
+`deepseek-flash` instead of Claude Opus, and Prometheus, the scouts and the replanner stay on Claude.
+It is re-read at every builder spawn, so a flip here reaches the next phase with nothing restarted on
+either side; a phase already in flight keeps the provider its builder opened. The whole rule, its
+fallbacks and its cost accounting: `~/.claude/hooks/plan_runner/deepseek.py`, surfaced in
+`~/.claude/hooks/README.md` §Runner with its invariants at `~/.claude/hooks/GOTCHAS.md` #34.
+
+The same switch also steers `/dispatch`'s standalone souls through `plan-runner soul`, and THAT is
+where the operator sees it take effect: each such soul draws a pin in the chat it was launched from,
+wearing the mark of the endpoint that was actually billed ([dispatch-souls.md](dispatch-souls.md)).
+So the switch has three surfaces on this box, and only two of them touch DeepSeek — the switch's own
+controls, which write the flag (here), the account readout that asks the vendor what is left
+([deepseek-balance.md](deepseek-balance.md)), and the pin, which asks nobody and paints what a
+finished soul's own receipt says it ran on.
+
+**This LANE never talks to DeepSeek, and owns the switch alone.** Nothing under `/api/plan-runner`
+loads `DEEPSEEK_API_KEY`, sends it or logs it. Two programs on this box spend that key: the plan
+runner reads it straight out of `.env` at each soul spawn, so a runner restarted from cron still
+finds it; and ONE module on this server — `server/modules/deepseek/`, behind
+`GET /api/deepseek/balance` — reads it per request to report the money left on that account under
+the sidebar's account row ([deepseek-balance.md](deepseek-balance.md)). The two are siblings and
+neither is a route into the other: this lane still reads run files and shells out, and the balance
+route knows nothing about runs. Where the key lives and who reads it is declared once, in
+`.env.example`.
 
 ## How a run is classified
 
@@ -218,6 +313,7 @@ tabs receive, and only when that picture changed.
 | `complete`, no phase blocked or pending | `runner.finished` | `stop` — Run stopped | priority 3, ✅ |
 | `complete` with phases left, `all-blocked`, `halted`, `budget`, `flag-off` | `runner.blocked` | `error` — Run failed | priority 4, ⚠️ |
 | `rate-limited`, `dry-run`, a receipt caught mid-write (`unknown`) | none | — | — |
+| a fixture walk — the plan under `~/.claude/state/runner-fixtures/` or the OS temp dir (`scripts/runner_fixtures/*.sh`) | none | — | — |
 
 "Phases left" is the card's own `runUnfinished` rule — a blocked or pending phase — read off the
 phases, never off the receipt's word. A rate-limited park says nothing because nothing is wrong with
@@ -228,7 +324,7 @@ count — and the plan's spend over every run of it. Anything else adds how many
 left, and names the first blocked phase with its cause. Blocked means the row says `blocked` OR the
 receipt's `blocked` map names the phase (`blocked_causes` on the snapshot): a phase the runner halted
 on a crash or a budget is in that map while its row still reads `running` or `pending`. A tap opens
-the app root: a run belongs to no chat session.
+the app root: the push goes to every active user, so it names no chat.
 
 **A run belongs to no login, so every active user is told**, each through their own event switches
 and channels. The dedupe key carries the user id, because the orchestrator's 20-second dedupe is
@@ -321,14 +417,18 @@ than a failure — the next frame fills it — and is logged, not surfaced.
 
 The bus itself — the topic allowlist, the retained values, the synchronous replay, and why it knows
 no producer — is documented on
-[architecture/07-live-widgets.md](architecture/07-live-widgets.md). This lane is simply its first
-publisher; a second (git delegation, Task Master) arrives as a sibling `*Feed.tsx` in its own
-module and never as a line inside `live-bus/`.
+[architecture/07-live-widgets.md](architecture/07-live-widgets.md). This lane was simply its first
+publisher. **The second has arrived and it kept the shape**: `SoulLaunchFeed.tsx` in
+`src/modules/dispatch-souls/` publishes `souls:*` the same way, mounted NESTED inside this feed in
+`App` rather than beside it — a feed is a wrapper, not a sibling, so the innermost thing in that
+stack is still the router. Every further lane arrives as one more `*Feed.tsx` in its own module and
+never as a line inside `live-bus/`.
 
 ### The runner card
 
-`RunCard` is the lane's first screen: one plan-runner run, whole. Its ONE home is the Runner tab
-(`RunnerPanel`), and it renders nowhere else — never over the chat transcript.
+`RunCard` is the lane's first screen: one plan-runner run, whole. The runner card has two homes —
+the Runner tab (`RunnerPanel`), and the desktop chat gutter's Runner widget, which sits beside the
+transcript and never over it.
 
 **It was pinned above the transcript once, and that is why the rule is written down.** The card was
 built into a `flex-none` band between the CLI-version banner and the messages in
@@ -402,7 +502,9 @@ their own glyph and word as well.
 
 **Elapsed ticks locally, and is spelled in the app's own words.** `useElapsed` runs one interval
 per hook instance and none at all for `null`, so a five-phase card holds two timers — its header,
-and the single phase actually running. It counts from `started_at` and `stage_since`, never from
+and the single phase actually running. It is SHARED, at `src/shared/hooks/useElapsed.ts`: it moved
+out of this module when the chat's pinned soul row became its second consumer
+([dispatch-souls.md](dispatch-souls.md)), and a clock this lane changes now changes that one too. It counts from `started_at` and `stage_since`, never from
 `heartbeat_at`, which is a liveness beat rather than a start. The words come from
 `claudeStatus.elapsed.seconds` / `minutesSeconds` / `hoursMinutes` in the `chat` namespace — the
 same three keys the composer's own clock reads (`src/modules/chat/composer/ActivityIndicator.tsx`).
@@ -441,10 +543,10 @@ The tab that mounts it is the next section.
 
 ### The Runner tab
 
-`RunnerPanel` is where every run on the lane is drawn, and it is `RunCard`'s only caller. It reads
-`useRunnerRuns` and nothing else — no fetch on mount, no state of its own — so selecting the tab
-paints on the FIRST render with whatever the bus was already holding rather than blanking until the
-runner next moves.
+`RunnerPanel` is where every run on the lane is drawn — one of `RunCard`'s two callers now that the
+desktop chat gutter's Runner widget is the other (§"The runner card"). It reads `useRunnerRuns` and
+nothing else — no fetch on mount, no state of its own — so selecting the tab paints on the FIRST
+render with whatever the bus was already holding rather than blanking until the runner next moves.
 
 **The gate rule is the memory tab's, and the Runner tab is the second tab to take it.**
 `useWorkspaceTabGates` computes `shouldShowRunnerTab: runnerCount > 0 || activeTab === 'runner'`

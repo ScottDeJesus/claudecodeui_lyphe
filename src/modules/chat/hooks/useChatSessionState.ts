@@ -10,6 +10,7 @@ import { createMessageHistoryRefreshCoordinator } from '@/modules/chat/utils/mes
 import { createCachedDiffCalculator } from '@/modules/chat/utils/messageTransforms';
 import { normalizedToChatMessages } from '@/modules/chat/hooks/useChatMessages';
 import { findSearchTargetIndex, resolveSearchWindowSize } from '@/modules/chat/utils/searchTargetLocator';
+import { mergeSoulLaunchIds, readSoulLaunchIds } from '@/modules/chat/utils/soulLaunchAnchors';
 import { readSelectedProvider } from '@/shared/selectedProvider';
 import type { SearchTarget } from '@/modules/chat/utils/searchTargetLocator';
 
@@ -88,6 +89,8 @@ function findRenderedMessageElement(
 }
 /** Stable empty list so `chatMessages` keeps its identity while no session is selected. */
 const NO_MESSAGES: NormalizedMessage[] = [];
+/** The same, for a conversation that has started no launcher souls. */
+const NO_LAUNCH_IDS: string[] = [];
 
 type UseChatSessionStateArgs = {
   isActive: boolean;
@@ -466,6 +469,36 @@ export function useChatSessionState({
       .filter((message) => message.isSubagentContainer);
     return [...unloadedContainers, ...loadedContainers];
   }, [chatMessages, storeAgents, storeMessages]);
+
+  /**
+   * The launcher souls this conversation started, by id.
+   *
+   * Read off the transcript's own tool results (the launcher's `SOUL LAUNCHED launch=<id>` receipt),
+   * so the pins a reader sees are exactly the souls this chat began — a soul launched from another
+   * session, or from a terminal, stays out of this strip.
+   *
+   * TWO SOURCES, AND THE SECOND IS WHY A RELOAD KEEPS ITS PINS. The loaded rows carry a receipt
+   * only until the conversation moves past it, and a soul runs for minutes after the row that
+   * started it has left the window — so the ids also come off the server, which reads the WHOLE
+   * history for the session (`storeSoulLaunchIds`, the same door the agent list uses). The scan is
+   * kept because it is what makes a launch appear the second it happens, with no refetch.
+   *
+   * TWO MEMOS, NOT ONE, AND THE JOIN IS THE POINT. The scan runs on every streamed delta like any
+   * other read of the transcript, but the array it returns is fresh each time — and the strip it
+   * feeds is memoized on its props, so a new array would re-render the whole strip on every token
+   * that arrives, for a set of ids that changed hours ago. Keying the second memo on the joined
+   * string gives the strip ONE identity for as long as the SET of launches is unchanged, which is
+   * the only thing about this list that means anything.
+   */
+  const storeSoulLaunchIds = activeSessionId ? sessionStore.getSoulLaunchIds(activeSessionId) : NO_LAUNCH_IDS;
+  const soulLaunchIdsKey = useMemo(
+    () => mergeSoulLaunchIds(storeSoulLaunchIds, readSoulLaunchIds(chatMessages)).join(','),
+    [chatMessages, storeSoulLaunchIds],
+  );
+  const soulLaunchIds = useMemo(
+    () => (soulLaunchIdsKey === '' ? NO_LAUNCH_IDS : soulLaunchIdsKey.split(',')),
+    [soulLaunchIdsKey],
+  );
 
   /* ---------------------------------------------------------------- */
   /*  addMessage                                                       */
@@ -1258,6 +1291,7 @@ export function useChatSessionState({
   return {
     chatMessages,
     agentMessages,
+    soulLaunchIds,
     addMessage,
     sessionActivity,
     isProcessing,

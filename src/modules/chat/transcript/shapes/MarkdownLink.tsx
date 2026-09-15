@@ -67,7 +67,7 @@ export function MarkdownLink({ href, children }: MarkdownLinkProps) {
     return (
       <a
         href={href || fileSource}
-        className="cursor-pointer text-blue-600 hover:underline dark:text-blue-400"
+        className="cursor-pointer text-accent-ink underline decoration-accent-ink/40 underline-offset-2 hover:decoration-accent-ink"
         onClick={(event) => {
           event.preventDefault();
           openFileReference(fileRef.path, fileRef.line ?? undefined);
@@ -81,7 +81,7 @@ export function MarkdownLink({ href, children }: MarkdownLinkProps) {
   return (
     <a
       href={href}
-      className="text-blue-600 hover:underline dark:text-blue-400"
+      className="text-accent-ink underline decoration-accent-ink/40 underline-offset-2 hover:decoration-accent-ink"
       target="_blank"
       rel="noopener noreferrer"
     >

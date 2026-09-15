@@ -1,5 +1,5 @@
 import { clsx, type ClassValue } from 'clsx';
-import { twMerge } from 'tailwind-merge';
+import { extendTailwindMerge } from 'tailwind-merge';
 
 import type { Project, ProjectSession } from '@/shared/types';
 
@@ -14,6 +14,24 @@ export const IS_PLATFORM = import.meta.env?.VITE_IS_PLATFORM === 'true';
 // ---------------------------
 
 //----------------- TAILWIND CLASS COMPOSITION ------------
+
+/**
+ * The merger `cn` runs. It is built through `extendTailwindMerge` — rather than importing
+ * `twMerge` — so the rendered transcript's five named text sizes are known as FONT SIZES.
+ *
+ * tailwind-merge 3 reads an unknown `text-<name>` as a text COLOUR, so an unextended merger
+ * answers `cn('text-md-body', 'text-foreground')` with the colour alone: the class list still
+ * builds, the element just quietly stops following the reader's chat text size, and no type
+ * error ever says so. The five names are `tailwind.config.js`'s `fontSize` — `md-body`,
+ * `md-meta`, `md-code`, `md-stat` and `chat-tool`.
+ */
+const twMerge = extendTailwindMerge({
+  extend: {
+    classGroups: {
+      'font-size': [{ text: ['md-body', 'md-meta', 'md-code', 'md-stat', 'chat-tool'] }],
+    },
+  },
+});
 
 /**
  * Merges conditional class names and resolves conflicting Tailwind utilities so the

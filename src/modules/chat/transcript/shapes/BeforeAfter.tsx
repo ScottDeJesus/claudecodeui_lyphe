@@ -44,34 +44,34 @@ export function BeforeAfter({ data, collapseKey }: BeforeAfterProps) {
               <div className="mb-1.5 flex flex-wrap items-baseline gap-1.5">
                 <span
                   data-shape-label
-                  className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground"
+                  className="text-md-body font-semibold uppercase tracking-wide text-muted-foreground"
                 >
                   {data.headers[labelColumn]}
                 </span>
-                <span className="text-sm font-semibold text-foreground">{row[labelColumn]}</span>
+                <span className="text-md-body font-semibold text-foreground">{row[labelColumn]}</span>
               </div>
             )}
             <div className="grid gap-2 sm:grid-cols-2">
               <Card className="p-3">
                 <div
                   data-shape-label
-                  className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground"
+                  className="text-md-body font-semibold uppercase tracking-wide text-muted-foreground"
                 >
                   {data.headers[beforeColumn]}
                 </div>
-                <div className="mt-0.5 text-sm text-muted-foreground">{row[beforeColumn]}</div>
+                <div className="mt-0.5 text-md-body text-muted-foreground">{row[beforeColumn]}</div>
               </Card>
               <Card className="p-3">
                 {/* The arrow is the second channel: the pair reads left-to-right on a wide screen
                     and top-to-bottom on a phone, where only the arrow still says which way it ran. */}
                 <div
                   data-shape-label
-                  className="flex items-center gap-1 text-[11px] font-medium uppercase tracking-wide text-accent-ink"
+                  className="flex items-center gap-1 text-md-body font-semibold uppercase tracking-wide text-accent-ink"
                 >
                   <ArrowRightIcon aria-hidden="true" className="h-3 w-3 flex-none" />
                   {data.headers[afterColumn]}
                 </div>
-                <div className="mt-0.5 text-sm text-foreground">{row[afterColumn]}</div>
+                <div className="mt-0.5 text-md-body text-foreground">{row[afterColumn]}</div>
               </Card>
             </div>
           </div>

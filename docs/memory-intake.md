@@ -3,12 +3,16 @@
 The **Memory** tab in the workspace: every memory a session proposed and could not write itself,
 read whole and then filed or discarded by a person. It is not scoped to the selected project —
 Descent's queue is the whole estate's, so the same list shows under whichever project is open.
-`src/modules/memory-intake/` is one provider (`context/MemoryIntakeContext`), one panel
-(`MemoryIntakePanel`), one row (`MemoryCandidateRow`) and the panel's private write lifecycle
-(`hooks/useMemoryReview`); the barrel exports the first two and the provider hook. The server half —
-the four routes, the read/write contracts, the failure vocabulary — is
-[descent-proxy.md](descent-proxy.md), and the shapes on the wire are read from their declarations,
-not from a copy here (see §"Where the shapes live").
+`src/modules/memory-intake/` is one provider (`context/MemoryIntakeContext`), two bodies that read
+it — the Memory tab's pane (`MemoryIntakePanel`) and the desktop chat gutter's own body
+(`MemoryWidgetBody`; its sibling for runs is `RunnerWidgetBody` in `src/modules/plan-runner`,
+[plan-runner.md](plan-runner.md) §"The runner card") — two rows (`MemoryCandidateRow` for a pending
+candidate, the read-only `MemoryApprovedRow` for one already filed) and two hooks: `useMemoryReview`,
+the write lifecycle both bodies share, and `useApprovedMemories`, which reads the filed list beside
+the provider's own queue. The barrel exports the provider, its hook, `MemoryIntakePanel` and
+`MemoryWidgetBody`. The server half — the four routes, the read/write contracts, the failure
+vocabulary — is [descent-proxy.md](descent-proxy.md), and the shapes on the wire are read from their
+declarations, not from a copy here (see §"Where the shapes live").
 
 **One provider, one poller.** `App.tsx` mounts `MemoryIntakeProvider` inside `ProtectedRoute`, so
 the queue is never asked for against the login screen. The provider holds the READING alone: four
@@ -176,9 +180,19 @@ client calls the four routes through `api.descent.memory` in `src/shared/api.ts`
 200 even when Descent is down, so a caller reads the BODY rather than the status, and the writes are
 taken from the raw response because they carry Descent's own status through.
 
+The lean row carries `sessionId` — Descent's unverified provenance column resolved server-side to the
+app session id (`sessionsDb.resolveAppSessionId`, wired in `descent.module.ts`), display only, gates
+nothing — so a list can mark the memories the open chat proposed. Both lists come from the service's
+one `list(status)` verb: `GET /api/descent/memory?status=approved` reads the filed list, and any
+other status reads the pending queue.
+
 Every string is in `src/modules/i18n/locales/en/common.json` under `memory.*`, with the tab's own
 label at `tabs.memory`. English only, deliberately: the other ten locales fall back to `en`
 (`i18n/config.ts`), which is a readable English word rather than a missing key.
+
+The desktop chat gutter's own strings are the one exception. `gutters.memory.*` — which
+`MemoryWidgetBody` draws — and the `gutters.pin.*` marker it shares with the Runner widget are
+written in all eleven locales, per the operator's instruction for this plan.
 
 ## What is left standing
 

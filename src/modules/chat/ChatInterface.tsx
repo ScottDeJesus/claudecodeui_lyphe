@@ -32,6 +32,10 @@ import { usePlainModePreference } from '@/shared/hooks/usePlainModePreference';
 import { Banner, Button } from '@/shared/ui';
 import ChatMessagesPane from '@/modules/chat/transcript/ChatMessagesPane';
 import PinnedSubagents from '@/modules/chat/transcript/PinnedSubagents';
+import {
+  publishSubagentSource,
+  useSubagentStripClaimed,
+} from '@/modules/chat/subagents/subagentSource';
 import ChatComposer from '@/modules/chat/composer/ChatComposer';
 import CommandResultModal from '@/modules/chat/modals/CommandResultModal';
 
@@ -146,6 +150,7 @@ function ChatInterface({
   const {
     chatMessages,
     agentMessages,
+    soulLaunchIds,
     addMessage,
     sessionActivity,
     isProcessing,
@@ -192,6 +197,17 @@ function ChatInterface({
     lastSeqRef,
     sessionStore,
   });
+
+  // The gutters cannot see this chat's own store — `useSessionStore` is a ref private to this
+  // component — so the rows they draw are published here, tagged with the id they are handed.
+  useEffect(() => {
+    const sessionId = selectedSession?.id;
+    if (typeof sessionId !== 'string') { publishSubagentSource(null); return; }
+    publishSubagentSource({ sessionId, agentMessages, soulLaunchIds });
+    return () => publishSubagentSource(null);
+  }, [selectedSession?.id, agentMessages, soulLaunchIds]);
+  // While a gutter shows the Subagents widget it draws these same rows: the strip stands down.
+  const stripClaimed = useSubagentStripClaimed();
 
   // Brand-new conversation: the composer allocated a stable session id via
   // the session gateway before the first send. Record it locally and put it
@@ -591,7 +607,7 @@ function ChatInterface({
           )}
 
           <ChatComposer
-          pinnedAgents={<PinnedSubagents messages={agentMessages} />}
+          pinnedAgents={stripClaimed ? null : <PinnedSubagents messages={agentMessages} soulLaunchIds={soulLaunchIds} />}
           pendingPermissionRequests={pendingPermissionRequests}
           handlePermissionDecision={handlePermissionDecision}
           handleGrantToolPermission={handleGrantToolPermission}

@@ -34,6 +34,15 @@ type SettingsDependencies = {
     save(userId: number, endpoint: string, p256dh: string, auth: string): void;
     remove(endpoint: string): void;
   };
+  /**
+   * The plan runner's DeepSeek switch. It is machine-wide rather than per-user because the thing
+   * it steers is one daemon on this host, not a row anyone owns — every signed-in operator of
+   * this server sees and sets the same switch.
+   */
+  deepseekFlash: {
+    read(): Promise<boolean>;
+    write(enabled: boolean): Promise<void>;
+  };
   getVapidPublicKey(): string | null;
 };
 
@@ -146,6 +155,21 @@ export function createSettingsService(dependencies: SettingsDependencies) {
         success: true,
         preferences: dependencies.notifications.updatePreferences(userId, preferences),
       };
+    },
+    async getDeepseekFlash() {
+      return { enabled: await dependencies.deepseekFlash.read() };
+    },
+    async setDeepseekFlash(enabledInput: unknown) {
+      if (typeof enabledInput !== 'boolean') {
+        throw new AppError('enabled must be a boolean', {
+          code: 'INVALID_DEEPSEEK_FLASH_STATE',
+          statusCode: 400,
+        });
+      }
+      await dependencies.deepseekFlash.write(enabledInput);
+      // Read back rather than echo the input: the switch is a file another daemon reads, and the
+      // answer the UI renders should be what is on disk, not what we asked for.
+      return { enabled: await dependencies.deepseekFlash.read() };
     },
     getVapidPublicKey() {
       return { publicKey: dependencies.getVapidPublicKey() };

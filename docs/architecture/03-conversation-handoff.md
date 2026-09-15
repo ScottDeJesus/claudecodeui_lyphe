@@ -127,6 +127,15 @@ Reading in the other direction, runtimes receive the **app** id and translate it
 - an id with no row at all is returned unchanged, on the assumption that a direct API caller
   passed a provider-native id the watcher has not indexed yet.
 
+Going the other way — a provider or disk-discovered id in, the app id out — is
+`sessionsDb.resolveAppSessionId`, which checks the current provider mapping, then
+`superseded_provider_sessions` (so an id an edit moved on from still resolves), then a plain app id,
+and returns the input unchanged rather than `null` when no row carries it at all. It exists for
+callers outside the sessions service that hold a provider-spelled id and must show it beside an app
+session without ever letting a provider id itself reach the browser: the plan-runner lane's
+`launched_by_session` ([plan-runner.md](../plan-runner.md) §files) and the Descent memory lane's
+`sessionId` ([memory-intake.md](../memory-intake.md) §"Where the shapes live").
+
 ### What `session_created` used to do
 
 It used to be the handoff. The frontend held a placeholder id, sent the first message, and

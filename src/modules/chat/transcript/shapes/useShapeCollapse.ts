@@ -1,7 +1,7 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { useIsExportingTranscript } from '@/modules/chat/context/TranscriptRenderContext';
-import { clearCollapsed, isCollapsed, setCollapsed } from '@/modules/chat/transcript/shapes/collapseState';
+import { clearCollapsed, hasEntered, isCollapsed, markEntered, setCollapsed } from '@/modules/chat/transcript/shapes/collapseState';
 
 /**
  * The two cross-cutting rules every collapsible shape obeys, in one place.
@@ -14,11 +14,16 @@ import { clearCollapsed, isCollapsed, setCollapsed } from '@/modules/chat/transc
  * controls but no fold state of its own (`DataTable`, `DiffBlock`, `TabbedCode`) calls
  * `useShapeInteractive` at the foot of this file for the same reason — as does `CodeFence`, which
  * draws a mermaid fence's source instead of the diagram in an export.
+ *
+ * It also answers whether this card should PLAY its entrance (`enter`), remembered by content
+ * beside the fold in `collapseState.ts`: a mount is not an arrival, because a row unmounts as it
+ * scrolls away and a settled block is remounted when a stream retracts it.
  */
 export function useShapeCollapse(collapseKey: string): {
   collapsed: boolean;
   toggle: () => void;
   interactive: boolean;
+  enter: boolean;
 } {
   // An export is a static render inside `renderToStaticMarkup`, where no effect ever runs and
   // there is no chevron to click: a folded block there is content the reader can never reach.
@@ -63,6 +68,27 @@ export function useShapeCollapse(collapseKey: string): {
     setFolded(remembered);
   }
 
+  const interactive = !isExporting;
+  // Whether this card should PLAY its entrance, captured ONCE per mount — on the first render in
+  // which `interactive` is true — and never recomputed. A mount is not an arrival: a row unmounts as
+  // it scrolls away, so a card the reader has already watched rise would replay every scroll back.
+  // `hasEntered` is the page's answer, not this mount's, and it is read exactly once so the
+  // attribute cannot drop out from under an animation already in flight. In an export `interactive`
+  // is false, so nothing is captured and the frame arrives plain — an exported document has no
+  // reader to arrive for.
+  const enterRef = useRef<boolean | null>(null);
+  if (interactive && enterRef.current === null) {
+    enterRef.current = !hasEntered(collapseKey);
+  }
+
+  // Marked on COMMIT and never during render: marking while rendering would claim the key before
+  // the first appearance had a chance to rise, and the entrance would never play for anyone. The
+  // key is content-addressed and changes under a growing block, so this marks every key the mount
+  // moves to — the same migration the fold above performs, from the same reason.
+  useEffect(() => {
+    if (interactive) markEntered(collapseKey);
+  }, [interactive, collapseKey]);
+
   const toggle = useCallback(() => {
     // Flipped from this instance's own state, which the re-seed above keeps equal to the Map's
     // answer for the CURRENT key. Two mounted blocks with identical text do share a key, but
@@ -73,7 +99,7 @@ export function useShapeCollapse(collapseKey: string): {
     setFolded(next);
   }, [collapseKey, folded]);
 
-  return { collapsed: isExporting ? false : folded, toggle, interactive: !isExporting };
+  return { collapsed: isExporting ? false : folded, toggle, interactive, enter: enterRef.current === true };
 }
 
 /**

@@ -8,6 +8,7 @@ import { providerTokenUsageService } from '@/modules/providers/services/provider
 import { providerSkillsService } from '@/modules/providers/services/skills.service.js';
 import { sessionConversationsSearchService } from '@/modules/providers/services/session-conversations-search.service.js';
 import { sessionsService } from '@/modules/providers/services/sessions.service.js';
+import { subagentTranscriptService } from '@/modules/providers/services/subagent-transcript.service.js';
 import type {
   CustomProviderModelInput,
   LLMProvider,
@@ -51,6 +52,21 @@ const parseSessionId = (value: unknown): string => {
   }
 
   return sessionId;
+};
+
+/** The Agent tool call's id, which addresses one subagent transcript. A plain id, never a path. */
+const TOOL_USE_ID_PATTERN = /^[A-Za-z0-9_-]{1,128}$/;
+
+const parseToolUseId = (value: unknown): string => {
+  const toolUseId = readPathParam(value, 'toolUseId').trim();
+  if (!TOOL_USE_ID_PATTERN.test(toolUseId)) {
+    throw new AppError('Invalid toolUseId.', {
+      code: 'INVALID_TOOL_USE_ID',
+      statusCode: 400,
+    });
+  }
+
+  return toolUseId;
 };
 
 const readOptionalQueryString = (value: unknown): string | undefined => {
@@ -848,6 +864,17 @@ router.get(
       limit,
       offset,
     });
+    res.json(createApiSuccessResponse(result));
+  }),
+);
+
+router.get(
+  '/sessions/:sessionId/subagents/:toolUseId/transcript',
+  asyncHandler(async (req: Request, res: Response) => {
+    const sessionId = parseSessionId(req.params.sessionId);
+    const toolUseId = parseToolUseId(req.params.toolUseId);
+
+    const result = await subagentTranscriptService.readByToolUse(sessionId, toolUseId);
     res.json(createApiSuccessResponse(result));
   }),
 );

@@ -382,11 +382,12 @@ function getSession(sessionId) {
  * was mapped from the start. `tool_use_result` was not, and the cost was invisible until
  * measured: a backgrounded agent's launch receipt carries `isAsync: true` INSIDE it, the only
  * evidence that a tool result is a receipt rather than a finish, so on the live path every
- * background agent read as finished the moment it launched and was never pinned above the
- * transcript (`PinnedSubagents.tsx`); the same row read correctly after a reload, because the
- * history reader takes the field from the JSONL. Measured 2026-09-10 with a live agent: the
- * pin strip empty, the row already stamped "4 tools". Both spellings are mapped here so the
- * normalizer sees one shape from either door.
+ * background agent read as finished the moment it launched and never reached the chat's pinned
+ * rows — the rows drawn in the strip above the chat box when the desktop chat gutters are not
+ * showing, and in the gutter's Subagents widget while they are (`PinnedSubagents.tsx`). The same
+ * row read correctly after a reload, because the history reader takes the field from the JSONL.
+ * Measured 2026-09-10 with a live agent: the pinned rows empty, the row already stamped "4 tools".
+ * Both spellings are mapped here so the normalizer sees one shape from either door.
  */
 function transformMessage(sdkMessage) {
   const mapped = { ...sdkMessage };

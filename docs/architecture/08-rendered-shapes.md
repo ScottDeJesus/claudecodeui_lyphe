@@ -7,7 +7,8 @@ whenever it matches a shape exactly: a GFM (GitHub Flavored Markdown) table beco
 with a copy-as-CSV action, a task list gains a progress bar, a `> [!NOTE]` alert becomes a toned
 callout, a `VERDICT: FAIL — B:1 H:0 M:2 L:0` line becomes a verdict banner, a `stats` fence becomes
 stat tiles, a `diff` fence is coloured by line, a run of fences in different languages becomes one
-tab strip, a heading folds its section, and `src/parser.ts:42` in a sentence becomes a chip that opens
+tab strip, a heading folds its section, a line ending in a colon becomes the title of the list or
+table written under it, and `src/parser.ts:42` in a sentence becomes a chip that opens
 the Files tab at line 42. Nothing is inferred and no model is consulted: every trigger is a pure,
 whole-text grammar behind one import path, `shapes/detect.ts`, and a block that misses its trigger by one
 character renders byte for byte as it did before this feature existed. The shapes are the element
@@ -54,13 +55,31 @@ one fence this feature routes around.
    so they do not count. A decision matrix with a `code` span in a cell stays a readable table
    instead of becoming lossy cards.
 6. **Every block shape wears one frame.** (The inline marks — chip, swatch, keycaps — carry
-   `data-shape` and no frame.) `ShapeFrame` is the shared `Collapsible` plus exactly three
-   things: the `data-shape` / `data-collapsed` / `data-shape-toggle` markers the probes measure, the
-   content-addressed fold memory, and an actions slot. Two collapsibles do not wear it: a heading
-   section, whose heading is its own toggle, and long output, whose control sits under the block.
+   `data-shape` and no frame.) `ShapeFrame` is the shared `Collapsible` plus the markers the probes
+   measure (`data-shape` / `data-collapsed` / `data-text-scale` on the root, plus `data-vv-enter` on
+   the root ONLY on a card the reader has not watched arrive, `data-shape-toggle` on
+   the trigger, `data-shape-header` / `data-shape-icon` / `data-shape-title` / `data-shape-actions` /
+   `data-shape-body` on the regions below it), the content-addressed fold memory, an actions slot,
+   and the header's own anatomy — an icon and a tone, both keyed off `kind` (a closed `ShapeKind`
+   union, not a bare `string`) through the file-local `SHAPE_KINDS` registry, overridable per call
+   site by the `tone`/`icon` props for the three kinds whose meaning only the caller knows
+   (`Callout`'s alert kind, `VerdictBanner`'s verdict, `CheckResults`' fail count). `accent` is not a
+   sixth tone but the ABSENCE of one — the structural wash a card of pure structure wears — and it is
+   the only value that writes no `data-tone`; that attribute sits on the header row, never the root,
+   so a `Badge` or a `Chip` in the body keeps its own tone instead of inheriting the frame's. Every
+   header and body size is `em`, off the named scale `tailwind.config.js`'s `fontSize` declares
+   (§"Header, type and motion"), so a frame follows the chat text size the reader set rather than a fixed px.
+   Its title can also arrive from above: `LeadIn` hands a lead-in paragraph's own rendered words down
+   through `LeadInTitleContext`, and the frame draws those instead of its `title` prop. Two
+   collapsibles do not wear it: a heading section, whose heading is its own toggle, and long output,
+   whose control sits under the block.
 7. **A fold is remembered by content, not by message id.** A module-level map keyed on
    `shapeKey(kind, payload)` survives the row unmounting as it scrolls away. Absent means expanded,
-   always — nothing ever opens folded on its own.
+   always — nothing ever opens folded on its own. **An entrance is remembered by content the same
+   way.** A module-level `Set<string>`, keyed on the same `shapeKey` and living beside the fold map,
+   records which cards have already risen: present means the reader has seen this card, so
+   `LazyMessageRow` unmounting a row as it scrolls away and a streaming retraction remounting a
+   settled block never replay a rise the reader already watched (§"Header, type and motion").
 8. **An export is whole.** Inside `renderToStaticMarkup` no effect runs and nothing can be clicked,
    so every shape draws its full content on the first synchronous render and draws no control. One
    module under `shapes/` reads the export context: `useShapeCollapse.ts`.
@@ -76,27 +95,32 @@ one fence this feature routes around.
 | File | Role |
 | --- | --- |
 | `Markdown.tsx` | `PLAIN_COMPONENTS`, `SHAPE_COMPONENTS`, and `MarkdownBodyRenderer` — the ternary between them, `remarkShapeGroups` added only when not streaming, and the `MarkdownStreamingContext` provider. `MarkdownBody`, `Markdown` and `TRANSCRIPT_PROSE` are its exports |
+| `markdownCards.css` | The element cards a markdown surface opts into by carrying `MARKDOWN_CARDS_CLASS` (`src/shared/constants.ts`, `'chat-md-cards'`). Imported by `Markdown.tsx` as a side effect; see §"Element cards" |
+| `shapes/shapeMotion.css` | The transcript's entrances: `[data-vv-enter]` plays `animate-shape-rise` once, and the rows, items and tiles inside it follow on `animate-shape-item` with a per-position stagger. FRAMES ONLY — a plain list, a quotation and the footnotes carry no key and render identically streaming or settled, so only a `ShapeFrame` root ever carries the marker. Imported by `Markdown.tsx` as a side effect, directly after `markdownCards.css`; see §"Header, type and motion" |
 | `StreamingMarkdown.tsx` | Renders a reply as a settled `<MarkdownBody>` and a pending `<MarkdownBody streaming>` |
-| `shapes/detect.ts` | Every trigger, behind the one import path every consumer uses: `classifyTable`, `soleNumericColumn`, `parseNumber`, `parseStatsFence`, `deltaTone`, `parseAlertKind`, `parseVerdict`, `isTimeToken`/`timeTokenLength`, `checkGlyph`/`checkGlyphLength`, `parseFileRef`, `FILE_REF_SCAN`, `KNOWN_EXTENSIONS`, `IMAGE_EXTENSIONS`/`previewKindOf`, `parseHexColor`, `parseKeyCombo`, `splitDiffLine`, `LONG_OUTPUT_LINES`, `LONG_OUTPUT_PREVIEW_LINES`. A barrel with no logic of its own — a new trigger goes in its family's module and gets its name added here |
+| `shapes/detect.ts` | Every trigger, behind the one import path every consumer uses: `classifyTable`, `soleNumericColumn`, `parseNumber`, `parseStatsFence`, `deltaTone`, `parseAlertKind`, `parseVerdict`, `isLeadInText`/`LEAD_IN_MAX_CHARS`, `isTimeToken`/`timeTokenLength`, `checkGlyph`/`checkGlyphLength`, `parseFileRef`, `FILE_REF_SCAN`, `KNOWN_EXTENSIONS`, `KNOWN_DOTFILES`, `IMAGE_EXTENSIONS`/`previewKindOf`, `parseHexColor`, `parseKeyCombo`, `splitDiffLine`, `LONG_OUTPUT_LINES`, `LONG_OUTPUT_PREVIEW_LINES`. A barrel with no logic of its own — a new trigger goes in its family's module and gets its name added here |
 | `shapes/detect/` | The grammars, one pure module per family: `tables`, `fences`, `prose`, `listMarks`, `fileRefs`, `inlineMarks` (which name lives where is the barrel's header). None imports anything, a sibling included, so `tsx` loads the barrel with no browser |
 | `shapes/hast.ts` | `HastNode` and the text readers: `textOf`, `readTable`, `readListItems`, `readFactPairs`, `readCodeChildren`, `hasInlineFormatting` |
-| `shapes/tableData.ts` | What happens after a table trigger fires: `tablePayload`, `dataTableKind`, `compareCells`, `sortedOrder`, `toCsv`, `barPercents` |
-| `shapes/listItems.ts` | `renderedListItems` and `liftLeadingToken` — pairs rendered `li`s with parsed items, and lifts a glyph, a time or an alert marker out of the first text node |
+| `shapes/tableData.ts` | What happens after a table trigger fires: `tableRung` (the ladder `ShapeTable` switches on and `LeadIn` asks about the table under a line), `tablePayload`, `dataTableKind`, `compareCells`, `sortedOrder`, `toCsv`, `barPercents` |
+| `shapes/listItems.ts` | `renderedListItems` and `liftLeadingToken` — pairs rendered `li`s with parsed items, and lifts a glyph, a time or an alert marker out of the first text node. Also the list ladder: `listRung`, plus the `listItemNodes`/`ownCheckbox` pair it reads the items with, shared with `ShapeList` so the rung and the count cannot disagree |
 | `shapes/listNesting.ts` | `InsideListContext` — a list inside a list is always plain |
 | `shapes/chipContext.ts` | `ChipsSuppressedContext` — true inside a link, a section heading and a sortable header, where a chip would be a button inside a control |
-| `shapes/collapseState.ts` | `shapeKey` (djb2, forced unsigned), `isCollapsed`, `setCollapsed`, `clearCollapsed` — the page-lifetime fold map |
-| `shapes/useShapeCollapse.ts` | `useShapeCollapse` (fold state, key migration, export override) and `useShapeInteractive` (may a control be drawn at all) |
+| `shapes/collapseState.ts` | `shapeKey` (djb2, forced unsigned), `isCollapsed`, `setCollapsed`, `clearCollapsed` — the page-lifetime fold map — plus `hasEntered`, `markEntered`, the page-lifetime entrance memory beside it, keyed the same way |
+| `shapes/useShapeCollapse.ts` | `useShapeCollapse` (fold state, key migration, export override, and `enter` — whether THIS mount may play its entrance) and `useShapeInteractive` (may a control be drawn at all) |
 | `shapes/markdownStreaming.ts` | `MarkdownStreamingContext`, in its own module to avoid an import cycle. Its one consumer is `CodeBlock` |
-| `shapes/remarkShapeGroups.ts` | The one remark plugin: groups root-level fence runs into `tabbed-code` and headings into `section` wrappers |
-| `shapes/ShapeFrame.tsx` | `ShapeFrame` — the header bar, fold and markers every framed shape wears |
+| `shapes/remarkShapeGroups.ts` | The one remark plugin, three passes over the root's children: fence runs into `tabbed-code`, a title paragraph and the list or table under it into `lead-in`, headings and their bodies into `section` wrappers |
+| `shapes/leadInContext.ts` | `LeadInTitle` (`{ title, hasLink }`) and `LeadInTitleContext` — the line above a block, travelling from `LeadIn`, which provides the paragraph's own rendered children AND whether they hold a link, to `ShapeFrame`, which shows them in place of its `title` prop, folds from its chevron alone when `hasLink` is true, and re-provides `null` around its own body so no nested frame can inherit the title |
+| `shapes/LeadIn.tsx` | `LeadIn` — the `lead-in` wrapper: asks `tableRung`/`listRung` whether the block below frames itself, hands the words down through `LeadInTitleContext` when it does, frames the list itself when it does not, and leaves a table that draws no frame exactly as it was |
+| `shapes/ShapeFrame.tsx` | `ShapeFrame` — the header bar, fold and markers every framed shape wears. `kind` is a closed `ShapeKind` union; its default icon and tone come from the file-local `SHAPE_KINDS` registry, overridable by the `tone`/`icon` props for the three kinds whose meaning only the caller knows. `title` is a `ReactNode` (a lead-in title is the author's own rendered paragraph), `prose` keeps `not-prose` off a frame that holds plain prose, `flush` drops the body's inset for a frame whose own content reaches its own edge, and the title span carries `data-shape-title` inside `ChipsSuppressedContext` while the body carries `data-shape-body`. Every header and body size is `em`, off the named scale `tailwind.config.js`'s `fontSize` declares (§"Header, type and motion"). A title holding a link folds from the chevron alone, the same answer `ShapeSection` gives a heading with a link in it |
 | `shapes/elements/index.ts` | The barrel `Markdown.tsx` imports every element override through |
-| `shapes/elements/table.tsx` | `PlainTable`, `PlainTableHead`, `PlainTableRow`, `PlainTableHeaderCell`, `PlainTableCell`, and `ShapeTable` — the table branch. `ShapeTableCell` is an alias of `PlainTableCell` |
-| `shapes/elements/list.tsx` | `PlainList`, `PlainListItem`, and `ShapeList` — the list ladder. `ShapeListItem` is an alias of `PlainListItem` |
+| `shapes/elements/table.tsx` | `PlainTable`, `PlainTableHead`, `PlainTableRow`, `PlainTableHeaderCell`, `PlainTableCell`, and `ShapeTable` — the table branch, which draws the rung `tableRung` hands it rather than deciding again. `ShapeTableCell` is an alias of `PlainTableCell` |
+| `shapes/elements/list.tsx` | `PlainList`, `PlainListItem`, and `ShapeList` — the list branch, which switches on `listRung` and keeps the rungs themselves in `shapes/listItems.ts` where `LeadIn` can ask the same question. `ShapeListItem` is an alias of `PlainListItem` |
 | `shapes/elements/blockquote.tsx` | `PlainBlockquote` and `ShapeBlockquote` — the alert branch |
 | `shapes/elements/paragraph.tsx` | `PlainParagraph` and `ShapeParagraph` — the verdict and fact ladder |
-| `shapes/elements/plain.tsx` | `PlainRule`, `PlainHeading` (forwards hast properties, so GFM's `sr-only` footnote label stays hidden), `PlainDiv`, and `ShapeDiv`, which routes the two plugin wrappers |
+| `shapes/elements/plain.tsx` | `PlainRule`, `PlainHeading` (forwards hast properties, so GFM's `sr-only` footnote label stays hidden), `PlainDiv`, and `ShapeDiv`, which routes the three plugin wrappers |
 | `shapes/elements/inlineText.tsx` | `renderInline` — the one seam where a block's rendered inline content gets file chips |
 | `shapes/code/index.tsx` | `CodeBlock` (the `code` override's dispatcher: inline or block, then the widget branch) and `CodePre` |
+| `shapes/code/EmbedFrame.tsx` | `EmbedFrame` — the card a LIVE embed wears: the one `ShapeFrame` header every shape draws, `flush` so the iframe reaches the card's own edge, plus an `a[data-docspace-open]` action carrying a DocSpace block's studio deep link. `CodeBlock` hands it to `WidgetFrame` as its `frame`, and `WidgetFrame` calls it only behind its mount and streaming gates; it imports nothing from `@/modules/widgets` and classifies no body. See [live widgets](./07-live-widgets.md) §"The DocSpace kind" |
 | `shapes/code/CodeFence.tsx` | The fence precedence, and `FenceBlock`, today's highlighted block. Injects the `cc-syntax-theme` style at module scope |
 | `shapes/code/InlineCode.tsx` | Today's inline code span, or a colour swatch, keycaps or a file chip |
 | `shapes/MarkdownLink.tsx` | The `a` override. Asks `parseFileRef` under its loose link policy and forwards the `:line` |
@@ -130,11 +154,14 @@ one fence this feature routes around.
 | `.verify/probe-shapes-tables.mjs` | The table branch: shapes, the two declines, sort, CSV, bars, export |
 | `.verify/probe-shapes-lists.mjs` | The alert branch and the list ladder, their near misses, nesting, and the `breaks` form |
 | `.verify/probe-shapes-prose.mjs` | The paragraph ladder, its declines, the streaming and `breaks` forms, and the 390 px layout |
-| `.verify/probe-shapes-fences.mjs` | The fence precedence: tiles, diff, long output, mermaid, the widget left alone, streaming, export |
+| `.verify/probe-shapes-fences.mjs` | The fence precedence: tiles, diff, long output, mermaid, the widget's own `data-shape="widget"` in that same order (it wears the card header now, so it is no longer left off the precedence list), streaming, export |
 | `.verify/probe-shapes-groups.mjs` | `remarkShapeGroups`: tab groups, sections, their near misses, the layout gate, export, streaming |
 | `.verify/probe-shapes-inline.mjs` | Chips, swatches and keycaps, where a chip must not go, the click chain, the streaming scan's cost |
 | `.verify/probe-shapes-lineopen.mjs` | A line number from `openFileReference` to a marked row on the reader's screen |
-| `.verify/phase-32.mjs` | The gallery: all nineteen kinds in one reply, through the fixture and the real transcript, the diagram drawn live and the export whole. The one shapes proof `all.mjs` runs |
+| `.verify/probe-markdown-cards.mjs` | The element cards: what a `chat-md-cards` surface paints, what it must not (a `.not-prose` list, a margin), the dark repaint, and the proof the class changes no DOM |
+| `.verify/phase-32.mjs` | The gallery: all nineteen kinds in one reply, through the fixture and the real transcript, the diagram drawn live and the export whole |
+| `.verify/phase-33.mjs` | The carded gallery: every element card and all twenty kinds in ONE document, shown whole at the transcript's own measured width — 836 px at a 1440 px viewport and 358 px at 390 — in both themes, with the paint read off the theme's own references. It is a `phase-` and not a `probe-` script so `all.mjs` runs it, and the card laws live in the standing gate rather than in a by-hand probe |
+| `.verify/phase-34.mjs` | The falsifiable probe for the rendered-markdown verve: lead-in frames, header wash, the text scale, framed embeds, and the entrance — a first settled mount carries `data-vv-enter` and plays the rise, a later mount of the same content carries neither, and reduced motion draws no rule at all |
 
 What each probe asserts, and which of its gates redden on which defect, is
 [verification.md](../verification.md) §"The browser harness".
@@ -152,7 +179,7 @@ rung that matches wins, and a block no rung matches takes the fallback.
 | `blockquote` | alert | today's bordered blockquote |
 | fence | widget → mermaid → `stats` → `diff` → long output | today's highlighted block |
 | inline code | hex colour → key combo → file reference | today's inline code span |
-| root blocks (plugin) | tabbed code, then heading sections | the blocks as written |
+| root blocks (plugin) | tabbed code, then lead-ins, then heading sections | the blocks as written |
 
 What "matches" means, rung by rung:
 
@@ -209,21 +236,33 @@ What "matches" means, rung by rung:
   header suppress chips and pictures, streaming or settled. The prose scan refuses a run that is
   only the front of a longer name (`src/logo.png.bak`, `src/a.ts.map`).
 - **File references** have one grammar and two policies. `parseFileRef` with its defaults is the
-  strict prose grammar: at least one `/`, a final segment with an extension, and either a
-  `:line[:col]` suffix or an extension in `KNOWN_EXTENSIONS`. `FILE_REF_SCAN` is meant to be the
+  strict prose grammar: at least one `/`, a final segment that is either a name with an extension or
+  a DOTFILE (whose whole name sits in the extension slot, `src/.env`), and either a `:line[:col]`
+  suffix or a name on the list its slot is vouched by — `KNOWN_EXTENSIONS` for the first shape,
+  `KNOWN_DOTFILES` for the second. So `src/.env` and `/etc/nginx/nginx.conf` chip; `src/.ts` stays
+  plain (`ts` names no dotfile) while `src/.ts:12` chips; a segment of only dots (`src/..ts`) is
+  never a file, and a bare `.env` has no separator and stays plain. An ABSOLUTE path is a path like
+  any other: the scanner allows the leading `/`, and what keeps that out of a URL is its lookbehind,
+  which refuses a match opening right after a letter, a `/` or a `:`. `FILE_REF_SCAN` is meant to be the
   same grammar as a global scanner for plain text, and it never matches inside a URL. **Today the two
-  disagree on one case**: a path that opens with `/` or holds `//` — `/etc/nginx/nginx.conf`,
-  `/home/me/src/a.ts:12`, `src//a.ts:3`. `parseFileRef` accepts it, so written as a whole inline code
-  span it becomes a chip. The scanner refuses it — its lookbehind rejects a match that starts right
-  after a `/`, and each of its segments must be non-empty — so the same text in a sentence stays
-  plain. Measured on 2026-09-11. Making them agree is a change to `detect/fileRefs.ts`. `MarkdownLink` calls
+  disagree on one case**: a path holding `//` — `src//a.ts:3`. `parseFileRef` accepts it, so written
+  as a whole inline code span it becomes a chip; the scanner refuses it, because each of its segments
+  must be non-empty, so the same text in a sentence stays plain. Measured on 2026-09-13. Making them
+  agree is a change to `detect/fileRefs.ts`. `MarkdownLink` calls
   `parseFileRef` with both options false, which is the looser reading an author-declared link has
   always had here. A chip is drawn only from strings: a path inside `**bold**` or a link stays text.
 - **The plugin** walks root children only, so nothing inside a list item or a blockquote is
   grouped. Tabbed code is a maximal run of two or more adjacent fences, every one with a language,
-  not all the same language, and none of them `widget`, `mermaid`, `stats` or `diff`. A heading
+  not all the same language, and none of them `widget`, `mermaid`, `stats` or `diff`. A lead-in is a
+  paragraph whose NEXT sibling is a list or a table and which is a title rather than a sentence:
+  `isLeadInText` in `shapes/detect/prose.ts` takes it when the line is at most
+  `LEAD_IN_MAX_CHARS` (120) characters, holds no line break, and either ends in a colon or is one
+  wholly bold run — `**Summary**`, colon or not. Its body has to be a single `strong` node and
+  nothing else but a lone `:` after it, so `**Important** and the rest` stays a sentence. A heading
   section runs from a heading to the next heading of equal or lower depth, deeper headings nesting
-  inside; a heading with no body stays bare, and a `---` ending a section stays outside it.
+  inside; a heading with no body stays bare, and a `---` ending a section stays outside it. The
+  lead-in pass runs between the other two, because `groupSections` nests a section's body one level
+  down and a pass after it would never see a pair written under a heading.
 
 **What the model is told.** `SURFACE_PROMPT_APPEND` reaches every Claude turn sent through
 CloudCLI's chat (see [chat-contracts.md](../chat-contracts.md) §"7. A widget fence is the opt-in,
@@ -262,15 +301,21 @@ it — the settled half of a streaming reply keeps growing, and a section's key 
 a folded block does not spring open on the next delta and the map still holds one entry per folded
 block.
 
-**Two memories are not folds.** `LongOutput` starts clamped, so its map entry records the reader's
+**Three memories are not folds.** `LongOutput` starts clamped, so its map entry records the reader's
 "Show all": `true` there means released, and a collision can only ever show a block whole.
 `TabbedCode` keeps a second module-level map of the tab each group last showed, keyed like its fold.
+`collapseState.ts` keeps a third itself, beside its own fold map: a `Set<string>` recording which
+cards have already risen, so `hasEntered`/`markEntered` answer whether THIS mount may play the
+entrance `ShapeFrame` draws through `data-vv-enter` — present means seen, and a card `LazyMessageRow`
+remounts, or a settled block a streaming retraction rebuilds, never replays a rise the reader already
+watched.
 
 **The export rule.** `buildTranscriptHtml` renders through `renderToStaticMarkup`, where
 `useIsExportingTranscript()` is true and no effect ever runs. `useShapeCollapse` then answers
 `collapsed: false, interactive: false`, and `useShapeInteractive` answers `false`:
 
-- `ShapeFrame` draws its title with no toggle, and its body whole.
+- `ShapeFrame` draws its title with no toggle, and its body whole, and plays no entrance: `enter` is
+  captured only while `interactive` is true, so an exported document never carries `data-vv-enter`.
 - `ShapeSection` draws the heading untouched and its body open, even if it was folded on screen.
 - `LongOutput` draws every line with no fade and no control.
 - `TabbedCode` stacks every fence, each under its own label.
@@ -319,6 +364,193 @@ in the pending half, which is a different parent (see [live widgets](./07-live-w
 then mounts fresh and re-reads its fold from the map, so the fold returns when its payload is
 unchanged.
 
+## Element cards
+
+The shapes decide what a block *becomes*; the cards decide how the markdown that stays today's
+markup is *painted*. On a carded surface a list is a framed, filled, rounded box; an ordered list
+lifts its numbers into pills in its own gutter; and a nested list keeps its parent's frame and
+loses its own. A quotation takes a wash and a rounded corner; a rule becomes a hairline that fades
+out at both ends; a visible `h1` or `h2` is underlined and `h3`–`h6` are not; the footnotes block is
+a card with its own list unpainted inside it; a footnote reference is a small tinted chip; an inline
+image is framed and rounded; struck-through words take the muted ink; display maths scrolls sideways
+on a wash of its own; and an item that opens with a bold label — `**Root cause:** the parser …` —
+draws that label as the card's own title, its own line with the item's words beneath it; and a table
+outside a shape — the streaming half, where nothing has settled into `DataTable` yet — takes the
+carded body size over `PlainTable`'s own smaller default. Seventeen rules, R1–R17, all of them in
+`src/modules/chat/transcript/markdownCards.css`.
+
+**Colour inside a card is the accent's pair, and only the pair.** A card's marks are the accent INK
+(`text-accent-ink` — the bullet, every `::marker`, the number pill's numeral, the title, the footnote
+chip) and its washes are the accent FILL at low alpha (`bg-primary/…` — the pill, the quotation, the
+chip behind that reference). That is the same pair the shapes draw between a green word and a green
+shape ([verve/README.md](../../src/shared/ui/verve/README.md) rule 3), and the frame itself stays the
+neutral hairline it was: Verve spends the accent sparingly, so a card is not a green box, it is a
+neutral box whose marks are green. Two rules spend no accent at all — R14 inks a struck word the
+muted foreground and R15 washes display maths in `bg-muted/50` — because those are the two marks a
+shape renders for itself as well, and a card has no business tinting the inside of a callout. Both
+are scoped `:not(.not-prose *)` like the rest of the paint, so inside a shape's own frame they do
+not apply at all.
+
+**The title's trigger is the bold lead-in, because CSS cannot read a colon.** A browser has no way to
+match text inside a text node, so `li > strong:first-child` and the loose list's
+`li > div:first-child > strong:first-child` are what a title is keyed on — the renderer spells a loose
+item's paragraph as a `div`, not a `p`. The cost is named rather than hidden: the trigger is **any**
+bold lead-in, colon or not, so `- **Important** and then the rest` is titled as well, and so is an
+item that is bold from end to end. A label with a body, a bold word at the head of a sentence and a
+wholly bold item are the same element with the same element siblings — the only difference is a text
+node, and no selector reads one of those, nor a colon inside one.
+
+**The line ABOVE a list or a table is read by the plugin, not by CSS.** Same reason, opposite
+conclusion: `groupLeadIns` has the paragraph's siblings, so it can read the colon the selector
+cannot and group the pair before either element renders. The paragraph's own rendered children —
+bold, code span and colon intact — become the frame's title, and a list that draws no frame of its
+own is framed by `LeadIn` under that title. That frame is built `prose`, so `not-prose` stays off it
+and the cards' rules DO reach the list inside: R2–R5 still keep the gutter, the marker and the number
+pills, and R16 still draws a `**Label:**` item's label as a title. The one rule that stops at the
+frame is R1, its border and its fill — the frame itself is the card, and painting the list again
+would nest border in border.
+
+**Paint is opted into by the wrapper.** `Plain*` renders every markdown surface and only the wrapper
+knows which surface it is, so the opt-in is one class there — `MARKDOWN_CARDS_CLASS` in
+`src/shared/constants.ts`, spelled `'chat-md-cards'` — and the paint is a stylesheet scoped to that
+class, side-effect imported by `Markdown.tsx`. It changes no DOM: the class rides the wrapper and
+nothing under it moves, so **a miss is today's markup** still holds byte for byte and
+`probe-shapes-baseline.mjs` is untouched by the cards. Four call sites in two files carry it —
+`MessageComponent`'s three bodies (the assistant reply, the thinking row, the tool-use text) and
+`MarkdownContent`, which is every tool markdown body. A user message bubble and a tool error
+deliberately do not.
+
+**Three layers, in this order.** Tailwind Typography paints from the prose container; the `Plain*`
+component's own class string paints next; on a carded surface `markdownCards.css` paints last. It
+wins by selector specificity, never `!important`: it overrides `PlainList`'s padding (`pl-5`), its
+list style (`list-decimal`) and its marker colour (`marker:text-current`), and `PlainRule`'s
+`border-t`. For headings, quotes, footnotes, images and maths it only adds paint.
+
+**The exclusion is `.not-prose`, and never `[data-shape]`.** Every block shape's frame wears
+`not-prose` (`shapes/ShapeFrame.tsx`), so a list inside a callout or a task list keeps the pixels it
+had. A heading section wears `data-shape="section"` and no `not-prose`, deliberately — a list under
+a heading keeps its card — and an exclusion written on `[data-shape]` would silently un-card every
+one of them. The one exception names a single kind and one rule: R1, the list card, also refuses
+`[data-shape="list"] *`, because a list under a lead-in line is already inside a frame that IS its
+card and painting it again would nest border in border. It is spelled as a literal kind, never as a
+bare `[data-shape]`, so `ShapeSection`'s lists keep their cards.
+
+**No card inside a card.** The frame's own predicate refuses `li *`, `blockquote *`,
+`section.footnotes *`, `[data-shape="list"] *` and anything carrying a checkbox, so a list inside a
+list item, a list inside a quote, the footnotes' own list, a list the lead-in already framed and a
+task list are never framed twice.
+
+**No rule sets a margin.** Typography's positional spacing and `SECTION_FLOW` stay the only spacing
+rules here; a badge or a pill is placed inside the box its list already owns.
+
+**A numbered badge uses the browser's own counter.** `content: counter(list-item)` honours
+`<ol start="3">`, so a numbered sequence split by a code block continues at 2 after the fence
+instead of starting again at 1. A custom `counter-reset` is what would restart it.
+
+**Streaming.** The cards paint the streaming half too, because the markup is identical on both sides
+of the settle boundary: a list crossing it shows as two cards until it settles, and a checks or
+timeline list still streaming is carded until it settles into its shape.
+
+**Export.** `collectDocumentStyles` in `buildTranscriptHtml.tsx` reads the running document's own
+stylesheets, so an exported transcript carries `markdownCards.css` with it.
+
+## Header, type and motion
+
+**The header is one component, and every block shape that draws one wears it** (the two
+collapsibles that draw their own are named in §"Mental model" rule 6). `ShapeFrame`
+(`shapes/ShapeFrame.tsx`) draws the bar above a shape's body — the fold's chevron, the kind's icon,
+the title, then an optional actions slot. `kind` is a closed `ShapeKind` union, spelled as a string
+literal at every call site, so a kind a shape draws with no line in the file-local `SHAPE_KINDS`
+registry is a type error rather than a silent default. The registry gives each kind its
+`{ icon, tone }`: seventeen kinds are in it, the fourteen structural ones wear `accent`, and only the
+three whose meaning is a verdict take a tone — `callout` (`info`), `checks` and `verdict`
+(`positive`) — each overridable per call site by the `tone`/`icon` props, which is what `Callout` (its
+alert kind), `VerdictBanner` (its verdict) and `CheckResults` (its fail count) do. **`accent` is not
+a sixth tone but the ABSENCE of one** — the structural wash a card of pure structure wears — and it
+is the only value that writes no `data-tone`. That attribute sits on the header ROW and never on the
+root, so a `Badge` or a `Chip` in the body keeps its own tone instead of inheriting the frame's. The
+title's words reach the frame two ways: the caller's `title` prop, or a lead-in paragraph's own
+rendered children through `LeadInTitleContext` — and when those children hold a link, the chevron
+alone becomes the button and the words are drawn beside it, because an anchor inside a button is two
+controls in one. The chevron, the icon and the body are all sized in `em`, never px or rem: they
+follow the chat text size the reader set, which is the one thing the prose around a frame already
+does.
+
+**Every size inside a rendered shape or a carded surface is `em`, off five names**
+`tailwind.config.js`'s `fontSize` declares: `md-body` (`1em` — every shape's body AND its own title;
+a header is never smaller than what it heads), `md-meta` (`0.875em` — a shape's actions slot, a
+numbered badge, a footnote chip), `md-code` (`0.875em` — `DiffBlock`'s own line font, its first
+caller), `md-stat` (`1.75em` — a stat tile's figure, and nothing else), and `chat-tool`
+(`calc(var(--chat-font-size, 1rem) * 0.875)` — the base size of a tool's own markdown body, the same
+ratio `prose-sm` drew at the default 16px, now following the setting instead of a fixed px).
+**Why `em`.** The anchor is the reader's own size: `ChatMessagesPane.tsx` sets `--chat-font-size` on
+`.chat-messages-pane`, and `TRANSCRIPT_PROSE` (`Markdown.tsx`) applies it to the prose container as
+`text-[length:var(--chat-font-size,1rem)]`. A relative unit is what lets one scale ride that
+setting, and it reaches a frame even though the frame wears `not-prose`: Typography's element rules
+stop at that class, but font-size still inherits, so `1em` inside a frame IS the chat size. **The
+compounding rule** follows from the unit — an `md-*` size goes on a text leaf, or on a frame's header
+and body wrappers, and never on a container that holds another sized element, where it would
+multiply. `ShapeFrame` writes `data-text-scale="flow"` on every frame's root so a probe can confirm
+the scale is in force. `MarkdownContent.tsx` (every tool markdown body — see
+[tool views](./06-tool-view.md) §"Content renderers") carries `text-chat-tool` beside its existing
+`prose-sm`, and `markdownCards.css`'s R5, R11, R12 and R17 (§"Element cards") spell `md-meta` and
+`md-body` where they spelled `text-xs`/`text-sm` before.
+
+**A `@/shared/ui` library piece a shape composes follows the same scale, through two custom
+properties rather than a `text-md-*` class.** `tokens.css`'s `[data-text-scale="flow"]` rule sets
+`--vv-text-body: 1em` and `--vv-text-meta: .875em` on the frame's own root — the one element that
+carries `data-text-scale="flow"` — and `Badge`, `Chip`, `Meter`, `Banner` and `Tabs`' (both its
+filled and underline registers) `font-size` in `verve/controls.css` and `verve/feedback.css` read
+`var(--vv-text-meta, <its old px>)` or, for `Banner`, `var(--vv-text-body, <its old px>)`, rather
+than the literal alone. A
+`Chip` or a `Badge` a shape composes therefore follows the reader's chat text size like the rest of
+the frame; the same component built bare — Settings' own `Badge`, say — finds no custom property on
+any ancestor and keeps the px it always had. `phase-34.mjs`'s `T4` reads the framed case and `T6`
+pins eight bare library class strings' literal size as a ratchet, so a later change to one of those
+literals is a deliberate, measured one. The library's own side of the contract is
+[verve/README.md](../../src/shared/ui/verve/README.md) rule 7.
+
+**`cn()` has to be told the five names are sizes, not colours.** `tailwind-merge` reads an unknown
+`text-<name>` utility as a text COLOUR by default, so an unextended merger answers `cn('text-md-body',
+'text-foreground')` with the colour alone: the class list still builds and no type error says so, the
+element just quietly stops following the reader's chat text size. `src/shared/utils.ts` builds `cn`'s
+merger through `extendTailwindMerge` rather than importing `twMerge` directly, registering `md-body`,
+`md-meta`, `md-code`, `md-stat` and `chat-tool` under the `font-size` class group so a later
+`text-md-body` really does replace an earlier one. See that file's own header comment for the failure
+this avoids.
+
+**Motion is frames only, and an entrance is remembered by content the way a fold is.** The
+transcript's entrances are one stylesheet, `shapes/shapeMotion.css`, side-effect imported by
+`Markdown.tsx` directly after `markdownCards.css`, and every rule in it sits inside ONE
+`@media screen and (prefers-reduced-motion: no-preference)` block. Its trigger is the library marker
+`data-vv-enter`, which `ShapeFrame` writes on a root only while the entrance memory says the reader
+has never watched this card arrive — `hasEntered`/`markEntered` in `shapes/collapseState.ts`, a
+page-lifetime `Set<string>` beside the fold map and keyed the same content-addressed way
+(§"Collapse and export"). A mount is not an arrival: `LazyMessageRow` unmounts a row as it scrolls
+away and a streaming retraction remounts a settled block, so without that memory every scroll back
+would replay every card. Three rules carry it. `M1` — the frame itself rises once on
+`animate-shape-rise`, Tailwind's `vv-rise var(--dur-move) var(--ease-enter) both` with its fill mode
+overridden to `backwards`. `M2` — the rows, the loose list items and the stat tiles inside it follow
+on `animate-shape-item`, Tailwind's `vv-pagein 240ms var(--ease-enter) backwards`, and `M2b` gives
+the second position a 30 ms step and each one after it another, so a table's rows cascade rather than
+land together — the rule's own list is `tbody > tr`, a loose `li`, `[data-stat-tile]` and `.vv-card`,
+and the stagger stops growing at 150 ms so the tail never runs past 390 ms. The
+meter's grow-in is the library's own and lives in `tokens.css` beside its other keyframes:
+`@keyframes vv-meter-grow` is a `from` frame only, because a meter's end state is its inline
+`transform: scaleX(p)` and a `to` frame with a fill would pin every bar at full width, and its rule
+`[data-vv-enter] .vv-meter__fill` sits inside the same reduced-motion query. Only `opacity` and
+`transform` animate, and the budget is bounded: a frame ends at 350 ms, a meter at 350 ms, and the
+last staggered item at 150 + 240 = 390 ms.
+
+**Three answers the design turns on.** *Frames only, never an element card* — a plain list, a
+quotation and the footnotes render identically in the streaming and the settled half and carry no
+key, so an entrance on one would play while it streams and again when it settles, while a frame
+exists only in the settled half; a streaming body draws no frame at all, so it carries no marker and
+nothing to animate. *An export plays nothing*: `enter` is captured only while `interactive` is true,
+so the static render carries no `data-vv-enter` and draws no animation (§"Collapse and export" holds
+the whole export contract). *Reduced motion draws no rule at all* — the stylesheet and the meter's
+rule beside it are both inside the query, so the card is simply there.
+
 ## Gotchas
 
 - **The baseline artifact exists only in this working tree.** `.verify/` is git-ignored, and
@@ -326,22 +558,15 @@ unchanged.
   change means the change is wrong, not the artifact: re-capturing from the current tree compares
   the new DOM with itself and can never fail again. How it was captured, and the only legitimate way
   to re-establish it, is in [verification.md](../verification.md).
-- **Two moved files still carry palette colours, on purpose.** `MarkdownLink.tsx` has
-  `text-blue-600 dark:text-blue-400` and `code/CodeFence.tsx` has `text-green-600
-  dark:text-green-500`, both inside blocks the baseline document renders, so re-toning either says
-  `DOM CHANGED`. The palette grep the plan runs over `shapes/` (`docs/plans/markdown-shapes.plan.md`,
-  Phase 2's verify) `--exclude`s exactly those two filenames. It also cannot see a third literal:
-  `FenceBlock` in `code/CodeFence.tsx` paints its shell `bg-muted/50 … dark:bg-zinc-900`, and the
-  grep's pattern (`blue`, `green`, `red`, `rgb(`, six-digit hex) has no `zinc`. That spelling is
-  `MermaidDiagram`'s too — the drift [live widgets](./07-live-widgets.md) §"Gotchas" records. A
-  re-tone is its own change, with its own baseline re-capture, and it must search for `zinc` as well.
 - **`FILE_REF_SCAN` carries the `g` flag.** Use it only with `match`, `matchAll`, `replace` or
   `split`. `test` and `exec` keep `lastIndex` between calls, so a second identical `test` answers
   `false`, and a scan built on them drops every other hit without a sound.
-- **A chip is a `<button>`, so three places suppress it.** `MarkdownLink`, `ShapeSection`'s heading
-  and `DataTable`'s header row provide `ChipsSuppressedContext`, and `FileChip` then draws the plain
-  text or code span it was handed. Anything else that puts rendered markdown inside a control needs
-  to provide it too, or one click fires two actions.
+- **A chip is a `<button>`, so four places suppress it.** `MarkdownLink`, `ShapeSection`'s heading,
+  `DataTable`'s header row and `ShapeFrame`'s title row provide `ChipsSuppressedContext`, and
+  `FileChip` then draws the plain text or code span it was handed. The title row is the fourth
+  because a lead-in title is rendered markdown sitting inside the fold toggle; the frame provides
+  the suppression around the whole span rather than letting a chip appear in one. Anything else that
+  puts rendered markdown inside a control needs to provide it too, or one click fires two actions.
 - **A section wrapper moves every block Typography positions.** Tailwind Typography spaces a reply
   with `> :first-child`, `h2 + *` and `hr + *`, and a wrapper changes all of those positions.
   `SECTION_FLOW` in `ShapeSection.tsx` restates each rule where the wrapper moved it, and the groups
@@ -371,15 +596,25 @@ unchanged.
 | A `shapeKey` payload | Two kinds never share a payload shape, and `section` still includes the body — the groups probe folds two "Findings" sections apart |
 | `isCollapsed`'s default | It stays expanded. A default of folded turns a 32-bit collision into content that disappears |
 | `useShapeCollapse` or `useShapeInteractive` | The tables, fences and groups probes' export mounts still draw every shape whole with zero controls, and a fold still survives its row remounting |
-| `ShapeFrame`'s markers | Every probe finds shapes by `data-shape`, `data-collapsed` and `data-shape-toggle`. Rename one and gates that never read this source go quiet |
+| `data-vv-enter`, `shapeMotion.css`'s selectors, or `hasEntered`/`markEntered` | `phase-34.mjs`'s `M` gates: a first settled mount carries the marker and plays the rise, a later mount of the same content carries neither, and reduced motion draws no rule at all |
+| `LeadIn`, `LeadInTitleContext`, or the rung predicates it asks (`tableRung`/`listRung`) | `phase-34.mjs`'s `L` gates: three list frames titled from their own line, a table no rung claimed left with its paragraph above it, and a link inside a lead-in title still folding from the chevron alone. `LeadIn` asks the SAME predicates the ladders use, so a rung answered two ways loses a paragraph or gives a table a second frame |
+| `EmbedFrame`, or `WidgetFrame`'s `frame` prop | `phase-34.mjs`'s `E` gates: a settled widget and a DocSpace fence wear the card header, an export and a streaming fence draw their raw source and no frame, and the DocSpace action points at the studio ([live widgets](./07-live-widgets.md) §"The DocSpace kind") |
+| `ShapeFrame`'s markers | Every probe finds shapes by `data-shape`, `data-collapsed` and `data-shape-toggle`; a title and a body are read by `data-shape-title` and `data-shape-body`, a header by `data-shape-header`, its icon by `data-shape-icon`, its actions by `data-shape-actions`, and the scale itself by `data-text-scale`. Rename one and gates that never read this source go quiet |
+| A new `ShapeKind`, or a kind's icon/tone in `SHAPE_KINDS` | Adding a kind with no `SHAPE_KINDS` entry is a type error at the call site, but the icon's existence in the installed `lucide-react` is not type-checked — confirm the import resolves before shipping |
+| A new named size in `tailwind.config.js`'s `fontSize`, or the `chat-tool` ratio | `src/shared/utils.ts`'s `extendTailwindMerge` list names every `text-<name>` this app spends as a font size; a size added there and not to that list is read as a text COLOUR by `cn()`'s merger and silently stops following the reader's setting (§"Header, type and motion") |
+| A new `font-size` in `verve/controls.css` or `verve/feedback.css` | If a shape may compose that piece inside its frame, wrap the literal in `var(--vv-text-meta, <literal>)` or `var(--vv-text-body, <literal>)`, the way `Badge`, `Chip`, `Meter` and `Banner` already do; left a bare literal, it silently ignores `data-text-scale="flow"` and the reader's chat text size (§"Header, type and motion") |
+| `isLeadInText` or the lead-in pass's target test | `probe-shapes-detect.mjs` carries the grammar's six cases, and `phase-33.mjs`'s gallery declares the `list` kind the pass produces. A rule that accepts more titles a paragraph the author wrote as a sentence |
+| The `[data-shape="list"]` exclusion in `markdownCards.css` | `probe-markdown-cards.mjs`'s plain-card lists stay plain, and `phase-33.mjs` finds a card under every heading — the exclusion must name one kind and never `[data-shape]` bare |
 | `SECTION_FLOW` | The groups probe's layout gate: every block within half a pixel of its unsectioned position, the opening heading flush, the reply's height unchanged |
 | `NEVER_TABBED` in `remarkShapeGroups` | A widget in a run of fences still mounts its live frame, and a `diff` beside a code fence stays its own shape — both are groups probe near misses |
 | `CodeFence`'s order, its streaming return, or its export branch | The fences probe: both mermaid fences wear `data-shape="diagram"`, a malformed `stats` fence keeps every line, and the streaming mount draws no shape and no svg. The groups probe's export mount: the mermaid fence comes out as its source inside its `diagram` frame. `useShapeInteractive` stays above the streaming return, so every render calls the same hooks |
 | `MermaidDiagram`'s render id | The gallery, `phase-32.mjs`, knows a diagram drew only by the `mermaid-` prefix on the svg id `MermaidDiagram` gives each render. Change the prefix and its four live-diagram lines redden with the diagram on screen |
 | `LONG_OUTPUT_LINES` or `LONG_OUTPUT_PREVIEW_LINES` | The fences probe's 25-line fence stays whole and its 26-line fence clamps, and `probe-shapes-detect.mjs` pins the pair at 25 and 12 |
-| `parseFileRef`, `FILE_REF_SCAN` or `MarkdownLink`'s policy | The inline probe: no chip in a URL, time, version or npm scope; every link that opened in the Files tab still does; the scan's cost ceiling. The whole-text parser and the scanner are built from the same fragments and are meant to agree; today they differ on a path opening with `/` or holding `//` (see **The triggers**), so a change to either must say which way that case goes |
+| `parseFileRef`, `FILE_REF_SCAN` or `MarkdownLink`'s policy | The inline probe: no chip in a URL, time, version or npm scope; every link that opened in the Files tab still does; the scan's cost ceiling. The whole-text parser and the scanner are built from the same fragments and are meant to agree; today they differ on one case only, a path holding `//` (see **The triggers**), so a change to either must say which way that case goes — and an absolute path and a dotfile are cases they now AGREE on, which is what a change must not undo |
 | `ChipsSuppressedContext` or where it is provided | The inline probe's backticked path in a link, a section heading and a sortable header stays today's code span, and React logs no nested-control warning |
 | `openFileReference`'s signature, or the file-manager chain behind it | `probe-shapes-lineopen.mjs` end to end, and the inline probe's click that must land on the target row |
 | `surface-signal.ts` | `WIDGET_SIGNAL`'s bytes are another session's and move unchanged, and `MARKDOWN_SIGNAL` names only conventions `detect.ts` really implements. It costs tokens on every turn |
 | A shape string | It exists under `shapes` in all eleven `chat.json` files. `MermaidDiagram`'s string is `common.shapes.diagramFailed`, because that component is shared with the PRD editor |
 | Where `Timeline` or `StatTiles` live | They move to `src/shared/ui/` only when a second module uses one, and never into `src/shared/ui/verve/`, which holds stylesheets and nothing else |
+| `markdownCards.css`, or the scope class its selectors spell | `probe-markdown-cards.mjs`: G2 reads the frame, G4 the badges and G7 the `.not-prose` exclusion back off the document, G1 proves the class moved no DOM and G15 that no margin moved. That probe spells `chat-md-cards` as a literal it cannot be told to rename, so renaming the class reddens it until the file is edited too |
+| `PlainList`'s or `PlainRule`'s class string | On a carded surface `markdownCards.css` overrides it by specificity, so run `probe-markdown-cards.mjs` as well as `probe-shapes-baseline.mjs`: the baseline compares the class string on a body that carries no cards, and cannot see the carded surface losing it |

@@ -1,8 +1,9 @@
 import { memo, useMemo, useState } from 'react';
-import { Bot, Brain, ChevronRight, CircleAlert, CircleCheck, MessageSquareText } from 'lucide-react';
+import { Bot, ChevronRight, CircleAlert, CircleCheck } from 'lucide-react';
 
 import type { DiffLine, Project, SubagentActivity, SubagentInfo, SubagentUsage, ToolResult } from '@/shared/types';
 import { cn } from '@/shared/utils';
+import { SubagentNote } from '@/modules/chat/tools/SubagentNote';
 import { ToolRenderer } from '@/modules/chat/tools/ToolRenderer';
 import { useIsExportingTranscript } from '@/modules/chat/context/TranscriptRenderContext';
 import { MarkdownContent } from '@/modules/chat/tools/ContentRenderers/MarkdownContent';
@@ -67,27 +68,6 @@ const STATUS_STYLES: Record<SubagentInfo['status'], string> = {
   // The reader's own Stop or an interrupt: nothing went wrong, so not red.
   stopped: 'text-amber-700 dark:text-amber-400',
 };
-
-/** One prose or reasoning entry from the agent's own narration. */
-const SubagentNote = memo(({ activity }: { activity: SubagentActivity }) => {
-  const isThinking = activity.kind === 'thinking';
-  const Icon = isThinking ? Brain : MessageSquareText;
-
-  return (
-    <div className="flex gap-2 py-1">
-      <Icon className={cn('mt-0.5 h-3 w-3 flex-shrink-0', isThinking ? 'text-muted-foreground/50' : 'text-muted-foreground/70')} />
-      <div
-        className={cn(
-          'min-w-0 flex-1 whitespace-pre-wrap break-words text-xs leading-relaxed',
-          isThinking ? 'italic text-muted-foreground/70' : 'text-muted-foreground',
-        )}
-      >
-        {activity.content}
-      </div>
-    </div>
-  );
-});
-SubagentNote.displayName = 'SubagentNote';
 
 /**
  * Rendered by chat's MessageComponent for any tool call that spawned a

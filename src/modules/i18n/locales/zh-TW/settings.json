@@ -115,7 +115,8 @@
       "actionRequired": "需要處理",
       "stop": "執行已停止",
       "error": "執行失敗",
-      "limits": "用量上限"
+      "limits": "用量上限",
+      "background": "Background agents finished"
     },
     "ntfy": {
       "title": "手機推播 (ntfy)",
@@ -323,6 +324,11 @@
       }
     },
     "connectionStatus": "連線狀態",
+    "runnerModel": {
+      "label": "建置之魂使用 DeepSeek Flash",
+      "description": "plan runner 將建構者、修復輪與 Athena 派送到 DeepSeek 的 deepseek-flash，而非 Claude Opus。Prometheus、偵察者與重新規劃者仍留在 Claude。下一階段生效。",
+      "unreadable": "無法從伺服器讀取此開關，因此其位置未知——這與關閉不同。每當此頁面重新取得焦點時都會重試。"
+    },
     "login": {
       "title": "登入",
       "reAuthenticate": "重新驗證",

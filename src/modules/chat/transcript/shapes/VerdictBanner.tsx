@@ -79,7 +79,12 @@ export function VerdictBanner({ verdict, counts, collapseKey }: VerdictBannerPro
   ) : null;
 
   return (
-    <ShapeFrame kind="verdict" title={t('shapes.titles.verdict')} collapseKey={collapseKey}>
+    <ShapeFrame
+      kind="verdict"
+      title={t('shapes.titles.verdict')}
+      collapseKey={collapseKey}
+      tone={verdict === 'PASS' ? 'positive' : 'danger'}
+    >
       {/* The chips sit in the banner's MESSAGE, not its `action` slot. `Banner`'s row never wraps
           and `action` is sized for a button or two; four chips beside the word are wider than a
           phone's transcript, and measured at 390px they overlapped the word they qualify. Here
@@ -89,7 +94,7 @@ export function VerdictBanner({ verdict, counts, collapseKey }: VerdictBannerPro
         {/* `items-baseline`, so the word sits on the chips' text line and level with the banner's
             top-anchored mark, rather than centred on the taller chips and a few pixels below it. */}
         <div className="flex flex-wrap items-baseline gap-x-3 gap-y-2">
-          <span data-verdict-word className="mr-auto text-base font-semibold tracking-wide">
+          <span data-verdict-word className="mr-auto text-md-body font-semibold tracking-wide">
             {verdict}
           </span>
           {chips}

@@ -270,5 +270,35 @@
   },
   "shapes": {
     "diagramFailed": "無法繪製此圖表，已顯示其原始碼。"
+  },
+  "gutters": {
+    "runner": {
+      "title": "執行"
+    },
+    "memory": {
+      "title": "記憶",
+      "pending": "等待審核",
+      "recent": "最近歸檔",
+      "recentEmpty": "尚未歸檔任何內容",
+      "pendingEmpty": "沒有等待中的項目"
+    },
+    "subagents": {
+      "title": "子代理",
+      "empty": "此對話中沒有子代理",
+      "back": "返回子代理",
+      "loading": "正在載入逐字稿…",
+      "notFound": "磁碟上還沒有逐字稿",
+      "failed": "無法讀取逐字稿",
+      "live": "即時",
+      "showEarlier": "顯示更早的步驟",
+      "openRow": "閱讀 {{name}} 的逐字稿"
+    },
+    "open": "開啟 {{name}}",
+    "collapse": "收合",
+    "dragHint": "拖曳到其他插槽",
+    "pin": {
+      "label": "本次工作階段",
+      "title": "由你開啟的對話建立"
+    }
   }
 }

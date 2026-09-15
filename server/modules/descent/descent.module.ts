@@ -1,5 +1,7 @@
 import type { Router } from 'express';
 
+import { sessionsDb } from '@/modules/database/index.js';
+
 import { createDescentMemoryService } from './descent.memory.service.js';
 import { createDescentRouter } from './descent.routes.js';
 import { createDescentService } from './descent.service.js';
@@ -37,7 +39,10 @@ export function createDescentModule(): Router {
 
   const transport = createDescentTransport(dependencies);
   const descentService = createDescentService(dependencies);
-  const memoryService = createDescentMemoryService(transport);
+  // The memory lane takes its one database dependency as a closure rather than importing the
+  // repository itself: a row's `session_id` is Descent's id spelling, and the translation to the
+  // app id belongs to the repository that owns both spellings.
+  const memoryService = createDescentMemoryService(transport, (id) => sessionsDb.resolveAppSessionId(id));
 
   return createDescentRouter(descentService, memoryService);
 }

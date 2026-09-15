@@ -87,7 +87,7 @@ export function LongOutput({ raw, collapseKey, children }: LongOutputProps) {
     <div className="-mt-2 flex justify-center px-4 pb-2">
       <CollapsibleTrigger
         data-output-toggle
-        className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+        className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-md-meta font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
       >
         <ChevronDownIcon
           aria-hidden="true"

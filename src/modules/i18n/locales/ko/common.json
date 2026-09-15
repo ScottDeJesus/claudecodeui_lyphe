@@ -270,5 +270,35 @@
   },
   "shapes": {
     "diagramFailed": "이 다이어그램을 그릴 수 없어 소스를 표시합니다."
+  },
+  "gutters": {
+    "runner": {
+      "title": "실행"
+    },
+    "memory": {
+      "title": "메모리",
+      "pending": "검토 대기 중",
+      "recent": "최근 기록됨",
+      "recentEmpty": "아직 기록된 것이 없습니다",
+      "pendingEmpty": "대기 중인 항목 없음"
+    },
+    "subagents": {
+      "title": "서브에이전트",
+      "empty": "이 대화에 서브에이전트가 없습니다",
+      "back": "서브에이전트로 돌아가기",
+      "loading": "트랜스크립트 불러오는 중…",
+      "notFound": "디스크에 아직 트랜스크립트가 없습니다",
+      "failed": "트랜스크립트를 읽을 수 없습니다",
+      "live": "실시간",
+      "showEarlier": "이전 단계 표시",
+      "openRow": "{{name}}의 트랜스크립트 읽기"
+    },
+    "open": "{{name}} 열기",
+    "collapse": "접기",
+    "dragHint": "다른 슬롯으로 드래그",
+    "pin": {
+      "label": "이 세션",
+      "title": "열어 둔 채팅에서 생성됨"
+    }
   }
 }

@@ -184,6 +184,7 @@ export function useChatRealtimeHandlers({
         // sessionId of its own inherits the viewed session's and is appended to the open
         // transcript, evicting real messages from the realtime buffer as it goes.
         case 'runner_state':
+        case 'soul_launch_state':
           return;
 
         default:

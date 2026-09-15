@@ -17,3 +17,9 @@ export { closeSessionsWatcher } from './services/sessions-watcher.service.js';
 // readoptKeepaliveSessions: used by server/index.ts to give every CLI that outlived
 // the API its registry run back, before the server starts listening (D-11).
 export { readoptKeepaliveSessions } from './list/claude/session-host/index.js';
+
+// readClaudeTranscriptBySessionId: used by the dispatch-souls module to read a launched soul's own
+// Claude transcript from the session id its launch recorded. A soul has no app session row, so its
+// provider session id is the only handle on the file, and this module is the one that knows where
+// Claude keeps it.
+export { readClaudeTranscriptBySessionId } from './list/claude/claude-transcript-activity.js';

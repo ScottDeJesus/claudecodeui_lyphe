@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next';
 
-import { useElapsed } from '@/modules/plan-runner/hooks/useElapsed';
+import { useElapsed } from '@/shared/hooks/useElapsed';
 import { useRunnerVerbs } from '@/modules/plan-runner/hooks/useRunnerVerbs';
 import { PhaseRow } from '@/modules/plan-runner/PhaseRow';
 import { PipelineStrip } from '@/modules/plan-runner/PipelineStrip';

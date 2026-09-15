@@ -36,6 +36,8 @@ export type UserPreferences = {
   planRunner: unknown;
   /** Composer toggle: every sent message rides under the `/plain` command. See `usePlainModePreference`. */
   plainMode: boolean;
+  /** Where each chat-gutter widget sits and whether it is open. See `modules/chat-gutters/hooks/useGutterPlacements.ts`. */
+  chatGutters: unknown;
 };
 
 export type UserPreferenceKey = keyof UserPreferences;
@@ -81,6 +83,7 @@ const LEGACY_STORAGE_KEYS: Record<UserPreferenceKey, string | null> = {
   chatFontSize: null,
   planRunner: null,
   plainMode: null,
+  chatGutters: null,
 };
 
 const PREFERENCE_KEYS = Object.keys(LEGACY_STORAGE_KEYS) as UserPreferenceKey[];

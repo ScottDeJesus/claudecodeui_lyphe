@@ -162,7 +162,7 @@ Put frames in state instead and two frames arriving in the same tick collapse in
 render carrying only the later one. A listener that throws is caught individually
 (`:63-67`) so it cannot take the others down with it.
 
-There are eight `useWebSocket()` call sites. Four of them are rowed below, and two of those
+There are ten `useWebSocket()` call sites. Five of them are rowed below, and two of those
 immediately hand `subscribe` to the hook that does the real work:
 
 | Call site | Handler | Frames it acts on | State it owns |
@@ -171,9 +171,10 @@ immediately hand `subscribe` to the hook that does the real work:
 | `ProjectWorkspaceRoute.tsx:32` | `useProjectsState` | `session_upserted`, `loading_progress`, `websocket_reconnected`, plus a sessionId-keyed "attention" marker for background sessions | project list, sidebar rows, session aliasing, selection |
 | `TaskMasterContext.tsx:102` | itself | `taskmaster-project-updated`, `taskmaster-tasks-updated` (`type`-keyed) | task board data |
 | `RunnerFeed.tsx` | itself | `runner_state`, `websocket_reconnected` | none of its own — it publishes the retained runner topics into the live bus |
+| `SoulLaunchFeed.tsx` | itself | `soul_launch_state`, `websocket_reconnected` | none of its own — it publishes the retained `souls:*` topic into the live bus ([dispatch-souls.md](../dispatch-souls.md)) |
 
-The four the table does not row — `useRestartOnInstalledCli.ts`, `useGitDelegation.ts`,
-`useSimpleChatList.ts` and `useSimpleChatRemove.ts` — are later arcs' call sites that take
+The five the table does not row — `useSessionPresence.ts`, `useRestartOnInstalledCli.ts`,
+`useGitDelegation.ts`, `useSimpleChatList.ts` and `useSimpleChatRemove.ts` — are later arcs' call sites that take
 `subscribe` or `sendMessage` straight into their own hooks rather than owning a slice of the
 frame vocabulary; re-grep before quoting the number, because it grows with every such arc.
 
@@ -306,6 +307,7 @@ Two kinds in those unions never appear where you would look for them:
 | `session_upserted` | `session-upsert-broadcast.service.ts:81-105` | `useProjectsState` — sidebar rows and alias folding |
 | `loading_progress` | `projects-with-sessions-fetch.service.ts:164-175` | `useProjectsState` — project scan progress (`:720-736`) |
 | `runner_state` | `plan-runner/runner-watcher.service.ts` | The plan runner's live runs, pushed on change. Not consumed by the chat handler, which returns early on it |
+| `soul_launch_state` | `dispatch-souls/dispatch-souls.module.ts` | The launcher souls a `/dispatch` started, pushed on change. `SoulLaunchFeed` publishes it into the live bus; the chat handler returns early on it too, in the same `case` group |
 
 ### The one exception
 
@@ -544,6 +546,7 @@ flowchart TD
     SET --> E2["session_upserted"]
     SET --> E3["taskmaster frames"]
     SET --> E4["runner_state"]
+    SET --> E6["soul_launch_state"]
   end
   subgraph PerRun["Per-run, this run's audience only"]
     W["ChatSessionWriter connections set"]
@@ -551,14 +554,21 @@ flowchart TD
   end
 ```
 
-There are four broadcasters over that set, not three: `loading_progress`, `session_upserted`, the
-Task Master frames, and the plan-runner watcher (`server/modules/plan-runner/`), which polls the
-runner's state directory every two seconds and puts a frame on the wire only when the picture
-actually changed — a live→stale flip included, since that is a change in the snapshot like any
-other. Its dedup records a picture as sent only AFTER the send returns, so a broadcast that throws
-part-way is re-sent on the next tick instead of being suppressed as unchanged — the frame carries the
-whole picture, so a client receiving it twice receives it once. It reaches `connectedClients` through
-the websocket module's own barrel, never a deep import.
+There are five broadcasters over that set: `loading_progress`, `session_upserted`, the Task Master
+frames, and the TWO STATE LANES — the plan-runner watcher (`server/modules/plan-runner/`) over the
+runner's state directory, and the launcher-souls lane (`server/modules/dispatch-souls/`) over
+`~/.claude/state/dispatch-souls/`. Both poll every two seconds and put a frame on the wire only when
+the picture actually changed — a live→stale flip included, since that is a change in the snapshot
+like any other. The dedup records a picture as sent only AFTER the send returns, so a broadcast that
+throws part-way is re-sent on the next tick instead of being suppressed as unchanged — the frame
+carries the whole picture, so a client receiving it twice receives it once. Both reach
+`connectedClients` through the websocket module's own barrel, never a deep import.
+
+That loop is written once, in `server/shared/polled-lane.service.ts` (`createPolledLane`); each lane
+supplies only its own `snapshot` and `frame`. Reasoning that belongs to polling-rather-than-watching
+lives there, not in either lane. The launcher lane's own half — what it reads off a launch directory,
+how it classifies a soul and which provider its pin paints — is
+[dispatch-souls.md](../dispatch-souls.md).
 
 A socket joins `connectedClients` when `handleChatConnection` runs
 (`chat-websocket.service.ts:589`) and leaves on close (`:632`) — closing a tab removes a

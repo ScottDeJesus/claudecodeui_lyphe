@@ -39,6 +39,13 @@ That is the law; this note only says how the law is wired into this repo.
    the wrong way round is how the sidebar's most important label went under AA. A name whose
    `var()` points at no existing token is rule 2's second palette in a Tailwind spelling.
 
+   A module carries its own stylesheet only where a selector must reach markup no className can: a
+   scope class's descendants, `:has()`, `::marker`. It still spells Tailwind names through `@apply`,
+   the transcript's named `md-body`, `md-meta`, `md-code` and `md-stat` sizes included, and there are
+   two today, side by side under `src/modules/chat/transcript/`: `markdownCards.css`
+   ([08-rendered-shapes.md](../../../../docs/architecture/08-rendered-shapes.md) §"Element cards")
+   and `shapes/shapeMotion.css` (its §"Header, type and motion").
+
 4. **Tone is a token swap, not a rule.** Put `data-tone="neutral|info|positive|warn|danger"`
    (the `Tone` type in `src/shared/types.ts`) on a container and the five `[data-tone]` rules
    hand `--tone-soft`, `--tone-ink`, `--tone-dot` and `--tone-glyph` to everything inside it by
@@ -46,6 +53,16 @@ That is the law; this note only says how the law is wired into this repo.
    spellings for one state is what the swap exists to prevent. `warn` covers errors; red is
    kept for destructive or denied. `Badge` is the first consumer: its `tone` prop lands as
    `data-tone` on the badge, and `.vv-badge` reads `--tone-soft` / `--tone-ink` from there.
+
+   The marker vocabulary is not only tone. `data-vv-enter` on a container is the ENTRANCE marker — a
+   container carrying it plays its entrance — and the library reads it in one place: `tokens.css`'s
+   `[data-vv-enter] .vv-meter__fill` runs `@keyframes vv-meter-grow`, a `from` frame only, because a
+   meter's end state is its inline `transform: scaleX(p)` and a `to` frame with a fill would pin
+   every bar at full width. That rule sits inside a `prefers-reduced-motion: no-preference` query, so
+   a reader who asked for less motion gets a still meter. The chat sets the marker, on the frames it
+   draws and only on a card the reader has not watched arrive
+   ([08-rendered-shapes.md](../../../../docs/architecture/08-rendered-shapes.md) §"Header, type and
+   motion"); a bare `.vv-meter` under no such marker never animates.
 
 5. **Colour animates only across a theme flip.** `body.vv-anim` sets a transition with
    `!important` on every element. `ThemeContext.toggleDarkMode` adds it for 500 ms around the
@@ -60,6 +77,16 @@ That is the law; this note only says how the law is wired into this repo.
    and only the eight Verve has no word for are literals, quarantined in one `INVENTED_LIGHT_ANSI`
    block. The dark sixteen stay as they are, in `useShellTerminal`'s `TERMINAL_OPTIONS`. Which
    measurement forced each choice is in that file's own header — doctrine §7's method, applied.
+
+7. **A library piece's text size is a custom-property swap too, the same shape as rule 4's tone.**
+   `.vv-badge`, `.vv-chip`, `.vv-meter__label`, `.vv-banner` and `.vv-tabs__tab` (both its filled and
+   underline registers) spell their `font-size` as `var(--vv-text-meta, <literal>)` or, for `Banner`,
+   `var(--vv-text-body, <literal>)`, in `controls.css`/`feedback.css`. Neither property is declared
+   here: a rendered shape's frame is the one thing that sets them, on `[data-text-scale="flow"]` in
+   `tokens.css`, so a library piece a shape composes inherits the reader's chat text size and the
+   same piece built bare — outside any frame — falls back to the literal it always had. The frame
+   side of the swap, and the five named sizes it stands beside, is
+   [08-rendered-shapes.md](../../../../docs/architecture/08-rendered-shapes.md) §"Header, type and motion".
 
 ## The library those tokens paint
 

@@ -90,6 +90,7 @@ This is the shared vocabulary every document uses. Both unions are declared in
 | `session_upserted` | gateway | Sidebar delta. Owned by the projects state, not by chat. |
 | `loading_progress` | gateway | Project scan progress. |
 | `runner_state` | gateway | The plan runner's runs, pushed on change. |
+| `soul_launch_state` | gateway | The launcher souls a `/dispatch` started, pushed on change. Feeds the soul pins in the strip above the composer when the desktop chat gutters are not showing, and in the gutter's Subagents widget while they are ([dispatch-souls.md](../dispatch-souls.md)). |
 | `protocol_error` | gateway | The request was rejected or never started. No `complete` follows. |
 
 One more kind never crosses the wire: **`websocket_reconnected`** is synthesized inside

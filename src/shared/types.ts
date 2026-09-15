@@ -1,4 +1,5 @@
 import type { TFunction } from 'i18next';
+import type { ReactNode } from 'react';
 import type { NavigateFunction } from 'react-router-dom';
 
 //----------------- LLM PROVIDER MODEL CATALOG ------------
@@ -1382,6 +1383,8 @@ export type NotificationPreferencesState = {
     error: boolean;
     /** The usage-limit family: limit reached, reset, warning, overage, out of credits. */
     limits: boolean;
+    /** Background work that finished after its turn ended: a wait or a subagent returning. Off by default. */
+    background: boolean;
   };
 };
 
@@ -1833,23 +1836,31 @@ export type DescentUsage =
 // documented against Descent's behaviour; a change to either shape belongs in both files at once.
 
 /**
- * One row of the memory-intake queue: enough to decide on, never enough to read.
+ * One row of a memory-intake list: enough to decide on, never enough to read. One lean shape serves
+ * BOTH lists, so `status` says which one the row came back under — `pending` in the review queue,
+ * `approved` on the filed list — and `assertedPath` is set only on an approved row.
  * `refusal` is the cap guard's own words about the last refused approve — the card is STILL
  * pending, so the row renders that text, and because Descent recorded it the text survives a
  * refresh and reaches every other tab too.
+ * `sessionId` is the APP session id of the chat that proposed the memory — Descent's unverified
+ * provenance column, resolved on the server, display only: a list may mark a row as this chat's,
+ * and nothing gates on it. `null` when the staging supplied none.
  */
-export type MemoryCandidateLean = { id: string; name: string; target: string; project: string | null; status: string; source: string | null; assertedPath: string | null; refusal: string | null; createdAt: string | null; reviewedAt: string | null };
+export type MemoryCandidateLean = { id: string; name: string; target: string; project: string | null; status: string; source: string | null; assertedPath: string | null; refusal: string | null; createdAt: string | null; reviewedAt: string | null; sessionId: string | null };
 
 /**
  * One candidate read whole — fetched only for the row a person actually expanded.
  * `body`, `rationale` and `indexLine` are operator-authored free text: each reaches the DOM as
  * a text node, never as markdown and never as markup, however much like markdown it looks.
+ * `sessionId` is inherited from the lean row rather than declared here, so a card read whole and
+ * the same card in a list can never disagree about which chat proposed it.
  */
-export type MemoryCandidateFull = MemoryCandidateLean & { body: string; indexLine: string | null; rationale: string | null; sessionId: string | null };
+export type MemoryCandidateFull = MemoryCandidateLean & { body: string; indexLine: string | null; rationale: string | null };
 
 /**
- * The pending queue, or the calm reason there is none — a read never fails.
- * `reachable: false` is NOT "zero pending": the count is 0 and the tab hides, but the panel
+ * One memory list — the review queue, or the filed memories when the read asked for them — or the
+ * calm reason there is none; a read never fails.
+ * `reachable: false` is NOT "nothing left": the list is empty and the panel
  * says Descent could not be read in words. It must never render as "All filed".
  */
 export type MemoryPending =
@@ -1903,6 +1914,31 @@ export type CliVersionReport = { installed: string | null; reason: string | null
 
 // ---------------------------
 
+//----------------- DEEPSEEK BALANCE ------------
+// The client mirror of `GET /api/deepseek/balance` (`server/shared/types.ts` § DEEPSEEK
+// CONTRACTS, where every field is documented against the vendor's own body). One reading, drawn
+// in two registers by the accounts module: the row under the account name, and the panel.
+
+/**
+ * The money left on this host's DeepSeek account, or the calm reason there is none.
+ * `total` is the vendor's own decimal STRING — never parsed to a number here, because a balance
+ * put through a float is a balance that can come back a cent short. `currency` is the vendor's
+ * code (`USD`, `CNY`), and the two together are what the row draws as money.
+ *
+ * `available: false` is a REAL reading — the vendor answered and said the account can no longer
+ * serve requests — so it is never folded into the unknown: the figure still shows, and the words
+ * under it say what the vendor said.
+ *
+ * With `reachable: false` the `reason` is the server's own word — `unconfigured` (no key on this
+ * host), `auth` (the vendor refused the key), `timeout`, `unreachable`, or `bad-response`. Every
+ * one of them draws the same calm em-dash; the word only decides the sentence under it.
+ */
+export type DeepseekBalance =
+  | { reachable: true; available: boolean; currency: string; total: string; checkedAt: number }
+  | { reachable: false; reason: string };
+
+// ---------------------------
+
 //----------------- LIVE WIDGETS ------------
 
 /** Frame → host: what a sandboxed widget's bridge script posts up to the page embedding it. */
@@ -1934,6 +1970,20 @@ export type WidgetBodyShape =
   | { kind: 'html' }
   | { kind: 'docspace'; ref: DocSpaceBlockRef }
   | { kind: 'invalid'; reason: string };
+
+/**
+ * A live embed's identity, handed to a caller's framer: which kind it is, and the studio link for a
+ * DocSpace block (null for an HTML widget). Built by WidgetFrame; read by the chat transcript's
+ * EmbedFrame.
+ */
+export type WidgetEmbed = { kind: 'html' | 'docspace'; studioUrl: string | null };
+
+/**
+ * Wraps a LIVE embed. WidgetFrame calls it on its two live branches only, behind its mount and
+ * streaming gates, never for the source `<pre>` or the error card. Passed by the chat transcript's
+ * CodeBlock.
+ */
+export type WidgetEmbedFramer = (embed: WidgetEmbed, live: ReactNode) => ReactNode;
 
 /**
  * A topic is a NAME, never an address. The host owns the vocabulary and `isAllowedTopic`
@@ -1974,11 +2024,55 @@ export type RunnerPhaseRow = { rank: number; id: string; title: string; state: R
 export type RunnerTimelineEntry = { at: string; phase_id: string; stage: string; detail: string };
 /** Where the run stands, from `progress.json.position`. `stage_since` is epoch SECONDS, like every timestamp inside a snapshot. */
 export type RunnerPosition = { rank: number; total: number; phase_id: string; title: string; remain: number; pipeline: string; stage: string; stage_detail: string; stage_since: number };
-/** One run as the lane reads it off disk. `position` is `null` while the runner has not composed one yet, which a live run does show in its first seconds. `blocked_causes` is the receipt's phase id → cause map, `{}` until the run ends — the only record of a phase halted on a crash or a budget, whose row never turns `blocked`. */
-export type RunnerRunSnapshot = { run_id: string; plan_path: string; plan_title: string; state: RunnerRunState; status: string; started_at: number; heartbeat_at: number; stopped_at: number | null; outcome: string | null; ended_at: number | null; blocked_causes: Record<string, string>; pid: number | null; position: RunnerPosition | null; phases: RunnerPhaseRow[]; spawns: number; max_spawns: number; cost_usd: number; plan_runs: number; plan_spawns: number; plan_cost_usd: number; plan_planning_usd: number; plan_review_usd: number; plan_scouts_usd: number; plan_total_usd: number; tokens: number; plan_tokens: number; line: string; timeline: RunnerTimelineEntry[] };
+/** One run as the lane reads it off disk. `position` is `null` while the runner has not composed one yet, which a live run does show in its first seconds. `blocked_causes` is the receipt's phase id → cause map, `{}` until the run ends — the only record of a phase halted on a crash or a budget, whose row never turns `blocked`. `launched_by_session` is the APP session id of the chat whose turn launched the run — the server resolves it before the snapshot is sent, so it is safe to compare against the open chat; `null` when the run names none. */
+export type RunnerRunSnapshot = { run_id: string; plan_path: string; plan_title: string; state: RunnerRunState; status: string; started_at: number; heartbeat_at: number; stopped_at: number | null; launched_by_session: string | null; outcome: string | null; ended_at: number | null; blocked_causes: Record<string, string>; pid: number | null; position: RunnerPosition | null; phases: RunnerPhaseRow[]; spawns: number; max_spawns: number; cost_usd: number; plan_runs: number; plan_spawns: number; plan_cost_usd: number; plan_planning_usd: number; plan_review_usd: number; plan_scouts_usd: number; plan_total_usd: number; tokens: number; plan_tokens: number; line: string; timeline: RunnerTimelineEntry[] };
 /** The whole picture, pushed on change over `/ws`. `runs` is ordered by `started_at` ascending. `at` is epoch MILLISECONDS, unlike every field inside a snapshot. */
 export type RunnerStateEvent = { kind: 'runner_state'; runs: RunnerRunSnapshot[]; at: number };
 /** The two verbs the server may relay. Starting a run is `/execute`'s act, never a button's. */
 export type RunnerVerb = 'stop' | 'resume';
 /** What one relayed verb did. A refusal is a RESULT, not an error: `stderr` carries the runner's own line whole so the reader sees the verdict rather than our paraphrase. */
 export type RunnerVerbResult = { ok: boolean; verb: RunnerVerb; run_id: string; exit: number | null; stdout: string; stderr: string; reason?: 'timeout' | 'spawn-failed' };
+/** How a launcher soul is going while it is out, and how it ended once its receipt landed. `stopped` is a cap, not a fault; the pinned agents keep the same two words apart for the same reason. */
+export type SoulLaunchState = 'running' | 'completed' | 'failed' | 'stopped';
+/** One launcher soul — a `/dispatch` hand started through `plan-runner soul` — as its pin draws it. `provider` is the one the pin PAINTS: `result.json`'s word once it landed, `spec.json`'s pin before then. `cost_usd`, `tokens` and `duration_s` are `null` until the receipt lands. */
+export type SoulLaunchSnapshot = { launch_id: string; role: string; agent: string; brief: string; provider: 'deepseek' | 'claude'; blocked: boolean; state: SoulLaunchState; status: string; cause: string; started_at: number; ended_at: number | null; duration_s: number | null; cost_usd: number | null; tokens: number | null };
+/** The whole picture, pushed on change over `/ws`. `launches` is ordered by `started_at` ascending. `at` is epoch MILLISECONDS, unlike every field inside a snapshot. */
+export type SoulLaunchStateEvent = { kind: 'soul_launch_state'; launches: SoulLaunchSnapshot[]; at: number };
+
+// ---------------------------
+//----------------- CHAT GUTTERS ------------
+// The desktop chat's side gutters: optional widgets beside the transcript, each draggable between
+// the four slots. The placement is a setting the client owns (it never reaches the server), so
+// these types describe a stored shape rather than a wire one.
+
+/** Where a widget may sit beside the chat transcript. Two slots per side, so a widget dragged to a
+ *  new corner keeps its column and only changes its end. */
+export type GutterSlotId = 'top-left' | 'bottom-left' | 'top-right' | 'bottom-right';
+
+/** The three widgets a chat gutter can hold: the plan-runner runs of the open session, the
+ *  memory-intake rows proposed by it, and the subagents that session has pinned. These are the ids
+ *  the DOM carries as `data-widget`, and the keys `useGutterPlacements` stores its records under. */
+export type GutterWidgetId = 'runner' | 'memory' | 'subagents';
+
+/** One widget's corner and whether it is expanded. A collapsed widget is still placed — it draws as
+ *  a tab in its slot, which is what makes `open` a separate fact from `slot` rather than a third
+ *  value of it. */
+export type GutterWidgetPlacement = { slot: GutterSlotId; open: boolean };
+
+/** Every widget's placement, as stored in `UserPreferences.chatGutters`. A record rather than a pair
+ *  of fields because a widget is addressed by its own id everywhere else in this feature, and a
+ *  widget added later costs one member here rather than a second parallel field. */
+export type ChatGutterPlacements = Record<GutterWidgetId, GutterWidgetPlacement>;
+
+// ---------------------------
+//----------------- SUBAGENT TRANSCRIPTS ------------
+/** What one subagent transcript read answers, mirrored byte-for-byte from the server's `server/shared/types.ts`. `found` is `false` when the session, provider, file or launch cannot be resolved — then `activity` is empty, `total` is 0, `inFlight` is `false` and `finishedAt` is `null`, and "not found" is a 200 carrying this shape, never an HTTP error. `activity` is the LAST 1000 entries (the server's `SUBAGENT_TRANSCRIPT_LIMIT`), each truncated, and `total` is the untruncated count. */
+export type SubagentTranscriptResult = { found: boolean; activity: SubagentActivity[]; total: number; inFlight: boolean; finishedAt: string | null };
+
+// ---------------------------
+//----------------- CHAT SUBAGENT WIDGET ------------
+/** What the chat publishes for its Subagents widget: the session the rows belong to, the agent container rows of the history the chat has loaded, and the launcher-soul ids that same history anchored. Scoped by `sessionId`, which the widget checks before drawing anything — rows tagged with another chat are refused, not shown. */
+export type ChatSubagentSource = { sessionId: string; agentMessages: ChatMessage[]; soulLaunchIds: string[] };
+
+/** What the widget's transcript view is open on: an `Agent`-tool row addressed by the tool call that spawned it (`id` is that call's `tool_id`), or a launcher soul addressed by its launch id. */
+export type SubagentTranscriptTarget = { kind: 'agent' | 'soul'; id: string };

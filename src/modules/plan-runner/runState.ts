@@ -6,7 +6,7 @@ import type { RunnerPhaseState, RunnerRunSnapshot, RunnerRunState, Tone } from '
  * Everything here is a total function of a snapshot the server already sent. Nothing polls,
  * nothing fetches and nothing remembers: a card that needs a fact about a run asks one of these,
  * so two screens reading the same run can never disagree about what colour it is or how far it
- * has got. The elapsed clocks are the one exception and they live in `hooks/useElapsed.ts`,
+ * has got. The elapsed clocks are the one exception and they live in `@/shared/hooks/useElapsed`,
  * because a clock is the only thing here that changes without the data changing.
  */
 
@@ -134,4 +134,25 @@ export function phaseProgress(run: RunnerRunSnapshot): { shipped: number; total:
   const total = phases.length;
   const shipped = phases.filter((phase) => phase.state === 'shipped').length;
   return { shipped, total, percent: total === 0 ? 0 : Math.round((shipped / total) * 100) };
+}
+
+/**
+ * Where a run is ranked in the list, and it is a reading of URGENCY rather than of recency.
+ *
+ * LIVE first because something is happening to it right now. STALE second because a lapsed
+ * heartbeat is the one state that may want a hand — it is the reason a person opens this tab
+ * unprompted. PAUSED last because a parked run is parked on purpose: the operator stopped it, and
+ * a list that raised their own decision above a run in trouble would be the app arguing with them.
+ * ENDED last of all — nothing more will happen to it; it is there to be read and dismissed — and
+ * within ENDED the most recent ending first, since that is the one the operator came to see.
+ *
+ * Reversible in one place, by design (the plan's own reversible default): change these three
+ * numbers and the order changes, with nothing else to find.
+ */
+export const STATE_ORDER: Record<RunnerRunState, number> = { live: 0, stale: 1, paused: 2, ended: 3 };
+
+/** State first, then newest first inside each state — by its ending for an ended run, its start otherwise. */
+export function byUrgencyThenNewest(a: RunnerRunSnapshot, b: RunnerRunSnapshot): number {
+  const recency = (run: RunnerRunSnapshot) => run.ended_at ?? run.started_at;
+  return STATE_ORDER[a.state] - STATE_ORDER[b.state] || recency(b) - recency(a);
 }

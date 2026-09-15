@@ -110,6 +110,11 @@
     "showAllCommands": "Tüm komutları göster",
     "plainMode": "Sade",
     "plainModeTooltip": "Her mesajı /plain ile gönder: kısa, kolay okunur yanıtlar",
+    "deepseekFlash": "DeepSeek Flash",
+    "deepseekFlashShort": "Flash",
+    "deepseekFlashTooltip": "Bu açıkken plan runner yapı ruhları — builder, düzeltme turu ve Athena — DeepSeek Flash üzerinde çalışır. Prometheus ve izciler Claude üzerinde kalır.",
+    "deepseekFlashReading": "Anahtar okunuyor…",
+    "deepseekFlashUnreadable": "Anahtar okunamadı — tekrar denemek için basın.",
     "clearInput": "Girdiyi temizle",
     "scrollToBottom": "En alta git"
   },
@@ -274,6 +279,7 @@
     "showAllLines": "{{count}} satırın tümünü göster",
     "showLess": "Daha az göster",
     "openFile": "{{path}} dosyasını aç",
+    "openInArchPulse": "ArchPulse'ta aç",
     "titles": {
       "table": "Tablo",
       "options": "Seçenekler",
@@ -288,7 +294,9 @@
       "diff": "Diff",
       "output": "Çıktı",
       "diagram": "Diyagram",
-      "code": "Kod"
+      "code": "Kod",
+      "widget": "Widget",
+      "docspace": "DocSpace bloğu"
     },
     "alert": {
       "note": "Not",

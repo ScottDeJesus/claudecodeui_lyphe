@@ -103,3 +103,13 @@ carries this in its own clause: anything that should persist, be edited by the r
 later turn is steered toward a DocSpace block instead of a one-off HTML fence. The full protocol
 both frames speak is still [architecture/07-live-widgets.md](architecture/07-live-widgets.md)
 §"The DocSpace kind".
+
+A LIVE embed of either kind wears the same card header every other shape in the transcript wears:
+the chat hands `WidgetFrame` an `EmbedFrame`, which draws one `ShapeFrame` — `Widget` for an HTML
+fence, `DocSpace block` for a DocSpace one — and, for a DocSpace block, an `Open in ArchPulse`
+action pointing at that block's own studio deep link. It stops short of the two cases where there
+is no live element to dress: a fence still being streamed and a fence in an exported document both
+keep the raw source they have always had, with no header and no card over it. That is why the frame
+is a FUNCTION passed in rather than a wrapper drawn around `WidgetFrame` — it is applied from
+behind that component's mount and streaming gates, which is the only place that knows whether a
+live frame exists at all.

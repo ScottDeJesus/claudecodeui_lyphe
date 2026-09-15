@@ -139,7 +139,8 @@
       "actionRequired": "需要处理",
       "stop": "运行已停止",
       "error": "运行失败",
-      "limits": "用量上限"
+      "limits": "用量上限",
+      "background": "Background agents finished"
     },
     "ntfy": {
       "title": "手机推送 (ntfy)",
@@ -350,6 +351,11 @@
       }
     },
     "connectionStatus": "连接状态",
+    "runnerModel": {
+      "label": "构建之魂使用 DeepSeek Flash",
+      "description": "plan runner 将构建者、修复轮与 Athena 派发到 DeepSeek 的 deepseek-flash，而不是 Claude Opus。Prometheus、侦察者与重规划者仍留在 Claude。下一阶段生效。",
+      "unreadable": "无法从服务器读取该开关，因此其位置未知——这与关闭不同。每当此页面重新获得焦点时都会重试。"
+    },
     "login": {
       "title": "登录",
       "reAuthenticate": "重新认证",

@@ -42,6 +42,9 @@ export function createSettingsRouter(
   router.put('/notification-preferences', respond((req) => service.updateNotificationPreferences(
     userId(req), req.body ?? {},
   )));
+  // Host-wide, not per-user: the switch steers one plan-runner daemon, so no `userId` is read.
+  router.get('/deepseek-flash', respond(() => service.getDeepseekFlash()));
+  router.put('/deepseek-flash', respond((req) => service.setDeepseekFlash(req.body?.enabled)));
   router.get('/push/vapid-public-key', respond(() => service.getVapidPublicKey()));
   router.post('/push/subscribe', respond((req) => service.subscribeToPush(userId(req), req.body ?? {})));
   router.post('/push/unsubscribe', respond((req) => service.unsubscribeFromPush(

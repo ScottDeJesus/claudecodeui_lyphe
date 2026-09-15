@@ -20,6 +20,13 @@ type ParsedSession = {
 };
 
 /**
+ * The ONE home of the Claude transcript layout. This synchronizer's recursive scan below reads it,
+ * and `claude-transcript-activity.ts` joins a provider session id under one of these directories
+ * when the database holds no transcript path for it. Nothing else may spell the layout out.
+ */
+export const CLAUDE_PROJECTS_ROOT = path.join(os.homedir(), '.claude', 'projects');
+
+/**
  * Session indexer for Claude transcript artifacts.
  */
 export class ClaudeSessionSynchronizer implements IProviderSessionSynchronizer {
@@ -49,7 +56,7 @@ export class ClaudeSessionSynchronizer implements IProviderSessionSynchronizer {
   async synchronize(since?: Date): Promise<number> {
     const nameMap = await buildLookupMap(path.join(this.claudeHome, 'history.jsonl'), 'sessionId', 'display');
     const files = await findFilesRecursivelyCreatedAfter(
-      path.join(this.claudeHome, 'projects'),
+      CLAUDE_PROJECTS_ROOT,
       '.jsonl',
       since ?? null
     );

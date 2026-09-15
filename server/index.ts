@@ -50,7 +50,9 @@ import {
 import browserUseRoutes from './modules/browser-use/browser-use.routes.js';
 import { assetsRoutes } from './modules/assets/index.js';
 import { createCliVersionModule } from './modules/cli-version/index.js';
+import { createDeepseekModule } from './modules/deepseek/index.js';
 import { createDescentModule } from './modules/descent/index.js';
+import { createDispatchSoulsModule } from './modules/dispatch-souls/index.js';
 import { createPlanRunnerModule } from './modules/plan-runner/index.js';
 import { fileTreeRoutes } from './modules/file-tree/index.js';
 import { worktreesRoutes } from './modules/worktrees/index.js';
@@ -185,11 +187,21 @@ app.use('/api/descent', authenticateToken, createDescentModule());
 // Installed CLI version + what the live runs are on (protected)
 app.use('/api/cli-version', authenticateToken, createCliVersionModule());
 
+// The money left on this host's DeepSeek account (protected) — a different account from the
+// Claude slots Descent holds, read from the vendor directly with the key in this host's .env.
+app.use('/api/deepseek', authenticateToken, createDeepseekModule());
+
 // The plan runner's live runs, and the relay for its own stop/resume (protected).
 // Built once here rather than inline: the poll behind its websocket frame is started after
 // `listen` and stopped on shutdown, so the module has to be something both can name.
 const planRunner = createPlanRunnerModule();
 app.use('/api/plan-runner', authenticateToken, planRunner.router);
+
+// The launcher souls a `/dispatch` started — the poll behind the `soul_launch_state` frame that
+// pins each one in its own chat's rows (protected). Built out here for the same
+// reason `planRunner` is: its poll starts after `listen` and stops on shutdown.
+const dispatchSouls = createDispatchSoulsModule();
+app.use('/api/dispatch-souls', authenticateToken, dispatchSouls.router);
 
 app.use('/api/notifications', authenticateToken, notificationRoutes);
 app.use('/api/ntfy/act', createNtfyActionRoutes({ runtime: providerRuntimeService })); // Public: ntfy buttons authenticate by signed token, not JWT.
@@ -414,6 +426,9 @@ async function startServer() {
             // frames it broadcasts are for sockets this server is only now able to accept.
             planRunner.start();
 
+            // The launcher souls, read off their own state root and broadcast the same way.
+            dispatchSouls.start();
+
             // Watch live runs for silence. Same placement and the same reason: the
             // notification it sends is about runs this server is now able to host.
             stopRunStallWatchdog = startRunStallWatchdog();
@@ -426,6 +441,7 @@ async function startServer() {
             // process new connections. Never awaited — open WebSockets keep it from resolving.
             server.close();
             planRunner.stop();
+            dispatchSouls.stop();
             stopRunStallWatchdog?.();
             try {
                 await browserUseService.stopAllSessions();

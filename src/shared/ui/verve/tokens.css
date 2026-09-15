@@ -168,6 +168,9 @@
 @keyframes vv-drift{0%{transform:translate(0,0) scale(1)}33%{transform:translate(60px,-40px) scale(1.15)}66%{transform:translate(-40px,30px) scale(0.95)}100%{transform:translate(0,0) scale(1)}}
 @keyframes vv-drift2{0%{transform:translate(0,0) scale(1)}50%{transform:translate(-70px,50px) scale(1.2)}100%{transform:translate(0,0) scale(1)}}
 @keyframes vv-draw{from{stroke-dashoffset:1}to{stroke-dashoffset:0}}
+/* vv-meter-grow has no to-frame: a meter's end state is its inline transform: scaleX(p) (Meter.tsx), and a to{transform:none} with fill would pin every bar at full width. */
+@keyframes vv-meter-grow{from{transform:scaleX(0)}}
+@media screen and (prefers-reduced-motion: no-preference){[data-vv-enter] .vv-meter__fill{animation:vv-meter-grow var(--dur-move) var(--ease-enter) backwards}}
 .vv-skeleton{border-radius:6px;background:linear-gradient(90deg,var(--surface2) 25%,var(--border) 50%,var(--surface2) 75%);background-size:400px 100%;animation:vv-shimmer 1.4s infinite linear}
 /* The one keyframe a screen names directly: a live status mark breathing. Verve spends it on a
    conversation that is working right now (prototype :101). It carries NO colour — the element
@@ -200,3 +203,6 @@ button:focus-visible,input:focus-visible,a:focus-visible,[tabindex]:focus-visibl
 [data-tone="positive"]{--tone-soft:var(--pos-soft);--tone-ink:var(--pos-ink);--tone-dot:var(--pos-dot);--tone-glyph:"✓"}
 [data-tone="warn"]{--tone-soft:var(--warn-soft);--tone-ink:var(--warn-ink);--tone-dot:var(--warn-dot);--tone-glyph:"▲"}
 [data-tone="danger"]{--tone-soft:var(--danger-soft);--tone-ink:var(--danger-ink);--tone-dot:var(--danger-dot);--tone-glyph:"✕"}
+
+/* The size half of §5's swap: the frame sets these two, the library reads them. */
+[data-text-scale="flow"]{--vv-text-body:1em;--vv-text-meta:.875em}

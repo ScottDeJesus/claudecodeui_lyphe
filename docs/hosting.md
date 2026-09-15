@@ -9,7 +9,7 @@ instantly rather than through a rebuild. Nothing here runs `npm run build`; the 
 | Unit | What it is | Bind |
 |---|---|---|
 | `cloudcli-server-dev.service` | `/usr/bin/node deploy/dev-supervisor/supervisor.mjs` — the handover supervisor: it boots each edited server beside the running one and retires the old one only when the new one reports READY; the API and WebSocket gateway are its child | `127.0.0.1:3011` (loopback only) |
-| `cloudcli-client-dev.service` | `node_modules/.bin/vite --host 0.0.0.0 --port 5183 --strictPort` — the client with HMR | `0.0.0.0:5183`, minus the Docker bridges (see below) |
+| `cloudcli-client-dev.service` | `node_modules/.bin/vite --host 0.0.0.0 --port 5183 --strictPort` — the client with HMR, its responses compressed by `vite-plugins/compressResponses.js` (see Rules) | `0.0.0.0:5183`, minus the Docker bridges (see below) |
 | `cloudcli-dev-watchdog.timer` → `.service` | every 60 s, `/usr/local/bin/cloudcli-dev-watchdog.sh` re-asserts the bridge drop, probes `/api/cli-version` on :3011 (any HTTP answer = alive; three misses 5 s apart = dead) and `/src/main.tsx` on :5183 (200; two misses), and restarts the one unit whose canary failed — the supervisor survives a boot that never listened and never boots a replacement of its own, so a FIRST boot that fails leaves `:3011` unanswered with the supervisor still running (a later boot that fails is harmless: the previous server keeps serving), and Vite's transform can wedge, and in every case systemd still reads `active`. After three heals in a row it stops healing and leaves the unit `failed` with one distinct journal line | — |
 | `cloudcli-sessions-tmux.service` | `/usr/bin/tmux -L cloudcli-sessions -f /dev/null new-session -d -s _keepalive sleep infinity` — a do-nothing session holding the tmux server that every chat CLI is spawned into, in a cgroup of its own so the API's restart cannot reach them. Each live turn adds a `<app session id>-<base36>` session beside `_keepalive`, with its socket, journal and meta under `~/.cloudcli/sessions` (mode 0700; `CLOUDCLI_SESSIONS_DIR` moves the directory). `sudo systemctl stop cloudcli-sessions-tmux` is the deliberate "end every live chat session" switch, and `CLOUDCLI_SESSION_KEEPALIVE=0` (or `off`/`false`) in the API's `.env` — unset here, so the feature is on — puts new turns back inside the API process | — (unix sockets under `~/.cloudcli/sessions`) |
 
@@ -51,6 +51,21 @@ Applications Hub (`~/.claude/hub/apps.json`, `http://{host}:5183`).
   each time the reader returns to the tab and reloads then if code changed — never on a timer,
   where another session's edit would reload it mid-read. If a Vite upgrade changes the client
   text it rewrites, the plugin warns and Vite's own reload stands.
+- **Every response Vite compiles or generates is compressed** — transformed modules, `index.html`,
+  source maps, `@vite/client`. Vite frames nothing — no `Content-Encoding`, no `Vary` — so the
+  transformed module graph went out raw, and on a phone's 120ms Tailscale link that is most of the
+  load. Measured on one cold boot: 1,177 requests moving **19.5 MB**, 48.6s, of which ~39s was pure
+  transfer. `vite-plugins/compressResponses.js` wraps `res.end` and brotli/gzips any compressible
+  body ≥1 KB handed to `res.end` before its headers are written, resetting `Content-Length` and
+  appending `Vary: Accept-Encoding` — to the 304 that revalidates such a module too (Vite's own
+  `Vary: Origin` is preserved; a coding sent with `q=0`, or no `Accept-Encoding` at all, gets the
+  raw body). Two kinds of response stream past it raw, by construction: files served off disk from
+  `public/` (`api-docs.html`, `sw.js`, `manifest.json`, the icons), and everything proxied to the API
+  (`/api`, `/ws`) — so no proxied or streamed response is ever buffered or framed twice. Measured after,
+  same harness and profile: **5.9 MB, 29.2s**. This is not a build and does not touch the choice at
+  the top of this file — the same transformed bytes go out in a smaller envelope, HMR is untouched,
+  and a save still lands instantly. It does **not** help a warm load: a warm boot is 588 conditional
+  revalidations carrying no body at all, 176 KB, and that cost is the request count, not the bytes.
 - **A client edit is instant** (HMR over the page's own host); **a server edit hands the API
   over.** The supervisor boots the edited server *beside* the running one and retires the old one
   only once the new one reports READY, so `:3011` is never unanswered: the journal reads
@@ -80,6 +95,18 @@ Applications Hub (`~/.claude/hub/apps.json`, `http://{host}:5183`).
   rule could neither cover a 16th network nor be widened. The watchdog re-inserts the two rules
   every minute, so a `ufw enable`, an `iptables-restore` or a Docker daemon restart reopens the
   port for at most 60 s.
+- **`.env` now carries a live credential, and the API unit hands its whole environment on.**
+  `DEEPSEEK_API_KEY` is the only secret in that file — everything else in it is a port, a path or a
+  window size — and the server unit loads the file with `EnvironmentFile=`, so the key is in the API
+  process's environment and therefore in the environment of the app's shell tab and of every Claude
+  session spawned from it: `userFacingEnv()` in `server/shared/child-env.ts` — the one funnel every
+  such spawn goes through — removes exactly one variable, `TSX_TSCONFIG_PATH`, and hands the rest
+  over, so anyone already past the login can read the key from a prompt. That is the same
+  trust boundary as the pty itself rather than a new hole, but it is a new thing to lose behind it,
+  so the file stays mode 600 and git-ignored, and a key that reaches a log or a transcript is
+  rotated at the vendor rather than deleted from whatever recorded it. Who reads the key, and the
+  boot-once mechanism that decides which copy of it wins, is
+  [`.env.example`](../.env.example) and [deepseek-balance.md](deepseek-balance.md).
 - **ArchPulse's port 8005 must never be proxied through this app.** The chat can embed a live
   DocSpace block, and that iframe is the one frame here that carries `allow-same-origin` — it has
   to, or the block cannot write the reader's edit back through ArchPulse's own API. What keeps

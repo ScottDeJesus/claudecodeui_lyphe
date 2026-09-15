@@ -110,6 +110,11 @@
     "showAllCommands": "Показать все команды",
     "plainMode": "Кратко",
     "plainModeTooltip": "Отправлять каждое сообщение с /plain: короткие, удобные ответы",
+    "deepseekFlash": "DeepSeek Flash",
+    "deepseekFlashShort": "Flash",
+    "deepseekFlashTooltip": "Пока это включено, строительные души plan runner — сборщик, его проход исправлений и Athena — работают на DeepSeek Flash. Prometheus и разведчики остаются на Claude.",
+    "deepseekFlashReading": "Чтение переключателя…",
+    "deepseekFlashUnreadable": "Не удалось прочитать переключатель — нажмите, чтобы повторить.",
     "clearInput": "Очистить ввод",
     "scrollToBottom": "Прокрутить вниз"
   },
@@ -274,6 +279,7 @@
     "showAllLines": "Показать все строки ({{count}})",
     "showLess": "Показать меньше",
     "openFile": "Открыть {{path}}",
+    "openInArchPulse": "Открыть в ArchPulse",
     "titles": {
       "table": "Таблица",
       "options": "Варианты",
@@ -288,7 +294,9 @@
       "diff": "Diff",
       "output": "Вывод",
       "diagram": "Диаграмма",
-      "code": "Код"
+      "code": "Код",
+      "widget": "Виджет",
+      "docspace": "Блок DocSpace"
     },
     "alert": {
       "note": "Заметка",

@@ -62,25 +62,26 @@ Read [the realtime stream](./02-realtime-stream.md) for how a reply arrives, and
 | File | Role |
 | --- | --- |
 | `src/modules/widgets/index.ts` | The barrel. Exports `WidgetFrame` and nothing else |
-| `src/modules/widgets/WidgetFrame.tsx` | `WidgetFrame` — the `<pre>`/iframe decision — and the private `WidgetFrameLive`, which only ever renders in a browser |
+| `src/modules/widgets/WidgetFrame.tsx` | `WidgetFrame` — the `<pre>`/iframe decision, and the optional `frame` a caller hands it — and the private `WidgetFrameLive`, which only ever renders in a browser |
 | `src/modules/widgets/buildWidgetDocument.ts` | `WIDGET_CSP` and `buildWidgetDocument` — the whole HTML document a widget lives in |
 | `src/modules/widgets/widgetBridgeScript.ts` | `WIDGET_BRIDGE_SCRIPT` — the in-frame script that becomes `window.live` |
 | `src/modules/widgets/readVerveTokens.ts` | `WIDGET_TOKEN_NAMES` (the contract) and `readVerveTokens` (the live read) |
 | `src/modules/widgets/hooks/useWidgetHost.ts` | `useWidgetHost` — the page's half: one message listener, the height, the theme post, and the `load` counter that revokes a frame which navigated itself away |
 | `src/modules/widgets/hooks/useWidgetBridge.ts` | `useWidgetBridge` — one frame's subscriptions: the two refusals, the per-frame cap, and the unmount sweep |
 | `src/modules/widgets/classifyWidgetBody.ts` | `DOCSPACE_ID_RE` and `classifyWidgetBody` — which KIND a settled fence body is. The raw path is the default |
-| `src/modules/widgets/docspaceOrigin.ts` | `DOCSPACE_EMBED_DEFAULT_PORT`, `resolveDocSpaceOrigin`, `docspaceEmbedUrl`, and `isForeignOrigin` — the gate on `allow-same-origin` |
-| `src/modules/widgets/DocSpaceFrame.tsx` | `DOCSPACE_SANDBOX`, `DOCSPACE_READY_TIMEOUT_MS` and `DocSpaceFrame` — the second frame: a `src` on ArchPulse's origin, the latched theme, and the ready timer |
+| `src/modules/widgets/docspaceOrigin.ts` | `DOCSPACE_EMBED_DEFAULT_PORT`, `resolveDocSpaceOrigin`, `docspaceEmbedUrl`, `docspaceStudioUrl`, and `isForeignOrigin` — the gate on `allow-same-origin` |
+| `src/modules/widgets/DocSpaceFrame.tsx` | `DOCSPACE_SANDBOX`, `DOCSPACE_READY_TIMEOUT_MS` and `DocSpaceFrame` — the second frame: a `src` on ArchPulse's origin, the latched theme, the ready timer, and the `framed` prop that drops its own border where a card already draws one |
 | `src/modules/widgets/WidgetErrorCard.tsx` | `WidgetErrorCard` — the two-sentence card shown where a widget was asked for and cannot be drawn |
 | `src/modules/live-bus/topics.ts` | `LIVE_TOPIC_ALLOWLIST`, `isAllowedTopic`, `RUNNER_ALL_TOPIC`, `runnerTopic` — the whole vocabulary |
 | `src/modules/live-bus/context/LiveBusContext.tsx` | `LiveBusProvider` and `useLiveBus` — the retained values, the listener registry, `publish`/`subscribe`/`get` |
 | `src/modules/live-bus/hooks/useLiveTopic.ts` | `useLiveTopic` — the module's ONE render trigger, for a React component reading a topic |
 | `src/modules/live-bus/index.ts` | The barrel. The provider, the bus hook, `useLiveTopic`, and the vocabulary |
-| `src/modules/chat/transcript/shapes/code/index.tsx` | `CodeBlock` — the `code` override's routing decision, and the widget branch inside it |
+| `src/modules/chat/transcript/shapes/code/index.tsx` | `CodeBlock` — the `code` override's routing decision, and the widget branch inside it, which hands `EmbedFrame` down as `WidgetFrame`'s `frame` |
+| `src/modules/chat/transcript/shapes/code/EmbedFrame.tsx` | `EmbedFrame` — the card a LIVE embed wears: the one `ShapeFrame` header every shape draws (flush), plus the `Open in ArchPulse` action a DocSpace block's studio link earns it. It imports nothing from this module |
 | `src/modules/chat/transcript/shapes/markdownStreaming.ts` | `MarkdownStreamingContext`, in its own module. `CodeBlock` is the last consumer left in the tree |
 | `src/modules/chat/transcript/Markdown.tsx` | Provides that context around its `ReactMarkdown`, and names `CodeBlock` as the `code` override in both component maps |
 | `src/modules/chat/transcript/StreamingMarkdown.tsx` | Marks the pending half streaming; the settled half is untouched |
-| `src/shared/types.ts` | `WidgetFrameMessage`, `WidgetHostMessage`, `WidgetHostHandlers`, `LiveTopic`, `LiveValue`, `LiveBus`, under `LIVE WIDGETS` |
+| `src/shared/types.ts` | `WidgetFrameMessage`, `WidgetHostMessage`, `WidgetHostHandlers`, `DocSpaceBlockRef`, `WidgetBodyShape`, `WidgetEmbed`, `WidgetEmbedFramer`, `LiveTopic`, `LiveValue`, `LiveBus`, under `LIVE WIDGETS` |
 | `.verify/phase-22.mjs` | The fence probe: the sandbox, the opaque origin, the CSP refusal, height, theme, streaming, export, and the revoke rule from both sides |
 | `.verify/phase-24.mjs` | The bus probe: a stage written to disk read back inside a sandboxed widget, both refusals, the cap, the unmount sweep, the REST seed and the retirement |
 | `.verify/phase-28.mjs` | The kind probe: the exact sandbox, the foreign origin, the error card, the raw path left alone, the streaming gate, the exports, and that a theme flip never rewrites `src` |
@@ -101,7 +102,8 @@ ordinary documentation label. It is the first language decision `CodeBlock` make
 ```
 ````
 
-renders `<WidgetFrame code={raw} streaming={streaming} />`. `streaming` comes from
+renders `<WidgetFrame code={raw} streaming={streaming} frame={(embed, live) => <EmbedFrame {...embed} code={raw}>{live}</EmbedFrame>} />`.
+`streaming` comes from
 `MarkdownStreamingContext`, a context defaulting to `false` which `MarkdownBodyRenderer` provides
 around its `ReactMarkdown`. It sits in a module of its own, `shapes/markdownStreaming.ts`, for a
 mechanical reason: `Markdown.tsx` imports `CodeBlock` and `CodeBlock` reads the context, so
@@ -118,6 +120,20 @@ message never carries the flag at all.
 The consequence worth holding on to: a widget fence renders as source in three situations — while
 the reply is still being written, in an exported document, and for one tick whenever the streaming
 split boundary RETRACTS back over an already-live widget — and as a live frame everywhere else.
+
+**`frame` dresses the live frame, and it is a function rather than a wrapper.** Both live kinds —
+the HTML widget and the DocSpace block — are handed to a caller's `frame` together with a
+`WidgetEmbed` saying which kind it is and, for a DocSpace block, the studio link that block's own
+`docspaceStudioUrl` resolves. The chat passes `EmbedFrame`, so an embed wears the same titled card
+the rest of the transcript wears. It is a function because a wrapper the CALLER drew would sit
+in front of this file's two gates: the export runs no effects, and a streaming fence's body is a
+fragment still growing on every delta. `frame` is therefore called from BEHIND both of them, and
+the `<pre>` and the error card are never passed to it at all — an exported or still-streaming fence
+stays raw source with no header over it, which is also what the invalid body draws. The element the
+framer is given is the same keyed one it would have been without a framer: `key={code}` stays on
+the inner `<DocSpaceFrame>`/`<WidgetFrameLive>`, because that key is what makes the host's revoke
+rule sound (below), and a key belongs to the element whose load count it resets rather than to
+whatever wraps it.
 
 That third one is worth stating plainly, because it is a restart and not a repaint.
 `StreamingMarkdown` renders two fixed sibling slots, settled and pending, and recomputes the
@@ -329,6 +345,34 @@ that is all: `DocSpaceFrame` passes no `onSubscribe`/`onUnsubscribe`, so a `subs
 answered `topic not allowed` exactly as it is for any widget with no bridge. **No topics reach a
 DocSpace block** — it has its own server to ask.
 
+**A framed block offers the way out to the studio.** `docspaceStudioUrl(pageId, blockId)` returns
+`<origin>/#page=<pageId>&block=<blockId>` on the origin `resolveDocSpaceOrigin` already resolved —
+ArchPulse's own studio deep link, which is why the link and the frame beside it can never point at
+two different hosts. `WidgetFrame` builds it from the SAME classified, id-checked ref the frame was
+built from, and only for a LIVE block: `EmbedFrame` draws it as an `a[data-docspace-open]` with
+`target="_blank"` and `rel="noopener noreferrer"`, so the studio opens in a new tab on ArchPulse's
+origin and receives neither this window's handle nor this page's referrer. It points at the studio
+and never at the embed route; port 8005 is never proxied through this app. The HTML widget has no
+such link and gets no action at all — `studioUrl` is `null` there, because a widget is model output
+this app composed rather than a page another service owns.
+
+**A framed block drops its OWN border, and nothing else.** `DocSpaceFrame` and `WidgetFrameLive`
+each draw their own `my-3 rounded-xl border` wrapper when they stand alone, because a border on the
+iframe itself would be taken out of the height the embed reported (border-box sizing) and leave a
+two-pixel scrollbar. Inside a card that border is the card's, so `WidgetFrame` passes
+`framed={Boolean(frame)}` and the wrapper keeps only the clipping and the fill. The sandbox, the
+`src`, the ready timer and `key={code}` are unchanged either way.
+
+**The embed probes are not the unframed path.** `phase-22`, `phase-28` and `phase-29` mount through
+`MarkdownBody`, the app's own transcript renderer, so `CodeBlock` hands them `EmbedFrame` exactly as
+a real reply would, and their shots (2026-09-15) carry the card header. The unframed branch —
+`WidgetFrame` called with no `frame` at all — is therefore a real path with no probe on it yet; it
+stays for any caller that renders this component directly, outside markdown.
+
+**Folding a framed embed is safe.** The card's `CollapsibleContent` is a `grid-rows-[0fr]` track
+and never an unmount, so shutting a DocSpace card leaves its iframe connected with its `src`
+untouched: no reload, and nothing the reader typed into the block is discarded.
+
 **"Editable in place" is a claim about two surfaces, and it is measured as one.**
 `.verify/phase-29.mjs` stands a real page up in the DocSpace store, embeds one of its blocks in a
 transcript here, edits it from inside the frame, and watches that edit arrive in a SECOND browser
@@ -410,17 +454,6 @@ listeners in the bus for every later publish to walk.
 - **The height is the height, not a `min-height`.** A widget that shrinks must shrink the element
   around it, which a minimum would prevent.
 - **`loading="lazy"` is deliberately absent.** A lazy frame subscribes late.
-- **OPEN: the two raw-source `<pre>` fallbacks do not match in dark, and the divergence is
-  recorded rather than quiet.** `WidgetFrame`'s fallback is `MermaidDiagram`'s spelling minus
-  `dark:bg-zinc-900`, so the two render on different dark backgrounds. Both spellings are
-  mandated: the plan's interfaces copy mermaid's classes verbatim, while this phase's executable
-  verification gate greps `src/modules/widgets` for palette literals and requires zero. The gate
-  is executable and the prose is not, so the literal was dropped. Be honest about the cost: it is
-  not free. `MermaidDiagram` carries `bg-muted/50` AND `dark:bg-zinc-900`, and the `dark:` variant
-  is the one that paints in dark mode — so in dark the widget fallback sits on the muted token
-  while mermaid's sits on zinc-900, which is exactly the drift "one spelling" existed to prevent.
-  Converging the two needs a ruling on which spelling wins; if it is mermaid's, the honest move is
-  to lift `MermaidDiagram` off its literal too, never to re-add this one.
 - **The token list is not sized to what a widget happens to use.** It is also the payload of the
   `theme` message, so trimming it silently narrows what a widget can restyle itself with.
 - **Any sandboxed frame on this page raises one `SecurityError: Failed to read the 'serviceWorker'

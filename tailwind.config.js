@@ -18,6 +18,18 @@ export default {
         sans: ['"Schibsted Grotesk"', '-apple-system', 'BlinkMacSystemFont', '"Segoe UI"', 'Roboto', '"Helvetica Neue"', 'Arial', 'sans-serif'],
         serif: ['"Instrument Serif"', 'Georgia', 'serif'],
       },
+      // The rendered-transcript text scale: four named sizes plus the tool anchor. Every one is
+      // `em`, so a framed shape follows the chat text size the reader set and never a fixed px.
+      // A header is never smaller than what it heads — `md-body` is the size of all content AND of
+      // every title — and `md-stat` is the stat tile's figure and nothing else. `chat-tool` is the
+      // base size of a markdown tool body, 7/8 of the chat setting.
+      fontSize: {
+        'md-body': '1em',
+        'md-meta': '0.875em',
+        'md-code': '0.875em',
+        'md-stat': '1.75em',
+        'chat-tool': 'calc(var(--chat-font-size, 1rem) * 0.875)',
+      },
       // Tailwind's colour names are kept — 665 utility sites already spell them — but every
       // one now resolves to a Verve token from src/shared/ui/verve/tokens.css, which is the
       // app's ONE colour source. color-mix carries the alpha modifier through: Tailwind
@@ -120,6 +132,14 @@ export default {
         'dialog-overlay-show': 'dialog-overlay-show 250ms var(--ease-enter)',
         'dialog-content-show': 'dialog-content-show 450ms var(--ease-enter)',
         'bottom-sheet-content-show': 'bottom-sheet-content-show 220ms cubic-bezier(0.22, 1, 0.36, 1)',
+        // The rendered transcript's entrances, both on Verve's own keyframes (`vv-rise` and
+        // `vv-pagein`, `src/shared/ui/verve/tokens.css`) rather than on a second spelling of them
+        // here. `shape-rise` is a FRAME arriving — a card the reader has never seen rises once, and
+        // `both` keeps it at its end state while the memory that suppressed it is consulted.
+        // `shape-item` is a row or a tile following its frame, `backwards` so the stagger's delay
+        // holds the item invisible instead of flashing it at full opacity before its turn.
+        'shape-rise': 'vv-rise var(--dur-move) var(--ease-enter) both',
+        'shape-item': 'vv-pagein 240ms var(--ease-enter) backwards',
       },
     },
   },

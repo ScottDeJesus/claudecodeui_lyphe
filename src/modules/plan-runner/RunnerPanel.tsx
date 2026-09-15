@@ -5,29 +5,8 @@ import { useTranslation } from 'react-i18next';
 import { dismissRun } from '@/modules/plan-runner/dismissedRuns';
 import { useRunnerRuns } from '@/modules/plan-runner/hooks/useRunnerRuns';
 import { RunCard } from '@/modules/plan-runner/RunCard';
+import { byUrgencyThenNewest } from '@/modules/plan-runner/runState';
 import { Badge, EmptyState, ScrollArea } from '@/shared/ui';
-import type { RunnerRunSnapshot, RunnerRunState } from '@/shared/types';
-
-/**
- * Where a run is ranked in the list, and it is a reading of URGENCY rather than of recency.
- *
- * LIVE first because something is happening to it right now. STALE second because a lapsed
- * heartbeat is the one state that may want a hand — it is the reason a person opens this tab
- * unprompted. PAUSED last because a parked run is parked on purpose: the operator stopped it, and
- * a list that raised their own decision above a run in trouble would be the app arguing with them.
- * ENDED last of all — nothing more will happen to it; it is there to be read and dismissed — and
- * within ENDED the most recent ending first, since that is the one the operator came to see.
- *
- * Reversible in one place, by design (the plan's own reversible default): change these three
- * numbers and the order changes, with nothing else to find.
- */
-const STATE_ORDER: Record<RunnerRunState, number> = { live: 0, stale: 1, paused: 2, ended: 3 };
-
-/** State first, then newest first inside each state — by its ending for an ended run, its start otherwise. */
-function byUrgencyThenNewest(a: RunnerRunSnapshot, b: RunnerRunSnapshot): number {
-  const recency = (run: RunnerRunSnapshot) => run.ended_at ?? run.started_at;
-  return STATE_ORDER[a.state] - STATE_ORDER[b.state] || recency(b) - recency(a);
-}
 
 /**
  * The Runner tab's pane: every run the lane is carrying, each as a whole card.

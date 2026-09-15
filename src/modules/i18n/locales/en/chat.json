@@ -132,6 +132,11 @@
     "showAllCommands": "Show all commands",
     "plainMode": "Plain",
     "plainModeTooltip": "Send every message with /plain: short, skimmable replies",
+    "deepseekFlash": "DeepSeek Flash",
+    "deepseekFlashShort": "Flash",
+    "deepseekFlashTooltip": "While this is on, the plan runner's build souls — the builder, its fix-pass and Athena — run on DeepSeek Flash. Prometheus and the scouts stay on Claude.",
+    "deepseekFlashReading": "Reading the switch…",
+    "deepseekFlashUnreadable": "The switch could not be read — press to try again.",
     "clearInput": "Clear input",
     "scrollToBottom": "Scroll to bottom",
     "queue": {
@@ -342,6 +347,7 @@
     "showAllLines": "Show all {{count}} lines",
     "showLess": "Show less",
     "openFile": "Open {{path}}",
+    "openInArchPulse": "Open in ArchPulse",
     "expandFile": "Show the preview of {{path}}",
     "collapseFile": "Hide the preview of {{path}}",
     "titles": {
@@ -358,7 +364,9 @@
       "diff": "Diff",
       "output": "Output",
       "diagram": "Diagram",
-      "code": "Code"
+      "code": "Code",
+      "widget": "Widget",
+      "docspace": "DocSpace block"
     },
     "alert": {
       "note": "Note",

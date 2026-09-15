@@ -20,6 +20,26 @@ type ChipProps = {
   className?: string;
   /** Native tooltip, for a chip whose one word needs a sentence behind it. */
   title?: string;
+  /**
+   * The name, for a chip whose visible content is a MARK rather than a word — the composer's
+   * DeepSeek chip, whose whale is the whole chip on a phone. The mark carries its own
+   * `aria-label` of "DeepSeek", which is a name for the picture and not for the control.
+   */
+  ariaLabel?: string;
+  /**
+   * The position is not known — the switch has not been read, or the read came back with nothing.
+   * Renders `aria-pressed="mixed"` and a dashed ring, so a third state exists on screen instead of
+   * "unknown" being painted as OFF. A two-state control that draws its ignorance as one of its two
+   * answers is the one lie it cannot recover from, because the reader has no way to tell.
+   */
+  indeterminate?: boolean;
+  /**
+   * Refuses the press without leaving the tab order. The node keeps focus and announces
+   * `aria-disabled`, where a real `disabled` attribute blurs the button the moment it is set — so
+   * the reader who pressed with Enter would have to Tab from the top of the page to press again.
+   * The refusal itself is the caller's, in its own handler.
+   */
+  busy?: boolean;
 };
 
 /**
@@ -30,9 +50,22 @@ type ChipProps = {
  *
  * With `onClick` it renders a real `<button>` so it is reachable by keyboard and announces
  * its pressed state; without one it is a `<span>`, because a static tag that takes focus
- * sends the reader somewhere nothing happens.
+ * sends the reader somewhere nothing happens. `busy` and `indeterminate` are for a chip whose
+ * state lives somewhere else — a switch read back off the server — where a press cannot always
+ * be taken yet and the position is not always known.
  */
-export function Chip({ selected = false, onClick, children, size = 'md', tone, className: extra, title }: ChipProps) {
+export function Chip({
+  selected = false,
+  onClick,
+  children,
+  size = 'md',
+  tone,
+  className: extra,
+  title,
+  ariaLabel,
+  indeterminate = false,
+  busy = false,
+}: ChipProps) {
   const className = cn(
     'vv-chip inline-flex items-center gap-1.5',
     size === 'sm' && 'vv-chip--sm',
@@ -54,7 +87,10 @@ export function Chip({ selected = false, onClick, children, size = 'md', tone, c
       className={className}
       data-selected={selected}
       data-tone={tone}
-      aria-pressed={selected}
+      data-state={indeterminate ? 'unknown' : undefined}
+      aria-pressed={indeterminate ? 'mixed' : selected}
+      aria-label={ariaLabel}
+      aria-disabled={busy || undefined}
       onClick={onClick}
       title={title}
     >

@@ -16,6 +16,7 @@ function dependencies(overrides: Partial<Dependencies> = {}): Dependencies {
       notifyUser: () => undefined,
     },
     pushSubscriptions: { save: () => undefined, remove: () => undefined },
+    deepseekFlash: { read: async () => false, write: async () => undefined },
     getVapidPublicKey: () => null,
     ...overrides,
   };

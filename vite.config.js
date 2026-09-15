@@ -4,6 +4,7 @@ import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
 import { getConnectableHost, normalizeLoopbackHost } from './shared/networkHosts.js'
 import keepPageOnReconnect from './vite-plugins/keepPageOnReconnect.js'
+import compressResponses from './vite-plugins/compressResponses.js'
 
 // The client shows the installed package version so it can be compared against the
 // version the server process is actually running. Reading package.json here and
@@ -29,7 +30,10 @@ export default defineConfig(({ mode }) => {
 
   return {
     // keepPageOnReconnect: a phone waking a sleeping tab keeps its page instead of reloading it.
-    plugins: [react(), keepPageOnReconnect()],
+    // compressResponses: the dev server sends every transformed module uncompressed — 19.5 MB of
+    // boot on the wire, ~39s of it pure transfer on a phone's Tailscale link. Same bytes, smaller
+    // envelope; a save still lands through HMR exactly as before.
+    plugins: [react(), keepPageOnReconnect(), compressResponses()],
     define: {
       __APP_VERSION__: JSON.stringify(pkg.version)
     },

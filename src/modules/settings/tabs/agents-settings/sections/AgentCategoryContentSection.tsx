@@ -4,6 +4,7 @@ import { ProviderSkills } from '@/modules/skills';
 import AccountContent from '@/modules/settings/tabs/agents-settings/sections/content/AccountContent';
 import EditModeContent from '@/modules/settings/tabs/agents-settings/sections/content/EditModeContent';
 import PermissionsContent from '@/modules/settings/tabs/agents-settings/sections/content/PermissionsContent';
+import RunnerModelContent from '@/modules/settings/tabs/agents-settings/sections/content/RunnerModelContent';
 
 /** The three modes Codex accepts, narrowed back out of the shared mode union before it is stored. */
 const toCodexPermissionMode = (mode: PermissionMode): CodexPermissionMode => (
@@ -44,6 +45,15 @@ export default function AgentCategoryContentSection({
           authStatus={agentContextById[selectedAgent].authStatus}
           onLogin={agentContextById[selectedAgent].onLogin}
         />
+      )}
+
+      {/* Below the connection card, and only for Claude: it is a choice ABOUT this account —
+          whether the runner's hands spend it at all — so it reads as a consequence of the card
+          above rather than a setting of its own. */}
+      {selectedCategory === 'account' && selectedAgent === 'claude' && (
+        <div className="mt-6">
+          <RunnerModelContent />
+        </div>
       )}
 
       {/* Above the allow/deny lists on purpose: this one setting decides whether

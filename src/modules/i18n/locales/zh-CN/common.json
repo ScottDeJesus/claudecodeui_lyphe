@@ -270,5 +270,35 @@
   },
   "shapes": {
     "diagramFailed": "无法绘制此图表，已显示其源代码。"
+  },
+  "gutters": {
+    "runner": {
+      "title": "运行"
+    },
+    "memory": {
+      "title": "记忆",
+      "pending": "等待审核",
+      "recent": "最近归档",
+      "recentEmpty": "还没有归档内容",
+      "pendingEmpty": "没有等待中的内容"
+    },
+    "subagents": {
+      "title": "子代理",
+      "empty": "此对话中没有子代理",
+      "back": "返回子代理",
+      "loading": "正在加载记录…",
+      "notFound": "磁盘上还没有记录",
+      "failed": "无法读取记录",
+      "live": "实时",
+      "showEarlier": "显示更早的步骤",
+      "openRow": "阅读 {{name}} 的记录"
+    },
+    "open": "打开 {{name}}",
+    "collapse": "折叠",
+    "dragHint": "拖到其他槽位",
+    "pin": {
+      "label": "本次会话",
+      "title": "由你打开的会话创建"
+    }
   }
 }

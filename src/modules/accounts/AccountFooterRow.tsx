@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { ACCOUNT_PANEL_ID, AccountPopover } from '@/modules/accounts/AccountPopover';
+import { DeepseekBalanceReadout } from '@/modules/accounts/DeepseekBalanceReadout';
 import { useDescentAccounts } from '@/modules/accounts/hooks/useDescentAccounts';
 import { useDescentUsage } from '@/modules/accounts/hooks/useDescentUsage';
+import { useDeepseekBalance } from '@/modules/accounts/hooks/useDeepseekBalance';
 import { accountInitials } from '@/modules/accounts/utils/accountInitials';
 import { formatWindowCountdown, windowPercent, windowTone } from '@/modules/accounts/utils/usageWindows';
 import { ProviderLoginModal } from '@/modules/provider-auth';
@@ -39,6 +41,9 @@ type AccountFooterRowProps = {
 export function AccountFooterRow({ collapsed = false, onExpand }: AccountFooterRowProps) {
   const { data: accounts, switchTo, capture, busy, error, clearError } = useDescentAccounts();
   const { data: usage, refresh: refreshUsage } = useDescentUsage();
+  // A different account from the one above, from a route that never touches Descent — held here
+  // so the row and the panel share their ONE reading, and so neither is hidden by a Descent outage.
+  const { data: balance, refresh: refreshBalance } = useDeepseekBalance();
 
   // Whether the account panel is showing. Not derivable from the picture: the picture says
   // which account is live, and the panel is open precisely while that is being reconsidered.
@@ -138,8 +143,11 @@ export function AccountFooterRow({ collapsed = false, onExpand }: AccountFooterR
     }
     setOpen(true);
     // D7: a reading is taken when the panel opens, so what a person reads is what is true
-    // now rather than whatever the last three-minute tick left behind.
+    // now rather than whatever the last three-minute tick left behind. Both readings: the
+    // balance is money, and a figure that only moves on a timer is the one a person would
+    // check twice.
     void refreshUsage();
+    void refreshBalance();
   };
 
   // "Add another account": save the login that is live NOW before the CLI can replace it, then
@@ -216,6 +224,14 @@ export function AccountFooterRow({ collapsed = false, onExpand }: AccountFooterR
           ) : (
             <span className="block text-xs text-muted-foreground">usage —</span>
           )}
+          {/* Under the meters and inside the same column, which is where the account's own
+              readings live: the windows above are what is LEFT of this Claude account, and this
+              line is what is LEFT of the DeepSeek one that pays for builds. It draws while the
+              meters are unknown — the two sources fail independently, and this is the one that
+              still answers when Descent does not. */}
+          <span className="mt-1 block">
+            <DeepseekBalanceReadout balance={balance} variant="inline" />
+          </span>
         </span>
         <span aria-hidden="true" className="flex-none text-[9px] text-ink-faint">▼</span>
       </button>
@@ -226,6 +242,7 @@ export function AccountFooterRow({ collapsed = false, onExpand }: AccountFooterR
         <AccountPopover
           accounts={accounts}
           usage={usage}
+          balance={balance}
           busy={busy}
           error={error}
           onSwitch={(slug) => { void switchTo(slug); }}

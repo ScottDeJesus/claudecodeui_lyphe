@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 
+import type { WidgetEmbedFramer } from '@/shared/types';
 import { buildWidgetDocument } from '@/modules/widgets/buildWidgetDocument';
 import { classifyWidgetBody } from '@/modules/widgets/classifyWidgetBody';
+import { docspaceStudioUrl } from '@/modules/widgets/docspaceOrigin';
 import { DocSpaceFrame } from '@/modules/widgets/DocSpaceFrame';
 import { readVerveTokens } from '@/modules/widgets/readVerveTokens';
 import { WidgetErrorCard } from '@/modules/widgets/WidgetErrorCard';
@@ -9,23 +11,20 @@ import { useWidgetBridge } from '@/modules/widgets/hooks/useWidgetBridge';
 import { useWidgetHost } from '@/modules/widgets/hooks/useWidgetHost';
 
 /**
- * The raw source a widget falls back to, in the spelling `MermaidDiagram` already uses for its
- * own fallback, so the two unresolved fences in a transcript read as one thing.
+ * The raw source a widget falls back to, in the spelling `MermaidDiagram` uses for its own
+ * fallback, so the two unresolved fences in a transcript read as one thing.
  *
- * ONE CLASS OF MERMAID'S IS DELIBERATELY ABSENT, and the divergence is recorded rather than
- * quiet. The plan asks for two things that cannot both hold: its Interfaces W copies Mermaid's
- * fallback classes verbatim, which includes a `dark:bg-zinc-*` palette literal, while the phase's
- * own verification gate greps this directory for exactly that family of literals and requires
- * zero. The gate is executable and the prose is not, so the gate wins and the literal is dropped.
+ * THE TWO SPELLINGS MATCH TODAY, with no palette literal on either side. They briefly diverged:
+ * this module's own verification gate greps this directory for a palette literal and requires
+ * zero, so while `MermaidDiagram` still carried a `dark:bg-zinc-*` override this constant could
+ * not copy it, and the two fallbacks painted different dark backgrounds. The rendered-markdown-
+ * verve plan's Phase 8 closed that the honest way this comment used to call for: it lifted
+ * `MermaidDiagram` off the literal instead of re-adding it here, so both fallbacks are now exactly
+ * this string.
  *
- * BE HONEST ABOUT THE COST: this is not a no-op. `MermaidDiagram` carries BOTH `bg-muted/50` and
- * the `dark:` palette override, and the override is the one that paints in dark mode — so the two
- * fallbacks now differ there, which is the very drift "one spelling" existed to prevent. What is
- * bought is that this module names no palette literal; what is paid is that in dark mode the
- * widget fallback sits on the muted token where Mermaid's sits on its zinc override. To make them
- * one string again, lift Mermaid's off its literal — never re-add it here, which the gate rejects.
- * (The literal is not spelled out anywhere in this directory, including in prose: the gate greps
- * for the pattern and cannot tell a quoted example from a live class. Page 07 spells it.)
+ * If a future edit needs `MermaidDiagram`'s fallback to diverge from this one again, that is a
+ * deliberate re-tone with its own baseline re-capture (`docs/architecture/08-rendered-shapes.md`
+ * §"Gotchas"), never a quiet copy back of a palette literal this gate rejects.
  */
 const FALLBACK_CLASSES =
   'my-3 overflow-x-auto rounded-xl border border-border bg-muted/50 p-4 font-mono text-[0.8125rem] leading-relaxed text-muted-foreground';
@@ -59,8 +58,26 @@ const FALLBACK_CLASSES =
  * fence flashes back to source for one tick mid-reply and comes back when the reply ends.
  * Curing it means keeping the block in ONE slot across the boundary, which is `StreamingMarkdown`'s
  * shape to change, not this file's.
+ *
+ * `frame` IS THE CALLER'S, AND IT IS OPTIONAL. The live element for whichever kind this body turned
+ * out to be is handed to it, together with a `WidgetEmbed` saying which kind that is and where a
+ * DocSpace block's studio link points — so the frame can name the embed and offer a way out to the
+ * studio without ever learning how a body is classified. The chat transcript's `CodeBlock` is the
+ * only caller that passes one today, and it passes `EmbedFrame`. The three embed probes are NOT a
+ * second shape of caller: `phase-22`, `-28` and `-29` mount through the app's own `Markdown`, so
+ * `CodeBlock` hands them a frame too and their shots (2026-09-15) carry the card header. The
+ * unframed branch below is therefore a real path with no probe on it yet — it stays for any caller
+ * that renders this component directly, rather than through markdown.
  */
-export function WidgetFrame({ code, streaming }: { code: string; streaming?: boolean }) {
+export function WidgetFrame({
+  code,
+  streaming,
+  frame,
+}: {
+  code: string;
+  streaming?: boolean;
+  frame?: WidgetEmbedFramer;
+}) {
   // Whether an effect has run in this component — which is to say, whether we are in a browser
   // at all. It is the export's guard, not a loading nicety: `renderToStaticMarkup` runs no
   // effects, so this stays false there and the export gets the `<pre>` above. See FIRST RENDER.
@@ -85,13 +102,20 @@ export function WidgetFrame({ code, streaming }: { code: string; streaming?: boo
   // in `CodeBlock`. Forking upstream would put it in front of them: the HTML transcript export
   // runs no effects, so it would carry a live `<iframe>` into a saved file, and a docspace fence
   // still being streamed would mount — and start fetching — on a body that is a fragment. Behind
-  // the gates, every kind inherits the same two promises the HTML widget already makes.
+  // the gates, every kind inherits the same two promises the HTML widget already makes. The caller's
+  // `frame` is applied behind both gates too, which is why it is a function passed in rather than a
+  // wrapper the caller draws: a wrapper would have to be written in front of them.
   if (shape.kind === 'docspace') {
     // Keyed on the body for the same reason `WidgetFrameLive` is: a different body is a different
     // block, and it must arrive as a NEW element rather than as a new `src` on this one. The host
     // treats a second load on an element as a frame navigating itself away and revokes it
     // permanently, so an in-place swap would silently kill a healthy embed.
-    return <DocSpaceFrame key={code} pageId={shape.ref.pageId} blockId={shape.ref.blockId} />;
+    const live = (
+      <DocSpaceFrame key={code} pageId={shape.ref.pageId} blockId={shape.ref.blockId} framed={Boolean(frame)} />
+    );
+    return frame
+      ? frame({ kind: 'docspace', studioUrl: docspaceStudioUrl(shape.ref.pageId, shape.ref.blockId) }, live)
+      : live;
   }
 
   if (shape.kind === 'invalid') {
@@ -107,14 +131,17 @@ export function WidgetFrame({ code, streaming }: { code: string; streaming?: boo
   // console line, the widget simply never receiving a theme flip or (under the live bus) any data
   // again, since revocation is by design never lifted. With it, an element loads exactly one
   // document in its life, so a second load can only be a navigation.
-  return <WidgetFrameLive key={code} code={code} />;
+  const live = <WidgetFrameLive key={code} code={code} framed={Boolean(frame)} />;
+  // `studioUrl: null`: an HTML widget is model output composed here, not a page on another service,
+  // so there is nothing outside this app to open it in. The caller reads that null as "no action".
+  return frame ? frame({ kind: 'html', studioUrl: null }, live) : live;
 }
 
 /**
  * The living frame. Only ever rendered in a browser, after mount, on a settled fence body — and
  * only ever for ONE body, because its caller keys it on that body.
  */
-function WidgetFrameLive({ code }: { code: string }) {
+function WidgetFrameLive({ code, framed }: { code: string; framed?: boolean }) {
   const frameRef = useRef<HTMLIFrameElement>(null);
   const handlers = useWidgetBridge();
   const { height, onFrameLoad } = useWidgetHost(frameRef, handlers);
@@ -145,7 +172,15 @@ function WidgetFrameLive({ code }: { code: string }) {
     // comes out of `height` — the height the widget reported for its own content — and leaves
     // the viewport two pixels shorter than the document: a scrollbar for a two-pixel scroll, on
     // every widget. Measured 2026-09-10. DocSpaceFrame carries the same wrapper for the same reason.
-    <div className="my-3 overflow-hidden rounded-xl border border-border bg-card">
+    //
+    // `framed` drops the border, the radius and the margin, and nothing else — the caller has
+    // already drawn all three around this whole element. A framed embed that kept them would show
+    // an embed inside a frame inside the frame.
+    <div
+      className={
+        framed ? 'overflow-hidden bg-card' : 'my-3 overflow-hidden rounded-xl border border-border bg-card'
+      }
+    >
       <iframe
         ref={frameRef}
         sandbox="allow-scripts"

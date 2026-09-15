@@ -110,6 +110,11 @@
     "showAllCommands": "Alle Befehle anzeigen",
     "plainMode": "Schlicht",
     "plainModeTooltip": "Jede Nachricht mit /plain senden: kurze, überfliegbare Antworten",
+    "deepseekFlash": "DeepSeek Flash",
+    "deepseekFlashShort": "Flash",
+    "deepseekFlashTooltip": "Solange das an ist, laufen die Bau-Souls des Plan-Runners — der Builder, sein Fix-Durchlauf und Athena — auf DeepSeek Flash. Prometheus und die Scouts bleiben auf Claude.",
+    "deepseekFlashReading": "Der Schalter wird gelesen…",
+    "deepseekFlashUnreadable": "Der Schalter konnte nicht gelesen werden — zum erneuten Versuch tippen.",
     "clearInput": "Eingabe leeren",
     "scrollToBottom": "Nach unten scrollen"
   },
@@ -274,6 +279,7 @@
     "showAllLines": "Alle {{count}} Zeilen anzeigen",
     "showLess": "Weniger anzeigen",
     "openFile": "{{path}} öffnen",
+    "openInArchPulse": "In ArchPulse öffnen",
     "titles": {
       "table": "Tabelle",
       "options": "Optionen",
@@ -288,7 +294,9 @@
       "diff": "Diff",
       "output": "Ausgabe",
       "diagram": "Diagramm",
-      "code": "Code"
+      "code": "Code",
+      "widget": "Widget",
+      "docspace": "DocSpace-Block"
     },
     "alert": {
       "note": "Hinweis",

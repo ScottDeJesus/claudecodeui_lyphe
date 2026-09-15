@@ -88,9 +88,12 @@ export function createDescentRouter(
     await sendDescentWrite(response, next, () => descentService.capture());
   });
 
-  router.get('/memory', async (_request, response, next) => {
+  // One route, two lists: the review queue by default and the filed memories on
+  // `?status=approved`. Anything else — absent, unknown, repeated — reads the
+  // pending queue, so the Memory tab is never emptied by a typo in a query string.
+  router.get('/memory', async (request, response, next) => {
     try {
-      response.json(await memoryService.pending());
+      response.json(await memoryService.list(request.query.status === 'approved' ? 'approved' : 'pending'));
     } catch (error) {
       next(error);
     }

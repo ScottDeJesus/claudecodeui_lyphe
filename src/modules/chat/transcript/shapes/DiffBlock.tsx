@@ -91,10 +91,13 @@ export function DiffBlock({ raw, collapseKey }: DiffBlockProps) {
           aria-label={copied ? t('codeBlock.copied') : t('codeBlock.copyCode')}
           className="inline-flex items-center rounded p-1 transition-colors hover:bg-muted hover:text-foreground"
         >
+          {/* Sized in `em`, like the frame's own chevron and icon: the actions slot reads
+              `text-md-meta`, so `1em` is today's 14px at the default chat size and follows the
+              reader's chat text size rather than staying 14px. */}
           {copied ? (
-            <CheckIcon aria-hidden="true" className="h-3.5 w-3.5 text-accent-ink" />
+            <CheckIcon aria-hidden="true" className="h-[1em] w-[1em] text-accent-ink" />
           ) : (
-            <CopyIcon aria-hidden="true" className="h-3.5 w-3.5" />
+            <CopyIcon aria-hidden="true" className="h-[1em] w-[1em]" />
           )}
         </button>
       ) : null}
@@ -107,7 +110,7 @@ export function DiffBlock({ raw, collapseKey }: DiffBlockProps) {
           sideways rather than wrapping — a wrapped diff line reads as two lines, one of them
           unmarked. `w-max min-w-full` keeps every tint as wide as the widest line. */}
       <div className="-mx-3 -my-2 overflow-x-auto">
-        <div className="w-max min-w-full py-2 font-mono text-[0.8125rem] leading-relaxed">
+        <div className="w-max min-w-full py-2 font-mono text-md-code leading-relaxed">
           {lines.map((line, index) => (
             <div
               key={index}

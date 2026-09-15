@@ -51,11 +51,11 @@ export function FactCard({ pairs, collapseKey }: FactCardProps) {
           <div key={index} className="contents">
             <dt
               data-shape-label
-              className="text-xs font-medium text-muted-foreground sm:pt-0.5"
+              className="text-md-body font-semibold text-accent-ink sm:pt-0.5"
             >
               {pair.label}
             </dt>
-            <dd className="m-0 min-w-0 text-sm text-foreground">{pair.value}</dd>
+            <dd className="m-0 min-w-0 text-md-body text-foreground">{pair.value}</dd>
           </div>
         ))}
       </dl>

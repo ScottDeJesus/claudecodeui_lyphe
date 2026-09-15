@@ -114,6 +114,25 @@ export function docspaceEmbedUrl(origin: string, ref: DocSpaceBlockRef, dark: bo
 }
 
 /**
+ * ArchPulse's studio deep link for one block: where a reader goes to open the block OUT of the
+ * transcript, in a new tab on ArchPulse's own origin.
+ *
+ * Read by `WidgetFrame`, which hands it to the chat frame as the `Open in ArchPulse` action. The
+ * address is ArchPulse's own hash route, so it names the two ids the classifier already checked and
+ * needs no call to discover anything about the block itself. It points at the STUDIO, never at the
+ * embed route: a reader who follows it leaves the transcript for the real editor.
+ *
+ * The origin is `resolveDocSpaceOrigin`'s, the same one the embed URL beside it is built on, so the
+ * link and the frame it sits over can never point at two different hosts — moving
+ * `VITE_DOCSPACE_EMBED_ORIGIN` moves both or neither. Both ids are percent-encoded for the same
+ * belt-and-braces reason `docspaceEmbedUrl` spells out below.
+ */
+export function docspaceStudioUrl(pageId: string, blockId: string): string {
+  const origin = resolveDocSpaceOrigin();
+  return `${origin}/#page=${encodeURIComponent(pageId)}&block=${encodeURIComponent(blockId)}`;
+}
+
+/**
  * Whether `url` lands somewhere OTHER than this app's own origin — the gate on `allow-same-origin`.
  *
  * Origins, never hostnames: `http://127.0.0.1:5183` and `http://127.0.0.1:8005` share a hostname

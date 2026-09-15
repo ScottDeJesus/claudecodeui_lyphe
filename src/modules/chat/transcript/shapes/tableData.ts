@@ -1,9 +1,11 @@
 import type { Row, TableData } from '@/modules/chat/transcript/shapes/detect';
-import { parseNumber } from '@/modules/chat/transcript/shapes/detect';
+import { classifyTable, parseNumber } from '@/modules/chat/transcript/shapes/detect';
+import type { HastNode } from '@/modules/chat/transcript/shapes/hast';
+import { hasInlineFormatting, readTable } from '@/modules/chat/transcript/shapes/hast';
 
 /**
- * What the table shapes DECIDE with: the pure functions that turn a parsed `TableData` into a row
- * order, a CSV, a bar width and a collapse payload.
+ * What the table shapes DECIDE with: the rung the table ladder lands on, and the pure functions
+ * that turn a parsed `TableData` into a row order, a CSV, a bar width and a collapse payload.
  *
  * They live beside the components rather than inside them for two reasons. The first is the rule
  * this whole feature rests on — the parsed TEXT decides, the rendered children get drawn — and a
@@ -12,8 +14,32 @@ import { parseNumber } from '@/modules/chat/transcript/shapes/detect';
  * which oxlint reports and this repo's warning ratchet does not allow to rise.
  *
  * `detect.ts` stays the home of every TRIGGER; this is the home of what happens after one fires,
- * and it is used by `DataTable.tsx` and by `elements/table.tsx`.
+ * and it is used by `DataTable.tsx`, by `elements/table.tsx` and by `LeadIn.tsx`.
  */
+
+/**
+ * What `ShapeTable` would draw for this node, decided here so a second caller asks the same
+ * question the renderer answers.
+ *
+ * Used by `elements/table.tsx`, which switches on it, and by `LeadIn.tsx`, which needs to know
+ * whether the table under a lead-in line frames itself at all. `'none'` is exactly the case where
+ * `ShapeTable` returns `PlainTable`: a table `readTable` cannot reason about, or a matrix or
+ * before/after pair this phase's shape would have to re-lay-out and therefore declines when the
+ * cells carry inline marks. Every other answer names the frame the ladder draws, with this
+ * module's sortable-table rung spelled `'table'` rather than `classifyTable`'s `'plain'` — a
+ * caller asking what to DRAW wants the kind, not the classifier's word for "none of the others".
+ */
+export function tableRung(
+  node: HastNode | undefined
+): 'decision-matrix' | 'before-after' | 'data-bars' | 'table' | 'none' {
+  const table = node ? readTable(node) : null;
+  if (!table) return 'none';
+  const classification = classifyTable(table);
+  if (classification === 'decision-matrix' || classification === 'before-after') {
+    return hasInlineFormatting(node) ? 'none' : classification;
+  }
+  return classification === 'data-bars' ? 'data-bars' : 'table';
+}
 
 /**
  * The `payload` a table's collapse key is hashed from, per the plan's one table of payloads: the

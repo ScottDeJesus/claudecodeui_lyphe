@@ -51,7 +51,9 @@ const getProviderCommand = ({
   }
 
   if (provider === 'codex') {
-    return IS_PLATFORM ? 'codex login --device-auth' : 'codex login';
+    // Device code, always: plain `codex login` redirects to a callback on the server's
+    // own localhost, which a browser on any other device can never reach.
+    return 'codex login --device-auth';
   }
 
   if (provider === 'opencode') {

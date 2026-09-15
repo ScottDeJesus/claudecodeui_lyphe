@@ -33,6 +33,8 @@ import {
   ShapeTable,
   ShapeTableCell,
 } from '@/modules/chat/transcript/shapes/elements';
+import '@/modules/chat/transcript/markdownCards.css';
+import '@/modules/chat/transcript/shapes/shapeMotion.css';
 
 type MarkdownProps = {
   children: ReactNode;
