@@ -20,8 +20,14 @@ export {
   unregisterDesktopNotificationClient,
 } from '@/modules/notifications/services/desktop-notification-clients.service.js';
 export { handleDesktopNotificationsConnection } from '@/modules/notifications/websocket/desktop-notifications-websocket.service.js';
-// Used by the chat websocket to record which session each tab shows; the ntfy channel skips a watched session.
-export { clearPresence, isSessionWatched, markPresence } from '@/modules/notifications/services/session-presence.service.js';
+// Used by the chat websocket to record which session each tab shows; the ntfy channel skips a watched session,
+// and the chat run registry asks whether any tab has the finishing chat on screen.
+export {
+  clearPresence,
+  isSessionOnScreen,
+  isSessionWatched,
+  markPresence,
+} from '@/modules/notifications/services/session-presence.service.js';
 // Used by the server entrypoint to mount the public tap-to-answer route at /api/ntfy/act.
 export { createNtfyActionRoutes } from '@/modules/notifications/ntfy-action.routes.js';
 // getPublicKey: used by Settings to expose the Web Push subscription key.

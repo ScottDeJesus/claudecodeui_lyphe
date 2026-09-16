@@ -24,7 +24,77 @@
     "git": "Git",
     "tasks": "Aufgaben",
     "browser": "Browser",
-    "computer": "Computer"
+    "computer": "Computer",
+    "kanban": "Kanban"
+  },
+  "kanban": {
+    "loading": "Board wird gelesen…",
+    "unreachable": {
+      "title": "Das Board konnte nicht gelesen werden",
+      "message": "Der Server hat nicht geantwortet. Nichts ist verloren — das Board steht da, wo du es verlassen hast.",
+      "retry": "Erneut versuchen"
+    },
+    "noBoard": {
+      "title": "Noch kein Board",
+      "message": "Ein Board ist der Ort, an dem Karten leben. Dieses Projekt hat noch keins.",
+      "action": "Board anlegen"
+    },
+    "board": {
+      "switcher": "Board",
+      "actions": "Board-Aktionen",
+      "noBoard": "Kein Board",
+      "autonomy": "Autonomie",
+      "newBoard": "Neues Board",
+      "rename": "Umbenennen",
+      "archive": "Archivieren",
+      "importDescent": "Aus Descent importieren",
+      "newTitle": "Neues Board",
+      "renameTitle": "Board umbenennen",
+      "archiveTitle": "Dieses Board archivieren?",
+      "archiveMessage": "Es verschwindet aus der Auswahl, und jede Karte bleibt, wo sie ist. Nichts wird gelöscht.",
+      "nameLabel": "Name des Boards",
+      "namePlaceholder": "Wofür dieses Board da ist",
+      "cancel": "Abbrechen",
+      "save": "Speichern",
+      "questionsFolded_one": "{{count}} Karte in „Zu erledigen“ wartet auf eine Antwort",
+      "questionsFolded_other": "{{count}} Karten in „Zu erledigen“ warten auf eine Antwort"
+    },
+    "lanes": {
+      "todo": "Zu erledigen",
+      "questions": "Offene Fragen",
+      "backlog": "Backlog",
+      "active": "In Arbeit",
+      "done": "Fertig"
+    },
+    "laneMenu": {
+      "collapse": "Spalte einklappen",
+      "sortByPriority": "Nach Priorität sortieren",
+      "sortByNewest": "Nach Neuestem sortieren",
+      "clearDone": "Fertige leeren"
+    },
+    "card": {
+      "open": "Öffnen",
+      "moveTo": "Nach {{lane}} verschieben",
+      "archive": "Archivieren",
+      "untitled": "Unbenannte Karte",
+      "moved": "{{title}} nach {{lane}} verschoben, Position {{position}} von {{total}}"
+    },
+    "toast": {
+      "cardNotSaved": "Die Karte wurde nicht gespeichert",
+      "boardNotSaved": "Das Board wurde nicht gespeichert",
+      "boardCreated": "Board angelegt",
+      "boardRenamed": "Board umbenannt",
+      "boardArchived": "Board archiviert – nichts wurde gelöscht",
+      "autonomyOn": "Autonomie an",
+      "autonomyOff": "Autonomie aus",
+      "cardArchived": "Karte archiviert",
+      "laneCleared": "Die Karten der Spalte wurden archiviert"
+    },
+    "import": {
+      "done": "Aus Descent importiert",
+      "counts": "{{inserted}} hinzugefügt, {{updated}} aktualisiert",
+      "failed": "Der Import ist nicht gelaufen"
+    }
   },
   "status": {
     "loading": "Lädt...",

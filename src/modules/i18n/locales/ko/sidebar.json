@@ -165,6 +165,12 @@
     "stopTitle": "이 채팅은 아직 실행 중입니다",
     "stopBody": "중지하고 제거할까요?",
     "stopConfirm": "중지하고 제거",
-    "removeFailed": "이 채팅을 제거할 수 없습니다."
+    "removeFailed": "이 채팅을 제거할 수 없습니다.",
+    "changeIcon": "아이콘 변경",
+    "iconTitle": "아이콘 선택",
+    "iconDefault": "기본",
+    "iconOption": "{{name}} 아이콘",
+    "unread": "완료됨, 아직 읽지 않음",
+    "dragHandle": "드래그하여 순서 변경"
   }
 }

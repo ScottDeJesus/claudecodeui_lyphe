@@ -1,0 +1,227 @@
+/* Verve board paint — every colour, border, radius, shadow and motion rule for the two kit
+ * pieces a board is built out of: KanbanLane and KanbanCard.
+ *
+ * The third paint file, opened rather than squeezed into the other two: controls.css is 435
+ * lines and feedback.css 386, both at their stated ceiling, and the README's rule 6 says the
+ * next file opens the same way again instead of winning four lines back.
+ *
+ * Same contract as its two siblings. A library class string carries `vv-<name>` plus layout
+ * and size utilities and nothing else; colour comes from tokens.css and nowhere else; no rule
+ * here declares a `--tone-*` property, because tone is a token swap (doctrine §5) and a badge
+ * on a card reads `--tone-soft` / `--tone-ink` exactly as one anywhere else does. Nothing here
+ * repeats a rule from controls.css or feedback.css: a card composes `.vv-card`'s ground and adds
+ * only what a DRAGGABLE card needs on top of it; the quiet badge spells its ink and leaves the
+ * SHAPE to the `.vv-badge--outline` it is paired with; and the two `.vv-meter` and `.vv-empty`
+ * rules below are density overrides scoped inside a 300px lane, not second copies.
+ *
+ * The ONE departure from the ruling's marker list: there is no `.vv-lane-card--ghost`. Drag
+ * here is native HTML5, which hands the browser a SNAPSHOT of the card and leaves the element
+ * itself in the flow — so the vacated slot and the lifted card are never two elements, and the
+ * split is made by the source lane marking its own root (`.vv-lane--dragging`) instead of by a
+ * second class nothing would ever set. A keyboard move has no snapshot, so `--lifted` alone is
+ * what the reader watches there.
+ *
+ * Imported once, for side effect, from src/shared/ui/index.ts, and LAST of the three: a lane
+ * card composes `.vv-card`'s ground and then overrides its background, shadow and transition, and
+ * at equal specificity the later file wins. Every rule that does override one of those is also
+ * written two classes deep, so the layer holds wherever a bundler decides to put it — the same
+ * guard `.vv-skeleton.vv-skeleton--text` already carries in controls.css.
+ */
+
+/* ------------------------------------------------------------------ Board root
+ * The one measurement a lane cannot make for itself. The board root declares it, every lane
+ * inherits it, and under 640px it narrows so the NEXT lane peeks past the right edge — which is
+ * the only thing that tells a phone reader there is more board than this. The fallback keeps a
+ * lane composed outside a board from collapsing. */
+.vv-board { --kb-lane-w: 300px; }
+@media (max-width: 639px) {
+  .vv-board { --kb-lane-w: min(86vw, 300px); }
+}
+
+/* ------------------------------------------------------------------ Lane */
+/* A lane carries NO colour: its identity is its position and its name. Surface, edge and radius
+ * are chrome, so the strip reads as a row of columns rather than a wash of them. */
+.vv-lane {
+  /* The fallback is the same pair, so a lane still narrows on a phone even where no ancestor
+   * carries `vv-board` — the class is this file's name for "the board root", and the panel that
+   * will own that root is a later phase's. A board root that DOES declare the property wins,
+   * because an inherited custom property beats a fallback. */
+  width: var(--kb-lane-w, 300px);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  transition: border-color var(--dur-quick) var(--ease-enter);
+}
+.vv-lane__head {
+  border-bottom: 1px solid var(--border);
+}
+.vv-lane__title {
+  font-size: var(--text-small);
+  font-weight: 600;
+  line-height: var(--leading-tight);
+}
+.vv-lane__body { border-bottom-left-radius: inherit; border-bottom-right-radius: inherit; }
+/* The `+` keeps the accent `ghost` hands it — it is the lane's one action. The overflow does
+ * NOT: a disclosure is not an action, and eight green dots down a four-lane strip spend the
+ * house green on chrome, which is the one thing Verve reserves it against. */
+.vv-button.vv-lane__menu-trigger,
+.vv-button.vv-lane-card__menu-trigger { color: var(--ink-muted); }
+.vv-button.vv-lane__menu-trigger:hover:not(:disabled),
+.vv-button.vv-lane-card__menu-trigger:hover:not(:disabled) { color: var(--ink); background: var(--surface2); }
+/* The sentinel is an 8px strip the pager watches, never something a reader sees. */
+.vv-lane__sentinel { pointer-events: none; }
+
+@media (max-width: 639px) {
+  .vv-lane { width: var(--kb-lane-w, min(86vw, 300px)); }
+}
+
+/* A lane the screen marked muted loses weight, not hue — the same move the cards inside it
+ * make, so the column reads as later rather than as a different kind of thing. */
+.vv-lane--muted .vv-lane__title { color: var(--ink-muted); }
+
+/* A lane that would accept the card now in flight. An edge and a body one step off the card
+ * surface, and NO fill wash: a tinted column behind eight tinted cards loses the cards. */
+.vv-lane--over { border-color: var(--accent); }
+.vv-lane--over .vv-lane__body { background: var(--surface2); }
+
+/* ------------------------------------------------------------------ Card */
+/* `.vv-card` (controls.css) is the ground — surface, border, radius, --shadow-rest. This adds
+ * only what a card you can pick up needs: a faster hover than a static card's 0.4s, because a
+ * lane full of them is a surface the pointer crosses rather than one it arrives at. */
+.vv-lane-card {
+  cursor: grab;
+  transition: transform var(--dur-quick) var(--ease-enter), box-shadow var(--dur-quick) var(--ease-enter), opacity var(--dur-quick) var(--ease-enter);
+}
+.vv-lane-card.vv-lane-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-hover); }
+
+/* The 2px accent left edge, worn by a SELECTED card (the drawer is open on it) and by a LEASED
+ * one (a builder holds it). Drawn as a background image rather than a border or an inset shadow,
+ * both of which were tried and both of which are wrong here: a real border widens the box and
+ * shoves every card in the lane sideways the moment one is picked, and an inset shadow follows
+ * the 12px radius and wraps the corners until the card reads as OUTLINED in green rather than
+ * edged. A gradient strip inset 8px top and bottom is a bar, and only a bar. It also leaves both
+ * pseudo-elements free for the insertion line, which a selected card can carry at the same time. */
+.vv-lane-card.vv-lane-card--selected,
+.vv-lane-card.vv-lane-card--leased {
+  background-image: linear-gradient(var(--accent), var(--accent));
+  background-repeat: no-repeat;
+  background-size: 2px calc(100% - 16px);
+  background-position: 0 8px;
+}
+/* The wash is the accent-soft HALF Phase 5 measured; the full strength read under AA on this ink.
+ * The edge alone would be a bare mark, which doctrine §6 forbids as a whole signal — the drawer
+ * is the word for selected, and the lease badge beside it is the word for leased. */
+.vv-lane-card.vv-lane-card--selected {
+  background-color: color-mix(in srgb, var(--accent-soft) 50%, var(--surface));
+}
+
+/* Muted — the screen's decision about a whole lane, arriving one card at a time. A weight
+ * change, never a hue, exactly as ruled — but NOT `opacity`, which was the ruling's mechanism and
+ * does not survive being measured. At .8 the composite takes a tag's neutral ink from 5.07:1 to
+ * 3.39:1, the amber priority mark from 5.24:1 to 3.52:1, the muted ink from 4.9:1 to 3.3:1 and a
+ * danger badge's ink-on-fill from 5.06:1 to 3.98:1, every one of them on a light card and every
+ * one under AA; and no opacity that dims visibly keeps them, since 0.93 would be needed and 0.93
+ * reads as no dim at all. The last of those four cannot be compensated even in principle: fixing
+ * a toned badge means writing a tone rule, which doctrine §5 forbids a component from doing. So
+ * the weight comes off the two things that can afford it — the card's shadow and edge, and its
+ * title — and every ink on the face keeps the ratio it was measured at. The precedent for moving
+ * a ruled value that reads under AA, and for writing down why beside it, is the selected project
+ * row in Phase 5 (verve/README, "What a composed screen looks like"). */
+.vv-lane-card.vv-lane-card--muted {
+  border-color: color-mix(in srgb, var(--border) 55%, transparent);
+  box-shadow: none;
+}
+.vv-lane-card--muted .vv-lane-card__title { color: var(--ink-mid); }
+.vv-lane-card.vv-lane-card--muted:hover { box-shadow: var(--shadow-rest); }
+
+/* Lifted. Under a KEYBOARD move this is the whole of what the reader watches; under a pointer
+ * drag it is the frame the browser snapshots into its drag image. */
+.vv-lane-card.vv-lane-card--lifted {
+  transform: scale(1.02) rotate(1deg);
+  box-shadow: var(--shadow-lift);
+  cursor: grabbing;
+}
+/* …and one frame later the browser owns that image, so the element still sitting in the lane is
+ * no longer the card but the hole it left. The source lane marks itself, and the hole stays
+ * exactly where it was at .35 with no shadow — a gap that slid shut would move every card under
+ * the pointer mid-drag. */
+.vv-lane--dragging .vv-lane-card--lifted {
+  transform: none;
+  box-shadow: none;
+  opacity: 0.35;
+}
+.vv-lane--dragging .vv-lane-card:hover { transform: none; box-shadow: var(--shadow-rest); }
+
+/* The insertion line: 2px of accent on the neighbour's edge, centred in the lane's own 8px gap.
+ * Never a phantom box — a box claims a size the card may not have, and the reader is being told
+ * WHERE it lands, not how big it is. */
+.vv-lane-card--edge-top::before,
+.vv-lane-card--edge-bottom::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  border-radius: var(--radius-pill);
+  background: var(--accent);
+}
+.vv-lane-card--edge-top::before { top: -5px; }
+.vv-lane-card--edge-bottom::after { bottom: -5px; }
+
+/* ------------------------------------------------------------------ Card face */
+/* Everything a face shows only when it is being looked at — the overflow menu, the card id, the
+ * token chip. Always in the DOM and faded by OPACITY, never mounted on hover: the row keeps its
+ * height either way, so nothing on the card moves under the pointer that is reaching for it. */
+.vv-lane-card__reveal {
+  opacity: 0;
+  /* `visibility`, not opacity alone, and this is the load-bearing half: the overflow menu rides in
+   * here, and an element merely at `opacity: 0` is still IN THE TAB ORDER — a fifty-card lane was
+   * fifty invisible tab stops before a reader reached the second card. `hidden` takes it out, and
+   * the `:focus-within` below puts it back for exactly the card that has focus, which is the
+   * ruled focus list: one card per lane, and the focused card's own `…`. It transitions as a
+   * discrete step that waits out the fade on the way down and fires at once on the way up. */
+  visibility: hidden;
+  transition: opacity var(--dur-quick) var(--ease-enter), visibility var(--dur-quick);
+}
+.vv-lane-card:hover .vv-lane-card__reveal,
+.vv-lane-card:focus-within .vv-lane-card__reveal,
+.vv-lane-card--selected .vv-lane-card__reveal,
+/* An open menu is PORTALLED, so focus leaving for it also leaves the card and `:focus-within`
+ * stops matching. Without this the trigger would hide underneath its own open menu and ActionMenu
+ * would restore focus to something invisible. */
+.vv-lane-card__reveal:has([aria-expanded='true']) { opacity: 1; visibility: visible; }
+/* There is no hover on a touch screen, and a menu nobody can reach is a menu nobody has. */
+@media (pointer: coarse) {
+  .vv-lane-card__reveal { opacity: 1; visibility: visible; }
+}
+
+/* A tag is a NAME, not a verdict: outline and neutral ink, clipped rather than allowed to push
+ * the priority mark off its own row. */
+/* `inline-block` rather than the badge's own `inline-flex`, because `text-overflow` needs a block
+ * box to ellipsise in; a flex container clips mid-glyph and says nothing about it. `flex: none` is
+ * the other half and is not optional once the ellipsis exists: these ride in a flex row, flex
+ * items shrink before they overflow, and a shrunk box that can ellipsise DOES — measured, a
+ * four-tag row truncated `import` to `i…` and `db` to `d…` while the tag that actually needed it
+ * sat at full width. Refusing to shrink lets each tag keep its own width up to the 96px cap and
+ * hands the overflow back to the row, which clips it. */
+.vv-badge.vv-lane-card__tag {
+  display: inline-block;
+  flex: none;
+  max-width: 96px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+.vv-lane-card__signal { flex: none; white-space: nowrap; }
+/* A signal under the face's two-tone cut. It keeps its glyph and its count and goes quiet. The
+ * SHAPE is already `.vv-badge--outline`'s, which the component pairs this with, so only the ink
+ * is spelled here — --ink-muted, 4.6:1 on a light card, so quiet is still read. */
+.vv-badge.vv-lane-card__signal--quiet { color: var(--ink-muted); }
+
+/* Two density overrides scoped to a card, which is a denser place than either component was
+ * sized for. The inline meter's 4px track is one line among several on a face of four, and the
+ * empty state's 24px serif title was drawn to fill a pane, not a 300px column. */
+.vv-lane-card .vv-meter--inline .vv-meter__track { height: 3px; }
+.vv-lane__empty .vv-empty { padding: 20px 12px; }
+.vv-lane__empty .vv-empty__title { font-size: 18px; }

@@ -161,6 +161,12 @@
     "stopTitle": "このチャットはまだ実行中です",
     "stopBody": "停止して削除しますか?",
     "stopConfirm": "停止して削除",
-    "removeFailed": "このチャットを削除できませんでした。"
+    "removeFailed": "このチャットを削除できませんでした。",
+    "changeIcon": "アイコンを変更",
+    "iconTitle": "アイコンを選択",
+    "iconDefault": "デフォルト",
+    "iconOption": "{{name}} アイコン",
+    "unread": "完了、未読",
+    "dragHandle": "ドラッグして並べ替え"
   }
 }

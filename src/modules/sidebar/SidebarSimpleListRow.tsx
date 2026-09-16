@@ -1,11 +1,13 @@
 import { useState } from 'react';
-import { Edit2, EyeOff, Loader2, MoreHorizontal, Trash2 } from 'lucide-react';
+import type { HTMLAttributes } from 'react';
+import { Edit2, EyeOff, Loader2, MoreHorizontal, Smile, Trash2 } from 'lucide-react';
 import type { TFunction } from 'i18next';
 
 import { ActionMenu, Tooltip } from '@/shared/ui';
 import { cn } from '@/shared/utils';
 import type { RecentConversationListItem } from '@/shared/types';
 import { useCompactSidebar } from '@/modules/sidebar/hooks/useCompactSidebar';
+import { SimpleChatIconGlyph } from '@/modules/sidebar/SidebarSessionIcon';
 
 // File-local: read only by SidebarSimpleList, which renders one of these per row.
 type SidebarSimpleListRowProps = {
@@ -17,10 +19,17 @@ type SidebarSimpleListRowProps = {
   onArchive: () => void;
   onDelete: () => void;
   onRename: (title: string) => void;
+  onChooseIcon: () => void;
+  // The pointer handlers that pick this row up; null when the list offers no reorder.
+  dragProps: Pick<HTMLAttributes<HTMLElement>, 'onPointerDown' | 'onClickCapture' | 'onDragStart'> | null;
+  // True while this very row is the one being carried: it fades so the drop line reads.
+  isDragging: boolean;
+  // Which edge of this row the carried row would land on, or null when it is not the target.
+  dropEdge: 'before' | 'after' | null;
   t: TFunction;
 };
 
-/** One row of SidebarSimpleList: title, project, a running spinner, and Rename/Archive/Delete behind one ActionMenu. */
+/** One row of SidebarSimpleList: its icon, title, project, a running spinner or unread dot, and Rename/Change icon/Archive/Delete behind one ActionMenu. */
 export default function SidebarSimpleListRow({
   row,
   isSelected,
@@ -30,6 +39,10 @@ export default function SidebarSimpleListRow({
   onArchive,
   onDelete,
   onRename,
+  onChooseIcon,
+  dragProps,
+  isDragging,
+  dropEdge,
   t,
 }: SidebarSimpleListRowProps) {
   const isCompact = useCompactSidebar();
@@ -53,8 +66,11 @@ export default function SidebarSimpleListRow({
 
   return (
     <div
+      {...(dragProps ?? {})}
       data-testid="simple-chat-row"
       data-session-id={row.sessionId}
+      data-dragging={isDragging ? 'true' : 'false'}
+      data-drop-edge={dropEdge ?? undefined}
       className={cn(
         'group relative flex min-w-0 items-center gap-2 rounded-lg px-2 text-left transition-colors',
         // No `py-2` in compact mode: the anchor below reaches 44px by stretching to fill this
@@ -63,8 +79,19 @@ export default function SidebarSimpleListRow({
         // Desktop is unaffected — it never carries the compact height floor at all.
         isCompact ? 'min-h-11' : 'py-2',
         isSelected ? 'bg-primary/10 text-foreground' : 'text-foreground hover:bg-accent/60',
+        isDragging && 'opacity-50',
       )}
     >
+      <span
+        data-testid="simple-chat-icon"
+        data-drag-handle
+        data-icon={row.icon ?? 'default'}
+        title={t('simpleList.dragHandle')}
+        className="flex h-7 w-6 flex-shrink-0 cursor-grab touch-none items-center justify-center text-muted-foreground"
+      >
+        <SimpleChatIconGlyph icon={row.icon} className="h-4 w-4" />
+      </span>
+
       {isEditing ? (
         <input
           type="text"
@@ -82,6 +109,8 @@ export default function SidebarSimpleListRow({
       ) : (
         <a
           href={`/session/${row.sessionId}`}
+          // The browser's own link drag would fight the pointer reorder the row carries.
+          draggable={false}
           // `self-stretch` fills the row div's CONTENT box, which in compact mode is now exactly
           // the row's own 44px floor (no padding above to shrink it) — `flex flex-col
           // justify-center` keeps the two text lines centred inside that. Measured against the
@@ -116,6 +145,16 @@ export default function SidebarSimpleListRow({
         </Tooltip>
       )}
 
+      {row.unread && !isSelected && !isRunning && !isEditing && (
+        <span
+          data-testid="simple-chat-unread"
+          role="img"
+          aria-label={t('simpleList.unread')}
+          title={t('simpleList.unread')}
+          className="mx-1.5 h-2 w-2 flex-shrink-0 rounded-full bg-primary"
+        />
+      )}
+
       {!isEditing && (
         <div data-testid="simple-chat-menu">
           <ActionMenu
@@ -133,6 +172,12 @@ export default function SidebarSimpleListRow({
                 label: t('simpleList.rename'),
                 icon: Edit2,
                 onSelect: startRename,
+              },
+              {
+                key: 'simple-chat-icon',
+                label: t('simpleList.changeIcon'),
+                icon: Smile,
+                onSelect: onChooseIcon,
               },
               // Two entries where there was one "Remove", because they are two different
               // outcomes: archive keeps the transcript and can be undone from the archive
@@ -154,6 +199,18 @@ export default function SidebarSimpleListRow({
             ]}
           />
         </div>
+      )}
+
+      {/* Where the carried row lands. It ignores the pointer, so the row under it stays the
+          target it marks. */}
+      {dropEdge && (
+        <span
+          aria-hidden
+          className={cn(
+            'pointer-events-none absolute inset-x-1 h-0.5 rounded-full bg-primary',
+            dropEdge === 'before' ? 'top-0' : 'bottom-0',
+          )}
+        />
       )}
     </div>
   );

@@ -168,6 +168,12 @@
     "stopTitle": "Bu sohbet hâlâ çalışıyor",
     "stopBody": "Durdurulsun ve kaldırılsın mı?",
     "stopConfirm": "Durdur ve kaldır",
-    "removeFailed": "Bu sohbet kaldırılamadı."
+    "removeFailed": "Bu sohbet kaldırılamadı.",
+    "changeIcon": "Simgeyi değiştir",
+    "iconTitle": "Bir simge seç",
+    "iconDefault": "Varsayılan",
+    "iconOption": "{{name}} simgesi",
+    "unread": "Bitti, henüz okunmadı",
+    "dragHandle": "Sıralamak için sürükleyin"
   }
 }

@@ -26,7 +26,190 @@
     "browser": "Browser",
     "computer": "Computer",
     "memory": "Memory",
-    "runner": "Runner"
+    "runner": "Runner",
+    "kanban": "Kanban"
+  },
+  "kanban": {
+    "loading": "Reading the board…",
+    "unreachable": {
+      "title": "The board could not be read",
+      "message": "The server did not answer. Nothing has been lost — the board is wherever you left it.",
+      "retry": "Try again"
+    },
+    "noBoard": {
+      "title": "No board yet",
+      "message": "A board is where cards live. This project does not have one yet.",
+      "action": "Create a board"
+    },
+    "board": {
+      "switcher": "Board",
+      "actions": "Board actions",
+      "noBoard": "No board",
+      "autonomy": "Autonomy",
+      "newBoard": "New board",
+      "rename": "Rename",
+      "archive": "Archive",
+      "importDescent": "Import from Descent",
+      "newTitle": "New board",
+      "renameTitle": "Rename board",
+      "archiveTitle": "Archive this board?",
+      "archiveMessage": "It leaves the switcher and every card stays where it is. Nothing is deleted.",
+      "nameLabel": "Board name",
+      "namePlaceholder": "What this board is for",
+      "cancel": "Cancel",
+      "save": "Save",
+      "questionsFolded_one": "{{count}} card in To Do is waiting on an answer",
+      "questionsFolded_other": "{{count}} cards in To Do are waiting on an answer"
+    },
+    "lanes": {
+      "todo": "To Do",
+      "questions": "Open questions",
+      "backlog": "Backlog",
+      "active": "In Progress",
+      "done": "Done"
+    },
+    "laneMenu": {
+      "collapse": "Collapse lane",
+      "sortByPriority": "Sort by priority",
+      "sortByNewest": "Sort by newest",
+      "clearDone": "Clear done"
+    },
+    "card": {
+      "open": "Open",
+      "moveTo": "Move to {{lane}}",
+      "archive": "Archive",
+      "untitled": "Untitled card",
+      "moved": "{{title}} moved to {{lane}}, position {{position}} of {{total}}"
+    },
+    "priority": {
+      "low": "Low",
+      "medium": "Medium",
+      "high": "High"
+    },
+    "drawer": {
+      "title": "Title",
+      "titlePlaceholder": "What this card is called",
+      "priority": "Priority",
+      "tags": "Tags",
+      "tagPlaceholder": "Add a tag",
+      "addTag": "Add",
+      "removeTag": "Remove tag {{tag}}",
+      "description": "Description",
+      "descriptionPlaceholder": "What this card is for",
+      "body": "Body",
+      "bodyEdit": "Edit",
+      "bodyCancel": "Cancel",
+      "bodySave": "Save",
+      "bodyPlaceholder": "Anything written about this card",
+      "bodyEmpty": "Nothing written yet.",
+      "close": "Close the card",
+      "untitled": "Untitled card",
+      "unreachable": {
+        "title": "This card could not be read",
+        "retry": "Try again"
+      }
+    },
+    "questions": {
+      "title": "Questions",
+      "unanswered_one": "{{count}} unanswered",
+      "unanswered_other": "{{count}} unanswered",
+      "none": "Nothing is waiting on an answer.",
+      "multiHint": "More than one may be chosen.",
+      "other": "Something else",
+      "otherPlaceholder": "Say it in your own words",
+      "answer": "Answer",
+      "change": "Change",
+      "cancel": "Cancel",
+      "answeredBlank": "Answered"
+    },
+    "checklist": {
+      "title": "Checklist",
+      "progress": "Steps done",
+      "progressAria": "Steps completed",
+      "none": "No steps written down yet.",
+      "add": "Add a step",
+      "addPlaceholder": "What has to happen",
+      "note": "Note on this step",
+      "notePlaceholder": "What was found here",
+      "noteSave": "Save the note",
+      "markPending": "Mark this step pending",
+      "markActive": "Mark this step in progress",
+      "markDone": "Mark this step done"
+    },
+    "issues": {
+      "title": "Issues",
+      "open_one": "{{count}} open",
+      "open_other": "{{count}} open",
+      "none": "Nothing went wrong.",
+      "file": "File an issue",
+      "filePlaceholder": "What went wrong",
+      "resolve": "Resolve",
+      "resolvedBy": "Resolved by {{who}}, {{when}}",
+      "someone": "someone"
+    },
+    "approve": {
+      "approve": "Approve",
+      "unapprove": "Withdraw approval",
+      "approved": "Approved {{when}}",
+      "needed": "Needs approval",
+      "blockedByQuestions_one": "{{count}} question is still unanswered.",
+      "blockedByQuestions_other": "{{count}} questions are still unanswered.",
+      "blockedByEmptiness": "This card says nothing yet — a plan, a body or a description is what approval is for."
+    },
+    "tokens": {
+      "title": "Spend",
+      "total": "{{total}} in all",
+      "in": "Input",
+      "out": "Output",
+      "cacheRead": "Cache read",
+      "cacheCreate": "Cache written"
+    },
+    "closing": {
+      "title": "Closing remarks",
+      "placeholder": "What was left to say at the end"
+    },
+    "toast": {
+      "cardNotSaved": "The card was not saved",
+      "boardNotSaved": "The board was not saved",
+      "boardCreated": "Board created",
+      "boardRenamed": "Board renamed",
+      "boardArchived": "Board archived — nothing was deleted",
+      "autonomyOn": "Autonomy on",
+      "autonomyOff": "Autonomy off",
+      "cardArchived": "Card archived",
+      "laneCleared": "The lane's cards were archived"
+    },
+    "import": {
+      "title": "Import from Descent",
+      "pathLabel": "Descent database",
+      "pathHelper": "Read only. Nothing in Descent is written, and a second import updates what it already brought across instead of adding it twice.",
+      "run": "Import",
+      "running": "Reading Descent…",
+      "again": "Import again",
+      "cancel": "Cancel",
+      "close": "Close",
+      "summary": "{{inserted}} added, {{updated}} updated",
+      "done": "Imported from Descent",
+      "counts": "{{inserted}} added, {{updated}} updated",
+      "failed": "The import did not run",
+      "table": {
+        "row": "What",
+        "source": "In Descent",
+        "imported": "On this board"
+      },
+      "rows": {
+        "boards": "Boards",
+        "cards": "Cards",
+        "tags": "Tags",
+        "questions": "Questions",
+        "issues": "Issues",
+        "decisions": "Decisions",
+        "checklist": "Checklist steps",
+        "attachments": "Attachments",
+        "events": "Events",
+        "settings": "Settings"
+      }
+    }
   },
   "status": {
     "loading": "Loading...",

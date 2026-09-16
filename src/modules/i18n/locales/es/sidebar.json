@@ -171,6 +171,12 @@
     "stopTitle": "Este chat sigue en ejecución",
     "stopBody": "¿Detenerlo y eliminarlo?",
     "stopConfirm": "Detener y eliminar",
-    "removeFailed": "No se pudo eliminar este chat."
+    "removeFailed": "No se pudo eliminar este chat.",
+    "changeIcon": "Cambiar icono",
+    "iconTitle": "Elegir un icono",
+    "iconDefault": "Predeterminado",
+    "iconOption": "Icono {{name}}",
+    "unread": "Finalizado, sin leer",
+    "dragHandle": "Arrastra para reordenar"
   }
 }

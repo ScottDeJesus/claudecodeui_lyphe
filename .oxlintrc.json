@@ -74,7 +74,8 @@
           "server/shared/message-unification.ts",
           "server/shared/local-commands.ts",
           "server/shared/child-env.ts",
-          "server/shared/polled-lane.service.ts"
+          "server/shared/polled-lane.service.ts",
+          "server/shared/kanban-types.ts"
         ],
         "mode": "file"
       },
@@ -102,7 +103,8 @@
           "src/shared/userSettings.ts",
           "src/shared/chatDrafts.ts",
           "src/shared/solarSchedule.ts",
-          "src/shared/syntaxHighlighter.ts"
+          "src/shared/syntaxHighlighter.ts",
+          "src/shared/kanban-types.ts"
         ],
         "mode": "file"
       },

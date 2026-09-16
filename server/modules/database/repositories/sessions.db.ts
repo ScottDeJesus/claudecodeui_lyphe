@@ -1,5 +1,9 @@
 import { getConnection } from '@/modules/database/connection.js';
 import { projectsDb } from '@/modules/database/repositories/projects.db.js';
+import {
+  NEXT_TOP_SIMPLE_LIST_RANK_SQL,
+  SESSION_UNREAD_SQL,
+} from '@/modules/database/repositories/session-user-state.db.js';
 import { normalizeProjectPath } from '@/shared/utils.js';
 
 type SessionRow = {
@@ -15,8 +19,18 @@ type SessionRow = {
   effort: string | null;
   /** The app session this one was branched from; NULL unless it is a fork. */
   forked_from_session_id: string | null;
-  /** Set when this session was created from the simple chat list; also its sort key. NULL = not tagged. */
+  /** Set when this session was created from the simple chat list. NULL = not tagged. */
   simple_list_at: string | null;
+  /** The simple list's manual sort key: a higher value sits nearer the top. NULL = not tagged. */
+  simple_list_rank: number | null;
+  /** The kebab-case icon name chosen for this chat. NULL = render the default. */
+  icon: string | null;
+  /** When this session's last run finished, ISO-8601 UTC. NULL until one has finished. */
+  last_completed_at: string | null;
+  /** When this session was last on screen, ISO-8601 UTC. NULL until it has been once. */
+  last_read_at: string | null;
+  /** Present only on rows read through `getRecentSessionsPage`, as `1`/`0`. */
+  unread?: number;
   isArchived: number;
   created_at: string;
   updated_at: string;
@@ -28,7 +42,7 @@ type RecentSessionsPage = {
 };
 
 const SESSION_ROW_COLUMNS =
-  'session_id, provider, provider_session_id, project_path, jsonl_path, custom_name, model, effort, forked_from_session_id, simple_list_at, isArchived, created_at, updated_at';
+  'session_id, provider, provider_session_id, project_path, jsonl_path, custom_name, model, effort, forked_from_session_id, simple_list_at, simple_list_rank, icon, last_completed_at, last_read_at, isArchived, created_at, updated_at';
 
 const SQLITE_UTC_TIMESTAMP_REGEX = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/;
 
@@ -189,10 +203,13 @@ export const sessionsDb = {
 
     projectsDb.createProjectPath(normalizedProjectPath);
 
+    // A session created into the simple list is created at the top of it: its
+    // rank is stamped from the one rank expression, rather than left NULL for
+    // the first reorder to resolve.
     db.prepare(
-      `INSERT INTO sessions (session_id, provider, provider_session_id, custom_name, project_path, jsonl_path, simple_list_at, isArchived, created_at, updated_at)
-       VALUES (?, ?, NULL, ?, ?, NULL, CASE WHEN ? = 1 THEN CURRENT_TIMESTAMP ELSE NULL END, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`
-    ).run(sessionId, provider, customName ?? null, normalizedProjectPath, simpleList ? 1 : 0);
+      `INSERT INTO sessions (session_id, provider, provider_session_id, custom_name, project_path, jsonl_path, simple_list_at, simple_list_rank, isArchived, created_at, updated_at)
+       VALUES (?, ?, NULL, ?, ?, NULL, CASE WHEN ? = 1 THEN CURRENT_TIMESTAMP ELSE NULL END, CASE WHEN ? = 1 THEN ${NEXT_TOP_SIMPLE_LIST_RANK_SQL} ELSE NULL END, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`
+    ).run(sessionId, provider, customName ?? null, normalizedProjectPath, simpleList ? 1 : 0, simpleList ? 1 : 0);
 
     return sessionId;
   },
@@ -613,15 +630,17 @@ export const sessionsDb = {
       sessions.isArchived = 0
       AND (projects.isArchived IS NULL OR projects.isArchived = 0)
     `;
-    // The simple list sorts by tagging time so a running chat never jumps;
-    // the tree keeps sorting by last activity.
+    // The simple list sorts by its manual rank so a running chat never jumps
+    // and a drag sticks; the tree keeps sorting by last activity.
     const orderByClause = options.simpleListOnly
-      ? 'sessions.simple_list_at DESC, sessions.session_id DESC'
+      ? 'sessions.simple_list_rank DESC, sessions.session_id DESC'
       : `julianday(COALESCE(sessions.updated_at, sessions.created_at)) DESC,
                   sessions.session_id DESC`;
+    // `unread` is derived here, from the one unread expression, so the client
+    // never re-derives the rule from the two raw timestamps.
     const rows = db
       .prepare(
-        `SELECT sessions.*
+        `SELECT sessions.*, (${SESSION_UNREAD_SQL}) AS unread
          FROM sessions
          LEFT JOIN projects ON projects.project_path = sessions.project_path
          WHERE ${visibilityClause}

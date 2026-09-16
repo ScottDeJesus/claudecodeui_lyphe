@@ -108,7 +108,24 @@ why three of its files are plain ESM JavaScript, are in
 `POST /api/providers/sessions` accepts an optional `simpleList` boolean; only
 `true` tags the new row for the simple chat list. `GET /api/providers/sessions/recent`
 accepts an optional `simpleList=true` query flag that narrows the same feed to
-tagged rows only, ordered by tagging time instead of last activity.
+tagged rows only, ordered by `simple_list_rank` instead of last activity.
+
+Every row of that feed also carries the chat's `icon` (the chosen kebab-case
+icon name, or `null` for the default) and its `unread` flag (its last run
+finished while the chat was not on screen, and it has not been on screen since).
+
+The two writes the sidebar owns outside the chat itself live in
+`session-user-state.routes.ts`, mounted from `provider.routes.ts`:
+
+- `PUT /api/providers/sessions/:sessionId/icon` takes `{ icon: string | null }`
+  and answers `{ sessionId, icon }`. A bad name is a 400 `INVALID_SESSION_ICON`.
+- `PUT /api/providers/sessions/:sessionId/simple-list-position` takes
+  `{ afterSessionId: string | null }` — `null` means the top of the list — and
+  answers `{ sessionId, afterSessionId }`. A bad id is a 400
+  `INVALID_SIMPLE_LIST_POSITION`.
+
+Both answers are followed by a `session_upserted` broadcast on the chat
+websocket, so every open tab re-renders the row.
 
 ## How To Add A Provider
 

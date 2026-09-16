@@ -40,7 +40,12 @@ type ArchivedSessionListItem = {
 type RecentSessionListItem = Pick<
   ArchivedSessionListItem,
   'sessionId' | 'provider' | 'projectId' | 'projectDisplayName' | 'sessionTitle' | 'lastActivity'
->;
+> & {
+  /** The chat's chosen icon name, or null for the default. */
+  icon: string | null;
+  /** Its last run finished while the chat was not on screen, and it has not been on screen since. */
+  unread: boolean;
+};
 
 type RecentSessionsPage = {
   conversations: RecentSessionListItem[];
@@ -218,6 +223,8 @@ export const sessionsService = {
         projectDisplayName: resolveProjectDisplayName(projectPath, project?.custom_project_name),
         sessionTitle: session.custom_name?.trim() || session.session_id,
         lastActivity: session.updated_at ?? session.created_at ?? null,
+        icon: session.icon ?? null,
+        unread: Boolean(session.unread),
       };
     });
 

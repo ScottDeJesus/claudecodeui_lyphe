@@ -109,9 +109,13 @@ three restyled. What they share is the contract every later one joins:
 5. **Props come from a site you can point at** — the integration plan's §4 table
    (`~/.claude/plans/cloudcli-verve-integration.md`), or a real call. A prop nobody passes is a
    prop nobody proves: `Card`'s `interactive` has no consumer today.
-6. **`controls.css` is full, 296 of its 300 lines.** Phase 3's paint went into `feedback.css`
-   beside it, imported from the barrel the same way; the next file opens the same way again.
-   Don't win four lines back by squeezing either one.
+6. **`controls.css` is 435 lines and `feedback.css` 386, both at their stated ceiling.** Phase 3's
+   paint went into `feedback.css` beside `controls.css`, and the board's paint went into a THIRD
+   file, `board.css` — the `.vv-lane`, `.vv-lane__head` and `.vv-lane-card` rules and their
+   variants — imported from the barrel exactly as the other two are, and imported LAST there on
+   purpose: a lane card composes `.vv-card`'s ground and overrides its background, shadow and
+   transition, and at equal specificity the earlier import wins. The next file opens the same way
+   again. Don't win lines back by squeezing an existing one.
 
 Which components exist at all, and when a screen composes instead of asking for a new one, is
 doctrine §1–§3. Read it there, not here.

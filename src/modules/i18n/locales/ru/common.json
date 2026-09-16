@@ -24,7 +24,79 @@
     "git": "Git",
     "tasks": "Задачи",
     "browser": "Browser",
-    "computer": "Компьютер"
+    "computer": "Компьютер",
+    "kanban": "Канбан"
+  },
+  "kanban": {
+    "loading": "Чтение доски…",
+    "unreachable": {
+      "title": "Не удалось прочитать доску",
+      "message": "Сервер не ответил. Ничего не потеряно — доска там, где вы её оставили.",
+      "retry": "Повторить"
+    },
+    "noBoard": {
+      "title": "Доски ещё нет",
+      "message": "Доска — это место, где живут карточки. У этого проекта её пока нет.",
+      "action": "Создать доску"
+    },
+    "board": {
+      "switcher": "Доска",
+      "actions": "Действия с доской",
+      "noBoard": "Нет доски",
+      "autonomy": "Автономность",
+      "newBoard": "Новая доска",
+      "rename": "Переименовать",
+      "archive": "В архив",
+      "importDescent": "Импортировать из Descent",
+      "newTitle": "Новая доска",
+      "renameTitle": "Переименовать доску",
+      "archiveTitle": "Отправить доску в архив?",
+      "archiveMessage": "Она уйдёт из списка, а каждая карточка останется на месте. Ничего не удаляется.",
+      "nameLabel": "Название доски",
+      "namePlaceholder": "Для чего эта доска",
+      "cancel": "Отмена",
+      "save": "Сохранить",
+      "questionsFolded_one": "{{count}} карточка в «Сделать» ждёт ответа",
+      "questionsFolded_few": "{{count}} карточки в «Сделать» ждут ответа",
+      "questionsFolded_many": "{{count}} карточек в «Сделать» ждут ответа",
+      "questionsFolded_other": "{{count}} карточки в «Сделать» ждут ответа"
+    },
+    "lanes": {
+      "todo": "Сделать",
+      "questions": "Открытые вопросы",
+      "backlog": "Бэклог",
+      "active": "В работе",
+      "done": "Готово"
+    },
+    "laneMenu": {
+      "collapse": "Свернуть колонку",
+      "sortByPriority": "Сортировать по приоритету",
+      "sortByNewest": "Сортировать по новизне",
+      "clearDone": "Очистить готовые"
+    },
+    "card": {
+      "open": "Открыть",
+      "moveTo": "Переместить в {{lane}}",
+      "archive": "В архив",
+      "untitled": "Карточка без названия",
+      "moved": "{{title}} перемещена в {{lane}}, позиция {{position}} из {{total}}"
+    },
+    "toast": {
+      "cardNotSaved": "Карточка не сохранена",
+      "boardNotSaved": "Доска не сохранена",
+      "boardCreated": "Доска создана",
+      "boardRenamed": "Доска переименована",
+      "boardArchived": "Доска отправлена в архив — ничего не удалено",
+      "autonomyOn": "Автономность включена",
+      "autonomyOff": "Автономность выключена",
+      "cardArchived": "Карточка отправлена в архив",
+      "laneCleared": "Карточки колонки отправлены в архив"
+    },
+    "import": {
+      "done": "Импортировано из Descent",
+      "counts": "{{inserted}} добавлено, {{updated}} обновлено",
+      "failed": "Импорт не выполнился"
+    }
   },
   "status": {
     "loading": "Загрузка...",

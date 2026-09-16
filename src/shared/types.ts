@@ -51,7 +51,7 @@ export type ProviderModelActions = {
 //----------------- PROJECTS AND SESSIONS ------------
 
 /** Identifies the workspace pane the user is looking at; plugin panes are namespaced by plugin id. */
-export type AppTab = 'chat' | 'files' | 'shell' | 'git' | 'tasks' | 'browser' | 'memory' | 'runner' | `plugin:${string}`;
+export type AppTab = 'chat' | 'files' | 'shell' | 'git' | 'tasks' | 'browser' | 'memory' | 'runner' | 'kanban' | `plugin:${string}`;
 
 /** A message queued to be sent to a session at a future time. */
 export type ScheduledMessage = {
@@ -1532,11 +1532,14 @@ export type ArchivedSessionListItem = {
   isProjectArchived: boolean;
 };
 
-/** The subset of archived-session fields needed to render a recent-conversations row and reopen the session it points at. */
+/**
+ * The subset of archived-session fields needed to render a recent-conversations row and reopen the session it points at.
+ * `icon` is the chat's chosen icon name, or null for the default; `unread` means its last run finished while it was not on screen and it has not been on screen since.
+ */
 export type RecentConversationListItem = Pick<
   ArchivedSessionListItem,
   'sessionId' | 'provider' | 'projectId' | 'projectDisplayName' | 'sessionTitle' | 'lastActivity'
->;
+> & { icon: string | null; unread: boolean };
 
 /**
  * The rename the sidebar currently has open, if any.

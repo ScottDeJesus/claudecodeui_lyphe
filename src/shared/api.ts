@@ -285,6 +285,16 @@ export const api = {
     post(`/api/providers/sessions/${encodeURIComponent(sessionId)}/fork`, body),
   renameSession: (sessionId: string, summary: string) =>
     put(`/api/providers/sessions/${sessionId}`, { summary }),
+  // Sets or clears the icon a chat carries in the simple list. `null` restores
+  // the default glyph.
+  setSessionIcon: (sessionId: string, icon: string | null) =>
+    put(`/api/providers/sessions/${encodeURIComponent(sessionId)}/icon`, { icon }),
+  // Moves a chat in the simple list to sit directly below `afterSessionId`, or
+  // to the top of the list when that is null.
+  moveSimpleListSession: (sessionId: string, afterSessionId: string | null) =>
+    put(`/api/providers/sessions/${encodeURIComponent(sessionId)}/simple-list-position`, {
+      afterSessionId,
+    }),
 
   // Scheduled messages: send a message to a session at a future time.
   scheduledMessages: {
@@ -621,6 +631,44 @@ export const api = {
     run: (id: string) => get(`/api/plan-runner/runs/${encodeURIComponent(id)}`),
     stop: (id: string) => post(`/api/plan-runner/runs/${encodeURIComponent(id)}/stop`, {}),
     resume: (id: string) => post(`/api/plan-runner/runs/${encodeURIComponent(id)}/resume`, {}),
+  },
+
+  // The Kanban board (docs/kanban.md). Boards are GLOBAL: the selected board is a server-side
+  // setting, so switching projects never switches boards, and the only method here that names a
+  // project is the first-mount lookup that adopts a board for the project the panel opened with.
+  // Writes carry no actor — there is no per-user identity on this board yet, and the server
+  // defaults every audit row to `'operator'`. `laneCards` takes a lane as a SET of statuses and
+  // joins them for the wire, because which statuses compose a lane (To Do is `todo` plus
+  // `questions` with autonomy off) is the panel's policy and only the panel's. A lease names an
+  // `owner` rather than an actor: a lease owner is a build process, and who holds a card and who
+  // wrote its audit row are different questions.
+  kanban: {
+    boards: () => get('/api/kanban/boards'),
+    createBoard: (body: { name: string; projectId?: string | null }) => post('/api/kanban/boards', body),
+    updateBoard: (id: string, body: Record<string, unknown>) =>
+      patch(`/api/kanban/boards/${encodeURIComponent(id)}`, body),
+    selectBoard: (id: string) => post(`/api/kanban/boards/${encodeURIComponent(id)}/select`, {}),
+    lanes: (id: string) => get(`/api/kanban/boards/${encodeURIComponent(id)}/lanes`),
+    laneCards: (id: string, statuses: string[], cursor?: string | null, limit = 50) =>
+      get(`/api/kanban/boards/${encodeURIComponent(id)}/cards?status=${encodeURIComponent(statuses.join(','))}&limit=${limit}${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`),
+    createCard: (id: string, body: Record<string, unknown>) => post(`/api/kanban/boards/${encodeURIComponent(id)}/cards`, body),
+    boardForProject: (projectId: string) => get(`/api/kanban/projects/${encodeURIComponent(projectId)}/board`),
+    card: (id: string) => get(`/api/kanban/cards/${encodeURIComponent(id)}`),
+    updateCard: (id: string, body: Record<string, unknown>) => patch(`/api/kanban/cards/${encodeURIComponent(id)}`, body),
+    moveCard: (id: string, body: Record<string, unknown>) => post(`/api/kanban/cards/${encodeURIComponent(id)}/move`, body),
+    archiveCard: (id: string) => post(`/api/kanban/cards/${encodeURIComponent(id)}/archive`, {}),
+    addTag: (id: string, tag: string) => post(`/api/kanban/cards/${encodeURIComponent(id)}/tags`, { tag }),
+    removeTag: (id: string, tag: string) => del(`/api/kanban/cards/${encodeURIComponent(id)}/tags/${encodeURIComponent(tag)}`),
+    addQuestion: (id: string, body: Record<string, unknown>) => post(`/api/kanban/cards/${encodeURIComponent(id)}/questions`, body),
+    answerQuestion: (id: string, body: Record<string, unknown>) => post(`/api/kanban/questions/${encodeURIComponent(id)}/answer`, body),
+    fileIssue: (id: string, body: { text: string }) => post(`/api/kanban/cards/${encodeURIComponent(id)}/issues`, body),
+    resolveIssue: (id: string, body: Record<string, unknown>) => post(`/api/kanban/issues/${encodeURIComponent(id)}/resolve`, body),
+    addChecklistItem: (id: string, body: Record<string, unknown>) => post(`/api/kanban/cards/${encodeURIComponent(id)}/checklist`, body),
+    updateChecklistItem: (id: string, body: Record<string, unknown>) => patch(`/api/kanban/checklist/${encodeURIComponent(id)}`, body),
+    approveCard: (id: string) => post(`/api/kanban/cards/${encodeURIComponent(id)}/approve`, {}),
+    unapproveCard: (id: string) => post(`/api/kanban/cards/${encodeURIComponent(id)}/unapprove`, {}),
+    events: (query: string) => get(`/api/kanban/events${query}`),
+    importDescent: (body: { dbPath?: string }) => post('/api/kanban/import/descent', body),
   },
 
   // The launcher souls a `/dispatch` started with `plan-runner soul`, read off the launcher's own

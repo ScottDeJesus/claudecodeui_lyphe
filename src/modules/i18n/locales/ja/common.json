@@ -24,7 +24,76 @@
     "git": "Git",
     "tasks": "タスク",
     "browser": "Browser",
-    "computer": "Computer"
+    "computer": "Computer",
+    "kanban": "カンバン"
+  },
+  "kanban": {
+    "loading": "ボードを読み込んでいます…",
+    "unreachable": {
+      "title": "ボードを読み込めませんでした",
+      "message": "サーバーが応答しませんでした。失われたものはありません。ボードはそのままの場所にあります。",
+      "retry": "再試行"
+    },
+    "noBoard": {
+      "title": "ボードがまだありません",
+      "message": "ボードはカードが置かれる場所です。このプロジェクトにはまだありません。",
+      "action": "ボードを作成"
+    },
+    "board": {
+      "switcher": "ボード",
+      "actions": "ボードの操作",
+      "noBoard": "ボードなし",
+      "autonomy": "自律",
+      "newBoard": "新しいボード",
+      "rename": "名前を変更",
+      "archive": "アーカイブ",
+      "importDescent": "Descent からインポート",
+      "newTitle": "新しいボード",
+      "renameTitle": "ボードの名前を変更",
+      "archiveTitle": "このボードをアーカイブしますか？",
+      "archiveMessage": "切り替え一覧から外れ、カードはそのまま残ります。削除はされません。",
+      "nameLabel": "ボード名",
+      "namePlaceholder": "このボードの用途",
+      "cancel": "キャンセル",
+      "save": "保存",
+      "questionsFolded_other": "未着手の {{count}} 件のカードが回答待ちです"
+    },
+    "lanes": {
+      "todo": "未着手",
+      "questions": "未回答の質問",
+      "backlog": "バックログ",
+      "active": "進行中",
+      "done": "完了"
+    },
+    "laneMenu": {
+      "collapse": "列を折りたたむ",
+      "sortByPriority": "優先度で並べ替え",
+      "sortByNewest": "新しい順に並べ替え",
+      "clearDone": "完了を空にする"
+    },
+    "card": {
+      "open": "開く",
+      "moveTo": "{{lane}} へ移動",
+      "archive": "アーカイブ",
+      "untitled": "無題のカード",
+      "moved": "{{title}} を {{lane}} の {{total}} 件中 {{position}} 番目に移動しました"
+    },
+    "toast": {
+      "cardNotSaved": "カードを保存できませんでした",
+      "boardNotSaved": "ボードを保存できませんでした",
+      "boardCreated": "ボードを作成しました",
+      "boardRenamed": "ボード名を変更しました",
+      "boardArchived": "ボードをアーカイブしました（削除はされていません）",
+      "autonomyOn": "自律モードをオンにしました",
+      "autonomyOff": "自律モードをオフにしました",
+      "cardArchived": "カードをアーカイブしました",
+      "laneCleared": "レーンのカードをアーカイブしました"
+    },
+    "import": {
+      "done": "Descent からインポートしました",
+      "counts": "{{inserted}} 件追加、{{updated}} 件更新",
+      "failed": "インポートを実行できませんでした"
+    }
   },
   "status": {
     "loading": "読み込み中...",

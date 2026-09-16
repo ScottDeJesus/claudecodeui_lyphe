@@ -171,6 +171,12 @@
     "stopTitle": "Questa chat è ancora in esecuzione",
     "stopBody": "Interromperla e rimuoverla?",
     "stopConfirm": "Interrompi e rimuovi",
-    "removeFailed": "Impossibile rimuovere questa chat."
+    "removeFailed": "Impossibile rimuovere questa chat.",
+    "changeIcon": "Cambia icona",
+    "iconTitle": "Scegli un'icona",
+    "iconDefault": "Predefinita",
+    "iconOption": "Icona {{name}}",
+    "unread": "Terminata, non ancora letta",
+    "dragHandle": "Trascina per riordinare"
   }
 }

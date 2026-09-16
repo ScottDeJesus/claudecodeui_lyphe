@@ -81,6 +81,37 @@ export function isSessionWatched(
   options: { freshMs?: number } = {},
 ): boolean {
   if (userId === null || userId === undefined || !sessionId) return false;
+  return hasFreshVisiblePresence(sessionId, options, String(userId));
+}
+
+/**
+ * Whether any open tab has this session on screen right now, whichever user it
+ * belongs to — the same freshness window and the same store `isSessionWatched`
+ * uses, minus the user comparison.
+ *
+ * Consumed by the chat run registry: when a chat that is already on screen
+ * finishes, its completion is stamped as read in the same breath, so the user
+ * is not shown an unread dot for a run they just watched. A run carries no
+ * user and `sessions` has no user column, so requiring one would answer false
+ * for every run.
+ */
+export function isSessionOnScreen(sessionId: string, options: { freshMs?: number } = {}): boolean {
+  if (!sessionId) return false;
+  return hasFreshVisiblePresence(sessionId, options, null);
+}
+
+/**
+ * The shared presence walk behind `isSessionWatched` and `isSessionOnScreen`.
+ *
+ * `userId` is the only difference between the two questions — a string to
+ * match one account's tabs, `null` to accept any tab — so the freshness rule,
+ * the liveness check and the single store live here once.
+ */
+function hasFreshVisiblePresence(
+  sessionId: string,
+  options: { freshMs?: number },
+  userId: string | null,
+): boolean {
   const freshMs = options.freshMs ?? DEFAULT_FRESH_MS;
   const now = Date.now();
   for (const [connection, record] of presenceByConnection) {
@@ -91,7 +122,7 @@ export function isSessionWatched(
     if (
       record.visible
       && record.sessionId === sessionId
-      && String(record.userId) === String(userId)
+      && (userId === null || String(record.userId) === userId)
       && now - record.updatedAt <= freshMs
     ) {
       return true;

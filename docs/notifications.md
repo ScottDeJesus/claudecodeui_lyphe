@@ -220,6 +220,12 @@ behind the Files, Shell or Git tab reports nothing, so its approval prompt still
 phone. Presence is per socket, not per account: a phone with the session closed still gets the
 push a watching laptop does not.
 
+The same store now answers a second, user-agnostic question too — is *any* tab watching this
+session right now, whoever it belongs to — through the sibling `isSessionOnScreen(sessionId)`.
+It is how the sidebar decides not to raise an unread dot for a run that finished while its own
+chat was already open; see [server/modules/providers/README.md](../server/modules/providers/README.md)
+and [server/modules/websocket/README.md](../server/modules/websocket/README.md).
+
 **Bursts.** Eight codes can arrive in bursts: `api.error`, `run.failed`, `session.stuck`,
 `limit.warning`, `limit.reached`, `limit.overage`, `agent.notification` and `run.stopped`. The
 channel collapses them per user, provider, code and session (`ntfy-flood-control.service.ts`). The

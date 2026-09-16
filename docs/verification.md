@@ -339,6 +339,21 @@ and the row's own link (not the row `div`, which the fix never had to touch) bot
 `18-simple-390-light` and `18-simple-390-dark`. Its contract is at
 [simple-chat-list.md](simple-chat-list.md).
 
+Three probes sit under phases 17 and 18 without being phases themselves, and all three spend
+**zero** Claude turns for the same reason: the one run each starts is a CURSOR session, whose CLI
+is absent on this box, so the runtime throws and the registry ends the run through the same
+terminal `complete` every other run emits. `.verify/probe-sidebar-state-api.mjs` ends
+`SIDEBAR-STATE-API PASS` over `[PASS] A1` … `[PASS] A8`, and it is the server half that opens no
+browser — it reads the four session-state columns over HTTP and drives the read rule through a
+real `chat.presence` frame on a chat socket, so unread is measured against the API rather than
+against a dot. `.verify/probe-simple-icons-unread.mjs` ends `SIMPLE-ICONS-UNREAD PASS` over
+`[PASS] B1` … `[PASS] B8`, reading the picker's 25 options and the dot each run's own
+`session_upserted` broadcast lit. `.verify/probe-simple-reorder.mjs` ends `SIMPLE-REORDER PASS`
+over `[PASS] C1` … `[PASS] C7`, dragging a row with `page.mouse` on desktop and with CDP
+`Input.dispatchTouchEvent` on a 390 px phone rather than any synthetic `PointerEvent`. None of the
+three is in `all.mjs`, which collects `phase-<n>.mjs` alone, so each is run by hand like every
+other `probe-*.mjs`; their contract is at [simple-chat-list.md](simple-chat-list.md).
+
 Phase 19 is the Descent proxy's other lane — memory intake — and it opens no browser either: four
 more HTTP contracts with nothing visual about them, driven with `fetch` behind a token from the real
 login route. Its first duty is to decide no real card. Approving one writes into a file every future

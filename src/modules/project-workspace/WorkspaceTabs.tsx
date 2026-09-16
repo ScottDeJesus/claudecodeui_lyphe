@@ -4,6 +4,7 @@ import {
   FolderTree,
   GitBranch,
   Globe,
+  KanbanSquare,
   ListTodo,
   MessageSquare,
   Terminal,
@@ -40,13 +41,18 @@ type BuiltInTab = {
 
 // One glyph per view, each naming the thing the view actually shows rather than an action:
 // a speech bubble for the conversation, a terminal for the shell, a file tree for the files,
-// a branch for git, a globe for the browser, a checklist for tasks, a brain for memory, and a
-// pulse for the runner — the one view whose subject is something moving on its own.
+// a branch for git, lanes for the board, a globe for the browser, a checklist for tasks, a
+// brain for memory, and a pulse for the runner — the one view whose subject is something
+// moving on its own.
 const BASE_TABS: BuiltInTab[] = [
   { id: 'chat',  labelKey: 'tabs.chat',  icon: MessageSquare },
   { id: 'shell', labelKey: 'tabs.shell', icon: Terminal },
   { id: 'files', labelKey: 'tabs.files', icon: FolderTree },
   { id: 'git',   labelKey: 'tabs.git',   icon: GitBranch },
+  // Always visible, and so carrying no gate at all — the convention chat, files and git
+  // already keep. The board is global, not per project or per session: it is here whatever
+  // the workspace is pointed at.
+  { id: 'kanban', labelKey: 'tabs.kanban', icon: KanbanSquare },
 ];
 
 const BROWSER_TAB: BuiltInTab = { id: 'browser', labelKey: 'tabs.browser', icon: Globe };
@@ -62,7 +68,7 @@ const RUNNER_TAB: BuiltInTab = { id: 'runner', labelKey: 'tabs.runner', icon: Ac
  * any enabled plugin tabs.
  *
  * The built-in tabs are icon-only — a glyph each, named by `title` and `aria-label` — which is
- * what lets eight of them share the sidebar's width. Plugin tabs keep their words: a plugin
+ * what lets nine of them share the sidebar's width. Plugin tabs keep their words: a plugin
  * supplies a display name and no glyph, and a guessed icon would name it wrong.
  *
  * The strip still scrolls sideways rather than wrapping, because plugin tabs are words and a row

@@ -23,8 +23,13 @@
 // own. tokens.css (the colours these rules read) is loaded earlier, by src/main.tsx.
 import '@/shared/ui/verve/controls.css';
 import '@/shared/ui/verve/feedback.css';
+// The board layer goes LAST on purpose, and the order is load-bearing: a lane card composes
+// `.vv-card`'s ground and then overrides its background, shadow and transition. Imported first,
+// `.vv-card` won every one of those at equal specificity and a selected card lost its wash.
+import '@/shared/ui/verve/board.css';
 
 export { ActionMenu } from '@/shared/ui/ActionMenu';
+export type { ActionMenuItem } from '@/shared/ui/ActionMenu';
 export { Avatar } from '@/shared/ui/Avatar';
 export { Badge } from '@/shared/ui/Badge';
 export { Banner } from '@/shared/ui/Banner';
@@ -39,6 +44,9 @@ export { Dialog, DialogTrigger, DialogContent, DialogTitle } from '@/shared/ui/D
 export { EmptyState } from '@/shared/ui/EmptyState';
 export { Field } from '@/shared/ui/Field';
 export { Input } from '@/shared/ui/Input';
+export { KanbanCard } from '@/shared/ui/KanbanCard';
+export type { CardPriority, KanbanCardModel, KanbanCardSignals } from '@/shared/ui/KanbanCard';
+export { KanbanLane } from '@/shared/ui/KanbanLane';
 export { LLMProviderLogo } from '@/shared/ui/LLMProviderLogo';
 export { Menu } from '@/shared/ui/Menu';
 export { Meter } from '@/shared/ui/Meter';

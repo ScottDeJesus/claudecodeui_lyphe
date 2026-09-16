@@ -72,6 +72,7 @@ const NAV_TABS: Array<{ id: AppTab; label: string; keywords: string }> = [
   { id: 'files', label: 'Go to Files', keywords: 'files file tree explorer' },
   { id: 'shell', label: 'Go to Shell', keywords: 'shell terminal console' },
   { id: 'git', label: 'Go to Git', keywords: 'git diff branches' },
+  { id: 'kanban', label: 'Go to Kanban', keywords: 'kanban board lanes cards backlog' },
   { id: 'tasks', label: 'Go to Tasks', keywords: 'tasks taskmaster' },
   { id: 'memory', label: 'Go to Memory', keywords: 'memory intake pending descent' },
   { id: 'runner', label: 'Go to Runner', keywords: 'runner plan run live phases' },

@@ -24,7 +24,78 @@
     "git": "Git",
     "tasks": "Tâches",
     "browser": "Navigateur",
-    "computer": "Ordinateur"
+    "computer": "Ordinateur",
+    "kanban": "Kanban"
+  },
+  "kanban": {
+    "loading": "Lecture du tableau…",
+    "unreachable": {
+      "title": "Le tableau n'a pas pu être lu",
+      "message": "Le serveur n'a pas répondu. Rien n'est perdu — le tableau est là où vous l'avez laissé.",
+      "retry": "Réessayer"
+    },
+    "noBoard": {
+      "title": "Pas encore de tableau",
+      "message": "Un tableau, c'est là où vivent les cartes. Ce projet n'en a pas encore.",
+      "action": "Créer un tableau"
+    },
+    "board": {
+      "switcher": "Tableau",
+      "actions": "Actions du tableau",
+      "noBoard": "Aucun tableau",
+      "autonomy": "Autonomie",
+      "newBoard": "Nouveau tableau",
+      "rename": "Renommer",
+      "archive": "Archiver",
+      "importDescent": "Importer depuis Descent",
+      "newTitle": "Nouveau tableau",
+      "renameTitle": "Renommer le tableau",
+      "archiveTitle": "Archiver ce tableau ?",
+      "archiveMessage": "Il quitte le sélecteur et chaque carte reste où elle est. Rien n'est supprimé.",
+      "nameLabel": "Nom du tableau",
+      "namePlaceholder": "À quoi sert ce tableau",
+      "cancel": "Annuler",
+      "save": "Enregistrer",
+      "questionsFolded_one": "{{count}} carte dans À faire attend une réponse",
+      "questionsFolded_many": "{{count}} cartes dans À faire attendent une réponse",
+      "questionsFolded_other": "{{count}} cartes dans À faire attendent une réponse"
+    },
+    "lanes": {
+      "todo": "À faire",
+      "questions": "Questions ouvertes",
+      "backlog": "En attente",
+      "active": "En cours",
+      "done": "Terminé"
+    },
+    "laneMenu": {
+      "collapse": "Replier la colonne",
+      "sortByPriority": "Trier par priorité",
+      "sortByNewest": "Trier par plus récent",
+      "clearDone": "Vider les terminées"
+    },
+    "card": {
+      "open": "Ouvrir",
+      "moveTo": "Déplacer vers {{lane}}",
+      "archive": "Archiver",
+      "untitled": "Carte sans titre",
+      "moved": "{{title}} déplacée vers {{lane}}, position {{position}} sur {{total}}"
+    },
+    "toast": {
+      "cardNotSaved": "La carte n'a pas été enregistrée",
+      "boardNotSaved": "Le tableau n'a pas été enregistré",
+      "boardCreated": "Tableau créé",
+      "boardRenamed": "Tableau renommé",
+      "boardArchived": "Tableau archivé — rien n'a été supprimé",
+      "autonomyOn": "Autonomie activée",
+      "autonomyOff": "Autonomie désactivée",
+      "cardArchived": "Carte archivée",
+      "laneCleared": "Les cartes de la colonne ont été archivées"
+    },
+    "import": {
+      "done": "Importé depuis Descent",
+      "counts": "{{inserted}} ajoutées, {{updated}} mises à jour",
+      "failed": "L'import n'a pas abouti"
+    }
   },
   "status": {
     "loading": "Chargement...",

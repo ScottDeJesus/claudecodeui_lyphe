@@ -24,7 +24,77 @@
     "git": "Git",
     "tasks": "Görevler",
     "browser": "Browser",
-    "computer": "Bilgisayar"
+    "computer": "Bilgisayar",
+    "kanban": "Kanban"
+  },
+  "kanban": {
+    "loading": "Pano okunuyor…",
+    "unreachable": {
+      "title": "Pano okunamadı",
+      "message": "Sunucu yanıt vermedi. Hiçbir şey kaybolmadı — pano bıraktığın yerde.",
+      "retry": "Yeniden dene"
+    },
+    "noBoard": {
+      "title": "Henüz pano yok",
+      "message": "Pano, kartların yaşadığı yer. Bu projede henüz yok.",
+      "action": "Pano oluştur"
+    },
+    "board": {
+      "switcher": "Pano",
+      "actions": "Pano işlemleri",
+      "noBoard": "Pano yok",
+      "autonomy": "Otonomi",
+      "newBoard": "Yeni pano",
+      "rename": "Yeniden adlandır",
+      "archive": "Arşivle",
+      "importDescent": "Descent'ten içe aktar",
+      "newTitle": "Yeni pano",
+      "renameTitle": "Panoyu yeniden adlandır",
+      "archiveTitle": "Bu pano arşivlensin mi?",
+      "archiveMessage": "Seçiciden çıkar, her kart yerinde kalır. Hiçbir şey silinmez.",
+      "nameLabel": "Pano adı",
+      "namePlaceholder": "Bu panonun amacı",
+      "cancel": "Vazgeç",
+      "save": "Kaydet",
+      "questionsFolded_one": "Yapılacaklar içinde {{count}} kart yanıt bekliyor",
+      "questionsFolded_other": "Yapılacaklar içinde {{count}} kart yanıt bekliyor"
+    },
+    "lanes": {
+      "todo": "Yapılacaklar",
+      "questions": "Açık sorular",
+      "backlog": "Bekleyenler",
+      "active": "Sürüyor",
+      "done": "Bitti"
+    },
+    "laneMenu": {
+      "collapse": "Sütunu daralt",
+      "sortByPriority": "Önceliğe göre sırala",
+      "sortByNewest": "En yeniye göre sırala",
+      "clearDone": "Bitmişleri temizle"
+    },
+    "card": {
+      "open": "Aç",
+      "moveTo": "{{lane}} sütununa taşı",
+      "archive": "Arşivle",
+      "untitled": "Adsız kart",
+      "moved": "{{title}} → {{lane}}, {{total}} karttan {{position}}. sırada"
+    },
+    "toast": {
+      "cardNotSaved": "Kart kaydedilemedi",
+      "boardNotSaved": "Pano kaydedilemedi",
+      "boardCreated": "Pano oluşturuldu",
+      "boardRenamed": "Pano yeniden adlandırıldı",
+      "boardArchived": "Pano arşivlendi — hiçbir şey silinmedi",
+      "autonomyOn": "Otonomi açık",
+      "autonomyOff": "Otonomi kapalı",
+      "cardArchived": "Kart arşivlendi",
+      "laneCleared": "Sütundaki kartlar arşivlendi"
+    },
+    "import": {
+      "done": "Descent'ten içe aktarıldı",
+      "counts": "{{inserted}} eklendi, {{updated}} güncellendi",
+      "failed": "İçe aktarma çalışmadı"
+    }
   },
   "status": {
     "loading": "Yükleniyor...",

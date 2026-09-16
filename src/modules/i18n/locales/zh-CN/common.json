@@ -24,7 +24,76 @@
     "git": "Git",
     "tasks": "任务",
     "browser": "浏览器",
-    "computer": "计算机"
+    "computer": "计算机",
+    "kanban": "看板"
+  },
+  "kanban": {
+    "loading": "正在读取看板…",
+    "unreachable": {
+      "title": "无法读取看板",
+      "message": "服务器没有响应。什么都没有丢失——看板还在您离开的地方。",
+      "retry": "重试"
+    },
+    "noBoard": {
+      "title": "还没有看板",
+      "message": "看板是卡片所在的地方。这个项目还没有看板。",
+      "action": "创建看板"
+    },
+    "board": {
+      "switcher": "看板",
+      "actions": "看板操作",
+      "noBoard": "无看板",
+      "autonomy": "自主",
+      "newBoard": "新建看板",
+      "rename": "重命名",
+      "archive": "归档",
+      "importDescent": "从 Descent 导入",
+      "newTitle": "新建看板",
+      "renameTitle": "重命名看板",
+      "archiveTitle": "归档此看板？",
+      "archiveMessage": "它会从切换列表中消失，每张卡片都留在原处。不会删除任何内容。",
+      "nameLabel": "看板名称",
+      "namePlaceholder": "这个看板的用途",
+      "cancel": "取消",
+      "save": "保存",
+      "questionsFolded_other": "待办中有 {{count}} 张卡片在等待答复"
+    },
+    "lanes": {
+      "todo": "待办",
+      "questions": "待答复问题",
+      "backlog": "积压",
+      "active": "进行中",
+      "done": "已完成"
+    },
+    "laneMenu": {
+      "collapse": "折叠列",
+      "sortByPriority": "按优先级排序",
+      "sortByNewest": "按最新排序",
+      "clearDone": "清空已完成"
+    },
+    "card": {
+      "open": "打开",
+      "moveTo": "移动到{{lane}}",
+      "archive": "归档",
+      "untitled": "无标题卡片",
+      "moved": "{{title}} 已移动到{{lane}}，第 {{position}} 位，共 {{total}} 张"
+    },
+    "toast": {
+      "cardNotSaved": "卡片未保存",
+      "boardNotSaved": "看板未保存",
+      "boardCreated": "看板已创建",
+      "boardRenamed": "看板已重命名",
+      "boardArchived": "看板已归档——没有删除任何内容",
+      "autonomyOn": "自主模式已开启",
+      "autonomyOff": "自主模式已关闭",
+      "cardArchived": "卡片已归档",
+      "laneCleared": "该列的卡片已归档"
+    },
+    "import": {
+      "done": "已从 Descent 导入",
+      "counts": "新增 {{inserted}} 项，更新 {{updated}} 项",
+      "failed": "导入未执行"
+    }
   },
   "status": {
     "loading": "加载中...",

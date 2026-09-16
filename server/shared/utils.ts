@@ -91,6 +91,60 @@ export function asyncHandler(
 }
 
 // ---------------------------
+//----------------- ROUTE PARAMETER PARSING ------------
+/**
+ * Reads one Express route parameter as a string.
+ *
+ * A parameter arrives as a string for a plain `:name` segment and as an array
+ * for a repeatable one, so both shapes are accepted here and anything else is
+ * a 400 — a route never has to test the shape itself. Consumed by
+ * `provider.routes.ts` (every parser below and its other path parsers) and
+ * `session-user-state.routes.ts`.
+ */
+export const readPathParam = (value: unknown, name: string): string => {
+  if (typeof value === 'string') {
+    return value;
+  }
+
+  if (Array.isArray(value) && typeof value[0] === 'string') {
+    return value[0];
+  }
+
+  throw new AppError(`${name} path parameter is invalid.`, {
+    code: 'INVALID_PATH_PARAMETER',
+    statusCode: 400,
+  });
+};
+
+/**
+ * Allowed shape of a session id: a bounded run of id-safe characters, never a
+ * path. Consumed by `parseSessionId` below on behalf of `provider.routes.ts` and
+ * `session-user-state.routes.ts`.
+ */
+export const SESSION_ID_PATTERN = /^[a-zA-Z0-9._-]{1,120}$/;
+
+/**
+ * Validates one session id route parameter.
+ *
+ * Session ids reach the filesystem and the database as identifiers, so they are
+ * bounded to id-safe characters before any caller uses them. Throws a 400
+ * rather than sanitizing: a malformed id is the client's bug, and quietly
+ * trimming it would address a different session. Consumed by
+ * `provider.routes.ts` and `session-user-state.routes.ts`.
+ */
+export const parseSessionId = (value: unknown): string => {
+  const sessionId = readPathParam(value, 'sessionId').trim();
+  if (!SESSION_ID_PATTERN.test(sessionId)) {
+    throw new AppError('Invalid sessionId.', {
+      code: 'INVALID_SESSION_ID',
+      statusCode: 400,
+    });
+  }
+
+  return sessionId;
+};
+
+// ---------------------------
 //----------------- SHARED ERROR UTILITIES ------------
 /**
  * Shared application error with HTTP status and machine-readable code metadata.

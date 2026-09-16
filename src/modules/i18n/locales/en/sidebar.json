@@ -181,6 +181,12 @@
     "removeFailed": "Could not remove this chat.",
     "deleteTitle": "Delete this chat?",
     "deleteBody": "Its transcript is removed from disk. This cannot be undone.",
-    "deleteBodyRunning": "It is still running. It will be stopped, then its transcript removed from disk. This cannot be undone."
+    "deleteBodyRunning": "It is still running. It will be stopped, then its transcript removed from disk. This cannot be undone.",
+    "changeIcon": "Change icon",
+    "iconTitle": "Choose an icon",
+    "iconDefault": "Default",
+    "iconOption": "{{name}} icon",
+    "unread": "Finished, not read yet",
+    "dragHandle": "Drag to reorder"
   }
 }

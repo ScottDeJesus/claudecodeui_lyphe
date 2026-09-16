@@ -41,8 +41,8 @@ Benefits:
 |---|---|
 | `services/websocket-server.service.ts` | Creates `WebSocketServer`, binds `verifyClient`, routes connection by pathname |
 | `services/websocket-auth.service.ts` | Authenticates upgrade requests and attaches `request.user` |
-| `services/chat-websocket.service.ts` | Handles the `/ws` chat protocol (`chat.send` / `chat.edit-send` / `chat.abort` / `chat.subscribe` / `chat.permission-response` / `chat.presence`) |
-| `services/chat-run-registry.service.ts` | Tracks live provider runs per app session id: seq numbering, event replay buffer, provider-id mapping, completion state, and `lastEventAt` — the silence clock every recorded event resets |
+| `services/chat-websocket.service.ts` | Handles the `/ws` chat protocol (`chat.send` / `chat.edit-send` / `chat.abort` / `chat.subscribe` / `chat.permission-response` / `chat.presence`). A visible `chat.presence` also marks that session read when it was unread, and broadcasts `session_upserted` only when a row changed |
+| `services/chat-run-registry.service.ts` | Tracks live provider runs per app session id: seq numbering, event replay buffer, provider-id mapping, completion state, and `lastEventAt` — the silence clock every recorded event resets. On the terminal `complete` it stamps `last_completed_at` once per run end (and `last_read_at` with it when the chat is on screen), then broadcasts `session_upserted` |
 | `services/chat-session-writer.service.ts` | Gateway writer handed to provider runtimes: remaps provider session ids to app ids, swallows `session_created`, assigns `seq` |
 | `services/run-stall-watchdog.service.ts` | Polls the registry's running runs and announces one that has gone quiet past the threshold. A poller rather than a timer per run, so a run that ended cannot leak one |
 | `services/shell-websocket.service.ts` | Handles `/shell` PTY lifecycle, reconnect buffering, auth URL detection |
@@ -245,6 +245,18 @@ Broadcasts `kind: loading_progress` while project snapshots are being built.
 Broadcasts per-session `kind: session_upserted` deltas when provider session artifacts change (no full project snapshots).
 3. `modules/plan-runner/runner-watcher.service.ts`
 Broadcasts `kind: runner_state` when the plan runner's state directory changes, reaching this set through `modules/websocket/index.js` rather than a deep import.
+
+4. `modules/websocket/services/chat-run-registry.service.ts`
+Broadcasts per-session `kind: session_upserted` when a run ends — once per run,
+from the terminal `complete` — so the sidebar re-reads the row whose
+`last_completed_at` (and `last_read_at`, when the chat was on screen) it just
+stamped. The chat websocket broadcasts the same delta from its `chat.presence`
+handler when a visible report marks an unread session read; an already-read
+session broadcasts nothing, so a tab's 30 s heartbeat writes and sends nothing.
+
+`markReadIfCompleted` in `chat-websocket.service.ts` reads `last_completed_at`
+and `last_read_at` through the one unread expression
+(`SESSION_UNREAD_SQL`), never by re-deriving the comparison here.
 
 This design centralizes cross-module realtime fanout without requiring route-local references to WebSocket internals.
 

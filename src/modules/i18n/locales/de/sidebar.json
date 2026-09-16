@@ -168,6 +168,12 @@
     "stopTitle": "Dieser Chat läuft noch",
     "stopBody": "Stoppen und entfernen?",
     "stopConfirm": "Stoppen und entfernen",
-    "removeFailed": "Dieser Chat konnte nicht entfernt werden."
+    "removeFailed": "Dieser Chat konnte nicht entfernt werden.",
+    "changeIcon": "Symbol ändern",
+    "iconTitle": "Symbol wählen",
+    "iconDefault": "Standard",
+    "iconOption": "Symbol {{name}}",
+    "unread": "Fertig, noch nicht gelesen",
+    "dragHandle": "Zum Umsortieren ziehen"
   }
 }

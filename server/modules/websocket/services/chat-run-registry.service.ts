@@ -1,4 +1,7 @@
-import { sessionsDb } from '@/modules/database/index.js';
+import { sessionUserStateDb, sessionsDb } from '@/modules/database/index.js';
+// Whether the finishing chat is on screen decides if its completion is stamped
+// as read; presence has one store, and it lives in the notifications module.
+import { isSessionOnScreen } from '@/modules/notifications/index.js';
 import { ChatSessionWriter } from '@/modules/websocket/services/chat-session-writer.service.js';
 import { broadcastSessionUpserted } from '@/modules/websocket/services/session-upsert-broadcast.service.js';
 import type {
@@ -118,6 +121,7 @@ function decorateAndRecordEvent(run: ChatRun, message: NormalizedMessage): Norma
     outbound.actualSessionId = run.appSessionId;
     run.status = 'completed';
     run.completedAt = Date.now();
+    recordRunCompletion(run.appSessionId);
     evictRunLater(run.appSessionId);
   }
 
@@ -160,6 +164,36 @@ function recordProviderSessionId(run: ChatRun, providerSessionId: string): void 
     console.error('[ChatRunRegistry] Failed to persist provider session id mapping', {
       appSessionId: run.appSessionId,
       providerSessionId,
+      error: message,
+    });
+  }
+}
+
+/**
+ * Stamps a finished run's session as completed — and as read in the same
+ * statement when the chat was on screen while it finished — then tells every
+ * client, so the sidebar's unread dot and ordering update without a reload.
+ *
+ * Called from `decorateAndRecordEvent` for the single terminal `complete` of
+ * every run: natural, aborted, crashed or re-adopted. Failures are logged and
+ * never thrown, because a bookkeeping write must not drop the frame that ends
+ * the run.
+ */
+function recordRunCompletion(appSessionId: string): void {
+  try {
+    sessionUserStateDb.markRunCompleted(appSessionId, isSessionOnScreen(appSessionId));
+
+    void broadcastSessionUpserted(appSessionId).catch((error) => {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error('[ChatRunRegistry] Failed to broadcast session completion', {
+        appSessionId,
+        error: message,
+      });
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error('[ChatRunRegistry] Failed to record session completion', {
+      appSessionId,
       error: message,
     });
   }

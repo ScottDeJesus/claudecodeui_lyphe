@@ -164,6 +164,12 @@
     "stopTitle": "此對話仍在執行中",
     "stopBody": "要停止並移除嗎?",
     "stopConfirm": "停止並移除",
-    "removeFailed": "無法移除此對話。"
+    "removeFailed": "無法移除此對話。",
+    "changeIcon": "變更圖示",
+    "iconTitle": "選擇圖示",
+    "iconDefault": "預設",
+    "iconOption": "{{name}} 圖示",
+    "unread": "已完成，尚未閱讀",
+    "dragHandle": "拖曳以重新排序"
   }
 }

@@ -2,12 +2,13 @@ import path from 'node:path';
 
 import type { WebSocket } from 'ws';
 
-import { sessionsDb } from '@/modules/database/index.js';
+import { sessionUserStateDb, sessionsDb } from '@/modules/database/index.js';
 // Presence is recorded here and read by the notification channels, so a push is
 // never sent about the session the user is looking at right now.
 import { clearPresence, markPresence } from '@/modules/notifications/index.js';
 import { providerModelsService, sessionsService } from '@/modules/providers/index.js';
 import { chatRunRegistry } from '@/modules/websocket/services/chat-run-registry.service.js';
+import { broadcastSessionUpserted } from '@/modules/websocket/services/session-upsert-broadcast.service.js';
 import { connectedClients, WS_OPEN_STATE } from '@/modules/websocket/services/websocket-state.service.js';
 import {
   getGlobalImageAssetsDir,
@@ -536,11 +537,41 @@ function handlePermissionResponse(data: AnyRecord, dependencies: ChatWebSocketDe
  * same frame with `sessionId: null`; there is no `chat.unsubscribe`.
  */
 function handleChatPresence(ws: WebSocket, userId: string | number | null, data: AnyRecord): void {
-  markPresence(ws, {
-    userId,
-    sessionId: typeof data.sessionId === 'string' && data.sessionId.length > 0 ? data.sessionId : null,
-    visible: data.visible === true,
-  });
+  const sessionId = typeof data.sessionId === 'string' && data.sessionId.length > 0 ? data.sessionId : null;
+  const visible = data.visible === true;
+
+  markPresence(ws, { userId, sessionId, visible });
+
+  // A visible report is also the moment the chat came on screen, which is what
+  // clears an unread dot left by a run that finished while it was away.
+  if (visible && sessionId !== null) {
+    markReadIfCompleted(sessionId);
+  }
+}
+
+/**
+ * Marks a session read now that its chat is on screen, and tells every client
+ * only when a row actually changed.
+ *
+ * The guard matters: a visible tab re-reports its presence every 30 s, and an
+ * already-read session must not write or broadcast again. Failures are logged
+ * and never thrown — a bookkeeping write must not cost the presence record
+ * that the same frame just wrote.
+ */
+function markReadIfCompleted(sessionId: string): void {
+  try {
+    if (sessionUserStateDb.markReadIfCompleted(sessionId) === false) {
+      return;
+    }
+
+    void broadcastSessionUpserted(sessionId).catch((error) => {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error('[Chat] Failed to broadcast session read', { sessionId, error: message });
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error('[Chat] Failed to mark session read', { sessionId, error: message });
+  }
 }
 
 /**

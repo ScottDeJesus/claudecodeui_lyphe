@@ -24,7 +24,78 @@
     "git": "Git",
     "tasks": "Attività",
     "browser": "Browser",
-    "computer": "Computer"
+    "computer": "Computer",
+    "kanban": "Kanban"
+  },
+  "kanban": {
+    "loading": "Lettura della bacheca…",
+    "unreachable": {
+      "title": "Impossibile leggere la bacheca",
+      "message": "Il server non ha risposto. Non è andato perso niente: la bacheca è dove l'hai lasciata.",
+      "retry": "Riprova"
+    },
+    "noBoard": {
+      "title": "Nessuna bacheca",
+      "message": "Una bacheca è dove vivono le schede. Questo progetto non ne ha ancora una.",
+      "action": "Crea una bacheca"
+    },
+    "board": {
+      "switcher": "Bacheca",
+      "actions": "Azioni sulla bacheca",
+      "noBoard": "Nessuna bacheca",
+      "autonomy": "Autonomia",
+      "newBoard": "Nuova bacheca",
+      "rename": "Rinomina",
+      "archive": "Archivia",
+      "importDescent": "Importa da Descent",
+      "newTitle": "Nuova bacheca",
+      "renameTitle": "Rinomina bacheca",
+      "archiveTitle": "Archiviare questa bacheca?",
+      "archiveMessage": "Esce dal selettore e ogni scheda resta dov'è. Non si cancella nulla.",
+      "nameLabel": "Nome della bacheca",
+      "namePlaceholder": "A cosa serve questa bacheca",
+      "cancel": "Annulla",
+      "save": "Salva",
+      "questionsFolded_one": "{{count}} scheda in Da fare attende una risposta",
+      "questionsFolded_many": "{{count}} schede in Da fare attendono una risposta",
+      "questionsFolded_other": "{{count}} schede in Da fare attendono una risposta"
+    },
+    "lanes": {
+      "todo": "Da fare",
+      "questions": "Domande aperte",
+      "backlog": "Arretrato",
+      "active": "In corso",
+      "done": "Fatto"
+    },
+    "laneMenu": {
+      "collapse": "Comprimi colonna",
+      "sortByPriority": "Ordina per priorità",
+      "sortByNewest": "Ordina per più recente",
+      "clearDone": "Svuota le fatte"
+    },
+    "card": {
+      "open": "Apri",
+      "moveTo": "Sposta in {{lane}}",
+      "archive": "Archivia",
+      "untitled": "Scheda senza titolo",
+      "moved": "{{title}} spostata in {{lane}}, posizione {{position}} di {{total}}"
+    },
+    "toast": {
+      "cardNotSaved": "La scheda non è stata salvata",
+      "boardNotSaved": "La bacheca non è stata salvata",
+      "boardCreated": "Bacheca creata",
+      "boardRenamed": "Bacheca rinominata",
+      "boardArchived": "Bacheca archiviata: non è stato eliminato nulla",
+      "autonomyOn": "Autonomia attiva",
+      "autonomyOff": "Autonomia disattivata",
+      "cardArchived": "Scheda archiviata",
+      "laneCleared": "Le schede della colonna sono state archiviate"
+    },
+    "import": {
+      "done": "Importato da Descent",
+      "counts": "{{inserted}} aggiunte, {{updated}} aggiornate",
+      "failed": "L'importazione non è partita"
+    }
   },
   "status": {
     "loading": "Caricamento...",

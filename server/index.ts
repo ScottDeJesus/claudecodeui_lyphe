@@ -14,6 +14,7 @@ import {
     initializeSessionsWatcher,
     providerRuntimeService,
     readoptKeepaliveSessions,
+    releaseKeepaliveOwnership,
 } from '@/modules/providers/index.js';
 import { createWebSocketServer, startRunStallWatchdog } from '@/modules/websocket/index.js';
 
@@ -52,6 +53,7 @@ import { assetsRoutes } from './modules/assets/index.js';
 import { createCliVersionModule } from './modules/cli-version/index.js';
 import { createDeepseekModule } from './modules/deepseek/index.js';
 import { createDescentModule } from './modules/descent/index.js';
+import { createKanbanModule } from './modules/kanban/index.js';
 import { createDispatchSoulsModule } from './modules/dispatch-souls/index.js';
 import { createPlanRunnerModule } from './modules/plan-runner/index.js';
 import { fileTreeRoutes } from './modules/file-tree/index.js';
@@ -183,6 +185,10 @@ app.use('/api/system', authenticateToken, systemRoutes);
 
 // Descent account/usage proxy (protected)
 app.use('/api/descent', authenticateToken, createDescentModule());
+
+// The Kanban board (protected). The guard rides the MOUNT rather than each route, so no file in
+// the module imports `authenticateToken` and a sibling route package cannot forget it.
+app.use('/api/kanban', authenticateToken, createKanbanModule());
 
 // Installed CLI version + what the live runs are on (protected)
 app.use('/api/cli-version', authenticateToken, createCliVersionModule());
@@ -361,7 +367,7 @@ async function soleServerDuties() {
     if (soleServerDutiesRan) return;
     soleServerDutiesRan = true;
     try { // D-11: a browser that subscribes before this ran reads a live keepalive session as idle
-        const keepalive = await readoptKeepaliveSessions({ runtime: providerRuntimeService });
+        const keepalive = await readoptKeepaliveSessions({ runtime: providerRuntimeService, supervised });
         console.log(`[keepalive] re-adopted ${keepalive.readopted} host(s), swept ${keepalive.swept}`);
     } catch (error) { console.error('[keepalive] re-adopt failed (continuing):', getErrorMessage(error)); }
     // Sends anything that came due while the server was not running, then keeps polling.
@@ -454,6 +460,7 @@ async function startServer() {
                 console.error('[Plugins] Error stopping plugins during shutdown:', getErrorMessage(err));
             }
             try {
+                releaseKeepaliveOwnership();
                 await removeLocalServerMarker();
             } catch (err) {
                 console.error('[Local Server] Error removing server marker during shutdown:', getErrorMessage(err));

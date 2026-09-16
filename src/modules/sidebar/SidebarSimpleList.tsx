@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { TFunction } from 'i18next';
 
+import { api } from '@/shared/api';
 import { Button, EmptyState, Select } from '@/shared/ui';
 import { useBusySessionIdSet } from '@/shared/context/SessionProtectionContext';
 import { useSimpleChatListPreferences } from '@/shared/hooks/useSimpleChatListPreferences';
@@ -8,9 +9,11 @@ import type { Project, ProjectSession, RecentConversationListItem, SessionWithPr
 import { useCompactSidebar } from '@/modules/sidebar/hooks/useCompactSidebar';
 import { useSimpleChatList } from '@/modules/sidebar/hooks/useSimpleChatList';
 import { useSimpleChatRemove } from '@/modules/sidebar/hooks/useSimpleChatRemove';
+import { useSimpleChatReorder } from '@/modules/sidebar/hooks/useSimpleChatReorder';
 import SidebarSimpleListRow from '@/modules/sidebar/SidebarSimpleListRow';
 import SidebarSimpleDeleteDialog from '@/modules/sidebar/SidebarSimpleDeleteDialog';
 import SidebarSimpleStopDialog from '@/modules/sidebar/SidebarSimpleStopDialog';
+import SidebarSimpleIconPicker from '@/modules/sidebar/SidebarSimpleIconPicker';
 
 // File-local: this shape is read only here (the frontend standard's single-file rule for a
 // prop type with exactly one consumer) — `SidebarProjectListProps` at src/shared/types.ts:1381
@@ -55,7 +58,7 @@ export default function SidebarSimpleList({
   // Gate 9's 44px floor is compact-only: desktop keeps the New chat button's stock h-9.
   const isCompact = useCompactSidebar();
 
-  const { rows, hasMore, isLoading, hasError, reload, loadMore, renameLocal, removeLocal } =
+  const { rows, hasMore, isLoading, hasError, reload, loadMore, patchLocal, removeLocal, moveLocal } =
     useSimpleChatList(selectedSession?.id ?? null);
 
   const handleArchived = useCallback((sessionId: string) => {
@@ -137,8 +140,45 @@ export default function SidebarSimpleList({
 
   const handleRename = useCallback(async (sessionId: string, title: string) => {
     await onRenameSession(sessionId, title);
-    renameLocal(sessionId, title);
-  }, [onRenameSession, renameLocal]);
+    patchLocal(sessionId, { sessionTitle: title });
+  }, [onRenameSession, patchLocal]);
+
+  // The row whose icon picker is open, null when none is. The picker seeds its grid from this
+  // very object, and closing the dialog is one write of null — so the target and the open flag
+  // are the same fact rather than two that can disagree.
+  const [iconTarget, setIconTarget] = useState<RecentConversationListItem | null>(null);
+  const handlePickIcon = useCallback(async (icon: string | null) => {
+    const target = iconTarget;
+    if (!target) return;
+    // Closed first: the row below is this click's feedback, and it shows the choice at once.
+    setIconTarget(null);
+    patchLocal(target.sessionId, { icon });
+    try {
+      const response = await api.setSessionIcon(target.sessionId, icon);
+      if (!response.ok) throw new Error(`setSessionIcon answered HTTP ${response.status}`);
+    } catch (error) {
+      // The server never took the icon, so the row goes back to the one the picker opened on.
+      console.error('[SidebarSimpleList] Failed to set the chat icon:', error);
+      patchLocal(target.sessionId, { icon: target.icon });
+    }
+  }, [iconTarget, patchLocal]);
+
+  // Puts the row where the pointer left it, then asks the server for the same order. A server
+  // that refuses the move rolls the list back by reloading it, so the two never disagree.
+  const handleMove = useCallback((sessionId: string, afterSessionId: string | null) => {
+    moveLocal(sessionId, afterSessionId);
+    void (async () => {
+      try {
+        const response = await api.moveSimpleListSession(sessionId, afterSessionId);
+        if (!response.ok) throw new Error(`moveSimpleListSession answered HTTP ${response.status}`);
+      } catch (error) {
+        console.error('[SidebarSimpleList] Failed to move the chat:', error);
+        await reload();
+      }
+    })();
+  }, [moveLocal, reload]);
+
+  const { draggingId, dropTarget, rowDragProps } = useSimpleChatReorder({ rows, onMove: handleMove });
 
   return (
     <div data-testid="simple-chat-list" className="flex flex-col gap-2 px-2 py-2">
@@ -176,7 +216,11 @@ export default function SidebarSimpleList({
           <EmptyState title={t('simpleList.empty')} />
         </div>
       ) : (
-        <div className="flex flex-col gap-1">
+        <div
+          data-testid="simple-chat-list-rows"
+          // No text selection while a row is carried; the titles stay selectable at rest.
+          className={draggingId !== null ? 'flex select-none flex-col gap-1' : 'flex flex-col gap-1'}
+        >
           {rows.map((row) => (
             <SidebarSimpleListRow
               key={row.sessionId}
@@ -188,6 +232,10 @@ export default function SidebarSimpleList({
               onArchive={() => remove(row, 'archive')}
               onDelete={() => remove(row, 'delete')}
               onRename={(title) => void handleRename(row.sessionId, title)}
+              onChooseIcon={() => setIconTarget(row)}
+              dragProps={rowDragProps(row.sessionId)}
+              isDragging={draggingId === row.sessionId}
+              dropEdge={dropTarget?.sessionId === row.sessionId ? dropTarget.edge : null}
               t={t}
             />
           ))}
@@ -219,6 +267,14 @@ export default function SidebarSimpleList({
         isRunning={pendingDelete !== null && busySessionIds.has(pendingDelete.sessionId)}
         onConfirm={confirmDelete}
         onCancel={cancelDelete}
+        t={t}
+      />
+
+      <SidebarSimpleIconPicker
+        open={iconTarget !== null}
+        currentIcon={iconTarget?.icon ?? null}
+        onPick={handlePickIcon}
+        onCancel={() => setIconTarget(null)}
         t={t}
       />
     </div>

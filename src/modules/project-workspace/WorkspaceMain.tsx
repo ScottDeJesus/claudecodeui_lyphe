@@ -9,6 +9,7 @@ import { GitRepositoriesPanel } from '@/modules/git-panel';
 import { PluginTabContent } from '@/modules/plugins';
 import { BrowserUsePanel } from '@/modules/browser-use';
 import { usePaletteOpsRegister } from '@/modules/command-palette';
+import { KanbanPanel } from '@/modules/kanban';
 import { MemoryIntakePanel } from '@/modules/memory-intake';
 import { RunnerPanel } from '@/modules/plan-runner';
 import { TaskMasterPanel, useTaskMasterProjectSync } from '@/modules/task-master';
@@ -389,6 +390,15 @@ function WorkspaceMain({
         {shouldShowRunnerTab && activeTab === 'runner' && (
           <div className="h-full overflow-hidden">
             <RunnerPanel />
+          </div>
+        )}
+
+        {/* No gate: the board is always on the strip, the way chat, files and git are. It is also
+            GLOBAL — the project it is handed is a first-run hint about which board to select, not
+            a filter — so nothing here unmounts or refetches when the open project changes. */}
+        {activeTab === 'kanban' && (
+          <div className="h-full overflow-hidden">
+            <KanbanPanel projectId={selectedProject.projectId} />
           </div>
         )}
 

@@ -133,8 +133,8 @@ CREATE TABLE IF NOT EXISTS sessions (
     custom_name TEXT,
     project_path TEXT,
     jsonl_path TEXT,
-    -- Model and reasoning effort this session runs with. Written when the user
-    -- changes either selection and on every send, so reopening a session
+    -- Model and reasoning effort this session runs with. Written whenever
+    -- either selection changes and on every send, so reopening a session
     -- restores its exact runtime configuration instead of provider defaults.
     model TEXT,
     effort TEXT,
@@ -143,9 +143,20 @@ CREATE TABLE IF NOT EXISTS sessions (
     -- session, and deleting the source does not affect it.
     forked_from_session_id TEXT,
     -- Set to the tagging timestamp when this session was created from the
-    -- simple chat list view; NULL for sessions created from the tree. Also
-    -- the simple list's sort key, so tagged rows never jump while running.
+    -- simple chat list view; NULL for sessions created from the tree.
     simple_list_at DATETIME,
+    -- The simple list's manual sort key: a higher value sits nearer the top.
+    -- NULL for a row that is not tagged for the simple list.
+    simple_list_rank REAL,
+    -- The kebab-case icon name chosen for this chat; NULL renders the default.
+    icon TEXT,
+    -- When this session's last run finished, as ISO-8601 UTC with
+    -- milliseconds. The fixed format is what makes the unread comparison
+    -- against last_read_at a correct time comparison.
+    last_completed_at TEXT,
+    -- When this session was last on screen, in the same format as above.
+    -- NULL until it has been looked at once.
+    last_read_at TEXT,
     isArchived BOOLEAN DEFAULT 0,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,

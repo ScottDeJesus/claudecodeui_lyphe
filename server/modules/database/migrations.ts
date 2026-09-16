@@ -15,6 +15,7 @@ import {
   USER_NOTIFICATION_PREFERENCES_TABLE_SCHEMA_SQL,
   VAPID_KEYS_TABLE_SCHEMA_SQL,
 } from '@/modules/database/schema.js';
+import { KANBAN_SCHEMA_SQL } from '@/modules/database/kanban-schema.js';
 
 const SQLITE_UUID_SQL = `
 lower(hex(randomblob(4))) || '-' ||
@@ -443,6 +444,31 @@ const addSimpleListAtColumn = (db: Database): void => {
 };
 
 /**
+ * Adds the simple list's manual sort key, the chosen icon, and the two
+ * completion/read timestamps the unread dot is derived from.
+ *
+ * `simple_list_rank` is backfilled from the tagging timestamp, which is the
+ * order the simple list used before ranks existed, so rows tagged by an older
+ * build keep their newest-first order instead of collapsing onto one tiebreak.
+ * The backfill is guarded by `simple_list_rank IS NULL`, so re-running it can
+ * never overwrite a rank a user has since dragged.
+ */
+const addSessionUserStateColumns = (db: Database): void => {
+  const columnNames = getTableInfo(db, 'sessions').map((column) => column.name);
+
+  addColumnToTableIfNotExists(db, 'sessions', columnNames, 'simple_list_rank', 'REAL');
+  addColumnToTableIfNotExists(db, 'sessions', columnNames, 'icon', 'TEXT');
+  addColumnToTableIfNotExists(db, 'sessions', columnNames, 'last_completed_at', 'TEXT');
+  addColumnToTableIfNotExists(db, 'sessions', columnNames, 'last_read_at', 'TEXT');
+
+  db.exec(`
+    UPDATE sessions
+    SET simple_list_rank = julianday(simple_list_at)
+    WHERE simple_list_at IS NOT NULL AND simple_list_rank IS NULL
+  `);
+};
+
+/**
  * Adds the `model` column that records which model each session runs with.
  *
  * Left NULL for pre-existing rows on purpose: the model resolver falls back to
@@ -532,8 +558,11 @@ export const runMigrations = (db: Database) => {
     addSessionEffortColumn(db);
     addForkedFromSessionIdColumn(db);
     addSimpleListAtColumn(db);
+    addSessionUserStateColumns(db);
     ensureProjectsForSessionPaths(db);
     db.exec(SCHEDULED_MESSAGES_TABLE_SCHEMA_SQL);
+    // After the projects rebuild above: the boards table references projects(project_id).
+    db.exec(KANBAN_SCHEMA_SQL);
 
     db.exec('CREATE INDEX IF NOT EXISTS idx_session_ids_lookup ON sessions(session_id)');
     db.exec('CREATE INDEX IF NOT EXISTS idx_sessions_provider_session_id ON sessions(provider_session_id)');
@@ -544,6 +573,7 @@ export const runMigrations = (db: Database) => {
     db.exec('CREATE INDEX IF NOT EXISTS idx_scheduled_messages_session ON scheduled_messages(session_id)');
     db.exec('CREATE INDEX IF NOT EXISTS idx_sessions_is_archived ON sessions(isArchived)');
     db.exec('CREATE INDEX IF NOT EXISTS idx_sessions_simple_list_at ON sessions(simple_list_at)');
+    db.exec('CREATE INDEX IF NOT EXISTS idx_sessions_simple_list_rank ON sessions(simple_list_rank)');
     db.exec('CREATE INDEX IF NOT EXISTS idx_projects_is_starred ON projects(isStarred)');
     db.exec('CREATE INDEX IF NOT EXISTS idx_projects_is_archived ON projects(isArchived)');
 

@@ -8,6 +8,7 @@ import { providerTokenUsageService } from '@/modules/providers/services/provider
 import { providerSkillsService } from '@/modules/providers/services/skills.service.js';
 import { sessionConversationsSearchService } from '@/modules/providers/services/session-conversations-search.service.js';
 import { sessionsService } from '@/modules/providers/services/sessions.service.js';
+import { sessionUserStateRoutes } from '@/modules/providers/session-user-state.routes.js';
 import { subagentTranscriptService } from '@/modules/providers/services/subagent-transcript.service.js';
 import type {
   CustomProviderModelInput,
@@ -18,41 +19,18 @@ import type {
   ProviderSkillCreateInput,
   UpsertProviderMcpServerInput,
 } from '@/shared/types.js';
-import { AppError, asyncHandler, createApiSuccessResponse } from '@/shared/utils.js';
+import {
+  AppError,
+  asyncHandler,
+  createApiSuccessResponse,
+  parseSessionId,
+  readPathParam,
+} from '@/shared/utils.js';
 
 const router = express.Router();
 
-const readPathParam = (value: unknown, name: string): string => {
-  if (typeof value === 'string') {
-    return value;
-  }
-
-  if (Array.isArray(value) && typeof value[0] === 'string') {
-    return value[0];
-  }
-
-  throw new AppError(`${name} path parameter is invalid.`, {
-    code: 'INVALID_PATH_PARAMETER',
-    statusCode: 400,
-  });
-};
-
 const normalizeProviderParam = (value: unknown): string =>
   readPathParam(value, 'provider').trim().toLowerCase();
-
-const SESSION_ID_PATTERN = /^[a-zA-Z0-9._-]{1,120}$/;
-
-const parseSessionId = (value: unknown): string => {
-  const sessionId = readPathParam(value, 'sessionId').trim();
-  if (!SESSION_ID_PATTERN.test(sessionId)) {
-    throw new AppError('Invalid sessionId.', {
-      code: 'INVALID_SESSION_ID',
-      statusCode: 400,
-    });
-  }
-
-  return sessionId;
-};
 
 /** The Agent tool call's id, which addresses one subagent transcript. A plain id, never a path. */
 const TOOL_USE_ID_PATTERN = /^[A-Za-z0-9_-]{1,128}$/;
@@ -852,6 +830,8 @@ router.put(
     res.json(createApiSuccessResponse(result));
   }),
 );
+
+router.use(sessionUserStateRoutes);
 
 router.get(
   '/sessions/:sessionId/messages',

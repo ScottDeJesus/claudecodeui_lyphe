@@ -41,8 +41,12 @@ export function useSimpleChatList(selectedSessionId: string | null): {
   hasError: boolean;
   reload: () => Promise<void>;
   loadMore: () => Promise<void>;
-  renameLocal: (sessionId: string, title: string) => void;
+  patchLocal: (
+    sessionId: string,
+    patch: Partial<Pick<RecentConversationListItem, 'sessionTitle' | 'icon'>>,
+  ) => void;
   removeLocal: (sessionId: string) => void;
+  moveLocal: (sessionId: string, afterSessionId: string | null) => void;
 } {
   const { subscribe } = useWebSocket();
 
@@ -141,16 +145,40 @@ export function useSimpleChatList(selectedSessionId: string | null): {
     void reload();
   }, [selectedSessionId, rows, reload]);
 
-  const renameLocal = useCallback((sessionId: string, title: string) => {
-    setRows((previous) => previous.map((row) => (
-      row.sessionId === sessionId ? { ...row, sessionTitle: title } : row
-    )));
-  }, []);
+  // The optimistic write behind a rename and an icon pick: the row shows the change at once and
+  // the server's own `session_upserted` refetch confirms it a moment later. Merging rather than
+  // replacing keeps every field the patch does not name — a replaced row would drop the project
+  // label and the activity stamp the row still renders. `unread` is deliberately outside the
+  // patch type: it is the server's answer to a completed run, never a client's guess.
+  const patchLocal = useCallback(
+    (sessionId: string, patch: Partial<Pick<RecentConversationListItem, 'sessionTitle' | 'icon'>>) => {
+      setRows((previous) => previous.map((row) => (
+        row.sessionId === sessionId ? { ...row, ...patch } : row
+      )));
+    },
+    [],
+  );
 
   const removeLocal = useCallback((sessionId: string) => {
     setRows((previous) => previous.filter((row) => row.sessionId !== sessionId));
     setTotal((previous) => Math.max(0, previous - 1));
   }, []);
 
-  return { rows, total, hasMore, isLoading, hasError, reload, loadMore, renameLocal, removeLocal };
+  // The optimistic write behind a drag: the row lands where it was dropped at once, and the
+  // server's own `session_upserted` refetch confirms the order a moment later. Either id not
+  // being loaded is not a position, so the rows are left exactly as they stand rather than
+  // guessed at — a missing `afterSessionId` must never quietly mean "the top".
+  const moveLocal = useCallback((sessionId: string, afterSessionId: string | null) => {
+    setRows((previous) => {
+      const moving = previous.find((row) => row.sessionId === sessionId);
+      if (!moving) return previous;
+      const without = previous.filter((row) => row.sessionId !== sessionId);
+      if (afterSessionId === null) return [moving, ...without];
+      const after = without.findIndex((row) => row.sessionId === afterSessionId);
+      if (after === -1) return previous;
+      return [...without.slice(0, after + 1), moving, ...without.slice(after + 1)];
+    });
+  }, []);
+
+  return { rows, total, hasMore, isLoading, hasError, reload, loadMore, patchLocal, removeLocal, moveLocal };
 }

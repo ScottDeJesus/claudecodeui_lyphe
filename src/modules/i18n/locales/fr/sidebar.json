@@ -171,6 +171,12 @@
     "stopTitle": "Ce chat est toujours en cours",
     "stopBody": "Arrêter et supprimer ?",
     "stopConfirm": "Arrêter et supprimer",
-    "removeFailed": "Impossible de supprimer ce chat."
+    "removeFailed": "Impossible de supprimer ce chat.",
+    "changeIcon": "Changer l'icône",
+    "iconTitle": "Choisir une icône",
+    "iconDefault": "Par défaut",
+    "iconOption": "Icône {{name}}",
+    "unread": "Terminé, pas encore lu",
+    "dragHandle": "Glisser pour réordonner"
   }
 }

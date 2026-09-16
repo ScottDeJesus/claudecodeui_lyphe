@@ -1,6 +1,8 @@
 import type { IncomingMessage } from 'node:http';
 import type { Readable } from 'node:stream';
 
+import type { KanbanCardSummary, KanbanLaneCount } from './kanban-types.js';
+
 //----------------- HTTP RESPONSE SHAPES ------------
 /**
  * Canonical success envelope used by backend APIs that return a structured payload.
@@ -207,6 +209,7 @@ export type GatewayEventKind =
   | 'loading_progress'
   | 'runner_state'
   | 'soul_launch_state'
+  | 'kanban_event'
   | 'protocol_error';
 
 /**
@@ -252,6 +255,29 @@ export type SessionUpsertedEvent = {
   };
   project: SessionUpsertedProject | null;
   timestamp: string;
+};
+
+/**
+ * The board frame: one write has committed, and this is what it left behind.
+ *
+ * Built and sent by exactly one function, `writeKanban` in
+ * `modules/kanban/kanban-write.service.ts` — no verb, route or repository ever constructs one.
+ * It is assembled AFTER the transaction commits, so a write that rolled back never told a client
+ * it happened, and the card and lane totals it carries are read fresh rather than predicted.
+ *
+ * `card` is null for a board-level write; `lanes` is the board's per-status totals after the
+ * write, which the panel sums through its own lane policy. `at` is epoch MILLISECONDS.
+ *
+ * Declared here rather than in `kanban-types.ts` because `GatewayEventKind` lives here, and a
+ * frame belongs beside its siblings. Mirrored field-for-field in `src/shared/kanban-types.ts`.
+ */
+export type KanbanBoardEvent = {
+  kind: 'kanban_event';
+  boardId: string;
+  event: { id: number; ts: string; kind: string; cardId: string | null; actor: string };
+  card: KanbanCardSummary | null;
+  lanes: KanbanLaneCount[];
+  at: number;
 };
 
 // ---------------------------

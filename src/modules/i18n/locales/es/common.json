@@ -24,7 +24,78 @@
     "git": "Git",
     "tasks": "Tareas",
     "browser": "Navegador",
-    "computer": "Equipo"
+    "computer": "Equipo",
+    "kanban": "Kanban"
+  },
+  "kanban": {
+    "loading": "Leyendo el tablero…",
+    "unreachable": {
+      "title": "No se pudo leer el tablero",
+      "message": "El servidor no respondió. No se ha perdido nada: el tablero está donde lo dejaste.",
+      "retry": "Reintentar"
+    },
+    "noBoard": {
+      "title": "Aún no hay tablero",
+      "message": "Un tablero es donde viven las tarjetas. Este proyecto todavía no tiene uno.",
+      "action": "Crear un tablero"
+    },
+    "board": {
+      "switcher": "Tablero",
+      "actions": "Acciones del tablero",
+      "noBoard": "Sin tablero",
+      "autonomy": "Autonomía",
+      "newBoard": "Nuevo tablero",
+      "rename": "Renombrar",
+      "archive": "Archivar",
+      "importDescent": "Importar desde Descent",
+      "newTitle": "Nuevo tablero",
+      "renameTitle": "Renombrar tablero",
+      "archiveTitle": "¿Archivar este tablero?",
+      "archiveMessage": "Sale del selector y cada tarjeta se queda donde está. No se borra nada.",
+      "nameLabel": "Nombre del tablero",
+      "namePlaceholder": "Para qué sirve este tablero",
+      "cancel": "Cancelar",
+      "save": "Guardar",
+      "questionsFolded_one": "{{count}} tarjeta en Por hacer espera una respuesta",
+      "questionsFolded_many": "{{count}} tarjetas en Por hacer esperan una respuesta",
+      "questionsFolded_other": "{{count}} tarjetas en Por hacer esperan una respuesta"
+    },
+    "lanes": {
+      "todo": "Por hacer",
+      "questions": "Preguntas abiertas",
+      "backlog": "Pendientes",
+      "active": "En curso",
+      "done": "Hecho"
+    },
+    "laneMenu": {
+      "collapse": "Plegar columna",
+      "sortByPriority": "Ordenar por prioridad",
+      "sortByNewest": "Ordenar por más reciente",
+      "clearDone": "Vaciar las hechas"
+    },
+    "card": {
+      "open": "Abrir",
+      "moveTo": "Mover a {{lane}}",
+      "archive": "Archivar",
+      "untitled": "Tarjeta sin título",
+      "moved": "{{title}} movida a {{lane}}, posición {{position}} de {{total}}"
+    },
+    "toast": {
+      "cardNotSaved": "La tarjeta no se guardó",
+      "boardNotSaved": "El tablero no se guardó",
+      "boardCreated": "Tablero creado",
+      "boardRenamed": "Tablero renombrado",
+      "boardArchived": "Tablero archivado: no se ha borrado nada",
+      "autonomyOn": "Autonomía activada",
+      "autonomyOff": "Autonomía desactivada",
+      "cardArchived": "Tarjeta archivada",
+      "laneCleared": "Se han archivado las tarjetas de la columna"
+    },
+    "import": {
+      "done": "Importado desde Descent",
+      "counts": "{{inserted}} añadidas, {{updated}} actualizadas",
+      "failed": "La importación no se ejecutó"
+    }
   },
   "status": {
     "loading": "Cargando...",

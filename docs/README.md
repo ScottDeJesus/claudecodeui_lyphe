@@ -59,6 +59,7 @@
 - **Integrated Shell Terminal** - Direct access to the Agents CLI through built-in shell functionality
 - **File Explorer** - Interactive file tree with a read-only preview of text, images and downloads — ask an Agent to change a file
 - **Git Explorer** - Read your branch, what is waiting to be pushed, and every pending change with its diff — committing and pushing are the Agent's: one button starts the conversation and runs your own `/git`
+- **Kanban Board** - Backlog, to do, in progress and done, with questions, checklists, issues, tags and build leases, live over the websocket — plus a one-way import from an existing Descent install ([kanban.md](kanban.md))
 - **Browser Use** - Open browser sessions for web research, testing, and agent-driven browser tasks
 - **Session Management** - Resume conversations, manage multiple sessions, and track history
 - **Plugin System** - Extend CloudCLI with custom plugins — add new tabs, backend services, and integrations. [Build your own →](https://github.com/cloudcli-ai/cloudcli-plugin-starter)

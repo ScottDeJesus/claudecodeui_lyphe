@@ -25,4 +25,4 @@ export type { KeepaliveReattach } from './spawner.js';
  * The boot step that gives every CLI which outlived the API its run back (D-11).
  * consumer: server/index.ts, through the providers barrel
  */
-export { readoptKeepaliveSessions } from './readopt.js';
+export { readoptKeepaliveSessions, releaseKeepaliveOwnership } from './readopt.js';

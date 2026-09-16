@@ -254,7 +254,7 @@ export const AskUserQuestionPanel: React.FC<PermissionPanelProps> = ({
           )}
 
           {/* Question text */}
-          <p className="text-[14px] font-medium leading-snug text-gray-900 dark:text-gray-100">
+          <p className="whitespace-pre-wrap text-[14px] font-medium leading-snug text-gray-900 dark:text-gray-100">
             {q.question}
           </p>
           {multi && (
