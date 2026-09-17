@@ -14,6 +14,7 @@ import type {
   LLMProvider,
   NormalizedMessage,
 } from '@/shared/types.js';
+import { isHiddenProjectPath } from '@/shared/hidden-project-paths.js';
 import { AppError, sliceTailPage } from '@/shared/utils.js';
 
 type CreateAppSessionResult = {
@@ -69,6 +70,8 @@ type RunningSessionListItem = {
   projectDisplayName: string;
   sessionTitle: string;
   lastActivity: string | null;
+  /** A question or permission prompt in this run is waiting on the user. */
+  awaitingInput: boolean;
 };
 
 type SessionDetails = {
@@ -169,7 +172,9 @@ export const sessionsService = {
       const projectPath = session?.project_path?.trim() ? session.project_path : null;
       let project = null;
 
-      if (projectPath) {
+      // A run in a scratch folder is still a run (busy and awaiting marks read it), but it carries
+      // no project id, so the Running list does not draw the hidden folder as a group of its own.
+      if (projectPath && !isHiddenProjectPath(projectPath)) {
         if (!projectCache.has(projectPath)) {
           projectCache.set(projectPath, projectsDb.getProjectPath(projectPath));
         }
@@ -191,6 +196,10 @@ export const sessionsService = {
         projectDisplayName: resolveProjectDisplayName(projectPath, project?.custom_project_name),
         sessionTitle: session?.custom_name?.trim() || run.sessionId,
         lastActivity: session?.updated_at ?? session?.created_at ?? null,
+        // Read from the providers directly: `providerRuntimeService` imports this service.
+        awaitingInput: providerRegistry.listProviders().some(
+          (provider) => (provider.runtime.permissions?.listPending(run.sessionId) ?? []).length > 0,
+        ),
       };
     });
   },

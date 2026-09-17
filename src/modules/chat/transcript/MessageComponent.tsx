@@ -10,7 +10,7 @@ import type { ChatMessage, ClaudePermissionSuggestion, PermissionGrantResult, LL
 import { formatUsageLimitText, stripProposedPlanEnvelope } from '@/modules/chat/utils/chatFormatting';
 import { ToolRenderer, ToolErrorDisplay, SubagentPanel, shouldHideToolResult } from '@/modules/chat/tools';
 import type { ReadToolPermissionState } from '@/modules/chat/hooks/useToolPermissionState';
-import { Reasoning, ReasoningContent, ReasoningTrigger } from '@/modules/chat/transcript/Reasoning';
+import ThinkingRow from '@/modules/chat/transcript/ThinkingRow';
 import ChatMessageImages from '@/modules/chat/transcript/ChatMessageImages';
 import { shapeKey } from '@/modules/chat/transcript/shapes/collapseState';
 import { PreviewScopeContext } from '@/modules/chat/transcript/shapes/previewScope';
@@ -289,6 +289,8 @@ const MessageComponent = memo(({ message, prevMessage, previewAnchor = '', isRun
                 subagent={message.subagent}
                 activity={message.subagentActivity}
                 usage={message.subagentUsage}
+                provider={message.subagentProvider}
+                model={message.subagentModel}
                 onFileOpen={onFileOpen}
                 createDiff={createDiff}
                 selectedProject={selectedProject}
@@ -348,46 +350,10 @@ const MessageComponent = memo(({ message, prevMessage, previewAnchor = '', isRun
                 )}
               </>
             ) : message.isThinking ? (
-              /* Thinking: a dashed card, because it is a note to itself rather
-                 than part of the answer. The border says so before the words do. */
-              <Reasoning
-                defaultOpen={isExporting}
-                className="border-[1.5px] border-dashed border-input px-4 py-3.5"
-                style={{ borderRadius: 'var(--radius-card)' }}
-              >
-                <ReasoningTrigger
-                  getThinkingMessage={(_isStreaming, duration) => (
-                    <span className="font-serif text-[17px] italic text-ink-faint">
-                      {t('thinking.card', { defaultValue: 'Thinking' })}
-                      {typeof duration === 'number' && duration > 0 ? ` · ${duration}s` : ''}
-                    </span>
-                  )}
-                />
-                <ReasoningContent>
-                  <Markdown className={cn(TRANSCRIPT_PROSE, 'prose-gray', MARKDOWN_CARDS_CLASS)}>
-                    {message.content}
-                  </Markdown>
-                  {!isExporting && (
-                    <div className="mt-3 flex items-center text-[11px]">
-                      <MessageCopyControl content={String(message.content || '')} messageType="assistant" />
-                    </div>
-                  )}
-                </ReasoningContent>
-              </Reasoning>
+              /* Thinking: a tool row like the calls around it, collapsed to its first line. */
+              <ThinkingRow content={String(message.content || '')} />
             ) : (
               <div dir="auto" className="text-[15px] leading-relaxed text-foreground">
-                {/* Reasoning accordion */}
-                {showThinking && message.reasoning && (
-                  <Reasoning className="mb-3" defaultOpen={false}>
-                    <ReasoningTrigger />
-                    <ReasoningContent>
-                      <div className="whitespace-pre-wrap">
-                        {message.reasoning}
-                      </div>
-                    </ReasoningContent>
-                  </Reasoning>
-                )}
-
                 {(() => {
                   const content = formattedMessageContent;
 

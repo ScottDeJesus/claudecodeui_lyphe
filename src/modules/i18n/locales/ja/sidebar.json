@@ -151,7 +151,6 @@
     "projectsScanned_other": "{{count}} 件のプロジェクトを検索済み"
   },
   "simpleList": {
-    "project": "プロジェクト",
     "newChat": "新しいチャット",
     "empty": "まだチャットがありません。「新しいチャット」で始めましょう。",
     "loadMore": "もっと見る",

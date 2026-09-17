@@ -24,8 +24,8 @@
     "git": "Git",
     "tasks": "Attività",
     "browser": "Browser",
-    "computer": "Computer",
-    "kanban": "Kanban"
+    "kanban": "Kanban",
+    "universe": "Universo"
   },
   "kanban": {
     "loading": "Lettura della bacheca…",
@@ -371,5 +371,52 @@
       "label": "Questa sessione",
       "title": "Creato dalla chat che hai aperto"
     }
+  },
+  "applications": {
+    "fabLabel": "Applicazioni",
+    "heading": "Le tue <em>app</em>",
+    "closeDrawer": "Chiudi",
+    "close": "Chiudi tutte",
+    "summaryNone": "Nessuna registrata",
+    "summarySingle_one": "{{count}} app · schermo singolo",
+    "summarySingle_other": "{{count}} app · schermo singolo",
+    "summaryDual_one": "{{count}} app · schermo diviso attivo",
+    "summaryDual_other": "{{count}} app · schermo diviso attivo",
+    "dualScreen": "Schermo diviso",
+    "dualScreenHint": "Due app affiancate, divisore trascinabile.",
+    "opensIn": "Si apre in",
+    "left": "Sinistra",
+    "right": "Destra",
+    "hostOnScreen": "{{host}} · sullo schermo",
+    "reload": "Ricarica",
+    "openInNewTab": "Apri in una nuova scheda",
+    "openInDual": "Apri in schermo diviso",
+    "closeDual": "Chiudi schermo diviso",
+    "remove": "Rimuovi",
+    "removeFailed": "Non è stato possibile rimuovere l'applicazione",
+    "removeFailedPane": "{{name}} è stata chiusa ed è ancora registrata.",
+    "unreadable": "Non è stato possibile leggere l'elenco delle applicazioni",
+    "empty": "Nessuna applicazione al momento",
+    "emptyMessage": "Aggiungine una con nome e indirizzo web e si apre proprio qui.",
+    "emptyAction": "Aggiungi la tua prima applicazione",
+    "addApplication": "Aggiungi applicazione",
+    "form": {
+      "title": "Nuova applicazione",
+      "nameLabel": "Nome",
+      "nameHelper": "Come la chiami in questo pannello.",
+      "namePlaceholder": "Console lavori",
+      "urlLabel": "Indirizzo web",
+      "urlHelper": "Se manca http://, viene aggiunto. {host} indica l'indirizzo su cui è aperta questa pagina.",
+      "urlPlaceholder": "{host}:8080",
+      "nameRequired": "Dalle un nome per ritrovarla qui.",
+      "urlRequired": "Serve un indirizzo per caricare l'app.",
+      "urlInvalid": "Questo indirizzo non è leggibile: controlla eventuali errori di battitura.",
+      "submit": "Aggiungila",
+      "cancel": "Annulla",
+      "addFailed": "Non è stato possibile aggiungere l'applicazione"
+    },
+    "appearanceLight": "Aspetto chiaro",
+    "appearanceDark": "Aspetto scuro",
+    "divider": "Ridimensiona le applicazioni"
   }
 }

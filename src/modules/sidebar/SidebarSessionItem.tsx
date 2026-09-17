@@ -9,6 +9,7 @@ import type { LLMProvider, Project, ProjectSession, SessionWithProvider } from '
 import { api } from '@/shared/api';
 import { useSessionForkingProviders } from '@/shared/hooks/useProviderCapabilities';
 import { useCliVersion } from '@/shared/hooks/useCliVersion';
+import { useAwaitingInputSessionIdSet } from '@/shared/context/SessionProtectionContext';
 import { createSessionViewModel, formatCompactAge } from '@/modules/sidebar/utils/sidebarProjectFormatting';
 import SidebarSessionMeta from '@/modules/sidebar/SidebarSessionMeta';
 import { useCompactSidebar } from '@/modules/sidebar/hooks/useCompactSidebar';
@@ -36,6 +37,35 @@ type SidebarSessionItemProps = {
 };
 
 type CopyState = 'loading' | 'idle' | 'copying' | 'copied' | 'error';
+/**
+ * The mark beside a running session: a spinner while it works, a yellow dot while a question or
+ * permission prompt waits on the user — the run is paused on them, not busy.
+ */
+function SessionRunIndicator({ awaitingInput, t }: { awaitingInput: boolean; t: TFunction }) {
+  if (awaitingInput) {
+    const label = t('simpleList.awaitingInput');
+    return (
+      <Tooltip content={label} position="top">
+        <span
+          role="status"
+          aria-label={label}
+          className="vv-pulse flex h-5 w-5 items-center justify-center"
+        >
+          {/* The same 8px disc as the simple list's unread dot, in the warning ink. */}
+          <span aria-hidden="true" className="h-2 w-2 rounded-full bg-warn-ink" />
+        </span>
+      </Tooltip>
+    );
+  }
+  return (
+    <Tooltip content={t('tooltips.processingSessionIndicator', 'Processing session')} position="top">
+      <span className="flex h-5 w-5 items-center justify-center rounded-md text-muted-foreground">
+        <Loader2 className="h-3 w-3 animate-spin" />
+      </span>
+    </Tooltip>
+  );
+}
+
 /** Rendered by SidebarProjectSessions for one session row, including its rename, copy and delete controls. */
 function SidebarSessionItem({
   project,
@@ -66,6 +96,7 @@ function SidebarSessionItem({
   const [copyState, setCopyState] = useState<CopyState>('idle');
   const [providerSessionId, setProviderSessionId] = useState<string | null>(null);
   const providerIdRequestRef = useRef(0);
+  const isAwaitingInput = useAwaitingInputSessionIdSet().has(session.id);
   const showAttentionIndicator = needsAttention && !isSelected;
   const showRecentIndicator = !showAttentionIndicator && !isProcessing && sessionView.isActive;
   const providerLabel = LLM_PROVIDER_LABELS[session.__provider];
@@ -256,11 +287,7 @@ function SidebarSessionItem({
                 </div>
                 {isProcessing ? (
                   <span className="ml-auto flex-shrink-0">
-                    <Tooltip content={t('tooltips.processingSessionIndicator', 'Processing session')} position="top">
-                      <span className="flex h-5 w-5 items-center justify-center rounded-md text-muted-foreground">
-                        <Loader2 className="h-3 w-3 animate-spin" />
-                      </span>
-                    </Tooltip>
+                    <SessionRunIndicator awaitingInput={isAwaitingInput} t={t} />
                   </span>
                 ) : null}
               </div>
@@ -465,11 +492,7 @@ function SidebarSessionItem({
                       isEditing ? 'opacity-0' : 'group-hover:opacity-0',
                     )}
                   >
-                    <Tooltip content={t('tooltips.processingSessionIndicator', 'Processing session')} position="top">
-                      <span className="flex h-5 w-5 items-center justify-center rounded-md text-muted-foreground">
-                        <Loader2 className="h-3 w-3 animate-spin" />
-                      </span>
-                    </Tooltip>
+                    <SessionRunIndicator awaitingInput={isAwaitingInput} t={t} />
                   </span>
                 ) : null}
               </div>

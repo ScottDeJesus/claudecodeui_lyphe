@@ -328,7 +328,7 @@ const readOpenCodeJsonFile = async (filePath: string): Promise<Record<string, un
  * project-level `opencode.json` are not visible here; the null fallback and the
  * env-key sweep keep those installs on the full list.
  */
-const readConnectedOpenCodeProviderIds = async (): Promise<Set<string> | null> => {
+export const readConnectedOpenCodeProviderIds = async (): Promise<Set<string> | null> => {
   const providerIds = new Set<string>();
   const configDir = path.join(os.homedir(), '.config', 'opencode');
 

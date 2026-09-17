@@ -4,6 +4,7 @@ import { ChevronDown, Loader2, type LucideIcon } from 'lucide-react';
 
 import { cn } from '@/shared/utils';
 import { Button } from '@/shared/ui/Button';
+import { OWNS_ESCAPE } from '@/shared/ui/overlayEscape';
 
 type ButtonVariant = 'default' | 'destructive' | 'outline' | 'secondary' | 'ghost' | 'link';
 type ButtonSize = 'default' | 'sm' | 'lg' | 'icon';
@@ -209,6 +210,9 @@ export function ActionMenu({
       id={menuId}
       role="menu"
       tabIndex={-1}
+      // It closes itself on Escape, so it says so: a dialog it is open over stands its own Escape
+      // down for this panel rather than taking the key. See `shared/ui/overlayEscape`.
+      {...OWNS_ESCAPE}
       className={cn(
         'vv-action-menu',
         portal ? 'fixed z-[70]' : 'absolute top-full z-50 mt-2',

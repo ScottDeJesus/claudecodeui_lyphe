@@ -24,8 +24,8 @@
     "git": "Git",
     "tasks": "Tareas",
     "browser": "Navegador",
-    "computer": "Equipo",
-    "kanban": "Kanban"
+    "kanban": "Kanban",
+    "universe": "Universo"
   },
   "kanban": {
     "loading": "Leyendo el tablero…",
@@ -371,5 +371,52 @@
       "label": "Esta sesión",
       "title": "Creado por el chat que tienes abierto"
     }
+  },
+  "applications": {
+    "fabLabel": "Aplicaciones",
+    "heading": "Tus <em>apps</em>",
+    "closeDrawer": "Cerrar",
+    "close": "Cerrar todas",
+    "summaryNone": "Ninguna registrada",
+    "summarySingle_one": "{{count}} app · una pantalla",
+    "summarySingle_other": "{{count}} apps · una pantalla",
+    "summaryDual_one": "{{count}} app · pantalla dividida activada",
+    "summaryDual_other": "{{count}} apps · pantalla dividida activada",
+    "dualScreen": "Pantalla dividida",
+    "dualScreenHint": "Dos apps lado a lado, con divisor arrastrable.",
+    "opensIn": "Se abre en",
+    "left": "Izquierda",
+    "right": "Derecha",
+    "hostOnScreen": "{{host}} · en pantalla",
+    "reload": "Recargar",
+    "openInNewTab": "Abrir en una pestaña nueva",
+    "openInDual": "Abrir en pantalla dividida",
+    "closeDual": "Cerrar pantalla dividida",
+    "remove": "Quitar",
+    "removeFailed": "No se pudo quitar la aplicación",
+    "removeFailedPane": "{{name}} se cerró y sigue registrada.",
+    "unreadable": "No se pudo leer la lista de aplicaciones",
+    "empty": "Aún no hay aplicaciones",
+    "emptyMessage": "Añade una con su nombre y dirección web y se abrirá aquí mismo.",
+    "emptyAction": "Añade tu primera aplicación",
+    "addApplication": "Añadir aplicación",
+    "form": {
+      "title": "Nueva aplicación",
+      "nameLabel": "Nombre",
+      "nameHelper": "Cómo la llamas en este panel.",
+      "namePlaceholder": "Consola de trabajos",
+      "urlLabel": "Dirección web",
+      "urlHelper": "Si no pones http://, se añade. {host} equivale a la dirección en la que está abierta esta página.",
+      "urlPlaceholder": "{host}:8080",
+      "nameRequired": "Ponle un nombre para encontrarla aquí.",
+      "urlRequired": "Hace falta una dirección para cargar la app.",
+      "urlInvalid": "No se puede leer esa dirección: revisa si hay erratas.",
+      "submit": "Añadirla",
+      "cancel": "Cancelar",
+      "addFailed": "No se pudo añadir la aplicación"
+    },
+    "appearanceLight": "Apariencia clara",
+    "appearanceDark": "Apariencia oscura",
+    "divider": "Cambiar el tamaño de las aplicaciones"
   }
 }

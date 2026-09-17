@@ -30,8 +30,9 @@ which is new to systemd and therefore `enable --now`. Both commands are in the R
 
 The client is the only port the LAN needs: `vite.config.js` proxies `/api`, `/ws`, `/shell` and
 `/plugin-ws` to the API on loopback, so the API never faces the LAN. The app is reachable at
-`http://<this host>:5183` on the LAN and over Tailscale, and as the **CloudCLI** tile in the
-Applications Hub (`~/.claude/hub/apps.json`, `http://{host}:5183`).
+`http://<this host>:5183` on the LAN and over Tailscale, and as the **CloudCLI** row of the
+application drawer this app serves — `apps.local.json`, git-ignored; the drawer's one
+documentation home is [`applications.md`](applications.md).
 
 ## Rules that bite
 
@@ -78,12 +79,12 @@ Applications Hub (`~/.claude/hub/apps.json`, `http://{host}:5183`).
   state machine, every log line, the two environment bits and the failure table are in
   [`deploy/dev-supervisor/README.md`](../deploy/dev-supervisor/README.md), the mechanism's one
   home. What the same handover costs a Claude turn already in flight is its own rule below.
-- **`--strictPort` is deliberate.** The `.verify/` harness and the Hub tile are pinned to 5183;
-  a drift to 5184 would pass silently and break both.
-- **Vite 7 refuses any `Host` header that is not an IP or `localhost`.** The Hub frames the app
-  under whatever name the Hub was opened on, so `vite.config.js` allows `eis1` and this
-  tailnet's MagicDNS name, `eis1.tail8717cd.ts.net` (`server.allowedHosts`); any other name
-  renders Vite's "Blocked request" page in the tile.
+- **`--strictPort` is deliberate.** The `.verify/` harness and the application drawer's CloudCLI
+  row are pinned to 5183; a drift to 5184 would pass silently and break both.
+- **Vite 7 refuses any `Host` header that is not an IP or `localhost`.** The app is opened
+  directly under those names on the LAN and the tailnet, so `vite.config.js` allows `eis1` and
+  this tailnet's MagicDNS name, `eis1.tail8717cd.ts.net` (`server.allowedHosts`); any other name
+  renders Vite's "Blocked request" page.
 - **The wildcard bind reaches the Docker bridges too** (`172.17-20.0.1`, 19 containers, several
   third-party images, no host firewall). The client unit's root `ExecStartPre` inserts
   `iptables -I INPUT -p tcp --dport 5183 -s 172.16.0.0/12 -j DROP` idempotently before Vite

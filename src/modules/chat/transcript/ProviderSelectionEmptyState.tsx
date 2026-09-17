@@ -3,6 +3,7 @@ import { Check, ChevronDown, Plus } from "lucide-react";
 import { Trans, useTranslation } from "react-i18next";
 
 import type {
+  ProjectChoice,
   ProjectSession,
   LLMProvider,
   ProviderModelActions,
@@ -25,8 +26,11 @@ import {
   Badge,
   Button,
   LLMProviderLogo,
+  Select,
 } from "@/shared/ui";
+import { useSimpleChatListPreferences } from "@/shared/hooks/useSimpleChatListPreferences";
 import ModelLibraryPanel from "@/modules/chat/modals/ModelLibraryPanel";
+import { useSignedOutProviders } from "@/modules/chat/hooks/useSignedOutProviders";
 import { writeSelectedProvider } from '@/shared/selectedProvider';
 
 const PROVIDER_META: { id: LLMProvider; name: string }[] = [
@@ -50,6 +54,8 @@ function modelSearchFilter(value: string, search: string): number {
   return tokens.every((token) => haystack.includes(token)) ? 1 : 0;
 }
 
+const PROVIDER_IDS = PROVIDER_META.map((p) => p.id);
+
 type ProviderSelectionEmptyStateProps = {
   selectedSession: ProjectSession | null;
   currentSessionId: string | null;
@@ -66,6 +72,12 @@ type ProviderSelectionEmptyStateProps = {
   isTaskMasterInstalled: boolean | null;
   onShowAllTasks?: (() => void) | null;
   setInput: React.Dispatch<React.SetStateAction<string>>;
+  /** The project the workspace points at, which a new chat starts in. */
+  selectedProjectId?: string | null;
+  /** The projects a new chat can start in; absent or empty draws no project picker. */
+  projectChoices?: ProjectChoice[];
+  /** Points the workspace at another project. */
+  onSelectProject?: (projectId: string) => void;
 };
 
 type ProviderGroup = {
@@ -109,18 +121,39 @@ export default function ProviderSelectionEmptyState({
   isTaskMasterInstalled,
   onShowAllTasks,
   setInput,
+  selectedProjectId = null,
+  projectChoices = [],
+  onSelectProject,
 }: ProviderSelectionEmptyStateProps) {
   const { t } = useTranslation("chat");
-  const [dialogOpen, setDialogOpen] = useState(false);
   const [modelLibraryOpen, setModelLibraryOpen] = useState(false);
+  const isNewChat = !selectedSession && !currentSessionId;
+  // Providers the server reports signed out offer nothing to pick; the hook also owns the
+  // picker's open state, which decides when that set may change.
+  const { signedOut, pickerOpen: dialogOpen, setPickerOpen: setDialogOpen } = useSignedOutProviders(isNewChat, PROVIDER_IDS);
+
+  // The project a new chat starts in, chosen here beside the model. With the simple list on it is
+  // saved as that list's project for new chats too, so its New chat row and this picker agree; in
+  // the project tree nothing reads that setting, so nothing is written to it.
+  const { enabled: simpleListEnabled, setProjectId } = useSimpleChatListPreferences();
+  const projectOptions = useMemo(
+    () => projectChoices.map((project) => ({ value: project.projectId, label: project.displayName })),
+    [projectChoices],
+  );
+  const handleProjectChange = useCallback((projectId: string) => {
+    if (simpleListEnabled) setProjectId(projectId);
+    onSelectProject?.(projectId);
+  }, [onSelectProject, setProjectId, simpleListEnabled]);
 
   const visibleProviderGroups = useMemo<ProviderGroup[]>(() => {
-    return PROVIDER_META.map((p) => ({
+    // The provider already chosen stays listed even when signed out, so the reader can see what
+    // the card above names and move off it.
+    return PROVIDER_META.filter((p) => p.id === provider || !signedOut.has(p.id)).map((p) => ({
       id: p.id,
       name: p.name,
       models: providerModelCatalog[p.id]?.OPTIONS ?? [],
     }));
-  }, [providerModelCatalog]);
+  }, [providerModelCatalog, provider, signedOut]);
 
   const nextTaskPrompt = t("tasks.nextTaskPrompt", {
     defaultValue: "Start the next task",
@@ -144,7 +177,7 @@ export default function ProviderSelectionEmptyState({
       setDialogOpen(false);
       setTimeout(() => textareaRef.current?.focus(), 100);
     },
-    [setProvider, setProviderModel, textareaRef],
+    [setProvider, setProviderModel, setDialogOpen, textareaRef],
   );
 
   const openModelLibrary = () => {
@@ -154,10 +187,11 @@ export default function ProviderSelectionEmptyState({
 
   const closeModelLibrary = () => {
     setModelLibraryOpen(false);
-    setDialogOpen(true);
+    // A return from the library, not a new opening: nothing to re-check.
+    setDialogOpen(true, { recheck: false });
   };
 
-  if (!selectedSession && !currentSessionId) {
+  if (isNewChat) {
     return (
       <div className="flex h-full items-center justify-center px-4">
         <div className="w-full max-w-[34.25rem]">
@@ -170,7 +204,20 @@ export default function ProviderSelectionEmptyState({
             </p>
           </div>
 
-          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+          {onSelectProject && projectOptions.length > 0 && (
+            <div data-testid="new-chat-project" className="mx-auto mb-2 max-w-xs">
+              <Select
+                ariaLabel={t("providerSelection.project", { defaultValue: "Project folder" })}
+                options={projectOptions}
+                value={selectedProjectId ?? ""}
+                onChange={handleProjectChange}
+                placeholder={t("providerSelection.project", { defaultValue: "Project folder" })}
+                size="sm"
+              />
+            </div>
+          )}
+
+          <Dialog open={dialogOpen} onOpenChange={(open) => setDialogOpen(open)}>
             <DialogTrigger asChild>
               <Card
                 className="group mx-auto max-w-xs cursor-pointer border-border/60 transition-all duration-150 hover:border-border hover:shadow-md active:scale-[0.99]"

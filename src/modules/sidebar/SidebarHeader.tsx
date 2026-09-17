@@ -31,6 +31,8 @@ type SidebarHeaderProps = {
   simpleMode?: boolean;
   /** The workspace tab strip, rendered under the wordmark. A slot: this file never imports it. */
   tabs?: ReactNode;
+  /** Rendered left of the wordmark, gated like `tabs`. A slot: this file never imports it. */
+  leading?: ReactNode;
   t: TFunction;
 };
 
@@ -69,7 +71,7 @@ function SearchModeChips({
     : t('search.modeRunning');
 
   return (
-    // Wraps rather than scrolling sideways: four chips do not fit a 288px rail, and a chip half
+    // Wraps rather than scrolling sideways: four chips do not fit a 328px rail, and a chip half
     // off the edge with no scrollbar reads as a broken row rather than as more to come.
     <div className="flex flex-wrap gap-1.5">
       <Chip size="sm" selected={searchMode === 'projects'} onClick={() => onSearchModeChange('projects')}>
@@ -108,6 +110,7 @@ export default function SidebarHeader({
   onCollapseSidebar,
   simpleMode,
   tabs,
+  leading,
   t,
 }: SidebarHeaderProps) {
   // This file draws its desktop and mobile headers as two blocks and hides one with CSS, so a
@@ -132,6 +135,7 @@ export default function SidebarHeader({
         style={{}}
       >
         <div className="flex items-center justify-between gap-2">
+          {leading && !isCompact && <div className="flex flex-shrink-0">{leading}</div>}
           {IS_PLATFORM ? (
             <a
               href="https://cloudcli.ai/dashboard"
@@ -144,7 +148,7 @@ export default function SidebarHeader({
             <LogoBlock t={t} />
           )}
 
-          <div className="flex flex-shrink-0 items-center gap-1">
+          <div className="ml-auto flex flex-shrink-0 items-center gap-1">
             <Button
               variant="tonal"
               size="sm"
@@ -235,6 +239,7 @@ export default function SidebarHeader({
         style={isPWA && isMobile ? { paddingTop: '16px' } : {}}
       >
         <div className="flex items-center justify-between">
+          {leading && isCompact && <div className="mr-2 flex flex-shrink-0">{leading}</div>}
           {IS_PLATFORM ? (
             <a
               href="https://cloudcli.ai/dashboard"
@@ -247,7 +252,7 @@ export default function SidebarHeader({
             <LogoBlock t={t} />
           )}
 
-          <div className="flex flex-shrink-0 gap-1.5">
+          <div className="ml-auto flex flex-shrink-0 gap-1.5">
             <button
               className="flex h-8 w-8 items-center justify-center rounded-lg bg-muted/50 transition-all active:scale-95"
               onClick={onRefresh}

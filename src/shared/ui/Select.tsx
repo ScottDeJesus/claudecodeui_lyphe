@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 
+import { OWNS_ESCAPE } from '@/shared/ui/overlayEscape';
 import { cn } from '@/shared/utils';
 
 type SelectOption = { value: string; label: string };
@@ -77,7 +78,8 @@ export function Select({ options, value, onChange, placeholder = 'Choose…', ar
       </button>
 
       {open && (
-        <ul className="vv-select__panel" role="listbox" aria-label={ariaLabel}>
+        // The panel owns Escape while it is up — see `shared/ui/overlayEscape`.
+        <ul className="vv-select__panel" role="listbox" aria-label={ariaLabel} {...OWNS_ESCAPE}>
           {options.map((option) => (
             <li
               key={option.value}

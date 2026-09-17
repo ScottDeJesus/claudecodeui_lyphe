@@ -1,8 +1,9 @@
 # The simple chat list
 
-An alternative sidebar for someone who does not think in projects: no tree, no search chips, one
-project picker, one New chat button, and a flat feed of the chats they started from this view —
-newest first. `src/modules/sidebar/SidebarSimpleList.tsx` composes it from two module-private
+An alternative sidebar for someone who does not think in projects: no tree, no search chips, and a
+flat feed of the chats they started from this view — newest first — ending in a New chat row (a
+`+` pill shaped like a chat, `SidebarNewChatButton.tsx`). The project a new chat starts in is picked
+on the new-chat screen, beside the model, and saved as the list's project for new chats. `src/modules/sidebar/SidebarSimpleList.tsx` composes it from two module-private
 hooks (`hooks/useSimpleChatList.ts`, `hooks/useSimpleChatRemove.ts`) and is rendered by
 `Sidebar.tsx` in a slot `SidebarContent` never imports, so the tree's own code carries no
 knowledge of this view. Settings stays reachable either way — this replaces the tree, not the
@@ -76,7 +77,11 @@ Unread is a fact about the server's two timestamps, never a client flag. A run's
 `sessions.last_completed_at` once, from the run registry's single `recordRunCompletion` — the one
 place every provider's terminal `complete` passes — and stamps `last_read_at` in the same statement
 when the chat was already on screen as the run ended, so a chat you were watching never goes
-unread. Otherwise the read comes from the chat's own `chat.presence` report: the presence handler in
+unread. A server restart re-adopts every chat whose process outlived it. A re-adopted chat whose turn
+had already finished is closed without stamping when its host's journal shows no turn ending after
+the session's `last_completed_at` (`lastTurnFinishedAt` in `session-host/hosts.ts`) — a re-stamp
+there would make it unread again with no new activity — and stamped when one did, since a follow-up
+turn a background task pushed ends without a completion of its own. Otherwise the read comes from the chat's own `chat.presence` report: the presence handler in
 `chat-websocket.service.ts` marks the row read when a socket reports that chat `visible`, in either
 sidebar mode, and writes only a row that is still unread. The rule is one SQL fragment —
 `last_read_at IS NULL OR last_read_at < last_completed_at` — evaluated in the recents page query,

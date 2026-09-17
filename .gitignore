@@ -150,3 +150,9 @@ electron/*.tar.gz
 
 # Local verification harness (screenshots, console probes) — never committed
 .verify/
+
+# The application registry — created on first boot, private to this machine.
+# The .tmp beside it is its own atomic-write scratch (apps.store.ts): renameSync removes it on
+# every completed write, so one left behind is a killed process, not a file to notice in the status.
+apps.local.json
+apps.local.json.tmp

@@ -5,6 +5,7 @@ import {
   SESSION_UNREAD_SQL,
 } from '@/modules/database/repositories/session-user-state.db.js';
 import { normalizeProjectPath } from '@/shared/utils.js';
+import { visibleProjectPathSql } from '@/shared/hidden-project-paths.js';
 
 type SessionRow = {
   session_id: string;
@@ -620,15 +621,19 @@ export const sessionsDb = {
     const db = getConnection();
     // Both the SELECT and the COUNT share this clause so `total` never
     // disagrees with the rows returned for the same feed.
+    // A chat in a scratch folder (`shared/hidden-project-paths.ts`) stays out of both feeds.
+    const visiblePath = visibleProjectPathSql('sessions.project_path');
     const visibilityClause = options.simpleListOnly
       ? `
       sessions.isArchived = 0
       AND (projects.isArchived IS NULL OR projects.isArchived = 0)
       AND sessions.simple_list_at IS NOT NULL
+      AND ${visiblePath.clause}
     `
       : `
       sessions.isArchived = 0
       AND (projects.isArchived IS NULL OR projects.isArchived = 0)
+      AND ${visiblePath.clause}
     `;
     // The simple list sorts by its manual rank so a running chat never jumps
     // and a drag sticks; the tree keeps sorting by last activity.
@@ -647,7 +652,7 @@ export const sessionsDb = {
          ORDER BY ${orderByClause}
          LIMIT ? OFFSET ?`
       )
-      .all(limit, offset) as SessionRow[];
+      .all(...visiblePath.params, limit, offset) as SessionRow[];
     const countRow = db
       .prepare(
         `SELECT COUNT(*) AS count
@@ -655,7 +660,7 @@ export const sessionsDb = {
          LEFT JOIN projects ON projects.project_path = sessions.project_path
          WHERE ${visibilityClause}`
       )
-      .get() as { count: number } | undefined;
+      .get(...visiblePath.params) as { count: number } | undefined;
 
     return {
       sessions: normalizeSessionRows(rows),

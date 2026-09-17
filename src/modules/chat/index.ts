@@ -10,3 +10,7 @@ export { useSubagentWidgetCount } from '@/modules/chat/hooks/useSubagentWidgetRo
 // stops drawing its own copy. Consumer: the chat-gutters module, whose layout claims the pinned
 // strip exactly while its width draws the Subagents widget.
 export { useClaimSubagentStrip } from '@/modules/chat/subagents/subagentSource';
+// The one transcript view, opened from a row: the chat's own subagent rows draw it in the gutter
+// and in the pinned dialog, and it is the same view a board Metis's row opens. Consumer: the
+// kanban module's `KanbanMetisPanel.tsx`, which reads it through this barrel.
+export { SubagentTranscriptView } from '@/modules/chat/subagents/SubagentTranscriptView';

@@ -495,6 +495,17 @@ const addSessionEffortColumn = (db: Database): void => {
   addColumnToTableIfNotExists(db, 'sessions', columnNames, 'effort', 'TEXT');
 };
 
+/**
+ * Adds `session_drafts.last_claimed_queue_id`: the id of the queued message the dispatcher last
+ * sent for a scope. A save that carries that id again — a browser retrying a request whose response
+ * was lost, after the server had stored, claimed and sent it — is ignored instead of sending the
+ * message twice. NULL for existing rows, which have no ids.
+ */
+const addLastClaimedQueueIdColumn = (db: Database): void => {
+  const columnNames = getTableInfo(db, 'session_drafts').map((column) => column.name);
+  addColumnToTableIfNotExists(db, 'session_drafts', columnNames, 'last_claimed_queue_id', 'TEXT');
+};
+
 const ensureProjectsForSessionPaths = (db: Database): void => {
   if (!tableExists(db, 'sessions')) {
     return;
@@ -512,6 +523,31 @@ const ensureProjectsForSessionPaths = (db: Database): void => {
     WHERE project_path IS NOT NULL AND trim(project_path) <> ''
     ON CONFLICT(project_path) DO NOTHING
   `);
+};
+
+/**
+ * Adds `kanban_boards.deepseek_flash`: the board's OWN DeepSeek Flash switch — whether a Metis
+ * this board launches runs on Flash or on Claude.
+ *
+ * A separate function and not a line in the projects or sessions bodies: those rebuild a table
+ * this column has nothing to do with, and a kanban column filed under a projects rebuild is a
+ * column nobody reading this table would think to open. The guard and the column read are its own
+ * for exactly that reason.
+ *
+ * It has to exist because `kanban-schema.ts` is `IF NOT EXISTS` end to end: the declaration there
+ * builds the column on a scratch database and changes NOTHING on the operator's live `auth.db`,
+ * which already has `kanban_boards`. This is the half that reaches an existing one.
+ *
+ * Existing boards keep `0` — autonomy and the DeepSeek switch are independent, and a board that
+ * was running its builds on Claude yesterday does not silently start spending Flash today.
+ */
+const migrateKanbanBoardsColumns = (db: Database): void => {
+  if (!tableExists(db, 'kanban_boards')) {
+    return;
+  }
+
+  const columnNames = getTableInfo(db, 'kanban_boards').map((column) => column.name);
+  addColumnToTableIfNotExists(db, 'kanban_boards', columnNames, 'deepseek_flash', 'INTEGER NOT NULL DEFAULT 0');
 };
 
 export const runMigrations = (db: Database) => {
@@ -544,6 +580,7 @@ export const runMigrations = (db: Database) => {
     `);
     db.exec(USER_PREFERENCES_TABLE_SCHEMA_SQL);
     db.exec(SESSION_DRAFTS_TABLE_SCHEMA_SQL);
+    addLastClaimedQueueIdColumn(db);
     db.exec(SUPERSEDED_PROVIDER_SESSIONS_TABLE_SCHEMA_SQL);
     addSupersededTranscriptPathColumn(db);
 
@@ -563,6 +600,7 @@ export const runMigrations = (db: Database) => {
     db.exec(SCHEDULED_MESSAGES_TABLE_SCHEMA_SQL);
     // After the projects rebuild above: the boards table references projects(project_id).
     db.exec(KANBAN_SCHEMA_SQL);
+    migrateKanbanBoardsColumns(db);
 
     db.exec('CREATE INDEX IF NOT EXISTS idx_session_ids_lookup ON sessions(session_id)');
     db.exec('CREATE INDEX IF NOT EXISTS idx_sessions_provider_session_id ON sessions(provider_session_id)');

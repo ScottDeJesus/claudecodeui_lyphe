@@ -2,6 +2,7 @@ import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type Mouse
 import { useTranslation } from 'react-i18next';
 import { Copy, Download, FileText, FolderPlus, Pencil, RefreshCw, Trash2, Upload, type LucideIcon } from 'lucide-react';
 
+import { OWNS_ESCAPE } from '@/shared/ui/overlayEscape';
 import { cn } from '@/shared/utils';
 
 type FileContextItem = {
@@ -280,6 +281,9 @@ export default function FileContextMenu({
         <div
           ref={menuRef}
           role="menu"
+          // It closes itself on Escape, so it says so: a dialog it is open over stands its own Escape
+          // down rather than taking the key. See `shared/ui/overlayEscape`.
+          {...OWNS_ESCAPE}
           aria-label={t('fileTree.context.menuLabel', 'File context menu')}
           style={{ position: 'fixed', left: menuPosition.x, top: menuPosition.y, zIndex: 9999 }}
           className={cn(

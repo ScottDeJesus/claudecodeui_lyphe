@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { KanbanBoardDialog, type KanbanBoardDialogMode } from '@/modules/kanban/KanbanBoardDialog';
 import { KanbanBoardHeader } from '@/modules/kanban/KanbanBoardHeader';
 import { KanbanImportDialog } from '@/modules/kanban/KanbanImportDialog';
+import { KanbanMetisPanel } from '@/modules/kanban/KanbanMetisPanel';
 import { KanbanRail } from '@/modules/kanban/KanbanRail';
 import { KanbanCardDrawer } from '@/modules/kanban/card-drawer/KanbanCardDrawer';
 import { useKanbanBoards } from '@/modules/kanban/hooks/useKanbanBoards';
@@ -50,6 +51,7 @@ export function KanbanPanel({ projectId }: KanbanPanelProps) {
     boards,
     currentBoardId,
     autonomy,
+    deepseekFlash,
     loading: boardsLoading,
     unreachable: boardsUnreachable,
     refresh: refreshBoards,
@@ -175,6 +177,7 @@ export function KanbanPanel({ projectId }: KanbanPanelProps) {
         boards={boards}
         currentBoardId={currentBoardId}
         autonomy={autonomy}
+        deepseekFlash={deepseekFlash}
         // Boards are GLOBAL: selecting one writes the one `current_board` setting, and the lanes
         // repaint from the id the server answers with. Never scoped to the open project.
         onSelectBoard={(boardId) => { void selectBoard(boardId); }}
@@ -182,6 +185,11 @@ export function KanbanPanel({ projectId }: KanbanPanelProps) {
           // It changes what the board SHOWS only: no write is skipped and nothing is hidden on the
           // server, which is why the lanes are recomposed from the same setting the faces read.
           if (currentBoardId) void updateBoard(currentBoardId, { autonomy: next });
+        }}
+        onToggleDeepseekFlash={(next) => {
+          // A board's own switch, and the row is the only thing that holds it: the flag file a
+          // Metis and her plan runners read is derived from it at spawn, and nothing running moves.
+          if (currentBoardId) void updateBoard(currentBoardId, { deepseekFlash: next });
         }}
         // A kit `Dialog` + `Field`, never `window.prompt`: a new board is labelled with THIS panel's
         // projectId, and that label is the point of `board.project_id`.
@@ -227,6 +235,13 @@ export function KanbanPanel({ projectId }: KanbanPanelProps) {
           void refresh();
         }}
       />
+
+      {/* THE FLEET, IN THE BOARD'S OWN COLUMN, under the rail. A sibling of the drawer and the import
+          dialog rather than a child of either: it is a strip in the board's flow, and it must be
+          readable while a card is open beside it. Mounted ONLY while a board is selected — a fleet
+          belongs to a board, and with none there is nothing to ask about. It reads the fleet itself
+          and reports into nothing here. */}
+      {currentBoardId !== null && <KanbanMetisPanel boardId={currentBoardId} boardName={currentName} />}
 
       {/* The board's single live region. Every move announces here, and nowhere else.
           `key` is the ANNOUNCEMENT and not the text: a reader who moves two cards to the same

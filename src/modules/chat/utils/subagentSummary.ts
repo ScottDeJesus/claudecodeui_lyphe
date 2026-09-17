@@ -1,4 +1,4 @@
-import type { SubagentActivity, SubagentInfo, SubagentUsage, ToolResult } from '@/shared/types';
+import type { LLMProvider, SubagentActivity, SubagentInfo, SubagentUsage, ToolResult } from '@/shared/types';
 import { formatTokenCount } from '@/modules/chat/utils/chatFormatting';
 
 /**
@@ -56,6 +56,34 @@ export function parseSubagentToolInput(toolInput: unknown): Record<string, unkno
  * SDK's `tool_use_result` onto `toolUseResult`; until 2026-09-10 it did not, and this check was
  * true only after a reload — measured, a live background agent was never pinned at all.
  */
+/**
+ * A launch that NEVER RAN: the harness refused it before any agent existed — a PreToolUse hook
+ * denial (the planner go-gate, the intent lock) or the operator rejecting the dispatch. The
+ * result is an error with no agent metadata and its text says which. Measured 2026-09-16 over
+ * 56 errored Agent results: 48 hook denials, 4 rejections. An interrupt, an unknown type and an
+ * agent that ran and died are NOT this — they never unpin — and get their own status words below.
+ */
+export const isRefusedLaunch = (toolResult?: ToolResult | null): boolean => {
+  if (!toolResult?.isError) return false;
+  const text = String(toolResult.content ?? '');
+  return /^(?:Error: )?PreToolUse:/.test(text) || /tool use was rejected|doesn't want to proceed/i.test(text);
+};
+
+/**
+ * The STATUS WORD's other never-finished cases (the pin filter keeps `isRefusedLaunch` alone):
+ * a dispatch naming an agent type that does not exist, and an agent the API terminated early —
+ * both measured reading "Finished" with zero tools before 2026-09-16.
+ */
+const isDeadOnArrival = (toolResult?: ToolResult | null): boolean => (
+  Boolean(toolResult?.isError)
+  && /not found\. Available agents:|Agent terminated early due to an API error/.test(String(toolResult?.content ?? ''))
+);
+
+/** The operator interrupted the turn while the agent was out: `stopped`, the amber word, never red. */
+const isInterrupted = (toolResult?: ToolResult | null): boolean => (
+  Boolean(toolResult?.isError) && /interrupted by user/i.test(String(toolResult?.content ?? ''))
+);
+
 const isAsyncLaunchReceipt = (toolResult?: ToolResult | null): boolean => (
   (toolResult as { toolUseResult?: { isAsync?: unknown } } | null | undefined)
     ?.toolUseResult?.isAsync === true
@@ -83,8 +111,13 @@ export function readSubagentSummary({
   // The backend's own word wins wherever there is one — the history reader knows whether a
   // background agent's notification has arrived. Only the live path, which carries no subagent
   // metadata at all, falls through to the inference below.
+  // A launch the harness REFUSED is `failed`, never `completed` — measured 2026-09-16: the
+  // planner go-gate's denial drew an "odysseus · done" row beside the real dispatch that followed
+  // it, and the operator read a finished run where nothing had run. An interrupt is `stopped`.
   const status = subagent?.status
-    ?? (toolResult && !isAsyncLaunchReceipt(toolResult) ? 'completed' : 'running');
+    ?? (isRefusedLaunch(toolResult) || isDeadOnArrival(toolResult) ? 'failed'
+      : isInterrupted(toolResult) ? 'stopped'
+      : toolResult && !isAsyncLaunchReceipt(toolResult) ? 'completed' : 'running');
 
   const finishedAt = status !== 'running' && toolResultAt
     ? new Date(toolResultAt).toISOString()
@@ -166,3 +199,19 @@ export const formatSubagentFinishTime = (finishedAt: string | null): string => {
     ? ''
     : parsed.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
 };
+
+/** A provider whose mark an agent row can wear: a session provider, or DeepSeek for an agent run on it. */
+export type SubagentMarkProvider = LLMProvider | 'deepseek';
+
+/**
+ * The provider whose mark an agent wears: DeepSeek's when the agent's own model is a DeepSeek one (a
+ * Claude session's agent that ran on `deepseek-v4-pro`), else the session's provider. Read by the
+ * transcript's agent row and the pinned and gutter rows, so one agent carries one mark everywhere.
+ */
+export function subagentMarkProvider(
+  sessionProvider: LLMProvider | undefined,
+  model: string | undefined,
+): SubagentMarkProvider | undefined {
+  if (model && /deepseek/i.test(model)) return 'deepseek';
+  return sessionProvider;
+}

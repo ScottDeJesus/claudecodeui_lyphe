@@ -1,11 +1,9 @@
-import os from 'node:os';
-import path from 'node:path';
-
 import type { Router } from 'express';
 
 import { WS_OPEN_STATE, connectedClients } from '@/modules/websocket/index.js';
 import { createPolledLane } from '@/shared/polled-lane.service.js';
 import type { SoulLaunchSnapshot, SoulLaunchStateEvent } from '@/shared/types.js';
+import { expandHome } from '@/shared/utils.js';
 
 import { createDispatchSoulsRouter } from './dispatch-souls.routes.js';
 import { readSoulTranscript } from './soul-transcript.service.js';
@@ -38,12 +36,6 @@ const POLL_MS = 2000;
  * the morning's dispatch pinned with its cost, short enough that the lane is never an archive.
  */
 const LAUNCH_KEEP_S = 6 * 60 * 60;
-
-/** `~` at the front becomes this user's home. Anywhere else it is an ordinary character. */
-function expandHome(value: string): string {
-  if (value === '~') return os.homedir();
-  return value.startsWith('~/') ? path.join(os.homedir(), value.slice(2)) : value;
-}
 
 export type DispatchSoulsModule = {
   router: Router;

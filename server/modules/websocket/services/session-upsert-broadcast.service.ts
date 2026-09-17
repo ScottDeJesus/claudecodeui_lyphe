@@ -2,6 +2,7 @@ import path from 'node:path';
 
 import { projectsDb, sessionsDb } from '@/modules/database/index.js';
 import { generateDisplayName } from '@/modules/projects/index.js';
+import { isHiddenProjectPath } from '@/shared/hidden-project-paths.js';
 import { connectedClients, WS_OPEN_STATE } from '@/modules/websocket/services/websocket-state.service.js';
 import type { SessionUpsertedEvent } from '@/shared/types.js';
 
@@ -32,7 +33,9 @@ async function buildSessionUpsertedEvent(
   }
 
   const projectPath = row.project_path;
-  const project = projectPath ? projectsDb.getProjectPath(projectPath) : null;
+  // A chat in a scratch project still announces itself — an open chat reloads on it — but without
+  // its project, so no sidebar adds the folder the project list keeps out.
+  const project = projectPath && !isHiddenProjectPath(projectPath) ? projectsDb.getProjectPath(projectPath) : null;
   const displayName = project?.custom_project_name?.trim()
     ? project.custom_project_name
     : await generateDisplayName(path.basename(projectPath ?? '') || (projectPath ?? ''), projectPath);

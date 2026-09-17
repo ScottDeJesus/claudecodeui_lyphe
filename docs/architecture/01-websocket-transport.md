@@ -162,7 +162,7 @@ Put frames in state instead and two frames arriving in the same tick collapse in
 render carrying only the later one. A listener that throws is caught individually
 (`:63-67`) so it cannot take the others down with it.
 
-There are ten `useWebSocket()` call sites. Five of them are rowed below, and two of those
+There are fourteen `useWebSocket()` call sites. Six of them are rowed below, and two of those
 immediately hand `subscribe` to the hook that does the real work:
 
 | Call site | Handler | Frames it acts on | State it owns |
@@ -172,9 +172,10 @@ immediately hand `subscribe` to the hook that does the real work:
 | `TaskMasterContext.tsx:102` | itself | `taskmaster-project-updated`, `taskmaster-tasks-updated` (`type`-keyed) | task board data |
 | `RunnerFeed.tsx` | itself | `runner_state`, `websocket_reconnected` | none of its own — it publishes the retained runner topics into the live bus |
 | `SoulLaunchFeed.tsx` | itself | `soul_launch_state`, `websocket_reconnected` | none of its own — it publishes the retained `souls:*` topic into the live bus ([dispatch-souls.md](../dispatch-souls.md)) |
+| `UniverseFeed.tsx` | itself | `universe_activity`, `universe_map`, `websocket_reconnected` | none of its own — it publishes the retained `universe:*` digest into the live bus, and `useUniverseStream` reads the same frames for the tab's canvas (`src/modules/universe/`) |
 
-The five the table does not row — `useSessionPresence.ts`, `useRestartOnInstalledCli.ts`,
-`useGitDelegation.ts`, `useSimpleChatList.ts` and `useSimpleChatRemove.ts` — are later arcs' call sites that take
+The call sites the table does not row — `useSessionPresence.ts`, `useRestartOnInstalledCli.ts`,
+`useGitDelegation.ts`, `useSimpleChatList.ts`, `useSimpleChatRemove.ts` and the kanban panel's two — take
 `subscribe` or `sendMessage` straight into their own hooks rather than owning a slice of the
 frame vocabulary; re-grep before quoting the number, because it grows with every such arc.
 
@@ -277,10 +278,17 @@ in `server/shared/types.ts`.**
 `permission_request`, `permission_resolved`, `permission_cancelled`, `session_created`,
 `history_truncated`, `task_notification`.
 
-**`GatewayEventKind` (`:204-208`) — produced by the gateway, no provider involved:**
-`chat_subscribed`, `session_upserted`, `loading_progress`, `protocol_error`.
+**`GatewayEventKind` (`server/shared/types.ts`) — produced by the gateway, no provider involved:**
+`chat_subscribed`, `session_upserted`, `loading_progress`, `runner_state`, `soul_launch_state`,
+`kanban_metis_state`, `kanban_event`, `universe_activity`, `universe_map`, `protocol_error`.
+`kanban_metis_state` is `server/modules/kanban-metis`'s own frame — a board's live Metis
+sessions, pushed on change the same way `soul_launch_state` is (`kanban-metis.module.ts`'s
+polled lane) — and it has no row in the consumption table below for the same reason
+`kanban_event` does not: neither name is in `useChatRealtimeHandlers.ts`'s excused
+`case` group at `:191-195`, so today BOTH carry no `sessionId` of their own and fall through
+to the default path, inheriting the viewed session's id and landing in its transcript.
 
-`ServerEventKind` (`:217`) is their union, and its doc comment claims every server-to-client
+`ServerEventKind` is their union, and its doc comment claims every server-to-client
 frame carries a `kind` from it. That is true of everything the *chat gateway* sends and not
 quite true of the socket as a whole — see the Task Master exception below.
 
@@ -308,6 +316,8 @@ Two kinds in those unions never appear where you would look for them:
 | `loading_progress` | `projects-with-sessions-fetch.service.ts:164-175` | `useProjectsState` — project scan progress (`:720-736`) |
 | `runner_state` | `plan-runner/runner-watcher.service.ts` | The plan runner's live runs, pushed on change. Not consumed by the chat handler, which returns early on it |
 | `soul_launch_state` | `dispatch-souls/dispatch-souls.module.ts` | The launcher souls a `/dispatch` started, pushed on change. `SoulLaunchFeed` publishes it into the live bus; the chat handler returns early on it too, in the same `case` group |
+| `universe_map` | `universe/universe.module.ts` | The estate map was rebuilt because a tracked repo's `.git` HEAD moved; carries the `mapId` `GET /api/universe/map` now serves. Consumed by `useUniverseStream.ts:122` and `UniverseFeed.tsx:77`, which announce it through `setKnownMapId` and refetch on the strength of it; the announcement never redefines the gate, so the rows admitted below are still keyed to the map the client holds. Excused from the chat handler beside `runner_state`/`soul_launch_state` (`useChatRealtimeHandlers.ts:191-195`) |
+| `universe_activity` | `universe/universe-activity.service.ts` | What the estate is doing now: the journald and transcript taps' rows, coalesced per node and sent at most ten times a second. Sent only when there is a row, so a quiet estate keeps silence on the wire. Consumed by `useUniverseStream.ts:126`, which keeps the canvas's ring of rows and the chrome's 1 Hz summary, and by `UniverseFeed.tsx:60-67`, which accumulates the same rows into the `universe:*` bus digest. Excused from the chat handler with `universe_map`, which it must be — at ten frames a second the fall-through would fill an open transcript with stray rows |
 
 ### The one exception
 
@@ -547,6 +557,9 @@ flowchart TD
     SET --> E3["taskmaster frames"]
     SET --> E4["runner_state"]
     SET --> E6["soul_launch_state"]
+    SET --> E7["universe_map"]
+    SET --> E8["universe_activity"]
+    SET --> E9["kanban_metis_state"]
   end
   subgraph PerRun["Per-run, this run's audience only"]
     W["ChatSessionWriter connections set"]
@@ -554,21 +567,48 @@ flowchart TD
   end
 ```
 
-There are five broadcasters over that set: `loading_progress`, `session_upserted`, the Task Master
-frames, and the TWO STATE LANES — the plan-runner watcher (`server/modules/plan-runner/`) over the
-runner's state directory, and the launcher-souls lane (`server/modules/dispatch-souls/`) over
-`~/.claude/state/dispatch-souls/`. Both poll every two seconds and put a frame on the wire only when
-the picture actually changed — a live→stale flip included, since that is a change in the snapshot
-like any other. The dedup records a picture as sent only AFTER the send returns, so a broadcast that
-throws part-way is re-sent on the next tick instead of being suppressed as unchanged — the frame
-carries the whole picture, so a client receiving it twice receives it once. Both reach
-`connectedClients` through the websocket module's own barrel, never a deep import.
+There are seven broadcasters over that set: `loading_progress`, `session_upserted`, the Task Master
+frames, and FOUR STATE LANES — the plan-runner watcher (`server/modules/plan-runner/`) over the
+runner's state directory, the launcher-souls lane (`server/modules/dispatch-souls/`) over
+`~/.claude/state/dispatch-souls/`, a board's own Metis sessions
+(`server/modules/kanban-metis/`) over `~/.claude/state/kanban-metis/`, and the universe lane
+(`server/modules/universe/`), which watches the registered repos' `.git` HEADs and reads two live
+feeds of the estate, the systemd journal and the Claude transcripts. The first three poll every two
+seconds and put a frame on the wire only when the picture actually changed — a live→stale flip
+included, since that is a change in the snapshot like any other. The dedup records a picture as
+sent only AFTER the send returns, so a broadcast that throws part-way is re-sent on the next tick
+instead of being suppressed as unchanged — the frame carries the whole picture, so a client
+receiving it twice receives it once. All of them reach `connectedClients` through the websocket
+module's own barrel, never a deep import.
 
 That loop is written once, in `server/shared/polled-lane.service.ts` (`createPolledLane`); each lane
-supplies only its own `snapshot` and `frame`. Reasoning that belongs to polling-rather-than-watching
-lives there, not in either lane. The launcher lane's own half — what it reads off a launch directory,
-how it classifies a soul and which provider its pin paints — is
-[dispatch-souls.md](../dispatch-souls.md).
+supplies only its own `snapshot` and `frame`. The universe lane is the one broadcaster over
+`connectedClients` that runs through NEITHER that shape NOR a single kind — it sends `universe_map`
+and `universe_activity`, and the reason differs for each.
+
+`universe_map` is the HEAD watcher. Reconciling a HEAD change means shelling a crawler child and
+awaiting it, and `createPolledLane`'s contract is a `snapshot()` that is cheap and never throws — a
+snapshot that can launch a subprocess would fire on a cadence nobody chose and let crawls stack. So
+`universe.module.ts` writes its own thirty-second interval, reads every registered repo's `.git/HEAD`
+directly off disk (never a `git rev-parse` subprocess), and broadcasts only when a rebuilt map
+actually lands.
+
+`universe_activity` is the estate's traffic, coalesced. Two taps produce it, and neither broadcasts:
+the journal tap (`universe-journal.tap.ts`) follows one `journalctl -f -o json` child over every unit
+the registry names and resolves each line to a star, and the transcript tap (`universe-transcript.tap.ts`
+with the tail in `universe-transcript-tail.ts`) follows every Claude `*.jsonl` under `~/.claude/projects`
+and resolves each admitted tool use to a star, live and with no replay. Both push into one window keyed
+by node, kind and source (`universe-activity.service.ts`), and a hundred-millisecond interval drains it —
+one frame per drain, and NOTHING at all when the window is empty. That window is why this frame is not a
+`createPolledLane` either: what it carries is the rows that arrived since the last frame, a delta rather
+than a picture of state that persists between ticks, so there is nothing cheap or meaningful to compare
+against a previous snapshot — an empty window is silence, not an unchanged picture, and a lane that sent
+it anyway would be ten frames a second saying nothing.
+
+Reasoning that belongs to polling-rather-than-watching for the other three lanes lives at
+`polled-lane.service.ts`, not in any lane. The launcher lane's own half — what it reads off a launch
+directory, how it classifies a soul and which provider its pin paints — is
+[dispatch-souls.md](../dispatch-souls.md). A board's own Metis lane has no write-up of its own yet.
 
 A socket joins `connectedClients` when `handleChatConnection` runs
 (`chat-websocket.service.ts:589`) and leaves on close (`:632`) — closing a tab removes a

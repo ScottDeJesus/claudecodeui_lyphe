@@ -5,8 +5,8 @@ import { useTranslation } from 'react-i18next';
 import type { SubagentTranscriptTarget } from '@/shared/types';
 import { EmptyState } from '@/shared/ui';
 import { useSubagentWidgetRows } from '@/modules/chat/hooks/useSubagentWidgetRows';
-import type { PinnedSubagentRow } from '@/modules/chat/hooks/usePinnedSubagentRows';
 import { SubagentTranscriptView } from '@/modules/chat/subagents/SubagentTranscriptView';
+import { rowId, rowLabel, rowRunning } from '@/modules/chat/subagents/subagentRow';
 import PinnedAgentRow from '@/modules/chat/transcript/PinnedAgentRow';
 import SoulLaunchPinRow from '@/modules/chat/transcript/SoulLaunchPinRow';
 
@@ -16,29 +16,13 @@ type OpenedTranscript = {
   target: SubagentTranscriptTarget & { label: string };
 };
 
-/** The id a row is addressed by: an agent's spawning tool call, or a soul's launch id. */
-function rowId(row: PinnedSubagentRow): string {
-  return row.kind === 'agent' ? row.id : row.launch.launch_id;
-}
-
-/** Whether a row is still working — the same reading its own drawing takes. */
-function rowRunning(row: PinnedSubagentRow): boolean {
-  return row.kind === 'agent' ? row.summary.status === 'running' : row.launch.state === 'running';
-}
-
-/** What a row is called where a name is needed in words: the transcript's header, and the label
- * its row announces as the thing a press will open. */
-function rowLabel(row: PinnedSubagentRow): string {
-  return row.kind === 'agent' ? row.summary.label || row.summary.description || '' : row.launch.agent;
-}
-
 /**
  * The Subagents widget: the open chat's pinned rows, each one opening its own transcript.
  *
  * THE SAME ROWS THE STRIP DRAWS, drawn again — `useSubagentWidgetRows` is the strip's own reading,
  * so the two surfaces cannot disagree about what this chat has working for it. What the widget adds
- * is the press: a row here opens the subagent's transcript beside the conversation, which is the
- * one thing the strip above the chat box has no room to do.
+ * is the press: a row here opens the subagent's transcript in place, beside the conversation. The
+ * strip above the chat box opens the same view in a dialog, having no room of its own for it.
  *
  * ONE ROW AT A TIME, AND NEVER ACROSS A CHAT. The open target is held WITH the session it was
  * opened in, and a target whose tag no longer matches the widget's own session is read as none:
@@ -103,6 +87,7 @@ export function SubagentWidgetBody({ sessionId }: { sessionId: string | null }) 
                 id={row.id}
                 latest={row.latest}
                 summary={row.summary}
+                provider={row.provider}
                 onDismiss={dismiss}
                 onOpen={() => setOpened({ sessionId, target: { kind: 'agent', id, label } })}
                 openLabel={t('gutters.subagents.openRow', { name: label })}

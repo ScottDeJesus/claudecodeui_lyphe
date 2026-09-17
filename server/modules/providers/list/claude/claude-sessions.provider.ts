@@ -369,9 +369,12 @@ function collectTaskNotifications(messages: AnyRecord[]): {
   byToolUseId: Map<string, ClaudeTaskNotification>;
   /** By `<task-id>`, which is the agent id: the turns that name no tool-use id (a stop, a resume) still say which agent. */
   byTaskId: Map<string, ClaudeTaskNotification>;
+  /** Every report one agent made, in order: a resumed agent's earlier reports are superseded by its latest. */
+  allByTaskId: Map<string, ClaudeTaskNotification[]>;
 } {
   const byToolUseId = new Map<string, ClaudeTaskNotification>();
   const byTaskId = new Map<string, ClaudeTaskNotification>();
+  const allByTaskId = new Map<string, ClaudeTaskNotification[]>();
 
   for (const message of messages) {
     if (message.message?.role !== 'user') {
@@ -411,11 +414,12 @@ function collectTaskNotifications(messages: AnyRecord[]): {
       }
       if (taskId) {
         byTaskId.set(taskId, notification);
+        allByTaskId.set(taskId, [...(allByTaskId.get(taskId) ?? []), notification]);
       }
     }
   }
 
-  return { byToolUseId, byTaskId };
+  return { byToolUseId, byTaskId, allByTaskId };
 }
 
 /**
@@ -639,6 +643,21 @@ async function getSessionMessages(
     const notifications = collectTaskNotifications(messages);
     const foldedNotificationUuids = new Set<string>();
 
+    // The latest `SendMessage` that RESUMED each agent (its result names `resumedAgentId`; a message
+    // queued to an agent still running does not). A resumed agent is working again, and it reports
+    // back under that call's id, not under the call that launched it.
+    const resumes = new Map<string, { toolUseId: string; at?: string }>();
+    for (const message of messages) {
+      const resumedAgentId = message.toolUseResult?.resumedAgentId;
+      const toolUseId = readAgentToolUseId(message);
+      if (typeof resumedAgentId === 'string' && resumedAgentId && toolUseId) {
+        resumes.set(resumedAgentId, {
+          toolUseId,
+          at: typeof message.timestamp === 'string' ? message.timestamp : undefined,
+        });
+      }
+    }
+
     for (const message of messages) {
       const agentId = message.toolUseResult?.agentId;
       if (!agentId) {
@@ -658,6 +677,17 @@ async function getSessionMessages(
         && !notification
         && (!subagent || subagent.inFlight);
 
+      // Resumed since: its latest resume either reported back (that report is the agent's status,
+      // answer and finish time now) or has not, and the agent is running again while its own
+      // transcript is still being written.
+      const resume = resumes.get(String(agentId));
+      const resumeNotification = resume && resume.toolUseId !== toolUseId
+        ? notifications.byToolUseId.get(resume.toolUseId)
+        : undefined;
+      const isResumedAndRunning = Boolean(resume && resume.toolUseId !== toolUseId)
+        && !resumeNotification
+        && (!subagent || subagent.inFlight);
+
       if (subagent) {
         if (subagent.activity.length > 0) {
           message.subagentTools = subagent.activity;
@@ -668,15 +698,33 @@ async function getSessionMessages(
             ?? (typeof message.toolUseResult?.description === 'string' ? message.toolUseResult.description : undefined),
           model: subagent.info.model
             ?? (typeof message.toolUseResult?.resolvedModel === 'string' ? message.toolUseResult.resolvedModel : undefined),
-          status: isAwaitingAsyncAgent
+          status: isAwaitingAsyncAgent || isResumedAndRunning
             ? 'running'
-            : notification
-              ? readNotificationStatus(notification)
-              : subagent.failed ? 'failed' : subagent.interrupted ? 'stopped' : 'completed',
+            : resumeNotification
+              ? readNotificationStatus(resumeNotification)
+              : notification
+                ? readNotificationStatus(notification)
+                : subagent.failed ? 'failed' : subagent.interrupted ? 'stopped' : 'completed',
+          ...(resume && resume.toolUseId !== toolUseId ? { resume } : {}),
         };
       }
 
-      if (notification) {
+      if (resumeNotification) {
+        // The resumed run's report is the agent's latest answer and finish; every earlier report of
+        // the agent — its launch's and those of earlier resumes — is folded away with it rather than
+        // left standing as a loose turn.
+        replaceAgentToolResultContent(message, resumeNotification.result || resumeNotification.summary);
+        if (resumeNotification.timestamp) {
+          message.toolResultAt = resumeNotification.timestamp;
+        }
+        foldedNotificationUuids.add(resumeNotification.sourceUuid);
+        if (notification) {
+          foldedNotificationUuids.add(notification.sourceUuid);
+        }
+        for (const earlier of notifications.allByTaskId.get(String(agentId)) ?? []) {
+          foldedNotificationUuids.add(earlier.sourceUuid);
+        }
+      } else if (notification) {
         replaceAgentToolResultContent(message, notification.result || notification.summary);
         // The finish time the row can show: the notification's, not the launch receipt's.
         if (notification.timestamp) {
@@ -691,6 +739,11 @@ async function getSessionMessages(
       // No notification turn, but the agent's own transcript reached its closing reply: that
       // record's time is the finish. The usual case for a backgrounded agent (see `finishedAt`).
       if (!message.toolResultAt && !isAwaitingAsyncAgent && message.toolUseResult?.isAsync === true && subagent?.finishedAt) {
+        message.toolResultAt = subagent.finishedAt;
+      }
+      // Resumed and done, but the resume's report has not reached the parent transcript yet (it is
+      // written when the parent's turn takes it up): the agent's own transcript ending is the finish.
+      if (resume && resume.toolUseId !== toolUseId && !resumeNotification && !isResumedAndRunning && subagent?.finishedAt) {
         message.toolResultAt = subagent.finishedAt;
       }
     }

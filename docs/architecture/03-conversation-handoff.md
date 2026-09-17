@@ -267,7 +267,7 @@ What remains is a `Map<sessionId, SessionActivity>` of `{ statusText, canInterru
 | --- | --- |
 | `markSessionProcessing` | The composer, just before `chat.send`; a `chat_subscribed` ack with `isProcessing: true`; a `status` frame carrying text; a `permission_request` |
 | `markSessionIdle` | `complete`; `protocol_error`; a `chat_subscribed` ack with `isProcessing: false` |
-| `syncProcessingSessions` | Every 5 s from `GET /api/providers/sessions/running`, which returns `chatRunRegistry.listRunningRuns()` |
+| `syncProcessingSessions` | Every 5 s, and when the tab becomes visible again, from `GET /api/providers/sessions/running`, which returns `chatRunRegistry.listRunningRuns()` |
 
 Two guards make it stable:
 
@@ -282,7 +282,10 @@ Two guards make it stable:
 Consumers: `useProcessingSessions` (chat — the activity line and the abort button),
 `useBusySessionIdSet` (sidebar — membership only, derived from a sorted membership key so
 its `Set` identity survives the several-times-a-second `statusText` rewrites; pinned by
-`src/shared/tests/busySessionIds.test.tsx`), and `isSessionProcessing` (`useProjectsState`,
+`src/shared/tests/busySessionIds.test.tsx`), `useAwaitingInputSessionIdSet` (sidebar — the running
+sessions whose poll item carries `awaitingInput`, i.e. a Claude question or permission prompt is
+pending in `permissions.listPending`; a row draws a yellow dot in place of its spinner; same
+membership-key identity), and `isSessionProcessing` (`useProjectsState`,
 to decide whether a `session_upserted` for the viewed session should force a reload).
 
 ## Reconciling live events with the persisted transcript
@@ -447,6 +450,11 @@ How rows are claimed:
 - OpenCode avoids the race up front: its synchronizer falls back to
   `findLatestPendingAppSession` to claim the newest app row for that project still missing a
   provider id.
+- Not every transcript on disk reaches this pipeline at all. A Claude transcript whose `cwd`
+  resolves under `~/.claude/kanban-metis/<boardId>/` is refused before any row is created — it
+  belongs to a Metis session the Kanban board's own driver launched and reads by session id
+  directly, never through this app's session list. See
+  [providers/README.md](../../server/modules/providers/README.md)'s Claude scan-roots row.
 
 `session-synchronizer.service.ts` adds two guarantees beyond indexing. Concurrent callers
 share one scan (opening the UI fires `/api/projects` and `/api/projects/archived` at once),

@@ -11,6 +11,7 @@ import { MemoryIntakeProvider } from '@/modules/memory-intake';
 import { LiveBusProvider } from '@/modules/live-bus';
 import { RunnerFeed } from '@/modules/plan-runner';
 import { SoulLaunchFeed } from '@/modules/dispatch-souls';
+import { UniverseFeed } from '@/modules/universe';
 import { WebSocketProvider } from '@/shared/context/WebSocketContext';
 import { PluginsProvider } from '@/modules/plugins';
 import { ProjectWorkspaceRoute } from '@/modules/project-workspace';
@@ -138,6 +139,9 @@ export default function App() {
                           one subscribes to the one socket and renders what it wraps, so the innermost
                           thing here is still the router. One feed per lane, in the lane's own module. */}
                       <SoulLaunchFeed>
+                      {/* The estate's lane: a digest of its activity, and the map fetch the fresh
+                          check needs. Its canvas reads the socket itself, inside the tab. */}
+                      <UniverseFeed>
                       {/* Inside the auth gate, so the memory poll never fires against the login screen. */}
                       <MemoryIntakeProvider>
                         <Router basename={routerBasename}>
@@ -147,6 +151,7 @@ export default function App() {
                           </Routes>
                         </Router>
                       </MemoryIntakeProvider>
+                      </UniverseFeed>
                       </SoulLaunchFeed>
                     </RunnerFeed>
                   </LiveBusProvider>

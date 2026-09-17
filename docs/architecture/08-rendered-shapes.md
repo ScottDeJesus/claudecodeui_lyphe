@@ -415,8 +415,8 @@ knows which surface it is, so the opt-in is one class there — `MARKDOWN_CARDS_
 `src/shared/constants.ts`, spelled `'chat-md-cards'` — and the paint is a stylesheet scoped to that
 class, side-effect imported by `Markdown.tsx`. It changes no DOM: the class rides the wrapper and
 nothing under it moves, so **a miss is today's markup** still holds byte for byte and
-`probe-shapes-baseline.mjs` is untouched by the cards. Four call sites in two files carry it —
-`MessageComponent`'s three bodies (the assistant reply, the thinking row, the tool-use text) and
+`probe-shapes-baseline.mjs` is untouched by the cards. Four call sites in three files carry it —
+`MessageComponent`'s two bodies (the assistant reply, the tool-use text), `ThinkingRow`'s body, and
 `MarkdownContent`, which is every tool markdown body. A user message bubble and a tool error
 deliberately do not.
 

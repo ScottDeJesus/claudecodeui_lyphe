@@ -62,7 +62,8 @@
   "thinking": {
     "title": "Thinking...",
     "emoji": "💭 Thinking...",
-    "card": "Thinking"
+    "card": "Thinking",
+    "copy": "Copy thinking"
   },
   "json": {
     "response": "JSON Response"
@@ -185,6 +186,7 @@
     "title": "Choose Your AI Assistant",
     "description": "Select a provider to start a new conversation",
     "selectModel": "Select Model",
+    "project": "Project folder",
     "providerInfo": {
       "anthropic": "by Anthropic",
       "openai": "by OpenAI",

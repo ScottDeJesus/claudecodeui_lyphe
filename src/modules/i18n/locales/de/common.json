@@ -24,8 +24,8 @@
     "git": "Git",
     "tasks": "Aufgaben",
     "browser": "Browser",
-    "computer": "Computer",
-    "kanban": "Kanban"
+    "kanban": "Kanban",
+    "universe": "Universum"
   },
   "kanban": {
     "loading": "Board wird gelesen…",
@@ -340,5 +340,52 @@
       "label": "Diese Sitzung",
       "title": "Von dem Chat erstellt, den du geöffnet hast"
     }
+  },
+  "applications": {
+    "fabLabel": "Anwendungen",
+    "heading": "Deine <em>Apps</em>",
+    "closeDrawer": "Schließen",
+    "close": "Alle schließen",
+    "summaryNone": "Keine hinterlegt",
+    "summarySingle_one": "{{count}} App · ein Bildschirm",
+    "summarySingle_other": "{{count}} Apps · ein Bildschirm",
+    "summaryDual_one": "{{count}} App · geteilter Bildschirm an",
+    "summaryDual_other": "{{count}} Apps · geteilter Bildschirm an",
+    "dualScreen": "Geteilter Bildschirm",
+    "dualScreenHint": "Zwei Apps nebeneinander, Trennlinie verschiebbar.",
+    "opensIn": "Öffnet in",
+    "left": "Links",
+    "right": "Rechts",
+    "hostOnScreen": "{{host}} · auf dem Bildschirm",
+    "reload": "Neu laden",
+    "openInNewTab": "In neuem Tab öffnen",
+    "openInDual": "Im geteilten Bildschirm öffnen",
+    "closeDual": "Geteilten Bildschirm schließen",
+    "remove": "Entfernen",
+    "removeFailed": "Die Anwendung konnte nicht entfernt werden",
+    "removeFailedPane": "{{name}} wurde geschlossen und ist weiterhin hinterlegt.",
+    "unreadable": "Die Anwendungsliste konnte nicht gelesen werden",
+    "empty": "Noch keine Anwendungen",
+    "emptyMessage": "Füg eine mit Namen und Webadresse hinzu, und sie öffnet sich direkt hier.",
+    "emptyAction": "Erste Anwendung hinzufügen",
+    "addApplication": "Anwendung hinzufügen",
+    "form": {
+      "title": "Neue Anwendung",
+      "nameLabel": "Name",
+      "nameHelper": "So heißt sie in dieser Leiste.",
+      "namePlaceholder": "Auftragskonsole",
+      "urlLabel": "Webadresse",
+      "urlHelper": "Fehlt http://, wird es ergänzt. {host} steht für die Adresse, unter der diese Seite offen ist.",
+      "urlPlaceholder": "{host}:8080",
+      "nameRequired": "Gib ihr einen Namen, damit du sie hier findest.",
+      "urlRequired": "Ohne Adresse kann die App nicht geladen werden.",
+      "urlInvalid": "Diese Adresse ist nicht lesbar – prüf sie auf Tippfehler.",
+      "submit": "Hinzufügen",
+      "cancel": "Abbrechen",
+      "addFailed": "Die Anwendung konnte nicht hinzugefügt werden"
+    },
+    "appearanceLight": "Helles Erscheinungsbild",
+    "appearanceDark": "Dunkles Erscheinungsbild",
+    "divider": "Größe der Anwendungen ändern"
   }
 }

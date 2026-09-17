@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="_ds/verve-design-system-845c78a0-5042-416e-b31e-e608179402c3/tokens/fonts.css">
+  <link rel="stylesheet" href="_ds/verve-design-system-845c78a0-5042-416e-b31e-e608179402c3/tokens/colors.css">
+  <link rel="stylesheet" href="_ds/verve-design-system-845c78a0-5042-416e-b31e-e608179402c3/tokens/typography.css">
+  <link rel="stylesheet" href="_ds/verve-design-system-845c78a0-5042-416e-b31e-e608179402c3/tokens/spacing.css">
+  <link rel="stylesheet" href="_ds/verve-design-system-845c78a0-5042-416e-b31e-e608179402c3/tokens/motion.css">
+  <link rel="stylesheet" href="_ds/verve-design-system-845c78a0-5042-416e-b31e-e608179402c3/tokens/base.css">
+  <link rel="stylesheet" href="_ds/verve-design-system-845c78a0-5042-416e-b31e-e608179402c3/styles.css">
+  <script src="_ds/verve-design-system-845c78a0-5042-416e-b31e-e608179402c3/_ds_bundle.js"></script>
+  <style>
+    html,body{margin:0;padding:0;height:100%;overflow:hidden;background:var(--canvas)}
+    *{box-sizing:border-box}
+    a{color:var(--accent);text-decoration:none}
+    a:hover{color:var(--accent-deep)}
+    @keyframes hub-drawer-in{from{opacity:0;transform:translateX(-22px)}to{opacity:1;transform:none}}
+  </style>
+</helmet>
+<div ref="{{ rootRef }}" style="position:fixed;inset:0;background:var(--canvas);font-family:var(--font-body);color:var(--ink);overflow:hidden">
+
+  <div ref="{{ wrapRef }}" style="position:absolute;inset:0;display:flex;align-items:stretch">
+    <div style="flex:var(--ra,1) 1 0;min-width:0;position:relative;background:var(--surface);overflow:hidden">
+      <sc-if value="{{ aHasApp }}" hint-placeholder-val="{{ true }}">
+        <iframe ref="{{ frameARef }}" src="{{ aUrl }}" title="{{ aName }}" referrerpolicy="no-referrer" onLoad="{{ aLoaded }}" style="width:100%;height:100%;border:none;display:block;background:var(--surface)"></iframe>
+      </sc-if>
+      <sc-if value="{{ aBlocked }}">
+        <div style="position:absolute;inset:0;display:grid;place-items:center;padding:40px;background:var(--canvas);animation:vv-fade .3s var(--ease-enter)">
+          <div style="max-width:380px;display:flex;flex-direction:column;align-items:center;gap:14px;text-align:center">
+            <div style="font-family:var(--font-display);font-size:30px;font-style:italic;color:var(--ink-faint)">Not showing up</div>
+            <div style="font-size:14.5px;line-height:1.6;color:var(--ink-muted)">{{ aName }} did not appear in this pane. Some apps refuse to be embedded and can only be opened in their own window.</div>
+            <div style="display:flex;gap:10px;margin-top:4px">
+              <x-import component-from-global-scope="VerveDesignSystem_845c78.Button" variant="tonal" size="sm" onClick="{{ aExternal }}" hint-size="auto,34px">Open in a new tab</x-import>
+              <x-import component-from-global-scope="VerveDesignSystem_845c78.Button" variant="outline" size="sm" onClick="{{ aReload }}" hint-size="auto,34px">Try again</x-import>
+            </div>
+            <div style="font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-faint);margin-top:6px">{{ aHost }}</div>
+          </div>
+        </div>
+      </sc-if>
+      <sc-if value="{{ aEmpty }}">
+        <div onClick="{{ pickForA }}" style="position:absolute;inset:16px;border:1.5px dashed var(--border-strong);border-radius:16px;display:grid;place-items:center;cursor:pointer;background:var(--canvas)">
+          <div style="display:flex;flex-direction:column;align-items:center;gap:8px;text-align:center;padding:24px">
+            <div style="font-family:var(--font-display);font-size:26px;font-style:italic;color:var(--ink-faint)">Empty pane</div>
+            <div style="font-size:13.5px;color:var(--ink-faint);max-width:240px;line-height:1.5">Tap to choose an application for the left side.</div>
+          </div>
+        </div>
+      </sc-if>
+      <sc-if value="{{ aActiveRing }}">
+        <div style="position:absolute;inset:0;pointer-events:none;border:2px solid var(--accent);border-radius:2px;z-index:5"></div>
+      </sc-if>
+    </div>
+
+    <sc-if value="{{ split }}">
+      <div onPointerDown="{{ divDown }}" style="flex:none;width:12px;cursor:col-resize;background:var(--canvas);position:relative;z-index:20;touch-action:none;display:grid;place-items:center" style-hover="background:var(--accent-soft)">
+        <div style="width:4px;height:48px;border-radius:999px;background:var(--border-strong)"></div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ split }}">
+      <div style="flex:var(--rb,1) 1 0;min-width:0;position:relative;background:var(--surface);overflow:hidden">
+        <sc-if value="{{ bHasApp }}" hint-placeholder-val="{{ true }}">
+          <iframe ref="{{ frameBRef }}" src="{{ bUrl }}" title="{{ bName }}" referrerpolicy="no-referrer" onLoad="{{ bLoaded }}" style="width:100%;height:100%;border:none;display:block;background:var(--surface)"></iframe>
+        </sc-if>
+        <sc-if value="{{ bBlocked }}">
+          <div style="position:absolute;inset:0;display:grid;place-items:center;padding:40px;background:var(--canvas);animation:vv-fade .3s var(--ease-enter)">
+            <div style="max-width:380px;display:flex;flex-direction:column;align-items:center;gap:14px;text-align:center">
+              <div style="font-family:var(--font-display);font-size:30px;font-style:italic;color:var(--ink-faint)">Not showing up</div>
+              <div style="font-size:14.5px;line-height:1.6;color:var(--ink-muted)">{{ bName }} did not appear in this pane. Some apps refuse to be embedded and can only be opened in their own window.</div>
+              <div style="display:flex;gap:10px;margin-top:4px">
+                <x-import component-from-global-scope="VerveDesignSystem_845c78.Button" variant="tonal" size="sm" onClick="{{ bExternal }}" hint-size="auto,34px">Open in a new tab</x-import>
+                <x-import component-from-global-scope="VerveDesignSystem_845c78.Button" variant="outline" size="sm" onClick="{{ bReload }}" hint-size="auto,34px">Try again</x-import>
+              </div>
+              <div style="font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-faint);margin-top:6px">{{ bHost }}</div>
+            </div>
+          </div>
+        </sc-if>
+        <sc-if value="{{ bEmpty }}">
+          <div onClick="{{ pickForB }}" style="position:absolute;inset:16px;border:1.5px dashed var(--border-strong);border-radius:16px;display:grid;place-items:center;cursor:pointer;background:var(--canvas)">
+            <div style="display:flex;flex-direction:column;align-items:center;gap:8px;text-align:center;padding:24px">
+              <div style="font-family:var(--font-display);font-size:26px;font-style:italic;color:var(--ink-faint)">Empty pane</div>
+              <div style="font-size:13.5px;color:var(--ink-faint);max-width:240px;line-height:1.5">Tap to choose an application for the right side.</div>
+            </div>
+          </div>
+        </sc-if>
+        <sc-if value="{{ bActiveRing }}">
+          <div style="position:absolute;inset:0;pointer-events:none;border:2px solid var(--accent);border-radius:2px;z-index:5"></div>
+        </sc-if>
+      </div>
+    </sc-if>
+  </div>
+
+  <sc-if value="{{ noApps }}">
+    <div style="position:absolute;inset:0;display:grid;place-items:center;background:var(--canvas);padding:32px">
+      <div style="display:flex;flex-direction:column;align-items:center;gap:20px;max-width:420px">
+        <div style="text-align:center">
+          <div style="font-family:var(--font-display);font-size:44px;line-height:1.1;color:var(--ink)">Your applications <span style="font-style:italic;color:var(--accent-ink)">hub</span></div>
+          <div style="font-size:14.5px;color:var(--ink-muted);line-height:1.6;margin-top:10px">Every app you add lives here full-bleed — no header, no footer. The button in the corner opens the drawer, and it can be dragged anywhere you like.</div>
+        </div>
+        <x-import component-from-global-scope="VerveDesignSystem_845c78.EmptyState" title="No applications yet" message="Add one with its name and web address and it opens right here." action-label="Add your first application" on-action="{{ startAdd }}" dc-props="{{ emptyStyle }}" hint-size="380px,220px"></x-import>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ drawer }}">
+    <div onClick="{{ closeDrawer }}" style="position:absolute;inset:0;z-index:50;background:rgba(16,17,22,.45);backdrop-filter:blur(6px);animation:vv-fade .2s var(--ease-enter)"></div>
+  </sc-if>
+
+  <sc-if value="{{ drawer }}">
+    <div style="position:absolute;top:0;left:0;bottom:0;z-index:60;width:min(88vw,364px);background:var(--canvas);border-right:1px solid var(--border);box-shadow:0 30px 80px rgba(16,17,22,.28);display:flex;flex-direction:column;animation:hub-drawer-in .34s var(--ease-enter)">
+
+      <div style="padding:26px 22px 16px;display:flex;flex-direction:column;gap:4px;flex:none">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px">
+          <div style="font-family:var(--font-display);font-size:30px;line-height:1.1;color:var(--ink)">Your <span style="font-style:italic;color:var(--accent-ink)">apps</span></div>
+          <button onClick="{{ closeDrawer }}" aria-label="Close drawer" style="flex:none;width:36px;height:36px;border-radius:999px;border:1px solid var(--border);background:var(--surface);color:var(--ink-muted);font-size:15px;cursor:pointer;line-height:1" style-hover="border-color:var(--accent);color:var(--accent-ink)">✕</button>
+        </div>
+        <div style="font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-faint)">{{ countLine }}</div>
+      </div>
+
+      <div style="padding:0 22px 14px;flex:none">
+        <div style="border:1px solid var(--border);background:var(--surface);border-radius:12px;padding:14px 16px;display:flex;flex-direction:column;gap:12px">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:14px">
+            <div style="display:flex;flex-direction:column;gap:3px">
+              <div style="font-size:14.5px;font-weight:500;color:var(--ink)">Dual screen</div>
+              <div style="font-size:12.5px;color:var(--ink-faint);line-height:1.45">Two apps side by side, divider draggable.</div>
+            </div>
+            <x-import component-from-global-scope="VerveDesignSystem_845c78.Switch" checked="{{ split }}" onChange="{{ toggleSplit }}" hint-size="52px,30px"></x-import>
+          </div>
+          <sc-if value="{{ split }}">
+            <div style="display:flex;gap:8px;align-items:center;padding-top:2px">
+              <div style="font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-faint);flex:none">Opens in</div>
+              <div style="display:flex;gap:6px;background:var(--surface2);padding:3px;border-radius:999px">
+                <button onClick="{{ activateA }}" style="border:none;background:var(--paneA-bg,transparent);color:var(--paneA-fg,var(--ink-muted));font-family:var(--font-body);font-size:12.5px;font-weight:500;padding:7px 14px;min-height:34px;border-radius:999px;cursor:pointer">Left</button>
+                <button onClick="{{ activateB }}" style="border:none;background:var(--paneB-bg,transparent);color:var(--paneB-fg,var(--ink-muted));font-family:var(--font-body);font-size:12.5px;font-weight:500;padding:7px 14px;min-height:34px;border-radius:999px;cursor:pointer">Right</button>
+              </div>
+            </div>
+          </sc-if>
+        </div>
+      </div>
+
+      <sc-if value="{{ formOpen }}">
+        <div style="flex:1 1 auto;min-height:0;overflow-y:auto;padding:2px 22px 22px;display:flex;flex-direction:column;gap:16px;animation:vv-rise .3s var(--ease-enter)">
+          <div style="font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-faint)">{{ formTitle }}</div>
+          <x-import component-from-global-scope="VerveDesignSystem_845c78.Field" label="Name" helper="What you call it in this drawer." error="{{ nameError }}" hint-size="100%,84px">
+            <x-import component-from-global-scope="VerveDesignSystem_845c78.Input" value="{{ formName }}" onChange="{{ onName }}" placeholder="Jobs console" dc-props="{{ wide }}" hint-size="100%,46px"></x-import>
+          </x-import>
+          <x-import component-from-global-scope="VerveDesignSystem_845c78.Field" label="Web address" helper="The page this app loads. https:// is added if you leave it off." error="{{ urlError }}" hint-size="100%,92px">
+            <x-import component-from-global-scope="VerveDesignSystem_845c78.Input" value="{{ formUrl }}" onChange="{{ onUrl }}" placeholder="app.example.com/jobs" dc-props="{{ wide }}" hint-size="100%,46px"></x-import>
+          </x-import>
+          <div style="font-size:12.5px;color:var(--ink-faint);line-height:1.5;border:1.5px dashed var(--border-strong);border-radius:10px;padding:12px 14px">The app's own icon is picked up from its address. If none is published, its initial is shown on a neutral tile.</div>
+          <div style="display:flex;gap:10px;margin-top:2px">
+            <x-import component-from-global-scope="VerveDesignSystem_845c78.Button" onClick="{{ submitForm }}" hint-size="auto,44px">{{ formSubmitLabel }}</x-import>
+            <x-import component-from-global-scope="VerveDesignSystem_845c78.Button" variant="outline" onClick="{{ cancelForm }}" hint-size="auto,44px">Cancel</x-import>
+          </div>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ listOpen }}" hint-placeholder-val="{{ true }}">
+        <div style="flex:1 1 auto;min-height:0;overflow-y:auto;padding:2px 22px 8px">
+          <sc-for list="{{ rows }}" as="app" hint-placeholder-count="3">
+            <div style="border:1px solid var(--border);background:var(--surface);border-radius:12px;margin-bottom:8px;overflow:hidden;transition:box-shadow .35s var(--ease-enter),border-color .2s" style-hover="border-color:var(--border-strong);box-shadow:0 6px 18px rgba(23,24,29,.07)">
+              <div style="display:flex;align-items:center;gap:12px;padding:var(--row-pad,10px 12px);min-height:var(--row-h,58px)">
+                <div onClick="{{ app.open }}" style="flex:1 1 auto;min-width:0;display:flex;align-items:center;gap:12px;cursor:pointer">
+                  <div style="position:relative;width:36px;height:36px;border-radius:9px;background:var(--surface2);border:1px solid var(--border);display:grid;place-items:center;flex:none;overflow:hidden">
+                    <span style="font-family:var(--font-display);font-size:19px;color:var(--ink-muted);line-height:1">{{ app.mono }}</span>
+                    <div aria-hidden="true" style="{{ app.iconStyle }}"></div>
+                  </div>
+                  <div style="min-width:0;display:flex;flex-direction:column;gap:2px">
+                    <div style="display:flex;align-items:center;gap:7px;min-width:0">
+                      <span style="font-size:15px;font-weight:500;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ app.name }}</span>
+                      <sc-if value="{{ app.fav }}"><span style="color:var(--accent);font-size:12px;flex:none">✦</span></sc-if>
+                    </div>
+                    <div style="display:var(--host-display,block);font-size:12px;color:var(--ink-faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ app.where }}</div>
+                  </div>
+                </div>
+                <button onClick="{{ app.toggleMenu }}" aria-label="More actions" style="flex:none;width:40px;height:40px;border-radius:9px;border:1px solid transparent;background:none;color:var(--ink-faint);font-size:16px;cursor:pointer;line-height:1" style-hover="border-color:var(--border-strong);color:var(--ink)">⋯</button>
+              </div>
+              <sc-if value="{{ app.menu }}">
+                <div style="border-top:1px solid var(--border);background:var(--surface2);padding:12px;display:flex;flex-wrap:wrap;gap:8px;animation:vv-fade .18s var(--ease-enter)">
+                  <button onClick="{{ app.openSplit }}" style="padding:0 12px;min-height:40px;border-radius:9px;border:1px solid var(--border-strong);background:var(--surface);color:var(--ink-mid);font-family:var(--font-body);font-size:12.5px;cursor:pointer" style-hover="border-color:var(--accent);color:var(--accent-ink)">{{ app.splitLabel }}</button>
+                  <button onClick="{{ app.reload }}" style="padding:0 12px;min-height:40px;border-radius:9px;border:1px solid var(--border-strong);background:var(--surface);color:var(--ink-mid);font-family:var(--font-body);font-size:12.5px;cursor:pointer" style-hover="border-color:var(--accent);color:var(--accent-ink)">Reload</button>
+                  <button onClick="{{ app.toggleFav }}" style="padding:0 12px;min-height:40px;border-radius:9px;border:1px solid var(--border-strong);background:var(--surface);color:var(--ink-mid);font-family:var(--font-body);font-size:12.5px;cursor:pointer" style-hover="border-color:var(--accent);color:var(--accent-ink)">{{ app.favLabel }}</button>
+                  <button onClick="{{ app.up }}" aria-label="Move up" style="width:40px;min-height:40px;border-radius:9px;border:1px solid var(--border-strong);background:var(--surface);color:var(--ink-mid);font-size:12px;cursor:pointer" style-hover="border-color:var(--accent);color:var(--accent-ink)">▲</button>
+                  <button onClick="{{ app.down }}" aria-label="Move down" style="width:40px;min-height:40px;border-radius:9px;border:1px solid var(--border-strong);background:var(--surface);color:var(--ink-mid);font-size:12px;cursor:pointer" style-hover="border-color:var(--accent);color:var(--accent-ink)">▼</button>
+                  <button onClick="{{ app.edit }}" style="padding:0 12px;min-height:40px;border-radius:9px;border:1px solid var(--border-strong);background:var(--surface);color:var(--ink-mid);font-family:var(--font-body);font-size:12.5px;cursor:pointer" style-hover="border-color:var(--accent);color:var(--accent-ink)">Edit</button>
+                  <button onClick="{{ app.remove }}" style="padding:0 12px;min-height:40px;border-radius:9px;border:1px solid var(--danger);background:var(--surface);color:var(--danger-ink);font-family:var(--font-body);font-size:12.5px;cursor:pointer" style-hover="background:var(--danger-soft)">{{ app.removeLabel }}</button>
+                </div>
+              </sc-if>
+            </div>
+          </sc-for>
+          <sc-if value="{{ noApps }}">
+            <div style="border:1.5px dashed var(--border-strong);border-radius:12px;padding:26px 20px;text-align:center;display:flex;flex-direction:column;gap:6px">
+              <div style="font-family:var(--font-display);font-size:22px;font-style:italic;color:var(--ink-faint)">Nothing here yet</div>
+              <div style="font-size:13px;color:var(--ink-faint);line-height:1.5">Add an application and it opens straight into the screen behind this drawer.</div>
+            </div>
+          </sc-if>
+        </div>
+      </sc-if>
+
+      <div style="flex:none;border-top:1px solid var(--border);background:var(--surface);padding:14px 22px 18px;display:flex;flex-direction:column;gap:12px">
+        <sc-if value="{{ listOpen }}" hint-placeholder-val="{{ true }}">
+          <x-import component-from-global-scope="VerveDesignSystem_845c78.Button" onClick="{{ startAdd }}" dc-props="{{ wideBtn }}" hint-size="100%,44px">Add application</x-import>
+        </sc-if>
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+          <div style="font-size:13.5px;color:var(--ink-mid)">{{ themeLabel }}</div>
+          <x-import component-from-global-scope="VerveDesignSystem_845c78.Switch" checked="{{ dark }}" onChange="{{ toggleDark }}" hint-size="52px,30px"></x-import>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ fabVisible }}" hint-placeholder-val="{{ true }}">
+  <div ref="{{ fabRef }}" onPointerDown="{{ fabDown }}" title="Applications" style="position:absolute;left:var(--fx,20px);top:var(--fy,20px);z-index:70;width:28px;height:28px;border-radius:999px;background:var(--accent);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2.5px;cursor:grab;touch-action:none;box-shadow:0 12px 32px rgba(23,24,29,.26);transition:transform .5s var(--ease-press),box-shadow .35s" style-hover="transform:scale(1.06);box-shadow:0 16px 40px rgba(47,168,118,.4)" style-active="transform:scale(.92)">
+    <div style="width:12px;height:1.5px;border-radius:2px;background:#fff"></div>
+    <div style="width:12px;height:1.5px;border-radius:2px;background:#fff"></div>
+    <div style="width:8px;height:1.5px;border-radius:2px;background:#fff"></div>
+  </div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;startDark&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Behaviour&quot;},&quot;rowDensity&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;Roomy&quot;,&quot;Compact&quot;],&quot;default&quot;:&quot;Roomy&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Drawer&quot;},&quot;embedTimeout&quot;:{&quot;editor&quot;:&quot;range&quot;,&quot;default&quot;:7,&quot;min&quot;:2,&quot;max&quot;:15,&quot;step&quot;:1,&quot;unit&quot;:&quot;s&quot;,&quot;tsType&quot;:&quot;number&quot;,&quot;section&quot;:&quot;Behaviour&quot;}}">
+class Component extends DCLogic {
+  KEY = "apphub.state.v1";
+  state = {
+    apps: [], panes: [null, null], split: false, ratio: 0.5, active: 0,
+    drawer: false, dark: false, form: null, menu: null,
+    fx: 20, fy: 20, load: { 0: null, 1: null }, name: "", url: "", err: {}
+  };
+
+  constructor(p) {
+    super(p);
+    this.rootRef = React.createRef();
+    this.wrapRef = React.createRef();
+    this.frameARef = React.createRef();
+    this.frameBRef = React.createRef();
+    this.timers = {};
+  }
+
+  componentDidMount() {
+    let saved = null;
+    try { saved = JSON.parse(localStorage.getItem(this.KEY) || "null"); } catch (e) { saved = null; }
+    const next = {
+      dark: !!(this.props.startDark ?? false),
+      split: false, fx: 20, fy: 20
+    };
+    if (saved && typeof saved === "object") {
+      if (Array.isArray(saved.apps)) next.apps = saved.apps;
+      if (Array.isArray(saved.panes)) next.panes = saved.panes;
+      if (typeof saved.ratio === "number") next.ratio = saved.ratio;
+      if (typeof saved.dark === "boolean") next.dark = saved.dark;
+      if (typeof saved.fx === "number") next.fx = saved.fx;
+      if (typeof saved.fy === "number") next.fy = saved.fy;
+    }
+    if (!next.apps || !next.apps.length) next.split = false;
+    this.setState(next, () => { this.applyVars(); this.armAll(); });
+    this.applyVars();
+  }
+
+  componentDidUpdate() { this.applyVars(); }
+
+  componentWillUnmount() { Object.values(this.timers).forEach(clearTimeout); }
+
+  // ---------- persistence + css vars ----------
+  save() {
+    const s = this.state;
+    try {
+      localStorage.setItem(this.KEY, JSON.stringify({
+        apps: s.apps, panes: s.panes, split: s.split, ratio: s.ratio, dark: s.dark, fx: s.fx, fy: s.fy
+      }));
+    } catch (e) { /* storage unavailable */ }
+  }
+
+  set(patch, cb) { this.setState(patch, () => { this.save(); cb && cb(); }); }
+
+  applyVars() {
+    const el = this.rootRef.current;
+    if (!el) return;
+    const s = this.state, r = Math.min(0.85, Math.max(0.15, s.ratio));
+    el.style.setProperty("--ra", s.split ? String(r) : "1");
+    el.style.setProperty("--rb", String(1 - r));
+    el.style.setProperty("--fx", s.fx + "px");
+    el.style.setProperty("--fy", s.fy + "px");
+    const compact = (this.props.rowDensity ?? "Roomy") === "Compact";
+    el.style.setProperty("--row-pad", compact ? "7px 10px" : "10px 12px");
+    el.style.setProperty("--row-h", compact ? "48px" : "58px");
+    el.style.setProperty("--host-display", compact ? "none" : "block");
+    el.style.setProperty("--paneA-bg", s.active === 0 ? "var(--surface)" : "transparent");
+    el.style.setProperty("--paneA-fg", s.active === 0 ? "var(--ink)" : "var(--ink-muted)");
+    el.style.setProperty("--paneB-bg", s.active === 1 ? "var(--surface)" : "transparent");
+    el.style.setProperty("--paneB-fg", s.active === 1 ? "var(--ink)" : "var(--ink-muted)");
+    document.body.classList.toggle("vv-dark", !!s.dark);
+  }
+
+  // ---------- helpers ----------
+  appOf(i) { const id = this.state.panes[i]; return this.state.apps.find(a => a.id === id) || null; }
+
+  host(u) { try { return new URL(u).host.replace(/^www\./, ""); } catch (e) { return u || ""; } }
+
+  normalize(u) {
+    let v = (u || "").trim();
+    if (!v) return "";
+    if (!/^https?:\/\//i.test(v)) v = "https://" + v;
+    return v;
+  }
+
+  timeoutMs() { return Math.round((this.props.embedTimeout ?? 7) * 1000); }
+
+  arm(i) {
+    clearTimeout(this.timers[i]);
+    const app = this.appOf(i);
+    if (!app) return;
+    this.setState(s => ({ load: { ...s.load, [i]: "loading" } }));
+    this.timers[i] = setTimeout(() => {
+      this.setState(s => (s.load[i] === "loading" ? { load: { ...s.load, [i]: "blocked" } } : null));
+    }, this.timeoutMs());
+  }
+
+  armAll() { this.arm(0); if (this.state.split) this.arm(1); }
+
+  onFrameLoad(i) {
+    clearTimeout(this.timers[i]);
+    const ref = i === 0 ? this.frameARef : this.frameBRef;
+    let blocked = false;
+    try {
+      const href = ref.current && ref.current.contentWindow.location.href;
+      if (!href || href === "about:blank") blocked = true; // refused frames land on about:blank
+    } catch (e) { blocked = false; } // real cross-origin document = it loaded
+    this.setState(s => ({ load: { ...s.load, [i]: blocked ? "blocked" : "ok" } }));
+  }
+
+  reload(i) {
+    const ref = i === 0 ? this.frameARef : this.frameBRef;
+    if (ref.current) { const u = ref.current.src; ref.current.src = "about:blank"; setTimeout(() => { if (ref.current) ref.current.src = u; }, 30); }
+    this.arm(i);
+  }
+
+  external(i) { const app = this.appOf(i); if (app) window.open(app.url, "_blank", "noopener"); }
+
+  assign(app, i) {
+    const panes = this.state.panes.slice();
+    panes[i] = app.id;
+    this.set({ panes, drawer: false, menu: null }, () => this.arm(i));
+  }
+
+  // ---------- drags ----------
+  divDown = e => {
+    e.preventDefault();
+    const wrap = this.wrapRef.current, root = this.rootRef.current;
+    if (!wrap) return;
+    const rect = wrap.getBoundingClientRect();
+    const move = ev => {
+      const r = Math.min(0.85, Math.max(0.15, (ev.clientX - rect.left) / rect.width));
+      this.pending = r;
+      root.style.setProperty("--ra", this.state.split ? String(r) : "1");
+      root.style.setProperty("--rb", String(1 - r));
+    };
+    const up = () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+      if (this.pending != null) this.set({ ratio: this.pending });
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+  };
+
+  fabDown = e => {
+    e.preventDefault();
+    const root = this.rootRef.current, fab = this.fabRef.current;
+    const startX = e.clientX, startY = e.clientY;
+    const ox = this.state.fx, oy = this.state.fy;
+    let moved = false;
+    this.pendingFab = null;
+    const move = ev => {
+      const dx = ev.clientX - startX, dy = ev.clientY - startY;
+      if (Math.abs(dx) > 4 || Math.abs(dy) > 4) moved = true;
+      if (!moved) return;
+      const w = window.innerWidth, h = window.innerHeight, size = 28, pad = 8;
+      const x = Math.min(w - size - pad, Math.max(pad, ox + dx));
+      const y = Math.min(h - size - pad, Math.max(pad, oy + dy));
+      this.pendingFab = { fx: x, fy: y };
+      root.style.setProperty("--fx", x + "px");
+      root.style.setProperty("--fy", y + "px");
+      if (fab) fab.style.cursor = "grabbing";
+    };
+    const up = () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+      if (fab) fab.style.cursor = "grab";
+      if (moved && this.pendingFab) this.set(this.pendingFab);
+      else this.set({ drawer: !this.state.drawer, menu: null });
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+  };
+
+  // ---------- form ----------
+  submitForm = () => {
+    const name = this.state.name.trim(), url = this.normalize(this.state.url);
+    const err = {};
+    if (!name) err.name = "Give it a name so you can find it here.";
+    let ok = false;
+    try { new URL(url); ok = true; } catch (e) { ok = false; }
+    if (!url) err.url = "An address is needed to load the app.";
+    else if (!ok) err.url = "That address can't be read — check for typos.";
+    if (Object.keys(err).length) { this.setState({ err }); return; }
+    const editing = this.state.form;
+    if (editing && editing !== "new") {
+      const apps = this.state.apps.map(a => a.id === editing ? { ...a, name, url } : a);
+      this.set({ apps, form: null, err: {}, name: "", url: "" }, () => {
+        this.state.panes.forEach((p, i) => { if (p === editing) this.arm(i); });
+      });
+    } else {
+      const app = { id: "a" + Date.now().toString(36), name, url, fav: false };
+      const apps = this.state.apps.concat([app]);
+      const panes = this.state.panes.slice();
+      const target = this.state.split ? this.state.active : 0;
+      if (!panes[target]) panes[target] = app.id;
+      this.set({ apps, panes, form: null, err: {}, name: "", url: "" }, () => this.arm(target));
+    }
+  };
+
+  removeApp(id) {
+    const apps = this.state.apps.filter(a => a.id !== id);
+    const panes = this.state.panes.map(p => (p === id ? null : p));
+    this.set({ apps, panes, menu: null, split: apps.length ? this.state.split : false });
+  }
+
+  move(id, dir) {
+    const apps = this.state.apps.slice();
+    const i = apps.findIndex(a => a.id === id);
+    const j = i + dir;
+    if (i < 0 || j < 0 || j >= apps.length) return;
+    const t = apps[i]; apps[i] = apps[j]; apps[j] = t;
+    this.set({ apps });
+  }
+
+  renderVals() {
+    const s = this.state;
+    const a = this.appOf(0), b = this.appOf(1);
+    const sorted = s.apps.slice().sort((x, y) => (y.fav ? 1 : 0) - (x.fav ? 1 : 0));
+    const openIds = s.panes.filter(Boolean);
+
+    const rows = sorted.map(app => ({
+      id: app.id,
+      name: app.name,
+      mono: (app.name || "?").trim().charAt(0).toUpperCase(),
+      iconStyle: {
+        position: "absolute", top: 7, left: 7, width: 22, height: 22, borderRadius: 4,
+        backgroundImage: "url('https://www.google.com/s2/favicons?domain=" + encodeURIComponent(this.host(app.url)) + "&sz=64')",
+        backgroundSize: "cover", backgroundPosition: "center", backgroundRepeat: "no-repeat"
+      },
+      where: this.host(app.url) + (openIds.indexOf(app.id) > -1 ? " · on screen" : ""),
+      fav: !!app.fav,
+      favLabel: app.fav ? "Unfavourite" : "Favourite",
+      menu: s.menu === app.id,
+      splitLabel: s.split && s.panes[1] === app.id ? "Close dual screen" : "Open in dual screen",
+      removeLabel: "Remove",
+      open: () => this.assign(app, s.split ? s.active : 0),
+      toggleMenu: () => this.setState({ menu: s.menu === app.id ? null : app.id }),
+      openSplit: () => {
+        if (s.split && s.panes[1] === app.id) { this.set({ split: false, active: 0, menu: null }); return; }
+        const panes = s.panes.slice();
+        panes[1] = app.id;
+        if (!panes[0]) panes[0] = app.id;
+        this.set({ split: true, panes, active: 1, drawer: false, menu: null }, () => { this.arm(0); this.arm(1); });
+      },
+      reload: () => { const i = s.panes.indexOf(app.id); if (i > -1) this.reload(i); else this.assign(app, s.split ? s.active : 0); },
+      toggleFav: () => this.set({ apps: s.apps.map(x => x.id === app.id ? { ...x, fav: !x.fav } : x) }),
+      up: () => this.move(app.id, -1),
+      down: () => this.move(app.id, 1),
+      edit: () => this.setState({ form: app.id, name: app.name, url: app.url, err: {}, menu: null }),
+      remove: () => this.removeApp(app.id)
+    }));
+
+    const n = s.apps.length;
+    const countLine = n === 0 ? "None on file" :
+      n + (n === 1 ? " app" : " apps") + " · " + (s.split ? "dual screen on" : "single screen");
+
+    return {
+      rootRef: this.rootRef, wrapRef: this.wrapRef,
+      frameARef: this.frameARef, frameBRef: this.frameBRef,
+      fabRef: (this.fabRef = this.fabRef || React.createRef()),
+      fabDown: this.fabDown, divDown: this.divDown,
+
+      split: s.split, dark: s.dark, drawer: s.drawer, noApps: n === 0,
+      rows, countLine,
+      themeLabel: s.dark ? "Dark appearance" : "Light appearance",
+
+      aHasApp: !!a, aUrl: a ? a.url : "", aName: a ? a.name : "", aHost: a ? this.host(a.url) : "",
+      aEmpty: !a, aBlocked: !!a && s.load[0] === "blocked",
+      aActiveRing: s.split && s.active === 0,
+      aLoaded: () => this.onFrameLoad(0), aReload: () => this.reload(0), aExternal: () => this.external(0),
+      pickForA: () => this.set({ drawer: true, active: 0 }),
+
+      bHasApp: !!b, bUrl: b ? b.url : "", bName: b ? b.name : "", bHost: b ? this.host(b.url) : "",
+      bEmpty: !b, bBlocked: !!b && s.load[1] === "blocked",
+      bActiveRing: s.split && s.active === 1,
+      bLoaded: () => this.onFrameLoad(1), bReload: () => this.reload(1), bExternal: () => this.external(1),
+      pickForB: () => this.set({ drawer: true, active: 1 }),
+
+      closeDrawer: () => this.setState({ drawer: false, menu: null }),
+      activateA: () => this.set({ active: 0 }),
+      activateB: () => this.set({ active: 1 }),
+      toggleSplit: v => {
+        if (v) {
+          const panes = s.panes.slice();
+          if (!panes[0] && s.apps[0]) panes[0] = s.apps[0].id;
+          this.set({ split: true, panes, active: panes[1] ? 1 : 1 }, () => this.arm(1));
+        } else this.set({ split: false, active: 0 });
+      },
+      toggleDark: v => this.set({ dark: !!v }),
+      fabVisible: !s.drawer,
+
+      formOpen: !!s.form, listOpen: !s.form,
+      formTitle: s.form && s.form !== "new" ? "Edit application" : "New application",
+      formSubmitLabel: s.form && s.form !== "new" ? "Save changes" : "Add it",
+      formName: s.name, formUrl: s.url,
+      nameError: s.err.name || "", urlError: s.err.url || "",
+      onName: e => this.setState({ name: e.target.value, err: { ...s.err, name: "" } }),
+      onUrl: e => this.setState({ url: e.target.value, err: { ...s.err, url: "" } }),
+      startAdd: () => this.setState({ drawer: true, form: "new", name: "", url: "", err: {}, menu: null }),
+      cancelForm: () => this.setState({ form: null, err: {}, name: "", url: "" }),
+      submitForm: this.submitForm,
+
+      wide: { style: { width: "100%" } },
+      wideBtn: { style: { width: "100%" } },
+      emptyStyle: { style: { width: "100%", background: "var(--surface)" } }
+    };
+  }
+}
+</script>
+</body>
+</html>

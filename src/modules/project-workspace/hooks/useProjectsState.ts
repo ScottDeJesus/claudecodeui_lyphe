@@ -346,7 +346,7 @@ const removeSessionFromProject = (project: Project, sessionIdToDelete: string): 
   return updatedProject;
 };
 
-const VALID_TABS: Set<string> = new Set(['chat', 'files', 'shell', 'git', 'tasks', 'browser', 'memory', 'runner', 'kanban']);
+const VALID_TABS: Set<string> = new Set(['chat', 'files', 'shell', 'git', 'tasks', 'browser', 'memory', 'runner', 'kanban', 'universe']);
 
 const isValidTab = (tab: string): tab is AppTab => {
   return VALID_TABS.has(tab) || tab.startsWith('plugin:');
@@ -1005,10 +1005,12 @@ export function useProjectsState({
   }, [navigate, sessionId, projects, selectedProject, selectedSession?.id, selectedSession?.__provider]);
 
   const handleProjectSelect = useCallback(
-    (project: Project) => {
+    // `replaceHistory` for a pick made where the reader already is at `/` (the new-chat screen's
+    // project picker): a pushed entry per pick would leave Back doing nothing.
+    (project: Project, options: { replaceHistory?: boolean } = {}) => {
       setSelectedProject(project);
       setSelectedSession(null);
-      navigate('/');
+      navigate('/', { replace: Boolean(options.replaceHistory) });
 
       if (isMobile) {
         setSidebarOpen(false);
@@ -1021,10 +1023,7 @@ export function useProjectsState({
     (session: ProjectSession) => {
       clearSessionAttention(session.id);
       setSelectedSession(session);
-
-      if (activeTab === 'tasks' || activeTab === 'browser' || activeTab === 'memory' || activeTab === 'runner') {
-        setActiveTab('chat');
-      }
+      setActiveTab('chat');
 
       if (isMobile) {
         // Sessions are tagged with the owning project's DB `projectId` when
@@ -1041,7 +1040,7 @@ export function useProjectsState({
 
       navigate(`/session/${session.id}`);
     },
-    [activeTab, clearSessionAttention, isMobile, navigate, selectedProject?.projectId],
+    [clearSessionAttention, isMobile, navigate, selectedProject?.projectId],
   );
 
   const handleNewSession = useCallback(

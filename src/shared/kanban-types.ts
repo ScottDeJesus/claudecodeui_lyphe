@@ -33,7 +33,7 @@ export type KanbanStatus = 'not_ready' | 'todo' | 'questions' | 'active' | 'done
 export type KanbanPriority = 'low' | 'medium' | 'high';
 
 /**
- * One board row, with the two booleans SQLite stores as 0 or 1 already converted.
+ * One board row, with the booleans SQLite stores as 0 or 1 already converted.
  *
  * `autonomy` is what the board header's switch reads: OFF hides the questions lane, every card
  * signal, the approve control, the leases, the checklist, the token chips and the issues — it
@@ -44,6 +44,12 @@ export type KanbanBoard = {
   name: string;
   projectId: string | null;
   autonomy: boolean;
+  /** This board's OWN DeepSeek Flash switch, read at every spawn to decide whether the Metis this
+   *  board launches runs on Flash or on Claude. The host-wide flag file
+   *  (`~/.claude/state/deepseek_flash.flag`) is NEVER consulted for anything this board launches —
+   *  two boards on one host must be able to run different models, and a switch that is a file the
+   *  whole box shares cannot say that. */
+  deepseekFlash: boolean;
   sortOrder: number;
   archived: boolean;
   createdAt: string;

@@ -21,7 +21,7 @@ type CollapsibleProps = {
   onOpenChange?: (open: boolean) => void;
 } & React.HTMLAttributes<HTMLDivElement>;
 
-/** Used by the chat module for collapsible tool output and by the shared Reasoning primitive. */
+/** Used by the chat module for collapsible tool output. */
 export const Collapsible = React.forwardRef<HTMLDivElement, CollapsibleProps>(
   ({ defaultOpen = false, open: controlledOpen, onOpenChange: controlledOnOpenChange, className, children, ...props }, ref) => {
     const [internalOpen, setInternalOpen] = React.useState(defaultOpen);
@@ -48,7 +48,7 @@ export const Collapsible = React.forwardRef<HTMLDivElement, CollapsibleProps>(
 );
 Collapsible.displayName = 'Collapsible';
 
-/** Toggle slot of Collapsible, used by the chat module and the shared Reasoning primitive. */
+/** Toggle slot of Collapsible, used by the chat module. */
 export const CollapsibleTrigger = React.forwardRef<HTMLButtonElement, React.ButtonHTMLAttributes<HTMLButtonElement>>(
   ({ onClick, children, className, ...props }, ref) => {
     const { open, onOpenChange } = useCollapsible();
@@ -78,7 +78,7 @@ export const CollapsibleTrigger = React.forwardRef<HTMLButtonElement, React.Butt
 );
 CollapsibleTrigger.displayName = 'CollapsibleTrigger';
 
-/** Body slot of Collapsible, used by the chat module and the shared Reasoning primitive. */
+/** Body slot of Collapsible, used by the chat module. */
 export const CollapsibleContent = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
   ({ className, children, ...props }, ref) => {
     const { open } = useCollapsible();

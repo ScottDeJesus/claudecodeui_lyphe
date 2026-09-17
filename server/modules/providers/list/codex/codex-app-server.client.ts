@@ -44,22 +44,30 @@ export type CodexThreadFork = {
 };
 
 /**
- * Resolves the `codex` launcher shipped in node_modules.
+ * The `codex` launcher shipped in node_modules, or null when the package is missing. Also read by
+ * `codex-auth.provider.ts`, so "is Codex installed" asks about the same binary a run uses.
  *
  * Deliberately not the `codex` on PATH: a machine can have a second, older
  * install, and the protocol this speaks is only guaranteed against the
  * version this package depends on.
  */
-function resolveCodexLauncher(): string {
-  const require_ = createRequire(import.meta.url);
+export function findCodexLauncher(): string | null {
   try {
-    return require_.resolve('@openai/codex/bin/codex.js');
+    return createRequire(import.meta.url).resolve('@openai/codex/bin/codex.js');
   } catch {
+    return null;
+  }
+}
+
+function resolveCodexLauncher(): string {
+  const launcher = findCodexLauncher();
+  if (!launcher) {
     throw new AppError('The Codex CLI package is not installed, so Codex conversations cannot be branched.', {
       code: 'CODEX_APP_SERVER_UNAVAILABLE',
       statusCode: 501,
     });
   }
+  return launcher;
 }
 
 /**

@@ -172,6 +172,60 @@ export function listLiveHosts(): LiveHost[] {
   return live;
 }
 
+/** How far back, per read, the journal is scanned for its newest turn end. */
+const JOURNAL_SCAN_CHUNK_BYTES = 256 * 1024;
+
+/**
+ * When the host's CLI last ended a turn — the `at` of the newest `result` line in its journal — or
+ * null when it never has. Read backwards in chunks, so a multi-megabyte journal costs one chunk in
+ * the usual case, where the newest line is that result.
+ *
+ * Re-adoption asks it to tell a turn whose end the previous server already recorded from one that
+ * ended without a recorded completion (a follow-up turn a background task pushed): only the second
+ * is news for the unread dot.
+ */
+export function lastTurnFinishedAt(hostId: string): number | null {
+  let fd: number;
+  try {
+    fd = fs.openSync(hostJournalPath(hostId), 'r');
+  } catch {
+    return null;
+  }
+  try {
+    let position = fs.fstatSync(fd).size;
+    let carry = '';
+    while (position > 0) {
+      const length = Math.min(JOURNAL_SCAN_CHUNK_BYTES, position);
+      position -= length;
+      const buffer = Buffer.alloc(length);
+      fs.readSync(fd, buffer, 0, length, position);
+      const lines = (buffer.toString('utf8') + carry).split('\n');
+      // The first piece may be the tail of a line that starts in the previous chunk.
+      carry = position > 0 ? (lines.shift() ?? '') : '';
+      for (let i = lines.length - 1; i >= 0; i -= 1) {
+        const at = readResultAt(lines[i]);
+        if (at !== null) return at;
+      }
+    }
+    return readResultAt(carry);
+  } finally {
+    fs.closeSync(fd);
+  }
+}
+
+/** The `at` of one journal entry when it is CLI output carrying a `result`, else null. */
+function readResultAt(raw: string): number | null {
+  if (!raw.includes('"t":"out"') || !raw.includes('result')) return null;
+  try {
+    const entry = JSON.parse(raw) as { t?: unknown; at?: unknown; line?: unknown };
+    if (entry.t !== 'out' || typeof entry.at !== 'number' || typeof entry.line !== 'string') return null;
+    const output = JSON.parse(entry.line) as { type?: unknown };
+    return output.type === 'result' ? entry.at : null;
+  } catch {
+    return null;
+  }
+}
+
 /** Removes the two files the attached adapter owns; the host unlinks its own socket. */
 export function removeHostJournal(hostId: string): void {
   for (const target of [hostJournalPath(hostId), hostMetaPath(hostId)]) {

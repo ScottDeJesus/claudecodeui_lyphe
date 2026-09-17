@@ -164,7 +164,7 @@ export const OneLineDisplay: React.FC<OneLineDisplayProps> = ({
             <button
               onClick={handleAction}
               onKeyDown={stopKey}
-              className="flex-shrink-0 text-muted-foreground/40 opacity-0 transition-all hover:text-muted-foreground group-hover:opacity-100"
+              className="flex-shrink-0 text-muted-foreground/40 opacity-0 transition-all hover:text-muted-foreground focus:opacity-100 group-hover:opacity-100 [@media(hover:none)]:opacity-100"
               title="Copy to clipboard"
               aria-label="Copy to clipboard"
             >

@@ -142,9 +142,6 @@ export function buildTranscriptMarkdown(input: BuildTranscriptMarkdownInput): st
     }
 
     sections.push(`### ${speakerFor(message)}`);
-    if (message.reasoning) {
-      sections.push('', '<details><summary>Reasoning</summary>', '', readString(message.reasoning), '', '</details>');
-    }
     sections.push('', readString(message.content));
   }
 

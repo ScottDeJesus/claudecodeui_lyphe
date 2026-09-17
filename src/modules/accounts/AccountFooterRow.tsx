@@ -77,7 +77,7 @@ export function AccountFooterRow({ collapsed = false, onExpand }: AccountFooterR
   //
   // ⚠ Escape is claimed at WINDOW in the CAPTURE phase and marked with preventDefault, and with
   // preventDefault ALONE. ChatInterface aborts the running turn from a document-level capture
-  // listener gated on `defaultPrevented` (`ChatInterface.tsx:302-310`), and window-capture runs
+  // listener gated on `defaultPrevented` (`ChatInterface.tsx`'s stop-on-Escape effect), and window-capture runs
   // before document-capture — so the mark is already on the event by the time that gate reads
   // it, and closing this panel mid-run no longer kills the run.
   //

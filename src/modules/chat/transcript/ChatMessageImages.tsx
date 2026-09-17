@@ -93,12 +93,14 @@ export function ImageLightbox({ src, alt, square = false, onClose }: { src: stri
   useEffect(() => {
     const handleKeyDown = (event: globalThis.KeyboardEvent) => {
       if (event.key === 'Escape') {
+        // Marked from window capture, as the shared Dialog does, so closing never stops the run.
+        event.preventDefault();
         event.stopPropagation();
         onClose();
       }
     };
-    document.addEventListener('keydown', handleKeyDown, true);
-    return () => document.removeEventListener('keydown', handleKeyDown, true);
+    window.addEventListener('keydown', handleKeyDown, true);
+    return () => window.removeEventListener('keydown', handleKeyDown, true);
   }, [onClose]);
 
   return createPortal(

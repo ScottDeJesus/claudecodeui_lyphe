@@ -1,10 +1,13 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 
 import type { ChatMessage, SoulLaunchSnapshot } from '@/shared/types';
 import { useSoulLaunches } from '@/modules/dispatch-souls';
 import {
   describeLatestActivity,
+  isRefusedLaunch,
   readSubagentSummary,
+  subagentMarkProvider,
+  type SubagentMarkProvider,
   type SubagentSummary,
 } from '@/modules/chat/utils/subagentSummary';
 import { dismissPin, useDismissedPins } from '@/modules/chat/utils/pinnedDismissals';
@@ -54,6 +57,12 @@ type AgentEntry = {
   endedAtMs: number;
   running: boolean;
   id: string;
+  /**
+   * What a dismissal of this row is remembered under: the id, or the id and the resume for an
+   * agent resumed since — so a pin dismissed after one run comes back when the agent is resumed.
+   */
+  dismissKey: string;
+  provider?: SubagentMarkProvider;
   latest: string;
   summary: SubagentSummary;
 };
@@ -120,9 +129,16 @@ export function usePinnedSubagentRows(
 
   const agentEntries: PinnedSubagentRow[] = messages
     .filter((message) => message.isSubagentContainer)
+    // A launch the harness refused before any agent existed (a hook denial or an operator
+    // rejection, with no agent metadata) never worked for this conversation and is not pinned;
+    // the transcript's own tool row shows the refusal. An agent that ran and then errored keeps
+    // its row.
+    .filter((message) => !(isRefusedLaunch(message.toolResult) && !message.subagent))
     .map((message): AgentEntry => {
       const id = String(message.toolId ?? '');
-      const startedAtMs = new Date(message.timestamp).getTime();
+      // A resumed agent started again when its resume landed: the four-hour belief window and the
+      // running sort run from there, not from a launch that may be hours old.
+      const startedAtMs = new Date(message.subagent?.resume?.at ?? message.timestamp).getTime();
       const summary = readSubagentSummary({
         toolInput: message.toolInput,
         toolResult: message.toolResult,
@@ -139,11 +155,13 @@ export function usePinnedSubagentRows(
         endedAtMs: summary.finishedAt ? new Date(summary.finishedAt).getTime() : startedAtMs,
         running: summary.status === 'running',
         id,
+        dismissKey: message.subagent?.resume ? `${id}@${message.subagent.resume.toolUseId}` : id,
+        provider: subagentMarkProvider(message.subagentProvider, message.subagentModel),
         latest: describeLatestActivity(message.subagentActivity),
         summary,
       };
     })
-    .filter((entry) => !dismissed.has(entry.id))
+    .filter((entry) => !dismissed.has(entry.dismissKey))
     .filter((entry) => {
       if (entry.running) {
         return !Number.isFinite(entry.startedAtMs) || now - entry.startedAtMs < RUNNING_BELIEVED_FOR_MS;
@@ -201,5 +219,19 @@ export function usePinnedSubagentRows(
     return () => window.clearTimeout(timer);
   }, [msUntilExpiry]);
 
-  return { rows, dismiss: dismissPin };
+  // The rows hand back the id they were drawn with; the dismissal is filed under the row's key.
+  // Read through a ref so `dismiss` keeps one identity and the memoized rows stay memoized.
+  const dismissKeyByIdRef = useRef(new Map<string, string>());
+  const dismissKeys = agentEntries.map((entry) => (entry.kind === 'agent' ? `${entry.id}\u0000${entry.dismissKey}` : '')).join('\u0001');
+  // Layout effect: filled before paint, so no click can reach `dismiss` ahead of it.
+  useLayoutEffect(() => {
+    dismissKeyByIdRef.current = new Map(
+      dismissKeys.split('\u0001').filter(Boolean).map((pair) => pair.split('\u0000') as [string, string]),
+    );
+  }, [dismissKeys]);
+  const dismiss = useCallback((id: string) => {
+    dismissPin(dismissKeyByIdRef.current.get(id) ?? id);
+  }, []);
+
+  return { rows, dismiss };
 }

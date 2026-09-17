@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 
+import { OWNS_ESCAPE } from '@/shared/ui/overlayEscape';
 import { cn } from '@/shared/utils';
 
 type MenuItem = {
@@ -81,6 +82,8 @@ export function Menu({ trigger, items, onSelect, width, align = 'left' }: MenuPr
         <ul
           className={cn('vv-menu__panel', `vv-menu__panel--${align}`)}
           role="menu"
+          // The panel owns Escape while it is up — see `shared/ui/overlayEscape`.
+          {...OWNS_ESCAPE}
           // `minWidth` travels with `width`, or the prop does nothing below 200px: feedback.css
           // gives the panel a 200px floor for the callers that pass no width, and a floor beats
           // an inline width. A prop ignored across a third of its range is worse than no prop

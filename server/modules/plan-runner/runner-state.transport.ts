@@ -289,7 +289,7 @@ export function readRunFiles(dir: string): RunnerRunFiles {
  *
  * The lock is the honest beat: a daemon thread rewrites `heartbeat_at` every 30 s for as long as
  * it lives (`state_lock.py:239-250`, `HEARTBEAT_S = 30`), independently of what any phase is
- * doing. `follow` reads liveness the same way (`cmd/observe.py:140-141`).
+ * doing. `plan-runner status` reads liveness the same way (`cmd/observe.py`, `_liveness`).
  *
  * RESIDUE, named: that independence cuts both ways. The beat thread survives a run that is alive
  * but WEDGED — a phase blocked forever on a subprocess that never returns keeps its lock beaten

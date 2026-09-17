@@ -1,16 +1,16 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import type { TFunction } from 'i18next';
 
 import { api } from '@/shared/api';
-import { Button, EmptyState, Select } from '@/shared/ui';
-import { useBusySessionIdSet } from '@/shared/context/SessionProtectionContext';
-import { useSimpleChatListPreferences } from '@/shared/hooks/useSimpleChatListPreferences';
+import { Button, EmptyState } from '@/shared/ui';
+import { useAwaitingInputSessionIdSet, useBusySessionIdSet } from '@/shared/context/SessionProtectionContext';
 import type { Project, ProjectSession, RecentConversationListItem, SessionWithProvider } from '@/shared/types';
-import { useCompactSidebar } from '@/modules/sidebar/hooks/useCompactSidebar';
 import { useSimpleChatList } from '@/modules/sidebar/hooks/useSimpleChatList';
+import { useSimpleChatProject } from '@/modules/sidebar/hooks/useSimpleChatProject';
 import { useSimpleChatRemove } from '@/modules/sidebar/hooks/useSimpleChatRemove';
 import { useSimpleChatReorder } from '@/modules/sidebar/hooks/useSimpleChatReorder';
 import SidebarSimpleListRow from '@/modules/sidebar/SidebarSimpleListRow';
+import SidebarNewChatButton from '@/modules/sidebar/SidebarNewChatButton';
 import SidebarSimpleDeleteDialog from '@/modules/sidebar/SidebarSimpleDeleteDialog';
 import SidebarSimpleStopDialog from '@/modules/sidebar/SidebarSimpleStopDialog';
 import SidebarSimpleIconPicker from '@/modules/sidebar/SidebarSimpleIconPicker';
@@ -38,8 +38,9 @@ type SidebarSimpleListProps = {
 
 /**
  * Rendered by Sidebar (not SidebarContent) in place of the project tree when the "Simple chat
- * list" preference is on: one project picker, a New chat button, and a flat, server-tagged feed
- * of chats started from this view. Composes `useSimpleChatList` (the feed) and
+ * list" preference is on: a flat, server-tagged feed of chats started from this view, ending in a
+ * New chat row (`SidebarNewChatButton`). The project a new chat starts in is picked on the new-chat
+ * screen. Composes `useSimpleChatList` (the feed) and
  * `useSimpleChatRemove` (idle-archive / stop-then-archive) so this file stays presentational.
  */
 export default function SidebarSimpleList({
@@ -53,10 +54,8 @@ export default function SidebarSimpleList({
   onRenameSession,
   t,
 }: SidebarSimpleListProps) {
-  const { projectId: preferredProjectId, setProjectId } = useSimpleChatListPreferences();
   const busySessionIds = useBusySessionIdSet();
-  // Gate 9's 44px floor is compact-only: desktop keeps the New chat button's stock h-9.
-  const isCompact = useCompactSidebar();
+  const awaitingInputSessionIds = useAwaitingInputSessionIdSet();
 
   const { rows, hasMore, isLoading, hasError, reload, loadMore, patchLocal, removeLocal, moveLocal } =
     useSimpleChatList(selectedSession?.id ?? null);
@@ -77,16 +76,7 @@ export default function SidebarSimpleList({
     cancelDelete,
   } = useSimpleChatRemove({ onArchived: handleArchived });
 
-  // The dropdown's options, sorted by the label a person reads — same order the row's own
-  // project label uses.
-  const projectOptions = useMemo(
-    () => [...projects]
-      .sort((a, b) => a.displayName.localeCompare(b.displayName))
-      .map((project) => ({ value: project.projectId, label: project.displayName })),
-    [projects],
-  );
-
-  const effectiveProject = projects.find((project) => project.projectId === preferredProjectId) ?? projects[0] ?? null;
+  const effectiveProject = useSimpleChatProject(projects);
 
   // Deliberately the ids, not the objects: a new selectedSession/selectedProject/effectiveProject
   // reference with the SAME id must not re-arm the effect below, or a parent re-render (not a
@@ -95,7 +85,7 @@ export default function SidebarSimpleList({
   const selectedSessionId = selectedSession?.id ?? null;
   const selectedProjectId = selectedProject?.projectId ?? null;
 
-  // Keeps Files/Git/Shell pointed at the dropdown's project whenever no chat is open. Fires at
+  // Keeps Files/Git/Shell pointed at the saved project whenever no chat is open. Fires at
   // most once per transition to "no chat open": the moment it runs, selectedProject catches up
   // to effectiveProject and the guard below stops matching, so it never loops and never fires
   // while a chat IS open (the first guard). The deps array intentionally tracks ids rather than
@@ -133,10 +123,6 @@ export default function SidebarSimpleList({
       onSessionSelect(session, row.projectId ?? '');
     }
   }, [projects, onProjectSelect, onSessionSelect]);
-
-  const handleNewChat = useCallback(() => {
-    if (effectiveProject) onNewSession(effectiveProject);
-  }, [effectiveProject, onNewSession]);
 
   const handleRename = useCallback(async (sessionId: string, title: string) => {
     await onRenameSession(sessionId, title);
@@ -182,28 +168,6 @@ export default function SidebarSimpleList({
 
   return (
     <div data-testid="simple-chat-list" className="flex flex-col gap-2 px-2 py-2">
-      <div className="flex items-center gap-2">
-        <div data-testid="simple-chat-project" className="min-w-0 flex-1">
-          <Select
-            ariaLabel={t('simpleList.project')}
-            options={projectOptions}
-            value={effectiveProject?.projectId ?? ''}
-            onChange={setProjectId}
-            placeholder={t('simpleList.project')}
-            size="sm"
-          />
-        </div>
-        <Button
-          data-testid="simple-chat-new"
-          size="sm"
-          className={isCompact ? 'min-h-11' : undefined}
-          onClick={handleNewChat}
-          disabled={!effectiveProject}
-        >
-          {t('simpleList.newChat')}
-        </Button>
-      </div>
-
       {hasError && rows.length === 0 ? (
         <div className="px-2 py-6 text-center text-sm text-muted-foreground">
           {t('recent.loadFailed', 'Could not load recent conversations')}
@@ -212,8 +176,11 @@ export default function SidebarSimpleList({
           </Button>
         </div>
       ) : !isLoading && rows.length === 0 ? (
-        <div data-testid="simple-chat-empty">
-          <EmptyState title={t('simpleList.empty')} />
+        <div className="flex flex-col gap-1">
+          <div data-testid="simple-chat-empty">
+            <EmptyState title={t('simpleList.empty')} />
+          </div>
+          <SidebarNewChatButton project={effectiveProject} onNewSession={onNewSession} t={t} />
         </div>
       ) : (
         <div
@@ -227,6 +194,7 @@ export default function SidebarSimpleList({
               row={row}
               isSelected={selectedSession?.id === row.sessionId}
               isRunning={busySessionIds.has(row.sessionId)}
+              isAwaitingInput={awaitingInputSessionIds.has(row.sessionId)}
               isRemoveFailed={failedSessionId === row.sessionId}
               onSelect={() => handleRowSelect(row)}
               onArchive={() => remove(row, 'archive')}
@@ -239,6 +207,7 @@ export default function SidebarSimpleList({
               t={t}
             />
           ))}
+          <SidebarNewChatButton project={effectiveProject} onNewSession={onNewSession} t={t} />
           {hasMore && (
             <Button
               data-testid="simple-chat-load-more"

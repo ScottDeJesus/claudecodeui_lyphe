@@ -299,7 +299,7 @@ flowchart TD
   false. The 2500 ms hide timer in the hook is matched by the overlay's own
   `loadAllOverlayAutoFade 2500ms` animation in `LoadAllMessagesOverlay.tsx`, so the pill
   fades out exactly as the state clears.
-- **Paging is bounded by distance, not by a latch.** With "Show work" off a page can add
+- **Paging is bounded by distance, not by a latch.** With "Show work" (or another transcript switch) off a page can add
   almost nothing on screen, so a latch that waits for the reader to move away from the top
   would strand them there. The run only happens within a screen of the top, each prepend
   moves `scrollTop` down by what it added, and a page that brings nothing back ends it. A
@@ -394,7 +394,7 @@ bottom rather than placeholder estimates.
 The loop declines entirely if `searchScrollActiveRef` is set — a session opened from a
 search hit is not supposed to land at the bottom.
 
-**Filling a short screen.** A 20-row page with "Show work" or thinking off can leave one
+**Filling a short screen.** A 20-row page with "Show work", thinking or the compaction summary off can leave one
 reply and nothing to scroll, so `fillViewportWithHistory` (asked by `ChatMessagesPane` after
 every commit; see [the message store](./04-message-store-and-lazy-loading.md)) loads older
 history until the transcript overflows by 200 px. While the reader has not scrolled up it

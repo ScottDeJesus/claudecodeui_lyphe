@@ -20,6 +20,7 @@ import type { CommandModalPayload, CostCommandData, HelpCommandData, MarkSession
 import { grantClaudeToolPermission } from '@/modules/chat/utils/chatPermissions';
 import {
   clearQueuedMessage,
+  createQueuedMessageId,
   hydrateChatDrafts,
   readDraftText,
   readQueuedMessage,
@@ -130,6 +131,7 @@ const restoreQueuedDraft = (sessionKey: string): QueuedDraft | null => {
   const saved = readQueuedMessage(sessionKey);
   return saved
     ? {
+        id: saved.id,
         content: saved.content,
         attachments: [],
         uploadedAttachments: saved.attachments ?? saved.images,
@@ -665,7 +667,7 @@ export function useChatComposerState({
         // its files again.
         if (queuedSubmission) {
           queuedDraftSessionRef.current = sessionKey;
-          setQueuedDraft(queuedSubmission);
+          setQueuedDraft({ ...queuedSubmission, id: queuedSubmission.id ?? createQueuedMessageId() });
           return;
         }
 
@@ -686,6 +688,7 @@ export function useChatComposerState({
         }
 
         const durableDraft: QueuedDraft = {
+          id: createQueuedMessageId(),
           content: currentInput,
           attachments: currentAttachments,
           uploadedAttachments,
@@ -695,6 +698,7 @@ export function useChatComposerState({
           // Write the claim ticket synchronously after upload; this closes the
           // gap before React's persistence effect runs.
           writeQueuedMessage(queuedSessionKey, {
+            id: durableDraft.id,
             content: durableDraft.content,
             options: durableDraft.options,
             attachments: durableDraft.uploadedAttachments,
@@ -1030,6 +1034,7 @@ export function useChatComposerState({
       && (queuedDraft.content.trim() || (queuedDraft.uploadedAttachments?.length ?? 0) > 0)
     ) {
       writeQueuedMessage(sessionKey, {
+        id: queuedDraft.id,
         content: queuedDraft.content,
         options: queuedDraft.options,
         attachments: queuedDraft.uploadedAttachments,

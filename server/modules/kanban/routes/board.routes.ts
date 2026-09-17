@@ -59,8 +59,8 @@ function parseEventLimit(value: unknown): number {
 }
 
 /**
- * The board routes: the board list, its create, update and select, its per-status counts, the
- * lookup that resolves a project to its board, and the board's audit log.
+ * The board routes: the board list, its create, update and select, its per-status counts, its
+ * claimable count, the lookup that resolves a project to its board, and the board's audit log.
  *
  * Auth is the mount's (`authenticateToken` in `server/index.ts`): no file here imports the guard,
  * and no route reads an actor off the request — the write verbs take the optional trailing context
@@ -103,7 +103,13 @@ export function createBoardRoutes(dependencies: BoardRouteDependencies): Router 
     '/boards/:boardId',
     handle<{ boardId: string }>((request, response) => {
       const body = (request.body ?? {}) as Record<string, unknown>;
-      const patch: { name?: string; autonomy?: boolean; projectId?: string | null; archived?: boolean } = {};
+      const patch: {
+        name?: string;
+        autonomy?: boolean;
+        deepseekFlash?: boolean;
+        projectId?: string | null;
+        archived?: boolean;
+      } = {};
 
       if (body.name !== undefined) {
         if (typeof body.name !== 'string') {
@@ -118,6 +124,15 @@ export function createBoardRoutes(dependencies: BoardRouteDependencies): Router 
           return;
         }
         patch.autonomy = body.autonomy;
+      }
+      if (body.deepseekFlash !== undefined) {
+        // `true`/`false` and nothing else. A `"yes"` coerced here would be a board whose model the
+        // server guessed at, and the spawn reads this field to decide what the child runs on.
+        if (typeof body.deepseekFlash !== 'boolean') {
+          response.status(400).json({ error: 'deepseekFlash must be a boolean' });
+          return;
+        }
+        patch.deepseekFlash = body.deepseekFlash;
       }
       if (body.projectId !== undefined) {
         if (typeof body.projectId !== 'string' && body.projectId !== null) {
@@ -149,6 +164,15 @@ export function createBoardRoutes(dependencies: BoardRouteDependencies): Router 
     '/boards/:boardId/lanes',
     handle<{ boardId: string }>((request, response) => {
       response.json({ lanes: boards.laneCounts(request.params.boardId) });
+    })
+  );
+
+  router.get(
+    '/boards/:boardId/claimable',
+    handle<{ boardId: string }>((request, response) => {
+      // A count, never the cards: the driver needs the green light, and the child re-reads the
+      // lane itself through the board's own verbs once it wakes.
+      response.json({ claimable: boards.claimableCount(request.params.boardId) });
     })
   );
 

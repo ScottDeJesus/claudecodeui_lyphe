@@ -17,6 +17,12 @@ export type WorkspaceTabGates = {
   shouldShowRunnerTab: boolean;
   /** How many runs the lane is carrying, for the tab's count pill. Paused runs are counted: they are still runs. */
   runnerCount: number;
+  /**
+   * Always true. The Universe tab is GLOBAL — not per project or per session, exactly as the
+   * kanban board is — so it is here whatever the workspace is pointed at and nothing can take it
+   * off the bar. The gate exists only so the strip, the palette and the pane read the same shape.
+   */
+  shouldShowUniverseTab: boolean;
   /** True once the UI preference store has answered — the snap-back effects wait on it. */
   preferencesSettled: boolean;
 };
@@ -66,6 +72,8 @@ export function useWorkspaceTabGates(activeTab: AppTab): WorkspaceTabGates {
     memoryPendingCount: pendingCount,
     shouldShowRunnerTab: runnerCount > 0 || activeTab === 'runner',
     runnerCount,
+    // The literal true, never a reading: the Universe tab is global, the way the kanban board is.
+    shouldShowUniverseTab: true,
     preferencesSettled,
   };
 }

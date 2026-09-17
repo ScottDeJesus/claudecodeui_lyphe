@@ -7,6 +7,7 @@ import { rgPath } from '@vscode/ripgrep';
 
 import { projectsDb, sessionsDb } from '@/modules/database/index.js';
 import { localCommandDisplayText, type LocalCommandPayload } from '@/shared/local-commands.js';
+import { isHiddenProjectPath } from '@/shared/hidden-project-paths.js';
 
 type AnyRecord = Record<string, any>;
 type SearchableProvider = 'claude' | 'codex';
@@ -201,7 +202,7 @@ function findSessionTitleResults(
       }
 
       const project = projectCache.get(projectKey) ?? null;
-      if (project?.isArchived) {
+      if (project?.isArchived || isHiddenProjectPath(projectPath)) {
         return [];
       }
 
@@ -548,6 +549,10 @@ function normalizeSearchableSessions(rows: SessionRepositoryRow[]): SearchableSe
      * does not re-query the same project row for every session in that folder.
      */
     const normalizedProjectPath = typeof row.project_path === 'string' ? row.project_path.trim() : '';
+    // A scratch folder's chats are never searched: its folder is hidden everywhere else.
+    if (isHiddenProjectPath(normalizedProjectPath)) {
+      continue;
+    }
     if (normalizedProjectPath) {
       if (!projectArchiveStateByPath.has(normalizedProjectPath)) {
         const projectRow = projectsDb.getProjectPath(normalizedProjectPath);

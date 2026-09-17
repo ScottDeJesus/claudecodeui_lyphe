@@ -10,19 +10,28 @@
  * the clearest use for it. The two-module rule is a bar for admission, not a
  * trigger for eviction.
  *
- * PromptInput, Reasoning, Queue and Confirmation did move out, on a different
+ * PromptInput, Queue and Confirmation did move out, on a different
  * test: they are not primitives at all but chat-domain compositions — the
- * composer form, the assistant-reasoning disclosure, the tool todo list and the
+ * composer form, the tool todo list and the
  * inline tool-permission request — with chat vocabulary in their prop names and
  * no plausible second consumer. Alert went with Confirmation, which was its only
  * importer and the reason it existed.
+ *
+ * DockableFab and SplitPane came in with one consumer, the application switcher, on
+ * the doctrine's other test: they are mechanism — pointer capture, a viewport clamp,
+ * a dock hit-test, a clamped divider — which no arrangement of the parts here can
+ * produce, so every screen that wants either composes it rather than rebuilding it.
  */
 
 // The library's paint, imported once for its side effect so that every consumer of this
 // barrel gets it — and only here, because `verve/` holds stylesheets and no module of its
-// own. tokens.css (the colours these rules read) is loaded earlier, by src/main.tsx.
+// own. tokens.css (the colours these rules read) is imported by src/main.tsx, but AFTER App, so it
+// lands LATER in the cascade than every file below and wins any equal-specificity tie with them.
 import '@/shared/ui/verve/controls.css';
 import '@/shared/ui/verve/feedback.css';
+// The FAB and split-pane paint shares no selector with the files either side of it, so its only
+// constraint is the next line's: board.css stays last.
+import '@/shared/ui/verve/surfaces.css';
 // The board layer goes LAST on purpose, and the order is load-bearing: a lane card composes
 // `.vv-card`'s ground and then overrides its background, shadow and transition. Imported first,
 // `.vv-card` won every one of those at equal specificity and a selected card lost its wash.
@@ -41,6 +50,8 @@ export { Command, CommandInput, CommandList, CommandEmpty, CommandGroup, Command
 export { DarkModeToggle } from '@/shared/ui/DarkModeToggle';
 export { default as DeepSeekLogo } from '@/shared/ui/DeepSeekLogo';
 export { Dialog, DialogTrigger, DialogContent, DialogTitle } from '@/shared/ui/Dialog';
+export { DockableFab } from '@/shared/ui/DockableFab';
+export type { DockableFabPosition } from '@/shared/ui/DockableFab';
 export { EmptyState } from '@/shared/ui/EmptyState';
 export { Field } from '@/shared/ui/Field';
 export { Input } from '@/shared/ui/Input';
@@ -55,6 +66,7 @@ export { ScrollArea } from '@/shared/ui/ScrollArea';
 export { Select } from '@/shared/ui/Select';
 export { Shimmer } from '@/shared/ui/Shimmer';
 export { Spinner } from '@/shared/ui/Spinner';
+export { SplitPane, SPLIT_MIN_RATIO, SPLIT_MAX_RATIO } from '@/shared/ui/SplitPane';
 export { Stepper } from '@/shared/ui/Stepper';
 export { Switch } from '@/shared/ui/Switch';
 export { Tabs } from '@/shared/ui/Tabs';

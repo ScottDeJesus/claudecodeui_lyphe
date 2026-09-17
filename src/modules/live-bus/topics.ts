@@ -26,6 +26,14 @@ export const LIVE_TOPIC_ALLOWLIST: readonly RegExp[] = [
   // reader is the pin above the composer, which wants the whole picture, and a topic nothing
   // subscribes to is a topic with no way to tell it has gone stale.
   /^souls:\*$/,
+  // The estate's activity as one DIGEST — how many edits and executions the last window carried and
+  // when the newest one landed. A digest and never the raw rows: the estate's stream is coalesced
+  // and flushed up to ten times a second, and this bus retains one value per topic and compares
+  // every publish by `JSON.stringify` (`LiveBusContext`), so a lane carrying raw rows would
+  // stringify the whole payload ten times a second for as long as the estate is busy, whether or
+  // not anything is listening. No per-repo topic for the same reason `souls:*` has no per-launch
+  // one: nothing subscribes to one.
+  /^universe:\*$/,
 ];
 
 /** Whether a topic may be published or subscribed. A non-string is refused before any pattern runs. */
@@ -39,6 +47,13 @@ export const RUNNER_ALL_TOPIC = 'runner:*';
 
 /** The topic carrying every launcher soul the lane can see, running and recently ended alike. */
 export const SOULS_ALL_TOPIC = 'souls:*';
+
+/**
+ * The topic carrying the estate's activity digest — how many edits and executions the last window
+ * held, never the rows themselves. Published by `UniverseFeed`, read by whatever wants to watch the
+ * estate without opening its tab.
+ */
+export const UNIVERSE_ALL_TOPIC = 'universe:*';
 
 /**
  * The topic for one run. Deliberately NOT validating the id: an id that fails the allowlist

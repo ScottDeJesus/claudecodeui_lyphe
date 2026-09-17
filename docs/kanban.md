@@ -1,7 +1,7 @@
 # The Kanban board
 
-Thirty-two routes under `/api/kanban`, behind `authenticateToken` on the MOUNT
-(`server/index.ts:191` — no route file imports the guard), wired in `kanban.module.ts`, plus one
+Thirty-three routes under `/api/kanban`, behind `authenticateToken` on the MOUNT
+(`server/index.ts:194` — no route file imports the guard), wired in `kanban.module.ts`, plus one
 websocket frame — `kind: 'kanban_event'` — sent to every open `/ws` socket on every write and
 never on a read.
 
@@ -39,7 +39,7 @@ later change needs an explicit `ALTER TABLE` in `migrations.ts` beside the `sess
 
 | Table | What it holds |
 |---|---|
-| `kanban_boards` | A board: its name, the project it is ABOUT (`project_id`, a label and never a filter), `autonomy`, `sort_order`, `archived`, `descent_id`. |
+| `kanban_boards` | A board: its name, the project it is ABOUT (`project_id`, a label and never a filter), `autonomy`, `deepseek_flash`, `sort_order`, `archived`, `descent_id`. |
 | `kanban_cards` | The card, every column of Descent's `ov_features` including the ones its own `_migrate` adds: title, `status` with a five-value CHECK, `priority` with a three-value CHECK, description, `closing_remarks`, `plan`, `body`, approval, `archived`, `sort_order`, the four token counters, both leases (`build_lease_at`/`build_owner`, `plan_lease_at`/`plan_owner`), and the timestamps. |
 | `kanban_card_tags` | The card/tag join. Descent's `ov_tags` IS a join table, so there is no tag entity here either: `(card_id, tag)` is the primary key and a tag exists only as a name attached to a card. |
 | `kanban_questions` | A card's questions: `text`, `multi`, `options` and `selected` as JSON text arrays, the free-text `other`, and `answered`. |
@@ -100,8 +100,9 @@ names is deleted, and the same clause that unlabels a board when its project goe
   never learns that a board has lanes.
 - **A lease is claimable when it is unclaimed, already the caller's, or STALE** — stale meaning the
   stamp is null, unparseable, or older than `KANBAN_LEASE_STALE_SECONDS` (**40**, Descent's own
-  `DEFAULT_STALE_SECS`, written once in `server/shared/kanban-types.ts` and imported by both
-  consumers). A claim against a fresh foreign lease returns `{ granted: false }` with the current
+  `DEFAULT_STALE_SECS`, written once in `server/shared/kanban-types.ts` and imported by every
+  consumer — the lease verbs, the card summaries, and `claimableCount` (§"The services")). A claim
+  against a fresh foreign lease returns `{ granted: false }` with the current
   card — the ordinary answer, never an exception, and never an event: a refused claim writes
   nothing. Moving a card off `active` clears the build lease. The `leaseState` a `KanbanCardSummary`
   carries (`'none' | 'held' | 'stale'`) is computed SERVER-side by the one row-to-summary mapper;
@@ -160,15 +161,21 @@ concept from an event actor, and both ride on the summary.
 createBoard(input: { name, projectId? }, context?) -> KanbanBoard
 listBoards(options?: { includeArchived? }) -> { boards, currentBoardId }
 getBoard(boardId) -> KanbanBoard | null
-updateBoard(boardId, patch: { name?, autonomy?, projectId?, archived? }, context?) -> KanbanBoard
+updateBoard(boardId, patch: { name?, autonomy?, deepseekFlash?, projectId?, archived? }, context?) -> KanbanBoard
 selectBoard(boardId, context?) -> { currentBoardId }
 boardForProject(projectId) -> KanbanBoard | null
 laneCounts(boardId) -> KanbanLaneCount[]
+claimableCount(boardId) -> number
 listEvents(options: { boardId?, cardId?, limit? }) -> KanbanEventRow[]
 ```
 
 `selectBoard` is a write to `kanban_settings.current_board` and takes the seam like any other.
-`laneCounts` and `listEvents` are the only two reads the whole module exposes at board level.
+`laneCounts`, `claimableCount` and `listEvents` are the only three reads the whole module exposes
+at board level. `claimableCount` counts a board's live `todo` cards plus its `active` cards on a
+stale build lease (the same staleness `KANBAN_LEASE_STALE_SECONDS` defines above) — the green
+light an autonomous session reads before it spawns, over `GET /boards/:boardId/claimable`
+(§"The routes"). Nothing in this module spawns that session or reads `deepseekFlash`; both are
+scaffolding for a driver that launches FROM the board and is not built in this module.
 
 `kanban-cards.service.ts`
 
@@ -232,7 +239,7 @@ Descent".
 
 ## The routes
 
-`server/modules/kanban/routes/` is a PACKAGE, not one file: `board.routes.ts` (7 routes),
+`server/modules/kanban/routes/` is a PACKAGE, not one file: `board.routes.ts` (8 routes),
 `card.routes.ts` (9), `detail.routes.ts` (15) and `import.routes.ts` (1), each exporting a
 `create<X>Routes(services): Router` factory; and `kanban.routes.ts`, the FACTORY that builds one
 `express.Router()` and `use`s the four onto it. The package is INTERNAL — nothing outside
@@ -242,9 +249,10 @@ constructor, never a route.
 ```
 GET    /api/kanban/boards                       -> { boards, currentBoardId }
 POST   /api/kanban/boards                       { name, projectId? }   -> { board }
-PATCH  /api/kanban/boards/:boardId              { name?, autonomy?, projectId?, archived? } -> { board }
+PATCH  /api/kanban/boards/:boardId              { name?, autonomy?, deepseekFlash?, projectId?, archived? } -> { board }
 POST   /api/kanban/boards/:boardId/select                              -> { currentBoardId }
 GET    /api/kanban/boards/:boardId/lanes                               -> { lanes }
+GET    /api/kanban/boards/:boardId/claimable                           -> { claimable }
 GET    /api/kanban/projects/:projectId/board                           -> { board }
 GET    /api/kanban/events?boardId=&cardId=&limit=                      -> { events }
 GET    /api/kanban/boards/:boardId/cards?status=todo,questions&limit=&cursor= -> { cards, nextCursor }
@@ -321,13 +329,14 @@ The client subscribes with `useWebSocket()` from `@/shared/context/WebSocketCont
 returns its own unsubscribe closure and hands each listener the loose `ServerEvent`, so the lanes
 hook filters on `event.kind === 'kanban_event'` itself and ignores every other frame. **The board
 does not use the live-bus**: that bus retains a value for components mounted elsewhere and admits
-only `runner:*` and `souls:*` topics; this panel is its own only consumer and exists only while its
+only the run, soul and universe lanes; this panel is its own only consumer and exists only while its
 tab is active.
 
 ## The panel
 
 `src/modules/kanban/` composes the tab's pane, its header, its import dialog, the card drawer under
-`card-drawer/`, five hooks, and four module-private utilities under `utils/`. The barrel exports
+`card-drawer/`, six hooks — `useKanbanMetis` is the newest, reading the board's own Metis fleet —
+and four module-private utilities under `utils/`. The barrel exports
 `KanbanPanel` and nothing else — a second export is how a policy that must be decided in one place
 starts being read in two.
 
@@ -338,11 +347,13 @@ returns four lanes and To Do carries TWO statuses; with autonomy ON it returns f
 
 | autonomy off | statuses | autonomy on | statuses |
 |---|---|---|---|
+| Backlog | `not_ready` | Backlog | `not_ready` |
 | To Do | `todo`, `questions` | To Do | `todo` |
-| Backlog | `not_ready` | Open questions | `questions` |
-| In Progress | `active` | Backlog | `not_ready` |
+| In Progress | `active` | Open questions | `questions` |
 | Done | `done` | In Progress | `active` |
 | | | Done | `done` |
+
+Backlog is the leftmost lane: work enters at the left edge and flows right.
 
 **When autonomy is off, a card waiting on an answer shows in To Do.** Its status is never rewritten
 to make the board simpler and the card is never hidden — it sits in To Do wearing its own chip. The
@@ -362,6 +373,22 @@ early return is the whole mechanism, not a second render path), and in the drawe
 the checklist, the issues, the token ledger, the closing remarks and the approve control. Turning
 it off hides nothing on the server and skips no write: the same routes answer, the same rows are
 there, and switching it back on shows the same data.
+
+**A second board column, `deepseekFlash`, round-trips beside `autonomy`.** It reached
+`kanban_boards` in the same phase as `claimableCount` (§"The services") — the board's own
+DeepSeek Flash switch, mirroring the host-wide flag file the plan runner polls
+([plan-runner.md](plan-runner.md) §"The DeepSeek switch") but scoped to one board. The header row
+now draws it too, beside Autonomy: a second `Switch` wearing the DeepSeek mark
+(`LLMProviderLogo`) rather than a colour of its own, with a `Tooltip` naming what the switch
+moves. That composition is now WIRED, not a scaffold: `useKanbanBoards` reads `deepseekFlash`
+off the current board the same way it reads `autonomy` (`?? false`, so a board that is gone or a
+server too old to answer with the field reads as off), and `KanbanBoardHeader`'s two FILL markers
+are gone — `checked` takes that value and `onChange` calls `onToggleDeepseekFlash`, which
+`KanbanPanel` guards on `currentBoardId` before sending `updateBoard(currentBoardId,
+{ deepseekFlash: next })`, the same `PATCH` and the same post-write re-read `autonomy`'s own
+toggle takes. Nothing reads `deepseekFlash` for a decision yet even so: it is for a driver that
+will spawn sessions FROM the board and read it at spawn time — not built in this module, and this
+doc says nothing about that driver until it lands.
 
 **Boards are GLOBAL, not per project.** The selected board is the single `kanban_settings` row
 `current_board`, so switching projects does NOT change the selected board, and no board is

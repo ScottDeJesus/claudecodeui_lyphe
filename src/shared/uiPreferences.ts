@@ -17,6 +17,11 @@ export type UiPreferences = {
    * A row that needs the person (a question, a plan, a permission prompt) shows regardless.
    */
   showWork: boolean;
+  /**
+   * Draws the summary Claude writes after a compaction. Off leaves only the `/compact` command and
+   * its "Compacted" line in the transcript; the summary stays in the session either way.
+   */
+  showCompactSummary: boolean;
   showThinking: boolean;
   sendByCtrlEnter: boolean;
   sidebarVisible: boolean;
@@ -38,6 +43,7 @@ export type UiPreferencesAction =
 const DEFAULTS: UiPreferences = {
   showRawParameters: false,
   showWork: false,
+  showCompactSummary: true,
   showThinking: true,
   sendByCtrlEnter: false,
   sidebarVisible: true,

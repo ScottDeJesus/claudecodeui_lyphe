@@ -9,7 +9,7 @@ import { cn } from '@/shared/utils';
  * (Phase 5); the git panel's two tabs pass none.
  *
  * A tab with an `icon` draws the glyph ALONE and keeps `label` as its accessible name and
- * hover title — the workspace strip's built-in tabs, where seven words never fit a 288px
+ * hover title — the workspace strip's built-in tabs, where seven words never fit a 328px
  * sidebar without a scroller. A tab without one draws its label, unchanged.
  */
 type TabItem = {

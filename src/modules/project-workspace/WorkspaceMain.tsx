@@ -13,7 +13,8 @@ import { KanbanPanel } from '@/modules/kanban';
 import { MemoryIntakePanel } from '@/modules/memory-intake';
 import { RunnerPanel } from '@/modules/plan-runner';
 import { TaskMasterPanel, useTaskMasterProjectSync } from '@/modules/task-master';
-import type { AppTab, GitRepository, Project, ProjectSession, SessionEstablishedContext, SessionNavigationOptions, SettingsMainTab } from '@/shared/types';
+import { UniversePanel } from '@/modules/universe';
+import type { AppTab, GitRepository, Project, ProjectChoice, ProjectSession, SessionEstablishedContext, SessionNavigationOptions, SettingsMainTab } from '@/shared/types';
 import { api } from '@/shared/api';
 import { useUiPreferences } from '@/shared/context/UiPreferencesContext';
 import { useFileOpenResolver } from '@/modules/project-workspace/hooks/useFileOpenResolver';
@@ -25,6 +26,9 @@ import WorkspaceErrorBoundary from '@/modules/project-workspace/WorkspaceErrorBo
 type WorkspaceMainProps = {
   /** The git tab's repositories, in strip order — memoised upstream, so its identity is stable. */
   gitRepositories: GitRepository[];
+  /** The projects a new chat can start in, and how to switch to one. */
+  projectChoices: ProjectChoice[];
+  onSelectProject: (projectId: string) => void;
   selectedProject: Project | null;
   selectedSession: ProjectSession | null;
   activeTab: AppTab;
@@ -71,6 +75,8 @@ async function readCapped(response: Response, cap: number): Promise<Blob | null>
 /** Rendered by ProjectMainRegion to show the selected project's active tab: chat, files, shell, git, tasks, browser or a plugin. */
 function WorkspaceMain({
   gitRepositories,
+  projectChoices,
+  onSelectProject,
   selectedProject,
   selectedSession,
   activeTab,
@@ -88,7 +94,7 @@ function WorkspaceMain({
 }: WorkspaceMainProps) {
   const { t } = useTranslation();
   const preferences = useUiPreferences();
-  const { showRawParameters, showThinking, showWork, sendByCtrlEnter } = preferences;
+  const { showRawParameters, showThinking, showWork, showCompactSummary, sendByCtrlEnter } = preferences;
 
   // The same reading the sidebar's tab strip takes — one hook, so the strip and these panes can
   // never disagree about which tabs exist.
@@ -329,6 +335,9 @@ function WorkspaceMain({
                 showRawParameters={showRawParameters}
                 showThinking={showThinking}
                 showWork={showWork}
+                showCompactSummary={showCompactSummary}
+                projectChoices={projectChoices}
+                onSelectProject={onSelectProject}
                 sendByCtrlEnter={sendByCtrlEnter}
                 externalMessageUpdate={externalMessageUpdate}
                 newSessionTrigger={newSessionTrigger}
@@ -399,6 +408,14 @@ function WorkspaceMain({
         {activeTab === 'kanban' && (
           <div className="h-full overflow-hidden">
             <KanbanPanel projectId={selectedProject.projectId} />
+          </div>
+        )}
+
+        {/* No gate either, for the same reason: the sky is global, not a view of the open project,
+            so nothing here unmounts or refetches when the selected project changes. */}
+        {activeTab === 'universe' && (
+          <div className="h-full overflow-hidden">
+            <UniversePanel />
           </div>
         )}
 

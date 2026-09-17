@@ -74,8 +74,11 @@
           "server/shared/message-unification.ts",
           "server/shared/local-commands.ts",
           "server/shared/child-env.ts",
+          "server/shared/hidden-project-paths.ts",
+          "server/shared/mcp-command.ts",
           "server/shared/polled-lane.service.ts",
-          "server/shared/kanban-types.ts"
+          "server/shared/kanban-types.ts",
+          "server/shared/app-types.ts"
         ],
         "mode": "file"
       },
@@ -104,7 +107,8 @@
           "src/shared/chatDrafts.ts",
           "src/shared/solarSchedule.ts",
           "src/shared/syntaxHighlighter.ts",
-          "src/shared/kanban-types.ts"
+          "src/shared/kanban-types.ts",
+          "src/shared/app-types.ts"
         ],
         "mode": "file"
       },
@@ -211,9 +215,7 @@
         "src/shared/context/**/*.ts",
         "src/shared/context/**/*.tsx",
         "src/shared/ui/**/*.ts",
-        "src/shared/ui/**/*.tsx",
-        "src/shared/tests/**/*.ts",
-        "src/shared/tests/**/*.tsx"
+        "src/shared/ui/**/*.tsx"
       ],
       "rules": {
         // --- TypeScript type hygiene (frontend modules) ---

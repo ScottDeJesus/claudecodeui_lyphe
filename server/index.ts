@@ -10,6 +10,7 @@ import express, { type NextFunction, type Request, type Response } from 'express
 import cors from 'cors';
 
 import { AppError, findApplicationRoot, getModuleDirectory, IS_PLATFORM, terminalTextStyles } from '@/shared/utils.js';
+import { createAppsModule } from '@/modules/apps/index.js';
 import {
     initializeSessionsWatcher,
     providerRuntimeService,
@@ -54,8 +55,10 @@ import { createCliVersionModule } from './modules/cli-version/index.js';
 import { createDeepseekModule } from './modules/deepseek/index.js';
 import { createDescentModule } from './modules/descent/index.js';
 import { createKanbanModule } from './modules/kanban/index.js';
+import { createKanbanMetisModule, kanbanMetisSecretGuard } from './modules/kanban-metis/index.js';
 import { createDispatchSoulsModule } from './modules/dispatch-souls/index.js';
 import { createPlanRunnerModule } from './modules/plan-runner/index.js';
+import { createUniverseModule } from './modules/universe/index.js';
 import { fileTreeRoutes } from './modules/file-tree/index.js';
 import { worktreesRoutes } from './modules/worktrees/index.js';
 import browserUseMcpRoutes from './modules/browser-use/browser-use-mcp.routes.js';
@@ -190,6 +193,19 @@ app.use('/api/descent', authenticateToken, createDescentModule());
 // the module imports `authenticateToken` and a sibling route package cannot forget it.
 app.use('/api/kanban', authenticateToken, createKanbanModule());
 
+// A board's own Metis: launching one by hand, watching her, stopping and resuming her (protected).
+app.use('/api/kanban-metis', authenticateToken, createKanbanMetisModule());
+
+// The SAME board router behind a second door, for the `kanban-pm` MCP child and nothing else —
+// no verb is duplicated here, and there is deliberately NO `authenticateToken`: a Metis is not a
+// user and holds no user token. `kanbanMetisSecretGuard` is that door's own credential check, on a
+// secret derived from the session id, and it refuses the descent importer outright.
+app.use('/api/kanban-pm', kanbanMetisSecretGuard, createKanbanModule());
+
+// The applications this host serves, and the registry file the switcher's drawer reads (protected).
+// The registry file is created at module creation, so it exists from the first boot.
+app.use('/api/apps', authenticateToken, createAppsModule());
+
 // Installed CLI version + what the live runs are on (protected)
 app.use('/api/cli-version', authenticateToken, createCliVersionModule());
 
@@ -208,6 +224,12 @@ app.use('/api/plan-runner', authenticateToken, planRunner.router);
 // reason `planRunner` is: its poll starts after `listen` and stops on shutdown.
 const dispatchSouls = createDispatchSoulsModule();
 app.use('/api/dispatch-souls', authenticateToken, dispatchSouls.router);
+
+// The estate map — every tracked file in the four crawled repos — and the watcher that rebuilds it
+// when a repo's HEAD moves (protected; the map is the estate, and this app is reachable from a LAN).
+// Built out here for the same reason again: its watcher starts after `listen` and stops on shutdown.
+const universe = createUniverseModule();
+app.use('/api/universe', authenticateToken, universe.router);
 
 app.use('/api/notifications', authenticateToken, notificationRoutes);
 app.use('/api/ntfy/act', createNtfyActionRoutes({ runtime: providerRuntimeService })); // Public: ntfy buttons authenticate by signed token, not JWT.
@@ -435,6 +457,9 @@ async function startServer() {
             // The launcher souls, read off their own state root and broadcast the same way.
             dispatchSouls.start();
 
+            // The estate's HEADs, watched so a commit is what announces the next map.
+            universe.start();
+
             // Watch live runs for silence. Same placement and the same reason: the
             // notification it sends is about runs this server is now able to host.
             stopRunStallWatchdog = startRunStallWatchdog();
@@ -448,6 +473,7 @@ async function startServer() {
             server.close();
             planRunner.stop();
             dispatchSouls.stop();
+            universe.stop();
             stopRunStallWatchdog?.();
             try {
                 await browserUseService.stopAllSessions();

@@ -42,7 +42,7 @@ export const KANBAN_STATUSES: readonly KanbanStatus[] = ['not_ready', 'todo', 'q
 export const KANBAN_PRIORITIES: readonly KanbanPriority[] = ['low', 'medium', 'high'];
 
 /**
- * One board row, with the two booleans SQLite stores as 0 or 1 already converted.
+ * One board row, with the booleans SQLite stores as 0 or 1 already converted.
  *
  * The conversion is the repository's job and nobody else's: `autonomy` and `archived` are booleans
  * on this side of the wire, which is what the panel's autonomy switch reads and what makes
@@ -56,6 +56,12 @@ export type KanbanBoard = {
   name: string;
   projectId: string | null;
   autonomy: boolean;
+  /** This board's OWN DeepSeek Flash switch, read at every spawn to decide whether the Metis this
+   *  board launches runs on Flash or on Claude. The host-wide flag file
+   *  (`~/.claude/state/deepseek_flash.flag`) is NEVER consulted for anything this board launches —
+   *  two boards on one host must be able to run different models, and a switch that is a file the
+   *  whole box shares cannot say that. */
+  deepseekFlash: boolean;
   sortOrder: number;
   archived: boolean;
   createdAt: string;

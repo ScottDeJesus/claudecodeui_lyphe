@@ -166,15 +166,15 @@
     "cannotUndo": "You can re-add the project later."
   },
   "simpleList": {
-    "project": "Project",
     "newChat": "New chat",
-    "empty": "No chats yet. Start one with New chat.",
+    "empty": "No chats yet. Start one with the + below.",
     "loadMore": "Show more",
     "rename": "Rename",
     "renamePlaceholder": "Chat name",
     "archive": "Archive",
     "delete": "Delete permanently",
     "running": "Running",
+    "awaitingInput": "Waiting for your answer",
     "stopTitle": "This chat is still running",
     "stopBody": "Stop it and archive?",
     "stopConfirm": "Stop and archive",

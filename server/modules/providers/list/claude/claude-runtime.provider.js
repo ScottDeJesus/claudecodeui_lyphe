@@ -780,8 +780,32 @@ async function joinProcess(live, command, options, ws, context) {
   return turnEnded ? { turnEnded } : null;
 }
 
-// How long a retiring process gets to answer the interrupt before its stdin is ended anyway.
+// How long a process gets to answer a control request — an interrupt on a retirement or a Stop, a
+// setting applied to it live — before it is treated as unresponsive: a retiring one has its stdin
+// ended anyway, a stopped one is killed, and a message that could not apply its settings is sent to
+// a fresh process instead.
 const INTERRUPT_GRACE_MS = 5_000;
+
+/**
+ * Awaits one control request, rejecting when the CLI has not answered within INTERRUPT_GRACE_MS.
+ * A wedged CLI answers none, and unbounded they hang whatever awaits them for good.
+ */
+async function withinGrace(request, what) {
+  let timer;
+  try {
+    return await Promise.race([
+      request,
+      new Promise((_, reject) => {
+        timer = setTimeout(() => reject(new Error(`${what} was not answered within ${INTERRUPT_GRACE_MS} ms`)), INTERRUPT_GRACE_MS);
+        timer.unref?.();
+      })
+    ]);
+  } finally {
+    clearTimeout(timer);
+    // A late rejection from the abandoned request is expected once the process is replaced.
+    Promise.resolve(request).catch(() => {});
+  }
+}
 // How long a message waits on a spawn still registering its handle before looking for itself.
 const SPAWN_WAIT_MS = 10_000;
 
@@ -896,6 +920,7 @@ async function spawnProcess(command, options, initialWs, context) {
   let profile = null;
 
   const isBusy = () => pendingTurn !== null || turnInFlight || heldForBackgroundWork() || backgroundTasks.size > 0;
+  const processAbort = new AbortController();
 
   // The handle later messages join through, registered under the session key.
   const handle = {
@@ -904,6 +929,14 @@ async function spawnProcess(command, options, initialWs, context) {
     },
     get profile() {
       return profile;
+    },
+    // Kills the CLI outright, for a process that did not answer an interrupt: a CLI that ignores
+    // the interrupt control request will not act on the EOF `close()` sends either.
+    kill() {
+      closing = true;
+      idle?.cancel();
+      queue?.end();
+      processAbort.abort();
     },
     // Ends stdin; the CLI exits within ~300 ms when nothing is running. A task that slipped in
     // between the busy check and the EOF rides the CLI's own ceiling (BG_WAIT_CEILING_MS).
@@ -940,20 +973,20 @@ async function spawnProcess(command, options, initialWs, context) {
         console.log(`[Claude SDK] Applying to the running process for session ${sessionKey()}: ${applied.join(', ')}`);
       }
       if (changes.model) {
-        await queryInstance.setModel(changes.model);
+        await withinGrace(queryInstance.setModel(changes.model), 'setModel');
         profile.model = next.model;
       }
       if (changes.effort) {
-        await queryInstance.applyFlagSettings({
+        await withinGrace(queryInstance.applyFlagSettings({
           effortLevel: changes.effort.level,
           ultracode: changes.effort.ultracode || null,
           enableWorkflows: changes.effort.ultracode || null
-        });
+        }), 'applyFlagSettings');
         profile.effort = next.effort;
         profile.ultracode = next.ultracode;
       }
       if (changes.permissionMode) {
-        await queryInstance.setPermissionMode(changes.permissionMode);
+        await withinGrace(queryInstance.setPermissionMode(changes.permissionMode), 'setPermissionMode');
         sdkOptions.permissionMode = changes.permissionMode;
         profile.permissionMode = next.permissionMode;
       }
@@ -1019,6 +1052,9 @@ async function spawnProcess(command, options, initialWs, context) {
     try {
       const resolved = await resolveSdkOptions(options, context);
       sdkOptions = resolved.sdkOptions;
+      // Ours, so Stop can end a process that will not answer an interrupt: aborting it has the SDK
+      // close the transport and kill the CLI (SIGTERM, then SIGKILL) — through the host when there is one.
+      sdkOptions.abortController = processAbort;
       // A re-adopted process answers to the profile its host recorded at spawn; only a host
       // from before that field leaves it unknown.
       profile = reattach
@@ -1435,7 +1471,9 @@ async function spawnProcess(command, options, initialWs, context) {
       }
 
     } catch (error) {
-      console.error('SDK query error:', error);
+      if (!supersededInstances.has(queryInstance) && !abortedInstances.has(queryInstance)) {
+        console.error('SDK query error:', error);
+      }
 
       if (supersededInstances.has(queryInstance)) {
         // Retired because a newer process took over this session id; that one
@@ -1504,33 +1542,46 @@ async function abortClaudeSDKSession(sessionId) {
     return false;
   }
 
+  console.log(`Aborting SDK session: ${sessionId}`);
+
+  // Mark before interrupting so the loop knows not to emit its own terminal
+  // complete (the abort handler sends the aborted one).
+  abortedInstances.add(session.instance);
+
+  // Over the still-open stdin, so it arrives. It also takes the CLI's background tasks
+  // down (no per-task stop is declared), so nothing is left worth keeping the process for.
+  //
+  // Bounded: the interrupt is a control request the CLI must answer, and a wedged CLI never does.
+  // Awaited without a limit, Stop hung for good on such a process — every click logged here and
+  // nothing ended, because the run is only completed once this returns. A process that does not
+  // answer in the grace, or whose interrupt fails, is killed instead: Stop always stops.
+  const interrupting = session.instance.interrupt();
+  const answered = await Promise.race([
+    interrupting.then(() => true, (error) => {
+      console.warn(`[Claude SDK] Interrupt failed for session ${sessionId}: ${error?.message || error}`);
+      return false;
+    }),
+    new Promise((resolve) => setTimeout(() => resolve(false), INTERRUPT_GRACE_MS).unref()),
+  ]);
+  // A late rejection from the abandoned interrupt is expected once the process is killed.
+  interrupting.catch(() => {});
+
   try {
-    console.log(`Aborting SDK session: ${sessionId}`);
-
-    // Mark before interrupting so the loop knows not to emit its own terminal
-    // complete (the abort handler sends the aborted one).
-    abortedInstances.add(session.instance);
-
-    // Over the still-open stdin, so it arrives. It also takes the CLI's background tasks
-    // down (no per-task stop is declared), so nothing is left worth keeping the process for.
-    await session.instance.interrupt();
-
-    // End stdin; the next message spawns a fresh process.
-    session.process?.close();
-
-    // Update session status
-    session.status = 'aborted';
-
-    // Clean up session
-    removeSession(sessionId);
-
-    return true;
+    if (answered) {
+      // End stdin; the next message spawns a fresh process.
+      session.process?.close();
+    } else {
+      console.warn(`[Claude SDK] Session ${sessionId} did not answer the interrupt within ${INTERRUPT_GRACE_MS} ms; killing its process`);
+      session.process?.kill();
+    }
   } catch (error) {
-    console.error(`Error aborting session ${sessionId}:`, error);
-    // The run keeps going; let it emit its own terminal complete.
-    abortedInstances.delete(session.instance);
-    return false;
+    console.error(`[Claude SDK] Winding down the process for session ${sessionId} failed: ${error?.message || error}`);
+  } finally {
+    // The session leaves the map whatever happened above, so the caller always completes the run.
+    session.status = 'aborted';
+    removeSession(sessionId);
   }
+  return true;
 }
 
 /**

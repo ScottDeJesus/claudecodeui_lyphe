@@ -314,7 +314,7 @@ tree it always has; `phase-17.mjs` is one of the harnesses that flips the prefer
 itself and back in its own `finally`. `probe-simple-settings.mjs` and `probe-simple-view.mjs` are
 the cheap smokes underneath it — the toggle exists in Settings, and the view mounts and unmounts
 cleanly — so `phase-17.mjs` does not re-prove either; what it proves instead is a New chat's POST
-carrying `simpleList: true` for the dropdown's own project, the row that appears naming both the
+carrying `simpleList: true` for the saved project for new chats, the row that appears naming both the
 chat and its project, the sealed send leaving nothing but the frame itself on the wire, a rename
 round-tripping through a real `PUT`, opening two different rows and the Files tab reading each
 row's own project, an idle Remove archiving without ever opening the stop dialog, and toggling off

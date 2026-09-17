@@ -61,13 +61,14 @@ Read [the realtime stream](./02-realtime-stream.md) first for how the frames arr
 | `src/modules/chat/tools/ToolErrorDisplay.tsx` | Collapsed red row for a failed result |
 | `src/modules/chat/tools/ToolDiffViewer.tsx` | Inline added and removed lines for Edit, Write, ApplyPatch |
 | `src/modules/chat/tools/DiffStatsBadge.tsx` | The `+12 -3` counts on a diff header and on a collapsed group |
-| `src/modules/chat/tools/SubagentPanel.tsx` | The whole card for a call that spawned an agent |
+| `src/modules/chat/tools/SubagentPanel.tsx` | The whole row for a call that spawned an agent, on the tool-row frame |
 | `src/modules/chat/tools/SubagentNote.tsx` | One prose or reasoning entry from an agent's own narration. Extracted out of `SubagentPanel.tsx` so it can be shared, verbatim, with the gutter's read-on-demand transcript view (§Subagents) |
 | `src/modules/chat/tools/PlanDisplay.tsx` | ExitPlanMode card with the inline Build and Revise buttons |
 | `src/modules/chat/tools/ContentRenderers/` | The bodies a collapsible can contain |
 | `src/modules/chat/tools/InteractiveRenderers/AskUserQuestionPanel.tsx` | Keyboard-driven answer picker for an `AskUserQuestion` prompt |
 | `src/modules/chat/transcript/MessageComponent.tsx` | Draws one transcript row. Decides container versus tool versus error |
 | `src/modules/chat/transcript/ToolGroupContainer.tsx` | The collapsed `Read x4` row and its expanded children |
+| `src/modules/chat/transcript/ThinkingRow.tsx` | A thinking block as a tool row: brain, `Thinking /`, the first line truncated, copy on hover (always shown on touch); the row toggles the full text |
 | `src/modules/chat/utils/workVisibility.ts` | `isHiddenWork`: which messages "Show work" off hides, and which it never hides |
 | `src/modules/chat/transcript/TypingIndicator.tsx` | The three-dot "still working" mark drawn while the work is hidden |
 | `src/modules/chat/utils/toolGrouping.ts` | `groupConsecutiveTools`, `isToolGroupItem`, `buildGroupPreview` |
@@ -357,7 +358,7 @@ same order as a single row. Expanding it renders the run's real
 **RULE: "Show work" off hides the agent's work, never anything the person has to act on.**
 
 Settings → Appearance → "Show work" (`uiPreferences.showWork`, default **off**, stored in
-`auth.db` like "Show thinking", which it sits directly above). Off, `ChatMessagesPane`
+`auth.db` like "Show thinking" below it). Off, `ChatMessagesPane`
 filters `visibleMessages` through `isHiddenWork` (`utils/workVisibility.ts`) **before**
 `groupConsecutiveTools`, so a hidden run never leaves an empty `x{n}` row behind. Hidden:
 every tool call, a standalone tool result (`type: 'tool'`, `isOrphanToolResult`), a task
@@ -373,6 +374,12 @@ dot 178ms after the last, a dip-hop-overshoot, ink at 30% rising to 65% at the t
 hop. Its keyframes are `chat-typing-hop` in `src/index.css`. With "Show work" on, the
 indicator is not drawn: the rows themselves show the turn moving.
 
+"Show compaction summary" (`uiPreferences.showCompactSummary`, default **on**) sits between
+the two and filters in the same pass: off, a row flagged `isCompactSummary` (the summary
+Claude writes after a compaction, which the Claude provider emits as an assistant row) is
+dropped. After a manual `/compact` the command and its "Compacted" line stay; an automatic
+compaction writes no such line, so with the switch off it leaves no row at all.
+
 ## Subagents
 
 **RULE: a row is a subagent container when the backend attached agent metadata to it, or
@@ -383,8 +390,16 @@ its tool name is `Task` or `Agent`.**
 covers a live spawn whose metadata has not been indexed yet. `MessageComponent` then hands
 the whole row to `SubagentPanel` and never calls `ToolRenderer` for it.
 
-The panel's header shows the agent type, description, nickname, and a status of running,
-failed, or `N tools` — `done` when the agent completed without running any. While open it
+The panel is a tool row (`toolRow.ts`'s frame, no caret, no stripe): the mark of the provider the
+agent ran on (`subagentMarkProvider` — DeepSeek's whale when the agent's own model is a DeepSeek
+one, else the session's provider; the robot only when none is known), the agent type, `/`, the
+description, the nickname, then its figures (`N tools`, tokens, finish time — hidden when the row
+itself is under 480px, a container query in `index.css`, so a phone or a narrow chat column keeps
+the description and the outcome) and the outcome pill — `Finished`, `Failed` or
+`Stopped`, or a spinner and `running` while it works. The model behind the mark is
+`ChatMessage.subagentModel`: the history record's `subagent.model`, else the newest model the
+agent's live turns named (`useChatMessages` folds it from the rows streamed with its
+`parentToolUseId`), so a DeepSeek agent wears the whale while it runs, not only after a reload. While open it
 shows the model, the task prompt, the timeline, and the agent's markdown result. A timeline
 entry of `kind: 'tool'` goes through `ToolRenderer` with `mode="input"` — the same router
 the main thread uses — so a subagent's shell command looks identical to the parent's.
@@ -487,9 +502,12 @@ like a loaded container.
 — running first by oldest launch, then finished by newest finish — because the reader is asking it
 one question, *what is working for me right now*, and the answer would be a lie if half of it were
 somewhere else. The second kind is a LAUNCHER SOUL: a `/dispatch` hand started as a detached
-`plan-runner soul` child, which streams nothing into this transcript at all. Only the drawing
-differs, and only in the mark — an `Agent` subagent carries the robot, a soul carries
-`LLMProviderLogo` on the endpoint that is paying for it (the DeepSeek whale, or Claude's).
+`plan-runner soul` child, which streams nothing into this transcript at all. Both kinds are drawn
+alike: `LLMProviderLogo` centred on the row's height beside its two lines — an `Agent` subagent on
+the provider it ran on (`subagentMarkProvider`, the same reading the transcript row takes; the robot
+only when none is known), a soul
+on the endpoint paying for it (the DeepSeek whale, or Claude's). No coloured left rule; the status
+column carries the state.
 
 That row is a JOIN, and it is the reason the two halves are in different modules. **Ownership comes
 from this transcript**: the launcher's receipt, `SOUL LAUNCHED launch=<id> …`, read off the result of
@@ -510,15 +528,18 @@ and the reader's act is the same either way. The list is read through a module-s
 so every copy of the rows — the strip and the gutter widget alike, whichever has the claim above —
 drops a dismissed row in the same frame; a `storage` listener folds in another tab's dismissal too.
 
-**Click to read, live.** Both row components accept optional `onOpen`/`openLabel` props, unused by
-the strip, which has nowhere to open a transcript TO: given them, the row's root becomes a
-keyboard-and-mouse button, and its dismiss control calls `event.stopPropagation()` first so a press
-on the X cannot also open the row. `src/modules/chat/subagents/SubagentWidgetBody.tsx` is the one
-caller that supplies them. It draws the exact same rows the strip does — through
-`useSubagentWidgetRows` (`hooks/useSubagentWidgetRows.ts`), which layers `usePinnedSubagentRows` over
-`useSubagentSource` the same way `PinnedSubagents.tsx` does — then, on a click, swaps its own body for
-`subagents/SubagentTranscriptView.tsx`, tagged with the chat it was opened in so a chat switch can
-never leave another conversation's transcript on screen. The view reads the subagent's own file on
+**Click to read, live.** Both row components take `onOpen`/`openLabel`: the row's root is a
+keyboard-and-mouse button, its dismiss control calls `event.stopPropagation()` so a click on the X
+cannot also open the row, and the row's key handler ignores keys whose target is not the row itself,
+so Enter on the X dismisses. Both surfaces supply
+them, addressing a row through `subagents/subagentRow.ts` (`rowId`/`rowRunning`/`rowLabel`), and both
+open `subagents/SubagentTranscriptView.tsx` tagged with the chat it was opened in, so a chat switch can
+never leave another conversation's transcript on screen. `src/modules/chat/subagents/SubagentWidgetBody.tsx`
+— which draws the same rows from the same derivation through `useSubagentWidgetRows` (`hooks/useSubagentWidgetRows.ts`),
+layering `usePinnedSubagentRows` over `useSubagentSource` — swaps its own body for the view;
+`PinnedSubagents.tsx`, having no room, opens it in a `Dialog` over the chat. Closing any `Dialog` with
+Escape never stops the running turn: the shared `Dialog` marks the key from a window capture listener,
+which runs before `ChatInterface`'s document-level stop-on-Escape. The view reads the subagent's own file on
 disk — never `ChatMessage.subagentActivity`, which the history path caps at 200 entries from the head
 and a launcher soul carries none of at all — through `useSubagentTranscript`
 (`hooks/useSubagentTranscript.ts`), which re-reads it every two seconds while the row is running or
@@ -526,7 +547,10 @@ the server reports the file still growing (`inFlight`), and stops re-reading onc
 `Agent` row resolves through `GET
 /api/providers/sessions/:sessionId/subagents/:toolUseId/transcript`; a soul row through `GET
 /api/dispatch-souls/launches/:launchId/transcript` ([dispatch-souls.md](../dispatch-souls.md)
-§"The routes and the frame"). Only the newest 100 entries draw at first, with a "show earlier" step
+§"The routes and the frame"); and the view's third target kind, a board's Metis, through `GET
+/api/kanban-metis/sessions/:sessionId/transcript` — opened from outside this module entirely, by
+the kanban module's `KanbanMetisPanel.tsx` with `sessionId` null, since a board's Metis belongs to
+no chat ([kanban.md](../kanban.md) §"The panel"). Only the newest 100 entries draw at first, with a "show earlier" step
 of 100 more, because a single entry can expand into a diff and mounting all 1000 the server may hold
 at once would be a thousand tool renderers the moment the row opens. The entries reuse the same
 drawing the panel uses: `tools/SubagentNote.tsx` for prose and reasoning, `ToolRenderer` in
@@ -835,8 +859,8 @@ memoized, and four with no other reason to know exports exist.
 | `TOOL_CONFIGS` entry shape | `ToolRenderer`'s three `type` branches and its `contentType` switch; the `input` and `result` unions differ, so a field valid on one may not be on the other; `ToolGroupContainer` reads `label`, `colorScheme` and `contentType` off the same config |
 | `getToolConfig` fallback | `toolGrouping.ts` → `getToolInputPreview` calls it for the collapsed line, so an unmapped tool must still name what it did |
 | The soul-launch ownership rule (the receipt regex, the marker, the chain-segment test) | It is written TWICE and the two trees cannot import each other: `src/modules/chat/utils/soulLaunchAnchors.ts` and `server/modules/providers/services/session-soul-launches.service.ts`. Loosen one alone and one half pins souls the other will not. The line itself is the launcher's — `~/.claude/hooks/GOTCHAS.md` #36 |
-| Anything the pinned rows render | Both row components, not one: `PinnedAgentRow.tsx` and `SoulLaunchPinRow.tsx` are deliberately the same shape, and `usePinnedSubagentRows.ts` feeds TWO surfaces — the strip above the composer when the desktop chat gutters are not showing, and the gutter's Subagents widget (`SubagentWidgetBody.tsx`) while they are — so a change to the left rule, the two-line layout or the status column that lands in only one component, or in only one surface, makes the same rows read as two different lists |
-| The click-to-open affordance (`onOpen`/`openLabel`) | Both row components again: their keyboard handling and their dismiss button's `stopPropagation()` must stay identical, since `SubagentWidgetBody.tsx` is the only caller that supplies the props and a divergence there breaks the widget silently while the strip, which supplies neither, looks unchanged |
+| Anything the pinned rows render | Both row components, not one: `PinnedAgentRow.tsx` and `SoulLaunchPinRow.tsx` are deliberately the same shape, and `usePinnedSubagentRows.ts` feeds TWO surfaces — the strip above the composer when the desktop chat gutters are not showing, and the gutter's Subagents widget (`SubagentWidgetBody.tsx`) while they are — so a change to the centred mark, the two-line layout or the status column that lands in only one component, or in only one surface, makes the same rows read as two different lists |
+| The click-to-open affordance (`onOpen`/`openLabel`) | Both row components again: their keyboard handling and their dismiss button's `stopPropagation()` must stay identical, since both surfaces (`SubagentWidgetBody.tsx` and `PinnedSubagents.tsx`) supply the props and a divergence breaks one kind of row on both |
 | `deriveToolStatus` | `ToolStatusBadge`'s `STATUS_CONFIG` needs a key for every `ToolStatus`; `BashCommandDisplay` and `OneLineDisplay` both special-case `running`; every caller filters out `completed` |
 | `CLAUDE_DENIAL_MESSAGES` | The exact strings the Claude runtime adapter emits. The test is `includes` on lowercased content, so a rewording silently downgrades `denied` to `error` |
 | Result pairing in `normalizedToChatMessages` | The `WeakMap` projection cache keys `toolResultSource` and `subagentActivitySource`, and `src/modules/chat/tests/useChatMessages.test.ts` |

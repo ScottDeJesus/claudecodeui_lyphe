@@ -9,7 +9,7 @@ type ShimmerProps = {
 };
 
 /**
- * Used by the chat module for streaming text and by the shared Reasoning primitive.
+ * Used by the chat module for streaming text.
  *
  * The gradient it used to spell in its own class string now lives in controls.css, with the
  * rest of the library's paint. `--text` is load-bearing, not decoration: it clips the sweep to

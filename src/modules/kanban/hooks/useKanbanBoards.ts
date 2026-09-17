@@ -13,10 +13,10 @@ import { useToast } from '@/shared/context/ToastContext';
  * switches boards and nothing here is filtered by project. `projectId` enters this hook for
  * exactly one purpose, stated once: the FIRST-MOUNT CONVENIENCE below.
  *
- * EVERY WRITE RE-READS. Selecting, renaming, archiving and flipping autonomy all change what
- * `listBoards` answers — an archived board drops out of the list, and the selected board reads
- * as null when the setting names one that is gone — so the panel takes its next picture from the
- * server rather than from a local guess about what the list became.
+ * EVERY WRITE RE-READS. Selecting, renaming, archiving and flipping either of the board's two
+ * switches all change what `listBoards` answers — an archived board drops out of the list, and the
+ * selected board reads as null when the setting names one that is gone — so the panel takes its
+ * next picture from the server rather than from a local guess about what the list became.
  */
 
 type BoardListBody = { boards: KanbanBoard[]; currentBoardId: string | null };
@@ -25,6 +25,7 @@ type BoardListBody = { boards: KanbanBoard[]; currentBoardId: string | null };
 export type KanbanBoardPatch = {
   name?: string;
   autonomy?: boolean;
+  deepseekFlash?: boolean;
   projectId?: string | null;
   archived?: boolean;
 };
@@ -34,6 +35,9 @@ export type KanbanBoards = {
   currentBoardId: string | null;
   /** The selected board's own setting. It gates the UI only; no write is ever skipped. */
   autonomy: boolean;
+  /** The selected board's own DeepSeek switch: where this board's Metis, and every plan runner
+   *  she starts, are billed. This panel only paints and writes it — nothing running is moved. */
+  deepseekFlash: boolean;
   loading: boolean;
   /** A failed READ. Different news from a board with no cards — and from having no board. */
   unreachable: boolean;
@@ -52,8 +56,8 @@ function reasonFor(error: unknown): string | undefined {
 /**
  * WHAT ONE BOARD WRITE DID, IN WORDS — because none of the three is legible from the control that
  * caused it. A rename leaves the row looking like every other row, an archive takes the board out
- * of the list entirely, and the autonomy switch shows its own new position without ever saying the
- * write landed.
+ * of the list entirely, and either of the two switches shows its own new position without ever
+ * saying the write landed.
  *
  * THE SENTENCE IS THE WHOLE OF IT. `ToastRequest` carries a title, a message and a tone and no
  * action slot, so there is no undo to hang here — and `src/shared/types.ts`, where that slot would
@@ -68,6 +72,9 @@ function saidFor(patch: KanbanBoardPatch, t: TFunction): string | undefined {
   if (patch.name !== undefined) return t('kanban.toast.boardRenamed');
   if (patch.autonomy !== undefined) {
     return patch.autonomy ? t('kanban.toast.autonomyOn') : t('kanban.toast.autonomyOff');
+  }
+  if (patch.deepseekFlash !== undefined) {
+    return patch.deepseekFlash ? t('kanban.toast.deepseekFlashOn') : t('kanban.toast.deepseekFlashOff');
   }
   return undefined;
 }
@@ -246,5 +253,24 @@ export function useKanbanBoards(projectId: string): KanbanBoards {
     [boards, currentBoardId]
   );
 
-  return { boards, currentBoardId, autonomy, loading, unreachable, refresh, selectBoard, createBoard, updateBoard };
+  // Read off the CURRENT BOARD for the same reason autonomy is: the switch paints the row's own
+  // column, and `?? false` is what a board that is gone — or a server too old to answer with the
+  // field — reads as, which is the position the switch was born in.
+  const deepseekFlash = useMemo(
+    () => boards.find((board) => board.id === currentBoardId)?.deepseekFlash ?? false,
+    [boards, currentBoardId]
+  );
+
+  return {
+    boards,
+    currentBoardId,
+    autonomy,
+    deepseekFlash,
+    loading,
+    unreachable,
+    refresh,
+    selectBoard,
+    createBoard,
+    updateBoard,
+  };
 }

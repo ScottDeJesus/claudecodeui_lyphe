@@ -7,7 +7,7 @@
  * the tallest thing a row carries.
  *
  * Used by BashCommandDisplay, OneLineDisplay, CollapsibleSection (via ToolRenderer's
- * framed call card) and ToolGroupContainer.
+ * framed call card), ToolGroupContainer and ThinkingRow.
  */
 export const TOOL_ROW_FRAME = 'overflow-hidden rounded-lg border border-border/60 bg-muted/40';
 

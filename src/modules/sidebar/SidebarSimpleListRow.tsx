@@ -14,6 +14,8 @@ type SidebarSimpleListRowProps = {
   row: RecentConversationListItem;
   isSelected: boolean;
   isRunning: boolean;
+  /** A question in this run waits on the user: drawn as a yellow dot in place of the spinner. */
+  isAwaitingInput: boolean;
   isRemoveFailed: boolean;
   onSelect: () => void;
   onArchive: () => void;
@@ -34,6 +36,7 @@ export default function SidebarSimpleListRow({
   row,
   isSelected,
   isRunning,
+  isAwaitingInput,
   isRemoveFailed,
   onSelect,
   onArchive,
@@ -134,7 +137,21 @@ export default function SidebarSimpleListRow({
         </a>
       )}
 
-      {isRunning && !isEditing && (
+      {isRunning && isAwaitingInput && !isEditing && (
+        <Tooltip content={t('simpleList.awaitingInput')} position="top">
+          <span
+            data-testid="simple-chat-awaiting-input"
+            role="status"
+            aria-label={t('simpleList.awaitingInput')}
+            className="vv-pulse flex h-5 w-5 flex-shrink-0 items-center justify-center"
+          >
+            {/* The same 8px disc as the unread dot beside it, in the warning ink. */}
+            <span aria-hidden="true" className="h-2 w-2 rounded-full bg-warn-ink" />
+          </span>
+        </Tooltip>
+      )}
+
+      {isRunning && !isAwaitingInput && !isEditing && (
         <Tooltip content={t('simpleList.running')} position="top">
           <span
             data-testid="simple-chat-running"

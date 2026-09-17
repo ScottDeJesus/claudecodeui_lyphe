@@ -26,7 +26,7 @@ type UserDependencies = {
   };
   drafts: {
     getDrafts(userId: number): DraftRecord[];
-    saveDraft(userId: number, scope: string, draft: { text: string; queuedMessage: unknown | null }): void;
+    saveDraft(userId: number, scope: string, draft: { text?: string; queuedMessage?: unknown | null }): void;
     deleteDraft(userId: number, scope: string): void;
   };
   readSystemGitConfig(): Promise<GitConfig>;
@@ -166,9 +166,13 @@ export function createUserService(dependencies: UserDependencies) {
     saveDraft(userId: number, scopeInput: unknown, body: unknown) {
       const scope = readDraftScope(scopeInput);
       const payload = (body ?? {}) as { text?: unknown; queuedMessage?: unknown };
-      const text = typeof payload.text === 'string' ? payload.text : '';
+      // Only the parts present in the body are written (see `sessionDraftsDb.saveDraft`): a text
+      // save must leave a queued message the dispatcher may already have sent alone.
+      const text = 'text' in payload
+        ? (typeof payload.text === 'string' ? payload.text : '')
+        : undefined;
 
-      if (text.length > MAX_DRAFT_TEXT_LENGTH) {
+      if (text !== undefined && text.length > MAX_DRAFT_TEXT_LENGTH) {
         throw new AppError('Draft text is too long to store', {
           code: 'DRAFT_TEXT_TOO_LONG',
           statusCode: 413,
@@ -177,7 +181,7 @@ export function createUserService(dependencies: UserDependencies) {
 
       dependencies.drafts.saveDraft(userId, scope, {
         text,
-        queuedMessage: payload.queuedMessage ?? null,
+        queuedMessage: 'queuedMessage' in payload ? (payload.queuedMessage ?? null) : undefined,
       });
       return { success: true };
     },

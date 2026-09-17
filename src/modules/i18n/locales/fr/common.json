@@ -24,8 +24,8 @@
     "git": "Git",
     "tasks": "Tâches",
     "browser": "Navigateur",
-    "computer": "Ordinateur",
-    "kanban": "Kanban"
+    "kanban": "Kanban",
+    "universe": "Univers"
   },
   "kanban": {
     "loading": "Lecture du tableau…",
@@ -371,5 +371,52 @@
       "label": "Cette session",
       "title": "Créé par la conversation que vous avez ouverte"
     }
+  },
+  "applications": {
+    "fabLabel": "Applications",
+    "heading": "Vos <em>apps</em>",
+    "closeDrawer": "Fermer",
+    "close": "Tout fermer",
+    "summaryNone": "Aucune enregistrée",
+    "summarySingle_one": "{{count}} app · écran unique",
+    "summarySingle_other": "{{count}} apps · écran unique",
+    "summaryDual_one": "{{count}} app · écran partagé activé",
+    "summaryDual_other": "{{count}} apps · écran partagé activé",
+    "dualScreen": "Écran partagé",
+    "dualScreenHint": "Deux apps côte à côte, séparateur déplaçable.",
+    "opensIn": "S'ouvre dans",
+    "left": "Gauche",
+    "right": "Droite",
+    "hostOnScreen": "{{host}} · à l'écran",
+    "reload": "Recharger",
+    "openInNewTab": "Ouvrir dans un nouvel onglet",
+    "openInDual": "Ouvrir en écran partagé",
+    "closeDual": "Fermer l'écran partagé",
+    "remove": "Retirer",
+    "removeFailed": "L'application n'a pas pu être retirée",
+    "removeFailedPane": "{{name}} a été fermée et reste enregistrée.",
+    "unreadable": "La liste des applications n'a pas pu être lue",
+    "empty": "Aucune application pour le moment",
+    "emptyMessage": "Ajoutez-en une avec son nom et son adresse web, et elle s'ouvre ici même.",
+    "emptyAction": "Ajouter votre première application",
+    "addApplication": "Ajouter une application",
+    "form": {
+      "title": "Nouvelle application",
+      "nameLabel": "Nom",
+      "nameHelper": "Le nom affiché dans ce panneau.",
+      "namePlaceholder": "Console des tâches",
+      "urlLabel": "Adresse web",
+      "urlHelper": "http:// est ajouté s'il manque. {host} désigne l'adresse sur laquelle cette page est ouverte.",
+      "urlPlaceholder": "{host}:8080",
+      "nameRequired": "Donnez-lui un nom pour la retrouver ici.",
+      "urlRequired": "Une adresse est nécessaire pour charger l'app.",
+      "urlInvalid": "Cette adresse est illisible — vérifiez les fautes de frappe.",
+      "submit": "L'ajouter",
+      "cancel": "Annuler",
+      "addFailed": "L'application n'a pas pu être ajoutée"
+    },
+    "appearanceLight": "Apparence claire",
+    "appearanceDark": "Apparence sombre",
+    "divider": "Redimensionner les applications"
   }
 }

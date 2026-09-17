@@ -195,6 +195,28 @@ const fileContentPath = (projectId: string, filePath: string) =>
 const pluginAssetPath = (pluginName: string, assetFile: string) =>
   `/api/plugins/${encodeURIComponent(pluginName)}/assets/${encodeURIComponent(assetFile)}`;
 
+// ─── The board's Metis transcript ───────────────────────────────────────────
+
+/**
+ * One Metis transcript, read and unwrapped: `/api/kanban-metis/sessions/:sessionId/transcript`.
+ *
+ * DEFINED ONCE, NAMED TWICE, because two callers ask for it in their own vocabulary — the fleet
+ * group below (`kanbanMetis.transcript`) and the transcript-reader family
+ * (`subagentTranscripts.metis`), which addresses every subagent by a target kind. One route and
+ * one unwrap, so the two names cannot drift into two spellings of a path.
+ *
+ * THE BOARD MINTS THE SESSION ID, so the id IS the mapping: there is no launch-id translation to
+ * perform. Two ways for it to come back empty-handed, and they are different news: an id the
+ * registry does not hold is a 404, which the caller reads as a failed request; a session the
+ * registry knows whose transcript is not yet on disk is a `found: false` RESULT — the reader falls
+ * back to scanning the projects root, and a board Metis having no sessions row of her own is
+ * exactly that case.
+ */
+const readKanbanMetisTranscript = async (sessionId: string): Promise<SubagentTranscriptResult> =>
+  readApiJson<SubagentTranscriptResult>(
+    await get(`/api/kanban-metis/sessions/${encodeURIComponent(sessionId)}/transcript`),
+  );
+
 // ─── API endpoints ──────────────────────────────────────────────────────────
 // Every `/api/...` path the frontend talks to is declared here; components
 // import a named method instead of assembling URLs of their own.
@@ -495,9 +517,9 @@ export const api = {
     savePreferences: (updates: Record<string, unknown>) =>
       patch('/api/user/preferences', updates),
     drafts: () => get('/api/user/drafts'),
-    saveDraft: (scope: string, draft: { text: string; queuedMessage?: unknown }) =>
+    /** Writes only the parts given; an absent part is left as the server has it. */
+    saveDraft: (scope: string, draft: { text?: string; queuedMessage?: unknown }) =>
       put('/api/user/drafts', { scope, ...draft }),
-    deleteDraft: (scope: string) => del('/api/user/drafts', { scope }),
   },
 
   // Server-side settings: API keys, stored credentials, notifications, web push
@@ -671,11 +693,48 @@ export const api = {
     importDescent: (body: { dbPath?: string }) => post('/api/kanban/import/descent', body),
   },
 
+  // The board's Metis fleet (docs/kanban.md): who this board has out working for it, and the three
+  // verbs over a session. `sessions` is the SEED — the fleet is pushed on change as a
+  // `kanban_metis_state` frame, which a panel mounting between two changes would otherwise wait
+  // for with nothing on screen. `launch` is a board's act and answers the session the server
+  // minted, so the panel paints the new row without waiting for the frame behind it; `stop` and
+  // `resume` answer the same shape for the session they moved.
+  kanbanMetis: {
+    sessions: () => get('/api/kanban-metis/sessions'),
+    launch: (boardId: string) =>
+      post(`/api/kanban-metis/boards/${encodeURIComponent(boardId)}/launch`, {}),
+    stop: (sessionId: string) =>
+      post(`/api/kanban-metis/sessions/${encodeURIComponent(sessionId)}/stop`, {}),
+    resume: (sessionId: string) =>
+      post(`/api/kanban-metis/sessions/${encodeURIComponent(sessionId)}/resume`, {}),
+    transcript: readKanbanMetisTranscript,
+  },
+
+  // The application registry (docs/applications.md): the rows the switcher's drawer lists, each a
+  // `{host}`-templated url this reader resolves against their own hostname. Three verbs and no
+  // more — `list` is read on mount and on every drawer open rather than polled, because the
+  // registry changes when the operator or a builder edits the file, and a row that appears a
+  // minute after the edit is a row nobody is waiting for. The shapes are `@/shared/app-types`.
+  apps: {
+    list: () => get('/api/apps'),
+    add: (body: { id?: string; name: string; url: string }) => post('/api/apps', body),
+    remove: (id: string) => del(`/api/apps/${encodeURIComponent(id)}`),
+  },
+
   // The launcher souls a `/dispatch` started with `plan-runner soul`, read off the launcher's own
   // state root. One plain read, for the seed the `soul_launch_state` frame cannot cover: the frame
   // is sent only on a CHANGE, so a page mounting while nothing moves has nothing to paint.
   dispatchSouls: {
     launches: () => get('/api/dispatch-souls/launches'),
+  },
+
+  // The estate map: every tracked file in the four crawled repos, with every index the crawler
+  // assigned. Fetched once by the universe tab's `useUniverseMap`, and refetched only when a
+  // `universe_map` frame carries a `mapId` the page does not already hold — the map is 1.4 MB, so
+  // it is the one thing here that must never be polled. `get` hands back the raw Response, and the
+  // hook parses the body, because nothing about the map belongs to this module's shape.
+  universe: {
+    map: () => get('/api/universe/map'),
   },
 
   // The transcript of ONE subagent — an `Agent`-tool row addressed by the tool call that spawned it,
@@ -694,6 +753,9 @@ export const api = {
     soul: async (launchId: string): Promise<SubagentTranscriptResult> => readApiJson<SubagentTranscriptResult>(
       await get(`/api/dispatch-souls/launches/${encodeURIComponent(launchId)}/transcript`),
     ),
+    // A board's Metis, addressed by the session id the BOARD minted. Its consumer is the kanban
+    // module's fleet panel, which opens a row into the same view the other two kinds use.
+    metis: readKanbanMetisTranscript,
   },
 
   // The installed Claude CLI and the version each LIVE run is on (docs/cli-version.md). It

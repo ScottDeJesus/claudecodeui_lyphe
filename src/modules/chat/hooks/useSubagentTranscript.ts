@@ -36,16 +36,18 @@ function keyOf(target: SubagentTranscriptTarget | null): string | null {
  * written. A finished transcript is read once and the timer is not re-armed: polling a file nobody
  * is writing would be a request per two seconds for an answer that cannot change.
  *
- * THE API MEMBER HANDS BACK THE BARE RESULT — both routes, one of which wraps its answer in an
- * envelope — so this hook unwraps nothing, and a "not found" is a `found: false` reading rather
- * than a thrown error.
+ * THE API MEMBER HANDS BACK THE BARE RESULT — all three routes, one of which wraps its answer in an
+ * envelope — so this hook unwraps nothing, and a transcript that is not on disk is a `found: false`
+ * reading rather than a thrown error. The one refusal that IS a failure is an id the route's own
+ * registry does not hold.
  *
  * THE NEWEST READ WINS. Each effect takes a number, and an answer carrying an older one is dropped
  * rather than written, so a slow first response cannot land after a fast second one and send the
  * list backwards. The timer is cleared on unmount and on a target change; a late answer from the
  * abandoned read is ignored.
  *
- * Read by the chat module's `subagents/SubagentTranscriptView.tsx`.
+ * Read by the chat module's `subagents/SubagentTranscriptView.tsx`, which is opened by the chat's own
+ * rows and by the kanban module's `KanbanMetisPanel.tsx`, whose `'metis'` target is a board session.
  */
 export function useSubagentTranscript(
   sessionId: string | null,
@@ -75,9 +77,13 @@ export function useSubagentTranscript(
     const run = async (): Promise<void> => {
       let next: SubagentTranscriptResult;
       try {
-        next = kind === 'soul'
-          ? await api.subagentTranscripts.soul(id)
-          : await api.subagentTranscripts.agent(agentSessionId, id);
+        // ONE ROUTE PER KIND, and the three are mutually exclusive. An agent row is addressed
+        // through the chat's own session id; a launcher soul by its launch id; a board's Metis by
+        // the session id the board minted, which IS its target id — so a Metis read needs no chat
+        // session, and is never sent down the agent route.
+        if (kind === 'soul') next = await api.subagentTranscripts.soul(id);
+        else if (kind === 'metis') next = await api.subagentTranscripts.metis(id);
+        else next = await api.subagentTranscripts.agent(agentSessionId, id);
       } catch {
         if (cancelled || tokenRef.current !== token) return;
         // The read itself failed — the route refused it, or the network dropped. Say so and KEEP

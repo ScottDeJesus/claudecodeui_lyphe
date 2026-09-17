@@ -2,8 +2,8 @@ import { readFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 
-import spawn from 'cross-spawn';
-
+import { readConnectedOpenCodeProviderIds } from '@/modules/providers/list/opencode/opencode-models.provider.js';
+import { commandRuns } from '@/modules/providers/shared/auth/command-runs.js';
 import type { IProviderAuth } from '@/shared/interfaces.js';
 import type { ProviderAuthStatus } from '@/shared/types.js';
 import { readObjectRecord, readOptionalString } from '@/shared/utils.js';
@@ -21,27 +21,23 @@ const OPENCODE_ENV_CREDENTIAL_KEYS = [
   'GOOGLE_GENERATIVE_AI_API_KEY',
   'GROQ_API_KEY',
   'OPENROUTER_API_KEY',
+  'OPENCODE_API_KEY',
 ];
 
 export class OpenCodeProviderAuth implements IProviderAuth {
   /**
    * Checks whether the OpenCode CLI is available to the server process.
    */
-  private checkInstalled(): boolean {
-    try {
-      const result = spawn.sync('opencode', ['--version'], { stdio: 'ignore', timeout: 5000 });
-      return !result.error && result.status === 0;
-    } catch {
-      return false;
-    }
+  private checkInstalled(): Promise<boolean> {
+    return commandRuns('opencode', ['--version']);
   }
 
   /**
    * Returns OpenCode CLI installation and credential status.
    */
   async getStatus(): Promise<ProviderAuthStatus> {
-    const installed = this.checkInstalled();
-    const credentials = await this.checkCredentials();
+    const installed = await this.checkInstalled();
+    const credentials = await this.checkCredentials(installed);
 
     return {
       installed,
@@ -54,9 +50,16 @@ export class OpenCodeProviderAuth implements IProviderAuth {
   }
 
   /**
-   * Reads OpenCode's auth store or falls back to provider API key environment variables.
+   * With OpenCode installed, reads its auth store, then provider API keys in the environment and the
+   * providers its global config declares.
    */
-  private async checkCredentials(): Promise<OpenCodeCredentialsStatus> {
+  private async checkCredentials(installed: boolean): Promise<OpenCodeCredentialsStatus> {
+    // Nothing counts without OpenCode installed: a login, an API key or a config file left behind
+    // is no sign that it can run here, and the keys are shared with other tools.
+    if (!installed) {
+      return { authenticated: false, email: null, method: null, error: 'OpenCode is not installed' };
+    }
+
     try {
       const authPath = path.join(os.homedir(), '.local', 'share', 'opencode', 'auth.json');
       const content = await readFile(authPath, 'utf8');
@@ -97,6 +100,17 @@ export class OpenCodeProviderAuth implements IProviderAuth {
         authenticated: true,
         email: envCredential,
         method: 'environment',
+      };
+    }
+
+    // The same sweep the model list narrows by: a provider declared in OpenCode's global config
+    // routes without any login, so an install the picker has models for is never read as signed out.
+    const connected = await readConnectedOpenCodeProviderIds();
+    if (connected) {
+      return {
+        authenticated: true,
+        email: `${[...connected].join(', ')} configured`,
+        method: 'config',
       };
     }
 

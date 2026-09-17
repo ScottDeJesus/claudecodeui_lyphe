@@ -31,13 +31,20 @@ it.
    touches a raw frame. It does not branch on provider, does not navigate, and does not
    translate session ids — the backend has already done all three. A frame with no `kind`
    is dropped on the first line, which is what makes Task Master's `type`-keyed
-   broadcasts invisible to chat. The two state lanes are the other case: `runner_state` and
-   `soul_launch_state` HAVE a kind, so they are returned early by name — one shared `case`
-   group — the same way `session_upserted` and `loading_progress` are. Each is a box-wide
-   picture owned by a reader outside the transcript, republished into the live bus by its own
-   feed. Returning rather than breaking is the whole of it: without the case a lane frame falls
-   through to the `default`, inherits the viewed session's id, and lands in the open transcript
-   as a message row.
+   broadcasts invisible to chat. The box-wide lanes are the other case: `runner_state`,
+   `soul_launch_state`, `universe_map` and `universe_activity` HAVE a kind and carry no session
+   id of their own, so they are returned early by name — one shared `case` group — the same way
+   `session_upserted` and `loading_progress` are. Each is a picture of the whole box owned by a
+   reader outside the transcript, republished into the live bus by its own feed. Returning
+   rather than breaking is the whole of it: without the case such a frame falls through to the
+   `default`, inherits the viewed session's id, and lands in the open transcript as a message
+   row — which for `universe_activity` would mean a row per coalesced frame, up to ten a second,
+   for as long as anything in the estate is busy
+   ([01-websocket-transport.md](./01-websocket-transport.md) §"Fan-out: who receives what").
+   **`kanban_event` and `kanban_metis_state` are also sessionless, but neither is in that
+   `case` group today** — both fall through to `default` and land in whatever session is
+   currently viewed. See [01-websocket-transport.md](./01-websocket-transport.md) §"The chat
+   protocol coming down".
 2. **The default action is "append to the store".** Read the switch as a filter, not a
    dispatcher: gateway kinds and the two streaming kinds are handled specially, five
    kinds are control events that are deliberately *not* stored, and everything else —
@@ -395,8 +402,11 @@ Then, **for the viewed session only**, `requestLatestMessages` re-reads the pers
 tail. A background session that finishes keeps its live rows until it is opened.
 
 Abort is a server-side transaction. `chat.abort` requires a run in `running` status —
-otherwise the server answers `protocol_error` with code `NO_ACTIVE_RUN` — then kills the
-runtime and calls `completeRun` with `aborted: true`. The killed process usually emits its
+otherwise the server answers `protocol_error` with code `NO_ACTIVE_RUN` — then stops the
+runtime and calls `completeRun` with `aborted: true`. For Claude, stopping is an interrupt the CLI
+answers within `INTERRUPT_GRACE_MS` (5 s), then end-of-input; a CLI that does not answer in time, or
+whose interrupt fails, is killed through the query's `AbortController` (SIGTERM, then SIGKILL — via
+its keepalive host when it has one), so Stop always completes the run. The killed process usually emits its
 own `complete` a moment later; `decorateAndRecordEvent` drops it, because a run already
 marked completed cannot complete twice. The partial reply that streamed before the abort
 stays in the transcript as an ordinary assistant row.

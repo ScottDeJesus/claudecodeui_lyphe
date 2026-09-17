@@ -51,7 +51,7 @@ export type ProviderModelActions = {
 //----------------- PROJECTS AND SESSIONS ------------
 
 /** Identifies the workspace pane the user is looking at; plugin panes are namespaced by plugin id. */
-export type AppTab = 'chat' | 'files' | 'shell' | 'git' | 'tasks' | 'browser' | 'memory' | 'runner' | 'kanban' | `plugin:${string}`;
+export type AppTab = 'chat' | 'files' | 'shell' | 'git' | 'tasks' | 'browser' | 'memory' | 'runner' | 'kanban' | 'universe' | `plugin:${string}`;
 
 /** A message queued to be sent to a session at a future time. */
 export type ScheduledMessage = {
@@ -124,6 +124,9 @@ export type Project = {
  * fields, so a project-list refresh that changes none of them re-renders nothing in the tab.
  */
 export type GitRepository = Pick<Project, 'projectId' | 'fullPath' | 'displayName'>;
+
+/** A project a new chat can start in, as the new-chat screen's project picker lists it. */
+export type ProjectChoice = Pick<Project, 'projectId' | 'displayName'>;
 
 /** Progress payload streamed while the backend enumerates projects, used to drive the sidebar loading bar. */
 export type LoadingProgress = {
@@ -214,6 +217,8 @@ export type RunningSessionListItem = {
   projectDisplayName: string;
   sessionTitle: string;
   lastActivity: string | null;
+  /** A question or permission prompt in this run is waiting on the user. */
+  awaitingInput: boolean;
 };
 
 // ---------------------------
@@ -342,6 +347,12 @@ export type SubagentInfo = {
   activityCount?: number;
   /** What the agent has spent so far, when the provider records usage (today: Claude). */
   usage?: SubagentUsage;
+  /**
+   * The latest `SendMessage` call that resumed this agent after it had stopped, when one did
+   * (today: Claude). Its tool-use id tells the live projection which resume the status already
+   * accounts for; a newer one in the stream is still running.
+   */
+  resume?: { toolUseId: string; at?: string };
 };
 
 /**
@@ -364,7 +375,6 @@ export type ChatMessage = {
   timestamp: string | number | Date;
   images?: ChatImage[];
   files?: ChatAttachment[];
-  reasoning?: string;
   /** The model id that produced this assistant turn, when the provider records one; the transcript resolves it to a catalog label so a raw id never reaches the screen. */
   model?: string;
   /**
@@ -407,6 +417,10 @@ export type ChatMessage = {
    * synthesized `subagent` would have to invent the status that field is read for.
    */
   subagentUsage?: SubagentUsage;
+  /** The provider a subagent container ran on, so its pinned row can wear that provider's mark. */
+  subagentProvider?: LLMProvider;
+  /** The model a spawned agent ran on: its history record's, else the newest one its live turns named. */
+  subagentModel?: string;
   /** Stored memory this reply drew on, shown as a footnote beneath it. */
   memoryCitations?: MemoryCitation[];
   /** Lifecycle the provider reported for this tool call, when it reports one; otherwise the status is inferred from whether a result has arrived. */
@@ -679,6 +693,12 @@ export type CommandModalPayload = {
 
 /** A composer message queued while its session is still busy, holding the text, the in-memory and already-uploaded attachments and the send options snapshotted at queue time so it can be auto-sent unchanged once the session goes idle. */
 export type QueuedDraft = {
+  /**
+   * Minted once when the message is queued, and kept through every save. The server remembers the
+   * id it last sent per session and ignores a save that brings it back, so a retried or stale save
+   * cannot send the message twice — while queueing the same text again, a new id, still works.
+   */
+  id?: string;
   content: string;
   /** Browser files retained while this composer stays mounted, for editing. */
   attachments: File[];
@@ -1312,20 +1332,6 @@ export type ProviderAuthStatus = {
 
 /** The authentication state of every CLI provider at once, keyed by LLMProvider, so onboarding and settings can render each provider's connected, loading and error state from one object returned by useProviderAuthStatus. */
 export type ProviderAuthStatusMap = Record<LLMProvider, ProviderAuthStatus>;
-
-// ---------------------------
-
-//----------------- QUICK SETTINGS PANEL ------------
-
-/** Identifier of a boolean user preference exposed in the quick settings panel; use it as the key when reading or writing one preference. */
-export type PreferenceToggleKey =
-  | 'showRawParameters'
-  | 'showWork'
-  | 'showThinking'
-  | 'sendByCtrlEnter'
-  | 'voiceEnabled';
-
-
 
 // ---------------------------
 
@@ -2043,6 +2049,147 @@ export type SoulLaunchSnapshot = { launch_id: string; role: string; agent: strin
 export type SoulLaunchStateEvent = { kind: 'soul_launch_state'; launches: SoulLaunchSnapshot[]; at: number };
 
 // ---------------------------
+//----------------- KANBAN METIS: the session a board launches ------------
+
+/**
+ * One Metis session — a board's own autonomous builder — as the pilot panel draws it.
+ *
+ * Mirrored field for field from `server/shared/types.ts`. `sessionId` is the uuid the board
+ * minted and handed to `claude --session-id`: the state directory's name, the address of every
+ * route and the input to the lease owner. `owner` is that derived owner, sixteen lowercase hex,
+ * which is what the board compares on every build-lease verb. `model` is the `--model` the child
+ * was actually given and `provider` says which endpoint it bills; the pair is settled at spawn.
+ *
+ * `lastActivityAt` is `child.log`'s mtime — the child is detached and owns its own log, so its
+ * log's stamp is the only liveness signal that outlives a server restart. Every timestamp is
+ * epoch MILLISECONDS.
+ */
+export type KanbanMetisSession = {
+  sessionId: string;
+  boardId: string;
+  boardName: string;
+  provider: 'deepseek' | 'claude';
+  model: string;
+  owner: string;
+  launchedBy: 'operator' | 'driver';
+  state: 'running' | 'completed' | 'stopped' | 'failed';
+  pid: number | null;
+  startedAt: number;
+  endedAt: number | null;
+  lastActivityAt: number;
+  exitCode: number | null;
+};
+
+/** The whole picture, pushed on change over `/ws`. `sessions` is ordered by `startedAt` ascending. `at` is epoch MILLISECONDS, unlike every field inside a session. */
+export type KanbanMetisStateEvent = { kind: 'kanban_metis_state'; sessions: KanbanMetisSession[]; at: number };
+
+// ---------------------------
+//----------------- UNIVERSE: the estate map and its live activity ------------
+
+/**
+ * One node of the estate map: a star (a tracked file), a body (a directory), a galaxy (a repo), the
+ * sun (`core`), or an endpoint (a Postgres database or an MCP server).
+ *
+ * The keys and the numbers are the crawler's own, carried through untouched — `l`, `t` and `c` come
+ * off the git history, and `p` indexes the map's `nodes` array as the one process that wrote them
+ * assigned it. Nothing on this side recomputes an index.
+ */
+export type UniverseNode = {
+  /** Basename only: where a node sits is the chain of `p` links above it. */
+  n: string;
+  /** Parent node index; `-1` for a repo, the sun or an endpoint, which hang off nothing. */
+  p: number;
+  k: 'galaxy' | 'core' | 'dir' | 'endpoint' | 'source' | 'config' | 'docs' | 'data-sql' | 'assets' | 'other';
+  /** Lines of the file; `0` for a directory or an endpoint, which have no length. */
+  l: number;
+  /** Epoch SECONDS of the newest commit touching it — what a star's brightness is read from. */
+  t: number;
+  /** Commits touching it — the churn a star's size and brightness are read from. */
+  c: number;
+};
+
+/**
+ * The whole estate as one payload: every repo the registry covers, flattened into one node list
+ * with every index already global. This is `merged.json` as the crawler wrote it, and the only
+ * thing the tab reads.
+ *
+ * `mapId` is the first 12 hex of the four repo HEAD shas joined by a newline, so it changes when,
+ * and only when, a repo's HEAD moves: a client holding a different one refetches, and that is the
+ * whole invalidation rule. `resolve` is shipped as DATA rather than restated as code — a consumer
+ * takes the FIRST entry its path starts with and never re-sorts, because the entries are ordered
+ * longest path first and the ordering IS the rule.
+ */
+export type UniverseMap = {
+  mapId: string;
+  /** Epoch SECONDS of the crawl that wrote this map. */
+  builtAt: number;
+  repos: {
+    id: string;
+    head: string;
+    /** Index of this repo's node in `nodes` — where its file tree begins. */
+    base: number;
+    files: number;
+    dirs: number;
+    builtAt: number;
+  }[];
+  nodes: UniverseNode[];
+  /** Flat `[from, to, weight]` triples over `nodes` indices, one list per relation. */
+  edges: {
+    tree: [number, number, number][];
+    import: [number, number, number][];
+    cochange: [number, number, number][];
+    endpoint: [number, number, number][];
+  };
+  /** The HTTP routes the app serves; `n` is the node of the file that declares one. */
+  routes: { m: string; p: string; n: number }[];
+  /** Logger name → the node of the file that logs under it. */
+  loggers: Record<string, number>;
+  /** Table name → the node of the file that touches it. */
+  tables: Record<string, number>;
+  /** The non-file nodes, appended after the file nodes and carrying no parent. */
+  endpoints: { id: string; k: 'pg' | 'mcp' }[];
+  /**
+   * Cross-repo edges by SHARED ATTENTION: `w` counts the sessions that read, named or edited files
+   * in both repos. It is not an edit edge, and nothing on screen may call it one.
+   */
+  attention: { a: string; b: string; w: number }[];
+  resolve: { id: string; path: string }[];
+  /** What a best-effort tap could not answer — a route dump that timed out, a repo it could not read. */
+  warnings: string[];
+};
+
+/**
+ * One row of the estate's live activity, from a `universe_activity` frame: what happened, where, and
+ * how much of it since the last frame. Rows are aggregated before they are sent — the raw stream is
+ * an edit per keystroke and an execution per log line, and the wire carries neither.
+ */
+export type UniverseActivityRow = {
+  /** Node index into the map; `-1` when nothing resolved. */
+  node: number;
+  kind: 'edit' | 'exec';
+  /** Raw events this row aggregates since the last frame. */
+  count: number;
+  /** Epoch MILLISECONDS of the newest raw event in this row — unlike the map's epoch-second stamps. */
+  at: number;
+  /** A systemd unit name, or `'session'`. */
+  source: string;
+  /** The Claude session id, when `source === 'session'`. */
+  session?: string;
+};
+
+/**
+ * What the estate's feed puts on the live bus (`universe:*`): the last window's activity COUNTED,
+ * never the rows themselves. The bus retains one value per topic and compares each publish by
+ * `JSON.stringify`, so a lane carrying the raw stream would stringify the whole payload ten times a
+ * second for as long as the estate is busy — the digest is what makes the lane cost a summary.
+ *
+ * `at` is the newest raw event the window held, epoch MILLISECONDS, and is what a reader measures
+ * the digest's staleness against: a quiet minute publishes nothing, so the counts describe the last
+ * window that had anything in it rather than the last second that elapsed.
+ */
+export type UniverseDigest = { edits: number; execs: number; at: number };
+
+// ---------------------------
 //----------------- CHAT GUTTERS ------------
 // The desktop chat's side gutters: optional widgets beside the transcript, each draggable between
 // the four slots. The placement is a setting the client owns (it never reaches the server), so
@@ -2077,5 +2224,5 @@ export type SubagentTranscriptResult = { found: boolean; activity: SubagentActiv
 /** What the chat publishes for its Subagents widget: the session the rows belong to, the agent container rows of the history the chat has loaded, and the launcher-soul ids that same history anchored. Scoped by `sessionId`, which the widget checks before drawing anything — rows tagged with another chat are refused, not shown. */
 export type ChatSubagentSource = { sessionId: string; agentMessages: ChatMessage[]; soulLaunchIds: string[] };
 
-/** What the widget's transcript view is open on: an `Agent`-tool row addressed by the tool call that spawned it (`id` is that call's `tool_id`), or a launcher soul addressed by its launch id. */
-export type SubagentTranscriptTarget = { kind: 'agent' | 'soul'; id: string };
+/** What the widget's transcript view is open on: an `Agent`-tool row addressed by the tool call that spawned it (`id` is that call's `tool_id`), a launcher soul addressed by its launch id, or a board's Metis addressed by the session id the board minted. Its third consumer is the kanban module's `KanbanMetisPanel.tsx`, which opens a fleet row into the same view rather than a copy of it. */
+export type SubagentTranscriptTarget = { kind: 'agent' | 'soul' | 'metis'; id: string };

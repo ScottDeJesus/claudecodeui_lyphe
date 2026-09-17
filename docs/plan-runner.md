@@ -55,13 +55,14 @@ recursive watch; and a run going stale is a *lapsed* heartbeat — the absence o
 filesystem event can ever report.
 
 **The poll itself is no longer this lane's own.** `server/shared/polled-lane.service.ts`
-(`createPolledLane`) is the read-picture / compare / broadcast-on-change loop both of this server's
-state lanes run, and `runner-watcher.service.ts` is now a thin adapter over it that supplies this
+(`createPolledLane`) is the read-picture / compare / broadcast-on-change loop every state lane on
+this server runs, and `runner-watcher.service.ts` is now a thin adapter over it that supplies this
 lane's `snapshot` and its `runner_state` frame and nothing else. The reasoning above, the
 broadcast-after-send dedup order, and why a failing tick never takes the interval down with it live
-there, in one copy. The sibling is the launcher-souls lane
+there, in one copy. The siblings are the launcher-souls lane
 ([dispatch-souls.md](dispatch-souls.md)), which reads `~/.claude/state/dispatch-souls/` on the same
-cadence — a different root, a different frame, the same loop.
+cadence, and a board's own Metis sessions (`kanban-metis/kanban-metis.module.ts`, the
+`kanban_metis_state` frame) — a different root and a different frame each time, the same loop.
 
 ## The DeepSeek switch — the one state file this server writes
 
@@ -70,6 +71,19 @@ reached through `GET`/`PUT /api/settings/deepseek-flash` (`{"enabled": boolean}`
 400, unauthenticated is 401 — the whole `/api/settings` mount is behind `authenticateToken`). Both
 verbs answer with what was READ BACK off the file, never with the input: the file belongs to another
 daemon, and the position the UI draws should be the one on disk.
+
+**The reader and writer behind this switch are now generalised, and this file is no longer the
+only one either is asked to touch.** `readFlagFile`/`writeFlagFile` in the same source file take a
+path and answer the question above for ANY flag file; `readDeepseekFlashSwitch`/
+`writeDeepseekFlashSwitch` are the two calls above them, fixed to this switch's own path. The
+generalisation exists for a per-board flag a Kanban board carries as its own DeepSeek switch,
+reached through the same barrel from `server/modules/settings/index.ts` ([kanban.md](kanban.md)
+§"The panel") — a board writes its OWN file rather than this one, because two boards on one host
+must run different models and a switch that is one file the whole box shares cannot say that.
+`server/modules/kanban-metis/metis-env.service.ts`'s `writeBoardFlag` is that second caller: it
+calls the generalised writer with a board's own path, `~/.claude/state/kanban-deepseek/<boardId>.flag`,
+at every Metis spawn — which precedence a spawned plan-runner then reads by is not yet written up
+here or in [kanban.md](kanban.md).
 
 Two client surfaces draw it, and neither holds a fetch of its own: **Settings → Agents → Claude** —
 `RunnerModelContent.tsx`, a `SettingsRow` + `SettingsToggle` — and the chat composer's own footer,
@@ -189,8 +203,8 @@ own budget is 5400 s.
 
 The beat is the **lock**, `~/.claude/state/runner/locks/<sha256(realpath(plan_path))[:16]>.json`,
 whose `heartbeat_at` a daemon thread rewrites every 30 s for as long as it lives
-(`state_lock.py:239-250`, `HEARTBEAT_S = 30`) regardless of what any phase is doing. `follow` reads
-liveness the same way (`cmd/observe.py:140-141`).
+(`state_lock.py:239-250`, `HEARTBEAT_S = 30`) regardless of what any phase is doing. `plan-runner status` reads
+liveness the same way (`cmd/observe.py`, `_liveness`).
 
 That path is **absolute and not `<state dir>/locks/`**, which is a distinction worth keeping
 straight because the two coincide in the default configuration and diverge in the one that matters.
@@ -313,7 +327,7 @@ tabs receive, and only when that picture changed.
 | `complete`, no phase blocked or pending | `runner.finished` | `stop` — Run stopped | priority 3, ✅ |
 | `complete` with phases left, `all-blocked`, `halted`, `budget`, `flag-off` | `runner.blocked` | `error` — Run failed | priority 4, ⚠️ |
 | `rate-limited`, `dry-run`, a receipt caught mid-write (`unknown`) | none | — | — |
-| a fixture walk — the plan under `~/.claude/state/runner-fixtures/` or the OS temp dir (`scripts/runner_fixtures/*.sh`) | none | — | — |
+| a fixture walk — the plan in a scratch folder — `~/.claude/state/test-projects/runner-fixtures/`, anywhere else under `~/.claude/state`, or the OS temp dir (`scripts/runner_fixtures/*.sh`) | none | — | — |
 
 "Phases left" is the card's own `runUnfinished` rule — a blocked or pending phase — read off the
 phases, never off the receipt's word. A rate-limited park says nothing because nothing is wrong with
@@ -418,8 +432,10 @@ than a failure — the next frame fills it — and is logged, not surfaced.
 The bus itself — the topic allowlist, the retained values, the synchronous replay, and why it knows
 no producer — is documented on
 [architecture/07-live-widgets.md](architecture/07-live-widgets.md). This lane was simply its first
-publisher. **The second has arrived and it kept the shape**: `SoulLaunchFeed.tsx` in
-`src/modules/dispatch-souls/` publishes `souls:*` the same way, mounted NESTED inside this feed in
+publisher. **Two more have arrived and both kept the shape**: `SoulLaunchFeed.tsx` in
+`src/modules/dispatch-souls/` publishes `souls:*` the same way, and `UniverseFeed.tsx` in
+`src/modules/universe/` publishes `universe:*` as a once-a-second digest rather than the raw stream —
+both mounted NESTED inside one another in
 `App` rather than beside it — a feed is a wrapper, not a sibling, so the innermost thing in that
 stack is still the router. Every further lane arrives as one more `*Feed.tsx` in its own module and
 never as a line inside `live-bus/`.
@@ -557,9 +573,8 @@ while it is the selected tab even after the last run ends, so a run finishing un
 its phases empties the panel instead of taking the tab out from under them. There is consequently
 **no snap-back effect** for it in `WorkspaceMain` — the three effects there belong to the
 PREFERENCE-gated tabs, whose gates really can turn off mid-act; a data-gated tab's gate is written
-never to. `VALID_TABS` and the `handleSessionSelect` reset in `useProjectsState` both name `runner`,
-so a restored `runner` tab lands on the panel rather than an empty pane, and switching session
-returns to chat the way it does from memory and tasks.
+never to. `VALID_TABS` names `runner`, so a restored `runner` tab lands on the panel rather than an empty
+pane; switching session returns to chat from it as from every tab (`handleSessionSelect`).
 
 **The badge.** `runnerCount` travels to `WorkspaceTabs` as a prop — the strip never calls
 `useRunnerRuns` itself, which would be a second source for a decision already made — and is drawn

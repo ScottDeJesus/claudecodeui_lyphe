@@ -25,6 +25,7 @@ type RunningSessionApiItem = {
   projectDisplayName?: unknown;
   sessionTitle?: unknown;
   lastActivity?: unknown;
+  awaitingInput?: unknown;
 };
 
 type RunningSessionsApiPayload = {
@@ -67,7 +68,8 @@ const runningSessionListsMatch = (
       && item.projectDisplayName === other.projectDisplayName
       && item.sessionTitle === other.sessionTitle
       && item.lastActivity === other.lastActivity
-      && item.provider === other.provider;
+      && item.provider === other.provider
+      && item.awaitingInput === other.awaitingInput;
   });
 
 /**
@@ -144,6 +146,7 @@ export function SessionProtectionProvider({ children }: { children: ReactNode })
             projectDisplayName: asOptionalString(session.projectDisplayName) ?? 'Unknown Project',
             sessionTitle: asOptionalString(session.sessionTitle) ?? session.sessionId,
             lastActivity: asOptionalString(session.lastActivity),
+            awaitingInput: session.awaitingInput === true,
           });
           return acc;
         }, []);
@@ -180,8 +183,19 @@ export function SessionProtectionProvider({ children }: { children: ReactNode })
     const interval = window.setInterval(() => {
       void refreshRunningSessions();
     }, 5000);
+    // A hidden tab's timers are throttled to about once a minute; refresh the moment it is looked
+    // at again, so a spinner or a waiting-for-you dot is not a minute stale on return.
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') {
+        void refreshRunningSessions();
+      }
+    };
+    document.addEventListener('visibilitychange', onVisible);
 
-    return () => window.clearInterval(interval);
+    return () => {
+      window.clearInterval(interval);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
   }, [refreshRunningSessions]);
 
   const actions = useMemo<SessionProtectionActions>(
@@ -224,6 +238,27 @@ export function useBusySessionIdSet(): ReadonlySet<string> {
     throw new Error('useBusySessionIdSet must be used within SessionProtectionProvider');
   }
   return busySessionIds;
+}
+
+/**
+ * The running sessions with a question or permission prompt waiting on the user, from the same
+ * 5-second refresh. A sidebar row shows these as a yellow dot in place of its spinner: the run is
+ * not working, it is waiting.
+ */
+export function useAwaitingInputSessionIdSet(): ReadonlySet<string> {
+  const runningSessions = useContext(RunningSessionsContext);
+  // A membership key, as `useBusySessionIds`: the running list is rebuilt whenever a run's
+  // `lastActivity` moves, and every sidebar row reads this set — keyed on the list, each poll
+  // during a run would re-render every row past its memo.
+  const membershipKey = runningSessions
+    .filter((run) => run.awaitingInput)
+    .map((run) => run.sessionId)
+    .sort()
+    .join('\u0000');
+  return useMemo(
+    () => new Set(membershipKey ? membershipKey.split('\u0000') : []),
+    [membershipKey],
+  );
 }
 
 /**

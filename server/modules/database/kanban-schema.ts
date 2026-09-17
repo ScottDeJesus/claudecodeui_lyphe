@@ -28,6 +28,7 @@ CREATE TABLE IF NOT EXISTS kanban_boards (
     name TEXT NOT NULL,
     project_id TEXT NULL REFERENCES projects(project_id) ON DELETE SET NULL,
     autonomy INTEGER NOT NULL DEFAULT 0,
+    deepseek_flash INTEGER NOT NULL DEFAULT 0,
     sort_order REAL NOT NULL DEFAULT 0,
     archived INTEGER NOT NULL DEFAULT 0,
     created_at TEXT NOT NULL,

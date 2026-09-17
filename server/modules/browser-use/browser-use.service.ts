@@ -10,12 +10,11 @@ import spawn from 'cross-spawn';
 import { appConfigDb } from '@/modules/database/index.js';
 import { providerMcpService } from '@/modules/providers/index.js';
 import { userFacingEnv } from '@/shared/child-env.js';
-import { getModuleDirectory } from '@/shared/utils.js';
+import { resolveMcpCommand } from '@/shared/mcp-command.js';
 
 import { getBrowserUseRuntime } from './browser-use-runtime.js';
 
 const require = createRequire(import.meta.url);
-const __dirname = getModuleDirectory(import.meta.url);
 const MAX_SESSIONS_PER_OWNER = Number.parseInt(process.env.CLOUDCLI_BROWSER_USE_MAX_SESSIONS_PER_OWNER || '3', 10);
 const SESSION_TTL_MS = Number.parseInt(process.env.CLOUDCLI_BROWSER_USE_SESSION_TTL_MS || String(30 * 60 * 1000), 10);
 const BROWSER_USE_SETTINGS_KEY = 'browser_use_settings';
@@ -145,46 +144,6 @@ function getPlaywright(): any | null {
   } catch {
     return null;
   }
-}
-
-/**
- * How an agent's MCP client should launch the Browser stdio server.
- *
- * Three installs, three answers. A packaged install has the compiled sibling next to this
- * module and runs it on the node already executing. A dev checkout has neither that sibling
- * NOR a global `cloudcli` on PATH — the server there runs from TypeScript through tsx — so
- * registering the bare binary wrote an entry whose only possible outcome was
- * `ENOENT: Executable not found in $PATH: cloudcli`; it runs the TS entry through the repo's
- * own tsx instead. The bare binary stays as the last resort, for an install that has the
- * global on PATH and no sources to run.
- */
-function getMcpCommand(): { command: string; args: string[] } {
-  const mcpScriptPath = path.join(__dirname, 'browser-use-mcp.js');
-  if (fs.existsSync(mcpScriptPath)) {
-    return {
-      command: process.execPath,
-      args: [mcpScriptPath],
-    };
-  }
-
-  // server/modules/browser-use → the repo root three levels up, in the dev layout this branch
-  // is the only one that fires from.
-  const repoRoot = path.resolve(__dirname, '..', '..', '..');
-  const tsxPath = path.join(repoRoot, 'node_modules', '.bin', 'tsx');
-  const mcpSourcePath = path.join(__dirname, 'browser-use-mcp.ts');
-  if (fs.existsSync(tsxPath) && fs.existsSync(mcpSourcePath)) {
-    return {
-      // The server tsconfig, not the root one: the entry imports through the same NodeNext
-      // resolution and `@/` paths the rest of server/ is built with.
-      command: tsxPath,
-      args: ['--tsconfig', path.join(repoRoot, 'server', 'tsconfig.json'), mcpSourcePath],
-    };
-  }
-
-  return {
-    command: 'cloudcli',
-    args: ['browser-use-mcp'],
-  };
 }
 
 function getMcpApiUrl(): string {
@@ -327,9 +286,13 @@ async function installRuntime(): Promise<{ success: boolean; message: string }> 
   runtimeProbeCache = null;
   installPromise = (async () => {
     try {
-      lastInstallMessage = 'Installing Playwright package...';
-      await runCommand(npmCommand, ['install', '--no-save', '--no-package-lock', 'playwright']);
-
+      // The `playwright` package is a declared optionalDependency (package.json), so every
+      // lockfile-driven install carries it. It used to be pulled in here with `npm install
+      // --no-save --no-package-lock`, which left it extraneous to the lockfile — the next
+      // `npm ci` pruned it (measured 2026-09-11: the upstream sync removed it and the feature
+      // went dark until 2026-09-16) — and `--no-package-lock` re-resolved every caret in the
+      // tree under the running server (727 packages churned in a dry run). Only the browser
+      // binaries are installed here; the package itself is npm's job.
       if (process.platform === 'linux') {
         lastInstallMessage = 'Installing Chromium system dependencies...';
         await runCommand(npmCommand, ['exec', '--', 'playwright', 'install-deps', 'chromium']);
@@ -474,7 +437,8 @@ export const browserUseService = {
       playwrightInstalled: readiness.playwrightInstalled,
       chromiumInstalled: readiness.chromiumInstalled,
       installInProgress: readiness.installInProgress,
-      sessionCount: sessions.size,
+      // Stopped sessions stay in the map (their record is still readable); only live ones count.
+      sessionCount: [...sessions.values()].filter((session) => session.status === 'ready').length,
       message: available
         ? 'Browser runtime is available.'
         : getSetupMessage(settings, readiness),
@@ -482,7 +446,9 @@ export const browserUseService = {
   },
 
   async registerAgentMcp() {
-    const { command, args } = getMcpCommand();
+    // The three-install resolver lives in `server/shared/mcp-command.ts`, because kanban-metis
+    // resolves the same three branches for its own stdio server.
+    const { command, args } = resolveMcpCommand('browser-use-mcp', 'browser-use-mcp');
     await Promise.all(LEGACY_MCP_SERVER_NAMES.map((name) => removeMcpServerFromAllProviders(name)));
     const results = await providerMcpService.addMcpServerToAllProviders({
       name: MCP_SERVER_NAME,

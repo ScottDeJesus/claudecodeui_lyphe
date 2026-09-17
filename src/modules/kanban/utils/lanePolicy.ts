@@ -46,7 +46,9 @@ export type KanbanLaneSpec = {
 export const DONE_LANE_ID = 'done';
 
 /**
- * The board's lanes, left to right, for a given autonomy setting.
+ * The board's lanes, left to right, for a given autonomy setting. Backlog is leftmost (operator
+ * ruling 2026-09-16): work enters at the left edge and flows right, so the scan reads as a
+ * pipeline — not-ready, ready, being asked about, being built, done.
  *
  * AUTONOMY OFF — four lanes, and To Do carries TWO statuses. A card waiting on an answer is not
  * hidden and its status is never rewritten to make the board simpler: it sits in To Do wearing
@@ -54,16 +56,12 @@ export const DONE_LANE_ID = 'done';
  *
  * AUTONOMY ON — five. To Do narrows to `todo` alone and Open questions becomes a lane of its own,
  * placed DIRECTLY AFTER To Do: those are the cards that just left it, and a card that splits out
- * should land next door rather than two columns away. It is also the lane that wants a person,
- * so it sits early in the left-to-right scan rather than behind the backlog.
+ * should land next door rather than two columns away.
  *
- * THE PLAN SAYS ONLY "between To Do and In Progress", which `[todo, backlog, questions, active]`
- * would also satisfy, so this file is where that is settled — and it is settled on more than
- * taste. This order IS the keyboard's: `Ctrl/Cmd + →` moves the focused card to the ADJACENT
- * lane, so from a To Do card the easiest key on the board asks a question about it, which is the
- * move a reader makes there. With Backlog second, that same key would demote a ready card to the
- * backlog — a rarer move, and a colder one, to have sitting under the easiest keystroke. Phase 10
- * inherits this ruling from here rather than re-deciding it in the drag hook.
+ * This order IS the keyboard's: `Ctrl/Cmd + →` moves the focused card to the ADJACENT lane, so
+ * from a To Do card the easiest key asks a question about it (autonomy on) or starts building it
+ * (autonomy off), and `←` demotes it to the backlog. The drag hook inherits this ruling from here
+ * rather than re-deciding it.
  */
 export function kanbanLanes(autonomy: boolean): KanbanLaneSpec[] {
   const todo: KanbanLaneSpec = {
@@ -114,8 +112,8 @@ export function kanbanLanes(autonomy: boolean): KanbanLaneSpec[] {
   };
 
   return autonomy
-    ? [todo, questions, backlog, inProgress, done]
-    : [todo, backlog, inProgress, done];
+    ? [backlog, todo, questions, inProgress, done]
+    : [backlog, todo, inProgress, done];
 }
 
 /**

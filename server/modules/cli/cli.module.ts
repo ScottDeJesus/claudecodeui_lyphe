@@ -91,5 +91,9 @@ export function createCliApplication(): CliApplication {
       const { startBrowserUseMcp } = await import('../browser-use/index.js');
       await startBrowserUseMcp();
     },
+    startKanbanPmMcp: async () => {
+      const { startKanbanPmMcp } = await import('../kanban-metis/index.js');
+      await startKanbanPmMcp();
+    },
   });
 }

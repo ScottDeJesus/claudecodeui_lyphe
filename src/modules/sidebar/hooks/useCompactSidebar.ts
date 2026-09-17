@@ -1,7 +1,8 @@
 import { useSyncExternalStore } from 'react';
 
-/** Tailwind's `md` breakpoint — the width the sidebar swaps layouts at. */
-const COMPACT_QUERY = '(max-width: 767px)';
+/** Tailwind's `md` breakpoint — the width the sidebar swaps layouts at. `.98`, not 767: `md` is
+ *  min-width 768px, and a zoomed viewport can sit between the two, where neither block would show. */
+const COMPACT_QUERY = '(max-width: 767.98px)';
 
 let query: MediaQueryList | null = null;
 const readQuery = (): MediaQueryList => (query ??= window.matchMedia(COMPACT_QUERY));

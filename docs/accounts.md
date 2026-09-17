@@ -155,7 +155,7 @@ both — the one in use and the one *Save it* would adopt — and `Save it` is t
    first — so closing this panel mid-run no longer kills the run. `stopPropagation()` is
    deliberately absent: this panel is not modal, an overlay opened over it sits in front, and
    stopping the key at the earliest point took it away from the very thing the reader was looking
-   at.
+   at. The shared `Dialog` does stop it, because a modal has nothing in front of it.
 
 5. **A switch is unguarded by a dialog; a second write is not.** The soft gate is the fact on the
    row — *in use now · 8 sessions running* — rather than a modal. What is refused is a write while

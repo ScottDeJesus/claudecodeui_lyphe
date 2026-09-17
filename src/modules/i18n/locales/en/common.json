@@ -24,10 +24,10 @@
     "git": "Git",
     "tasks": "Tasks",
     "browser": "Browser",
-    "computer": "Computer",
     "memory": "Memory",
     "runner": "Runner",
-    "kanban": "Kanban"
+    "kanban": "Kanban",
+    "universe": "Universe"
   },
   "kanban": {
     "loading": "Reading the board…",
@@ -46,6 +46,8 @@
       "actions": "Board actions",
       "noBoard": "No board",
       "autonomy": "Autonomy",
+      "deepseekFlash": "DeepSeek Flash",
+      "deepseekFlashTooltip": "Puts this board's Metis, and every plan runner she starts, on DeepSeek Flash.",
       "newBoard": "New board",
       "rename": "Rename",
       "archive": "Archive",
@@ -60,6 +62,33 @@
       "save": "Save",
       "questionsFolded_one": "{{count}} card in To Do is waiting on an answer",
       "questionsFolded_other": "{{count}} cards in To Do are waiting on an answer"
+    },
+    "metis": {
+      "title": "Metis",
+      "launch": "Launch Metis",
+      "loading": "Reading the fleet…",
+      "empty": {
+        "title": "No Metis on this board",
+        "message": "Nothing is running here and nothing has run recently. Launch one to start working the board."
+      },
+      "state": {
+        "running": "Running",
+        "completed": "Completed",
+        "stopped": "Stopped",
+        "failed": "Failed"
+      },
+      "stop": "Stop",
+      "resume": "Resume",
+      "transcript": "Transcript",
+      "ago": "{{elapsed}} ago",
+      "exitCode": "exit {{code}}",
+      "runningCount_one": "{{count}} running",
+      "runningCount_other": "{{count}} running",
+      "collapse": "Hide the fleet",
+      "expand": "Show the fleet",
+      "notLaunched": "The Metis was not launched",
+      "notStopped": "The Metis was not stopped",
+      "notResumed": "The Metis was not resumed"
     },
     "lanes": {
       "todo": "To Do",
@@ -176,6 +205,8 @@
       "boardArchived": "Board archived — nothing was deleted",
       "autonomyOn": "Autonomy on",
       "autonomyOff": "Autonomy off",
+      "deepseekFlashOn": "DeepSeek Flash on",
+      "deepseekFlashOff": "DeepSeek Flash off",
       "cardArchived": "Card archived",
       "laneCleared": "The lane's cards were archived"
     },
@@ -574,5 +605,52 @@
       "label": "This session",
       "title": "Created by the chat you have open"
     }
+  },
+  "applications": {
+    "fabLabel": "Applications",
+    "heading": "Your <em>apps</em>",
+    "closeDrawer": "Close",
+    "close": "Close all",
+    "summaryNone": "None on file",
+    "summarySingle_one": "{{count}} app · single screen",
+    "summarySingle_other": "{{count}} apps · single screen",
+    "summaryDual_one": "{{count}} app · dual screen on",
+    "summaryDual_other": "{{count}} apps · dual screen on",
+    "dualScreen": "Dual screen",
+    "dualScreenHint": "Two apps side by side, divider draggable.",
+    "opensIn": "Opens in",
+    "left": "Left",
+    "right": "Right",
+    "hostOnScreen": "{{host}} · on screen",
+    "reload": "Reload",
+    "openInNewTab": "Open in a new tab",
+    "openInDual": "Open in dual screen",
+    "closeDual": "Close dual screen",
+    "remove": "Remove",
+    "removeFailed": "The application could not be removed",
+    "removeFailedPane": "{{name}} was closed and is still on file.",
+    "unreadable": "The application list could not be read",
+    "empty": "No applications yet",
+    "emptyMessage": "Add one with its name and web address and it opens right here.",
+    "emptyAction": "Add your first application",
+    "addApplication": "Add application",
+    "form": {
+      "title": "New application",
+      "nameLabel": "Name",
+      "nameHelper": "What you call it in this drawer.",
+      "namePlaceholder": "Jobs console",
+      "urlLabel": "Web address",
+      "urlHelper": "http:// is added if you leave it off. {host} stands for the address this page is open on.",
+      "urlPlaceholder": "{host}:8080",
+      "nameRequired": "Give it a name so you can find it here.",
+      "urlRequired": "An address is needed to load the app.",
+      "urlInvalid": "That address can't be read — check for typos.",
+      "submit": "Add it",
+      "cancel": "Cancel",
+      "addFailed": "The application could not be added"
+    },
+    "appearanceLight": "Light appearance",
+    "appearanceDark": "Dark appearance",
+    "divider": "Resize applications"
   }
 }

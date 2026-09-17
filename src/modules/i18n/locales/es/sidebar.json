@@ -161,7 +161,6 @@
     "cannotUndo": "Puedes volver a añadir el proyecto más tarde."
   },
   "simpleList": {
-    "project": "Proyecto",
     "newChat": "Nuevo chat",
     "empty": "Aún no hay chats. Empieza uno con Nuevo chat.",
     "loadMore": "Mostrar más",

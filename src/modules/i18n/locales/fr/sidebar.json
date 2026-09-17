@@ -161,7 +161,6 @@
     "cannotUndo": "Vous pourrez rajouter le projet ultérieurement."
   },
   "simpleList": {
-    "project": "Projet",
     "newChat": "Nouveau chat",
     "empty": "Pas encore de chats. Commencez-en un avec Nouveau chat.",
     "loadMore": "Afficher plus",

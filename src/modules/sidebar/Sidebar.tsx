@@ -41,6 +41,8 @@ type SidebarProps = {
   // A slot, not an import: the workspace tab strip is built by project-workspace and rendered
   // here, under the wordmark, so the dependency keeps pointing one way. `null` = no strip.
   tabs?: ReactNode;
+  // Same slot discipline, for the control left of the wordmark. `undefined` = nothing there.
+  leading?: ReactNode;
 };
 
 type TaskMasterSidebarContext = {
@@ -69,6 +71,7 @@ function Sidebar({
   onCloseSettings,
   isMobile,
   tabs,
+  leading,
 }: SidebarProps) {
   const { t } = useTranslation(['sidebar', 'common']);
   // Here, not in the project tree: this component renders in BOTH sidebar modes.
@@ -292,6 +295,7 @@ function Sidebar({
               />
             ) : null}
             tabs={tabs}
+            leading={leading}
             runningSessionsCount={runningSessionsCount}
             archivedProjects={archivedProjects}
             archivedSessions={archivedSessions}

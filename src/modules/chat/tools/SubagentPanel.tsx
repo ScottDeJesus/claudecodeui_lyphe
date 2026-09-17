@@ -1,17 +1,20 @@
 import { memo, useMemo, useState } from 'react';
-import { Bot, ChevronRight, CircleAlert, CircleCheck } from 'lucide-react';
+import { Bot } from 'lucide-react';
 
-import type { DiffLine, Project, SubagentActivity, SubagentInfo, SubagentUsage, ToolResult } from '@/shared/types';
+import type { DiffLine, LLMProvider, Project, SubagentActivity, SubagentInfo, SubagentUsage, ToolResult } from '@/shared/types';
+import { Badge, LLMProviderLogo } from '@/shared/ui';
 import { cn } from '@/shared/utils';
 import { SubagentNote } from '@/modules/chat/tools/SubagentNote';
 import { ToolRenderer } from '@/modules/chat/tools/ToolRenderer';
 import { useIsExportingTranscript } from '@/modules/chat/context/TranscriptRenderContext';
 import { MarkdownContent } from '@/modules/chat/tools/ContentRenderers/MarkdownContent';
+import { TOOL_ROW_FRAME, TOOL_ROW_HEADER, TOOL_ROW_LABEL, TOOL_ROW_SEPARATOR } from '@/modules/chat/tools/toolRow';
 import {
   describeSubagentUsage,
   formatSubagentFinishTime,
   parseSubagentToolInput,
   readSubagentSummary,
+  subagentMarkProvider,
 } from '@/modules/chat/utils/subagentSummary';
 
 type SubagentPanelProps = {
@@ -24,6 +27,10 @@ type SubagentPanelProps = {
   activity?: SubagentActivity[];
   /** What the agent has spent, when its provider records usage. */
   usage?: SubagentUsage;
+  /** The session's provider; with the agent's own model it decides the row's mark. */
+  provider?: LLMProvider;
+  /** The model the agent ran on, live or from history (`ChatMessage.subagentModel`). */
+  model?: string;
   onFileOpen?: (filePath: string, diffInfo?: unknown) => void;
   createDiff: (oldStr: string, newStr: string) => DiffLine[];
   selectedProject?: Project | null;
@@ -61,18 +68,21 @@ function readResultText(content: unknown): string {
   return text;
 }
 
-const STATUS_STYLES: Record<SubagentInfo['status'], string> = {
-  running: 'text-purple-600 dark:text-purple-300',
-  completed: 'text-muted-foreground',
-  failed: 'text-red-600 dark:text-red-400',
-  // The reader's own Stop or an interrupt: nothing went wrong, so not red.
-  stopped: 'text-amber-700 dark:text-amber-400',
+/** An ended agent's outcome as the tool rows' compact pill. A Stop or an interrupt is not a failure, so it is not red. */
+const ENDED_BADGE: Record<Exclude<SubagentInfo['status'], 'running'>, { label: string; tone: 'positive' | 'danger' | 'warn' }> = {
+  completed: { label: 'Finished', tone: 'positive' },
+  failed: { label: 'Failed', tone: 'danger' },
+  stopped: { label: 'Stopped', tone: 'warn' },
 };
 
 /**
  * Rendered by chat's MessageComponent for any tool call that spawned a
  * subagent — Claude's `Agent`/`Task` and Codex's `spawn_agent` both normalize
  * to the same shape, so both render through this one panel.
+ *
+ * It wears the tool rows' frame (`toolRow.ts`) — the same pill, height and order as a Bash run: the
+ * mark of the provider the agent ran on, its name, `/`, what it was asked to do, then its figures
+ * and its outcome. The whole row toggles the timeline; there is no caret and no coloured stripe.
  *
  * The timeline is mounted only while the panel is open. The shared Collapsible
  * keeps its children mounted when closed, which for an agent that ran a
@@ -85,6 +95,8 @@ export const SubagentPanel = memo(({
   subagent,
   activity,
   usage,
+  provider,
+  model,
   onFileOpen,
   createDiff,
   selectedProject,
@@ -123,63 +135,73 @@ export const SubagentPanel = memo(({
   const untransmittedCount = Math.max(0, (subagent?.activityCount ?? entries.length) - entries.length);
   const visibleEntries = entries.slice(0, effectiveRenderLimit);
   const hiddenCount = entries.length - visibleEntries.length;
+  const markProvider = subagentMarkProvider(provider, model);
+  // The tool count shows while running too, as the pinned row does: it is how far the agent has got.
+  const toolFigure = toolCount > 0 ? `${toolCount} ${toolCount === 1 ? 'tool' : 'tools'}` : null;
+  const endFigure = status !== 'running' ? finishTime || null : null;
 
   return (
-    <div className="my-1 border-l-2 border-l-purple-500 py-0.5 pl-3 dark:border-l-purple-400">
+    <div
+      data-testid="subagent-row"
+      data-status={status}
+      data-provider={markProvider}
+      className={cn(
+        'subagent-row group/agent transition-all duration-200',
+        TOOL_ROW_FRAME,
+        isOpen ? 'bg-muted/50 shadow-sm' : 'hover:border-border hover:bg-muted/60',
+      )}
+    >
       <button
         type="button"
-        aria-expanded={isOpen}
+        aria-expanded={showTimeline}
         onClick={() => setIsOpen((previous) => !previous)}
-        className="flex w-full select-none items-center gap-1.5 py-0.5 text-left text-xs text-muted-foreground transition-colors hover:text-foreground"
+        className={cn(TOOL_ROW_HEADER, 'w-full select-none text-left outline-none focus-visible:ring-1 focus-visible:ring-ring')}
       >
-        <ChevronRight className={cn('h-3 w-3 flex-shrink-0 transition-transform duration-150', isOpen && 'rotate-90')} />
-        <Bot className="h-3.5 w-3.5 flex-shrink-0 text-purple-500 dark:text-purple-400" />
-        <span className="flex-shrink-0 font-medium text-foreground">{label || 'Agent'}</span>
+        {/* Defensive: a normalized message always carries its provider. The robot stands in only when
+          * none is known, because `LLMProviderLogo` would otherwise dress it in Claude's mark. */}
+        {markProvider ? (
+          <LLMProviderLogo provider={markProvider} className="h-3.5 w-3.5 flex-shrink-0" />
+        ) : (
+          <Bot aria-hidden className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />
+        )}
+        <span className={TOOL_ROW_LABEL}>{label || 'Agent'}</span>
         {description && (
           <>
-            <span className="flex-shrink-0 text-[10px] text-muted-foreground/40">/</span>
-            <span className="min-w-0 flex-1 truncate">{description}</span>
+            <span className={TOOL_ROW_SEPARATOR}>/</span>
+            <span className="min-w-0 flex-1 truncate text-xs text-foreground">{description}</span>
           </>
         )}
         {nickname && (
           <span className="flex-shrink-0 rounded bg-muted px-1 text-[10px] text-muted-foreground/70">{nickname}</span>
         )}
-        <span className={cn('ml-auto flex flex-shrink-0 items-center gap-1 text-[11px]', STATUS_STYLES[status])}>
-          {status === 'running' ? (
-            <>
-              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-purple-500 dark:bg-purple-400" />
-              running
-              {tokens && (
-                <span className="text-muted-foreground/70" title={tokens.long}>· {tokens.short}</span>
-              )}
-            </>
-          ) : status === 'failed' || status === 'stopped' ? (
-            <>
-              <CircleAlert className="h-3 w-3" />
-              {status}
-              {tokens && (
-                <span className="text-muted-foreground/70" title={tokens.long}>· {tokens.short}</span>
-              )}
-            </>
-          ) : (
-            <>
-              <CircleCheck className="h-3 w-3" />
-              {toolCount > 0 ? `${toolCount} ${toolCount === 1 ? 'tool' : 'tools'}` : 'done'}
-              {/* When it ended, once it is no longer pinned above the transcript. Absent
-                * rather than guessed when the stored timeline carried no stamps. */}
-              {tokens && (
-                <span className="text-muted-foreground/70" title={tokens.long}>· {tokens.short}</span>
-              )}
-              {finishTime && (
-                <span className="text-muted-foreground/70">· {finishTime}</span>
-              )}
-            </>
+        <span className="ml-auto flex flex-shrink-0 items-center gap-2 pl-2">
+          {status === 'running' && (
+            <span className="h-2.5 w-2.5 flex-shrink-0 animate-spin rounded-full border-[1.5px] border-muted-foreground/30 border-t-emerald-400" />
+          )}
+          {status === 'running' && <span className="text-[10px] text-muted-foreground/70">running</span>}
+          {/* The figures give way when the ROW is narrow (`.subagent-row__figures`, a container query in
+            * index.css) — not the window: at 768px the sidebar takes a third of the column. The row
+            * keeps what it was asked and its outcome rather than clipping both off its own frame; the
+            * pinned row still carries the figures. */}
+          {(toolFigure || tokens || endFigure) && (
+            <span className="subagent-row__figures text-[10px] tabular-nums text-muted-foreground/70">
+              {[
+                toolFigure && <span key="tools">{toolFigure}</span>,
+                tokens && <span key="tokens" title={tokens.long}>{tokens.short}</span>,
+                endFigure && <span key="end">{endFigure}</span>,
+              ]
+                .filter(Boolean)
+                .flatMap((part, index) => (index === 0 ? [part] : [<span key={`sep-${index}`}> · </span>, part]))}
+            </span>
+          )}
+          {status !== 'running' && (
+            <Badge tone={ENDED_BADGE[status].tone} className="vv-badge--compact">{ENDED_BADGE[status].label}</Badge>
           )}
         </span>
       </button>
 
       {showTimeline && (
-        <div className="mt-1.5 space-y-2 pl-[18px]">
+        <div className="settings-content-enter space-y-2 border-t border-border/50 bg-background/50 px-3 py-2">
           {subagent?.model && (
             <div className="text-[10px] uppercase tracking-wide text-muted-foreground/50">{subagent.model}</div>
           )}

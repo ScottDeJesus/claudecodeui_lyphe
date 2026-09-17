@@ -1,7 +1,7 @@
-import os from 'node:os';
 import path from 'node:path';
 
 import type { RunnerPhaseState, RunnerRunSnapshot } from '@/shared/types.js';
+import { isHiddenProjectPath } from '@/shared/hidden-project-paths.js';
 
 /**
  * Which plan-runner endings earn a notification, and the memory that makes each one push once.
@@ -64,16 +64,13 @@ const SILENT_OUTCOMES = new Set(['rate-limited', 'dry-run', 'unknown']);
 
 /**
  * The runner's own fixtures (`~/.claude/scripts/runner_fixtures/*.sh`) walk real runs off plans they
- * mint under `~/.claude/state/runner-fixtures/` or the OS temp dir. Their endings are the fixture's
- * evidence, never the operator's news: one review of the runner pushed eleven of them to the phone in
- * ten minutes (2026-09-14), three reading "Plan out of budget" for a fixture that spends nothing on purpose.
+ * mint in a scratch folder — the test root or the OS temp dir (`shared/hidden-project-paths.ts`).
+ * Their endings are the fixture's evidence, never the operator's news: one review of the runner
+ * pushed eleven of them to the phone in ten minutes (2026-09-14), three reading "Plan out of budget"
+ * for a fixture that spends nothing on purpose.
  */
-const FIXTURE_ROOTS = [path.join(os.homedir(), '.claude', 'state', 'runner-fixtures'), os.tmpdir()];
-
 function isFixture(run: RunnerRunSnapshot): boolean {
-  if (!run.plan_path) return false;
-  const plan = path.resolve(run.plan_path);
-  return FIXTURE_ROOTS.some((root) => plan === root || plan.startsWith(root + path.sep));
+  return isHiddenProjectPath(run.plan_path);
 }
 
 function isDue(run: RunnerRunSnapshot, mark: number): run is RunnerRunSnapshot & { ended_at: number } {

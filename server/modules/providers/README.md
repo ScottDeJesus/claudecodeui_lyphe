@@ -132,15 +132,17 @@ websocket, so every open tab re-renders the row.
 1. Add the provider id everywhere it is part of the contract.
 
 - Update `server/shared/types.ts` `LLMProvider`.
-- Update `src/types/app.ts` `LLMProvider` if the frontend should know about it.
+- Update `src/shared/types.ts` `LLMProvider` if the frontend should know about it.
 - Update `server/modules/providers/provider.routes.ts`.
 - Update `server/modules/agent/agent.routes.ts` if the provider is launchable from the agent runtime.
 - Update `server/index.ts` if the provider needs runtime boot or shutdown wiring.
 - Update the `PROVIDER_ORDER` list in `public/api-docs.html` if the provider should appear in the public API docs.
-- Update `src/components/chat/hooks/useChatProviderState.ts` and
-  `src/components/chat/view/subcomponents/ProviderSelectionEmptyState.tsx` if
-  the provider should be selectable in chat.
-- Update `src/components/provider-auth/view/ProviderLoginModal.tsx` if the
+- Update `src/modules/chat/hooks/useChatProviderState.ts` and
+  `src/modules/chat/transcript/ProviderSelectionEmptyState.tsx` if
+  the provider should be selectable in chat. The new-chat model picker hides a
+  provider whose `/:provider/auth/status` answers `authenticated: false`, so a
+  selectable provider needs a working auth status.
+- Update `src/modules/provider-auth/ProviderLoginModal.tsx` if the
   provider has a login/setup flow.
 
 2. Create the wrapper class.
@@ -235,6 +237,11 @@ Command forms currently used by the providers are:
   - `readLastTranscriptTimestamp(...)` — prefer this for `updated_at`; a
     transcript's mtime moves on idle bookkeeping writes, not just messages
 - Make the sync resilient to partial, malformed, or missing provider files.
+- Returning `null` from `synchronizeFile` (or refusing a path before the scan reads it) is
+  also how a provider excludes a session it does not own from ever getting a row — see
+  Claude's board-launched-Metis refusal in the scan-roots table above. Refuse on the
+  extractor's own returned `cwd`, not on a guessed path shape, and refuse it BEFORE the
+  file is read to EOF so an excluded transcript costs no more than any other skip.
 - The orchestration service runs all provider synchronizers and only advances
   `scan_state.last_scanned_at` when every provider succeeds.
 
@@ -242,7 +249,7 @@ Current session sync roots are:
 
 | Provider | Scan Roots | Metadata Helpers / Notes |
 | --- | --- | --- |
-| Claude | `~/.claude/projects/**/*.jsonl` | Uses `~/.claude/history.jsonl` for name lookup and the trailing `ai-title`, `last-prompt`, or `custom-title` entries for title recovery. |
+| Claude | `~/.claude/projects/**/*.jsonl` | Uses `~/.claude/history.jsonl` for name lookup and the trailing `ai-title`, `last-prompt`, or `custom-title` entries for title recovery. Refuses to enrol (never mints a `sessions`/`projects` row for) a transcript whose `cwd` resolves under `KANBAN_METIS_SESSION_ROOT` (`~/.claude/kanban-metis/<boardId>/`) — a board-launched Metis session the Kanban board's own driver owns and reads by session id instead; see `isUnder`/`KANBAN_METIS_SESSION_ROOT` in `claude-session-synchronizer.provider.ts`. |
 | Codex | `~/.codex/sessions/**/*.jsonl` | Uses `~/.codex/session_index.jsonl` for title lookup and the last `task_complete` message for a fallback title. |
 | Cursor | `~/.cursor/projects/**/*.jsonl` | Uses sibling `worker.log` to recover `workspacePath`, then derives the session title from the first user prompt. |
 | OpenCode | `~/.local/share/opencode/opencode.db` | Reads active sessions/messages/parts from OpenCode's shared SQLite database and stores `jsonl_path` as `null` so deleting one app session cannot remove the shared DB. |
@@ -265,10 +272,10 @@ If the provider can run live chat sessions, update the runtime entrypoints too:
 If the provider is visible in the UI, update:
 
 - provider model fallback files under `server/modules/providers/list/<provider>/`
-- `src/components/chat/hooks/useChatProviderState.ts`
-- `src/components/chat/view/subcomponents/ProviderSelectionEmptyState.tsx`
-- `src/components/provider-auth/view/ProviderLoginModal.tsx`
-- `src/components/mcp/constants.ts`
+- `src/modules/chat/hooks/useChatProviderState.ts`
+- `src/modules/chat/transcript/ProviderSelectionEmptyState.tsx`
+- `src/modules/provider-auth/ProviderLoginModal.tsx`
+- `src/shared/constants.ts` (`MCP_PROVIDER_NAMES`)
 
 ## Minimal Wrapper Template
 

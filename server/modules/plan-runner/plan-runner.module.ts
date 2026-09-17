@@ -1,4 +1,3 @@
-import os from 'node:os';
 import path from 'node:path';
 
 import type { Router } from 'express';
@@ -8,6 +7,7 @@ import { createNotificationEvent, notifyUserIfEnabled } from '@/modules/notifica
 import { WS_OPEN_STATE, connectedClients } from '@/modules/websocket/index.js';
 import type { RunnerRunSnapshot, RunnerStateEvent, RunnerVerb } from '@/shared/types.js';
 import { resolveClaudeCodeExecutablePath } from '@/shared/claude-cli-path.js';
+import { expandHome } from '@/shared/utils.js';
 
 import { createPlanRunnerRouter } from './plan-runner.routes.js';
 import { createRunnerEndingsNotifier } from './runner-endings.service.js';
@@ -69,12 +69,6 @@ const buildEndingEvent = createNotificationEvent as (input: {
   severity: 'info' | 'warning';
   dedupeKey: string | null;
 }) => object;
-
-/** `~` at the front becomes this user's home. Anywhere else it is an ordinary character. */
-function expandHome(value: string): string {
-  if (value === '~') return os.homedir();
-  return value.startsWith('~/') ? path.join(os.homedir(), value.slice(2)) : value;
-}
 
 /**
  * The directory holding the Claude CLI, or `null`.

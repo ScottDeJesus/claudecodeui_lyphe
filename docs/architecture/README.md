@@ -2,9 +2,9 @@
 
 *How a message gets from the composer to a provider CLI and back onto the screen.*
 
-Eight documents covering the websocket transport, the realtime stream, conversation
-handoff, the message store and lazy loading, scrolling, tool views, live widgets, and the
-rendered markdown shapes.
+Nine documents covering the websocket transport, the realtime stream, conversation
+handoff, the message store and lazy loading, scrolling, tool views, live widgets, the
+rendered markdown shapes, and the estate's own live map.
 
 These subsystems are hard to read from the source alone, because in every case the
 behaviour lives in the *interaction between files* rather than in any one of them. Each
@@ -52,6 +52,7 @@ one of those two paths disagreeing with the other.
 | 6 | [Tool views](./06-tool-view.md) | How a tool call becomes UI. Needs the message model from 2 and 4. |
 | 7 | [Live widgets](./07-live-widgets.md) | How a `widget` fence becomes a live frame — two of them, chosen by the body: a sandboxed HTML document, or one DocSpace block embedded from ArchPulse's own origin. Late, because it needs the streaming markdown pipeline from 2 — and the transport from 1 once a widget can subscribe to live data. |
 | 8 | [Rendered shapes](./08-rendered-shapes.md) | How ordinary markdown in a settled reply becomes a component — a sortable table, a callout, a verdict banner, a file chip — and why a block that misses its trigger renders exactly as it always did. After 7, because both share the `code` override's dispatcher, and it needs the streaming split from 2. |
+| 9 | [Project Universe](./09-universe.md) | How four repositories become one map and how the estate's real journal and transcript activity is drawn on it — the crawler and its registry, the two taps, the two websocket frames, and the tab. Last, because it adds two frame kinds to 1's tables and a second consumer to the stream in 2, and its map is the only thing here that is not about a conversation. |
 
 **In a hurry?** Read 1 and 2.
 **Debugging something a user can see?** Start at 5 or 6.
@@ -91,6 +92,8 @@ This is the shared vocabulary every document uses. Both unions are declared in
 | `loading_progress` | gateway | Project scan progress. |
 | `runner_state` | gateway | The plan runner's runs, pushed on change. |
 | `soul_launch_state` | gateway | The launcher souls a `/dispatch` started, pushed on change. Feeds the soul pins in the strip above the composer when the desktop chat gutters are not showing, and in the gutter's Subagents widget while they are ([dispatch-souls.md](../dispatch-souls.md)). |
+| `universe_map` | gateway | The estate map was rebuilt because a tracked repo's HEAD moved; carries the `mapId` a client refetches `GET /api/universe/map` for. Excused from the chat reducer beside `runner_state`/`soul_launch_state`. |
+| `universe_activity` | gateway | Coalesced estate activity — journal lines and Claude transcript edits resolved onto map stars. At most ten frames a second, and none at all while the estate is quiet; carries the held `mapId`, a `rows` array and a `dropped` count. Excused from the chat reducer. See [01-websocket-transport.md](./01-websocket-transport.md) §"Fan-out: who receives what". |
 | `protocol_error` | gateway | The request was rejected or never started. No `complete` follows. |
 
 One more kind never crosses the wire: **`websocket_reconnected`** is synthesized inside

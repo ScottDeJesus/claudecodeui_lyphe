@@ -73,6 +73,7 @@ const NAV_TABS: Array<{ id: AppTab; label: string; keywords: string }> = [
   { id: 'shell', label: 'Go to Shell', keywords: 'shell terminal console' },
   { id: 'git', label: 'Go to Git', keywords: 'git diff branches' },
   { id: 'kanban', label: 'Go to Kanban', keywords: 'kanban board lanes cards backlog' },
+  { id: 'universe', label: 'Go to Universe', keywords: 'universe galaxy stars repos map graph' },
   { id: 'tasks', label: 'Go to Tasks', keywords: 'tasks taskmaster' },
   { id: 'memory', label: 'Go to Memory', keywords: 'memory intake pending descent' },
   { id: 'runner', label: 'Go to Runner', keywords: 'runner plan run live phases' },
@@ -274,7 +275,10 @@ function CommandPalette({
                   <CommandItem
                     key={s.id}
                     value={`${s.label} ${s.snippet ?? ''} ${s.id}`.trim()}
-                    onSelect={() => run(() => navigate(`/session/${s.id}`))}
+                    onSelect={() => run(() => {
+                      onShowTab?.('chat');
+                      navigate(`/session/${s.id}`);
+                    })}
                   >
                     <MessageSquare className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
                     <div className="flex min-w-0 flex-1 flex-col">

@@ -34,7 +34,9 @@ const EARLIER_STEP = 100;
  * is opened — and the newest steps are the ones the reader came for.
  *
  * Drawn by the chat module's `subagents/SubagentWidgetBody.tsx`, in the desktop chat gutter's
- * Subagents widget.
+ * Subagents widget, and by `transcript/PinnedSubagents.tsx`, in a dialog over the chat. Its third
+ * drawer is the kanban module's `KanbanMetisPanel.tsx`, which opens a board Metis's fleet row here
+ * with a `'metis'` target and no chat session — one view, three kinds, never a copy.
  */
 export function SubagentTranscriptView({
   sessionId,
@@ -97,7 +99,12 @@ export function SubagentTranscriptView({
       data-live={String(live)}
       className="flex min-w-0 flex-col gap-3"
     >
-      <div className="flex min-w-0 items-center gap-2">
+      {/* Sticky, so the way back stays on screen: the view opens scrolled to the newest step, and a
+        * long run would otherwise carry this header thousands of pixels above the top — on a phone
+        * the dialog's only exit. Painted on the surface both containers share. z-20, above the
+        * z-10 sticky headers of open tool sections below it, which would otherwise paint over it
+        * and take the tap as they scroll past. */}
+      <div className="sticky top-0 z-20 flex min-w-0 items-center gap-2 bg-[var(--surface)] py-2">
         <Button
           data-testid="subagent-transcript-back"
           size="icon"

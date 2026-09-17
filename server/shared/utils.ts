@@ -1398,3 +1398,19 @@ export function findApplicationRoot(startDirectory: string): string {
     ? path.dirname(parentDirectory)
     : parentDirectory;
 }
+
+/**
+ * Expands a leading `~` to this user's home directory; anywhere else it is an
+ * ordinary character.
+ *
+ * Every module that reads a state root or a binary path out of the environment
+ * needs this, because the defaults are written the way an operator writes them
+ * on a shell and the server is not one. It lives here and not in each lane
+ * because three byte-identical copies drift the moment one of them learns
+ * something the others do not — `~` for another user, a `~user` form, a
+ * trailing separator — and only one lane then honors it.
+ */
+export function expandHome(value: string): string {
+  if (value === '~') return os.homedir();
+  return value.startsWith('~/') ? path.join(os.homedir(), value.slice(2)) : value;
+}

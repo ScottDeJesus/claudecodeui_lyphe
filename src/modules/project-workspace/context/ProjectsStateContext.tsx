@@ -1,10 +1,10 @@
-import { createContext, useContext, useMemo } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef } from 'react';
 import type { ReactNode } from 'react';
 import type { NavigateFunction } from 'react-router-dom';
 
 import { useProjectsState } from '@/modules/project-workspace/hooks/useProjectsState';
 import { GIT_REPO_PATHS } from '@/shared/constants';
-import type { GitRepository, IsSessionProcessing,ServerEvent } from '@/shared/types';
+import type { GitRepository, IsSessionProcessing, ProjectChoice, ServerEvent } from '@/shared/types';
 
 type ProjectsState = ReturnType<typeof useProjectsState>;
 
@@ -30,6 +30,10 @@ type ProjectMainState = Pick<
 > & {
   /** The git tab's repositories in strip order, memoised on the fields the tab reads. */
   gitRepositories: GitRepository[];
+  /** Every project a new chat can start in, by name, memoised on those two fields. */
+  projectChoices: ProjectChoice[];
+  /** Points the workspace at a project by id; an id no longer in the list does nothing. */
+  selectProjectById: (projectId: string) => void;
 };
 
 type ProjectCommandState = Pick<
@@ -114,9 +118,42 @@ export function ProjectsStateProvider({
     [gitRepositoriesKey],
   );
 
+  // The same discipline for the new-chat project picker: a list keyed on the id and name alone,
+  // so a session upsert that rebuilds `state.projects` does not wake the chat pane.
+  const projectChoicesKey = JSON.stringify(
+    [...state.projects]
+      .sort((a, b) => a.displayName.localeCompare(b.displayName))
+      .map((project) => [project.projectId, project.displayName]),
+  );
+  const projectChoices = useMemo<ProjectChoice[]>(
+    () => (JSON.parse(projectChoicesKey) as [string, string][])
+      .map(([projectId, displayName]) => ({ projectId, displayName })),
+    [projectChoicesKey],
+  );
+  // The full project is looked up at pick time, from the newest list, through a ref, so the
+  // callback keeps one identity while the list churns.
+  const projectsRef = useRef(state.projects);
+  useEffect(() => {
+    projectsRef.current = state.projects;
+  }, [state.projects]);
+  const { handleProjectSelect } = state;
+  const selectedProjectIdRef = useRef(state.selectedProject?.projectId ?? null);
+  useEffect(() => {
+    selectedProjectIdRef.current = state.selectedProject?.projectId ?? null;
+  }, [state.selectedProject?.projectId]);
+  // Re-picking the current project does nothing, and a pick made on the new-chat screen (already
+  // at `/`) replaces the history entry instead of pushing one, so Back still leaves the screen.
+  const selectProjectById = useCallback((projectId: string) => {
+    if (projectId === selectedProjectIdRef.current) return;
+    const project = projectsRef.current.find((candidate) => candidate.projectId === projectId);
+    if (project) handleProjectSelect(project, { replaceHistory: true });
+  }, [handleProjectSelect]);
+
   const mainState = useMemo<ProjectMainState>(
     () => ({
       gitRepositories,
+      projectChoices,
+      selectProjectById,
       selectedProject: state.selectedProject,
       selectedSession: state.selectedSession,
       activeTab: state.activeTab,
@@ -137,6 +174,8 @@ export function ProjectsStateProvider({
       state.isLoadingProjects,
       state.newSessionTrigger,
       gitRepositories,
+      projectChoices,
+      selectProjectById,
       state.openSettings,
       state.refreshProjectsSilently,
       state.registerOptimisticSession,

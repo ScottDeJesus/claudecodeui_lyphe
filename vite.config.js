@@ -45,9 +45,9 @@ export default defineConfig(({ mode }) => {
     server: {
       host,
       port: parseInt(env.VITE_PORT) || 5173,
-      // Vite 7 refuses any Host header that is not an IP or localhost. The Applications Hub frames
-      // this app under whatever name the Hub itself was opened on — the machine name and its
-      // tailnet MagicDNS name included — so those must be allowed or the tile renders a 403 page.
+      // Vite 7 refuses any Host header that is not an IP or localhost. This app is opened directly
+      // under those names on the LAN and the tailnet — the machine name and its MagicDNS name
+      // included — so they must stay allowed or such a visit renders a 403 page.
       allowedHosts: ['eis1', 'eis1.tail8717cd.ts.net'],
       proxy: {
         '/api': `http://${proxyHost}:${serverPort}`,

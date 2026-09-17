@@ -24,8 +24,8 @@
     "git": "Git",
     "tasks": "タスク",
     "browser": "Browser",
-    "computer": "Computer",
-    "kanban": "カンバン"
+    "kanban": "カンバン",
+    "universe": "宇宙"
   },
   "kanban": {
     "loading": "ボードを読み込んでいます…",
@@ -369,5 +369,50 @@
       "label": "このセッション",
       "title": "開いているチャットで作成されました"
     }
+  },
+  "applications": {
+    "fabLabel": "アプリケーション",
+    "heading": "マイ<em>アプリ</em>",
+    "closeDrawer": "閉じる",
+    "close": "すべて閉じる",
+    "summaryNone": "登録なし",
+    "summarySingle_other": "アプリ {{count}} 件 · シングル画面",
+    "summaryDual_other": "アプリ {{count}} 件 · 分割画面オン",
+    "dualScreen": "分割画面",
+    "dualScreenHint": "2つのアプリを並べて表示。境界はドラッグで調整できます。",
+    "opensIn": "開く位置",
+    "left": "左",
+    "right": "右",
+    "hostOnScreen": "{{host}} · 表示中",
+    "reload": "再読み込み",
+    "openInNewTab": "新しいタブで開く",
+    "openInDual": "分割画面で開く",
+    "closeDual": "分割画面を閉じる",
+    "remove": "削除",
+    "removeFailed": "アプリケーションを削除できませんでした",
+    "removeFailedPane": "{{name}} は閉じましたが、登録は残っています。",
+    "unreadable": "アプリケーション一覧を読み込めませんでした",
+    "empty": "アプリケーションはまだありません",
+    "emptyMessage": "名前とウェブアドレスを入力して追加すると、ここで開きます。",
+    "emptyAction": "最初のアプリケーションを追加",
+    "addApplication": "アプリケーションを追加",
+    "form": {
+      "title": "新しいアプリケーション",
+      "nameLabel": "名前",
+      "nameHelper": "このパネルでの表示名です。",
+      "namePlaceholder": "ジョブコンソール",
+      "urlLabel": "ウェブアドレス",
+      "urlHelper": "http:// を省略すると自動で付きます。{host} はこのページを開いているアドレスを表します。",
+      "urlPlaceholder": "{host}:8080",
+      "nameRequired": "ここで見つけられるよう、名前を付けてください。",
+      "urlRequired": "アプリを読み込むにはアドレスが必要です。",
+      "urlInvalid": "このアドレスは読み取れません。入力ミスがないか確認してください。",
+      "submit": "追加する",
+      "cancel": "キャンセル",
+      "addFailed": "アプリケーションを追加できませんでした"
+    },
+    "appearanceLight": "ライト表示",
+    "appearanceDark": "ダーク表示",
+    "divider": "アプリケーションの幅を変更"
   }
 }

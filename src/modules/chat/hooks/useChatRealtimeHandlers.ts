@@ -183,8 +183,15 @@ export function useChatRealtimeHandlers({
         // `default` falls into the NormalizedMessage path below, where a frame carrying no
         // sessionId of its own inherits the viewed session's and is appended to the open
         // transcript, evicting real messages from the realtime buffer as it goes.
+        //
+        // `universe_map` and `universe_activity` are here because they carry no sessionId at all:
+        // the first is one frame per HEAD move, but the second is the estate's activity coalesced
+        // and sent up to ten times a second for as long as anything in the estate is busy, so the
+        // fall-through would fill the open transcript with stray rows on a working host.
         case 'runner_state':
         case 'soul_launch_state':
+        case 'universe_map':
+        case 'universe_activity':
           return;
 
         default:

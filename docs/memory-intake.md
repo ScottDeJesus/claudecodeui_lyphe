@@ -49,9 +49,9 @@ snap-back and all — that is, none ([plan-runner.md](plan-runner.md) §"The Run
 tab, two policies, each in the layer that owns the act: the gate rule in the hook that decides a tab
 exists, the navigation where `setActiveTab` is.
 
-One move does leave it: choosing a conversation. `handleSessionSelect` sends `tasks`, `browser`,
-`memory` and `runner` back to `chat` (`hooks/useProjectsState.ts`), because picking a session is
-asking to read that session. The tab then stays on the strip while anything is pending and drops
+One move does leave it: choosing a conversation. The sidebar (`handleSessionSelect` in
+`hooks/useProjectsState.ts`) and the command palette send every tab back to `chat`, because picking
+a session is asking to read that session. The tab then stays on the strip while anything is pending and drops
 off it when nothing is.
 
 `memory` is a valid persisted tab (`VALID_TABS`), so a reload restores it — and the sticky clause

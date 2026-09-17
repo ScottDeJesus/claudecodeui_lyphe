@@ -24,7 +24,7 @@ import { sessionsDb } from '@/modules/database/index.js';
 import { chatRunRegistry, runDetachedChatTurn } from '@/modules/websocket/index.js';
 import type { ProviderRuntimeGateway } from '@/modules/websocket/index.js';
 
-import { listLiveHosts, retireHost, retireOlderHosts, sessionsDir, sweepDeadHosts } from './hosts.js';
+import { lastTurnFinishedAt, listLiveHosts, retireHost, retireOlderHosts, sessionsDir, sweepDeadHosts } from './hosts.js';
 import type { LiveHost } from './hosts.js';
 import { keepaliveEnabled } from './spawner.js';
 
@@ -68,7 +68,16 @@ function readoptHost(host: LiveHost, deps: ReadoptDeps): boolean {
       beforeRun: (run) => {
         // Before the provider is asked for anything: the run must never be observable as
         // `running` for a turn whose `complete` this API's predecessor already sent.
-        if (host.turnCompleteSent) chatRunRegistry.completeRunIfCurrent(run, { exitCode: 0 });
+        if (host.turnCompleteSent) {
+          // Stamped only when the CLI ended a turn after the session's last recorded completion:
+          // a follow-up turn a background task pushed ends with no `complete` of its own, so that
+          // is news. A turn the predecessor already recorded is not — re-stamping it made the chat
+          // unread on every restart with no new activity.
+          const finishedAt = lastTurnFinishedAt(host.hostId);
+          const stampedAt = row.last_completed_at ? Date.parse(row.last_completed_at) : Number.NaN;
+          const alreadyRecorded = finishedAt === null || (Number.isFinite(stampedAt) && finishedAt <= stampedAt);
+          chatRunRegistry.completeRunIfCurrent(run, { exitCode: 0, alreadyRecorded });
+        }
       }
     },
     deps

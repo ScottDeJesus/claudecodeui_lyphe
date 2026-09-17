@@ -5,6 +5,7 @@ import type {
 } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { AppSwitcherDock } from '@/modules/app-switcher';
 import { useProjectSidebarState } from '@/modules/project-workspace/context/ProjectsStateContext';
 import { useWorkspaceTabGates } from '@/modules/project-workspace/hooks/useWorkspaceTabGates';
 import WorkspaceTabs from '@/modules/project-workspace/WorkspaceTabs';
@@ -66,7 +67,7 @@ function ProjectSidebarRegion({
   if (!isMobile) {
     return (
       <div className="h-full flex-shrink-0 border-r border-border/50">
-        <Sidebar {...sidebarSharedProps} tabs={tabs} />
+        <Sidebar {...sidebarSharedProps} tabs={tabs} leading={<AppSwitcherDock />} />
       </div>
     );
   }
@@ -84,13 +85,13 @@ function ProjectSidebarRegion({
         aria-label={t('versionUpdate.ariaLabels.closeSidebar')}
       />
       <div
-        className={`relative h-full w-[85vw] max-w-sm transform border-r border-border/40 bg-card transition-transform duration-150 ease-out sm:w-80 ${
+        className={`relative h-full w-[85vw] max-w-sm transform border-r border-border/40 bg-card transition-transform duration-150 ease-out sm:w-[20.5rem] ${
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
         onClick={(event) => event.stopPropagation()}
         onTouchStart={(event) => event.stopPropagation()}
       >
-        <Sidebar {...sidebarSharedProps} tabs={tabs} />
+        <Sidebar {...sidebarSharedProps} tabs={tabs} leading={<AppSwitcherDock />} />
       </div>
     </div>
   );

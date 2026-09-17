@@ -75,6 +75,7 @@
     "toolDisplay": {
       "title": "Tool Display",
       "showWork": "Show work",
+      "showCompactSummary": "Show compaction summary",
       "showThinking": "Show thinking",
       "showRawParameters": "Show raw parameters"
     },

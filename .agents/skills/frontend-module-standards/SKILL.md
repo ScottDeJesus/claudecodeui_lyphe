@@ -171,4 +171,4 @@ Before finishing:
 5. Confirm types, utilities, constants, hooks, contexts, UI components, modals, and tests follow their ownership and usage rules.
 6. Confirm shared types, utilities, and constants use the required comments and grouping separators.
 7. Confirm every newly introduced state declaration explains why it exists or is marked as possibly unnecessary.
-8. Run the narrow relevant frontend tests, followed by `npm run test:client`, `npm run build:client`, `npm run typecheck`, and `npm run lint` when the task scope and environment permit.
+8. Run `npm run build:client`, `npm run typecheck`, and `npm run lint` when the task scope and environment permit. This house writes no unit tests; verification is running the real app.

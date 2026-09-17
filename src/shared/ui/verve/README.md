@@ -90,8 +90,10 @@ That is the law; this note only says how the law is wired into this repo.
 
 ## The library those tokens paint
 
-Twenty-one components carry Verve paint after Phase 3 — Phase 2's twelve, then six new and
-three restyled. What they share is the contract every later one joins:
+Twenty-three components carry Verve paint today — Phase 2's twelve, then Phase 3's six new and
+three restyled, then DockableFab and SplitPane for the application switcher's kit scaffold,
+admitted on the barrel's *mechanism* test rather than its two-module rule (`index.ts`'s own
+header). What they share is the contract every later one joins:
 
 1. **A component is a flat file in `src/shared/ui/`.** `verve/` holds stylesheets and nothing
    else: no component, no module, no `verve/components/` to grow into.
@@ -103,19 +105,25 @@ three restyled. What they share is the contract every later one joins:
 3. **Marker classes are surface, not decoration.** `vv-button--<variant>`, `vv-badge--<variant>`
    and `data-tone` are what a verify script queries to prove a variant painted; rename one and a
    gate that never reads your source goes quiet. A variant emitting no marker is unprovable.
-4. **Import from the barrel, `@/shared/ui`.** It side-effect-imports `controls.css`, so the
-   barrel — not the component file — is what puts the paint in the document. A deep import by
-   path gets an unpainted component unless something else loaded the barrel first.
+4. **Import from the barrel, `@/shared/ui`.** It side-effect-imports all four stylesheets (rule
+   6), so the barrel — not the component file — is what puts the paint in the document. A deep
+   import by path gets an unpainted component unless something else loaded the barrel first.
 5. **Props come from a site you can point at** — the integration plan's §4 table
    (`~/.claude/plans/cloudcli-verve-integration.md`), or a real call. A prop nobody passes is a
    prop nobody proves: `Card`'s `interactive` has no consumer today.
-6. **`controls.css` is 435 lines and `feedback.css` 386, both at their stated ceiling.** Phase 3's
-   paint went into `feedback.css` beside `controls.css`, and the board's paint went into a THIRD
-   file, `board.css` — the `.vv-lane`, `.vv-lane__head` and `.vv-lane-card` rules and their
-   variants — imported from the barrel exactly as the other two are, and imported LAST there on
-   purpose: a lane card composes `.vv-card`'s ground and overrides its background, shadow and
-   transition, and at equal specificity the earlier import wins. The next file opens the same way
-   again. Don't win lines back by squeezing an existing one.
+6. **`controls.css` is 440 lines — past its stated ceiling — and `feedback.css` 386, at its.**
+   Phase 3's paint went into `feedback.css` beside `controls.css`; the board's paint went into a
+   THIRD file, `board.css` — the `.vv-lane`, `.vv-lane__head` and `.vv-lane-card` rules and their
+   variants; and the application switcher's kit scaffold opened a FOURTH,
+   [`surfaces.css`](surfaces.css) — DockableFab's and SplitPane's own paint, plus the
+   `body.vv-dragging` / `vv-drag-fab` / `vv-drag-split` classes a drag of either sets for its
+   length (why a new file rather than a squeeze is that stylesheet's own header). Each is imported
+   from the barrel exactly as the ones before it, and the order is load-bearing at both ends:
+   `surfaces.css` shares no selector with its neighbours, so it only has to land before
+   `board.css`, which stays LAST because a lane card composes `.vv-card`'s ground and overrides
+   its background, shadow and transition, and at equal specificity the LATER rule wins, so imported
+   any earlier `board.css` would lose all three to `.vv-card`. A stylesheet at its ceiling opens a new file rather than winning lines back by
+   squeezing what's there; the next one will too.
 
 Which components exist at all, and when a screen composes instead of asking for a new one, is
 doctrine §1–§3. Read it there, not here.
@@ -136,6 +144,28 @@ Tabs, EmptyState and Menu new, Dialog, Tooltip and ActionMenu restyled.
   back to the first tab when `active` names none, because `role="tablist"` promises it. `Menu`
   closes on Escape and on an outside pointerdown, returns focus to its trigger, and marks its
   chosen row `aria-current` — its rows are menu items, of which one is current.
+- **`Dialog` owns Escape, unless a panel that CLAIMS it is up in front.** The dialog listens on
+  `window` capture and stops the key there, so no `document` handler below acts on a keystroke that
+  closed a panel. The exception is a panel drawn over it — inside it, or after it in document order
+  — that carries `data-owns-escape` (`overlayEscape.ts`): the dialog stands down and marks the key
+  rather than stopping it, so that panel's own Escape closes it, and the next press closes the
+  dialog. The claim is stated by the panel's producer, not read off a role, because a role is
+  shared: cmdk's list carries `role="listbox"` as static content of the dialog it sits in, and a
+  role-keyed rule left the command palette unable to be dismissed from the keyboard.
+
+  **Five panels carry the marker today**: `ActionMenu`, `Menu`, `Select`, the file tree's
+  `FileContextMenu` and the composer's `ComposerMenuPrimitives`. Each is rendered SOLELY while it
+  is open, which is what lets the marker's mere presence in the document stand for the fact
+  itself — a panel that stayed mounted closed could not honestly carry it.
+
+  **The failure direction is silent, not broken.** A new overlay that closes itself on Escape but
+  forgets `OWNS_ESCAPE` (`overlayEscape.ts`) is invisible to `overlayInFrontHoldsEscape`, so the
+  dialog beneath it never stands down: the FIRST Escape closes the dialog — and, being in front of
+  it, the forgetful overlay along with it — instead of just the overlay on its own press. That is
+  the OLD behaviour the marker exists to replace, not a crash, which is exactly why it shipped
+  once: the application switcher's drawer is a `Dialog` and its rows' kebabs are a portalled
+  `ActionMenu` in front of it, and before `ActionMenu` carried the marker, one Escape took the
+  sheet and the open kebab together.
 - **Dialog's motion is a Tailwind keyframe, not `vv-pop`.** `vv-pop` animates `transform`
   outright, which would overwrite the `-translate-*` that centres the panel. The retuned
   `animate-dialog-content-show` is that motion carried onto a centred box.

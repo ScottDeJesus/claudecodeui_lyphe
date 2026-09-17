@@ -60,6 +60,7 @@
 - **File Explorer** - Interactive file tree with a read-only preview of text, images and downloads — ask an Agent to change a file
 - **Git Explorer** - Read your branch, what is waiting to be pushed, and every pending change with its diff — committing and pushing are the Agent's: one button starts the conversation and runs your own `/git`
 - **Kanban Board** - Backlog, to do, in progress and done, with questions, checklists, issues, tags and build leases, live over the websocket — plus a one-way import from an existing Descent install ([kanban.md](kanban.md))
+- **Application Switcher** - Your other applications — Descent, EIS, Dispatch and ArchPulse — framed inside the workspace from a draggable button, one or two at a time, off a registry file you edit by hand ([applications.md](applications.md))
 - **Browser Use** - Open browser sessions for web research, testing, and agent-driven browser tasks
 - **Session Management** - Resume conversations, manage multiple sessions, and track history
 - **Plugin System** - Extend CloudCLI with custom plugins — add new tabs, backend services, and integrations. [Build your own →](https://github.com/cloudcli-ai/cloudcli-plugin-starter)

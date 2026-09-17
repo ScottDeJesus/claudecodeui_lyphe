@@ -24,8 +24,8 @@
     "git": "Git",
     "tasks": "작업",
     "browser": "Browser",
-    "computer": "Computer",
-    "kanban": "칸반"
+    "kanban": "칸반",
+    "universe": "우주"
   },
   "kanban": {
     "loading": "보드를 불러오는 중…",
@@ -369,5 +369,50 @@
       "label": "이 세션",
       "title": "열어 둔 채팅에서 생성됨"
     }
+  },
+  "applications": {
+    "fabLabel": "애플리케이션",
+    "heading": "내 <em>앱</em>",
+    "closeDrawer": "닫기",
+    "close": "모두 닫기",
+    "summaryNone": "등록된 앱 없음",
+    "summarySingle_other": "앱 {{count}}개 · 단일 화면",
+    "summaryDual_other": "앱 {{count}}개 · 화면 분할 켜짐",
+    "dualScreen": "화면 분할",
+    "dualScreenHint": "두 앱을 나란히 표시하고, 구분선을 끌어 조절합니다.",
+    "opensIn": "열 위치",
+    "left": "왼쪽",
+    "right": "오른쪽",
+    "hostOnScreen": "{{host}} · 표시 중",
+    "reload": "새로 고침",
+    "openInNewTab": "새 탭에서 열기",
+    "openInDual": "화면 분할로 열기",
+    "closeDual": "화면 분할 닫기",
+    "remove": "삭제",
+    "removeFailed": "애플리케이션을 삭제할 수 없습니다",
+    "removeFailedPane": "{{name}} 은(는) 닫혔지만 목록에는 남아 있습니다.",
+    "unreadable": "애플리케이션 목록을 읽을 수 없습니다",
+    "empty": "아직 애플리케이션이 없습니다",
+    "emptyMessage": "이름과 웹 주소로 추가하면 바로 여기에서 열립니다.",
+    "emptyAction": "첫 애플리케이션 추가",
+    "addApplication": "애플리케이션 추가",
+    "form": {
+      "title": "새 애플리케이션",
+      "nameLabel": "이름",
+      "nameHelper": "이 패널에 표시될 이름입니다.",
+      "namePlaceholder": "작업 콘솔",
+      "urlLabel": "웹 주소",
+      "urlHelper": "http://를 생략하면 자동으로 붙습니다. {host}는 이 페이지가 열린 주소를 뜻합니다.",
+      "urlPlaceholder": "{host}:8080",
+      "nameRequired": "여기서 찾을 수 있도록 이름을 입력하세요.",
+      "urlRequired": "앱을 불러오려면 주소가 필요합니다.",
+      "urlInvalid": "주소를 읽을 수 없습니다. 오타가 있는지 확인하세요.",
+      "submit": "추가",
+      "cancel": "취소",
+      "addFailed": "애플리케이션을 추가할 수 없습니다"
+    },
+    "appearanceLight": "라이트 모드",
+    "appearanceDark": "다크 모드",
+    "divider": "애플리케이션 크기 조절"
   }
 }

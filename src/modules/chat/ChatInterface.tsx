@@ -11,6 +11,7 @@ import { api } from '@/shared/api';
 import type {
   ChatMessage,
   Project,
+  ProjectChoice,
   ProjectSession,
   SessionEstablishedContext,
   SessionNavigationOptions,
@@ -53,6 +54,11 @@ type ChatInterfaceProps = {
   showThinking?: boolean;
   /** Draws tool calls and other work between replies; off shows a typing indicator instead. */
   showWork?: boolean;
+  /** Draws the summary written after a compaction; off leaves only the "Compacted" line. */
+  showCompactSummary?: boolean;
+  /** The projects a new chat can start in, and how to switch to one — the new-chat screen's picker. */
+  projectChoices?: ProjectChoice[];
+  onSelectProject?: (projectId: string) => void;
   sendByCtrlEnter?: boolean;
   externalMessageUpdate?: number;
   newSessionTrigger?: number;
@@ -83,6 +89,9 @@ function ChatInterface({
   showRawParameters,
   showThinking,
   showWork = false,
+  showCompactSummary = true,
+  projectChoices,
+  onSelectProject,
   sendByCtrlEnter,
   externalMessageUpdate,
   newSessionTrigger,
@@ -556,6 +565,8 @@ function ChatInterface({
           providerModelCatalog={providerModelCatalog}
           providerModelActions={providerModelActions}
           providerModelsLoading={providerModelsLoading}
+          projectChoices={projectChoices}
+          onSelectProject={onSelectProject}
           tasksEnabled={tasksEnabled}
           isTaskMasterInstalled={isTaskMasterInstalled}
           onShowAllTasks={onShowAllTasks}
@@ -581,6 +592,7 @@ function ChatInterface({
           showRawParameters={showRawParameters}
           showThinking={showThinking}
           showWork={showWork}
+          showCompactSummary={showCompactSummary}
           selectedProject={selectedProject}
           // Editing replaces the turn and everything after it, so it is only
           // offered when the session is idle — a half-truncated transcript with
@@ -607,7 +619,7 @@ function ChatInterface({
           )}
 
           <ChatComposer
-          pinnedAgents={stripClaimed ? null : <PinnedSubagents messages={agentMessages} soulLaunchIds={soulLaunchIds} />}
+          pinnedAgents={stripClaimed ? null : <PinnedSubagents messages={agentMessages} soulLaunchIds={soulLaunchIds} sessionId={selectedSession?.id ?? null} />}
           pendingPermissionRequests={pendingPermissionRequests}
           handlePermissionDecision={handlePermissionDecision}
           handleGrantToolPermission={handleGrantToolPermission}

@@ -92,6 +92,8 @@ type SidebarContentProps = {
   simpleList: ReactNode | null;
   // The workspace tab strip, same slot discipline as `simpleList` — handed straight to the header.
   tabs: ReactNode;
+  // The control left of the wordmark, same slot discipline — OPTIONAL, unlike `tabs`.
+  leading?: ReactNode;
   runningSessionsCount: number;
   archivedProjects: ArchivedProjectListItem[];
   archivedSessions: ArchivedSessionListItem[];
@@ -142,6 +144,7 @@ export default function SidebarContent({
   projects,
   simpleList,
   tabs,
+  leading,
   runningSessionsCount,
   archivedProjects,
   archivedSessions,
@@ -192,7 +195,7 @@ export default function SidebarContent({
 
   return (
     <div
-      className="flex h-full flex-col bg-background/80 backdrop-blur-sm md:w-72 md:select-none"
+      className="flex h-full flex-col bg-background/80 backdrop-blur-sm md:w-[20.5rem] md:select-none"
       style={{}}
     >
       <SidebarHeader
@@ -214,6 +217,7 @@ export default function SidebarContent({
         onCollapseSidebar={onCollapseSidebar}
         simpleMode={simpleList !== null}
         tabs={tabs}
+        leading={leading}
         t={t}
       />
 

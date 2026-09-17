@@ -2,8 +2,7 @@ import { readFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 
-import spawn from 'cross-spawn';
-
+import { commandRuns } from '@/modules/providers/shared/auth/command-runs.js';
 import { resolveClaudeCodeExecutablePath } from '@/shared/claude-cli-path.js';
 import type { IProviderAuth } from '@/shared/interfaces.js';
 import type { ProviderAuthStatus } from '@/shared/types.js';
@@ -20,27 +19,45 @@ const hasErrorCode = (error: unknown, code: string): boolean => (
   error instanceof Error && 'code' in error && error.code === code
 );
 
+/** Where Claude Code keeps its settings and login: `CLAUDE_CONFIG_DIR` when set, else `~/.claude`. */
+const claudeConfigDir = (): string => process.env.CLAUDE_CONFIG_DIR?.trim() || path.join(os.homedir(), '.claude');
+
+/**
+ * The cloud backends Claude Code signs in to through the cloud's own credentials rather than a
+ * Claude login, with the name each one reads as. The flag list is the CLI's own.
+ */
+const CLOUD_BACKEND_FLAGS: Record<string, string> = {
+  CLAUDE_CODE_USE_BEDROCK: 'Amazon Bedrock',
+  CLAUDE_CODE_USE_VERTEX: 'Google Vertex AI',
+  CLAUDE_CODE_USE_FOUNDRY: 'Microsoft Foundry',
+  CLAUDE_CODE_USE_ANTHROPIC_AWS: 'Anthropic on AWS',
+  CLAUDE_CODE_USE_ANTHROPIC_GOOGLE_CLOUD: 'Anthropic on Google Cloud',
+  CLAUDE_CODE_USE_MANTLE: 'Mantle',
+};
+
+/** A flag as the CLI reads it: a real boolean, or `1`, `true`, `yes` or `on` in any case. */
+const isFlagSet = (value: unknown): boolean => {
+  if (typeof value === 'boolean') return value;
+  if (value === undefined || value === null || value === '') return false;
+  return ['1', 'true', 'yes', 'on'].includes(String(value).trim().toLowerCase());
+};
+
 export class ClaudeProviderAuth implements IProviderAuth {
   /**
    * Checks whether the Claude Code CLI is available on this host.
    */
-  private checkInstalled(): boolean {
+  private checkInstalled(): Promise<boolean> {
     // cross-spawn resolves shims and PATHEXT itself, so the bare command is a
     // usable fallback here even where the SDK's raw spawn could not use it.
     const cliPath = resolveClaudeCodeExecutablePath(process.env.CLAUDE_CLI_PATH) ?? 'claude';
-    try {
-      spawn.sync(cliPath, ['--version'], { stdio: 'ignore', timeout: 5000 });
-      return true;
-    } catch {
-      return false;
-    }
+    return commandRuns(cliPath, ['--version']);
   }
 
   /**
    * Returns Claude installation and credential status using Claude Code's auth priority.
    */
   async getStatus(): Promise<ProviderAuthStatus> {
-    const installed = this.checkInstalled();
+    const installed = await this.checkInstalled();
 
     if (!installed) {
       return {
@@ -70,7 +87,7 @@ export class ClaudeProviderAuth implements IProviderAuth {
    */
   private async loadSettingsEnv(): Promise<Record<string, unknown>> {
     try {
-      const settingsPath = path.join(os.homedir(), '.claude', 'settings.json');
+      const settingsPath = path.join(claudeConfigDir(), 'settings.json');
       const content = await readFile(settingsPath, 'utf8');
       const settings = readObjectRecord(JSON.parse(content));
       return readObjectRecord(settings?.env) ?? {};
@@ -94,6 +111,11 @@ export class ClaudeProviderAuth implements IProviderAuth {
     }
 
     const settingsEnv = await this.loadSettingsEnv();
+
+    const cloudBackend = Object.keys(CLOUD_BACKEND_FLAGS).find((flag) => isFlagSet(process.env[flag]) || isFlagSet(settingsEnv[flag]));
+    if (cloudBackend) {
+      return { authenticated: true, email: CLOUD_BACKEND_FLAGS[cloudBackend], method: 'environment' };
+    }
     if (readOptionalString(settingsEnv.ANTHROPIC_API_KEY)) {
       return { authenticated: true, email: 'API Key Auth', method: 'api_key' };
     }
@@ -111,7 +133,7 @@ export class ClaudeProviderAuth implements IProviderAuth {
     }
 
     try {
-      const credPath = path.join(os.homedir(), '.claude', '.credentials.json');
+      const credPath = path.join(claudeConfigDir(), '.credentials.json');
       const content = await readFile(credPath, 'utf8');
       const creds = readObjectRecord(JSON.parse(content)) ?? {};
       const oauth = readObjectRecord(creds.claudeAiOauth);

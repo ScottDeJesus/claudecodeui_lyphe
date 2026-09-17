@@ -209,7 +209,10 @@ export type GatewayEventKind =
   | 'loading_progress'
   | 'runner_state'
   | 'soul_launch_state'
+  | 'kanban_metis_state'
   | 'kanban_event'
+  | 'universe_activity'
+  | 'universe_map'
   | 'protocol_error';
 
 /**
@@ -345,6 +348,211 @@ export type SoulLaunchState = 'running' | 'completed' | 'failed' | 'stopped';
 export type SoulLaunchSnapshot = { launch_id: string; role: string; agent: string; brief: string; provider: 'deepseek' | 'claude'; blocked: boolean; state: SoulLaunchState; status: string; cause: string; started_at: number; ended_at: number | null; duration_s: number | null; cost_usd: number | null; tokens: number | null };
 /** The whole picture, pushed on change over `/ws`. `launches` is ordered by `started_at` ascending, oldest first. `at` is epoch MILLISECONDS (`Date.now()`), unlike every field inside a snapshot. */
 export type SoulLaunchStateEvent = { kind: 'soul_launch_state'; launches: SoulLaunchSnapshot[]; at: number };
+// ---------------------------
+//----------------- KANBAN METIS: the session a board launches ------------
+
+/**
+ * One Metis session — a board's own autonomous builder, spawned detached by
+ * `modules/kanban-metis` and watched after every server restart.
+ *
+ * `sessionId` is the uuid handed to `claude --session-id`, and it is the identity everywhere:
+ * the state directory under `~/.claude/state/kanban-metis/`, the address of every route, the
+ * transcript lookup, and the input to the derived lease owner. The board MINTS it, which is why
+ * no launch-id-to-session-id translation exists anywhere on this path.
+ *
+ * `owner` is the lease owner every build-lease verb compares against — `sha256(sessionId)`
+ * truncated to sixteen lowercase hex, DERIVED rather than minted, so a resumed or re-adopted
+ * session comes back as the same owner and can still refresh the leases it holds.
+ *
+ * `model` is the `--model` flag the child was actually given (`deepseek-flash` or `opus`) and
+ * `provider` says which endpoint it bills; the pair is settled at spawn from the board's own
+ * `deepseekFlash`, never re-derived here, because the switch applies at the NEXT spawn.
+ *
+ * `lastActivityAt` is `child.log`'s mtime, not a heartbeat the child writes: the child is
+ * detached and owns its own log file descriptor, so its log's stamp is the only liveness signal
+ * that survives a server restart. `pid` is a fact to show and, for a live session, to signal.
+ * Every timestamp is epoch MILLISECONDS.
+ */
+export type KanbanMetisSession = {
+  sessionId: string;
+  boardId: string;
+  boardName: string;
+  provider: 'deepseek' | 'claude';
+  model: string;
+  owner: string;
+  launchedBy: 'operator' | 'driver';
+  state: 'running' | 'completed' | 'stopped' | 'failed';
+  pid: number | null;
+  startedAt: number;
+  endedAt: number | null;
+  lastActivityAt: number;
+  exitCode: number | null;
+};
+
+/** The whole picture, pushed on change over `/ws`. `sessions` is ordered by `startedAt` ascending, oldest first. `at` is epoch MILLISECONDS (`Date.now()`), unlike every field inside a session. */
+export type KanbanMetisStateEvent = { kind: 'kanban_metis_state'; sessions: KanbanMetisSession[]; at: number };
+// ---------------------------
+//----------------- UNIVERSE: the estate map and its live activity ------------
+/**
+ * One node of the estate map — a star (a tracked file), a body (a directory), a galaxy (a repo),
+ * the sun (`core`), or an endpoint (a Postgres database or an MCP server).
+ *
+ * The keys are the crawler's own short ones and the numbers are the crawler's own, carried through
+ * untouched: `l`, `t` and `c` come off the git history, and `p` is an index into the map's `nodes`
+ * array, assigned by the one process that wrote them. Nothing downstream recomputes an index — a
+ * second assignment rule is a second answer to the same question.
+ */
+export type UniverseNode = {
+  /** Basename only — the path a node sits at is the chain of `p` links above it. */
+  n: string;
+  /** Parent node index, `-1` for a node that hangs off nothing: a repo, the sun, an endpoint. */
+  p: number;
+  k: 'galaxy' | 'core' | 'dir' | 'endpoint' | 'source' | 'config' | 'docs' | 'data-sql' | 'assets' | 'other';
+  /** Lines of the file; `0` for a directory or an endpoint, which have no length. */
+  l: number;
+  /** Epoch SECONDS of the newest commit touching it, from the same `git log` the map was built on. */
+  t: number;
+  /** Commits touching it — churn, the number that says whether a file is alive or a fossil. */
+  c: number;
+};
+
+/**
+ * The whole estate as one payload: every repo the registry covers, flattened into one node list
+ * with every index already global.
+ *
+ * This is `merged.json` exactly as the crawler wrote it, and it is the only thing the fork reads —
+ * the per-repo files beside it are the crawler's own working form. `mapId` is the first 12 hex of
+ * the four repo HEAD shas joined by a newline, so it changes when, and only when, a repo's HEAD
+ * moves: a client holding a different one refetches, and that is the entire invalidation rule.
+ *
+ * `resolve` is shipped as DATA rather than restated as code: a consumer takes the FIRST entry its
+ * path starts with, and never re-sorts. The entries are ordered longest path first because the
+ * ordering IS the rule — without it `/home/lyphe/.claude` swallows the repo inside it.
+ */
+export type UniverseMap = {
+  mapId: string;
+  /** Epoch SECONDS of the crawl that wrote this map. */
+  builtAt: number;
+  repos: {
+    id: string;
+    head: string;
+    /** Index of this repo's node in `nodes` — where its file tree begins. */
+    base: number;
+    files: number;
+    dirs: number;
+    builtAt: number;
+  }[];
+  nodes: UniverseNode[];
+  /** Flat `[from, to, weight]` triples over `nodes` indices, one list per relation. */
+  edges: {
+    tree: [number, number, number][];
+    import: [number, number, number][];
+    cochange: [number, number, number][];
+    endpoint: [number, number, number][];
+  };
+  /** The HTTP routes the app serves; `n` is the node of the file that declares one. */
+  routes: { m: string; p: string; n: number }[];
+  /** Logger name -> the node of the file that logs under it. */
+  loggers: Record<string, number>;
+  /** Table name -> the node of the file that touches it. */
+  tables: Record<string, number>;
+  /** The non-file nodes, appended after the file nodes and carrying no parent. */
+  endpoints: { id: string; k: 'pg' | 'mcp' }[];
+  /**
+   * Cross-repo edges by SHARED ATTENTION: `w` counts the sessions that read, named or edited files
+   * in both repos. It is not an edit edge, and nothing on screen may call it one.
+   */
+  attention: { a: string; b: string; w: number }[];
+  resolve: { id: string; path: string }[];
+  /** What a best-effort tap could not answer — a route dump that timed out, a repo it could not read. */
+  warnings: string[];
+};
+
+/**
+ * One row of the estate's live activity: what happened, where, and how much of it since the last
+ * frame. Rows are aggregated before they are sent — the raw stream is an edit per keystroke and an
+ * execution per log line, and the wire carries neither.
+ */
+export type UniverseActivityRow = {
+  /** Node index into the map; `-1` when nothing resolved. */
+  node: number;
+  kind: 'edit' | 'exec';
+  /** Raw events this row aggregates since the last frame. */
+  count: number;
+  /** Epoch MILLISECONDS of the newest raw event in this row. */
+  at: number;
+  /** A systemd unit name, or `'session'`. */
+  source: string;
+  /** The Claude session id, when `source === 'session'`. */
+  session?: string;
+};
+/**
+ * One raw row as a tap pushes it, before the coalescer counts it: the coalescer's `push` input, and
+ * therefore what `universe-journal.tap.ts` and `universe-transcript.tap.ts` produce. Named because
+ * the one shape crosses three files — the two readers and the throttle between them.
+ */
+export type UniverseActivityInput = Omit<UniverseActivityRow, 'count'>;
+
+/**
+ * The activity digest, broadcast over `/ws`. `at` is epoch MILLISECONDS (`Date.now()`), unlike the
+ * epoch-second timestamps on the map.
+ *
+ * Every frame carries the `mapId` its node indices belong to, so a client holding a different one
+ * refetches the map and drops the in-flight rows rather than pointing them at the wrong stars.
+ * `dropped` counts rows discarded for volume, so a busy window is visibly lossy instead of quietly
+ * incomplete.
+ */
+export type UniverseActivityEvent = {
+  kind: 'universe_activity'; mapId: string; rows: UniverseActivityRow[]; dropped: number; at: number;
+};
+/**
+ * The announcement that a crawl landed: a new map is on disk, and the `mapId` in the frame is the
+ * one a client should compare against the map it holds. Sent only when a repo's HEAD moved — a
+ * crawl that changed nothing puts nothing on the wire.
+ */
+export type UniverseMapEvent = { kind: 'universe_map'; mapId: string; builtAt: number; at: number };
+
+/**
+ * One uvicorn app living in a registered repo, as `repos.json` declares it.
+ *
+ * `unit` is the pairing the journal tap needs: a systemd unit's HTTP access lines are routed to the
+ * routes of the app served BY that unit, which is how a request to `eis-app.service` pulses a star
+ * in `shadow-connector` — the two apps in that repo listen on two different units.
+ */
+export type UniverseRegistryApp = {
+  name: string;
+  /** The ASGI target, e.g. `eis_backend.main:app`. */
+  module: string;
+  python: string;
+  cwd: string;
+  unit: string;
+};
+
+/**
+ * One repo as `repos.json` declares it — the registry, and the only thing "deploying a project to
+ * the universe" means (`scripts/universe/registry.py`). Adding a repo is one entry here and nothing
+ * written into the repo itself, ever.
+ *
+ * The crawler WRITES this file, so the reader tolerates it: a hand-edited entry missing a field
+ * follows nothing rather than failing, and every list below is normalized to `[]` instead of being
+ * trusted. `role` is `sun` for the root project and `galaxy` for every other repo — a label for the
+ * map's own use, not a behaviour switch.
+ */
+export type UniverseRegistryEntry = {
+  id: string;
+  /** Absolute path to the repo root — the key of the prefix rule `resolve` ships. */
+  path: string;
+  role: 'sun' | 'galaxy';
+  /** systemd units whose journal lines belong to this repo. */
+  units: string[];
+  /** Repo-relative path of the star a journal line pulses when nothing else about it resolves. */
+  entry_file: string;
+  apps: UniverseRegistryApp[];
+  /** Postgres endpoint names, e.g. `eis` -> node `pg:eis`. */
+  pg: string[];
+  /** MCP server names, e.g. `archpulse` -> node `mcp:archpulse`. */
+  mcp: string[];
+};
 // ---------------------------
 
 /**
@@ -516,6 +724,12 @@ export type SubagentInfo = {
   activityCount?: number;
   /** What the agent has spent so far, when the provider records usage (today: Claude). */
   usage?: SubagentUsage;
+  /**
+   * The latest `SendMessage` call that resumed this agent after it had stopped, when one did
+   * (today: Claude). Its tool-use id tells the live projection which resume the status already
+   * accounts for; a newer one in the stream is still running.
+   */
+  resume?: { toolUseId: string; at?: string };
 };
 
 /**

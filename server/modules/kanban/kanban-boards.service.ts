@@ -1,9 +1,10 @@
 import { kanbanBoardsDb, kanbanEventsDb, kanbanIdsDb, projectsDb } from '@/modules/database/index.js';
-import type {
-  KanbanBoard,
-  KanbanEventRow,
-  KanbanLaneCount,
-  KanbanWriteContext,
+import {
+  KANBAN_LEASE_STALE_SECONDS,
+  type KanbanBoard,
+  type KanbanEventRow,
+  type KanbanLaneCount,
+  type KanbanWriteContext,
 } from '@/shared/kanban-types.js';
 import { AppError } from '@/shared/utils.js';
 
@@ -127,7 +128,13 @@ export const kanbanBoardsService = {
    */
   updateBoard(
     boardId: string,
-    patch: { name?: string; autonomy?: boolean; projectId?: string | null; archived?: boolean },
+    patch: {
+      name?: string;
+      autonomy?: boolean;
+      deepseekFlash?: boolean;
+      projectId?: string | null;
+      archived?: boolean;
+    },
     context?: KanbanWriteContext
   ): KanbanBoard {
     const name = patch.name === undefined ? undefined : requireBoardName(patch.name);
@@ -145,6 +152,7 @@ export const kanbanBoardsService = {
           id: boardId,
           name,
           autonomy: patch.autonomy,
+          deepseekFlash: patch.deepseekFlash,
           projectId: patch.projectId,
           archived: patch.archived,
         });
@@ -193,6 +201,22 @@ export const kanbanBoardsService = {
   laneCounts(boardId: string): KanbanLaneCount[] {
     requireBoard(boardId);
     return kanbanBoardsDb.laneCounts(boardId);
+  },
+
+  /**
+   * How many cards on this board an autonomous session could claim right now.
+   *
+   * It is the driver's green light: a board whose autonomy is on but whose claimable count is zero
+   * gets no child, because a session that wakes to find nothing to do is a session that burns a
+   * conversation to read an empty lane. Like `laneCounts` this is a READ — no transaction, no
+   * audit row, no frame — so the driver can ask it every tick without writing anything.
+   *
+   * `KANBAN_LEASE_STALE_SECONDS` is the same dial the card summaries and the lease verbs use, so
+   * "stale" means one thing on this server rather than two.
+   */
+  claimableCount(boardId: string): number {
+    requireBoard(boardId);
+    return kanbanBoardsDb.countClaimable(boardId, KANBAN_LEASE_STALE_SECONDS);
   },
 
   /** The audit log, newest first. The limit is the route's to clamp — this reads what it is given. */

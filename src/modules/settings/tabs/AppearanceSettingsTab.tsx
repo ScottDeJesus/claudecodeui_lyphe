@@ -29,7 +29,7 @@ export default function AppearanceSettingsTab({
   // The sun-follow switch reads the same theme context the Dark Mode switch beside it writes,
   // so the two can never disagree about who is in charge of the colour.
   const { followsSun, setFollowsSun } = useTheme();
-  const { hideShellTab, showRawParameters, showThinking, showWork, sendByCtrlEnter } = useUiPreferences();
+  const { hideShellTab, showRawParameters, showThinking, showWork, showCompactSummary, sendByCtrlEnter } = useUiPreferences();
   // The transcript's reading size, read and written through the one hook the chat pane reads —
   // so the stepper and the messages can never disagree about how big the text is.
   const chatFontSize = useChatFontSize();
@@ -110,9 +110,9 @@ export default function AppearanceSettingsTab({
         </SettingsCard>
       </SettingsSection>
 
-      {/* These three moved here whole when the quick-settings drawer went. They were the only
-          settings that drawer alone could reach, so deleting its handle without rehoming them
-          would have made three switches unreachable rather than tidier. */}
+      {/* The transcript switches moved here whole when the quick-settings drawer went. They were
+          the only settings that drawer alone could reach, so deleting its handle without rehoming
+          them would have made them unreachable rather than tidier. */}
       <SettingsSection title={t('appearance.toolDisplay.title')}>
         <SettingsCard divided>
           <SettingsRow label={t('appearance.toolDisplay.showWork')}>
@@ -120,6 +120,14 @@ export default function AppearanceSettingsTab({
               checked={showWork}
               onChange={(value) => setPreference('showWork', value)}
               ariaLabel={t('appearance.toolDisplay.showWork')}
+            />
+          </SettingsRow>
+
+          <SettingsRow label={t('appearance.toolDisplay.showCompactSummary')}>
+            <SettingsToggle
+              checked={showCompactSummary}
+              onChange={(value) => setPreference('showCompactSummary', value)}
+              ariaLabel={t('appearance.toolDisplay.showCompactSummary')}
             />
           </SettingsRow>
 

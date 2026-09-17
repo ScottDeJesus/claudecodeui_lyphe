@@ -7,6 +7,7 @@ import {
   KanbanSquare,
   ListTodo,
   MessageSquare,
+  Orbit,
   Terminal,
 } from 'lucide-react';
 import type { ComponentType, Dispatch, SetStateAction } from 'react';
@@ -42,8 +43,8 @@ type BuiltInTab = {
 // One glyph per view, each naming the thing the view actually shows rather than an action:
 // a speech bubble for the conversation, a terminal for the shell, a file tree for the files,
 // a branch for git, lanes for the board, a globe for the browser, a checklist for tasks, a
-// brain for memory, and a pulse for the runner — the one view whose subject is something
-// moving on its own.
+// brain for memory, an orbit for the sky, and a pulse for the runner — the one view whose
+// subject is something moving on its own.
 const BASE_TABS: BuiltInTab[] = [
   { id: 'chat',  labelKey: 'tabs.chat',  icon: MessageSquare },
   { id: 'shell', labelKey: 'tabs.shell', icon: Terminal },
@@ -53,6 +54,9 @@ const BASE_TABS: BuiltInTab[] = [
   // already keep. The board is global, not per project or per session: it is here whatever
   // the workspace is pointed at.
   { id: 'kanban', labelKey: 'tabs.kanban', icon: KanbanSquare },
+  // Global in the same way the board is — the sky is not a per-project or per-session view —
+  // and so it carries no gate either.
+  { id: 'universe', labelKey: 'tabs.universe', icon: Orbit },
 ];
 
 const BROWSER_TAB: BuiltInTab = { id: 'browser', labelKey: 'tabs.browser', icon: Globe };
@@ -68,8 +72,8 @@ const RUNNER_TAB: BuiltInTab = { id: 'runner', labelKey: 'tabs.runner', icon: Ac
  * any enabled plugin tabs.
  *
  * The built-in tabs are icon-only — a glyph each, named by `title` and `aria-label` — which is
- * what lets nine of them share the sidebar's width. Plugin tabs keep their words: a plugin
- * supplies a display name and no glyph, and a guessed icon would name it wrong.
+ * what lets the whole row of them share the sidebar's width. Plugin tabs keep their words: a
+ * plugin supplies a display name and no glyph, and a guessed icon would name it wrong.
  *
  * The strip still scrolls sideways rather than wrapping, because plugin tabs are words and a row
  * that reflows moves every tab a hand already knows the position of each time one is toggled.

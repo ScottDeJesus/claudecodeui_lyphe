@@ -27,6 +27,31 @@ type ParsedSession = {
 export const CLAUDE_PROJECTS_ROOT = path.join(os.homedir(), '.claude', 'projects');
 
 /**
+ * The root every board-launched Metis runs in: `<root>/<boardId>/` is a directory the
+ * board's driver creates and hands to the child as its cwd. A transcript whose cwd
+ * lives here belongs to a session the board OWNS — it is refused by the synchroniser
+ * below and read on demand by the transcript route instead.
+ */
+export const KANBAN_METIS_SESSION_ROOT = path.join(os.homedir(), '.claude', 'kanban-metis');
+
+/**
+ * True when `candidate` IS `root` or resolves beneath it.
+ *
+ * A resolved-path test, never a bare `startsWith`: `~/.claude/kanban-metis-old` is a
+ * different directory whose name merely begins with the same characters, and a string
+ * prefix would silently stop enrolling a real project's transcripts. The separator in
+ * the comparison is what separates the two; `path.resolve` also folds away a trailing
+ * slash or an interior `..`.
+ */
+const isUnder = (candidate: string, root: string): boolean => {
+  const resolvedCandidate = path.resolve(candidate);
+  const resolvedRoot = path.resolve(root);
+  return (
+    resolvedCandidate === resolvedRoot || resolvedCandidate.startsWith(resolvedRoot + path.sep)
+  );
+};
+
+/**
  * Session indexer for Claude transcript artifacts.
  */
 export class ClaudeSessionSynchronizer implements IProviderSessionSynchronizer {
@@ -163,6 +188,28 @@ export class ClaudeSessionSynchronizer implements IProviderSessionSynchronizer {
     });
 
     if (!parsed) {
+      return null;
+    }
+
+    // SECLUSION (Phase 6). A board-launched Metis runs inside
+    // `KANBAN_METIS_SESSION_ROOT`, so her transcript is not a project session — the
+    // board reads it by session id instead. Refused on the ONE authoritative cwd, the
+    // transcript's own `cwd` the extractor just returned; never on the file path,
+    // because a path-shaped test would have to guess the CLI's dash-encoding of a
+    // directory name — an encoding this repository does not own and has no forward
+    // encoder for.
+    //
+    // HERE, not inside the extractor callback above, and the difference is cost, not
+    // correctness: a `null` from that callback means "skip this record", so the extractor
+    // would read the refused transcript to EOF — making it the one file this scan ever
+    // reads in full, on every watcher event that touches it. From here the scan still
+    // stops at the first valid record, and the file is refused at the same point in the
+    // flow.
+    //
+    // That null reaches BOTH call sites (`synchronize`, `synchronizeFile`) BEFORE
+    // `sessionsDb.createSession`, which is what keeps `projectsDb.createProjectPath` from
+    // minting a `projects` row. The row is never CREATED — not created and filtered later.
+    if (isUnder(parsed.projectPath, KANBAN_METIS_SESSION_ROOT)) {
       return null;
     }
 

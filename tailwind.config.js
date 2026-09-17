@@ -124,6 +124,12 @@ export default {
           from: { opacity: '0', transform: 'translateY(100%)' },
           to: { opacity: '1', transform: 'translateY(0)' },
         },
+        // A sheet pinned to the LEFT edge arriving: a short slide in from the edge it hangs on, not a
+        // full-width sweep — the applications drawer's entrance in design/Applications Hub.dc.html.
+        'sheet-in-left': {
+          from: { opacity: '0', transform: 'translateX(-22px)' },
+          to: { opacity: '1', transform: 'none' },
+        },
       },
       animation: {
         shimmer: 'shimmer 2s linear infinite',
@@ -132,6 +138,7 @@ export default {
         'dialog-overlay-show': 'dialog-overlay-show 250ms var(--ease-enter)',
         'dialog-content-show': 'dialog-content-show 450ms var(--ease-enter)',
         'bottom-sheet-content-show': 'bottom-sheet-content-show 220ms cubic-bezier(0.22, 1, 0.36, 1)',
+        'sheet-in-left': 'sheet-in-left 340ms var(--ease-enter)',
         // The rendered transcript's entrances, both on Verve's own keyframes (`vv-rise` and
         // `vv-pagein`, `src/shared/ui/verve/tokens.css`) rather than on a second spelling of them
         // here. `shape-rise` is a FRAME arriving — a card the reader has never seen rises once, and

@@ -46,6 +46,12 @@ type ChatRun = {
   startedAt: number;
   lastEventAt: number;
   completedAt: number | null;
+  /**
+   * Set when this run's completion was already recorded by an earlier server: a re-adopted chat
+   * whose turn had finished before the restart. Its `complete` closes the run and tells the
+   * completion listeners, but stamps nothing — the turn is not new, so the chat is not unread.
+   */
+  completionAlreadyRecorded: boolean;
 };
 
 /**
@@ -121,7 +127,7 @@ function decorateAndRecordEvent(run: ChatRun, message: NormalizedMessage): Norma
     outbound.actualSessionId = run.appSessionId;
     run.status = 'completed';
     run.completedAt = Date.now();
-    recordRunCompletion(run.appSessionId);
+    recordRunCompletion(run.appSessionId, (message as { aborted?: boolean }).aborted === true, !run.completionAlreadyRecorded);
     evictRunLater(run.appSessionId);
   }
 
@@ -178,8 +184,27 @@ function recordProviderSessionId(run: ChatRun, providerSessionId: string): void 
  * every run: natural, aborted, crashed or re-adopted. Failures are logged and
  * never thrown, because a bookkeeping write must not drop the frame that ends
  * the run.
+ *
+ * `stamp` is false for a completion an earlier server already recorded (a
+ * re-adopted chat whose turn finished before the restart): the listeners still
+ * hear the session is idle, but the completion stamp is not rewritten. Stamping
+ * it again was what brought an unread dot back on every server restart, over a
+ * read the reader had already made, for a turn with no new activity.
  */
-function recordRunCompletion(appSessionId: string): void {
+function recordRunCompletion(appSessionId: string, aborted: boolean, stamp: boolean): void {
+  for (const listener of runCompletedListeners) {
+    try {
+      listener(appSessionId, { aborted });
+    } catch (error) {
+      console.error('[ChatRunRegistry] Run-completed listener failed', {
+        appSessionId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+  if (!stamp) {
+    return;
+  }
   try {
     sessionUserStateDb.markRunCompleted(appSessionId, isSessionOnScreen(appSessionId));
 
@@ -199,6 +224,11 @@ function recordRunCompletion(appSessionId: string): void {
   }
 }
 
+type RunCompletedListener = (appSessionId: string, outcome: { aborted: boolean }) => void;
+
+/** Called once per run, as its terminal `complete` is recorded. */
+const runCompletedListeners = new Set<RunCompletedListener>();
+
 /**
  * Registry of live provider runs keyed by the stable app session id.
  *
@@ -208,6 +238,17 @@ function recordRunCompletion(appSessionId: string): void {
  * regardless of which provider runtime produced them.
  */
 export const chatRunRegistry = {
+  /**
+   * Subscribes to run completion; returns the unsubscribe. The queued-message dispatcher uses it
+   * to send the next turn the moment a session goes idle rather than on its next poll.
+   */
+  onRunCompleted(listener: RunCompletedListener): () => void {
+    runCompletedListeners.add(listener);
+    return () => {
+      runCompletedListeners.delete(listener);
+    };
+  },
+
   /**
    * Starts tracking a run and returns it, or `null` when a run is already in
    * progress for the session (callers must reject the duplicate send).
@@ -242,6 +283,7 @@ export const chatRunRegistry = {
       startedAt: Date.now(),
       lastEventAt: Date.now(),
       completedAt: null,
+      completionAlreadyRecorded: false,
     };
 
     run.writer = new ChatSessionWriter({
@@ -354,12 +396,18 @@ export const chatRunRegistry = {
    * milliseconds of the previous turn ending) — the session-keyed
    * `completeRun` would terminate that newer run.
    */
-  completeRunIfCurrent(run: ChatRun, opts: { exitCode: number; aborted?: boolean }): void {
+  completeRunIfCurrent(
+    run: ChatRun,
+    opts: { exitCode: number; aborted?: boolean; alreadyRecorded?: boolean },
+  ): void {
     if (runs.get(run.appSessionId) !== run || run.status !== 'running') {
       return;
     }
 
-    run.writer.sendComplete(opts);
+    if (opts.alreadyRecorded) {
+      run.completionAlreadyRecorded = true;
+    }
+    run.writer.sendComplete({ exitCode: opts.exitCode, aborted: opts.aborted });
   },
 
   /**

@@ -42,6 +42,35 @@ const toProviderAuthStatus = (
   loading: false,
 });
 
+/**
+ * Asks the server whether one provider is signed in, with no React state of its own. `answered`
+ * is false when the check itself failed (an error response, a dropped request), which is not the
+ * same as the server reporting the provider signed out; the status then carries the failure.
+ */
+export async function fetchProviderAuthStatus(
+  provider: LLMProvider,
+): Promise<{ answered: boolean; status: ProviderAuthStatus }> {
+  try {
+    const response = await api.providers.authStatus(provider);
+
+    if (!response.ok) {
+      return {
+        answered: false,
+        status: { authenticated: false, email: null, method: null, loading: false, error: FALLBACK_STATUS_ERROR },
+      };
+    }
+
+    const payload = (await response.json()) as ProviderAuthStatusApiResponse;
+    return { answered: true, status: toProviderAuthStatus(payload.data) };
+  } catch (caughtError) {
+    console.error(`Error checking ${provider} auth status:`, caughtError);
+    return {
+      answered: false,
+      status: { authenticated: false, email: null, method: null, loading: false, error: toErrorMessage(caughtError) },
+    };
+  }
+}
+
 type UseProviderAuthStatusOptions = {
   initialLoading?: boolean;
 };
@@ -73,38 +102,9 @@ export function useProviderAuthStatus(
 
   const checkProviderAuthStatus = useCallback(async (provider: LLMProvider): Promise<ProviderAuthStatus> => {
     setProviderLoading(provider);
-
-    try {
-      const response = await api.providers.authStatus(provider);
-
-      if (!response.ok) {
-        const status: ProviderAuthStatus = {
-          authenticated: false,
-          email: null,
-          method: null,
-          loading: false,
-          error: FALLBACK_STATUS_ERROR,
-        };
-        setProviderStatus(provider, status);
-        return status;
-      }
-
-      const payload = (await response.json()) as ProviderAuthStatusApiResponse;
-      const status = toProviderAuthStatus(payload.data);
-      setProviderStatus(provider, status);
-      return status;
-    } catch (caughtError) {
-      console.error(`Error checking ${provider} auth status:`, caughtError);
-      const status: ProviderAuthStatus = {
-        authenticated: false,
-        email: null,
-        method: null,
-        loading: false,
-        error: toErrorMessage(caughtError),
-      };
-      setProviderStatus(provider, status);
-      return status;
-    }
+    const { status } = await fetchProviderAuthStatus(provider);
+    setProviderStatus(provider, status);
+    return status;
   }, [setProviderLoading, setProviderStatus]);
 
   const refreshProviderAuthStatuses = useCallback(async (providers: LLMProvider[] = CLI_PROVIDERS) => {

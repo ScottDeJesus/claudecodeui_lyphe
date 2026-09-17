@@ -72,7 +72,7 @@ Read [the realtime stream](./02-realtime-stream.md) for how a reply arrives, and
 | `src/modules/widgets/docspaceOrigin.ts` | `DOCSPACE_EMBED_DEFAULT_PORT`, `resolveDocSpaceOrigin`, `docspaceEmbedUrl`, `docspaceStudioUrl`, and `isForeignOrigin` — the gate on `allow-same-origin` |
 | `src/modules/widgets/DocSpaceFrame.tsx` | `DOCSPACE_SANDBOX`, `DOCSPACE_READY_TIMEOUT_MS` and `DocSpaceFrame` — the second frame: a `src` on ArchPulse's origin, the latched theme, the ready timer, and the `framed` prop that drops its own border where a card already draws one |
 | `src/modules/widgets/WidgetErrorCard.tsx` | `WidgetErrorCard` — the two-sentence card shown where a widget was asked for and cannot be drawn |
-| `src/modules/live-bus/topics.ts` | `LIVE_TOPIC_ALLOWLIST`, `isAllowedTopic`, `RUNNER_ALL_TOPIC`, `runnerTopic` — the whole vocabulary |
+| `src/modules/live-bus/topics.ts` | `LIVE_TOPIC_ALLOWLIST`, `isAllowedTopic`, `RUNNER_ALL_TOPIC`, `SOULS_ALL_TOPIC`, `UNIVERSE_ALL_TOPIC`, `runnerTopic` — the whole vocabulary |
 | `src/modules/live-bus/context/LiveBusContext.tsx` | `LiveBusProvider` and `useLiveBus` — the retained values, the listener registry, `publish`/`subscribe`/`get` |
 | `src/modules/live-bus/hooks/useLiveTopic.ts` | `useLiveTopic` — the module's ONE render trigger, for a React component reading a topic |
 | `src/modules/live-bus/index.ts` | The barrel. The provider, the bus hook, `useLiveTopic`, and the vocabulary |
@@ -395,15 +395,20 @@ caller in the app — the panel and the tab's own gate both read `runner:*` thro
 **The bus knows no producer.** It imports no transport, calls no endpoint and names no frame kind.
 What fills it is a FEED — a headless component owned by the module whose data it carries, which
 subscribes to whatever it likes and calls `publish`. The first is `RunnerFeed` in
-`src/modules/plan-runner/`, documented in [plan-runner.md](../plan-runner.md) under *Consumers*;
-a second (git delegation, Task Master) lands as a sibling `*Feed.tsx` in ITS own module and never as
-a line in `live-bus/`. That rule is what keeps this file from acquiring a switch over frame kinds it
-has no business knowing, and it is why the bus can be read without knowing anything about the runner.
+`src/modules/plan-runner/`, documented in [plan-runner.md](../plan-runner.md) under *Consumers*.
+Two more have followed and both kept the shape: `SoulLaunchFeed` in `src/modules/dispatch-souls/`
+([dispatch-souls.md](../dispatch-souls.md)) and `UniverseFeed` in `src/modules/universe/`, which
+publishes a once-a-second digest rather than the raw activity stream
+([plan-runner.md](../plan-runner.md) §"The feed"). A further lane (git delegation, Task Master)
+lands the same way — a sibling `*Feed.tsx` in ITS own module and never as a line in `live-bus/`.
+That rule is what keeps this file from acquiring a switch over frame kinds it has no business
+knowing, and it is why the bus can be read without knowing anything about the runner.
 
-**The vocabulary is an allowlist, and the shapes are anchored.** `LIVE_TOPIC_ALLOWLIST` holds two
-patterns today — `runner:*` (every run as one array) and `runner:<run_id>` with the route's own
-character class and its 120-character ceiling — and `isAllowedTopic` is the single question every
-other file asks. A `startsWith('runner:')` test would admit `runner:../../etc/passwd`, a topic
+**The vocabulary is an allowlist, and the shapes are anchored.** `LIVE_TOPIC_ALLOWLIST` holds four
+patterns today — `runner:*` (every run as one array), `runner:<run_id>` with the route's own
+character class and its 120-character ceiling, `souls:*` (every launcher soul), and `universe:*`
+(the estate's activity as one digest, never its rows) — and `isAllowedTopic` is the single question
+every other file asks. A `startsWith('runner:')` test would admit `runner:../../etc/passwd`, a topic
 carrying a URL, and a topic 40 kB long, each of which reads as a runner topic to a prefix and as
 nonsense to everything downstream. Adding a lane means adding a pattern here and nowhere else.
 
@@ -483,7 +488,7 @@ listeners in the bus for every later publish to walk.
 | The streaming context | `StreamingMarkdown` still marks only the pending half, `MarkdownBody` keeps its memo, and `CodeBlock` is still the only thing that reads the context — a second reader is a second place the streaming rule can be forgotten |
 | The widget branch in `CodeBlock` (`shapes/code/index.tsx`) | The opt-in is still the WHOLE info-string word `widget`. Gate 7 drives both an `html` fence and a `widget-config` one, each with a positive control — "zero iframes" is also what a container that rendered nothing reports |
 | `postToFrame` or the revoke rule | The host still stops posting after a second `load` on the element. Gate 9b navigates a widget to `about:blank`, forges the `ready` a real widget sends, and requires silence — a frame that navigated away keeps its `contentWindow`, so identity alone would go on admitting it |
-| `LIVE_TOPIC_ALLOWLIST` | Both patterns are still ANCHORED and still bounded. Gates 4 and 5 of `.verify/phase-24.mjs` drive a bare bad topic and a URL-shaped one; a prefix test passes neither |
+| `LIVE_TOPIC_ALLOWLIST` | Every pattern is still ANCHORED and still bounded. Gates 4 and 5 of `.verify/phase-24.mjs` drive a bare bad topic and a URL-shaped one; a prefix test passes neither |
 | `MAX_TOPICS_PER_FRAME` | The refusal is still an ANSWER, not a silence — gate 6 reads the reason out of the seventeenth topic's `onError` inside the frame |
 | `useWidgetBridge`'s cleanup | Gate 8 drops the WIDGETS while the bus and the feed stay mounted and publishing, and requires every subscription they held to have been released — counted at the bus through a wrapper over `subscribe`, which a leaked listener never calls back. Not console silence: a listener left behind posts into a dead `contentWindow`, and `postToFrame`'s `?.` makes that raise nothing at all |
 | `publish`'s equal-value skip | It must remain a COMPLETE no-op. Replace the retained entry on an equal reading and `useLiveTopic` re-renders forever, because its snapshot is compared by reference |

@@ -4,6 +4,7 @@ import type { CSSProperties, Dispatch, ReactElement, RefObject, SetStateAction }
 
 import type { ChatMessage,
   Project,
+  ProjectChoice,
   ProjectSession,
   LLMProvider,
   ProviderModelActions,
@@ -51,6 +52,9 @@ type ChatMessagesPaneProps = {
   providerModelCatalog: Partial<Record<LLMProvider, ProviderModelsDefinition>>;
   providerModelActions: ProviderModelActions;
   providerModelsLoading: boolean;
+  /** The projects a new chat can start in, and how to switch to one. */
+  projectChoices?: ProjectChoice[];
+  onSelectProject?: (projectId: string) => void;
   tasksEnabled: boolean;
   isTaskMasterInstalled: boolean | null;
   onShowAllTasks?: (() => void) | null;
@@ -82,6 +86,8 @@ type ChatMessagesPaneProps = {
    * shows a typing indicator at the foot of the turn while the session is processing.
    */
   showWork?: boolean;
+  /** Draws the summary written after a compaction; off leaves only the "Compacted" line. */
+  showCompactSummary?: boolean;
   selectedProject: Project;
   /** Loads an already-sent message back into the composer; absent when the provider cannot re-run from a point. */
   onEditMessage?: (message: ChatMessage) => void;
@@ -121,6 +127,8 @@ function ChatMessagesPane({
   providerModelCatalog,
   providerModelActions,
   providerModelsLoading,
+  projectChoices,
+  onSelectProject,
   tasksEnabled,
   isTaskMasterInstalled,
   onShowAllTasks,
@@ -149,6 +157,7 @@ function ChatMessagesPane({
   showRawParameters,
   showThinking,
   showWork = false,
+  showCompactSummary = true,
   selectedProject,
   readToolPermissionState,
   onExportSurface,
@@ -166,12 +175,14 @@ function ChatMessagesPane({
   // The reader's own transcript size, published to every message body below as a variable.
   const { size: chatFontSize } = useChatFontSize();
   // "Show work" off drops the work before grouping, so a hidden run never leaves an
-  // empty group row behind. Rows that need the person stay (see isHiddenWork).
+  // empty group row behind. Rows that need the person stay (see isHiddenWork). A compaction
+  // summary is dropped the same way when its switch is off.
   const shownMessages = useMemo(
-    () => (showWork
-      ? visibleMessages
-      : visibleMessages.filter((message) => !isHiddenWork(message, readToolPermissionState))),
-    [visibleMessages, showWork, readToolPermissionState],
+    () => visibleMessages.filter((message) => (
+      (showCompactSummary || !message.isCompactSummary)
+      && (showWork || !isHiddenWork(message, readToolPermissionState))
+    )),
+    [visibleMessages, showWork, showCompactSummary, readToolPermissionState],
   );
   const groupedVisibleMessages = useMemo(
     () => groupConsecutiveTools(shownMessages, Boolean(showThinking)),
@@ -316,6 +327,9 @@ function ChatMessagesPane({
           providerModelCatalog={providerModelCatalog}
           providerModelActions={providerModelActions}
           providerModelsLoading={providerModelsLoading}
+          selectedProjectId={selectedProject?.projectId ?? null}
+          projectChoices={projectChoices}
+          onSelectProject={onSelectProject}
           tasksEnabled={tasksEnabled}
           isTaskMasterInstalled={isTaskMasterInstalled}
           onShowAllTasks={onShowAllTasks}

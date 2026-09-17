@@ -12,12 +12,13 @@ import { AppError } from '@/shared/utils.js';
  */
 const BOARD_STATUSES: KanbanStatus[] = ['not_ready', 'todo', 'questions', 'active', 'done'];
 
-/** One `kanban_boards` row as SQLite holds it: the two booleans are 0 or 1, not true or false. */
+/** One `kanban_boards` row as SQLite holds it: the booleans are 0 or 1, not true or false. */
 type KanbanBoardRow = {
   id: string;
   name: string;
   project_id: string | null;
   autonomy: number;
+  deepseek_flash: number;
   sort_order: number;
   archived: number;
   created_at: string;
@@ -25,14 +26,15 @@ type KanbanBoardRow = {
 };
 
 /** Every column of a board, in one spelling, so no query is the odd one out. */
-const BOARD_COLUMNS = 'id, name, project_id, autonomy, sort_order, archived, created_at, updated_at';
+const BOARD_COLUMNS =
+  'id, name, project_id, autonomy, deepseek_flash, sort_order, archived, created_at, updated_at';
 
 /**
  * One SQLite row to the `KanbanBoard` the rest of the server speaks.
  *
- * `autonomy` and `archived` become real booleans here and nowhere else: a `0` reaching the wire
- * is a panel whose autonomy switch reads as stuck, which is what the check asserting
- * `autonomy=False` exists to catch.
+ * `autonomy`, `deepseekFlash` and `archived` become real booleans here and nowhere else: a `0`
+ * reaching the wire is a panel whose autonomy switch reads as stuck, which is what the check
+ * asserting `autonomy=False` exists to catch.
  */
 function toKanbanBoard(row: KanbanBoardRow): KanbanBoard {
   return {
@@ -40,6 +42,7 @@ function toKanbanBoard(row: KanbanBoardRow): KanbanBoard {
     name: row.name,
     projectId: row.project_id,
     autonomy: row.autonomy === 1,
+    deepseekFlash: row.deepseek_flash === 1,
     sortOrder: row.sort_order,
     archived: row.archived === 1,
     createdAt: row.created_at,
@@ -51,6 +54,7 @@ function toKanbanBoard(row: KanbanBoardRow): KanbanBoard {
 const BOARD_PATCH_COLUMNS = {
   name: 'name',
   autonomy: 'autonomy',
+  deepseekFlash: 'deepseek_flash',
   projectId: 'project_id',
   archived: 'archived',
 } as const;
@@ -60,6 +64,7 @@ export type KanbanBoardUpdatePatch = {
   id: string;
   name?: string;
   autonomy?: boolean;
+  deepseekFlash?: boolean;
   projectId?: string | null;
   archived?: boolean;
 };
@@ -237,5 +242,34 @@ export const kanbanBoardsDb = {
 
     const totals = new Map(rows.map((row) => [row.status, row.total]));
     return BOARD_STATUSES.map((status) => ({ status, total: totals.get(status) ?? 0 }));
+  },
+
+  /**
+   * How many of a board's live cards an autonomous session could pick up right now.
+   *
+   * A card is claimable when it is `todo`, or when it is `active` on a lease that has gone stale —
+   * an `active` card whose owner died mid-build is work nobody is doing, and leaving it out would
+   * strand it until an operator noticed. A card on a FRESH lease is somebody else's and is not
+   * counted, which is what keeps two sessions off one card.
+   *
+   * `staleSeconds` is the caller's dial and the ISO-8601 UTC seconds bound is derived HERE from
+   * `Date.now()`: `build_lease_at` is TEXT in that same format, so the comparison below is
+   * lexicographic — and correct only because the format is fixed-width and UTC. A `Date` bound
+   * here would compare a string against an object and match nothing, which reads as "no orphaned
+   * leases" forever.
+   */
+  countClaimable(boardId: string, staleSeconds: number): number {
+    const db = getConnection();
+    const staleBefore = new Date(Date.now() - staleSeconds * 1000).toISOString();
+    const row = db
+      .prepare(
+        `SELECT COUNT(*) AS n FROM kanban_cards
+         WHERE board_id = ? AND archived = 0
+           AND ( status = 'todo'
+              OR (status = 'active' AND (build_lease_at IS NULL OR build_lease_at < ?)) )`
+      )
+      .get(boardId, staleBefore) as { n: number };
+
+    return row.n;
   },
 };

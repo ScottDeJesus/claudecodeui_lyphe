@@ -1,6 +1,7 @@
 import type { ReactNode, Ref } from 'react';
 import { Check } from 'lucide-react';
 
+import { OWNS_ESCAPE } from '@/shared/ui/overlayEscape';
 import { cn } from '@/shared/utils';
 import type { ComposerMenuAnchor } from '@/shared/types';
 
@@ -25,6 +26,8 @@ export function ComposerMenuSurface({
     <div
       ref={menuRef}
       role="menu"
+      // The popover owns Escape while it is up — see `shared/ui/overlayEscape`.
+      {...OWNS_ESCAPE}
       aria-label={ariaLabel}
       className="fixed z-[100] min-w-48 overflow-y-auto overscroll-contain border border-border bg-popover p-1.5 text-popover-foreground"
       // The anchor is this menu's own business — it is a portalled overlay with

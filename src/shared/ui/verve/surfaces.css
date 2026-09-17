@@ -1,0 +1,197 @@
+/* Verve surface paint — every colour, size, radius, shadow and cursor rule for the two kit pieces
+ * that are mechanism rather than appearance: DockableFab and SplitPane, plus the body classes a
+ * drag of either one sets for its length.
+ *
+ * The fourth paint file, opened rather than squeezed in: controls.css is past its stated ceiling,
+ * feedback.css is at it, and board.css belongs to the board. README rule 6: the next file opens
+ * the same way again.
+ *
+ * Same contract as its three siblings. A library class string carries `vv-<name>` plus layout
+ * utilities and nothing else; colour comes from tokens.css and nowhere else; no rule declares a
+ * `--tone-*` property. Nothing here shares a selector with controls.css, feedback.css or
+ * board.css, so where it loads between them decides nothing.
+ *
+ * ONE departure from "the className carries size": the FAB's size is a custom property,
+ * `--vv-fab-size`, because two things read it — the box, and the inline `clamp()` that keeps a
+ * stored point on screen (DockableFab.tsx). Spelt as a Tailwind class it would be two spellings
+ * of one number, and they would drift.
+ *
+ * Imported once, for side effect, from src/shared/ui/index.ts — after feedback.css and before
+ * board.css, which keeps the last word.
+ */
+
+/* ---------------------------------------------------------------- DockableFab */
+/* The FAB positions rather than paints, for the toast stack's reason: it is a fixed overlay with
+ * no caller's layout to sit in. It is one node for life; docked or floating, only its inline
+ * left/top change.
+ *
+ * `60` is measured rather than chosen (2026-09-16), against five neighbours:
+ *   - the mobile sidebar drawer, `fixed inset-0 z-50`, IN THE SAME TREE (ProjectSidebarRegion.tsx:76).
+ *     The one it must beat: under that backdrop the FAB is dimmed, blurred and unclickable at the
+ *     exact moment the reader is trying to leave a pane.
+ *   - Dialog, z-50, portalled to <body> (Dialog.tsx:185,205): the drawer this FAB opens.
+ *   - ActionMenu (ActionMenu.tsx:214), two branches on one line. Portalled it is `fixed z-[70]`: the
+ *     menus inside that drawer, and 60 stays under them, so the order holds even for a FAB mounted
+ *     outside the shell. In-tree, the default, it is `absolute z-50`, rendered by exactly two
+ *     callers: ChatExportMenu.tsx:85, in the transcript, which a FAB the reader floated over it
+ *     covers where the two overlap (accepted: the docked FAB sits in the rail, and a floated one is
+ *     where the reader put it and moves in one drag); and McpServers.tsx:146, which renders inside
+ *     Settings' own `fixed z-[9999]` layer (Settings.tsx:147) and so is above the FAB regardless.
+ *   - the app's ceiling, z-[10000] (McpServerFormModal.tsx:107).
+ *   - the toast stack, 10001 (`.vv-toast-stack` in feedback.css).
+ * The number only competes inside the workspace shell. That container is `position: fixed`, which
+ * makes it a stacking context, so the FAB mounted in it is weighed against in-tree layers only; the
+ * portalled ones sit in the root context, above the whole shell.
+ *
+ * The drawer is not the only in-tree `fixed inset-0 z-50` overlay. Five hand-rolled modals render
+ * without a portal — TaskMasterSetupModal, CreateTaskModal and TaskHelpModal (task-master/modals),
+ * VersionUpgradeModal (rendered by SidebarModals.tsx) and BrowserUsePanel.tsx's fullscreen view —
+ * so the FAB stays sharp and clickable over their backdrops too. That is accepted: pressing it opens
+ * a portalled Dialog above the modal, and closing that returns the reader to the modal untouched.
+ * A modal that must cover the FAB portals itself the way Dialog does; this number does not drop. */
+.vv-fab {
+  /* 28px drawn, at every width, docked or floating — the size design/Applications Hub.dc.html draws
+   * it (the `fabDown` button). It is a way in and out, never the screen's subject, so it stays the
+   * smallest thing in the rail beside the wordmark; the 44px catch below is what a finger needs. */
+  --vv-fab-size: 28px;
+  --vv-fab-glyph: 12px;
+  /* Elevation as a property, so the docked, hover and active rules below change one rung
+   * without restating each other's shadows. Floating it is the scale's second rung. */
+  --vv-fab-elev: var(--shadow-hover);
+  position: fixed;
+  z-index: 60;
+  width: var(--vv-fab-size);
+  height: var(--vv-fab-size);
+  padding: 0;
+  /* Transparent, not none: forced colours (Windows High Contrast) flattens the accent fill and drops
+   * the shadow, and this border is then the only thing that still draws the circle. It is inside the
+   * box (border-box), so the size is unchanged, and the fill paints under it everywhere else. */
+  border: 1px solid transparent;
+  border-radius: var(--radius-pill);
+  background: var(--accent);
+  color: var(--on-accent);
+  box-shadow: var(--vv-fab-elev);
+  cursor: grab;
+  /* The browser pans and zooms on a touch drag unless told the gesture is the page's. */
+  touch-action: none;
+  -webkit-tap-highlight-color: transparent;
+  transition:
+    transform var(--dur-quick) var(--ease-press),
+    background-color 0.2s,
+    box-shadow var(--dur-move);
+}
+/* THE CATCH IS 44px; THE BOX STAYS 28px. The hub's drag.js trade: a small circle to look at, a
+ * finger-sized one to hit. A transparent pseudo-element centred on the button is part of the
+ * button for hit-testing, so a press 19px off-centre still lands `onPointerDown` — but it is not
+ * part of the button's layout box, so `getBoundingClientRect()` still answers 28px, and
+ * DockableFab's grab offset, viewport clamp and dock-snap centre (all read off that live rect)
+ * keep measuring the circle the reader sees. Round, so the corners of a 44px square never steal
+ * a press meant for the rail beside it: docked, the catch reaches 8px past the box — exactly the
+ * `gap-2` between the dock slot and the wordmark. */
+.vv-fab::before {
+  content: '';
+  position: absolute;
+  /* Less 1px: an absolute child is placed against the PADDING box, inside the 1px border above. */
+  inset: calc((var(--vv-fab-size) - 44px) / 2 - 1px);
+  border-radius: var(--radius-pill);
+}
+/* Docked it keeps the same 28px — the rail's other controls are 30px, and the design's button was
+ * 28px everywhere — and its shadow drops to the resting rung, so it reads as a control of the rail
+ * and not an object floating over it. The class still names the state: the probe and the drag read
+ * it as "seated in the dock". */
+.vv-fab--docked { --vv-fab-elev: var(--shadow-rest); }
+.vv-fab:active { transform: scale(0.92); }
+@media (hover: hover) {
+  .vv-fab:hover { transform: scale(1.06); background: var(--accent-deep); --vv-fab-elev: var(--shadow-lift); }
+  .vv-fab--docked:hover { --vv-fab-elev: var(--shadow-hover); }
+  .vv-fab:hover:active { transform: scale(0.92); }
+}
+/* What it opens is open. The fill deepens and a soft accent ring closes around it, so "on" is a
+ * change of shape as well as of shade. */
+.vv-fab--active {
+  background: var(--accent-deep);
+  box-shadow: 0 0 0 3px var(--accent-soft), var(--vv-fab-elev);
+}
+/* The kit draws no icon; the caller's glyph is sized to the circle it lands in. */
+.vv-fab__glyph > svg { width: var(--vv-fab-glyph); height: var(--vv-fab-glyph); }
+
+/* ---------------------------------------------------------------- SplitPane */
+/* `isolation` keeps the divider's z-index inside the split: its focus ring and hover cue only have to
+ * draw over the two panes' edges, never over anything else on the page. */
+.vv-split { isolation: isolate; }
+/* A pane's own ground, so a frame still loading shows a surface and not the screen underneath. */
+.vv-split__pane { background: var(--surface); }
+/* A gutter of its own, BESIDE the panes and over neither: every pixel of both applications stays
+ * theirs, so a control flush with either app's inner edge — and either pane's scrollbar — is still
+ * clickable. The whole 8px box is the grab target (16px under a finger), and it paints the pane
+ * ground with a 1px seam in its middle. The left pane still takes exactly the ratio; the gutter comes
+ * out of the right pane's share, so `aria-valuenow` and the left pane's measured width agree. A drag
+ * maps the pointer to the gutter's left edge, so a grab at its centre is 4px off the ratio (8px under
+ * a finger), and never more than the gutter is wide. */
+.vv-split__divider {
+  position: relative;
+  z-index: 1;
+  width: 8px;
+  background: var(--surface);
+  cursor: col-resize;
+  touch-action: none;
+}
+@media (pointer: coarse) {
+  .vv-split__divider { width: 16px; }
+}
+.vv-split__divider::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 1px;
+  background: var(--border-strong);
+  transition: background-color var(--dur-quick), box-shadow var(--dur-quick);
+}
+/* The cue on hover, focus and drag is a box-shadow ring on the seam, so it reads about 3px wide while
+ * nothing moves. */
+.vv-split__divider:hover::before,
+.vv-split__divider:focus-visible::before,
+body.vv-drag-split .vv-split__divider::before {
+  background: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+/* On keyboard focus the seam IS the ring. The house outline (`[tabindex]:focus-visible`, tokens.css)
+ * would draw two more accent bars around the 8px gutter, three parallel lines for one state. The
+ * seam widens to 5px instead, still inside the gutter, so where focus sits reads stronger than a
+ * hover hint. The outline is made transparent rather than removed, so forced colours still draws it
+ * in a system colour where the seam's own paint is flattened. The rule is scoped under `.vv-split`
+ * for its weight: tokens.css lands AFTER this file in the cascade (src/main.tsx imports App, and so
+ * this barrel, before it), and it would win a tie. */
+.vv-split > .vv-split__divider:focus-visible { outline-color: transparent; }
+.vv-split__divider:focus-visible::before { box-shadow: 0 0 0 2px var(--accent); }
+/* Forced colours overrides a background and drops a box-shadow, which would erase the seam at rest
+ * and every cue on it. So the seam opts out and paints in system colours only, never a token: the
+ * line in CanvasText, the hover and drag cue in Highlight. Keyboard focus there is the platform's
+ * own ring — the transparent outline above, which forced colours draws — so the focused seam stays
+ * a plain line rather than letting the accent focus rules through the opt-out. */
+@media (forced-colors: active) {
+  .vv-split__divider::before,
+  .vv-split__divider:focus-visible::before { forced-color-adjust: none; background: CanvasText; box-shadow: none; }
+  .vv-split__divider:hover::before,
+  body.vv-drag-split .vv-split__divider::before { background: Highlight; box-shadow: 0 0 0 1px Highlight; }
+}
+/* Last in the two sections it covers, so it outranks both transitions at equal specificity. */
+@media (prefers-reduced-motion: reduce) {
+  .vv-fab,
+  .vv-split__divider::before { transition: none; }
+}
+
+/* ---------------------------------------------------------------- The drag, for its length */
+/* A pane is a cross-origin iframe: its own browsing context, which swallows the pointer stream the
+ * moment a drag crosses into it, and the drag dies mid-gesture. So for the length of a drag every
+ * frame leaves hit-testing and every move and the release reach this document. It is a class on
+ * <body>, never an inline style on the frames, which React owns and would undo. usePointerDrag
+ * adds these at the threshold and removes them in the capture phase of the release. */
+body.vv-dragging { -webkit-user-select: none; user-select: none; }
+body.vv-dragging iframe { pointer-events: none; }
+/* The element's own cursor outranks the body's, so the held FAB is named as well as the body. */
+body.vv-drag-fab,
+body.vv-drag-fab .vv-fab { cursor: grabbing; }
+body.vv-drag-split { cursor: col-resize; }

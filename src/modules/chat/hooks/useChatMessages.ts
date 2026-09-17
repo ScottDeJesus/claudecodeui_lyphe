@@ -85,6 +85,7 @@ type CachedMessageProjection = {
   subagentActivitySource: NormalizedMessage | null;
   /** …and on the `<task-notification>` turn that declares its background agent finished. */
   finishSource: NormalizedMessage | null;
+  resumeSource: NormalizedMessage | null;
   messages: ChatMessage[];
 };
 
@@ -154,6 +155,8 @@ export function normalizedToChatMessages(messages: NormalizedMessage[]): ChatMes
   const liveSubagentUsage = new Map<string, LiveUsageFold>();
   /** Newest folded row per container, so its cached projection knows to rebuild. */
   const lastSubagentSourceByParent = new Map<string, NormalizedMessage>();
+  /** The model each live agent's turns name, newest last — history carries it only after a re-read. */
+  const liveSubagentModel = new Map<string, string>();
   /**
    * The row that finished each background agent, by the `Agent` call it names. On a history
    * load the server folds the transcript's `<task-notification>` turn onto the container
@@ -163,7 +166,17 @@ export function normalizedToChatMessages(messages: NormalizedMessage[]): ChatMes
    * pinned above the transcript — until the next reload.
    */
   const finishByToolUseId = new Map<string, { status: string; source: NormalizedMessage }>();
+  /**
+   * The latest `SendMessage` result that RESUMED each agent, by agent id (a message queued to an
+   * agent still running names no `resumedAgentId`). The agent is working again from that moment,
+   * and it reports back under the SendMessage call's id — not the Agent call that launched it.
+   */
+  const resumeByAgentId = new Map<string, NormalizedMessage>();
   for (const msg of messages) {
+    const resumedAgentId = (msg as { toolUseResult?: { resumedAgentId?: unknown } }).toolUseResult?.resumedAgentId;
+    if (msg.kind === 'tool_result' && msg.toolId && typeof resumedAgentId === 'string' && resumedAgentId) {
+      resumeByAgentId.set(resumedAgentId, msg);
+    }
     if (msg.kind === 'task_notification' && msg.toolId) {
       finishByToolUseId.set(msg.toolId, { status: typeof msg.status === 'string' ? msg.status : 'completed', source: msg });
     }
@@ -173,6 +186,12 @@ export function normalizedToChatMessages(messages: NormalizedMessage[]): ChatMes
       if (!activity) {
         activity = [];
         liveSubagentActivity.set(parentId, activity);
+      }
+
+      if (typeof msg.model === 'string' && msg.model && msg.model !== '<synthetic>' && liveSubagentModel.get(parentId) !== msg.model) {
+        liveSubagentModel.set(parentId, msg.model);
+        // The model decides the row's mark, so learning it is a reason to redraw the container.
+        lastSubagentSourceByParent.set(parentId, msg);
       }
 
       if (msg.usage && msg.usageMessageId) {
@@ -258,6 +277,23 @@ export function normalizedToChatMessages(messages: NormalizedMessage[]): ChatMes
       : null;
     const finish = msg.kind === 'tool_use' && msg.toolId ? finishByToolUseId.get(msg.toolId) : undefined;
     const finishSource = finish?.source ?? null;
+    // A resume of this container's agent the server has not already accounted for (a history load
+    // carries the one it saw on `subagent.resume`): live, the agent runs again until the resume's
+    // own finish lands.
+    const containerAgentId = msg.kind === 'tool_use'
+      ? msg.subagent?.id
+        ?? (toolResultSource as { toolUseResult?: { agentId?: unknown } } | null)?.toolUseResult?.agentId
+      : undefined;
+    const resumeRow = typeof containerAgentId === 'string' ? resumeByAgentId.get(containerAgentId) : undefined;
+    const liveResume = resumeRow && resumeRow.toolId !== msg.toolId && resumeRow.toolId !== msg.subagent?.resume?.toolUseId
+      ? resumeRow
+      : undefined;
+    // The resume's own finish, whether the resume is live or one the server already named: its
+    // report lands under the SendMessage call's id, so the container's own id never finds it.
+    const resumeToolUseId = liveResume?.toolId ?? (msg.kind === 'tool_use' ? msg.subagent?.resume?.toolUseId : undefined);
+    const resumeFinish = resumeToolUseId ? finishByToolUseId.get(resumeToolUseId) : undefined;
+    // Changes when the resume lands and again when its finish does.
+    const resumeSource = resumeFinish?.source ?? liveResume ?? null;
     const cachedProjection = projectionCache.get(msg);
 
     // A tool-use projection must be rebuilt when a matching result arrives,
@@ -268,6 +304,7 @@ export function normalizedToChatMessages(messages: NormalizedMessage[]): ChatMes
       cachedProjection?.toolResultSource === toolResultSource
       && cachedProjection.subagentActivitySource === subagentActivitySource
       && cachedProjection.finishSource === finishSource
+      && cachedProjection.resumeSource === resumeSource
     ) {
       converted.push(...cachedProjection.messages);
       continue;
@@ -378,7 +415,7 @@ export function normalizedToChatMessages(messages: NormalizedMessage[]): ChatMes
           ? combineSubagentUsage(
             msg.subagent?.usage,
             msg.toolId ? readLiveUsage(liveSubagentUsage.get(msg.toolId)) : undefined,
-            readFinishedContextTokens(tr, finish?.source ?? null),
+            readFinishedContextTokens(tr, (resumeFinish ?? finish)?.source ?? null),
           )
           : undefined;
 
@@ -387,17 +424,26 @@ export function normalizedToChatMessages(messages: NormalizedMessage[]): ChatMes
         // container itself: a resumed agent notifies under the `SendMessage` call that resumed
         // it, and that row is not the agent.
         const launchReceipt = tr as { toolUseResult?: { agentId?: unknown } } | null;
-        const finishedHere = finish && isSubagentContainer ? finish : undefined;
-        const subagent = finishedHere
+        const readFinishStatus = (status: string) => (
+          status === 'completed' ? ('completed' as const) : status === 'stopped' ? ('stopped' as const) : ('failed' as const)
+        );
+        // A resume newer than anything the row already knows outranks the launch's own finish: the
+        // agent is running again, or has finished again with that resume's report.
+        const resumedHere = liveResume && isSubagentContainer ? liveResume : undefined;
+        const knownResumeFinish = !resumedHere && isSubagentContainer ? resumeFinish : undefined;
+        const finishedHere = resumedHere || knownResumeFinish
+          ? resumeFinish
+          : finish && isSubagentContainer ? finish : undefined;
+        const subagentBase = msg.subagent ?? { id: String(launchReceipt?.toolUseResult?.agentId ?? msg.toolId ?? '') };
+        const subagent = resumedHere
           ? {
-              ...(msg.subagent ?? { id: String(launchReceipt?.toolUseResult?.agentId ?? msg.toolId ?? '') }),
-              status: finishedHere.status === 'completed'
-                ? ('completed' as const)
-                : finishedHere.status === 'stopped'
-                  ? ('stopped' as const)
-                  : ('failed' as const),
+              ...subagentBase,
+              status: resumeFinish ? readFinishStatus(resumeFinish.status) : ('running' as const),
+              resume: { toolUseId: String(resumedHere.toolId), at: resumedHere.timestamp },
             }
-          : msg.subagent;
+          : finishedHere
+            ? { ...subagentBase, status: readFinishStatus(finishedHere.status) }
+            : msg.subagent;
 
         converted.push({
           type: 'assistant',
@@ -419,6 +465,10 @@ export function normalizedToChatMessages(messages: NormalizedMessage[]): ChatMes
           subagent,
           subagentActivity,
           subagentUsage,
+          subagentProvider: isSubagentContainer ? msg.provider : undefined,
+          subagentModel: isSubagentContainer
+            ? msg.subagent?.model ?? (msg.toolId ? liveSubagentModel.get(msg.toolId) : undefined)
+            : undefined,
           memoryCitations: msg.memoryCitations,
           ...sharedMetadata,
         });
@@ -520,6 +570,7 @@ export function normalizedToChatMessages(messages: NormalizedMessage[]): ChatMes
       toolResultSource,
       subagentActivitySource,
       finishSource,
+      resumeSource,
       // One source record can produce zero, one, or two UI messages (task
       // notifications with a result produce two), so cache the whole slice.
       messages: converted.slice(convertedStart),

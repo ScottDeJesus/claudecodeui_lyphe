@@ -698,9 +698,7 @@ Measured; this list is complete (a grep of `'runner'` and `'memory'` across `src
 `useWorkspaceTabGates.ts` is **not** touched: the convention for an always-visible tab is the
 absence of a gate field, exactly as `chat`, `files` and `git` have none
 (`useWorkspaceTabGates.ts:61-70`), and `ProjectSidebarRegion.tsx:40-53` therefore needs no new
-prop. `useProjectsState.ts:1025`'s snap-back-to-chat list is **not** extended: that list snaps
-SESSION-scoped tabs back to chat, and the board is not session-scoped — a global board survives a
-session change and must stay open across one.
+prop. Choosing a conversation returns to chat from the board as from every tab.
 
 **Boards are GLOBAL, not per project.** The selected board is a single `kanban_settings` row
 (`current_board`), so switching projects does NOT change the selected board, and no board is
@@ -2400,7 +2398,7 @@ expect = "1"
 [[steps]]
 kind = "edit"
 path = "src/modules/project-workspace/hooks/useProjectsState.ts"
-what = "Add 'kanban' to the VALID_TABS Set at line 349 so a persisted activeTab of kanban survives a reload. Do not touch the snap-back-to-chat list at line 1025: that list snaps SESSION-scoped tabs back to chat, and the board is not session-scoped."
+what = "Add 'kanban' to the VALID_TABS Set at line 349 so a persisted activeTab of kanban survives a reload."
 check = "grep -c \"'kanban'\" src/modules/project-workspace/hooks/useProjectsState.ts"
 expect = "1"
 

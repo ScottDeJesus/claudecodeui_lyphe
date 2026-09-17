@@ -24,8 +24,8 @@
     "git": "Git",
     "tasks": "任务",
     "browser": "浏览器",
-    "computer": "计算机",
-    "kanban": "看板"
+    "kanban": "看板",
+    "universe": "宇宙"
   },
   "kanban": {
     "loading": "正在读取看板…",
@@ -369,5 +369,50 @@
       "label": "本次会话",
       "title": "由你打开的会话创建"
     }
+  },
+  "applications": {
+    "fabLabel": "应用",
+    "heading": "我的<em>应用</em>",
+    "closeDrawer": "关闭",
+    "close": "全部关闭",
+    "summaryNone": "暂无记录",
+    "summarySingle_other": "{{count}} 个应用 · 单屏",
+    "summaryDual_other": "{{count}} 个应用 · 双屏已开启",
+    "dualScreen": "双屏",
+    "dualScreenHint": "两个应用并排显示，分隔线可拖动。",
+    "opensIn": "打开位置",
+    "left": "左侧",
+    "right": "右侧",
+    "hostOnScreen": "{{host}} · 已显示",
+    "reload": "重新加载",
+    "openInNewTab": "在新标签页中打开",
+    "openInDual": "在双屏中打开",
+    "closeDual": "关闭双屏",
+    "remove": "移除",
+    "removeFailed": "无法移除该应用",
+    "removeFailedPane": "{{name}} 已关闭，但仍保留在列表中。",
+    "unreadable": "无法读取应用列表",
+    "empty": "暂无应用",
+    "emptyMessage": "填写名称和网址添加一个应用，它会直接在这里打开。",
+    "emptyAction": "添加第一个应用",
+    "addApplication": "添加应用",
+    "form": {
+      "title": "新应用",
+      "nameLabel": "名称",
+      "nameHelper": "它在此面板中显示的名称。",
+      "namePlaceholder": "作业控制台",
+      "urlLabel": "网址",
+      "urlHelper": "省略 http:// 时会自动补上。{host} 表示当前页面打开时使用的地址。",
+      "urlPlaceholder": "{host}:8080",
+      "nameRequired": "请起个名称，方便在这里找到它。",
+      "urlRequired": "需要填写地址才能加载应用。",
+      "urlInvalid": "无法识别该地址，请检查是否有拼写错误。",
+      "submit": "添加",
+      "cancel": "取消",
+      "addFailed": "无法添加该应用"
+    },
+    "appearanceLight": "浅色外观",
+    "appearanceDark": "深色外观",
+    "divider": "调整应用大小"
   }
 }

@@ -614,11 +614,14 @@
       opacity: 1 !important;
     }
     
-    /* Only disable hover states for interactive elements, not containers */
-    button:hover,
-    [role="button"]:hover,
-    .cursor-pointer:hover,
-    a:hover,
+    /* Only disable hover states for interactive elements, not containers.
+       Never on a Verve-painted element (`vv-*`): `inherit` copies the PARENT's paint, not the
+       element's own resting paint, so a tapped accent button or the DockableFab turned into a pale
+       disc in the page's colours until the next tap elsewhere. */
+    button:not([class*="vv-"]):hover,
+    [role="button"]:not([class*="vv-"]):hover,
+    .cursor-pointer:not([class*="vv-"]):hover,
+    a:not([class*="vv-"]):hover,
     .hover\:bg-gray-50:hover,
     .hover\:bg-gray-100:hover,
     .hover\:text-gray-900:hover,
@@ -940,5 +943,18 @@
       outline-offset: 4px;
       background-color: transparent;
     }
+  }
+}
+
+/* An agent row (`chat/tools/SubagentPanel.tsx`) measures itself: below 480px of its own width its
+   figures give way, so the description and the outcome badge stay inside the frame. A container
+   query, because the room that matters is the chat column's, which the sidebar narrows at 768px
+   while the window is still wide. */
+.subagent-row {
+  container-type: inline-size;
+}
+@container (max-width: 480px) {
+  .subagent-row__figures {
+    display: none;
   }
 }

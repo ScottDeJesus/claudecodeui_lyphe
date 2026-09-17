@@ -155,7 +155,6 @@
     "cannotUndo": "您可以稍后重新添加此项目。"
   },
   "simpleList": {
-    "project": "项目",
     "newChat": "新建对话",
     "empty": "还没有对话，点击「新建对话」开始吧。",
     "loadMore": "显示更多",

@@ -24,8 +24,8 @@
     "git": "Git",
     "tasks": "Görevler",
     "browser": "Browser",
-    "computer": "Bilgisayar",
-    "kanban": "Kanban"
+    "kanban": "Kanban",
+    "universe": "Evren"
   },
   "kanban": {
     "loading": "Pano okunuyor…",
@@ -370,5 +370,52 @@
       "label": "Bu oturum",
       "title": "Açık olan sohbet tarafından oluşturuldu"
     }
+  },
+  "applications": {
+    "fabLabel": "Uygulamalar",
+    "heading": "<em>Uygulamaların</em>",
+    "closeDrawer": "Kapat",
+    "close": "Tümünü kapat",
+    "summaryNone": "Kayıtlı uygulama yok",
+    "summarySingle_one": "{{count}} uygulama · tek ekran",
+    "summarySingle_other": "{{count}} uygulama · tek ekran",
+    "summaryDual_one": "{{count}} uygulama · bölünmüş ekran açık",
+    "summaryDual_other": "{{count}} uygulama · bölünmüş ekran açık",
+    "dualScreen": "Bölünmüş ekran",
+    "dualScreenHint": "İki uygulama yan yana, ayırıcı sürüklenebilir.",
+    "opensIn": "Açılacağı yer",
+    "left": "Sol",
+    "right": "Sağ",
+    "hostOnScreen": "{{host}} · ekranda",
+    "reload": "Yenile",
+    "openInNewTab": "Yeni sekmede aç",
+    "openInDual": "Bölünmüş ekranda aç",
+    "closeDual": "Bölünmüş ekranı kapat",
+    "remove": "Kaldır",
+    "removeFailed": "Uygulama kaldırılamadı",
+    "removeFailedPane": "{{name}} kapatıldı ama kayıtlı kalmaya devam ediyor.",
+    "unreadable": "Uygulama listesi okunamadı",
+    "empty": "Henüz uygulama yok",
+    "emptyMessage": "Adı ve web adresiyle bir uygulama ekle, hemen burada açılsın.",
+    "emptyAction": "İlk uygulamanı ekle",
+    "addApplication": "Uygulama ekle",
+    "form": {
+      "title": "Yeni uygulama",
+      "nameLabel": "Ad",
+      "nameHelper": "Bu panelde görünecek adı.",
+      "namePlaceholder": "İş konsolu",
+      "urlLabel": "Web adresi",
+      "urlHelper": "http:// yazmazsan eklenir. {host}, bu sayfanın açık olduğu adres anlamına gelir.",
+      "urlPlaceholder": "{host}:8080",
+      "nameRequired": "Burada bulabilmen için bir ad ver.",
+      "urlRequired": "Uygulamayı yüklemek için bir adres gerekli.",
+      "urlInvalid": "Bu adres okunamıyor — yazım hatası olup olmadığını kontrol et.",
+      "submit": "Ekle",
+      "cancel": "İptal",
+      "addFailed": "Uygulama eklenemedi"
+    },
+    "appearanceLight": "Açık görünüm",
+    "appearanceDark": "Koyu görünüm",
+    "divider": "Uygulamaları yeniden boyutlandır"
   }
 }
