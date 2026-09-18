@@ -1,3 +1,5 @@
+import type { UniverseNode } from '@/shared/types';
+import { isFileKind } from '@/modules/universe/utils/universeBirth';
 /**
  * EVERY TUNABLE THE ESTATE SKY HAS, IN ONE HOME — the type, the defaults, and the domain each value
  * has to fall inside.
@@ -47,6 +49,10 @@ export type UniverseTweaks = {
   labels: 'hubs' | 'all' | 'none';
   edges: 'all' | 'tree' | 'import' | 'cochange' | 'none';
   gravity: number;
+  /** How far everything sits from the sun, as a multiple of the rooms' own measure: every resting
+   *  position, ring and spring is scaled about the sun at once, so the sky closes in or opens out at
+   *  any zoom without waiting on the relaxation. */
+  distance: number;
   milkyWay: boolean;
   twinkle: number;
   perspective: number;
@@ -63,7 +69,17 @@ export type UniverseTweaks = {
   // data — where a star's brightness curve bends
   recencyBrightDays: number;
   recencyDimDays: number;
+  /** Which files are stars: `code` draws the `source` kind alone; `all` draws every tracked file —
+   *  config, docs, data, assets. Code by default: the operator's word (2026-09-17), the rest is not the
+   *  shape of the estate. */
+  files: 'code' | 'all';
 };
+
+/** A node kind the tweaks hide from the sky — not drawn, not hit, not clouded, not lit. It is still
+ *  relaxed: the relaxation is whole-graph by physics, so a folder's shape does not change when the
+ *  tweak flips. Only a file kind is ever hidden; a body, the sun and a source always stand. */
+export const hiddenKind = (kind: UniverseNode['k'], tweaks: UniverseTweaks): boolean =>
+  tweaks.files === 'code' && kind !== 'source' && isFileKind(kind);
 
 /**
  * The defaults. Frozen: the panel, the layout and the parser all read the same object, and a
@@ -73,9 +89,10 @@ export const DEFAULT_TWEAKS: Readonly<UniverseTweaks> = Object.freeze({
   orbit: 0.05, inclination: 0.7, precession: 0.5, parallax: 0.6, drift: false,
   pulseSpeed: 1.2, trails: 0,
   labels: 'hubs', edges: 'import',
-  gravity: 1.3, milkyWay: true, twinkle: 0.6, perspective: 0.8, flow: true, renderer: 'webgl',
+  gravity: 1.3, distance: 1, milkyWay: true, twinkle: 0.6, perspective: 0.8, flow: true, renderer: 'webgl',
   doppler: 0, wobble: 0, lensing: 0, transits: false, depthOfField: 0,
   recencyBrightDays: 7, recencyDimDays: 30,
+  files: 'code',
 } satisfies UniverseTweaks);
 
 /**
@@ -92,12 +109,13 @@ export const TWEAK_RANGES = Object.freeze({
   trails: { min: 0, max: 40 },
   labels: { options: ['hubs', 'all', 'none'] },
   edges: { options: ['all', 'tree', 'import', 'cochange', 'none'] },
-  gravity: { min: 0.3, max: 3 }, milkyWay: { boolean: true }, twinkle: { min: 0, max: 1 },
+  gravity: { min: 0.3, max: 3 }, distance: { min: 0.3, max: 1.5 }, milkyWay: { boolean: true }, twinkle: { min: 0, max: 1 },
   perspective: { min: 0, max: 1 }, flow: { boolean: true },
   renderer: { options: ['webgl', 'canvas'] },
   doppler: { min: 0, max: 1 }, wobble: { min: 0, max: 1 }, lensing: { min: 0, max: 1 },
   transits: { boolean: true }, depthOfField: { min: 0, max: 1 },
   recencyBrightDays: { min: 1, max: 90 }, recencyDimDays: { min: 2, max: 365 },
+  files: { options: ['code', 'all'] },
 } as const satisfies Readonly<Record<keyof UniverseTweaks, UniverseTweakDomain>>);
 
 /** A stored word, narrowed to the words a domain actually holds — the guard is what lets the parser

@@ -14,13 +14,14 @@ import { getLiveMetisRegistry, type MetisRegistry } from './metis-registry.servi
 import type { MetisSpawner } from './metis-spawn.service.js';
 
 /**
- * The board's Metis door: the five verbs that launch, watch and end a session, and the derived-
+ * The board's Metis door: the routes that launch, watch, end and answer a session, and the derived-
  * credential guard the MCP child comes in through.
  *
  * Thin on purpose — parse, call one service, format. Every decision here is about a request and
  * nothing else: what a launch means belongs to the spawner, what a session is belongs to the
- * registry, when a board may be worked on belongs to the driver, and what a transcript is belongs
- * to the providers module. This file is the only place in `kanban-metis` that knows a path.
+ * registry, when a board may be worked on belongs to the driver and to the board's own dial, and
+ * what a transcript is belongs to the providers module. This file is the only place in
+ * `kanban-metis` that knows a path.
  */
 
 /** The dependencies this router needs. `kanban-metis.module.ts` hands them over. */
@@ -73,7 +74,51 @@ function handle<P extends Record<string, string>>(
 const IMPORT_PATH = /\/import(\/|$)/i;
 
 /**
- * Is this the importer's path, however it is spelled?
+ * The lesson REVIEW, refused on the same terms — and this is the fence that actually matters.
+ *
+ * The lesson lifecycle has two ends with opposite actors: a Metis STAGES a note about what she
+ * learned, and a PERSON decides whether it reaches the corpus future sessions read. Not shipping
+ * an MCP tool for the review is not a fence — the board's router is mounted a second time at
+ * `/api/kanban-pm`, and every live Metis holds a derived credential that opens it. So a review
+ * request that arrives on the child's door is refused at the door, before any handler sees it.
+ *
+ * Staging and reading are untouched: `POST /lessons` and both GETs pass, because filing a lesson
+ * and reading the corpus are what a build is for. Only the two transitions out of `staged` are
+ * refused, and only on this mount — the operator's own `/api/kanban` carries them.
+ */
+const REVIEW_PATH = /\/lessons\/[^/]+\/(approve|reject)(\/|$)/i;
+
+/**
+ * The DESTRUCTION of an operator's uploaded bytes, refused on the same terms — and METHOD-SCOPED,
+ * unlike the two above.
+ *
+ * An attachment's bytes are the OPERATOR's: a screenshot he pasted into a card, a PDF he handed a
+ * build. A Metis who ADDS one is recording what her build produced, and one who READS one is looking
+ * at what she was handed — both are ordinary. One who DELETES one destroys bytes the board cannot
+ * reconstruct: the row's deletion is an audit line, the file is simply gone, and no lease CAS undoes
+ * a `rm`. So the refusal is on `DELETE` alone, and only on this door: the operator's own
+ * `/api/kanban` carries all three verbs.
+ *
+ * The path test is the same shape as the two above, so `…/cards/<id>/attachments/<id>` in any case
+ * is refused — spelled with `%2F` or not, because `matchesPath` decodes before it tests.
+ *
+ * ONE TRAILING SLASH IS TOLERATED, the way `REVIEW_PATH` above tolerates it, and that tolerance is
+ * load-bearing rather than cosmetic: Express matches a path without regard to a trailing slash, a
+ * regex anchored at `$` does not, and the gap between the two is the fence. MEASURED 2026-09-17:
+ * `DELETE /api/kanban-pm/cards/<id>/attachments/<id>` answered 403, the identical request with one
+ * trailing slash answered 401 — the fence MISSED and the credential check, which every live Metis
+ * passes with her derived credential, is the only thing that refused — while the same spelling on
+ * the operator's own mount answered 200 `{ok:true}` with the row gone and the file unlinked. The
+ * fence is worth nothing if one character spells around it.
+ *
+ * A two-segment tail (`a-1%2Fx`, decoding to `a-1/x`) still falls through to the credential check.
+ * That one IS harmless, and for a reason this one lacked: no minted attachment id carries a
+ * separator, so the path finds no row and answers 404 with nothing destroyed.
+ */
+const OPERATOR_BYTES = /\/cards\/[^/]+\/attachments\/[^/]+\/?$/i;
+
+/**
+ * Does this path reach the given door, however it is spelled?
  *
  * CASE-INSENSITIVE AND PERCENT-DECODED, because the router behind this guard is both. Express
  * matches routes without regard to case unless `case sensitive routing` is set, so a guard that
@@ -82,14 +127,14 @@ const IMPORT_PATH = /\/import(\/|$)/i;
  * `POST /api/kanban-pm/Import/descent` reached `import.routes.ts:46` and ran. A `%2F` is a `/` to
  * everything downstream of here too, so the test is made on the decoded path.
  */
-function isImporterPath(rawPath: string): boolean {
+function matchesPath(path: RegExp, rawPath: string): boolean {
   let decoded = rawPath;
   try {
     decoded = decodeURIComponent(rawPath);
   } catch {
     // A stray `%` that is not a valid escape. The raw path is then the only honest string to test.
   }
-  return IMPORT_PATH.test(decoded);
+  return path.test(decoded);
 }
 
 /**
@@ -125,6 +170,14 @@ function readBearer(request: Request): string | null {
  * mid-build accepts a live Metis's next tool call, and a session that has ended stops being
  * accepted, both without a byte of state kept between the two.
  *
+ * A CREDENTIAL ALONE IS NOT ACCEPTANCE. The guard asks this server's live registry whether that
+ * session is running, and that map is filled by the spawner and serialized nowhere — which is the
+ * revocation the whole scheme rests on. A credential minted in a SECOND process is therefore
+ * well-formed and unknown here: 401 `No such running Metis session.` A probe that needs an accepted
+ * bearer has to make THIS server adopt the session (the directory on disk before the boot), or read
+ * its own argv as a child the spawner launched; minting one beside the server cannot work however
+ * it is spelled.
+ *
  * A user's session token is NOT accepted here and cannot be: it has three dot-separated parts
  * where this has exactly one, so it fails the split before an HMAC is ever computed. That is what
  * keeps the operator's own JWT — which the chat sends to `/api/kanban` — from quietly working on
@@ -135,8 +188,23 @@ export function kanbanMetisSecretGuard(
   response: Response,
   next: NextFunction,
 ): void {
-  if (isImporterPath(request.path)) {
+  if (matchesPath(IMPORT_PATH, request.path)) {
     refuse(response, 403, 'The descent importer is not reachable from the kanban-pm door.');
+    return;
+  }
+
+  // The review fence, ahead of the credential check: a review is a person's act, so WHOSE
+  // credential arrived is not the question — no Metis reviews a lesson, this one included.
+  if (matchesPath(REVIEW_PATH, request.path)) {
+    refuse(response, 403, 'Reviewing a lesson is not reachable from the kanban-pm door.');
+    return;
+  }
+
+  // The byte-destruction fence, method-scoped: staging a lesson and ADDING an attachment are both
+  // how a build records its work, and both pass. Deleting one of the operator's uploaded files does
+  // not, and neither method nor path is a question of whose credential arrived.
+  if (request.method === 'DELETE' && matchesPath(OPERATOR_BYTES, request.path)) {
+    refuse(response, 403, 'Deleting an attachment is not reachable from the kanban-pm door.');
     return;
   }
 
@@ -195,12 +263,14 @@ export function createKanbanMetisRouter(dependencies: KanbanMetisRouteDependenci
   /**
    * Why this board is or is not being worked on, in the driver's own numbers.
    *
-   * The tick's decision is four dials and one timestamp, and every one of them is answered here:
-   * autonomy (the board's governor), concurrency (how many sessions it may run), live (how many it
-   * has), claimable (how much work is waiting) and lastSpawnAt (how recently the cooldown was
-   * stamped). Without this, an operator watching a quiet board cannot tell "nothing to do" from
-   * "the driver is not running" from "the cooldown is holding it" — the three have the same
-   * outward behaviour and completely different fixes.
+   * The tick's decision is five dials, a timestamp and two gate answers, and every one of them is
+   * answered here: autonomy (the board's governor), concurrency (how many sessions it may run), live
+   * (how many it has), claimable (how much work is waiting), lastSpawnAt (how recently the cooldown
+   * was stamped), rateLimitUntil (how long the account cap holds spawning back) and relaunchAllowed
+   * (whether the board's ledger still permits a launch). Without the last two, an operator watching
+   * a quiet board cannot tell "nothing to do" from "the driver is not running" from "the cooldown is
+   * holding it" from "the account is capped" from "this board has spent its attempts" — five
+   * outward-identical situations with five different fixes.
    *
    * The board is read here because a missing one is a 404 and that is a transport fact; the
    * arithmetic over it belongs to the driver.
@@ -222,6 +292,8 @@ export function createKanbanMetisRouter(dependencies: KanbanMetisRouteDependenci
         claimable: reading.claimable,
         live: reading.live,
         lastSpawnAt: reading.lastSpawnAt,
+        rateLimitUntil: reading.rateLimitUntil,
+        relaunchAllowed: reading.relaunchAllowed,
       });
     }),
   );
@@ -239,6 +311,29 @@ export function createKanbanMetisRouter(dependencies: KanbanMetisRouteDependenci
     }),
   );
 
+  /**
+   * The nudge: record that a person asked for this board to be worked on, and wake the driver.
+   *
+   * The tick is scheduled on the NEXT MACROTASK rather than called here, and that is not a
+   * stylistic choice: a tick reaps and then spawns, which reads the board, queries its claimable
+   * cards and can start a child — seconds of work the operator would spend watching a button spin.
+   * `setImmediate` also puts it after this response has been written, so the caller is answered
+   * first and the loop runs immediately afterwards. Nothing awaits the tick, and nothing needs to:
+   * it swallows its own faults, and what it did is not what this answer is about.
+   *
+   * The event is recorded THROUGH THE BOARD'S OWN SERVICE (`kanbanBoardsService`, imported from the
+   * kanban barrel), not written here, so the nudge lands in the board's audit log and on the wire
+   * like every other act on it. A board that does not exist is that service's 404.
+   */
+  router.post(
+    '/boards/:boardId/nudge',
+    handle<{ boardId: string }>((request, response) => {
+      kanbanBoardsService.nudgeBoard(request.params.boardId);
+      setImmediate(() => driver.tick());
+      response.json({ nudged: true, at: Date.now() });
+    }),
+  );
+
   router.post(
     '/sessions/:sessionId/stop',
     handle<{ sessionId: string }>((request, response) => {
@@ -250,6 +345,32 @@ export function createKanbanMetisRouter(dependencies: KanbanMetisRouteDependenci
     '/sessions/:sessionId/resume',
     handle<{ sessionId: string }>(async (request, response) => {
       response.json({ session: await spawner.resume(request.params.sessionId) });
+    }),
+  );
+
+  /**
+   * One person's words to a Metis whose child has stopped, as the turn she wakes up to.
+   *
+   * THE BLANK CHECK IS THE ROUTE'S, and it is made before anything is looked up: an empty turn
+   * would be a child spawned to answer nothing, and a 422 that named a session would be describing
+   * a request that never needed to find one. Everything after it is ONE call — the spawner refuses
+   * an unknown session (404), a session whose child is still running (409, `she is mid-turn — stop
+   * her first, then reply`) and a board at its dial (409, in `canSpawn`'s own words), in that order,
+   * because those are the three facts about a session and a board rather than three facts about a
+   * request. A route that re-derived any of them would be a second, quieter policy beside the
+   * spawner's — and this route is deliberately as thin as `resume` above it.
+   */
+  router.post(
+    '/sessions/:sessionId/reply',
+    handle<{ sessionId: string }>(async (request, response) => {
+      const body = (request.body ?? {}) as { text?: unknown };
+      if (typeof body.text !== 'string' || body.text.trim() === '') {
+        throw new AppError('a reply needs text', {
+          statusCode: 422,
+          code: 'KANBAN_REPLY_TEXT_REQUIRED',
+        });
+      }
+      response.json({ session: await spawner.reply(request.params.sessionId, body.text) });
     }),
   );
 

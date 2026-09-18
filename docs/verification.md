@@ -1549,7 +1549,7 @@ gateway over a WebSocket instead, and kill the real systemd units underneath it.
 part of `all.mjs`** and are run one case at a time:
 
 ```bash
-node .verify/keepalive-cases-p4.mjs <A|B|C|D|E|F> --evidence <dir>
+node .verify/keepalive-cases-p4.mjs <A|B|C|D|E|F|G> --evidence <dir>
 ```
 
 Each case prints one `CASE <name> key=value …` line last. Every key on it is **measured** — from
@@ -1565,6 +1565,7 @@ case that dies halfway therefore cannot print a passing line.
 | **D** | The stop switch: `systemctl stop cloudcli-sessions-tmux` takes every CLI with it, and the client is told so with an error frame rather than left hanging. |
 | **E** | The boot sweep collects a host whose tmux session is gone — planted as a dead meta file, counted as swept, no files left behind. |
 | **F** | The replay cursor's safe direction: re-subscribing with a cursor the run itself issued replays nothing twice. |
+| **G** | A permission prompt is on screen when an edit-triggered handover lands. One prompt precedes the handover (`prompts_before`, read not asserted); the successor re-issues it under a fresh request id first seen after the boot; the driver answers only that one, with a word the prompt never contains, and the model's own text (never a tool echo) carries it. The probe's host is killed on every exit of the case, a throw included, and counted. |
 
 One CLI per conversation has its own probe, driven the same way and printing the same shape:
 

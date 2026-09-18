@@ -8,19 +8,24 @@ import type { MemoryReviewOutcome } from '@/shared/types';
 /**
  * What to say when a write did not land at all.
  *
- * Descent's own `error` is preferred whenever it sent one — it names the actual refusal in
- * words a person can act on. Only when the proxy answered FOR Descent (503 `{reachable:false,
- * reason}`) does this translate the one word itself.
+ * The server's own `error` is preferred whenever it sent one — it names the actual refusal in
+ * words a person can act on. Only when no verdict came back at all (`{reachable:false, reason}`)
+ * does this translate the one word itself.
+ *
+ * The last sentence is the SAME one `memory.toast.unreachable` carries (the title it is spoken
+ * under) — one fact, one sentence, two places it is read. `memory.unreachable`, the panel's line
+ * for the same condition on a READ, ends "right now" instead: a poll that will be retried, not a
+ * write that has already failed.
  */
 function writeRefusalInWords(body: unknown): string {
   const answer = (body ?? {}) as { error?: unknown; reason?: unknown };
   if (typeof answer.error === 'string' && answer.error.trim()) return answer.error.trim();
-  if (answer.reason === 'timeout') return 'Descent did not answer in time.';
-  if (answer.reason === 'bad-response') return 'Descent answered with something this app could not read.';
-  return 'Descent is not reachable.';
+  if (answer.reason === 'timeout') return 'The memory queue did not answer in time.';
+  if (answer.reason === 'bad-response') return 'The memory queue answered with something this app could not read.';
+  return 'The memory queue is not reachable.';
 }
 
-/** A write's verdict is Descent's own body, so it is read before the status is judged — and a body that is not JSON must not throw over the status. */
+/** A write's verdict is the server's own body, so it is read before the status is judged — and a body that is not JSON must not throw over the status. */
 async function readBody(response: Response): Promise<unknown> {
   try {
     return await response.json();
@@ -40,7 +45,7 @@ async function readBody(response: Response): Promise<unknown> {
  * A refused write is NOT a failure: the cap guard answers in plain English, the card stays
  * pending, and that text is what the person needs in order to trim the memory and try again.
  * It is held here per id for THIS tab's next paint, and the refresh that follows also picks up
- * the copy Descent recorded on the row for every other tab.
+ * the copy the server recorded on the row for every other tab.
  */
 export function useMemoryReview() {
   const { refresh } = useMemoryIntake();
@@ -88,13 +93,13 @@ export function useMemoryReview() {
     setBusyId(id);
     let outcome: MemoryReviewOutcome;
     try {
-      const response = await api.descent.memory[approve ? 'approve' : 'reject'](id);
+      const response = await api.memory[approve ? 'approve' : 'reject'](id);
       const body = await readBody(response);
       if (response.ok) {
         forget(id);
         outcome = { kind: approve ? 'filed' : 'discarded' };
       } else if (response.status === 422) {
-        // Descent's OWN words, verbatim — the cap guard naming what to trim. A generic
+        // The server's OWN words, verbatim — the cap guard naming what to trim. A generic
         // sentence in their place would leave the person with a pending card and no reason.
         const said = (body ?? {}) as { error?: unknown };
         const reason = typeof said.error === 'string' && said.error.trim()
@@ -111,12 +116,12 @@ export function useMemoryReview() {
       outcome = { kind: 'unreachable', reason: writeRefusalInWords(null) };
     } finally {
       // After EVERY outcome, whatever it was: on a write the row leaves the queue, on a refusal
-      // it stays and picks up the text Descent recorded, and on a gone it was already gone.
+      // it stays and picks up the text the server recorded, and on a gone it was already gone.
       //
       // In a `finally`, and holding the re-read's own failure, because the one thing that must
       // not happen here is the buttons staying refused for the panel's life. `refresh()` swallows
       // its fetch and JSON throws today (MemoryIntakeContext.tsx:65-72) — this release is not a
-      // bet on that staying true, which is the house shape (useDescentAccounts.ts:129-133).
+      // bet on that staying true, which is the house shape the accounts hooks keep too.
       try {
         await refresh();
       } catch {
@@ -132,7 +137,7 @@ export function useMemoryReview() {
     const previous = inFlightRef.current;
     // The same card and the same verb pressed twice before the paint caught up: join the write
     // already going rather than open a second one — `busyId` is a render value and lands too
-    // late to stop it (useDescentAccounts.ts:68-70).
+    // late to stop it, the same reason the accounts hooks keep a synchronous ref.
     if (writingRef.current && previous && previous.id === id && previous.approve === approve) {
       return previous.running;
     }

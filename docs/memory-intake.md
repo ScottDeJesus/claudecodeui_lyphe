@@ -2,7 +2,7 @@
 
 The **Memory** tab in the workspace: every memory a session proposed and could not write itself,
 read whole and then filed or discarded by a person. It is not scoped to the selected project —
-Descent's queue is the whole estate's, so the same list shows under whichever project is open.
+the queue is the whole estate's, so the same list shows under whichever project is open.
 `src/modules/memory-intake/` is one provider (`context/MemoryIntakeContext`), two bodies that read
 it — the Memory tab's pane (`MemoryIntakePanel`) and the desktop chat gutter's own body
 (`MemoryWidgetBody`; its sibling for runs is `RunnerWidgetBody` in `src/modules/plan-runner`,
@@ -11,7 +11,9 @@ candidate, the read-only `MemoryApprovedRow` for one already filed) and two hook
 the write lifecycle both bodies share, and `useApprovedMemories`, which reads the filed list beside
 the provider's own queue. The barrel exports the provider, its hook, `MemoryIntakePanel` and
 `MemoryWidgetBody`. The server half — the four routes, the read/write contracts, the failure
-vocabulary — is [descent-proxy.md](descent-proxy.md), and the shapes on the wire are read from their
+vocabulary — is the native module this page describes in §"The native module"; the proxy's own
+memory path is no longer called from `src/` (what remains on the proxy is the accounts and usage
+surface [descent-proxy.md](descent-proxy.md) describes). The shapes on the wire are read from their
 declarations, not from a copy here (see §"Where the shapes live").
 
 **One provider, one poller.** `App.tsx` mounts `MemoryIntakeProvider` inside `ProtectedRoute`, so
@@ -88,11 +90,11 @@ Below it, one of four things:
 | The provider holds | The panel draws |
 |---|---|
 | `null` — nothing asked yet | a `Spinner` reading *reading…* |
-| `reachable: false` | *Descent is not reachable right now.* — never *All filed* |
+| `reachable: false` | *The memory queue is not reachable right now.* — never *All filed* |
 | a picture with no rows | *All filed* / *Nothing is waiting for review.* |
-| a picture with rows | one `MemoryCandidateRow` each, in Descent's own order, in a `ScrollArea` |
+| a picture with rows | one `MemoryCandidateRow` each, in the server's own order, in a `ScrollArea` |
 
-The badge is drawn only on `reachable === true`. Stating "0 pending" above *Descent is not
+The badge is drawn only on `reachable === true`. Stating "0 pending" above *The memory queue is not
 reachable* would have the panel contradict itself in two adjacent lines.
 
 ## One row
@@ -117,19 +119,19 @@ project and takes no size cap; its `title` says so. There is no confirmation dia
 expanding to read IS the deliberate step.
 
 Expanded, the row shows the body in a `<pre>` that wraps, then *Why* (`rationale`) and *Index line*
-(`indexLine`) where Descent sent them. Every one of those strings is operator-authored free text and
+(`indexLine`) where the server sent them. Every one of those strings is operator-authored free text and
 reaches the DOM as a text node — never as markdown and never as markup, however much like markdown
-it looks, which is how Descent's own panel draws it too.
+it looks, which is how the proxy's own panel drew it too.
 
 Three answers are not a body, and each gets its own sentence: a read that could not be made says
-*Descent is not reachable right now.* and is retried on the next expand; a `candidate: null` and a
+*The memory queue is not reachable right now.* and is retried on the next expand; a `candidate: null` and a
 full read whose `status` is no longer `pending` both say *This memory is no longer pending — it was
 reviewed elsewhere.* Those last two are the same news, which is why they share the words. Collapsing
 keeps whatever was read — a pending memory's text does not change while it waits, so re-opening is
 instant rather than another request.
 
 A refusal, when there is one, sits under the heading: this tab's freshest one if the person just hit
-the cap guard, otherwise the copy Descent recorded on the row (which is what every OTHER tab sees).
+the cap guard, otherwise the copy the server recorded on the row (which is what every OTHER tab sees).
 
 ## The two verbs
 
@@ -140,16 +142,16 @@ disabled while any write is in flight, and each raises one toast:
 |---|---|
 | 2xx on approve | positive — *filed — the memory is on disk* |
 | 2xx on reject | positive — *discarded — nothing was written* |
-| 422 | warn — *couldn't file that memory*, with Descent's OWN text under it |
+| 422 | warn — *couldn't file that memory*, with the server's OWN text under it |
 | 404 | neutral — *already reviewed elsewhere* |
-| 503, or a thrown fetch | warn — *Descent is not reachable.*, with the reason in words |
+| 503, or a thrown fetch | warn — *The memory queue is not reachable.*, with the reason in words |
 
-**A 422 is a verdict, not a fault.** It is Descent's cap guard refusing in plain English and naming
+**A 422 is a verdict, not a fault.** It is the module's own cap guard refusing in plain English and naming
 what to trim; the card stays PENDING, the text is held per id for this tab's next paint, and the
-refresh that follows also picks up the copy Descent recorded on the row for every other tab. A
+refresh that follows also picks up the copy the server recorded on the row for every other tab. A
 generic sentence in its place would leave the person with a pending card and no reason. That text
-travels through the proxy untouched — [descent-proxy.md](descent-proxy.md) §"The rules that bite",
-rule 8.
+reaches the screen untouched — the rule [descent-proxy.md](descent-proxy.md) §"The rules that bite",
+rule 8 states for the proxy, which the native module keeps.
 
 Two presses are handled by identity, not by a flag. The in-flight guard is a ref, read
 synchronously, because `busyId` is a render value and lands too late to stop a second press in the
@@ -170,21 +172,63 @@ every other app route, a soul proposes and only a signed-in person files, and De
 at `:7878` were already reachable unauthenticated by any process on this host. What CloudCLI adds is
 one bearer-authenticated HTTP path and a pair of buttons; nothing here is callable by an agent.
 
+## The native module
+
+A second implementation of the same four contracts lives inside this server itself, at
+`server/modules/memory-intake/` — `memory.service.ts` (the candidate lifecycle: stage, list, get,
+approve, reject, and `importDescentCandidates`, over its own `memory_candidates` table, which is not
+a board table and carries no `board_id`), `memory-assert.ts` (the disk half: every write path is DERIVED from a candidate's
+`target`, `project` and `name` against the same five-entry allowlist named in the table under §"One
+row" above — a row never carries a path of its own — and a `memory` candidate writes its topic note before its
+`MEMORY.md` router line, so a mid-write fault leaves an orphan note rather than a dangling index
+pointer), and `memory-caps.ts` (the size budgets, ported number-for-number from
+`~/.claude/hooks/enforce_memory_limits.py` — the predicate that guards a session's own MEMORY.md
+edits — so the two move together rather than drift apart). `index.ts` barrels the three for
+`memory-intake.module.ts`, which the server entrypoint mounts at `/api/memory` behind
+`authenticateToken` — and nowhere else: it is not on the board's router, so neither of that router's
+two mounts ([kanban.md](kanban.md) §"The routes", §"The kanban-pm MCP surface") can reach it.
+
+**`importDescentCandidates` is this lane's own door for the board's Descent import**, called from
+`kanban-import-satellites.ts` rather than reached over HTTP: an old install's `ov_memory_candidates`
+rows land here VERBATIM — Descent's own `status` and `target` words, not filtered through
+`validateMemoryArgs`, because those rows are what a person already lived with rather than a fresh
+proposal, and `target` has grown a value (`user`) this lane's own staging door would refuse today.
+Idempotent by `descent_id`: a second import of one install finds the row a previous import already
+minted a local id for and updates it rather than inserting a second copy. The board's importer keeps
+no tally of its own for this table — only the count this verb reports back — because
+`memory_candidates` carries no `board_id` and is not a board satellite
+([kanban.md](kanban.md) §"Importing from Descent").
+
+The four routes are `GET /`, `GET /:candidateId`, `POST /:candidateId/approve` and
+`POST /:candidateId/reject` — the same four contracts this page and `descent-proxy.md` describe, and
+a refusal answers the same shape a person reads: `{ error: "<words>" }`, a thrown `MemoryRefusal`
+caught at the route rather than the app's `{ success: false, error: { code, message } }` envelope. A
+malformed id (`/^[A-Za-z0-9_-]{1,64}$/`) is refused at the door on all four, matching the proxy's own
+fence.
+
+**The client points here, and only here.** `MemoryIntakeContext`, `useApprovedMemories`,
+`useMemoryReview` and the row all read and write through `api.memory` in `src/shared/api.ts`, whose
+five calls are the four routes below. Nothing in `src/` calls the proxy's memory path any more; the
+proxy's remaining surface is the accounts and usage reads `descent-proxy.md` describes.
+
 ## Where the shapes live
 
 `MemoryCandidateLean`, `MemoryCandidateFull`, `MemoryPending`, `MemoryCandidateRead` and
 `MemoryReviewOutcome` are declared in `src/shared/types.ts` § DESCENT MEMORY INTAKE, mirroring
 `server/shared/types.ts` § DESCENT CONTRACTS field for field. The server file is the source and
 carries the per-field documentation; a change to either shape belongs in both files at once. The
-client calls the four routes through `api.descent.memory` in `src/shared/api.ts` — the reads answer
-200 even when Descent is down, so a caller reads the BODY rather than the status, and the writes are
-taken from the raw response because they carry Descent's own status through.
+native module (§"The native module") imports the server-side declarations too — `MemoryCandidateFull`
+and `MemoryCandidateLean` are read from `server/shared/types.ts`, never re-declared beside
+`memory.service.ts`. The client calls the four routes through `api.memory` in `src/shared/api.ts` —
+the reads answer 200 with the `{ reachable }` envelope, so a caller reads the BODY rather than the
+status, and the writes are taken from the raw response because they carry the server's own verdict
+through.
 
-The lean row carries `sessionId` — Descent's unverified provenance column resolved server-side to the
-app session id (`sessionsDb.resolveAppSessionId`, wired in `descent.module.ts`), display only, gates
+The lean row carries `sessionId` — the row's unverified provenance column resolved server-side to the
+app session id (`sessionsDb.resolveAppSessionId`, wired in `memory.service.ts`), display only, gates
 nothing — so a list can mark the memories the open chat proposed. Both lists come from the service's
-one `list(status)` verb: `GET /api/descent/memory?status=approved` reads the filed list, and any
-other status reads the pending queue.
+one `list(status)` verb: `GET /api/memory?status=approved` reads the filed list, and any other status
+reads the pending queue.
 
 Every string is in `src/modules/i18n/locales/en/common.json` under `memory.*`, with the tab's own
 label at `tabs.memory`. English only, deliberately: the other ten locales fall back to `en`
@@ -207,7 +251,7 @@ written in all eleven locales, per the operator's instruction for this plan.
 - **A read that failed is retried, a read that succeeded is not.** `readFailed` leaves the card
   counting as "never asked", so the next expand tries again; a body already read is kept for the
   panel's life, including across a refresh that re-renders the row.
-- **The panel is one flat list, in Descent's order.** No grouping by target or project, no filter,
+- **The panel is one flat list, in the server's order.** No grouping by target or project, no filter,
   no search — a queue that outgrows one screen is scrolled. Nothing here paginates.
 - **`useBrowserUseEnabled` is three copies of one boolean.** Not this tab's, but it shares the hook:
   it is a per-call-site `useState` + fetch rather than a context, so the three `useWorkspaceTabGates`
@@ -221,7 +265,7 @@ route contracts, no browser. `node .verify/phase-20.mjs` is this surface in head
 tab on the strip with its count and its untouched accessible name, one row per candidate, the global
 mark, a body read on expand, both verbs offered, and the sticky rule driven both ways — the tab held
 at zero while it is selected, then dropped on the first tab change and brought back when something
-waits again. The zero-count half is produced by answering `GET /api/descent/memory` inside the page
-and re-reading through the provider's own visibility path, so the live queue is left exactly as it
-was found. Shots are `20-memory-light`, `20-memory-expanded-light`, `20-memory-empty-light`,
+waits again. The zero-count half is produced by answering the tab's own read (`GET /api/memory`, the
+path `api.memory.pending` calls) inside the page and re-reading through the provider's own visibility
+path, so the live queue is left exactly as it was found. Shots are `20-memory-light`, `20-memory-expanded-light`, `20-memory-empty-light`,
 `20-memory-390-light` and `20-memory-dark`. See [verification.md](verification.md).

@@ -32,6 +32,22 @@ if ('serviceWorker' in navigator) {
   });
 }
 
+// A lazy chunk that will not load means the page is older than the build now served (the :5184
+// build swapped under an open tab). One reload picks up the new build. The timestamp guard keeps a
+// chunk that is genuinely missing from looping, and like index.html's watchdog: no readable, writable
+// sessionStorage, no automatic reload. The error is never swallowed, so if the reload loses the race
+// the tab's error card still says what happened.
+window.addEventListener('vite:preloadError', () => {
+  try {
+    const last = Number(sessionStorage.getItem('chunk-reload-at') || 0)
+    if (Date.now() - last < 30_000) return
+    sessionStorage.setItem('chunk-reload-at', String(Date.now()))
+  } catch {
+    return
+  }
+  window.location.reload()
+})
+
 const rootElement = document.getElementById('root')
 if (!rootElement) {
   throw new Error('Unable to mount the app: #root is missing from the document')

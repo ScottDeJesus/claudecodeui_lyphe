@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { ComponentProps } from 'react';
-import { oneDark as prismOneDark, oneLight as prismOneLight } from 'react-syntax-highlighter/dist/esm/styles/prism';
+import prismOneDark from 'react-syntax-highlighter/dist/esm/styles/prism/one-dark';
+import prismOneLight from 'react-syntax-highlighter/dist/esm/styles/prism/one-light';
 
 import { copyTextToClipboard } from '@/shared/utils';
 import { SyntaxHighlighter } from '@/shared/syntaxHighlighter';

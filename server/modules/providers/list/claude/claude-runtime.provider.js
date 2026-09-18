@@ -192,7 +192,11 @@ function resolveToolApproval(requestId, decision) {
   const resolver = pendingToolApprovals.get(requestId);
   if (resolver) {
     resolver(decision);
+    return;
   }
+  // A request this process never held: answered already, timed out, or issued by a predecessor
+  // that was handed over mid-prompt (the successor re-issues it under a new id).
+  console.warn(`[permission] decision for unknown request ${requestId}: no pending approval in this process`);
 }
 
 // Match stored permission entries against a tool + input combo.

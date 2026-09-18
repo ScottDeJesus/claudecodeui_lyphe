@@ -16,6 +16,7 @@ import {
   VAPID_KEYS_TABLE_SCHEMA_SQL,
 } from '@/modules/database/schema.js';
 import { KANBAN_SCHEMA_SQL } from '@/modules/database/kanban-schema.js';
+import { MEMORY_SCHEMA_SQL } from '@/modules/database/memory-schema.js';
 
 const SQLITE_UUID_SQL = `
 lower(hex(randomblob(4))) || '-' ||
@@ -526,20 +527,23 @@ const ensureProjectsForSessionPaths = (db: Database): void => {
 };
 
 /**
- * Adds `kanban_boards.deepseek_flash`: the board's OWN DeepSeek Flash switch — whether a Metis
- * this board launches runs on Flash or on Claude.
+ * Adds the two columns `kanban_boards` gained after it was already on disk: the board's OWN
+ * DeepSeek Flash switch (whether a Metis this board launches runs on Flash or on Claude) and its
+ * concurrency dial (how many of them it may run at once).
  *
  * A separate function and not a line in the projects or sessions bodies: those rebuild a table
- * this column has nothing to do with, and a kanban column filed under a projects rebuild is a
+ * these columns have nothing to do with, and a kanban column filed under a projects rebuild is a
  * column nobody reading this table would think to open. The guard and the column read are its own
  * for exactly that reason.
  *
  * It has to exist because `kanban-schema.ts` is `IF NOT EXISTS` end to end: the declaration there
- * builds the column on a scratch database and changes NOTHING on the operator's live `auth.db`,
+ * builds the columns on a scratch database and changes NOTHING on the operator's live `auth.db`,
  * which already has `kanban_boards`. This is the half that reaches an existing one.
  *
- * Existing boards keep `0` — autonomy and the DeepSeek switch are independent, and a board that
- * was running its builds on Claude yesterday does not silently start spending Flash today.
+ * Existing boards keep `0` for the switch — autonomy and the DeepSeek switch are independent, and a
+ * board that was running its builds on Claude yesterday does not silently start spending Flash
+ * today — and `1` for the dial, which is the value the driver's own default carried before this
+ * column existed, so no live board changes how many sessions it runs.
  */
 const migrateKanbanBoardsColumns = (db: Database): void => {
   if (!tableExists(db, 'kanban_boards')) {
@@ -548,6 +552,7 @@ const migrateKanbanBoardsColumns = (db: Database): void => {
 
   const columnNames = getTableInfo(db, 'kanban_boards').map((column) => column.name);
   addColumnToTableIfNotExists(db, 'kanban_boards', columnNames, 'deepseek_flash', 'INTEGER NOT NULL DEFAULT 0');
+  addColumnToTableIfNotExists(db, 'kanban_boards', columnNames, 'concurrency', 'INTEGER NOT NULL DEFAULT 1');
 };
 
 export const runMigrations = (db: Database) => {
@@ -601,6 +606,10 @@ export const runMigrations = (db: Database) => {
     // After the projects rebuild above: the boards table references projects(project_id).
     db.exec(KANBAN_SCHEMA_SQL);
     migrateKanbanBoardsColumns(db);
+    // The memory lane's own table, in its own script — it is not a board table, so it is not in
+    // KANBAN_SCHEMA_SQL above. It sits here, after the projects rebuild, for the same reason the
+    // board's script does: nothing in this lane references `projects`.
+    db.exec(MEMORY_SCHEMA_SQL);
 
     db.exec('CREATE INDEX IF NOT EXISTS idx_session_ids_lookup ON sessions(session_id)');
     db.exec('CREATE INDEX IF NOT EXISTS idx_sessions_provider_session_id ON sessions(provider_session_id)');

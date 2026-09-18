@@ -7,6 +7,7 @@ import path from 'node:path';
 
 import { projectsDb } from '@/modules/database/index.js';
 import { kanbanBoardsService } from '@/modules/kanban/index.js';
+import type { KanbanBoard } from '@/shared/kanban-types.js';
 import type { KanbanMetisSession } from '@/shared/types.js';
 import { AppError, findApplicationRoot, getModuleDirectory } from '@/shared/utils.js';
 
@@ -23,14 +24,16 @@ import type { MetisEndRecord, MetisRegistry, MetisSpecRecord } from './metis-reg
 
 /**
  * The machine that starts ONE Metis: mint her identity, write her record, hand her a detached
- * process with a log of her own, and keep the handle that can stop or resume her.
+ * process with a log of her own, and keep the handle that can stop, resume or reply to her.
  *
- * There is no tick loop here and no policy. WHEN to spawn is the driver's question and belongs to
- * its own module; this one answers HOW — and it is deliberately the only file in the module that
- * starts a process at all, so that "what does a launch actually do" has one answer.
+ * There is no tick loop here and no SCHEDULING policy: WHEN a board is worth working on is the
+ * driver's question and belongs to its own module; this one answers HOW, and it is deliberately the
+ * only file in the module that starts a process at all, so that "what does a launch actually do" has
+ * one answer. The one thing it does decide is the DIAL — how many sessions one board may run at
+ * once — because that fence has to stand on every door that starts a child, and the door is here.
  *
- * Consumers: `kanban-metis.routes.ts` (launch, stop, resume) and, in Phase 10, the driver's tick —
- * the same three verbs, called on a schedule instead of by a click.
+ * Consumers: `kanban-metis.routes.ts` (launch, stop, resume, reply) and, in Phase 10, the driver's
+ * tick — the same verbs, called on a schedule instead of by a click.
  */
 
 /**
@@ -92,7 +95,45 @@ export type MetisSpawner = {
   stop(sessionId: string): KanbanMetisSession;
   /** Continues a session's conversation in place. Throws when she is already running. */
   resume(sessionId: string): Promise<KanbanMetisSession>;
+  /**
+   * Hands one person's words to a session that is NOT running, as the turn she wakes up to.
+   *
+   * The same `--resume <sessionId>` a resume sends, with `text` in place of the standard opening
+   * turn — one conversation, continued deliberately. A session whose child is still running cannot
+   * receive it (her stdin was closed at spawn and nothing in this repository can reach it), and a
+   * board at its dial cannot gain a child through this door either: both refusals are 409s.
+   */
+  reply(sessionId: string, text: string): Promise<KanbanMetisSession>;
 };
+
+/**
+ * May one more Metis be started on this board?
+ *
+ * Pure arithmetic over the two facts the caller gathers — how many of the board's sessions are
+ * running NOW, and the board's own dial — in the shape `metis-liveness.ts` uses for its own
+ * verdicts: no process, no file and no database is touched here, and the rule can be read without a
+ * running server. That shape is why this predicate can be handed to `launch`, `resume` and `reply`
+ * alike without any of them re-deriving a count of its own.
+ *
+ * `live < dial` and not `live <= dial`: with one session running against a dial of one there is no
+ * room, and `dial` of zero is a real setting — a board dialled to zero spawns nothing at all.
+ *
+ * The reason is a whole sentence, and it NAMES THE DIAL AND ITS VALUE, because the two callers that
+ * show a refusal to a person (the reply route and the launch route) put these words on the screen:
+ * "at its dial of 1" is a fact the operator can act on; "cannot spawn" is not.
+ */
+export function canSpawn(input: { live: number; dial: number }): { allowed: boolean; reason: string | null } {
+  if (input.live < input.dial) return { allowed: true, reason: null };
+
+  if (input.dial === 0) {
+    return { allowed: false, reason: 'this board is dialled to 0 — it spawns nothing' };
+  }
+  const running = input.live === 1 ? '1 session is running' : `${input.live} sessions are running`;
+  return {
+    allowed: false,
+    reason: `this board is at its dial of ${input.dial} — ${running}, so there is no room for another`,
+  };
+}
 
 /** Where the brief lives, resolved from the APPLICATION root so `dist-server` reads the same tree. */
 function briefRoot(): string {
@@ -303,6 +344,11 @@ export function createMetisSpawner(dependencies: MetisSpawnDependencies): MetisS
     sessionId: string;
     launchedBy: 'operator' | 'driver';
     resumed: boolean;
+    /**
+     * The turn this child is asked to take. Absent means the standard one (`metisOpeningTurn`); a
+     * REPLY passes a person's own words here, which is the only difference between the two.
+     */
+    openingTurn?: string;
   }): Promise<{ spec: MetisChildSpec; record: MetisSpecRecord; cwd: string }> => {
     const board = kanbanBoardsService.getBoard(input.boardId);
     if (board === null) {
@@ -312,6 +358,13 @@ export function createMetisSpawner(dependencies: MetisSpawnDependencies): MetisS
       });
     }
 
+    // THE DIAL, ASKED AT THE ONE PLACE EVERY SPAWNER PATH PASSES THROUGH — launch, resume and reply
+    // all call `prepare` before they create anything, so no door starts a child without this gate
+    // and a fourth door added later cannot forget it. The two facts are gathered HERE rather than
+    // remembered: the board row was read a line above, and the live count is counted at this
+    // instant, so a dial moved from the panel is honoured by the next spawn instead of by the next
+    // restart.
+    ensureDialAllows(board);
     const route = metisRouteFor(board.deepseekFlash);
     // A Flash board with no key is refused HERE, before this launch has created anything: the
     // alternative is a 201 `running` and a child that dies on its first model call, which reads to
@@ -359,7 +412,7 @@ export function createMetisSpawner(dependencies: MetisSpawnDependencies): MetisS
       launchedBy: input.launchedBy,
       apiOrigin,
       cwd,
-      openingTurn: metisOpeningTurn(board.id),
+      openingTurn: input.openingTurn ?? metisOpeningTurn(board.id),
       briefPath: brief.filePath,
       briefSha256: brief.sha256,
       resumed: input.resumed,
@@ -369,28 +422,95 @@ export function createMetisSpawner(dependencies: MetisSpawnDependencies): MetisS
     return { spec, record, cwd };
   };
 
-  /** Is a Metis of this board alive right now? The one question a duplicate launch asks. */
-  const boardHasRunningSession = (boardId: string): boolean =>
-    registry.list().some((session) => session.boardId === boardId && session.state === 'running');
+  /**
+   * How many of a board's Metises are running right now — one of the two facts `canSpawn` reads.
+   *
+   * Counted from the registry at the instant it is asked, never remembered: a session that has just
+   * exited may still read `running` here, and that is the safe direction — the board fills one tick
+   * later rather than overshooting.
+   */
+  const liveCountForBoard = (boardId: string): number =>
+    registry.list().filter((session) => session.boardId === boardId && session.state === 'running').length;
+
+  /**
+   * The dial's gate: the board's number against its live count, refused in `canSpawn`'s own words.
+   *
+   * A 409, because nothing here is malformed — the request is a perfectly good one that the board
+   * is not in a state to accept, and the operator's fix is to stop a session or raise the dial.
+   */
+  const ensureDialAllows = (board: KanbanBoard): void => {
+    const verdict = canSpawn({ live: liveCountForBoard(board.id), dial: board.concurrency });
+    if (verdict.allowed) return;
+    // The fallback is unreachable — `canSpawn` names the dial whenever it refuses — and it is here
+    // so that a refusal can never be rendered as an empty message.
+    throw new AppError(verdict.reason ?? `Board "${board.id}" has no room for another session.`, {
+      statusCode: 409,
+      code: 'CONFLICT',
+    });
+  };
+
+  /**
+   * One person's words to a session whose child has stopped, as the turn she wakes up to.
+   *
+   * This is `resume` with the TEXT in place of the standard opening turn, and everything else is
+   * deliberately the same: the same `--resume <sessionId>` continues the same conversation, the
+   * brief is re-read from disk and handed over again, and the `--mcp-config` / `--strict-mcp-config`
+   * pair, the permission mode and the environment are the ones every spawn builds. Her own record
+   * carries the reply verbatim as its `openingTurn`, so `spec.json` answers "what was she actually
+   * asked" for this turn the way it does for the first one.
+   *
+   * Its two refusals, in the order they are asked:
+   *
+   * 1. SHE IS RUNNING. Her stdin was closed when she was spawned (`child.stdin.end()`), and there is
+   *    no live-injection path in this repository — the chat websocket and the session host know
+   *    nothing of her. A turn held back until she finished would be a queued turn nobody can see,
+   *    which is worse than a refusal the screen can explain, so this one is a 409 saying exactly
+   *    what to do about it.
+   * 2. THE BOARD IS AT ITS DIAL. `prepare` asks `canSpawn` on the way through, so a reply cannot
+   *    slip a child onto a board that is already full — the same gate, the same words, whatever the
+   *    door it came in through.
+   */
+  const reply = async (sessionId: string, text: string): Promise<KanbanMetisSession> => {
+    const previous = registry.specOf(sessionId);
+    const session = registry.get(sessionId);
+    if (previous === null || session === null) {
+      throw new AppError(`No Metis session with id "${sessionId}".`, {
+        statusCode: 404,
+        code: 'NOT_FOUND',
+      });
+    }
+    if (session.state === 'running') {
+      throw new AppError('she is mid-turn — stop her first, then reply', {
+        statusCode: 409,
+        code: 'CONFLICT',
+      });
+    }
+
+    const { spec, record, cwd } = await prepare({
+      boardId: previous.boardId,
+      sessionId,
+      launchedBy: 'operator',
+      resumed: true,
+      openingTurn: text,
+    });
+    registry.record(record);
+    await spawnChild(spec, record, cwd);
+    return registry.get(sessionId) ?? session;
+  };
 
   return {
     launch: async (input) => {
-      // AN OPERATOR LAUNCH IS REFUSED WHILE THE BOARD IS ALREADY BEING BUILT. Two children of one
-      // board share a cwd (`~/.claude/kanban-metis/<boardId>/`) and are handed DIFFERENT lease
-      // owners, so they claim cards against each other in the same directory while neither click
-      // stops the other — a second click is a mistake, not a request for a second Metis. `resume`
-      // refuses the same collision for the same reason.
-      //
-      // The DRIVER is deliberately exempt: how many sessions one board may run at once is its own
-      // concurrency dial to spend, and a refusal here would take that decision away from the
-      // component the plan hands it to.
-      if (input.launchedBy === 'operator' && boardHasRunningSession(input.boardId)) {
-        throw new AppError(`Board "${input.boardId}" already has a running Metis session.`, {
-          statusCode: 409,
-          code: 'CONFLICT',
-        });
-      }
-
+      // AN OPERATOR LAUNCH IS REFUSED WHILE THE BOARD IS ALREADY AT ITS DIAL, and so is a driver
+      // launch — `prepare` asks the same question of both, because there is one number and both
+      // paths spend it. Two children of one board share a cwd
+      // (`~/.claude/kanban-metis/<boardId>/`) and are handed DIFFERENT lease owners, so they claim
+      // cards against each other while neither click stops the other; the shared directory is the
+      // ORDINARY case up to the dial, and it is safe there because nothing per-session is written
+      // into it — every per-session file lives under
+      // `~/.claude/state/kanban-metis/<sessionId>/` — and because the arbiter of who owns a card is
+      // the lease CAS, not the directory. A per-session cwd is FORBIDDEN: `~/.claude/hooks/
+      // kanban_metis.py`'s `board_id()` reads the leaf directly under the session root, so a deeper
+      // path would make every board session invisible to the seclusion predicate.
       const sessionId = crypto.randomUUID();
       const { spec, record, cwd } = await prepare({ ...input, sessionId, resumed: false });
       // BEFORE the spawn. The record is what a server that restarts mid-launch re-adopts from, and
@@ -514,5 +634,7 @@ export function createMetisSpawner(dependencies: MetisSpawnDependencies): MetisS
       await spawnChild(spec, record, cwd);
       return registry.get(sessionId) ?? session;
     },
+
+    reply,
   };
 }

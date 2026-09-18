@@ -173,8 +173,9 @@ differ — widgets asks origin-only, where being conservative is right because t
 
 One control, and it is the reader's way in and out of every pane.
 
-- **It is 28px drawn, docked or floating, inside a 44px round catch** — the size and the three-bar
-  glyph `design/Applications Hub.dc.html` draws. The catch is a transparent `::before` on `.vv-fab`,
+- **It is 28px drawn, docked or floating, inside a 44px round catch** — the size
+  `design/Applications Hub.dc.html` draws. Its face is the app's logo (`/logo-64.png`), filling the
+  circle inside a 1px accent rim. The catch is a transparent `::before` on `.vv-fab`,
   so a press up to 22px from the centre starts a drag while `getBoundingClientRect()` still answers
   28px, and every rect the drag, the clamp and the dock snap read is the circle the reader sees.
 - **It sits docked to the left of the wordmark**, in the sidebar's logo row. The rail holds 30px
@@ -350,9 +351,11 @@ which is what earns a component in this house. Every screen composes them; none 
   it takes its `left`/`top` from the dock's rect, floating from its own `x`/`y`. It is never
   unmounted and re-mounted into the header, because a node that unmounts mid-drag loses its pointer
   capture and the drag dies in the reader's hand. 28px drawn everywhere, with a 44px catch. Its
-  drag threshold is 4px, its snap radius 64px, its edge padding 8px. Enter and Space reach it the
-  way they reach any button — a keyboard click carries `detail === 0` and is never swallowed as the
-  tail of a drag.
+  drag threshold is 4px, its snap radius 64px, its edge padding 8px. It presses on the CLICK, never
+  on the pointer release: a phone dispatches a tap's click after the release, at the finger's point,
+  into whatever is on screen by then — and the drawer it opens covers it, so a drawer opened on the
+  release caught its own tap on the backdrop and shut again (or pressed a row inside the sheet). The
+  click that ends a drag is swallowed; Enter and Space carry `detail === 0` and always press.
 - **`SplitPane.tsx`** — two panes and a draggable seam, or one pane filling the row. The seam is
   its own narrow gutter BESIDE the panes rather than over them: a grab area laid over a pane would
   steal the clicks of whatever that application draws flush against its edge. It carries
@@ -388,7 +391,7 @@ FAB and the layer — and nothing else:
 |---|---|
 | `context/AppSwitcherContext.tsx` | The one state home: the registry, the two panes, dual, the ratio, the FAB position, the dock rect, the drawer's open flag, `openInDualScreen` (dual-on-and-filled in one update) — and `refresh()` on every drawer open. |
 | `AppSwitcherDock.tsx` | The empty 28px box in the logo row. It paints nothing; it holds the space open and reports its rect. |
-| `AppSwitcherFab.tsx` · `AppDrawer.tsx` | The kit's FAB with the three-bar glyph, wired to the drawer it opens. |
+| `AppSwitcherFab.tsx` · `AppDrawer.tsx` | The kit's FAB wearing the app logo, wired to the drawer it opens. |
 | `AppDrawerHeader.tsx` | The sheet's "Your apps" heading, the count line and Close all — extracted out of `AppDrawer.tsx` at the 300-line ceiling. |
 | `AppDrawerRow.tsx` · `NewApplicationForm.tsx` | One application's card and kebab; the inline New application form and its field checks. |
 | `AppPane.tsx` · `AppSwitcherLayer.tsx` | One framed application; the panes composed over the main region. |

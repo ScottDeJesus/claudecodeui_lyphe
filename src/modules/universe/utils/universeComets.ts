@@ -2,6 +2,7 @@ import { tokenOf } from '@/modules/universe/utils/universeTokens';
 import { PULSE_TOKEN } from '@/modules/universe/utils/universePulses';
 import type { Frame } from '@/modules/universe/utils/universeGraphPasses';
 import type { UniverseGraph, UniverseGraphNode } from '@/modules/universe/utils/universeGraph';
+import { isHidden } from '@/modules/universe/utils/universeRegimes';
 import type { UniverseSky } from '@/modules/universe/utils/universeSky';
 import type { UniversePulse } from '@/modules/universe/utils/universePulses';
 
@@ -68,15 +69,16 @@ const HEAVY_RADIUS = 5.5;
  *  A BODY IS ALWAYS HEAVY, AND SO IS A LARGE STAR: the export built this list from its kind and its
  *  radius (`core || hub || r >= 5.5`), and a lens made of the bodies alone bends nothing a visitor
  *  could see at the fitted view. */
-let heavyHeld: { graph: UniverseGraph; list: number[] } | null = null;
+let heavyHeld: { graph: UniverseGraph; codeOnly: boolean; list: number[] } | null = null;
 
 export function heavyStars(graph: UniverseGraph): readonly number[] {
-  if (heavyHeld !== null && heavyHeld.graph === graph) return heavyHeld.list;
+  if (heavyHeld !== null && heavyHeld.graph === graph && heavyHeld.codeOnly === graph.codeOnly) return heavyHeld.list;
   const list: number[] = [];
   for (const node of graph.nodes) {
+    if (isHidden(graph, node)) continue;
     if (node.kind === 'core' || node.kind === 'galaxy' || node.r >= HEAVY_RADIUS) list.push(node.id);
   }
-  heavyHeld = { graph, list };
+  heavyHeld = { graph, codeOnly: graph.codeOnly, list };
   return list;
 }
 
@@ -132,6 +134,10 @@ export function drawComets(
     const from = graph.nodes[path[pulse.seg]];
     const to = graph.nodes[path[pulse.seg + 1]];
     if (from === undefined || to === undefined) continue;
+    // A leg that starts or ends on a hidden file is not drawn: the file's drawn position is frozen
+    // where the float pass last wrote it, and a light leaving a place the star left is a lie. The
+    // row is still the feed's; the pulse resumes on the next leg if that leg is between drawn nodes.
+    if (isHidden(graph, from) || isHidden(graph, to)) continue;
     const lx = from.x + (to.x - from.x) * pulse.t;
     const ly = from.y + (to.y - from.y) * pulse.t;
     const [hx, hy] = bendAt(from, to, pulse.t, lx, ly);

@@ -1,9 +1,9 @@
-import { useCallback, useState } from 'react';
+import { Suspense, useCallback, useState } from 'react';
 
 import type { Project, ProjectSession } from '@/shared/types';
-import { Shell } from '@/modules/shell';
 import StandaloneShellEmptyState from '@/modules/standalone-shell/StandaloneShellEmptyState';
 import StandaloneShellHeader from '@/modules/standalone-shell/StandaloneShellHeader';
+import { Shell } from '@/modules/shell';
 
 type StandaloneShellProps = {
   project?: Project | null;
@@ -63,6 +63,7 @@ export default function StandaloneShell({
       )}
 
       <div className="min-h-0 w-full flex-1">
+        <Suspense fallback={null}>
         <Shell
           selectedProject={project}
           selectedSession={session}
@@ -73,6 +74,7 @@ export default function StandaloneShell({
           minimal={minimal}
           autoConnect={minimal ? true : autoConnect}
         />
+        </Suspense>
       </div>
     </div>
   );

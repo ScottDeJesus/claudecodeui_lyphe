@@ -1,3 +1,4 @@
+import { isHidden } from '@/modules/universe/utils/universeRegimes';
 import { bandedBrightness, colorForNode, tokenOf } from '@/modules/universe/utils/universeTokens';
 import { coreOf, dopplerSwing, flareHalo, flareRing } from '@/modules/universe/utils/universeStarGeometry';
 import type { Frame } from '@/modules/universe/utils/universeGraphPasses';
@@ -82,7 +83,7 @@ export function drawCores(frame: Frame): void {
     ctx.arc(node.x, node.y, core.radius, 0, TAU);
     // Documents and directories are drawn a shade under full, as the export drew them.
     if (node.kind === 'docs') ctx.globalAlpha *= 0.8;
-    else if (node.kind === 'dir') ctx.globalAlpha *= 0.9;
+    else if (node.kind === 'dir' || node.kind === 'system') ctx.globalAlpha *= 0.9;
     ctx.fill();
   }
 
@@ -90,7 +91,7 @@ export function drawCores(frame: Frame): void {
     ctx.globalAlpha = batch.alpha;
     ctx.fillStyle = batch.color;
     if (batch.kind === 'docs') ctx.globalAlpha *= 0.8;
-    else if (batch.kind === 'dir') ctx.globalAlpha *= 0.9;
+    else if (batch.kind === 'dir' || batch.kind === 'system') ctx.globalAlpha *= 0.9;
     ctx.fill(batch.path);
   }
   ctx.globalAlpha = 1;
@@ -114,6 +115,8 @@ export function drawFlares(frame: Frame, flares: Map<number, number>, sky: Unive
   for (const [id, flare] of flares) {
     const node = graph.nodes[id];
     if (node === undefined || flare <= 0 || !frame.visible(node)) continue;
+    // An edit to a hidden file is a row for the feed, not a light in empty sky.
+    if (isHidden(graph, node)) continue;
     const halo = flareHalo(node, flare);
     // The halo is the star's own glow grown bright, so it wears the glow's colour rather than the
     // disc's: the two are the same light, and the flare is the same light at another strength.
@@ -130,7 +133,7 @@ export function drawFlares(frame: Frame, flares: Map<number, number>, sky: Unive
   ctx.globalCompositeOperation = 'source-over';
   for (const [id, flare] of flares) {
     const node = graph.nodes[id];
-    if (node === undefined || flare <= 0 || !frame.visible(node)) continue;
+    if (node === undefined || flare <= 0 || !frame.visible(node) || isHidden(graph, node)) continue;
     const ring = flareRing(node, flare, now);
     ctx.globalAlpha = ring.alpha;
     ctx.strokeStyle = starColor(frame, node, tweaks.doppler);
@@ -148,7 +151,7 @@ export function drawSelectionRing(frame: Frame): void {
   const { ctx, graph, tokens, now } = frame;
   const focus = graph.focus;
   const node = focus === null ? undefined : graph.nodes[focus];
-  if (node === undefined) return;
+  if (node === undefined || isHidden(graph, node)) return;
   ctx.globalAlpha = RING_ALPHA;
   ctx.strokeStyle = tokenOf(tokens, '--ink');
   ctx.lineWidth = RING_WIDTH / Math.sqrt(frame.view.z);

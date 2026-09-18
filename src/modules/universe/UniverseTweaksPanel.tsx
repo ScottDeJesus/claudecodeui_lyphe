@@ -56,7 +56,9 @@ const WORDS: Readonly<Record<TweakKey, TweakWords>> = {
   labels: { group: 'Look', label: 'Labels', helper: 'Which stars carry their name.' },
   edges: { group: 'Look', label: 'Edges', helper: 'Which relationships are drawn as lines.' },
   gravity: { group: 'Look', label: 'Gravity', helper: 'How tightly repos and directories pull their stars in.', step: 0.1 },
+  distance: { group: 'Look', label: 'Distance', helper: 'How far everything sits from Claude, the centre.', step: 0.05 },
   milkyWay: { group: 'Look', label: 'Milky Way', helper: 'Paint a faint band of dust behind the sky.' },
+  files: { group: 'Look', label: 'Files', helper: 'Which files are stars: code alone, or every tracked file.' },
   twinkle: { group: 'Look', label: 'Twinkle', helper: 'How much the stars flicker.', step: 0.05 },
   perspective: { group: 'Look', label: 'Perspective', helper: 'How much depth the sky has. Zero flattens it.', step: 0.05 },
   flow: { group: 'Look', label: 'Flow', helper: 'Draw executions as pulses travelling along the edges.' },
@@ -91,6 +93,7 @@ const OPTION_LABELS: Readonly<Record<string, string>> = {
   tree: 'Tree',
   import: 'Imports',
   cochange: 'Co-changes',
+  code: 'Code only',
   webgl: 'GPU (WebGL)',
   canvas: 'Canvas',
 };

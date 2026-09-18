@@ -13,7 +13,7 @@ import { clear } from '@/modules/universe/utils/universeLayers';
 import { bokehOf, coreOf, dopplerSwing, glowOf } from '@/modules/universe/utils/universeStarGeometry';
 import { CORE_IRIS_ALPHA, CORE_IRIS_RADII, KIND_DIM, discAlphaOf } from '@/modules/universe/utils/universeStarsGL';
 import { drawCores, drawFlares, drawSelectionRing } from '@/modules/universe/utils/universeStarlight';
-import { bandedBrightness, colorForNode, tokenOf } from '@/modules/universe/utils/universeTokens';
+import { bandedBrightness, colorForNode, glowColorOf, tokenOf } from '@/modules/universe/utils/universeTokens';
 import { worldToScreen } from '@/modules/universe/utils/universeView';
 import type { Cloud } from '@/modules/universe/utils/universeClouds';
 import type { Frame } from '@/modules/universe/utils/universeGraphPasses';
@@ -32,7 +32,7 @@ import type { UniversePulses } from '@/modules/universe/utils/universePulses';
  *
  * | layer | passes | repainted when |
  * |---|---|---|
- * | sky | the wash, the milky way, the nebulae, the parallax fields, the twinklers | the camera moved, `dirtySky`, else every 4th frame |
+ * | sky | the wash, the milky way, the parallax fields, the twinklers | the camera moved, `dirtySky`, else every 4th frame |
  * | stars | edges, trails, dust, glow, the clouds when coarse, the stars | the camera moved, the intro, `dirtyStars`, a focus fade, else every 2nd frame (6 coarse, 3 under z 1) |
  * | gl | the glow and the disc of every star that fits a GPU point, in one draw | with the stars |
  * | live | comets, flares, the selection ring, the labels | every frame |
@@ -48,7 +48,7 @@ import type { UniversePulses } from '@/modules/universe/utils/universePulses';
  * frame happens at all is `universeLoop`'s. This draws what it is handed, when it is told to.
  *
  * THE SKY AND THE VIEWPORT ARE THE OWNER'S. The sky is made once by the component that owns the
- * stack — it holds the tiles, the field and the sprite caches the clouds, the nebulae and the stars
+ * stack — it holds the tiles, the field and the sprite caches the clouds and the stars
  * all borrow — and it arrives here as an argument rather than being found through a singleton. The
  * viewport arrives the same way, and the frame this file builds from it is the one every pass
  * measures its `visible()` against.
@@ -73,6 +73,8 @@ import type { UniversePulses } from '@/modules/universe/utils/universePulses';
 /** The fonts the labels are set in — the two the design system's own display faces are named by. */
 const CORE_FONT = 'italic 22px "Instrument Serif", Georgia, serif';
 const BODY_FONT = '500 13px "Schibsted Grotesk", system-ui, sans-serif';
+/** The body font's size in CSS pixels — the height a placed name's box is tested at. */
+const BODY_FONT_PX = 13;
 const DIM_FONT = '500 11.5px "Schibsted Grotesk", system-ui, sans-serif';
 const FILE_FONT = '400 11.5px "Schibsted Grotesk", system-ui, sans-serif';
 /** How far a label clears its star, in CSS pixels. */
@@ -85,6 +87,16 @@ const BODY_FADE_SPAN = 0.25;
 const FILE_LABEL_ZOOM = 1.7;
 /** The zoom past which a directory stops being labelled, because its children's names rule. */
 const DIR_LABEL_ZOOM = 1.1;
+/** The most neighbours a focus may name. A hover names the node under the hand and the nodes it
+ *  touches — and a database touches five hundred stars, a repo fifty, so a hand crossing one threw
+ *  every name in the neighbourhood onto the sky at once (operator, 2026-09-17: "all of the titles
+ *  pop up and it's illegible"). Past this many, only the focus itself is named. */
+const LIT_LABELS_MAX = 24;
+/** The zoom an integration folder's name starts to fade in at, and the span it fades over: absent
+ *  at the fitted view (0.04 on the merged map), whole by a third of a power in — before a plain
+ *  directory's name (`DIR_LABEL_ZOOM`), since the integrations are the reason a visitor zooms. */
+const SYSTEM_LABEL_FROM = 0.22;
+const SYSTEM_LABEL_SPAN = 0.28;
 
 /**
  * The star layer's flares: one empty map, made once and handed to every frame the star layer
@@ -95,7 +107,7 @@ const NO_FLARES: Map<number, number> = new Map();
 
 /**
  * The background, and the whole of it: the wash the world is drawn over, the milky way, the
- * nebulae and the parallax fields. It is the only pass that paints in the box's own pixels, which
+ * parallax fields. It is the only pass that paints in the box's own pixels, which
  * is why the sky layer never carries the world transform.
  */
 export function drawSky(
@@ -179,7 +191,7 @@ function drawLeftovers(
   ctx.globalCompositeOperation = 'lighter';
   for (const node of nodes) {
     const glow = glowOf(node, now, 0);
-    const color = colorForNode(node, tokens, 1);
+    const color = glowColorOf(node, tokens);
     ctx.globalAlpha = glow.alpha;
     // The same pair of caches the glow pass blits from, chosen the same way: under six screen pixels
     // the quarter-size sprite is the same falloff at a quarter of the texels.
@@ -272,10 +284,11 @@ function worldTransform(ctx: CanvasRenderingContext2D, view: Viewport): void {
 }
 
 /**
- * The labels, in screen space over everything. A body's name appears as the view widens; a file's
+ * The labels, in screen space over everything. A root's name is always drawn; a directory's
  * appears as the view closes on it, or whenever the tweak says all of them; a directory hands its
  * name over to its children once they are the ones being read. A label only exists for a star the
- * caller marked as focused, hovered, or near the selection, plus the sun, which is always named.
+ * caller marked as focused, hovered, or near the selection — and near it only while the focus has
+ * `LIT_LABELS_MAX` neighbours or fewer — plus the sun, which is always named.
  */
 function drawLabels(frame: Frame, mode: UniverseTweaks['labels']): void {
   if (mode === 'none') return;
@@ -285,15 +298,19 @@ function drawLabels(frame: Frame, mode: UniverseTweaks['labels']): void {
   // How much of the body labels' strength the zoom has earned: nothing at the fitted view, all of
   // it a quarter of a power in. The sun is exempt, because the sun is never not worth naming.
   const far = Math.max(0, Math.min(1, (z - BODY_FADE_FROM) / BODY_FADE_SPAN));
+  // Whether the focus's neighbours are named at all: a small neighbourhood is a story, a hub's is a wall.
+  // Counted as distinct partners: a pair joined by two lanes is one neighbour, not two.
+  const nameLit = focus !== null && new Set(graph.nodes[focus]?.adj ?? []).size <= LIT_LABELS_MAX;
   const core = tokenOf(tokens, '--ink');
   const body = tokenOf(tokens, '--ink');
   const dim = tokenOf(tokens, '--ink-mid');
   ctx.textAlign = 'center';
   ctx.textBaseline = 'top';
 
+  const integrations: { node: UniverseGraphNode; alpha: number }[] = [];
   for (const node of graph.bodies) {
     if (!frame.visible(node)) continue;
-    const lit = focus !== null && node.f > 0.85;
+    const lit = nameLit && node.f > 0.85;
     const near = focus === node.id;
     if (node.kind === 'core') {
       // The sun is named whenever it is on screen: at the fitted view it is the one word that
@@ -303,12 +320,40 @@ function drawLabels(frame: Frame, mode: UniverseTweaks['labels']): void {
       continue;
     }
     if (node.kind === 'galaxy' || node.kind === 'endpoint') {
-      if (far < 0.02) continue;
-      labelAt(frame, node, body, BODY_FONT, Math.max(0.35, node.f) * far, LABEL_GAP_BODY);
+      // A root is the sky's map — a repo, a database — and is named at every zoom: at the fitted
+      // view, where the rooms put the repos three hundred pixels from the sun, the names are what
+      // tells a visitor which cloud is which.
+      labelAt(frame, node, body, BODY_FONT, Math.max(0.35, node.f), LABEL_GAP_BODY);
+      continue;
+    }
+    if (node.kind === 'system') {
+      // An integration folder is named as the view closes on its repo — not at the fitted view,
+      // where fifteen names would crowd one belt, and well before a plain directory's. The names
+      // are placed after this walk, largest folder first, each skipped where it would print over
+      // one already placed: the belt is fifteen names in a patch a hundred pixels across until the
+      // view is most of a power in, and a name half over another is a name nobody can read.
+      const shown = Math.max(0, Math.min(1, (z - SYSTEM_LABEL_FROM) / SYSTEM_LABEL_SPAN));
+      const alpha = Math.max(shown, near || lit ? 1 : 0) * Math.max(0.35, node.f);
+      if (alpha > 0.01) integrations.push({ node, alpha });
       continue;
     }
     if (node.kind === 'dir') {
       if (z > DIR_LABEL_ZOOM || near || lit) labelAt(frame, node, dim, DIM_FONT, node.f, LABEL_GAP);
+    }
+  }
+
+  if (integrations.length > 0) {
+    integrations.sort((a, b) => b.node.r - a.node.r);
+    ctx.font = BODY_FONT;
+    const placed: { x0: number; y0: number; x1: number; y1: number }[] = [];
+    for (const { node, alpha } of integrations) {
+      const at = worldToScreen(frame.camera, node, frame.camera.w, frame.camera.h);
+      const half = ctx.measureText(node.label).width / 2;
+      const top = at.y + node.r * z + LABEL_GAP_BODY;
+      const box = { x0: at.x - half, y0: top, x1: at.x + half, y1: top + BODY_FONT_PX };
+      if (placed.some((p) => box.x0 < p.x1 && box.x1 > p.x0 && box.y0 < p.y1 && box.y1 > p.y0)) continue;
+      placed.push(box);
+      labelAt(frame, node, body, BODY_FONT, alpha, LABEL_GAP_BODY);
     }
   }
 
@@ -319,7 +364,7 @@ function drawLabels(frame: Frame, mode: UniverseTweaks['labels']): void {
   if (mode !== 'all' && z <= FILE_LABEL_ZOOM && focus === null) return;
   for (const node of graph.act) {
     if (!isFile(node) || !frame.visible(node)) continue;
-    const lit = focus !== null && node.f > 0.85;
+    const lit = nameLit && node.f > 0.85;
     const near = focus === node.id;
     if (mode === 'all' || z > FILE_LABEL_ZOOM || near || lit) {
       // A file's own name earns its strength with the zoom that brought it close enough to read.

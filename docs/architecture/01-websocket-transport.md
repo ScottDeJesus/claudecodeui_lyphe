@@ -13,7 +13,7 @@ serves the app, and it decides what a connection is by looking at the pathname �
 no second server and no socket.io-style namespacing. Every path authenticates once, at the
 HTTP upgrade, before any handler runs. The path that matters is `/ws`, the chat socket: a
 browser tab opens exactly one, and every feature that needs live data subscribes to that
-one socket rather than opening its own. The protocol on it is deliberately small — six
+one socket rather than opening its own. The protocol on it is deliberately small — seven
 inbound message types, every outbound frame tagged with a `kind` — so the client needs one
 switch statement and no provider-specific branching. The server trusts the client for the
 session id and the prompt text and nothing else: provider, project path and the
@@ -49,8 +49,9 @@ does.
    for mid-run problems and keep going. Only `complete` clears processing state.
 8. **Completed runs are never replayed.** Once a run has finished, its transcript belongs
    to REST. Replaying it would duplicate what the history fetch already returned.
-9. **There is no send queue and no backoff.** A frame sent while the socket is closed is
-   logged and dropped; a dropped socket retries flat every 3 seconds, forever.
+9. **A send waits for a live socket; a retry has no backoff.** A frame sent while the socket
+   is closed, suspect or quiet waits in the browser's outbox until the socket is proven alive
+   or replaced; a dropped socket retries flat every 3 seconds, forever.
 
 A tenth thing that is not a rule but is worth holding: there are exactly **two fan-out
 mechanisms**, and confusing them is the most common bug in this area. `connectedClients` is
@@ -65,7 +66,7 @@ every open `/ws` socket in the process. A run's writer holds only the sockets wa
 | `server/modules/websocket/services/websocket-auth.service.ts` | `verifyWebSocketClient` — the upgrade-time gate for every path |
 | `server/modules/auth/auth.middleware.ts` | `authenticateWebSocket` — first DB user in platform mode, JWT verification in OSS mode |
 | `server/modules/websocket/services/websocket-state.service.ts` | `connectedClients`, the set of open `/ws` sockets, and `WS_OPEN_STATE` |
-| `server/modules/websocket/services/chat-websocket.service.ts` | The `/ws` protocol: the six inbound handlers, `protocol_error`, the attachment trust boundary, `runDetachedChatTurn` |
+| `server/modules/websocket/services/chat-websocket.service.ts` | The `/ws` protocol: the seven inbound handlers, `protocol_error`, the attachment trust boundary, `runDetachedChatTurn` |
 | `server/modules/websocket/services/chat-run-registry.service.ts` | `chatRunRegistry` — one run per session, `seq` stamping, the replay buffer, the exactly-one-`complete` contract |
 | `server/modules/websocket/services/chat-session-writer.service.ts` | `ChatSessionWriter` — the object runtimes write into; swallows `session_created`, fans out to every attached socket |
 | `server/modules/websocket/services/session-upsert-broadcast.service.ts` | The only builder of `session_upserted`, and the batched broadcast helper |
@@ -185,7 +186,7 @@ frame with no `kind` at all (`:96-98`), which is how the Task Master frames pass
 
 ## The chat protocol going up
 
-**RULE: six `type` values, dispatched by one switch (`chat-websocket.service.ts:649-671`).
+**RULE: seven `type` values, dispatched by one switch (`chat-websocket.service.ts:649-671`).
 Anything else is answered with `protocol_error` / `UNKNOWN_MESSAGE_TYPE`; anything that
 throws is answered with `INTERNAL_ERROR`.**
 
@@ -197,11 +198,12 @@ throws is answered with `INTERNAL_ERROR`.**
 | `chat.subscribe` | `sessions: [{ sessionId, lastSeq }]` | Acks with `chat_subscribed`, attaches this socket to a running run, replays what was missed (`:448-504`) |
 | `chat.permission-response` | `requestId`, `allow`, `updatedInput?`, `message?`, `rememberEntry?` | Resolves one pending tool approval (`:511-522`) |
 | `chat.presence` | `sessionId`, `visible` | Records which session this socket is showing, for the notification channels' watched-session check (`:538-544`) |
+| `chat.ping` | — | Answers `pong`. The browser's liveness probe; `WebSocketContext.tsx` swallows the answer, so no feature ever sees it |
 
-Five of the six are built in exactly two client files: the composer builds sends, aborts and
-permission answers (`useChatComposerState.ts:877`, `:1183`, `:1225`), and
-`chat.subscribe` is built in `useChatSessionState.ts:773` and
-`ChatInterface.tsx:305`. `chat.presence` has a third home of its own,
+Five of the first six are built in exactly two client files: the composer builds sends, aborts and
+permission answers (`useChatComposerState.ts:877`, `:1187`, `:1229`), and
+`chat.subscribe` is built in `useChatSessionState.ts:811` and
+`ChatInterface.tsx:330`. `chat.presence` has a third home of its own,
 `src/modules/chat/hooks/useSessionPresence.ts`, called once from `ChatInterface.tsx`, which
 passes the session only while the chat tab is the one showing (a hidden chat behind Files,
 Shell or Git reports `null`): it announces at mount, on every session or connection change,
@@ -519,14 +521,15 @@ stateDiagram-v2
   Connecting --> Open: onopen fires
   Connecting --> WaitingRetry: onclose before the handshake finished
   Open --> WaitingRetry: onclose and wsRef still points at this socket
-  WaitingRetry --> Connecting: after 3000 ms
+  WaitingRetry --> Connecting: after 3000 ms, or at once when a send or a page resume probes
+  Open --> Connecting: a probe gets no frame back within 4000 ms, so the socket is replaced
   Open --> Detached: cleanup nulls the handlers and closes
   Connecting --> Detached: cleanup nulls the handlers and closes
   Detached --> Connecting: effect re-runs after a token refresh
   Detached --> [*]: the provider unmounts
 ```
 
-The retry is a flat 3 second timer with no backoff (`WebSocketContext.tsx:113-116`). On
+The retry is a flat 3 second timer with no backoff, cut short by a probe. On
 re-open, `websocket_reconnected` is dispatched only if this socket had connected at least
 once before (`:89-93`), so a first connection does not look like a recovery.
 
@@ -539,9 +542,38 @@ Four guards do real work here, and each of them exists because of a specific fai
 | `unmountedRef.current = false` at the top of the effect | `:136` | Every re-run (a token refresh, say) short-circuiting inside `connect` and leaving the socket permanently dead (`f082cdc6`) |
 | Storing the socket in `wsRef` while still `CONNECTING` | `:83-85` | A token refresh being unable to close a socket whose handshake has not completed |
 
-`sendMessage` (`:161-168`) warns and drops when the socket is not `OPEN`. There is no
-outbound queue; a message sent during a reconnect window is gone, which is exactly why
-state is re-established with `chat.subscribe` rather than by replaying sends.
+`sendMessage` sends at once only over a socket it trusts: `OPEN`, not suspect, nothing already
+waiting, and a frame from the server within the last 25 s — 3 s for a user's frame, since a
+socket can also die while the page is on screen and a send into it is lost for good. Anything else joins an outbox (in
+order, 50 frames at most) and the socket is proven first — a `chat.ping`, and any frame back
+inside 4 s flushes the outbox; silence replaces the socket, and the new socket's `onopen` flushes
+it. The case this exists for is the half-open socket a phone leaves after sleeping or changing
+networks: `readyState` still reads `OPEN`, the browser sees no `onclose` for minutes, and a send
+used to vanish until the page was reloaded. The page going hidden or the network going offline
+marks the socket suspect; the page coming back (`visibilitychange`, `pageshow`) or the network
+returning (`online`) probes it straight away, so a dead socket is replaced — and its reconnect
+catch-up runs — before the next send needs it. The outbox only delivers what never left; state is
+still re-established with `chat.subscribe`, never by replaying sends.
+
+Three rules keep a wait from turning into a second fault. **A user's frame gives up after 30 s**
+(`chat.send`, `chat.edit-send`, `chat.abort`, `chat.permission-response`, each carrying its session —
+the permission answer carries one only for this): it is removed and answered with a synthetic
+`protocol_error` / `NOT_DELIVERED`, so the chat shows why and stops its spinner. While a send waits,
+its spinner is held: the running-sessions poll would otherwise clear it after 10 s, since the server
+cannot list a run it was never told about, and a second press would then become a second
+`chat.send` the server refuses with `RUN_IN_PROGRESS` instead of taking the composer's queue path
+(`hasQueuedSend`, read by `SessionProtectionContext.tsx`). **A queued `chat.subscribe` is never
+flushed with a stale cursor**: a replacement socket drops it before `websocket_reconnected`, when
+every subscriber asks again with its current cursor; a probe answered on the same socket drops it
+too and dispatches `websocket_reconnected` itself. A replayed window would otherwise double streamed
+text, which has no id to dedupe it by. An identical subscribe is never queued twice. The probe's 4 s
+budget is spent on the send path as well, so a live link whose round trip nears it loses its socket
+on a press. **Stop pressed over a send still in the outbox takes the send back**: both frames are
+dropped and the chat is told the message never left, rather than delivering it and aborting the run
+it starts. **A full outbox drops its oldest background frame** (presence,
+subscribe) before any user frame, with a console warning. The probe also swallows an older server's
+`UNKNOWN_MESSAGE_TYPE` refusal of `chat.ping`, which carries no session and would otherwise be pinned
+on the conversation on screen.
 
 ## Fan-out: who receives what
 
@@ -687,12 +719,12 @@ is in [notifications.md](../notifications.md).
 | `completeRunIfCurrent` next to `completeRun` | A queued message can start the session's next run before the previous runtime promise settles; the session-keyed helper would then kill the *new* run |
 | Completed runs do not replay | The transcript comes from REST after a reload. "Messages missing after reload" is therefore a history-fetch bug, not a replay bug |
 | `replayEvents` ignores run status | The completed-run rule is enforced by `handleChatSubscribe`, not by the registry. Calling `replayEvents` from somewhere new re-opens the duplicate-message bug |
-| Two `chat.subscribe` frames per reconnect | One from the `ws`-identity effect, one from the reconnect handler after its REST refresh. Both carry the current `lastSeq`, so the second asks only for what the first missed |
-| No send queue, no backoff | A frame sent while closed is dropped with a warning, and a dead server is retried flat every 3 seconds forever |
+| Two `chat.subscribe` frames per reconnect | One from the `ws`-identity effect, one from the reconnect handler after its REST refresh. Both carry the current `lastSeq`, so the second asks only for what the first missed — which holds only because the outbox drops subscribes queued before the new socket opened |
+| An outbox, no backoff | A frame sent over a closed or unproven socket waits and goes out once the socket answers or is replaced — a user's frame for 30 s at most, with its spinner held; a dead server is retried flat every 3 seconds forever, and the outbox holds 50 frames, shedding background ones first |
 | An expired token produces no socket *and no retry* | `buildWebSocketUrl` returns `null` before a `WebSocket` exists, so there is no `onclose` to schedule anything. Recovery waits on the auth state changing |
 | Heartbeat detection takes two intervals | The tick that finds `isAlive === false` is the one *after* the unanswered ping — so up to ~60 s, not 30 |
-| Platform mode ignores tokens entirely | `verifyWebSocketClient:32`. The local `.env` here sets `VITE_IS_PLATFORM=true`, so auth in this working copy does not behave the way CI does |
-| `ws` in the context value is a snapshot | `value` memoises `ws: wsRef.current` at render time (`:177-183`), so it can be stale between renders. Use `sendMessage` and `subscribe`; treat `ws` as a connectedness signal only |
+| Platform mode ignores tokens entirely | `verifyWebSocketClient:32`. This working copy's `.env` sets no `VITE_IS_PLATFORM`, so `/ws` here demands a JWT at the upgrade (401 without one), as CI does |
+| `ws` in the context value is a snapshot | `value` memoises `ws: wsRef.current` at render time, so it can be stale between renders. Use `sendMessage` and `subscribe`; treat `ws` as a connectedness signal only |
 | `/plugin-ws` has no in-repo caller | It is a third-party extension point, which is exactly why broadcasting over `wss.clients` was a real leak and not a tidiness complaint |
 
 ## Where to look when something breaks

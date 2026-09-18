@@ -50,6 +50,10 @@ export type KanbanBoard = {
    *  two boards on one host must be able to run different models, and a switch that is a file the
    *  whole box shares cannot say that. */
   deepseekFlash: boolean;
+  /** This board's own Metis dial: how many sessions it may run at once, clamped by the server to
+   *  `[0, 4]` at every read and every write. Zero is a real value and means the board spawns
+   *  NOTHING, so the panel draws it as a number rather than as an absence. */
+  concurrency: number;
   sortOrder: number;
   archived: boolean;
   createdAt: string;
@@ -256,6 +260,129 @@ export type KanbanImportResult = {
 };
 
 /**
+ * Every event kind the seam may record, mirrored from `server/shared/kanban-types.ts` where it is
+ * declared beside the frame's own shapes.
+ *
+ * The panel reads it when it filters what arrived: `KanbanBoardEvent.event.kind` is the same
+ * vocabulary one layer in. A kind the panel does not recognise is a frame it ignores rather than
+ * crashes on, so this union widens with the server's and never narrows its checks.
+ */
+export type KanbanEventKind =
+  | 'board.created'
+  | 'board.updated'
+  | 'board.selected'
+  | 'board.archived'
+  | 'card.created'
+  | 'card.updated'
+  | 'card.moved'
+  | 'card.archived'
+  | 'card.restored'
+  | 'card.approved'
+  | 'card.unapproved'
+  | 'tag.added'
+  | 'tag.removed'
+  | 'question.added'
+  | 'question.answered'
+  | 'issue.filed'
+  | 'issue.resolved'
+  | 'checklist.added'
+  | 'checklist.updated'
+  | 'checklist.removed'
+  | 'attachment.added'
+  | 'attachment.removed'
+  | 'lease.build_claimed'
+  | 'lease.build_refreshed'
+  | 'lease.build_released'
+  | 'lease.plan_claimed'
+  | 'lease.plan_released'
+  | 'lesson.staged'
+  | 'lesson.reviewed'
+  | 'metis.nudged'
+  | 'import.descent';
+
+/**
+ * One lesson: what a build learned, staged for a person's review before any later session reads it
+ * back.
+ *
+ * The lifecycle is one-way and its two ends have OPPOSITE actors: a build stages, a person reviews,
+ * and only an approved lesson reaches a session again. `status` is Descent's own word — today
+ * `staged`, `approved` or `rejected` — a plain string, because that vocabulary grew a value twice.
+ * `draftPath` is set ONLY for a `kind='skill_draft'` lesson, whose body also landed as a `SKILL.md`
+ * file to promote, and `cardId` is nullable because a lesson outlives the card it was learned on.
+ */
+export type KanbanLesson = {
+  id: string;
+  cardId: string | null;
+  name: string;
+  summary: string;
+  body: string;
+  trigger: string;
+  kind: 'note' | 'skill_draft';
+  tags: string[];
+  status: string;
+  source: string;
+  draftPath: string | null;
+  createdAt: string;
+  reviewedAt: string | null;
+};
+
+/**
+ * One lesson as the index read returns it: enough to decide whether it is relevant — name,
+ * one-line summary, trigger, tags, status — and never the body. `body` and `draftPath` arrive from
+ * the by-id read for the one lesson the operator opens.
+ */
+export type KanbanLessonLean = {
+  id: string;
+  cardId: string | null;
+  name: string;
+  summary: string;
+  trigger: string;
+  kind: 'note' | 'skill_draft';
+  tags: string[];
+  status: string;
+  source: string;
+  createdAt: string;
+  reviewedAt: string | null;
+};
+
+/**
+ * What one Metis session has spent, as the reader last counted it.
+ *
+ * One row per session, upserted as the session's transcript grows: the four counters are TOTALS,
+ * never a delta, and `byteOffset` is how far into the transcript this reading consumed — the next
+ * tick resumes there rather than re-counting a file that only ever gets longer.
+ */
+export type KanbanSessionUsage = {
+  sessionId: string;
+  boardId: string | null;
+  cardId: string | null;
+  tokensIn: number;
+  tokensOut: number;
+  cacheRead: number;
+  cacheCreate: number;
+  byteOffset: number;
+  updatedAt: string;
+};
+
+/**
+ * The board header's six counts, fetched in one request.
+ *
+ * FOUR are scoped to the board in the URL: `building`, `awaitingAnswer`, `awaitingApprove` and
+ * `claimable`. TWO are estate-wide and carry the word in their own names —
+ * `lessonsPendingEstate`, `memoryPendingEstate` — because the rows behind them belong to no board
+ * at all. The suffix is the contract: it is what stops a reader mistaking one for a board's number.
+ * Zero is a count; an unknown reading is not — the strip draws it as an em-dash, never as 0.
+ */
+export type KanbanVitals = {
+  building: number;
+  awaitingAnswer: number;
+  awaitingApprove: number;
+  lessonsPendingEstate: number;
+  memoryPendingEstate: number;
+  claimable: number;
+};
+
+/**
  * The websocket frame one board write produces, mirrored field-for-field from
  * `server/shared/types.ts` where it is declared beside its websocket siblings.
  *
@@ -264,10 +391,14 @@ export type KanbanImportResult = {
  * `boardId` matching the open board — the server does no per-user or per-project filtering, so a
  * frame for another board arrives here too. `card` is the affected card FRESH after the write, or
  * null for a board-level write; `lanes` is the board's per-status totals after the write.
+ *
+ * `boardId` is null for a write made against the ESTATE rather than a board — a lesson staged with
+ * no card behind it — and `lanes` is `[]` there. The subscription's own `typeof frame.boardId !==
+ * 'string'` test drops such a frame, which is the truth: it is about no board this panel has open.
  */
 export type KanbanBoardEvent = {
   kind: 'kanban_event';
-  boardId: string;
+  boardId: string | null;
   event: { id: number; ts: string; kind: string; cardId: string | null; actor: string };
   card: KanbanCardSummary | null;
   lanes: KanbanLaneCount[];

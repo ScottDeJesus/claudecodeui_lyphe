@@ -1,5 +1,7 @@
-import { PrismLight } from 'react-syntax-highlighter';
-
+// Type-only, and erased from the build: it loads the package's ambient declarations for the deep
+// `dist/esm/...` paths below, without pulling in the package entry and its ~290 grammars.
+import type {} from 'react-syntax-highlighter';
+import PrismLight from 'react-syntax-highlighter/dist/esm/prism-light';
 import bash from 'react-syntax-highlighter/dist/esm/languages/prism/bash';
 import batch from 'react-syntax-highlighter/dist/esm/languages/prism/batch';
 import c from 'react-syntax-highlighter/dist/esm/languages/prism/c';

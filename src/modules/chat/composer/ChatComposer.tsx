@@ -13,11 +13,8 @@ import type {
 import { PaperclipIcon, PencilRulerIcon, XIcon, Loader2, ArrowUpIcon, PencilIcon } from 'lucide-react';
 
 import { useDeviceSettings } from '@/shared/hooks/useDeviceSettings';
-import { Chip } from '@/shared/ui';
-import { useVoiceInput } from '@/modules/chat/hooks/useVoiceInput';
-import { useVoiceAvailable } from '@/modules/chat/hooks/useVoiceAvailable';
-import type { QueuedDraft, ScheduledMessage, SlashCommand,SessionActivity,PendingPermissionRequest,PermissionMode,ProviderModelOption } from '@/shared/types';
 import {
+  Chip,
   PromptInput,
   PromptInputHeader,
   PromptInputBody,
@@ -26,7 +23,10 @@ import {
   PromptInputTools,
   PromptInputButton,
   PromptInputSubmit,
-} from '@/modules/chat/composer/PromptInput';
+} from '@/shared/ui';
+import { useVoiceInput } from '@/modules/chat/hooks/useVoiceInput';
+import { useVoiceAvailable } from '@/modules/chat/hooks/useVoiceAvailable';
+import type { QueuedDraft, ScheduledMessage, SlashCommand,SessionActivity,PendingPermissionRequest,PermissionMode,ProviderModelOption } from '@/shared/types';
 import CommandMenu from '@/modules/chat/composer/CommandMenu';
 import ActivityIndicator from '@/modules/chat/composer/ActivityIndicator';
 import ComposerAttachment from '@/modules/chat/composer/ComposerAttachment';
@@ -39,6 +39,7 @@ import { ScheduledMessageList } from '@/modules/chat/composer/ScheduledMessageLi
 import ComposerDeepSeekSwitch from '@/modules/chat/composer/ComposerDeepSeekSwitch';
 import ComposerModelMenu from '@/modules/chat/composer/ComposerModelMenu';
 import ComposerPermissionMenu from '@/modules/chat/composer/ComposerPermissionMenu';
+import ChatExportMenu, { type ChatExportSurface } from '@/modules/chat/transcript/ChatExportMenu';
 
 type MentionableFile = {
   name: string;
@@ -74,6 +75,12 @@ type ChatComposerProps = {
    * is never under it, and the activity tab still floats above it as it floats above the
    * transcript today. The composer knows nothing about agents; it only holds the seat.
    */
+  /**
+   * What an export needs, or `null` while there is nothing to export. Drawn here from `md` up —
+   * beside the model and the edit mode, where the conversation's own controls are — and by the
+   * workspace header below that width, which is the one surface a phone has room for.
+   */
+  exportSurface?: ChatExportSurface | null;
   pinnedAgents?: ReactNode;
   /** Every message goes out under `/plain` while this is on. */
   plainMode: boolean;
@@ -158,6 +165,7 @@ export default function ChatComposer({
   tokenBudget,
   onShowTokenUsage,
   onToggleCommandMenu,
+  exportSurface,
   pinnedAgents,
   plainMode,
   onTogglePlainMode,
@@ -602,6 +610,14 @@ export default function ChatComposer({
                 permissionModes={availablePermissionModes}
                 onSelectPermissionMode={onSelectPermissionMode}
               />
+            )}
+
+            {/* From `md` up only: below it the workspace header carries the same menu, and two of
+                them would offer one conversation twice. */}
+            {exportSurface && (
+              <div className="hidden md:block">
+                <ChatExportMenu {...exportSurface} />
+              </div>
             )}
 
             <PromptInputSubmit

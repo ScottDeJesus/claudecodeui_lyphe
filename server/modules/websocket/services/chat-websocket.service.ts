@@ -696,6 +696,11 @@ export function handleChatConnection(
         case 'chat.presence':
           handleChatPresence(ws, userId, data);
           return;
+        case 'chat.ping':
+          // The browser cannot see protocol-level pings, so it proves a socket alive with this
+          // frame before trusting it with a send (`WebSocketContext.tsx`).
+          sendJson(ws, { kind: 'pong', timestamp: new Date().toISOString() });
+          return;
         default:
           sendProtocolError(ws, 'UNKNOWN_MESSAGE_TYPE', `Unknown message type "${messageType}".`);
           return;

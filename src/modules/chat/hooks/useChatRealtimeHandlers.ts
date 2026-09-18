@@ -5,6 +5,7 @@ import type { ServerEvent,MarkSessionIdle,MarkSessionProcessing,PendingPermissio
 import { showCompletionTitleIndicator } from '@/modules/chat/utils/pageTitleNotification';
 import { playChatCompletionSound, playNotificationSound } from '@/shared/utils';
 import type { SessionStore } from '@/modules/chat/hooks/useSessionStore';
+import { markPermissionSettled } from '@/modules/chat/tools/toolOutcome';
 
 const isActionablePermissionRequest = (request: { toolName?: unknown } | null | undefined): boolean => {
   return request?.toolName !== 'ExitPlanMode' && request?.toolName !== 'exit_plan_mode';
@@ -332,6 +333,10 @@ export function useChatRealtimeHandlers({
         // clears the prompt in other tabs watching the same run.
         case 'permission_resolved':
         case 'permission_cancelled': {
+          // A fact about the run, recorded whichever session is on screen: the card that sent
+          // the answer asks for it when a re-issued prompt arrives (`QuestionAnswerContent`).
+          // Cancelled counts as settled — the server is done with the id either way.
+          if (typeof msg.requestId === 'string') markPermissionSettled(msg.requestId);
           if (msg.requestId && sid === activeViewSessionId) {
             const nextPendingPermissionRequests = pendingPermissionRequestsRef.current.filter(
               (request: PendingPermissionRequest) => request.requestId !== msg.requestId,

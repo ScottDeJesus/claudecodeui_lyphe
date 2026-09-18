@@ -366,7 +366,7 @@
     },
     "open": "Abrir {{name}}",
     "collapse": "Contraer",
-    "dragHint": "Arrastra a otra posición",
+    "dragHint": "Arrastra a cualquier lado",
     "pin": {
       "label": "Esta sesión",
       "title": "Creado por el chat que tienes abierto"

@@ -1,4 +1,4 @@
-import type { DescentUsageWindow } from '@/shared/types';
+import type { ClaudeUsageWindow } from '@/shared/types';
 
 /** Amber from here up (D7). One number, written once, so no two readings of a window disagree about what "heavy" is. */
 export const HEAVY_PERCENT = 80;
@@ -6,12 +6,12 @@ export const HEAVY_PERCENT = 80;
 /**
  * The reading, rounded ONCE.
  *
- * Descent emits one decimal place (`usage_windows.py:81,123` — `round(float(pct), 1)`), so a
+ * The meter emits one decimal place (`server/modules/accounts/usage-windows.ts`, `round1`), so a
  * raw 79.6 used to print "80% used" over a calm green bar: the label rounded and the threshold
  * did not. Everything downstream — the figure, the tone, the bar, `aria-valuenow` — reads this
  * one integer, so the number the reader sees is the number the threshold judged.
  */
-export function windowPercent(usageWindow: DescentUsageWindow): number | null {
+export function windowPercent(usageWindow: ClaudeUsageWindow): number | null {
   return usageWindow.percent === null ? null : Math.round(usageWindow.percent);
 }
 
@@ -20,7 +20,7 @@ export function windowPercent(usageWindow: DescentUsageWindow): number | null {
  * window, so its presence alone forces amber: a flagged window can read a comfortable 12 %
  * and still mean an account lock.
  */
-export function windowTone(usageWindow: DescentUsageWindow, percent: number | null): 'accent' | 'warn' {
+export function windowTone(usageWindow: ClaudeUsageWindow, percent: number | null): 'accent' | 'warn' {
   if (usageWindow.severity) return 'warn';
   return percent !== null && percent >= HEAVY_PERCENT ? 'warn' : 'accent';
 }
@@ -36,7 +36,7 @@ export function windowTone(usageWindow: DescentUsageWindow, percent: number | nu
  * Floors throughout, so a label never claims more time than there is: 23h50m reads "23h", not
  * "1d", and 59m50s reads "59m" rather than the "60m" a ceiling would print. The one exception
  * is the last minute, which reads "1m" rather than "0m" until it is actually spent. `null` when
- * Descent reports no reset time — the caller keeps its static label rather than drawing a blank.
+ * the meter reports no reset time — the caller keeps its static label rather than drawing a blank.
  */
 export function formatWindowCountdown(resetsAt: string | null, now: number = Date.now()): string | null {
   if (!resetsAt) return null;

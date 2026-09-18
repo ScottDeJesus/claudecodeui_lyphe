@@ -34,14 +34,21 @@ const PROVIDER_LABELS: Record<string, string> = {
   system: 'System',
 };
 
-/** The SDK's `rateLimitType` values, as a person says them. */
+/**
+ * The SDK's `rateLimitType` values, as a person says them. The Fable weekly window arrives as
+ * `seven_day_overage_included` — the CLI's own label table names it "Fable limit".
+ */
 const WINDOW_LABELS: Record<string, string> = {
   five_hour: '5-hour',
-  seven_day: '7-day',
-  seven_day_opus: '7-day Opus',
-  seven_day_sonnet: '7-day Sonnet',
-  overage: 'overage',
+  seven_day: 'Weekly',
+  seven_day_opus: 'Weekly Opus',
+  seven_day_sonnet: 'Weekly Sonnet',
+  seven_day_overage_included: 'Fable',
+  overage: 'Overage',
 };
+
+/** Codes about the account's usage windows: their title names the window, never a session. */
+const ACCOUNT_LIMIT_CODES = new Set(['limit.reached', 'limit.reset', 'limit.warning', 'limit.overage', 'limit.out_of_credits']);
 
 /** Tools whose approval body is the path they touch. */
 const FILE_PATH_TOOLS = new Set(['Edit', 'Write', 'Read', 'MultiEdit', 'NotebookEdit']);
@@ -83,15 +90,25 @@ function providerLabel(provider: unknown): string {
 }
 
 function windowLabel(meta: Record<string, unknown>): string {
-  return lookup(WINDOW_LABELS, meta.rateLimitType) ?? 'usage';
+  return lookup(WINDOW_LABELS, meta.rateLimitType) ?? 'Usage';
 }
 
-/** `resetsAt` arrives as the SDK's epoch number: seconds below 1e12, milliseconds above. */
-function resetsAtText(resetsAt: unknown): string {
+/** Windows a week long: their reset is days out, so a bare time does not say which day. */
+const WEEK_WINDOWS = new Set(['seven_day', 'seven_day_opus', 'seven_day_sonnet', 'seven_day_overage_included']);
+
+/**
+ * `resetsAt` arrives as the SDK's epoch number: seconds below 1e12, milliseconds above. A weekly
+ * window — or any reset that is not today — names its day (`Thu 12:00 AM`); the 5-hour window's
+ * reset is hours out and reads as the time alone.
+ */
+function resetsAtText(resetsAt: unknown, rateLimitType: unknown): string {
   const epoch = readNumber(resetsAt);
   if (epoch === null || epoch <= 0) return 'soon';
   const date = new Date(epoch < 1e12 ? epoch * 1000 : epoch);
-  return date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+  const time = date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+  const today = date.toDateString() === new Date().toDateString();
+  const weekly = typeof rateLimitType === 'string' && WEEK_WINDOWS.has(rateLimitType);
+  return weekly || !today ? `${date.toLocaleDateString('en-US', { weekday: 'short' })} ${time}` : time;
 }
 
 /** `45s`, `3m 12s`, `1h 5m` — the precision a person reads at a glance. */
@@ -238,24 +255,23 @@ const COPY_BY_CODE = new Map<string, CodeCopy>([
     return { headline: 'Login needed', body: `Claude needs you to sign in again${detail ? `: ${detail}` : ''}` };
   }],
   ['limit.reached', ({ meta }) => ({
-    headline: 'Rate limit reached',
-    body: `${windowLabel(meta)} limit hit — resets ${resetsAtText(meta.resetsAt)}`,
+    headline: `${windowLabel(meta)} limit reached`,
+    body: `Resets ${resetsAtText(meta.resetsAt, meta.rateLimitType)}`,
   })],
   ['limit.reset', ({ meta }) => ({
-    headline: 'Limit reset',
-    body: `${windowLabel(meta)} window reset — you can resume`,
+    headline: `${windowLabel(meta)} limit reset`,
+    body: 'You can resume',
   })],
   ['limit.warning', ({ meta }) => {
     const pct = readNumber(meta.pct);
-    const usage = pct === null ? 'nearly used' : `at ${pct}%`;
     return {
-      headline: pct === null ? 'Usage warning' : `Usage at ${pct}%`,
-      body: `${windowLabel(meta)} window ${usage} — resets ${resetsAtText(meta.resetsAt)}`,
+      headline: `${windowLabel(meta)} limit ${pct === null ? 'nearly used' : `at ${pct}%`}`,
+      body: `Resets ${resetsAtText(meta.resetsAt, meta.rateLimitType)}`,
     };
   }],
   ['limit.overage', ({ meta }) => ({
     headline: 'Overage started',
-    body: `You are now using overage on the ${windowLabel(meta)} window`,
+    body: 'You are now using overage',
   })],
   ['limit.out_of_credits', () => ({ headline: 'Out of credits', body: 'Overage is disabled: out of credits' })],
   ['runner.finished', ({ meta }) => {
@@ -295,14 +311,15 @@ const COPY_BY_CODE = new Map<string, CodeCopy>([
  * Consumed by the notification orchestrator's `buildNotificationPayload` (web
  * push, desktop and ntfy all send its output) and exported from the module
  * barrel for any caller that must show an event's wording. The title is the
- * code's headline followed by ` · <session name>` when one is known; an
+ * code's headline followed by ` · <session name>` when one is known — except
+ * an account-limit code, whose headline names the window instead; an
  * unknown code renders the generic CloudCLI copy rather than nothing.
  */
 export function buildNotificationText(event: NotificationEventLike): NotificationText {
   const meta = isRecord(event.meta) ? event.meta : {};
   const copy = typeof event.code === 'string' ? COPY_BY_CODE.get(event.code) : undefined;
   const { headline, body } = copy ? copy({ meta, providerLabel: providerLabel(event.provider) }) : FALLBACK_COPY;
-  const sessionName = event.sessionName ?? readText(meta.sessionName);
+  const sessionName = ACCOUNT_LIMIT_CODES.has(event.code ?? '') ? null : event.sessionName ?? readText(meta.sessionName);
 
   return {
     title: `${headline}${sessionName ? ` · ${sessionName}` : ''}`,

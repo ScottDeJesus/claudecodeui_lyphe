@@ -2,6 +2,7 @@ import express from 'express';
 import type { NextFunction, Request, RequestHandler, Response, Router } from 'express';
 
 import type { KanbanBoardsService } from '../kanban-boards.service.js';
+import { vitalsCounts } from '../kanban-vitals.service.js';
 
 /**
  * What one audit-log read may ask for.
@@ -12,8 +13,22 @@ import type { KanbanBoardsService } from '../kanban-boards.service.js';
 const EVENT_LIMIT_DEFAULT = 50;
 const EVENT_LIMIT_MAX = 200;
 
+/**
+ * How many memory candidates are waiting on a person, counted across the whole install.
+ *
+ * It is a READER handed in rather than a value, because the board module does not import the
+ * memory-intake lane: the composition root reads it from that lane's barrel and passes the
+ * function down (`server/index.ts`), which is what keeps a scratch root reachable from a board
+ * route without the board knowing who fills the number. It is the ESTATE's count and the register
+ * it lands in says so.
+ */
+export type KanbanMemoryPendingReader = () => number;
+
 /** The dependencies this route package needs. `kanban.routes.ts` hands them over. */
-export type BoardRouteDependencies = { boards: KanbanBoardsService };
+export type BoardRouteDependencies = {
+  boards: KanbanBoardsService;
+  memoryPending: KanbanMemoryPendingReader;
+};
 
 /**
  * One handler, with its failure path attached once.
@@ -60,7 +75,8 @@ function parseEventLimit(value: unknown): number {
 
 /**
  * The board routes: the board list, its create, update and select, its per-status counts, its
- * claimable count, the lookup that resolves a project to its board, and the board's audit log.
+ * claimable count, the six registers of its vitals strip, the lookup that resolves a project to
+ * its board, and the board's audit log.
  *
  * Auth is the mount's (`authenticateToken` in `server/index.ts`): no file here imports the guard,
  * and no route reads an actor off the request — the write verbs take the optional trailing context
@@ -71,7 +87,7 @@ function parseEventLimit(value: unknown): number {
  */
 export function createBoardRoutes(dependencies: BoardRouteDependencies): Router {
   const router = express.Router();
-  const { boards } = dependencies;
+  const { boards, memoryPending } = dependencies;
 
   router.get(
     '/boards',
@@ -107,6 +123,7 @@ export function createBoardRoutes(dependencies: BoardRouteDependencies): Router 
         name?: string;
         autonomy?: boolean;
         deepseekFlash?: boolean;
+        concurrency?: number;
         projectId?: string | null;
         archived?: boolean;
       } = {};
@@ -133,6 +150,17 @@ export function createBoardRoutes(dependencies: BoardRouteDependencies): Router 
           return;
         }
         patch.deepseekFlash = body.deepseekFlash;
+      }
+      if (body.concurrency !== undefined) {
+        // A NUMBER and nothing else — the clamp is the service's (`[0, KANBAN_CONCURRENCY_MAX]`), so
+        // a `99` arrives as the ceiling rather than as a 400: the caller asked for "as many as you
+        // will give me", and the board's answer to that is the top of its range. A string is refused
+        // here, because `"3"` coerced would be a dial the server guessed at.
+        if (typeof body.concurrency !== 'number' || !Number.isFinite(body.concurrency)) {
+          response.status(400).json({ error: 'concurrency must be a number' });
+          return;
+        }
+        patch.concurrency = body.concurrency;
       }
       if (body.projectId !== undefined) {
         if (typeof body.projectId !== 'string' && body.projectId !== null) {
@@ -173,6 +201,18 @@ export function createBoardRoutes(dependencies: BoardRouteDependencies): Router 
       // A count, never the cards: the driver needs the green light, and the child re-reads the
       // lane itself through the board's own verbs once it wakes.
       response.json({ claimable: boards.claimableCount(request.params.boardId) });
+    })
+  );
+
+  router.get(
+    '/boards/:boardId/vitals',
+    handle<{ boardId: string }>((request, response) => {
+      // Six counts, never the rows behind them: the header draws six numbers, and the lists they
+      // summarise are a click away. `memoryPending()` is read here — at the request — rather than
+      // captured, so the register is as fresh as the statement that answers the other five.
+      response.json({
+        vitals: vitalsCounts(request.params.boardId, { memoryPending: memoryPending() }),
+      });
     })
   );
 

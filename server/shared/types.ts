@@ -213,6 +213,7 @@ export type GatewayEventKind =
   | 'kanban_event'
   | 'universe_activity'
   | 'universe_map'
+  | 'pong'
   | 'protocol_error';
 
 /**
@@ -271,12 +272,17 @@ export type SessionUpsertedEvent = {
  * `card` is null for a board-level write; `lanes` is the board's per-status totals after the
  * write, which the panel sums through its own lane policy. `at` is epoch MILLISECONDS.
  *
+ * `boardId` is null for the writes made against the ESTATE rather than a board — a lesson staged
+ * with no card behind it — and `lanes` is `[]` there, since a boardless write has no lanes to
+ * count. Every consumer tests the board id before it trusts the rest of the frame, so such a frame
+ * is inert where it does not apply and still a signal where it does.
+ *
  * Declared here rather than in `kanban-types.ts` because `GatewayEventKind` lives here, and a
  * frame belongs beside its siblings. Mirrored field-for-field in `src/shared/kanban-types.ts`.
  */
 export type KanbanBoardEvent = {
   kind: 'kanban_event';
-  boardId: string;
+  boardId: string | null;
   event: { id: number; ts: string; kind: string; cardId: string | null; actor: string };
   card: KanbanCardSummary | null;
   lanes: KanbanLaneCount[];
@@ -407,7 +413,9 @@ export type UniverseNode = {
   n: string;
   /** Parent node index, `-1` for a node that hangs off nothing: a repo, the sun, an endpoint. */
   p: number;
-  k: 'galaxy' | 'core' | 'dir' | 'endpoint' | 'source' | 'config' | 'docs' | 'data-sql' | 'assets' | 'other';
+  /** `system` is a directory the crawler's `systems.json` names as an integration folder — Drybook,
+   *  Xactimate, XactAnalysis — a body like `dir` in every way but the mark. */
+  k: 'galaxy' | 'core' | 'dir' | 'endpoint' | 'system' | 'source' | 'config' | 'docs' | 'data-sql' | 'assets' | 'other';
   /** Lines of the file; `0` for a directory or an endpoint, which have no length. */
   l: number;
   /** Epoch SECONDS of the newest commit touching it, from the same `git log` the map was built on. */
@@ -1840,34 +1848,43 @@ export type SandboxCommandService = {
 };
 
 // ---------------------------
-//----------------- DESCENT CONTRACTS ------------
-// Descent answers in snake_case and this proxy only camelCases it — no caching here, Descent caches.
-// Unknown is never zero, and an unreachable Descent is a calm 200 `{reachable:false, reason}` on reads, never a 5xx.
-/** One Claude account slot Descent holds. `expiresAt` is epoch MILLISECONDS, `null` when unread — never 0, so an unknown expiry cannot render as "expired". */
-export type DescentSlot = { slug: string; label: string; expiresAt: number | null; isActive: boolean };
-/** Descent's account picture, or the calm reason it is unknown. `liveExpiresAt` is epoch MILLISECONDS like `DescentSlot.expiresAt` — NOT seconds like `DescentUsage.checkedAt`. `liveSessions` and `drift` are facts a row states, never gates on switching.
- *  `unreadable:true` is Descent's own account store failing to read: `slots` is `[]` and every label `null`. Say that in words — an empty switcher reads as "you have no accounts". */
-export type DescentAccounts =
-  | { reachable: true; active: string | null; activeLabel: string | null; slots: DescentSlot[]; liveLabel: string | null; liveExpiresAt: number | null; drift: boolean; liveSessions: number; unreadable: boolean }
+//----------------- CLAUDE ACCOUNT CONTRACTS ------------
+// The account switcher's own wire shapes, produced by `server/modules/accounts/` and mirrored
+// field-for-field in `src/shared/types.ts`. The envelope survives because the client is built on it:
+// a read never fails, and a picture nobody can compute is a calm 200 `{reachable:false, reason}`,
+// never a 5xx. Units differ and are not interchangeable — `expiresAt`/`liveExpiresAt` are epoch
+// MILLISECONDS, `checkedAt`/`staleSince` epoch SECONDS, `resetsAt` an ISO-8601 string.
+/** One Claude account slot the store holds. `expiresAt` is epoch MILLISECONDS, `null` when unread — never 0, so an unknown expiry cannot render as "expired". */
+export type ClaudeAccountSlot = { slug: string; label: string; expiresAt: number | null; isActive: boolean };
+/** The whole account picture, or the calm reason it is unknown. `liveExpiresAt` is epoch MILLISECONDS like `ClaudeAccountSlot.expiresAt` — NOT seconds like `ClaudeUsage.checkedAt`. `liveSessions` is how many Claude sessions this box can prove are running: a fact a row states, never a gate on switching.
+ *  `unreadable:true` is the account store answering with nothing — no captured slot AND no readable live login: `slots` is `[]` and every label `null`. Say that in words, because an empty switcher reads as "you have no accounts". */
+export type ClaudeAccounts =
+  | { reachable: true; active: string | null; activeLabel: string | null; slots: ClaudeAccountSlot[]; liveLabel: string | null; liveExpiresAt: number | null; drift: boolean; liveSessions: number; unreadable: boolean }
   | { reachable: false; reason: string };
-/** One usage window. A `null` `percent` is "no reading": draw an empty track, never 0 %. `rolled:true` is NOT that — the percent is a REAL but HISTORICAL figure whose window has since ended, so keep the bar at low opacity and label it "was"; draining it draws a full tank nobody measured (`~/.claude/descent/usage_windows.py:211-221`).
- *  `severity` is present ONLY when the vendor flagged the window non-benign; it may ESCALATE a meter's tone, never soften it — a flagged window can read a comfortable 12 % and still mean an account lock (`usage_windows.py:93-97`). */
-export type DescentUsageWindow = { key: string; label: string; percent: number | null; resetsAt: string | null; rolled?: boolean; severity?: string };
-/** Usage as Descent last measured it. `checkedAt` (epoch SECONDS) and `staleSince` are Descent's own stamps, passed through untouched.
- *  `reason` carries TWO vocabularies: with `reachable:false` it is this proxy's own `unreachable`|`timeout`|`bad-response`; with `reachable:true` it is Descent's — `''` healthy, `pending` (a poll in flight: reading, NOT broken), `shape`, `credentials`, `auth`, `network`, `throttled`, `upstream`. `windows:[]` with `pending` means "not yet"; `windows:[]` with `degraded:true` means "no numbers under this account". */
-export type DescentUsage =
-  | { reachable: true; windows: DescentUsageWindow[]; degraded: boolean; reason: string; staleSince: number | null; checkedAt: number }
+/** One usage window. A `null` `percent` is "no reading": draw an empty track, never 0 %. `rolled:true` is NOT that — the percent is a REAL but HISTORICAL figure whose window has since ended, so keep the bar at low opacity and label it "was"; draining it draws a full tank nobody measured (`server/modules/accounts/usage-windows.ts`, `markRolled`).
+ *  `severity` is present ONLY when the vendor flagged the window non-benign; it may ESCALATE a meter's tone, never soften it — a flagged window can read a comfortable 12 % and still mean an account lock (`usage-windows.ts`, `parseWindows`). */
+export type ClaudeUsageWindow = { key: string; label: string; percent: number | null; resetsAt: string | null; rolled?: boolean; severity?: string };
+/** Usage as the meter last measured it. `checkedAt` (epoch SECONDS) and `staleSince` are its own stamps, converted to seconds for the client and nowhere else.
+ *  `reason` carries TWO vocabularies: with `reachable:false` it is the route's own `unreachable`; with `reachable:true` it is the meter's — `''` healthy, `pending` (a poll in flight: reading, NOT broken), `shape`, `credentials`, `auth`, `network`, `throttled`, `upstream`. `windows:[]` with `pending` means "not yet"; `windows:[]` with `degraded:true` means "no numbers under this account". `staleSince` is non-null only while degraded, and says how old the figures on screen are. */
+export type ClaudeUsage =
+  | { reachable: true; windows: ClaudeUsageWindow[]; degraded: boolean; reason: string; staleSince: number | null; checkedAt: number }
   | { reachable: false; reason: string };
-/** One row of Descent's memory-intake list, camelCased from its snake_case (`asserted_path`, `created_at`, `reviewed_at`). LEAN: no `body`, no `rationale` — enough to decide, not to read (`store_memory.py:88-106`); the body arrives from the by-id read for the ONE card the operator expands.
- *  `refusal` is the cap guard's own plain-English text, recorded on the row when an approve was refused — it stays on a PENDING card and is cleared on the next approve, so a non-null `refusal` means "still waiting, and here is what to trim", never "gone". One LEAN shape serves BOTH list reads, so `status` is Descent's word for which one the row came back under (`pending` in the review queue, `approved` on the filed list); `assertedPath` is the file an approved card landed in, `null` while the card is still pending. `sessionId` is the APP session id of the chat that proposed the memory — Descent's unverified provenance column, resolved through `sessionsDb.resolveAppSessionId`, display only, and `null` when the staging never supplied one. */
+
+// ---------------------------
+//----------------- MEMORY INTAKE CONTRACTS ------------
+// The native memory lane's own wire shapes, produced by `server/modules/memory-intake/` and mirrored
+// field-for-field in `src/shared/types.ts`. Same envelope, same calm 200: the queue answers what it
+// can compute, and a candidate that is not there is an answer rather than an error.
+/** One row of the memory-intake list. LEAN: no `body`, no `rationale` — enough to decide, not to read (`server/modules/memory-intake/memory.service.ts`); the body arrives from the by-id read for the ONE card the operator expands.
+ *  `refusal` is the cap guard's own plain-English text, recorded on the row when an approve was refused — it stays on a PENDING card and is cleared on the next approve, so a non-null `refusal` means "still waiting, and here is what to trim", never "gone". One LEAN shape serves BOTH list reads, so `status` is the row's own word for which one it came back under (`pending` in the review queue, `approved` on the filed list); `assertedPath` is the file an approved card landed in, `null` while the card is still pending. `sessionId` is the APP session id of the chat that proposed the memory — the staging's unverified provenance column, resolved through `sessionsDb.resolveAppSessionId`, display only, and `null` when the staging never supplied one. */
 export type MemoryCandidateLean = { id: string; name: string; target: string; project: string | null; status: string; source: string | null; assertedPath: string | null; refusal: string | null; createdAt: string | null; reviewedAt: string | null; sessionId: string | null };
 /** One candidate read whole. `body` is the memory's proposed text and is REQUIRED — a full read without one is not a reading, so it fails the read rather than arriving empty. `indexLine` and `rationale` are `null` when the staging never supplied them. Operator-authored free text throughout: it reaches the DOM as a text node, never as markup. */
 export type MemoryCandidateFull = MemoryCandidateLean & { body: string; indexLine: string | null; rationale: string | null };
-/** One memory list — the review queue, or the filed memories when the read asked for them — or the calm reason it is unknown; a read never fails. `reason` is one of this proxy's three words (`unreachable`|`timeout`|`bad-response`) and never Descent's text. `candidates` is whole or absent: one row missing `id`, `name` or `target` fails the WHOLE read as `bad-response`, because a silently shortened queue reads as "nothing to review". Descent caps the list at 100 rows. */
+/** One memory list — the review queue, or the filed memories when the read asked for them — or the calm reason it is unknown; a read never fails. `reason` is the lane's own word (`unreachable`) and never exception text. `candidates` is whole or absent: one row missing `id`, `name` or `target` fails the WHOLE read as `bad-response`, because a silently shortened queue reads as "nothing to review". The list is capped at 100 rows. */
 export type MemoryPending =
   | { reachable: true; candidates: MemoryCandidateLean[] }
   | { reachable: false; reason: string };
-/** One candidate read by id, or the calm reason it is unknown. `candidate: null` is Descent answering `ok:false`, which means ONE thing: no row carries that id. A card ALREADY REVIEWED still reads whole, `status` reading `approved` or `rejected` — Descent's by-id read has no status filter (`store_memory.py:343-349`, measured 2026-09-08 on `mc-26`), so a reviewed card is a candidate the queue no longer lists, never a null. The null is an ANSWER, not an error: the route stays 200 and the client draws "no longer there". `reason` is again only this proxy's three words. */
+/** One candidate read by id, or the calm reason it is unknown. `candidate: null` means ONE thing: no row carries that id. A card ALREADY REVIEWED still reads whole, `status` reading `approved` or `rejected` — the by-id read has no status filter, so a reviewed card is a candidate the queue no longer lists, never a null. The null is an ANSWER, not an error: the route stays 200 and the client draws "no longer there". `reason` is again only the lane's own word. */
 export type MemoryCandidateRead =
   | { reachable: true; candidate: MemoryCandidateFull | null }
   | { reachable: false; reason: string };
@@ -1885,14 +1902,14 @@ export type CliVersionReport = { installed: string | null; reason: string | null
 // ---------------------------
 //----------------- DEEPSEEK CONTRACTS ------------
 // The DeepSeek account this host spends on — the one Heph and Athena's builds ride. Read straight
-// from the vendor with the key this host holds, never from Descent, which knows nothing about it.
+// from the vendor with the key this host holds.
 // Unknown is never zero and never an error wall: a key that is absent, refused, slow or answered
 // with the wrong shape all arrive as `{reachable:false, reason}`, and the route stays 200.
 /** One balance reading, or the calm reason there is none.
  *  `total` is the vendor's OWN decimal string (`"99.63"`), carried through unconverted: money is never put through a
  *  float on this side, and the client decides how to draw it. `available` is the vendor's `is_available` — whether the
  *  account can still serve requests; it is a FACT about a reading that came back, never a reason to refuse one.
- *  `checkedAt` is epoch MILLISECONDS (`Date.now()`) — NOT seconds like `DescentUsage.checkedAt`, since this stamp is
+ *  `checkedAt` is epoch MILLISECONDS (`Date.now()`) — NOT seconds like `ClaudeUsage.checkedAt`, since this stamp is
  *  ours rather than a vendor's.
  *  `reason` is one of five words: `unconfigured` (no key in the process env or in `.env`), `auth` (the vendor refused
  *  the key), `timeout`, `unreachable`, `bad-response` (a non-2xx status other than a refusal, a body that is not JSON,

@@ -1,7 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { Mic, Square, Loader2 } from 'lucide-react';
 
-import { PromptInputButton } from '@/modules/chat/composer/PromptInput';
+import { PromptInputButton } from '@/shared/ui';
 import type { VoiceInputState } from '@/shared/types';
 
 type Props = {

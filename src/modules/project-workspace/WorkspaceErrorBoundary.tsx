@@ -5,12 +5,15 @@ import {
 } from 'react-error-boundary';
 
 type ErrorFallbackProps = FallbackProps & {
+  message: string;
   showDetails: boolean;
   componentStack: string | null;
 };
 
 type WorkspaceErrorBoundaryProps = {
   children: ReactNode;
+  /** The sentence under the heading: what failed to load. */
+  message?: string;
   showDetails?: boolean;
   onRetry?: () => void;
   resetKeys?: unknown[];
@@ -27,6 +30,7 @@ function formatError(error: unknown): string {
 function ErrorFallback({
   error,
   resetErrorBoundary,
+  message,
   showDetails,
   componentStack,
 }: ErrorFallbackProps) {
@@ -46,7 +50,7 @@ function ErrorFallback({
           <h3 className="ml-3 text-sm font-medium text-red-800">Something went wrong</h3>
         </div>
         <div className="text-sm text-red-700">
-          <p className="mb-2">An error occurred while loading the chat interface.</p>
+          <p className="mb-2">{message}</p>
           {showDetails && (
             <details className="mt-4">
               <summary className="cursor-pointer font-mono text-xs">Error Details</summary>
@@ -70,9 +74,10 @@ function ErrorFallback({
   );
 }
 
-/** Wraps the chat view in WorkspaceMain so a render error there cannot take down the whole workspace. */
+/** Wraps a region of WorkspaceMain (the chat, the tab panels, a chat-gutter widget) so a render error there cannot take down the whole workspace. */
 function WorkspaceErrorBoundary({
   children,
+  message = 'An error occurred while loading the chat interface.',
   showDetails = false,
   onRetry = undefined,
   resetKeys = undefined,
@@ -95,11 +100,12 @@ function WorkspaceErrorBoundary({
       <ErrorFallback
         error={error}
         resetErrorBoundary={resetErrorBoundary}
+        message={message}
         showDetails={showDetails}
         componentStack={componentStack}
       />
     ),
-    [showDetails, componentStack]
+    [message, showDetails, componentStack]
   );
 
   return (

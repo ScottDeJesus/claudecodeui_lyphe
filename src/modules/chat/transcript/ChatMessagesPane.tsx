@@ -23,7 +23,7 @@ import ProviderSelectionEmptyState from '@/modules/chat/transcript/ProviderSelec
 import ToolGroupContainer from '@/modules/chat/transcript/ToolGroupContainer';
 import TypingIndicator from '@/modules/chat/transcript/TypingIndicator';
 import LoadAllMessagesOverlay from '@/modules/chat/transcript/LoadAllMessagesOverlay';
-import ChatExportMenu, { type ChatExportSurface } from '@/modules/chat/transcript/ChatExportMenu';
+import { type ChatExportSurface } from '@/modules/chat/transcript/ChatExportMenu';
 
 /**
  * How many of the newest rows mount with real content on the first commit,
@@ -247,9 +247,11 @@ function ChatMessagesPane({
     return keys;
   }, [groupedVisibleMessages]);
 
-  // Assembled once and used twice: the floating button below draws it from `md` up, and the
-  // mobile workspace header draws the same menu from the published copy. `null` while there is
-  // nothing to export, which is also what makes the button disappear at zero messages.
+  // Assembled here, where the messages are, and PUBLISHED for the two surfaces that draw it: the
+  // composer from `md` up, and the workspace header below that. It used to float over the top-right
+  // of the transcript, where it sat above the reading column and away from every other control.
+  // `null` while there is nothing to export, which is what makes the button disappear at zero
+  // messages.
   const exportSurface = useMemo<ChatExportSurface | null>(
     () => (chatMessages.length === 0 ? null : {
       messages: chatMessages,
@@ -291,15 +293,6 @@ function ChatMessagesPane({
       // the transcript, and every message body inside it reads the variable off this ancestor.
       style={{ '--chat-font-size': `${chatFontSize}px` } as CSSProperties}
     >
-      {/* From `md` up only: below it the same menu rides the workspace header beside the token
-          count, and two of them would both float over the same transcript. */}
-      {exportSurface && (
-        <div className="pointer-events-none sticky right-4 top-3 z-10 mb-2 hidden justify-end sm:px-4 md:flex">
-          <div className="pointer-events-auto">
-            <ChatExportMenu {...exportSurface} />
-          </div>
-        </div>
-      )}
       {/* Laid out but invisible while the chat opens, so the settle loop measures real
           heights and pins the bottom before anything is seen; it then appears whole. */}
       <div

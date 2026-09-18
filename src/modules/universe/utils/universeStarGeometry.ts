@@ -25,11 +25,14 @@ import type { UniverseGraphNode } from '@/modules/universe/utils/universeGraph';
  * the live layer, which is the one place a flare's look now lives.
  */
 
-/** The glow an order of magnitude over a star's own radius, by what the node is. */
-const GLOW_MULT: Record<string, number> = { core: 8, galaxy: 5.5, dir: 4, endpoint: 4, docs: 2.4 };
+/** The glow an order of magnitude over a star's own radius, by what the node is. A repo glows like the
+ *  sun: at the fitted view of the merged map (zoom 0.03) its 15.7-unit disc glows 3.8 px at 8 and
+ *  2.6 px at the export's 5.5, a hair over the 2.5 px gate — a repo that is not drawn at the view that
+ *  exists to show the repos. */
+const GLOW_MULT: Record<string, number> = { core: 8, galaxy: 8, dir: 4, endpoint: 5, system: 5, docs: 2.4 };
 const GLOW_MULT_DEFAULT = 3.2;
 /** What the glow is drawn at, before the focus and depth factors narrow it. */
-const GLOW_ALPHA: Record<string, number> = { core: 0.7, galaxy: 0.55, dir: 0.35 };
+const GLOW_ALPHA: Record<string, number> = { core: 0.7, galaxy: 0.55, dir: 0.35, endpoint: 0.5, system: 0.5 };
 const GLOW_ALPHA_DEFAULT = 0.4;
 /** The bokeh an out-of-focus star spreads into, at its deepest — and how blurred it must be first. */
 const BOKEH_ALPHA = 0.6;

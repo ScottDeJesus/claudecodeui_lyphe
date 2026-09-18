@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { oneDark, oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism';
+import oneDark from 'react-syntax-highlighter/dist/esm/styles/prism/one-dark';
+import oneLight from 'react-syntax-highlighter/dist/esm/styles/prism/one-light';
 
 import { copyTextToClipboard } from '@/shared/utils';
 import { SyntaxHighlighter } from '@/shared/syntaxHighlighter';

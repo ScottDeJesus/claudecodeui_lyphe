@@ -1,4 +1,5 @@
 import { isFileKind } from '@/modules/universe/utils/universeBirth';
+import { hiddenKind } from '@/modules/universe/utils/universeTweaks';
 import { bandedBrightness, colorForNode } from '@/modules/universe/utils/universeTokens';
 import type { Frame } from '@/modules/universe/utils/universeGraphPasses';
 import type { UniverseGraph, UniverseGraphNode } from '@/modules/universe/utils/universeGraph';
@@ -81,7 +82,7 @@ function bakeTile(
   ctx.globalCompositeOperation = 'lighter';
   ctx.globalAlpha = DOT_ALPHA;
   for (const kid of kids) {
-    if (!isFileKind(kid.kind)) continue;
+    if (!isFileKind(kid.kind) || hiddenKind(kid.kind, tweaks)) continue;
     const x = Math.min(last, Math.max(0, Math.floor(centre + (kid.px - node.px) * ppu)));
     const y = Math.min(last, Math.max(0, Math.floor(centre + (kid.py - node.py) * ppu)));
     // The SAME light the star layer would have drawn here, through the same call: `bandedBrightness`
@@ -109,7 +110,9 @@ export function buildClouds(
   const clouds = new Map<number, Cloud>();
   for (const node of graph.bodies) {
     const kids = graph.children[node.id];
-    if (kids === undefined) continue;
+    // A folder whose every file is hidden has no dust to bake: `fr` is the tree's and says it has
+    // children, but a tile with no pixels is a canvas allocated and blitted for nothing.
+    if (kids === undefined || !kids.some((kid) => isFileKind(kid.kind) && !hiddenKind(kid.kind, tweaks))) continue;
     const tile = bakeTile(node, kids, tokens, tweaks, now);
     if (tile === null) continue;
     clouds.set(node.id, { node, tile, radius: node.fr * CLOUD_REACH });

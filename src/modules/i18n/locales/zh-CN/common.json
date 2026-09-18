@@ -364,7 +364,7 @@
     },
     "open": "打开 {{name}}",
     "collapse": "折叠",
-    "dragHint": "拖到其他槽位",
+    "dragHint": "拖到任意一侧",
     "pin": {
       "label": "本次会话",
       "title": "由你打开的会话创建"

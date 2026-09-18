@@ -135,7 +135,9 @@ export function viewportBounds(
   };
 }
 
-export const MIN_ZOOM = 0.06;
+/** The floor is what fits the whole sky on a laptop: the rooms `universeBirth` measures put the outermost
+ *  ring some nine thousand world units out on the merged map, and a 900-pixel canvas frames that at 0.04. */
+export const MIN_ZOOM = 0.01;
 export const MAX_ZOOM = 5;
 /** Below this the chrome takes a third of the height, and the fit has to allow for it. */
 export const NARROW_WIDTH = 720;
@@ -163,13 +165,16 @@ export function screenToWorld(
 }
 
 /**
- * The zoom that fits the whole galaxy between the header and the bottom bar, whatever the screen.
- * `scale` and `radius` are the layout's own (`graph.scale`, `graph.radius`); the caller hands them
- * in per frame and adopts the answer through `refit`, so a resized window re-fits itself.
+ * The zoom that fits the whole sky between the header and the bottom bar, whatever the screen.
+ * `radius` is the layout's own (`graph.radius`, the outermost ring and its margin); the caller hands it
+ * in per frame and adopts the answer through `refit`, so a resized window re-fits itself. The export
+ * capped this at `0.85 / scale` besides, which was the same number by another route while the radius
+ * was `290 * scale`; with the sky's radius measured from its rooms the cap framed the sun's own
+ * neighbourhood and nothing beyond it, so the radius is the whole answer.
  */
-export function fitZoom(w: number, h: number, scale: number, radius: number): number {
+export function fitZoom(w: number, h: number, radius: number): number {
   const availableW = w - 32;
   const availableH = h - (w < NARROW_WIDTH ? 270 : 170);
   const fit = Math.min(availableW, availableH) / (2 * ((radius || 290) + 190));
-  return Math.max(MIN_ZOOM, Math.min(0.85 / (scale || 1), fit));
+  return Math.max(MIN_ZOOM, fit);
 }

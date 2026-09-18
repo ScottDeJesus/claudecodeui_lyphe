@@ -23,7 +23,7 @@
     "conversationCount_other": "{{count}} conversations"
   },
   "app": {
-    "title": "LypheCLI",
+    "title": "Athena",
     "subtitle": "AI coding assistant interface"
   },
   "sessions": {

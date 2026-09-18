@@ -11,10 +11,11 @@ import {
 /**
  * The Descent importer's writes: the lookup that decides insert-or-refresh, the board and the
  * card, the card/tag join, and — spread in from `kanban-import-children.db.ts` — the six tables
- * that hang off a card. It is ONE object on purpose: the importer holds one handle on one rule.
+ * that hang off a card together with the lessons that hang off nothing. It is ONE object on
+ * purpose: the importer holds one handle on one rule.
  *
  * Every statement keys on `descent_id`, which is what makes a second run an UPDATE rather than a
- * second copy: the row already standing for a Descent row keeps the LypheCLI id it was minted, so
+ * second copy: the row already standing for a Descent row keeps the Athena id it was minted, so
  * every link that pointed at it still does. A row with no `descent_id` — every card created here —
  * is untouched by all of this: SQLite lets many NULLs stand under one UNIQUE constraint, and a
  * conflict on that column only ever fires for the rows that carry one.
@@ -43,11 +44,12 @@ export type KanbanImportTable =
   | 'kanban_decisions'
   | 'kanban_checklist_items'
   | 'kanban_attachments'
-  | 'kanban_events';
+  | 'kanban_events'
+  | 'kanban_lessons';
 
 export const kanbanImportDb = {
   /**
-   * The LypheCLI id already standing for a Descent row, or null when the row is new here.
+   * The Athena id already standing for a Descent row, or null when the row is new here.
    *
    * This is the answer that keeps a re-import from re-minting: the caller reuses the id it finds,
    * so a card's questions, tags and events keep pointing at the card they were imported beside.
@@ -152,6 +154,7 @@ export const kanbanImportDb = {
   },
 
   // The card's satellites — questions, issues, decisions, checklist items, attachments and the
-  // imported audit rows — are the sibling's, so this file stays the board and its cards.
+  // imported audit rows — and the estate's own lessons are the sibling's, so this file stays the
+  // board and its cards.
   ...kanbanImportChildrenDb,
 };

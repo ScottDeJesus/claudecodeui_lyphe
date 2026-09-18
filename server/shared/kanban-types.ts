@@ -62,6 +62,11 @@ export type KanbanBoard = {
    *  two boards on one host must be able to run different models, and a switch that is a file the
    *  whole box shares cannot say that. */
   deepseekFlash: boolean;
+  /** This board's own Metis dial: how many sessions it may run at once, clamped to
+   *  `[0, KANBAN_CONCURRENCY_MAX]` at every read and every write. Zero is a real value and means the
+   *  board spawns NOTHING. Read from the row at CALL time — by the driver's tick and by the
+   *  spawner's gate alike — so moving it moves the board without a restart. */
+  concurrency: number;
   sortOrder: number;
   archived: boolean;
   createdAt: string;
@@ -118,6 +123,43 @@ export const KANBAN_SORT_ORDER_GAP = 1000;
 export const KANBAN_SORT_ORDER_MIN_GAP = 1e-6;
 
 /**
+ * How many Metis sessions one board may run at once — the dial's ceiling, and its ONE home.
+ *
+ * `[0, 4]` is Descent's own range (`~/.claude/descent/pm_capacity.py:196-202`, `MAX_AUTONOMOUS_
+ * SESSIONS`), and the ceiling exists for the outcome rather than for the number: two children of one
+ * board share a cwd (`~/.claude/kanban-metis/<boardId>/`) and claim cards against each other, so a
+ * board runs in parallel only as far as its owner says. Zero is inside the range and means the dial
+ * is OFF — a board that is never spawned for.
+ *
+ * Consumers: `kanban-boards.db.ts` (the row mapper), `kanban-boards.service.ts` (a PATCH) and
+ * `metis-driver.service.ts` (the tick's comparison, and the reading the panel shows).
+ */
+export const KANBAN_CONCURRENCY_MAX = 4;
+
+/**
+ * What a board's dial reads as until something moves it — the column's own `DEFAULT 1`, quoted here
+ * so a caller that has to fall back falls back to what the database would have handed it.
+ *
+ * Consumers: {@link clampKanbanConcurrency}.
+ */
+export const KANBAN_CONCURRENCY_DEFAULT = 1;
+
+/**
+ * The ONE clamp on the dial, applied wherever a value enters — off a row, or in a patch about to be
+ * written.
+ *
+ * `NaN` falls back rather than propagating, and that is the whole reason this is a function instead
+ * of a `Math.min` at each site: every comparison the dial takes part in is `live < dial`, so a `NaN`
+ * makes each of them FALSE and puts a child on the board on every tick — a broken number turned into
+ * maximum fan-out. A fractional value is truncated for the same family of reasons: half a session is
+ * not a thing, and a caller that sent `2.5` meant a whole number.
+ */
+export function clampKanbanConcurrency(value: number): number {
+  if (!Number.isFinite(value)) return KANBAN_CONCURRENCY_DEFAULT;
+  return Math.min(Math.max(Math.trunc(value), 0), KANBAN_CONCURRENCY_MAX);
+}
+
+/**
  * The optional trailing argument every WRITE verb takes. An absent actor means `'operator'`.
  *
  * It exists so that adding a real identity later is a CALLER change rather than a schema change:
@@ -157,11 +199,15 @@ export type KanbanEventKind =
   | 'checklist.updated'
   | 'checklist.removed'
   | 'attachment.added'
+  | 'attachment.removed'
   | 'lease.build_claimed'
   | 'lease.build_refreshed'
   | 'lease.build_released'
   | 'lease.plan_claimed'
   | 'lease.plan_released'
+  | 'lesson.staged'
+  | 'lesson.reviewed'
+  | 'metis.nudged'
   | 'import.descent';
 
 /**
@@ -346,6 +392,11 @@ export type KanbanLeaseResult = { granted: boolean; card: KanbanCardSummary };
 /**
  * One side of an import's reckonable totals — the source or what this board now holds.
  *
+ * `lessons` and `memory` are an install's satellites rather than a board's spine: the lessons land
+ * in `kanban_lessons` like every other table here, while the candidates belong to the memory lane
+ * and are counted by its own verb. A source old enough to predate either holds zero of them, which
+ * is why neither appears on the importer's required-shape list.
+ *
  * Consumers: `kanban-import.service.ts` (it builds both sides), the import route,
  * and `src/shared/kanban-types.ts`.
  */
@@ -359,16 +410,42 @@ export type KanbanImportCounts = {
   checklist: number;
   attachments: number;
   events: number;
+  lessons: number;
+  memory: number;
   settings: number;
+};
+
+/**
+ * One attachment's bytes, as the copy that follows an import needs them.
+ *
+ * The paths are DERIVED and already contained: `sourcePath` is Descent's own layout under its
+ * install's attachment root, `targetPath` came out of `resolveUnderRoot` against this board's root.
+ * A pair travels rather than being re-derived at the moment of the copy because the translation it
+ * depends on — which card each source feature landed under — exists only inside the import's own
+ * transaction, and the copy runs after that transaction has committed.
+ */
+export type KanbanAttachmentCopy = {
+  cardId: string;
+  attachmentId: string;
+  sourcePath: string;
+  targetPath: string;
 };
 
 /**
  * What one Descent import did: the source's counts, this board's counts after it, how many rows
  * were new against how many were refreshed, and the id translation.
  *
- * `boardIdMap` maps a Descent board id to the LypheCLI id it landed under, which is what lets the
+ * `boardIdMap` maps a Descent board id to the Athena id it landed under, which is what lets the
  * operator recognise a board they know. `currentBoardId` is the imported `current_board` setting,
  * already translated, or null when the source named no board.
+ *
+ * `attachmentCopies` is an OBLIGATION, not a report: the attachment ROWS are committed and the files
+ * they point at are not, because the bytes are nine megabytes of I/O that must not run under the
+ * write seam's lock. The caller that answers the operator places them first —
+ * `placeAttachmentBytes()` in `kanban-import-satellites.ts`, one line, idempotent, never fatal —
+ * so the answer means "imported, bytes on disk" rather than "imported, maybe". A caller that drops
+ * them leaves rows whose files are not there, and this board's standing rule is that a row without
+ * its file reads as nothing.
  *
  * Consumers: `kanban-import.service.ts`, the import route, and `src/shared/kanban-types.ts`.
  */
@@ -379,4 +456,114 @@ export type KanbanImportResult = {
   updated: number;
   boardIdMap: Record<string, string>;
   currentBoardId: string | null;
+  attachmentCopies: KanbanAttachmentCopy[];
+};
+
+/**
+ * One lesson: what a build learned, staged for a person's review before any later session reads it
+ * back.
+ *
+ * The lifecycle is one-way and its two ends have OPPOSITE actors: a build (or the spill sweep)
+ * stages, a person reviews, and only an approved lesson reaches a session again. `status` is
+ * Descent's own word — today `staged`, `approved` or `rejected` — carried as a plain string and not
+ * a union, because that vocabulary grew a value twice. `draftPath` is set ONLY for a
+ * `kind='skill_draft'` lesson, whose body also landed as a `SKILL.md` file to promote. `cardId` is
+ * provenance and nullable on purpose: a lesson OUTLIVES the card it was learned on.
+ *
+ * Consumers: `kanban-learning.db.ts` (the row mapper), `kanban-lessons.service.ts` (stage, get and
+ * review), the lesson routes, and `src/shared/kanban-types.ts`.
+ */
+export type KanbanLesson = {
+  id: string;
+  cardId: string | null;
+  name: string;
+  summary: string;
+  body: string;
+  trigger: string;
+  kind: 'note' | 'skill_draft';
+  tags: string[];
+  status: string;
+  source: string;
+  draftPath: string | null;
+  createdAt: string;
+  reviewedAt: string | null;
+};
+
+/**
+ * One lesson as the index read returns it: enough to decide whether the lesson is relevant — name,
+ * one-line summary, trigger, tags, status — and never the body.
+ *
+ * The exclusion is the point: an index of fifty lessons carrying fifty bodies would ship the whole
+ * corpus so the panel could draw fifty titles. `body` and `draftPath` arrive from the by-id read for
+ * the one lesson the operator opens.
+ *
+ * Consumers: `kanban-learning.db.ts` (the lean projection), `kanban-lessons.service.ts` (`listLessons`
+ * and `approvedIndex`), the lesson list route, and `src/shared/kanban-types.ts`.
+ */
+export type KanbanLessonLean = {
+  id: string;
+  cardId: string | null;
+  name: string;
+  summary: string;
+  trigger: string;
+  kind: 'note' | 'skill_draft';
+  tags: string[];
+  status: string;
+  source: string;
+  createdAt: string;
+  reviewedAt: string | null;
+};
+
+/**
+ * What one Metis session has spent, as the reader last counted it.
+ *
+ * One row per session, upserted as the session's transcript grows: the four token counters are
+ * TOTALS for the session, never a delta, and `byteOffset` is how far into the transcript this
+ * reading consumed — which is what lets the next tick resume instead of re-counting a file that only
+ * ever gets longer. `boardId` and `cardId` are provenance and may be null: a session whose card has
+ * been deleted keeps its row.
+ *
+ * Consumers: `kanban-learning.db.ts` (the upsert and the by-session read),
+ * `metis-telemetry.service.ts` (the writer), the vitals and cost reads, and
+ * `src/shared/kanban-types.ts`.
+ */
+export type KanbanSessionUsage = {
+  sessionId: string;
+  boardId: string | null;
+  cardId: string | null;
+  tokensIn: number;
+  tokensOut: number;
+  cacheRead: number;
+  cacheCreate: number;
+  byteOffset: number;
+  updatedAt: string;
+};
+
+/**
+ * Six counts the board header shows as a strip of registers, read in one request rather than
+ * derived by the panel from six lists it would otherwise have to fetch whole.
+ *
+ * FOUR of them are BOARD-scoped, because they are counts of THIS board's cards: `building` (cards in
+ * the Building lane — `status = 'active'` — which is where a build lease puts them and where they
+ * stay until the builder moves them on, lease live or not), `awaitingAnswer` (cards with a question
+ * still unanswered),
+ * `awaitingApprove` (cards whose plan is written and waiting on an approve) and `claimable` (cards
+ * a Metis may claim right now). TWO are ESTATE-wide, because the rows behind them belong to no
+ * board at all: `lessonsPendingEstate` counts staged lessons and `memoryPendingEstate` counts
+ * pending memory candidates across the whole install.
+ *
+ * THE SUFFIX IS THE CONTRACT, not decoration: a count not scoped to the board in the URL carries
+ * the word `Estate` in its own name, so no caller can read one as a board-scoped number. Every value
+ * is a COUNT, never a list — the panel draws a badge, and the list is one click away.
+ *
+ * Consumers: `kanban-vitals.service.ts` (`vitalsCounts`), the vitals route's `{ vitals }` body, the
+ * panel's counts strip, and `src/shared/kanban-types.ts`.
+ */
+export type KanbanVitals = {
+  building: number;
+  awaitingAnswer: number;
+  awaitingApprove: number;
+  lessonsPendingEstate: number;
+  memoryPendingEstate: number;
+  claimable: number;
 };

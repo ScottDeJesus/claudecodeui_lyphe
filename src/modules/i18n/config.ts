@@ -3,7 +3,7 @@
  *
  * Configures i18next for internationalization support.
  * Features:
- * - Lazy-loading of translation namespaces
+ * - English bundled; every other language loaded on first use
  * - Language detection from localStorage
  * - Fallback to English for missing translations
  * - Development mode warnings for missing keys
@@ -12,7 +12,9 @@
 import i18n from 'i18next';
 import { initReactI18next } from 'react-i18next';
 
-// Import translation resources
+// English is bundled: it is the fallback every other language leans on, and the language most
+// sessions render in. Every other language loads on demand — a fresh page never fetches ten
+// languages it will not show.
 import enCommon from '@/modules/i18n/locales/en/common.json';
 import enSettings from '@/modules/i18n/locales/en/settings.json';
 import enAuth from '@/modules/i18n/locales/en/auth.json';
@@ -20,82 +22,6 @@ import enSidebar from '@/modules/i18n/locales/en/sidebar.json';
 import enChat from '@/modules/i18n/locales/en/chat.json';
 // oxlint-disable-next-line importx/order
 import enTasks from '@/modules/i18n/locales/en/tasks.json';
-
-import frCommon from '@/modules/i18n/locales/fr/common.json';
-import frSettings from '@/modules/i18n/locales/fr/settings.json';
-import frAuth from '@/modules/i18n/locales/fr/auth.json';
-import frSidebar from '@/modules/i18n/locales/fr/sidebar.json';
-import frChat from '@/modules/i18n/locales/fr/chat.json';
-// oxlint-disable-next-line importx/order
-import frTasks from '@/modules/i18n/locales/fr/tasks.json';
-
-import esCommon from '@/modules/i18n/locales/es/common.json';
-import esSettings from '@/modules/i18n/locales/es/settings.json';
-import esAuth from '@/modules/i18n/locales/es/auth.json';
-import esSidebar from '@/modules/i18n/locales/es/sidebar.json';
-import esChat from '@/modules/i18n/locales/es/chat.json';
-// oxlint-disable-next-line importx/order
-import esTasks from '@/modules/i18n/locales/es/tasks.json';
-
-import koCommon from '@/modules/i18n/locales/ko/common.json';
-import koSettings from '@/modules/i18n/locales/ko/settings.json';
-import koAuth from '@/modules/i18n/locales/ko/auth.json';
-import koSidebar from '@/modules/i18n/locales/ko/sidebar.json';
-import koChat from '@/modules/i18n/locales/ko/chat.json';
-// oxlint-disable-next-line importx/order
-import koTasks from '@/modules/i18n/locales/ko/tasks.json';
-
-import zhCommon from '@/modules/i18n/locales/zh-CN/common.json';
-import zhSettings from '@/modules/i18n/locales/zh-CN/settings.json';
-import zhAuth from '@/modules/i18n/locales/zh-CN/auth.json';
-import zhSidebar from '@/modules/i18n/locales/zh-CN/sidebar.json';
-import zhChat from '@/modules/i18n/locales/zh-CN/chat.json';
-import zhTasks from '@/modules/i18n/locales/zh-CN/tasks.json';
-import jaCommon from '@/modules/i18n/locales/ja/common.json';
-import jaSettings from '@/modules/i18n/locales/ja/settings.json';
-import jaAuth from '@/modules/i18n/locales/ja/auth.json';
-import jaSidebar from '@/modules/i18n/locales/ja/sidebar.json';
-import jaChat from '@/modules/i18n/locales/ja/chat.json';
-// oxlint-disable-next-line importx/order
-import jaTasks from '@/modules/i18n/locales/ja/tasks.json';
-
-import ruCommon from '@/modules/i18n/locales/ru/common.json';
-import ruSettings from '@/modules/i18n/locales/ru/settings.json';
-import ruAuth from '@/modules/i18n/locales/ru/auth.json';
-import ruSidebar from '@/modules/i18n/locales/ru/sidebar.json';
-import ruChat from '@/modules/i18n/locales/ru/chat.json';
-// oxlint-disable-next-line importx/order
-import ruTasks from '@/modules/i18n/locales/ru/tasks.json';
-
-import deCommon from '@/modules/i18n/locales/de/common.json';
-import deSettings from '@/modules/i18n/locales/de/settings.json';
-import deAuth from '@/modules/i18n/locales/de/auth.json';
-import deSidebar from '@/modules/i18n/locales/de/sidebar.json';
-import deChat from '@/modules/i18n/locales/de/chat.json';
-// oxlint-disable-next-line importx/order
-import deTasks from '@/modules/i18n/locales/de/tasks.json';
-
-import trCommon from '@/modules/i18n/locales/tr/common.json';
-import trSettings from '@/modules/i18n/locales/tr/settings.json';
-import trAuth from '@/modules/i18n/locales/tr/auth.json';
-import trSidebar from '@/modules/i18n/locales/tr/sidebar.json';
-import trChat from '@/modules/i18n/locales/tr/chat.json';
-import trTasks from '@/modules/i18n/locales/tr/tasks.json';
-import itCommon from '@/modules/i18n/locales/it/common.json';
-import itSettings from '@/modules/i18n/locales/it/settings.json';
-import itAuth from '@/modules/i18n/locales/it/auth.json';
-import itSidebar from '@/modules/i18n/locales/it/sidebar.json';
-import itChat from '@/modules/i18n/locales/it/chat.json';
-// oxlint-disable-next-line importx/order
-import itTasks from '@/modules/i18n/locales/it/tasks.json';
-
-import zhTWCommon from '@/modules/i18n/locales/zh-TW/common.json';
-import zhTWSettings from '@/modules/i18n/locales/zh-TW/settings.json';
-import zhTWAuth from '@/modules/i18n/locales/zh-TW/auth.json';
-import zhTWSidebar from '@/modules/i18n/locales/zh-TW/sidebar.json';
-import zhTWChat from '@/modules/i18n/locales/zh-TW/chat.json';
-// oxlint-disable-next-line importx/order
-import zhTWTasks from '@/modules/i18n/locales/zh-TW/tasks.json';
 
 // Import supported languages configuration
 import { languages } from '@/modules/i18n/languages';
@@ -117,11 +43,38 @@ const getSavedLanguage = (): string => {
   return 'en';
 };
 
+const NAMESPACES = ['common', 'settings', 'auth', 'sidebar', 'chat', 'tasks'];
+
+// Every non-English locale file, as a loader Vite splits into its own chunk.
+const LOCALE_LOADERS = import.meta.glob<{ default: Record<string, unknown> }>([
+  '/src/modules/i18n/locales/*/*.json',
+  '!/src/modules/i18n/locales/en/*.json',
+]);
+
+/**
+ * Adds a language's missing namespaces to i18next; English and unknown languages are a no-op. Each
+ * namespace is its own fetch: one that fails stays on the English fallback and is retried the next
+ * time the language is chosen, and the failure never escapes as an unhandled rejection.
+ */
+async function loadLanguage(lng: string): Promise<void> {
+  if (lng === 'en') return;
+  await Promise.all(NAMESPACES.map(async (ns) => {
+    const load = LOCALE_LOADERS[`/src/modules/i18n/locales/${lng}/${ns}.json`];
+    if (!load || i18n.hasResourceBundle(lng, ns)) return;
+    try {
+      const module = await load();
+      i18n.addResourceBundle(lng, ns, module.default, true, true);
+    } catch (error) {
+      console.warn(`[i18n] ${lng}/${ns} did not load; showing English for it`, error);
+    }
+  }));
+}
+
 // Initialize i18next
 i18n
   .use(initReactI18next) // Pass i18n instance to react-i18next
   .init({
-    // Resources containing all translations
+    // English only; the rest arrive through `loadLanguage` below.
     resources: {
       en: {
         common: enCommon,
@@ -130,86 +83,6 @@ i18n
         sidebar: enSidebar,
         chat: enChat,
         tasks: enTasks,
-      },
-      fr: {
-        common: frCommon,
-        settings: frSettings,
-        auth: frAuth,
-        sidebar: frSidebar,
-        chat: frChat,
-        tasks: frTasks,
-      },
-      es: {
-        common: esCommon,
-        settings: esSettings,
-        auth: esAuth,
-        sidebar: esSidebar,
-        chat: esChat,
-        tasks: esTasks,
-      },
-      ko: {
-        common: koCommon,
-        settings: koSettings,
-        auth: koAuth,
-        sidebar: koSidebar,
-        chat: koChat,
-        tasks: koTasks,
-      },
-      'zh-CN': {
-        common: zhCommon,
-        settings: zhSettings,
-        auth: zhAuth,
-        sidebar: zhSidebar,
-        chat: zhChat,
-        tasks: zhTasks,
-      },
-      ja: {
-        common: jaCommon,
-        settings: jaSettings,
-        auth: jaAuth,
-        sidebar: jaSidebar,
-        chat: jaChat,
-        tasks: jaTasks,
-      },
-      ru: {
-        common: ruCommon,
-        settings: ruSettings,
-        auth: ruAuth,
-        sidebar: ruSidebar,
-        chat: ruChat,
-        tasks: ruTasks,
-      },
-      de: {
-        common: deCommon,
-        settings: deSettings,
-        auth: deAuth,
-        sidebar: deSidebar,
-        chat: deChat,
-        tasks: deTasks,
-      },
-      tr: {
-        common: trCommon,
-        settings: trSettings,
-        auth: trAuth,
-        sidebar: trSidebar,
-        chat: trChat,
-        tasks: trTasks,
-      },
-      it: {
-        common: itCommon,
-        settings: itSettings,
-        auth: itAuth,
-        sidebar: itSidebar,
-        chat: itChat,
-        tasks: itTasks,
-      },
-      'zh-TW': {
-        common: zhTWCommon,
-        settings: zhTWSettings,
-        auth: zhTWAuth,
-        sidebar: zhTWSidebar,
-        chat: zhTWChat,
-        tasks: zhTWTasks,
       },
     },
 
@@ -222,8 +95,7 @@ i18n
     // Enable debug mode in development (logs missing keys to console)
     debug: false,
 
-    // Namespaces - load only what's needed
-    ns: ['common', 'settings', 'auth', 'sidebar', 'chat', 'tasks'],
+    ns: NAMESPACES,
     defaultNS: 'common',
 
     // Key separator for nested keys (default: '.')
@@ -244,14 +116,17 @@ i18n
     react: {
       useSuspense: true, // Use Suspense for lazy-loading
       bindI18n: 'languageChanged', // Re-render on language change
-      bindI18nStore: false, // Don't re-render on resource changes
+      // A language loaded after first paint re-renders what was drawn in the English fallback.
+      bindI18nStore: 'added',
     },
   });
 
-// Save language preference when it changes
+// Save language preference when it changes, and fetch that language if it is not loaded yet.
 i18n.on('languageChanged', (lng: string) => {
   writeUserPreference('userLanguage', lng);
+  void loadLanguage(lng);
 });
+void loadLanguage(i18n.language);
 
 // A language chosen on another device arrives with the hydrated preferences,
 // after i18n was already initialized with whatever the mirror held.

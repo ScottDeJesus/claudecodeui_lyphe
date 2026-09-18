@@ -11,7 +11,7 @@ import { createPerf } from '@/modules/universe/utils/universePerf';
 import { createPulses } from '@/modules/universe/utils/universePulses';
 import type { PerfSample } from '@/modules/universe/utils/universePerf';
 import { buildClouds } from '@/modules/universe/utils/universeClouds';
-import { isActive } from '@/modules/universe/utils/universeRegimes';
+import { isActive, isHidden } from '@/modules/universe/utils/universeRegimes';
 import { createLayers } from '@/modules/universe/utils/universeLayers';
 import { createRepaint } from '@/modules/universe/utils/universeRepaint';
 import { drawLive, drawSky, drawStars } from '@/modules/universe/utils/universeRenderer';
@@ -261,6 +261,8 @@ export function UniverseCanvas(props: UniverseCanvasProps) {
     let cloudTokens: UniverseTokens | null = null;
     let cloudBright = Number.NaN;
     let cloudDim = Number.NaN;
+    let cloudFiles: string | null = null;
+    let cloudDistance = Number.NaN;
 
     // The instrument, made once with the camera and the loop and published every frame. It is here
     // and not in a module of its own because the SAMPLE is assembled here: the counter is handed what
@@ -323,7 +325,7 @@ export function UniverseCanvas(props: UniverseCanvasProps) {
       // everything after the step is `drawMs`. Nothing before this line is the sky's cost.
       perf.begin();
 
-      camera.refit(fitZoom(camera.w, camera.h, graph.scale, graph.radius));
+      camera.refit(fitZoom(camera.w, camera.h, graph.radius));
       camera.track(now, dtMs, {
         tweaks,
         followAt: camera.follow === null ? null : graph.nodes[camera.follow] ?? null,
@@ -336,6 +338,16 @@ export function UniverseCanvas(props: UniverseCanvasProps) {
       // camera reaches the layout as the viewport below, which writes these same two fields; they
       // are written here as well because the drag is solved BEFORE the step, and a star under the
       // hand may not lag the camera by a frame.
+      // A selection the files tweak has hidden is released: its ring, its card and the camera's hold
+      // would otherwise stand on a star that is neither drawn nor hit-testable, at a position frozen
+      // where the float pass last wrote it.
+      if (selectedRef.current !== null) {
+        const chosen = graph.nodes[selectedRef.current];
+        if (chosen !== undefined && isHidden(graph, chosen)) {
+          selectedRef.current = null;
+          onSelectRef.current(null);
+        }
+      }
       const pivot = selectedRef.current ?? camera.hovering;
       graph.camX = camera.x;
       graph.camY = camera.y;
@@ -366,12 +378,16 @@ export function UniverseCanvas(props: UniverseCanvasProps) {
         graph !== cloudGraph ||
         tokens !== cloudTokens ||
         tweaks.recencyBrightDays !== cloudBright ||
-        tweaks.recencyDimDays !== cloudDim
+        tweaks.recencyDimDays !== cloudDim ||
+        tweaks.files !== cloudFiles ||
+        tweaks.distance !== cloudDistance
       ) {
         cloudGraph = graph;
         cloudTokens = tokens;
         cloudBright = tweaks.recencyBrightDays;
         cloudDim = tweaks.recencyDimDays;
+        cloudFiles = tweaks.files;
+        cloudDistance = tweaks.distance;
         clouds = buildClouds(graph, tokens, tweaks, now);
       }
       // A TWEAK OR A PALETTE THAT IS NOT WHAT THE LAST FRAME DREW WITH IS A LAYER OWED NOW. This is

@@ -6,25 +6,25 @@ import { recordPlanLease } from './kanban-pm-heartbeat.js';
 import { buildActionableQueue, leaseFacts } from './kanban-pm-projections.js';
 import {
   SEARCH_KINDS,
-  SEARCHABLE_KINDS,
   SEARCH_LIMIT_DEFAULT,
   SEARCH_LIMIT_MAX,
   SEARCH_QUERY_MAX,
   searchHistory,
   type SearchKind,
 } from './kanban-pm-recall.js';
+import { approvedLessons, createLessonTools } from './kanban-pm-tools-lessons.js';
 import {
   CARD_ID_ARGUMENT,
   errorResult,
   textResult,
   toolSchema,
-  type ToolResult,
   type ToolTable,
 } from './mcp-protocol.js';
 
 /**
- * The board-level tools: the orient queue, the resume read, the plan claim, history search, and the
- * three lesson tools this board answers honestly by refusing.
+ * The board-level tools: the orient queue, the resume read, the plan claim and history search —
+ * plus the three lesson tools, whose descriptors and handlers live in
+ * `kanban-pm-tools-lessons.ts` and are spliced in at the bottom of this table.
  *
  * Names are `descent-pm`'s, for the reason `kanban-pm-tools-cards.ts` states. The rows these reads
  * answer with are projected in `kanban-pm-projections.ts`.
@@ -32,21 +32,6 @@ import {
  * Consumers: `kanban-pm-mcp.ts`, which assembles this table with the other two and starts the
  * transport over it.
  */
-
-const LESSON_TRIGGERS = ['complex_task', 'error_resolved', 'operator_correction', 'workflow_discovered'];
-const LESSON_KINDS = ['note', 'skill_draft'];
-
-/**
- * The one sentence the three lesson tools answer with, in one home.
- *
- * These are STUBS, not empty reads. Answering "no lessons yet" would tell the model a fact about the
- * corpus — that there is nothing to learn from — when the truth is that this board has no corpus at
- * all. The difference matters: the first answer ends the search, the second sends the session to
- * the closing remarks, which is where the work actually gets recorded.
- */
-const LESSONS_NOT_HERE =
-  'lessons are not on this board yet — the lesson corpus is Descent-only until sunset. Record ' +
-  "what you learned in the card's closing remarks instead (set_closing_remarks).";
 
 export function createBoardTools(client: KanbanPmClient): ToolTable {
   /** The boards a read covers: this board, one named board, or every non-archived board. */
@@ -57,7 +42,7 @@ export function createBoardTools(client: KanbanPmClient): ToolTable {
     return boards.filter((entry) => entry.id === board);
   };
 
-  const lessonStub = (): ToolResult => errorResult(LESSONS_NOT_HERE);
+  const lessons = createLessonTools(client);
 
   const tools = [
     {
@@ -67,7 +52,8 @@ export function createBoardTools(client: KanbanPmClient): ToolTable {
         "'to_plan' (todo, not build-ready yet: claim_plan FIRST, then author and post questions), " +
         "'buildable' (todo, approved, no open questions), 'awaiting_you' (the questions lane, plus " +
         "any todo card tagged operator-scheduled) and 'active'. Every row carries its lease facts. " +
-        "The 'lessons' key is always empty on this board.",
+        "The 'lessons' key carries the APPROVED lesson index (newest first, at most 50) — the " +
+        'corpus the operator has signed off. It is estate-wide: a lesson belongs to no board.',
       inputSchema: toolSchema(
         {
           board: {
@@ -109,10 +95,11 @@ export function createBoardTools(client: KanbanPmClient): ToolTable {
       description:
         "Ask 'have we hit this before?' BEFORE planning a card or deep-debugging an error. " +
         "Searches this board's card titles, descriptions, bodies and closing remarks, its design " +
-        "decisions and its issues, plus the audit log — the only place an archived card's history " +
-        'is still readable. Ranked, snippeted. Answers {hits, scanned_cards, events_read, ' +
-        'more_events} — read those counts: a small scanned_cards or a true more_events means the ' +
-        "board was not fully read. 'lesson' is NOT searchable here and asking for it is refused.",
+        "decisions and its issues, the audit log — the only place an archived card's history is " +
+        'still readable — and the whole lesson corpus, rejected rows included, because a rejected ' +
+        'lesson is history too. Ranked, snippeted. Answers {hits, scanned_cards, events_read, ' +
+        'more_events, lessons_read, more_lessons} — read those counts: a small scanned_cards, a ' +
+        'true more_events or a true more_lessons means the corpus was not fully read.',
       inputSchema: toolSchema(
         {
           query: {
@@ -123,8 +110,8 @@ export function createBoardTools(client: KanbanPmClient): ToolTable {
             type: 'array',
             items: { type: 'string', enum: [...SEARCH_KINDS] },
             description:
-              'Optional: restrict to a subset of feature | decision | issue. The declared ' +
-              "'lesson' is refused: this board has no lesson corpus.",
+              'Optional: restrict to a subset of feature | decision | issue | lesson. The ' +
+              'default is all four.',
           },
           limit: {
             type: 'integer',
@@ -134,52 +121,13 @@ export function createBoardTools(client: KanbanPmClient): ToolTable {
         ['query']
       ),
     },
-    {
-      name: 'stage_lesson',
-      description:
-        'NOT AVAILABLE ON THIS BOARD. Staging asks for a lesson corpus this board does not have; ' +
-        'the call is refused, with the reason and the alternative in the answer.',
-      inputSchema: toolSchema(
-        {
-          name: { type: 'string', description: 'Short lesson name (<= 80 chars).' },
-          summary: { type: 'string', description: 'One-line index summary (<= 60 chars).' },
-          body: { type: 'string', description: 'The full lesson body (markdown OK).' },
-          trigger: { type: 'string', enum: LESSON_TRIGGERS, description: 'What prompted this lesson.' },
-          tags: { type: 'array', items: { type: 'string' }, description: 'A list of tag strings.' },
-          feature_id: { type: 'string', description: 'The card this lesson came from, for provenance.' },
-          kind: { type: 'string', enum: LESSON_KINDS, description: 'note (default) | skill_draft.' },
-        },
-        ['name', 'summary', 'trigger']
-      ),
-    },
-    {
-      name: 'list_lessons',
-      description:
-        'NOT AVAILABLE ON THIS BOARD. There is no lesson corpus here; the call is refused, with ' +
-        'the reason and the alternative in the answer.',
-      inputSchema: toolSchema(
-        {
-          status: { type: 'string', description: 'staged | approved | rejected (omit for all).' },
-          limit: { type: 'integer', description: 'Max rows, 1..500 (default 100).' },
-        },
-        []
-      ),
-    },
-    {
-      name: 'get_lesson',
-      description:
-        'NOT AVAILABLE ON THIS BOARD. There is no lesson corpus here; the call is refused, with ' +
-        'the reason and the alternative in the answer.',
-      inputSchema: toolSchema(
-        { id: { type: 'string', description: "The lesson id (e.g. 'ls-3')." } },
-        ['id']
-      ),
-    },
   ];
 
   return {
-    tools,
+    tools: [...tools, ...lessons.tools],
     handlers: {
+      ...lessons.handlers,
+
       list_actionable: async (args) => {
         const boards = await resolveBoards(args.board);
         const queue = await buildActionableQueue(client, boards, Date.now());
@@ -192,7 +140,9 @@ export function createBoardTools(client: KanbanPmClient): ToolTable {
           counts.push({ boardId: board.id, board: board.name, lanes: lanes.lanes });
         }
 
-        return textResult({ ...queue, counts, lessons: [] });
+        // The approved lesson index rides the orient read: the corpus is where a session learns
+        // what the operator already signed off before it plans anything.
+        return textResult({ ...queue, counts, lessons: await approvedLessons(client) });
       },
 
       list_active_builds: async (args) => {
@@ -235,26 +185,17 @@ export function createBoardTools(client: KanbanPmClient): ToolTable {
           return errorResult(`limit must be a whole number between 1 and ${SEARCH_LIMIT_MAX}`);
         }
 
-        // The DEFAULT is the searchable three, never the declared four: defaulting to the full
-        // enum would make the ordinary "search everything" call the one call that refuses.
-        const requestedKinds = (args.kinds as string[] | undefined) ?? [...SEARCHABLE_KINDS];
+        // The default is the whole corpus, as Descent's was: every kind a search covers.
+        const requestedKinds = (args.kinds as string[] | undefined) ?? [...SEARCH_KINDS];
         const unknownKind = requestedKinds.find(
           (kind) => !(SEARCH_KINDS as readonly string[]).includes(kind)
         );
         if (unknownKind !== undefined) return errorResult(`unknown search kind: ${unknownKind}`);
 
-        // The fourth lesson surface answers like the other three. There is no corpus to search,
-        // and an empty result set would say "nothing to learn from" instead of "not on this board".
-        if (requestedKinds.includes('lesson')) return lessonStub();
-
         return textResult(
           await searchHistory(client, query.toLowerCase(), new Set(requestedKinds as SearchKind[]), limit)
         );
       },
-
-      stage_lesson: () => lessonStub(),
-      list_lessons: () => lessonStub(),
-      get_lesson: () => lessonStub(),
     },
   };
 }

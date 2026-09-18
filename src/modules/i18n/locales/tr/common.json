@@ -365,7 +365,7 @@
     },
     "open": "{{name}} aç",
     "collapse": "Daralt",
-    "dragHint": "Başka bir yuvaya sürükleyin",
+    "dragHint": "İki yandan birine sürükleyin",
     "pin": {
       "label": "Bu oturum",
       "title": "Açık olan sohbet tarafından oluşturuldu"

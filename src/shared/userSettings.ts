@@ -36,7 +36,8 @@ export type UserPreferences = {
   planRunner: unknown;
   /** Composer toggle: every sent message rides under the `/plain` command. See `usePlainModePreference`. */
   plainMode: boolean;
-  /** Where each chat-gutter widget sits and whether it is open. See `modules/chat-gutters/hooks/useGutterPlacements.ts`. */
+  /** Where each chat-gutter widget sits and whether it is open, per chat, plus the fallback a chat
+   *  with no arrangement of its own opens with. See `modules/chat-gutters/hooks/useGutterPlacements.ts`. */
   chatGutters: unknown;
 };
 
@@ -133,6 +134,93 @@ function notifyListeners(): void {
   }
 }
 
+/**
+ * How long a save that could not be sent waits before it is tried again, doubled per failure and
+ * capped — the shape `chatDrafts.ts` already uses. A preference whose wire value names only what it
+ * changed (see `writeUserPreference`) cannot be re-sent by the next write, so a lost message has to
+ * keep itself; a server that stays down must still not be asked every five seconds forever.
+ */
+const SERVER_WRITE_RETRY_MS = 5_000;
+const SERVER_WRITE_RETRY_MAX_MS = 60_000;
+/** Consecutive failed saves, for the backoff; cleared by a save that lands. */
+let failedServerWrites = 0;
+/** Bumped on sign-out, so a retry scheduled for the previous user is dropped rather than re-sent. */
+let storeGeneration = 0;
+/** A failure worth retrying: the network, the server restarting, or rate limiting — not a refusal. */
+const isRetryableStatus = (status: number | null): boolean => (
+  status === null || status >= 500 || status === 429 || status === 408
+);
+
+/**
+ * Folds a queued save into the one already waiting. Every key but `chatGutters` replaces: the newest
+ * value of a setting is the setting. A gutter message names ONE chat (or, for a chat not sent yet,
+ * only the fallback), so replacing it would drop the chat the earlier message carried — two arranges
+ * inside the debounce window is enough — and the queue must keep the promise the wire value makes:
+ * a message never asserts a chat it did not touch.
+ *
+ * Three shapes can arrive here, and the third is why this is not simply a union. A message with a
+ * record `sessions` names that chat; a message that is only `{ fallback }` names no chat; and an
+ * older build's flat record (`{ runner, memory, subagents }` — no `fallback`, no `sessions`) IS the
+ * fallback it means, which is how the server reads it too. Folding that one like the others would
+ * throw its arrangement away, so it becomes the fallback over whatever chats are pending.
+ */
+function foldServerWrite(key: UserPreferenceKey, pending: unknown, incoming: unknown): unknown {
+  if (key !== 'chatGutters' || !isRecord(pending) || !isRecord(incoming)) {
+    return incoming;
+  }
+
+  const sessionsOf = (value: Record<string, unknown>) => (isRecord(value.sessions) ? value.sessions : {});
+  const orderOf = (value: Record<string, unknown>) => (Array.isArray(value.order) ? value.order : []);
+  const legacy = (value: Record<string, unknown>) => !('fallback' in value) && !('sessions' in value);
+
+  const fallback = legacy(incoming) ? incoming : incoming.fallback ?? (legacy(pending) ? pending : pending.fallback);
+  const sessions = { ...sessionsOf(pending), ...sessionsOf(incoming) };
+  const order = [
+    ...orderOf(pending).filter((id) => !orderOf(incoming).includes(id)),
+    ...orderOf(incoming),
+  ];
+  return { fallback, sessions, order };
+}
+
+/**
+ * The message to retry, rebuilt from what the store holds NOW rather than from what was sent.
+ *
+ * A save that fails late — the request timeout is 30 s — would otherwise put the value it carried
+ * back on the wire five seconds later, over anything the user changed in the meantime that already
+ * landed: the screen and the server would disagree until the next change. `chatDrafts.ts` retries
+ * the current value for the same reason.
+ *
+ * For `chatGutters` that means the current arrangement of the chats THIS message named, and no
+ * others — the retry must keep the wire's promise that a message never asserts a chat it did not
+ * touch. A chat the store has since forgotten is dropped from it.
+ */
+function refreshForRetry(key: UserPreferenceKey, sent: unknown): unknown {
+  const current = preferences[key];
+  if (key !== 'chatGutters') {
+    return current === undefined ? sent : current;
+  }
+  if (!isRecord(current) || !isRecord(sent)) {
+    return sent;
+  }
+
+  const named = isRecord(sent.sessions) ? Object.keys(sent.sessions) : [];
+  if (named.length === 0) {
+    // A chat that had no id yet: the message only ever carried the fallback, and the store's copy of
+    // it is the value the operator just set.
+    return { fallback: current.fallback ?? (isRecord(sent) ? sent.fallback : undefined) };
+  }
+
+  const held = isRecord(current.sessions) ? current.sessions : {};
+  const sessions: Record<string, unknown> = {};
+  for (const sessionId of named) {
+    if (sessionId in held) sessions[sessionId] = held[sessionId];
+  }
+  // No `fallback`: this message names chats, and the copy of the fallback beside them is exactly as
+  // stale as the sections the narrowing exists to keep off the wire. The fallback travels only in the
+  // message that carries nothing else, above.
+  return { sessions, order: Object.keys(sessions) };
+}
+
 function flushServerWrites(): void {
   serverWriteTimer = null;
   const updates = pendingServerWrites;
@@ -142,20 +230,58 @@ function flushServerWrites(): void {
     return;
   }
 
-  // A save that fails must never surface as an unhandled rejection out of a
-  // timer callback: the mirror already holds the value, and the next write
-  // re-sends it.
+  // A save that fails must never surface as an unhandled rejection out of a timer callback. A
+  // failure worth retrying is put back at the front of the queue: the mirror holds the value, but
+  // for a key whose message names only what it changed, no later write would carry this one's part.
+  // A REFUSAL (a 4xx that is not 408 or 429) is logged and dropped — re-sending it cannot help.
+  const generation = storeGeneration;
+  let status: number | null = null;
+
+  const keep = (error: unknown) => {
+    if (!isRetryableStatus(status)) {
+      console.error('Failed to save user preferences; the server refused it:', error);
+      return;
+    }
+    console.error('Failed to save user preferences; retrying:', error);
+    // A sign-out moved the generation on: this message belongs to whoever was signed in when it was
+    // built, and sending it now would write their values into the row of whoever is signed in next.
+    if (generation !== storeGeneration) return;
+
+    for (const [key, value] of Object.entries(updates) as Array<[UserPreferenceKey, unknown]>) {
+      const current = refreshForRetry(key, value);
+      pendingServerWrites[key] = key in pendingServerWrites
+        ? foldServerWrite(key, current, pendingServerWrites[key])   // the newer write is the incoming one
+        : current;
+    }
+    failedServerWrites += 1;
+    const delay = Math.min(SERVER_WRITE_RETRY_MS * 2 ** (failedServerWrites - 1), SERVER_WRITE_RETRY_MAX_MS);
+    if (serverWriteTimer !== null) clearTimeout(serverWriteTimer);
+    serverWriteTimer = setTimeout(flushServerWrites, delay);
+  };
+
   try {
-    void api.user.savePreferences(updates as Record<string, unknown>).catch((error: unknown) => {
-      console.error('Failed to save user preferences:', error);
-    });
+    // `authenticatedFetch` resolves for every answer the server gives, so a 500 or a 401 reaches
+    // this store only by reading the response: without this, every HTTP failure was silent.
+    void api.user.savePreferences(updates as Record<string, unknown>)
+      .then((response) => {
+        if (!response.ok) {
+          status = response.status;
+          throw new Error(`HTTP ${response.status}`);
+        }
+        failedServerWrites = 0;
+      })
+      .catch(keep);
   } catch (error) {
-    console.error('Failed to save user preferences:', error);
+    keep(error);
   }
 }
 
 function queueServerWrite(updates: PreferenceRecord): void {
-  pendingServerWrites = { ...pendingServerWrites, ...updates };
+  const merged: PreferenceRecord = { ...pendingServerWrites };
+  for (const [key, value] of Object.entries(updates) as Array<[UserPreferenceKey, unknown]>) {
+    merged[key] = key in merged ? foldServerWrite(key, merged[key], value) : value;
+  }
+  pendingServerWrites = merged;
 
   if (serverWriteTimer !== null) {
     clearTimeout(serverWriteTimer);
@@ -204,14 +330,18 @@ export function saveClaudePermissions(permissions: {
 }
 
 /** Writes one preference through to the mirror, the listeners and the server. */
-export function writeUserPreference(key: UserPreferenceKey, value: unknown): void {
+export function writeUserPreference(key: UserPreferenceKey, value: unknown, wireValue?: unknown): void {
   if (JSON.stringify(preferences[key]) === JSON.stringify(value)) {
     return;
   }
 
   preferences = { ...preferences, [key]: value };
   writeMirror();
-  queueServerWrite({ [key]: value });
+  // `wireValue` is for a preference the server merges rather than replaces (`chatGutters`, whose
+  // value holds a section per chat): the browser keeps the whole document, and sends only the part
+  // it changed, so a section another device wrote — and this one last read hours ago — is neither
+  // asserted nor reverted. Absent, the value itself goes up, which is right for every other key.
+  queueServerWrite({ [key]: wireValue === undefined ? value : wireValue });
   notifyListeners();
 }
 
@@ -393,6 +523,9 @@ export function resetUserPreferences(): void {
   preferences = {};
   pendingServerWrites = {};
   hasHydrated = false;
+  // A save still in flight belongs to the user who just left; its failure must not re-queue it.
+  storeGeneration += 1;
+  failedServerWrites = 0;
   if (serverWriteTimer !== null) {
     clearTimeout(serverWriteTimer);
     serverWriteTimer = null;

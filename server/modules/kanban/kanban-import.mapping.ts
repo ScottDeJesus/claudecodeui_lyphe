@@ -20,10 +20,12 @@ import type { DescentSourceRows } from './kanban-import.transport.js';
  * atomic — a failure anywhere below rolls the whole thing back, and there is no such thing as a
  * half-imported board. The tables are mapped in dependency order: boards, then the one setting
  * that names a board, then cards, tags, and the card's satellites, which are their own file
- * because they translate one parent and none of them is timestamp-guarded.
+ * because they translate one parent and none of them is timestamp-guarded. The install's lessons
+ * and memory candidates come over in the same act — the lessons through those satellites' own
+ * file, the candidates straight to the lane that owns them — so one button imports an install.
  *
  * IDS ARE MINTED IN THE PASS RUNNER AND DESCENT'S OWN ARE NEVER REUSED. A source id goes to
- * `descent_id` and the row is given a LypheCLI id from the local mint — writing `f-82` as a
+ * `descent_id` and the row is given a Athena id from the local mint — writing `f-82` as a
  * primary key would collide with a locally created card the first time one was made. Before
  * minting, the row is looked up by `descent_id`: one that is already here keeps the id it has, so
  * every question, tag and event imported beside it still points at it, and a re-import updates
@@ -140,6 +142,9 @@ export function mapDescentRows(
     boardOfCard,
     importBoardId,
   });
+  // PLANNED here and placed later: the seam is holding a write lock around this whole mapping, and
+  // the attachments' bytes are I/O. They travel out on the result as an obligation the caller that
+  // answers the operator discharges; the satellites' own file carries both halves and says why.
 
   const passes: ImportPass[] = [
     boards.pass,
@@ -151,8 +156,13 @@ export function mapDescentRows(
     satellites.checklist.pass,
     satellites.attachments.pass,
     satellites.events.pass,
+    satellites.lessons.pass,
     settings,
   ];
+  // The memory lane is NOT one of them: it keeps no board tally, holds no `ImportPass` and knows
+  // nothing about this board, so its rows are counted by its own verb and land on the counts below
+  // as one number. `inserted`/`updated` are therefore the BOARD's tables' totals, which is what
+  // those two words have always meant here.
   const imported: KanbanImportCounts = {
     boards: boards.pass.written,
     cards: cards.pass.written,
@@ -163,6 +173,8 @@ export function mapDescentRows(
     checklist: satellites.checklist.pass.written,
     attachments: satellites.attachments.pass.written,
     events: satellites.events.pass.written,
+    lessons: satellites.lessons.pass.written,
+    memory: satellites.memory,
     settings: settings.written,
   };
   const sourceCounts: KanbanImportCounts = {
@@ -175,6 +187,8 @@ export function mapDescentRows(
     checklist: source.checklist.length,
     attachments: source.attachments.length,
     events: source.events.length,
+    lessons: source.lessons.length,
+    memory: source.memoryCandidates.length,
     // All nineteen, against the one above: the difference is the daemon state left behind.
     settings: source.settings.length,
   };
@@ -185,6 +199,8 @@ export function mapDescentRows(
     updated: passes.reduce((total, pass) => total + pass.updated, 0),
     boardIdMap: Object.fromEntries(boards.ids),
     currentBoardId,
+    // The bytes the import owes the store. `KanbanImportResult` says what the caller does with it.
+    attachmentCopies: satellites.attachmentCopies,
   };
 
   // The seam reads `spec.payload` by reference and puts the audit row on the event AFTER `mutate`

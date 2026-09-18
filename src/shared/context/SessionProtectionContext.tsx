@@ -13,6 +13,7 @@ import {
 } from '@/shared/hooks/useSessionProtection';
 import type { IsSessionProcessing, LLMProvider, MarkSessionIdle, MarkSessionProcessing, RunningSessionListItem, SessionActivityMap, SyncProcessingSessions } from '@/shared/types';
 import { api } from '@/shared/api';
+import { useWebSocket } from '@/shared/context/WebSocketContext';
 
 type RunningSessionApiItem = {
   sessionId?: unknown;
@@ -117,6 +118,10 @@ export function SessionProtectionProvider({ children }: { children: ReactNode })
   } = useSessionProtection();
 
   const [runningSessions, setRunningSessions] = useState<readonly RunningSessionListItem[]>(NO_RUNNING_SESSIONS);
+  // A send still waiting in the socket's outbox has not reached the server, so the server cannot list
+  // it yet. Its spinner stays, which keeps a second press on the composer's queue path instead of
+  // becoming a second send the server would refuse.
+  const { hasQueuedSend } = useWebSocket();
 
   const refreshRunningSessions = useCallback(async () => {
     try {
@@ -169,11 +174,12 @@ export function SessionProtectionProvider({ children }: { children: ReactNode })
             };
           })
           .filter((session): session is NonNullable<typeof session> => Boolean(session)),
+        hasQueuedSend,
       );
     } catch (error) {
       console.error('[SessionProtection] Failed to sync running sessions:', error);
     }
-  }, [syncProcessingSessions]);
+  }, [hasQueuedSend, syncProcessingSessions]);
 
   useEffect(() => {
     void refreshRunningSessions();

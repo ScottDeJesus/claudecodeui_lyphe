@@ -9,6 +9,7 @@ import { createKanbanMetisRouter, readAppJwtSecret } from './kanban-metis.routes
 import { createMetisDriver } from './metis-driver.service.js';
 import { createMetisRegistry, setLiveMetisRegistry } from './metis-registry.service.js';
 import { createMetisSpawner } from './metis-spawn.service.js';
+import { startTelemetryWatcher } from './metis-telemetry.service.js';
 
 /**
  * The composition root: the one place in `kanban-metis` that reads an environment, names a URL or
@@ -63,7 +64,9 @@ const POLL_MS = 2000;
  * third-party plugin frontends that have no business seeing which boards the operator is building.
  */
 export function createKanbanMetisModule(): Router {
-  const registry = createMetisRegistry();
+  // A probe server sets KANBAN_METIS_STATE_ROOT (with DATABASE_PATH) so its registry never
+  // adopts, stops or deletes the operator's own sessions under the default root.
+  const registry = createMetisRegistry(process.env.KANBAN_METIS_STATE_ROOT || undefined);
   // The process's one registry, published before any request can arrive: the `kanban-pm` guard is
   // mounted as a bare middleware and has no argument to receive it through.
   setLiveMetisRegistry(registry);
@@ -123,6 +126,16 @@ export function createKanbanMetisModule(): Router {
    */
   const metisDriver = createMetisDriver({ registry, spawner });
   metisDriver.start();
+
+  /**
+   * The token watcher, started beside the two services it reads.
+   *
+   * It takes no argument because everything it needs is the process's own state: the registry the
+   * line above publishes, and the board, which it reaches through the board's barrel. Like the
+   * driver's, its interval is unreferenced, so it is never a reason for the process to stay alive —
+   * and it reads the clock itself, one second from now rather than one from construction.
+   */
+  startTelemetryWatcher();
 
   return createKanbanMetisRouter({ registry, spawner, driver: metisDriver });
 }

@@ -16,9 +16,10 @@ export const kanbanIdsDb = {
   /**
    * Mints `<prefix>-<n>` and returns it.
    *
-   * Prefixes are one letter and are the id's only semantic: `b` boards, `c` cards, `q` questions,
-   * `i` issues, `d` decisions, `k` checklist items, `a` attachments. A Descent row's own id is
-   * never reused as a primary key — it is kept in `descent_id`.
+   * The prefix is the id's only semantic, and this list is its vocabulary rather than a constraint
+   * — the mint takes whatever it is handed: `b` boards, `c` cards, `q` questions, `i` issues, `d`
+   * decisions, `k` checklist items, `a` attachments, `ls` lessons. A Descent row's own id is never
+   * reused as a primary key — it is kept in `descent_id`.
    */
   mintId(prefix: string): string {
     const db = getConnection();

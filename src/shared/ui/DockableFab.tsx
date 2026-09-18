@@ -18,7 +18,7 @@ type DockableFabProps = {
   position: DockableFabPosition;  // controlled — the owner persists it
   dockRect: DOMRect | null;       // where the dock is, measured by the owner; null = nowhere to dock
   active?: boolean;               // renders as aria-expanded and the pressed wash
-  onPress: () => void;            // a pointerup that never passed the drag threshold
+  onPress: () => void;            // a click that did not end a drag — a tap, a mouse click, Enter or Space
   onPositionChange: (next: DockableFabPosition) => void;  // exactly once per drag, at release
 };
 
@@ -141,10 +141,12 @@ function overDock(release: FabPoint, dockRect: DOMRect | null): boolean {
  * pseudo-element — so every rect this file reads is the circle the reader sees, and a press up to
  * 22px from its centre still starts a drag.
  *
- * The press rule is the sidebar reorder's (`useSimpleChatReorder`'s click guard): `onPress`
- * fires from a pointer release that never crossed the 4px threshold, and from any click whose
- * `detail` is 0 — Enter or Space, with no pointer behind it. The click that ends a drag is
- * swallowed, so moving the FAB never opens what it opens.
+ * The press is the CLICK, never the pointer release. On a touch screen the browser dispatches the
+ * tap's click after the release, hit-tested at the finger's point in whatever is on screen by then —
+ * and what this button opens is portalled over it. Opened on the release, the drawer caught its own
+ * opening tap: on its backdrop, which shut it again at once, or on a row inside the sheet, which
+ * pressed that row. So the release only records whether the gesture moved, and the click that ends a
+ * drag is swallowed; every other click — a tap, a mouse click, Enter or Space — presses.
  *
  * The tooltip is the native `title`: the library `Tooltip` measures a wrapper element, and a
  * wrapper around a fixed node sits in the caller's flow at zero size, somewhere else entirely.
@@ -166,6 +168,8 @@ export function DockableFab({
   // and what a docked FAB is placed on, and it is the one point the `:hover` and `:active` scales in
   // surfaces.css leave where it was — a press on the 44px catch lands up to 22px from it.
   const grab = useRef<FabPoint>({ x: 0, y: 0 });
+  // Whether the last pointer gesture ended as a drag: its click, if the browser sends one, is not a press.
+  const dragEnded = useRef(false);
 
   // The top-left that keeps the grabbed point under the pointer, for whatever size the box is now.
   function heldFrom(x: number, y: number): FabPoint {
@@ -185,12 +189,10 @@ export function DockableFab({
     },
     onEnd: ({ x, y, moved }) => {
       setHeldPoint(null);
-      // A release that never crossed the threshold is a press. The hook owns that decision, so this
-      // button and the click guard below can never disagree about what the reader just did.
-      if (!moved) {
-        onPress();
-        return;
-      }
+      // The hook owns what counts as a drag, so this button and the click guard below can never
+      // disagree about what the reader just did. A release that never moved presses through its click.
+      dragEnded.current = moved;
+      if (!moved) return;
       // The DROP point is the pointer, not the button's corner: that is what the reader aimed.
       if (overDock({ x, y }, dockRect)) {
         onPositionChange({ docked: true });
@@ -203,6 +205,8 @@ export function DockableFab({
   const docked = heldPoint === null && position.docked && dockRect !== null;
 
   function handlePointerDown(event: PointerEvent<HTMLButtonElement>) {
+    // A touch drag sends no click, so the last drag's flag must not swallow this gesture's.
+    dragEnded.current = false;
     // Measured off the live box rather than derived from the stored point: docked, the button is
     // centred on the dock and its top-left is nowhere near the x/y the record holds.
     const rect = buttonRef.current?.getBoundingClientRect();
@@ -213,21 +217,16 @@ export function DockableFab({
   }
 
   function handleClickCapture(event: MouseEvent<HTMLButtonElement>) {
-    // The rule the sidebar's reorder already settled (`useSimpleChatReorder`'s click guard, which
-    // reads `event.detail === 0` for exactly this reason): a click with no pointer behind it — Enter,
-    // Space, a screen reader, a programmatic `.click()` — is a keyboard press, and the ONLY keyboard
-    // path to this button. Hanging `onPress` off the pointer release alone would leave the drawer
-    // unreachable without a mouse.
-    if (event.detail === 0) {
-      onPress();
+    // A pointer click that ends a drag would open the drawer the reader was only moving out of the
+    // way. A click with no pointer behind it (`detail === 0`: Enter, Space, a screen reader) never
+    // ends a drag, whatever the last gesture was.
+    if (event.detail !== 0 && dragEnded.current) {
+      dragEnded.current = false;
+      event.preventDefault();
+      event.stopPropagation();
       return;
     }
-    // A pointer's click is already spent: the release above ran the rule, and either pressed (`moved`
-    // false) or dropped the button. Letting this one through would press a second time — open and then
-    // close, in one gesture — and, at the end of a drag, would open the drawer the reader was only
-    // trying to move out of the way.
-    event.preventDefault();
-    event.stopPropagation();
+    onPress();
   }
 
   return (

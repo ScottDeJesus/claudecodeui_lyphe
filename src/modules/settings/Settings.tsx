@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { Suspense, useEffect, useMemo, useState } from 'react';
 import { X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
@@ -219,7 +219,11 @@ function Settings({ isOpen, onClose, projects = [], initialTab = 'agents' }: Set
 
               {activeTab === 'voice' && <VoiceSettingsTab />}
 
-              {activeTab === 'plugins' && <PluginSettingsTab />}
+              {activeTab === 'plugins' && (
+                <Suspense fallback={null}>
+                  <PluginSettingsTab />
+                </Suspense>
+              )}
 
               {activeTab === 'about' && <AboutTab />}
             </div>

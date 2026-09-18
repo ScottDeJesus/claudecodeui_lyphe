@@ -4,10 +4,18 @@
  * Two rules this file exists to keep:
  * - Nothing here may touch the CLI's stdin. A client socket closing is a DETACH, never EOF
  *   (D-10), so the journal outlives every API process that reads from it.
- * - The "acked" cursor is min(deliveredSeq, pendingResults[0] - 1). A `result` line the API
- *   has not yet confirmed with a `note` MUST be replayed: a SIGKILL landing between that
- *   line's delivery and the provider processing it would otherwise wedge the turn forever,
- *   while a re-delivered stream delta is merely cosmetic (D-3).
+ * - The "acked" cursor is min(deliveredSeq, pendingResults[0] - 1, pendingControl[0].seq - 1).
+ *   A `result` line the API has not yet confirmed with a `note` MUST be replayed: a SIGKILL
+ *   landing between that line's delivery and the provider processing it would otherwise wedge
+ *   the turn forever, while a re-delivered stream delta is merely cosmetic (D-3). A
+ *   `control_request` the API has not yet answered on stdin (a `can_use_tool` waiting on a
+ *   person, a `hook_callback`, any subtype) MUST be replayed for the same reason: the CLI waits
+ *   on that request id and nothing else, so an API retired mid-prompt leaves it waiting forever
+ *   unless its successor sees the request and asks again (measured 2026-09-17: a handover one
+ *   second after a question left the CLI waiting 24 minutes, until the operator hit stop). Two
+ *   things release it: the API's `control_response` on stdin, and the CLI's OWN
+ *   `control_cancel_request` on stdout — the CLI withdraws a request it no longer waits on, and
+ *   a withdrawn request must not pin the cursor for the life of the host.
  */
 
 import fs from 'node:fs';
@@ -80,6 +88,7 @@ export function createJournal({ hostId, sessionsDir }) {
     profile: null,
     deliveredSeq: 0,
     pendingResults: [],
+    pendingControl: [],
     exited: null
   };
 
@@ -94,6 +103,13 @@ export function createJournal({ hostId, sessionsDir }) {
   function append(frame) {
     fs.appendFileSync(journalPath, `${JSON.stringify(frame)}\n`);
     return frame;
+  }
+
+  function release(requestId) {
+    const kept = meta.pendingControl.filter((entry) => entry.requestId !== requestId);
+    if (kept.length === meta.pendingControl.length) return;
+    meta.pendingControl = kept;
+    writeMeta();
   }
 
   return {
@@ -126,18 +142,48 @@ export function createJournal({ hostId, sessionsDir }) {
     },
 
     /**
-     * Records that `frame` actually reached a client socket. An unacked `result` seq is the
-     * only thing that can hold the cursor back, so the meta is refreshed exactly when that
-     * set changes; deliveredSeq alone is authoritative in memory and interests no one else.
+     * Records that `frame` actually reached a client socket. An unacked `result` seq and an
+     * unanswered `control_request` are the only things that can hold the cursor back, so the
+     * meta is refreshed exactly when either set changes; deliveredSeq alone is authoritative in
+     * memory and interests no one else.
      */
     markDelivered(frame) {
       if (!frame || typeof frame.seq !== 'number' || frame.seq <= 0) return;
       if (frame.seq > meta.deliveredSeq) meta.deliveredSeq = frame.seq;
-      if (frame.t !== 'out' || parseJson(frame.line)?.type !== 'result') return;
-      if (meta.pendingResults.includes(frame.seq)) return;
-      meta.pendingResults.push(frame.seq);
-      meta.pendingResults.sort((a, b) => a - b);
-      writeMeta();
+      if (frame.t !== 'out') return;
+      const parsed = parseJson(frame.line);
+      if (parsed?.type === 'result') {
+        if (meta.pendingResults.includes(frame.seq)) return;
+        meta.pendingResults.push(frame.seq);
+        meta.pendingResults.sort((a, b) => a - b);
+        writeMeta();
+        return;
+      }
+      // Keyed by request id, not seq: a replay re-delivers the same request under the same seq,
+      // and the CLI is waiting on the id. Released by `answered` or by the CLI's own cancel
+      // below, never by delivery.
+      if (parsed?.type === 'control_request' && typeof parsed.request_id === 'string') {
+        if (meta.pendingControl.some((entry) => entry.requestId === parsed.request_id)) return;
+        meta.pendingControl.push({ seq: frame.seq, requestId: parsed.request_id });
+        meta.pendingControl.sort((a, b) => a.seq - b.seq);
+        writeMeta();
+        return;
+      }
+      // The CLI withdrew a request (its abort listener, or after it consumed the answer): it is
+      // no longer waiting, so the request no longer holds the cursor. The journal is walked in
+      // seq order, so a replayed cancel is always seen after the request it cancels.
+      if (parsed?.type === 'control_cancel_request' && typeof parsed.request_id === 'string') {
+        release(parsed.request_id);
+      }
+    },
+
+    /**
+     * The API's `control_response` for this id reached the CLI's stdin: it is no longer waiting
+     * on it, so it no longer holds the cursor.
+     * consumer: host-conn.js
+     */
+    answered(requestId) {
+      release(requestId);
     },
 
     /**
@@ -170,7 +216,9 @@ export function createJournal({ hostId, sessionsDir }) {
       }
       const oldestUnacked =
         meta.pendingResults.length > 0 ? meta.pendingResults[0] - 1 : meta.deliveredSeq;
-      return Math.min(meta.deliveredSeq, oldestUnacked);
+      const oldestUnanswered =
+        meta.pendingControl.length > 0 ? meta.pendingControl[0].seq - 1 : meta.deliveredSeq;
+      return Math.min(meta.deliveredSeq, oldestUnacked, oldestUnanswered);
     },
 
     /** Streams the journal's own bytes back, so a replayed frame is never re-serialized. */

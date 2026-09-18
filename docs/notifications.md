@@ -120,19 +120,24 @@ reads, and the rules that keep one piece of bad news to one push:
 
 | The SDK says | It emits |
 | --- | --- |
-| `rate_limit_event`, `status: 'allowed_warning'` | `limit.warning`, carrying the window's true reading (`meta.pct`). Two steps per window, 80% and 95%: a reading inside a step already announced is silent |
+| `rate_limit_event`, `status: 'allowed_warning'` | `limit.warning`, carrying the window's true reading (`meta.pct`). Two steps per window, 80% and 95%: a reading inside a step already announced is silent, whichever session reads it — the steps are remembered against the window's own `resetsAt` — within a minute's slack, so a reset time that drifts a second is the same window — so a limit is one buzz for the account and not one per running chat. An event that names no `resetsAt` says nothing about which window it read, so it neither forgets the steps nor the window's name; only a warning older than an hour is forgotten that way |
 | `rate_limit_event`, `status: 'rejected'` | `limit.reached`, once per rejection — a window that moves its `resetsAt` counts as a new one |
-| `rate_limit_event`, `status: 'allowed'` after a rejection | `limit.reset`, and the warning steps are forgotten |
-| `isUsingOverage` / `overageDisabledReason: 'out_of_credits'` | `limit.overage` / `limit.out_of_credits`, once each until the field says it stopped |
+| `rate_limit_event`, `status: 'allowed'` after a rejection | `limit.reset`. The warning steps are NOT forgotten here: an ordinary reading from one session would otherwise let every other session re-announce the same threshold. A new `resetsAt` — a new window — is what forgets them |
+| `isUsingOverage` / `overageDisabledReason: 'out_of_credits'` | `limit.overage` / `limit.out_of_credits`, once each until the field says it stopped. Out of credits is one flag for the whole account, shared by both roads — a `rate_limit_event`'s `overageDisabledReason` and an assistant `billing_error` — so one emptied wallet is one push however many sessions and window types hit it. Only overage actually being available again re-arms it (no disabled reason, or `isUsingOverage`): another reason does not, because `org_level_disabled` rides on every event this account sends, full wallet or empty |
 | `system` / `api_retry` | nothing. The attempt is *recorded*, so the `api.error` that follows can say "overloaded after 3 retries" instead of one push per retry |
 | `assistant` with an `error` | `api.error`; `authentication_failed` and `oauth_org_not_allowed` become `login.expired` instead, `billing_error` becomes `limit.out_of_credits`, and `max_output_tokens` is the model's business and says nothing |
 | `auth_status` with an error, or mid-sign-in | `login.expired`, once per run |
 | `result` that is not `success` | `run.limit` for a max-turns or max-budget ceiling, else `run.failed` — whose body is the cause, with the CLI's own `[ede_diagnostic]` instrumentation line stripped out |
 
 Two memories, different in lifetime. **Per run**: the last retry, and whether this run has
-already said "sign in again". **Module-level, one record per rate-limit window**: limits are
-account-wide, so a second session must not re-announce what the first one did, and a window's
-reset needs a timer that outlives the run that armed it. That timer is capped at a day out —
+already said "sign in again". **Per account, one record per rate-limit window, on disk**
+(`claude-limit-memory.ts`, `~/.cloudcli/limit-memory.json`): limits are account-wide, so a second
+session must not re-announce what the first one did. The record is keyed by the live login's email,
+so a switched-to account warns for its own windows, and it lives on disk because the dev server
+hands over to a new process on every save under `server/` — held in the heap, every handover
+forgot what was sent and re-sent it (2026-09-17: "Weekly limit at 76%" three times in 17 minutes).
+A reset needs a timer that outlives the run that armed it; timers are not stored, so a rejection
+announced by a replaced process re-arms its timer on the next rejected reading. That timer is capped at a day out —
 further than that, the reset is left to the next `allowed` event — and it fires through the
 `emit` of whichever run armed it, hours after that run ended, which is why the runtime hands the
 detector a user id captured at spawn instead of a live socket. A run the server itself ended
@@ -228,8 +233,8 @@ and [server/modules/websocket/README.md](../server/modules/websocket/README.md).
 
 **Bursts.** Eight codes can arrive in bursts: `api.error`, `run.failed`, `session.stuck`,
 `limit.warning`, `limit.reached`, `limit.overage`, `agent.notification` and `run.stopped`. The
-channel collapses them per user, provider, code and session (`ntfy-flood-control.service.ts`). The
-first push of a burst goes out at once, never held back on a timer; repeats inside the next minute
+channel collapses them per user, provider, code and session — and, for a limit push, per window,
+since its title names the window (`ntfy-flood-control.service.ts`). The first push of a burst goes out at once, never held back on a timer; repeats inside the next minute
 are counted instead of sent. If the minute ends with repeats counted, one summary follows —
 `<latest title> ×<total>` / `<repeats> more in the last minute` — at priority 3 with the `bell`
 tag, whatever the originals' priority, and only if ntfy is still on. The windows live in server
@@ -337,7 +342,12 @@ reports.
 for every channel. To change what a code says, change it there and nowhere else; the function is
 also exported from the module's `index.ts` for any caller that has to show an event's wording.
 
-- The title is the code's headline followed by ` · <session name>` when a name is known. An
+- The title is the code's headline followed by ` · <session name>` when a name is known. The
+  `limit.*` codes are the exception: a limit belongs to the account, not the session that read it,
+  so they carry no session name, and the ones that read a window name it in the title —
+  `5-hour limit at 82%`, `Weekly limit reached`, `Fable limit reset`. The Fable weekly window
+  arrives as `rateLimitType: 'seven_day_overage_included'` (the Claude CLI's own label table names
+  it "Fable limit"); a window the table does not know reads "Usage". An
   unknown code reads "CloudCLI" / "You have a new notification".
 - The body is cut at 1,000 characters: web push refuses a payload over about 4 KB, and the
   orchestrator settles that refusal silently.

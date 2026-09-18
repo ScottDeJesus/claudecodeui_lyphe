@@ -364,7 +364,7 @@
     },
     "open": "開啟 {{name}}",
     "collapse": "收合",
-    "dragHint": "拖曳到其他插槽",
+    "dragHint": "拖曳到任一側",
     "pin": {
       "label": "本次工作階段",
       "title": "由你開啟的對話建立"

@@ -1,12 +1,13 @@
 import { MoreHorizontal } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
-import type { KanbanBoard } from '@/shared/kanban-types';
+import { KanbanVitalsStrip } from '@/modules/kanban/KanbanVitalsStrip';
+import type { KanbanBoard, KanbanVitals } from '@/shared/kanban-types';
 import { ActionMenu, type ActionMenuItem, LLMProviderLogo, Select, Switch, Tooltip } from '@/shared/ui';
 
 /**
- * The board's one row of chrome: which board you are looking at, whether it is running itself,
- * and the four things you can do to the board as a whole.
+ * The board's one row of chrome: which board you are looking at, how it stands in six counts,
+ * whether it is running itself, and the four things you can do to the board as a whole.
  *
  * IT INVENTS NO SHELL. `h-12`, a bottom border and no background of its own — it sits inside the
  * workspace tab and inherits the chrome the tab already draws. A second page-level header here
@@ -53,6 +54,10 @@ type KanbanBoardHeaderProps = {
   /** The board row's `deepseek_flash`: where this board's Metis, and every plan runner she
    *  starts, are billed. It moves nothing already running — a child reads it at its next spawn. */
   deepseekFlash: boolean;
+  /** The selected board's six counts, handed straight to the strip: an object is a reading, `null`
+   *  is a first reading still on its way, and absent is no reading at all — which the strip draws
+   *  as em-dashes, never as zeros. */
+  vitals?: KanbanVitals | null;
   /** Boards are GLOBAL: selecting one is never scoped to the open project. */
   onSelectBoard: (boardId: string) => void;
   onToggleAutonomy: (next: boolean) => void;
@@ -71,6 +76,7 @@ export function KanbanBoardHeader({
   currentBoardId,
   autonomy,
   deepseekFlash,
+  vitals,
   onSelectBoard,
   onToggleAutonomy,
   onToggleDeepseekFlash,
@@ -115,6 +121,12 @@ export function KanbanBoardHeader({
           size="sm"
         />
       </div>
+
+      {/* The board's counts sit against its name, because they are ABOUT the board: identity, then
+          the state of that identity, then — across the gap — the controls that change it. The strip
+          never shrinks; below `xl` it stands down to its two amber registers on its own, so the
+          switcher still truncates by its own rule and the cluster to the right never moves. */}
+      <KanbanVitalsStrip vitals={vitals} />
 
       {/* Identity left, mode right, and the gap between them deliberate: the board's name is what
           a reader arrives on, and the autonomy switch is the one control here that changes what

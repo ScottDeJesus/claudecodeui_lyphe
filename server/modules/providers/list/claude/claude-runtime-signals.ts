@@ -6,10 +6,13 @@
  * nothing else. This module never imports the orchestrator: the callback is the only way out.
  *
  * Two memories, different in lifetime. Per run (`SignalState`): the last `api_retry`, and
- * whether this run has already said "sign in again". Module-level (`limitMemory`): one record
- * per rate-limit window, because limits are account-wide — a second session must not re-announce
- * what the first one did, and a window's reset timer has to outlive the run that armed it.
+ * whether this run has already said "sign in again". Per account (`claude-limit-memory`): one
+ * record per rate-limit window, because limits are account-wide — a second session must not
+ * re-announce what the first one did — kept on disk, because the server process that said it is
+ * replaced on every save, and a window's reset timer has to outlive the run that armed it.
  */
+import { accountLimitMemory, saveLimitMemory, windowMemory, type LimitMemory } from '@/modules/providers/list/claude/claude-limit-memory.js';
+
 
 /** What the runtime turns into a notification event; the caller adds provider and session. */
 export type RuntimeSignal = {
@@ -29,22 +32,13 @@ export type SignalState = {
 /** Where a signal goes, and the app session it belongs to. */
 type SignalContext = { sessionId: string | null; emit: (signal: RuntimeSignal) => void };
 
-/** One rate-limit window's memory: everything already said about it. */
-type LimitMemory = {
-  /** The `resetsAt` of the rejection already announced (0 when none was sent); null while open. */
-  announcedResetsAt: number | null;
-  resetTimer: ReturnType<typeof setTimeout> | null;
-  /** Warning thresholds already announced, cleared when the window returns to `allowed`. */
-  warnedBuckets: Set<number>;
-  overageAnnounced: boolean;
-  outOfCreditsAnnounced: boolean;
-};
-
-const limitMemory = new Map<string, LimitMemory>();
-
 /** Past a day out, the reset is left to the next `allowed` event rather than a held timer. */
 const RESET_TIMER_CAP_MS = 24 * 60 * 60 * 1000;
 const HIGH_WARNING_PCT = 95;
+/** Two readings this close together are the same window; a `resetsAt` that drifts a second is not news. */
+const SAME_WINDOW_SLACK_MS = 60_000;
+/** How long a warning stands when the stream names no window: past it, the next reading may warn again. */
+const UNNAMED_WINDOW_TTL_MS = 60 * 60 * 1000;
 const LOW_WARNING_PCT = 80;
 /** Limits that stop work outright; every other limit signal is an advisory. */
 const HARD_LIMIT_CODES = new Set(['limit.reached', 'limit.out_of_credits']);
@@ -75,18 +69,9 @@ function toEpochMs(resetsAt: number | null): number | null {
   return resetsAt === null ? null : (resetsAt < 1e12 ? resetsAt * 1000 : resetsAt);
 }
 
-function memoryFor(rateLimitType: string): LimitMemory {
-  let memory = limitMemory.get(rateLimitType);
-  if (!memory) {
-    memory = { announcedResetsAt: null, resetTimer: null, warnedBuckets: new Set<number>(), overageAnnounced: false, outOfCreditsAnnounced: false };
-    limitMemory.set(rateLimitType, memory);
-  }
-  return memory;
-}
-
 /**
  * What the window actually reads, and the step that reading falls in. The push carries the
- * reading — a 7-day window warns from a quarter full, and "at 25%" is the true thing to say.
+ * reading — a weekly window warns from a quarter full, and "at 25%" is the true thing to say.
  * The step is what silences every further reading until the window returns to `allowed`.
  */
 function warningReading(info: Record<string, unknown>): { pct: number; bucket: number } {
@@ -143,6 +128,12 @@ function armResetTimer(memory: LimitMemory, rateLimitType: string, resetsAt: num
     if (memory.announcedResetsAt === null) return;
     memory.announcedResetsAt = null;
     memory.warnedBuckets.clear();
+    memory.warnedWindowResetsAt = null;
+    // The name goes with the window, and so must its age: a fresh `warnedAt` beside a missing name
+    // reads as "the window I already warned about", which would refuse the NEXT window's name and
+    // let it warn a second time an hour in.
+    memory.warnedAt = 0;
+    saveLimitMemory();
     emitLimit(context, 'limit.reset', rateLimitType, { resetsAt }, String(resetsAt ?? 'unknown'));
   }, delay);
   timer.unref();
@@ -155,13 +146,44 @@ function handleRateLimitEvent(message: Record<string, unknown>, context: SignalC
   const rateLimitType = readText(info.rateLimitType) ?? 'unknown';
   const status = readText(info.status);
   const resetsAt = readNumber(info.resetsAt);
-  const memory = memoryFor(rateLimitType);
+  const memory = windowMemory(rateLimitType);
+  const account = accountLimitMemory();
+
+  // A limit belongs to the ACCOUNT, so what has already been said about a window is remembered for
+  // the window itself — not for the run that happened to read it. Clearing the steps on any
+  // `allowed` reading made every other live session re-announce the same threshold, which is one
+  // buzz per session for one fact about one account.
+  //
+  // Only a different window forgets them, and "different" has slack: a `resetsAt` a second off the
+  // one already seen is the same window described twice, and treating it as new would put the
+  // per-session noise back in a worse form. A stream that names NO window cannot be identified at
+  // all, so its warnings simply expire — otherwise one warning would silence that window type for
+  // the life of the process.
+  // An event that names no window says nothing about whether the window changed, so it neither
+  // clears the steps nor forgets the name another event gave them — one session's nameless reading
+  // would otherwise let the next reading warn again, which is the buzzing this exists to stop. Then
+  // only the age of the warning can end it.
+  const windowAt = toEpochMs(resetsAt);
+  const knownAt = toEpochMs(memory.warnedWindowResetsAt);
+  const sameWindow = windowAt !== null && knownAt !== null
+    ? Math.abs(windowAt - knownAt) <= SAME_WINDOW_SLACK_MS
+    : Date.now() - memory.warnedAt < UNNAMED_WINDOW_TTL_MS;
+  if (!sameWindow) {
+    memory.warnedBuckets.clear();
+  }
+  // A name is only ever taken from an event that carries one.
+  if (windowAt !== null && !sameWindow) {
+    memory.warnedWindowResetsAt = resetsAt;
+  }
 
   if (status === 'rejected') {
     // One announcement per rejection: a window that moves its reset time is a new one.
     if (memory.announcedResetsAt !== (resetsAt ?? 0)) {
       memory.announcedResetsAt = resetsAt ?? 0;
       emitLimit(context, 'limit.reached', rateLimitType, { resetsAt }, String(resetsAt ?? 'unknown'));
+      armResetTimer(memory, rateLimitType, resetsAt, context);
+    } else if (!memory.resetTimer) {
+      // Announced by a process that has since been replaced: the rejection stands, its timer did not.
       armResetTimer(memory, rateLimitType, resetsAt, context);
     }
   } else if (status === 'allowed') {
@@ -172,13 +194,13 @@ function handleRateLimitEvent(message: Record<string, unknown>, context: SignalC
       memory.announcedResetsAt = null;
       emitLimit(context, 'limit.reset', rateLimitType, { resetsAt }, String(announced || 'unknown'));
     }
-    memory.warnedBuckets.clear();
   }
 
   if (status === 'allowed_warning') {
     const { pct, bucket } = warningReading(info);
     if (!memory.warnedBuckets.has(bucket)) {
       memory.warnedBuckets.add(bucket);
+      memory.warnedAt = Date.now();
       emitLimit(context, 'limit.warning', rateLimitType, { resetsAt, pct }, String(bucket));
     }
   }
@@ -193,12 +215,21 @@ function handleRateLimitEvent(message: Record<string, unknown>, context: SignalC
   }
 
   const overageReason = readText(info.overageDisabledReason);
-  if (overageReason === 'out_of_credits' && !memory.outOfCreditsAnnounced) {
-    memory.outOfCreditsAnnounced = true;
-    emitLimit(context, 'limit.out_of_credits', rateLimitType, { resetsAt }, 'disabled');
-  } else if (overageReason !== null && overageReason !== 'out_of_credits') {
-    memory.outOfCreditsAnnounced = false;
+  const overageStatus = readText(info.overageStatus);
+  if (overageReason === 'out_of_credits') {
+    if (!account.creditsExhaustedAnnounced) {
+      account.creditsExhaustedAnnounced = true;
+      emitLimit(context, 'limit.out_of_credits', rateLimitType, { resetsAt }, 'disabled');
+    }
+  } else if (info.isUsingOverage === true || (overageStatus !== null && overageStatus !== 'rejected')) {
+    // Overage is available again — in use, or reported as anything but refused — so the next emptying
+    // is news. Two things that are NOT that: another disabled reason (`org_level_disabled` rides on
+    // every event this account sends, full wallet or empty), and an event that simply does not
+    // mention overage (the `seven_day_overage_included` reading in the same run says nothing about
+    // the wallet). Both re-armed the flag and announced one emptying twice.
+    account.creditsExhaustedAnnounced = false;
   }
+  saveLimitMemory();
 }
 
 /** Said once per run: a second push cannot make signing in any more necessary. */
@@ -224,7 +255,14 @@ function handleAssistantError(error: string, state: SignalState, context: Signal
     return;
   }
   if (error === 'billing_error') {
-    emitLimit(context, 'limit.out_of_credits', 'overage', { resetsAt: null }, 'billing');
+    // The same flag the `overageDisabledReason` road sets: one emptied wallet, one push, whichever
+    // road reports it and however many sessions hit it.
+    const account = accountLimitMemory();
+    if (!account.creditsExhaustedAnnounced) {
+      account.creditsExhaustedAnnounced = true;
+      saveLimitMemory();
+      emitLimit(context, 'limit.out_of_credits', 'overage', { resetsAt: null }, 'billing');
+    }
     return;
   }
   // A reply cut short by the output ceiling is the model's business, not the user's.

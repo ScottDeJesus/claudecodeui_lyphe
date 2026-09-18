@@ -83,6 +83,7 @@ const KIND_WORDS: Readonly<Record<UniverseNode['k'], string>> = {
   galaxy: 'repository',
   core: 'the sun',
   endpoint: 'endpoint',
+  system: 'integration',
 };
 
 /** Each edge kind as the word beside a neighbour. */

@@ -187,6 +187,8 @@ export type MarkSessionIdle = (
 /** Replaces the whole processing map with the server's view, used by the periodic running-sessions poll. */
 export type SyncProcessingSessions = (
   sessions: readonly SessionActivitySnapshot[],
+  /** A session the server does not list but that must stay marked — its send is still on the way. */
+  isStillSending?: (sessionId: string) => boolean,
 ) => void;
 
 /** Reports whether one session is currently producing a response. */
@@ -1794,64 +1796,64 @@ type TaskPriority = 'high' | 'medium' | 'low' | string;
 
 // ---------------------------
 
-//----------------- DESCENT ACCOUNTS AND USAGE ------------
-// The client mirror of the proxy's own contracts (`server/shared/types.ts` § DESCENT CONTRACTS),
-// which is where each field is documented against Descent's behaviour. The notes here are the
-// half a SCREEN has to get right: which unit a number is in, and what "unknown" looks like.
+//----------------- CLAUDE ACCOUNT CONTRACTS ------------
+// The client mirror of the server's own contracts (`server/shared/types.ts` § CLAUDE ACCOUNT
+// CONTRACTS), which is where each field is documented against the module's behaviour. The notes here
+// are the half a SCREEN has to get right: which unit a number is in, and what "unknown" looks like.
 
 /**
- * One Claude account slot Descent holds.
+ * One Claude account slot the switcher holds.
  * `expiresAt` is epoch MILLISECONDS — compare it to `Date.now()` with no conversion; `null`
  * means the expiry was never read, which renders as an em-dash and never as a warning.
  */
-export type DescentSlot = { slug: string; label: string; expiresAt: number | null; isActive: boolean };
+export type ClaudeAccountSlot = { slug: string; label: string; expiresAt: number | null; isActive: boolean };
 
 /**
- * Descent's account picture, or the calm reason there is none.
+ * The whole account picture, or the calm reason there is none.
  * `drift` (the live login differs from its saved copy) and `liveSessions` are facts a row
  * STATES; neither gates a switch. `unreadable: true` is reachable-with-no-slots — say that in
  * words, because an empty switcher otherwise reads as "you have no accounts".
  */
-export type DescentAccounts =
-  | { reachable: true; active: string | null; activeLabel: string | null; slots: DescentSlot[]; liveLabel: string | null; liveExpiresAt: number | null; drift: boolean; liveSessions: number; unreadable: boolean }
+export type ClaudeAccounts =
+  | { reachable: true; active: string | null; activeLabel: string | null; slots: ClaudeAccountSlot[]; liveLabel: string | null; liveExpiresAt: number | null; drift: boolean; liveSessions: number; unreadable: boolean }
   | { reachable: false; reason: string };
 
 /**
- * One usage window as Descent measured it.
+ * One usage window as the meter measured it.
  * `percent: null` is "no reading" (em-dash, empty track); `0` is a REAL reading and says
  * "0% used". `rolled: true` keeps a real but HISTORICAL percent — show it dim and say "was",
  * never drain it to zero. `severity` is present only when the vendor flagged the window, and
  * may only ESCALATE a meter's tone: a flagged window can read a comfortable 12 % and still
  * mean an account lock.
  */
-export type DescentUsageWindow = { key: string; label: string; percent: number | null; resetsAt: string | null; rolled?: boolean; severity?: string };
+export type ClaudeUsageWindow = { key: string; label: string; percent: number | null; resetsAt: string | null; rolled?: boolean; severity?: string };
 
 /**
- * Usage as Descent last measured it.
+ * Usage as the meter last measured it.
  * `checkedAt` and `staleSince` are epoch SECONDS — multiply by 1000 before `new Date`, unlike
- * `DescentSlot.expiresAt`, which is already milliseconds. With `reachable: false` the `reason`
- * is the proxy's own word (`unreachable` | `timeout` | `bad-response`); with `reachable: true`
- * it is Descent's — `''` healthy, `pending` a poll in flight (reading, not broken), otherwise
+ * `ClaudeAccountSlot.expiresAt`, which is already milliseconds. With `reachable: false` the `reason`
+ * is the route's own word (`unreachable`); with `reachable: true`
+ * it is the meter's — `''` healthy, `pending` a poll in flight (reading, not broken), otherwise
  * the cause of a degraded reading.
  */
-export type DescentUsage =
-  | { reachable: true; windows: DescentUsageWindow[]; degraded: boolean; reason: string; staleSince: number | null; checkedAt: number }
+export type ClaudeUsage =
+  | { reachable: true; windows: ClaudeUsageWindow[]; degraded: boolean; reason: string; staleSince: number | null; checkedAt: number }
   | { reachable: false; reason: string };
 
 // ---------------------------
 
-//----------------- DESCENT MEMORY INTAKE ------------
-// The client mirror of `server/shared/types.ts` § DESCENT CONTRACTS, where every field is
-// documented against Descent's behaviour; a change to either shape belongs in both files at once.
+//----------------- MEMORY INTAKE CONTRACTS ------------
+// The client mirror of `server/shared/types.ts` § MEMORY INTAKE CONTRACTS, where every field is
+// documented against the memory lane's behaviour; a change to either shape belongs in both files at once.
 
 /**
  * One row of a memory-intake list: enough to decide on, never enough to read. One lean shape serves
  * BOTH lists, so `status` says which one the row came back under — `pending` in the review queue,
  * `approved` on the filed list — and `assertedPath` is set only on an approved row.
  * `refusal` is the cap guard's own words about the last refused approve — the card is STILL
- * pending, so the row renders that text, and because Descent recorded it the text survives a
+ * pending, so the row renders that text, and because the row records it the text survives a
  * refresh and reaches every other tab too.
- * `sessionId` is the APP session id of the chat that proposed the memory — Descent's unverified
+ * `sessionId` is the APP session id of the chat that proposed the memory — the staging's unverified
  * provenance column, resolved on the server, display only: a list may mark a row as this chat's,
  * and nothing gates on it. `null` when the staging supplied none.
  */
@@ -1870,7 +1872,7 @@ export type MemoryCandidateFull = MemoryCandidateLean & { body: string; indexLin
  * One memory list — the review queue, or the filed memories when the read asked for them — or the
  * calm reason there is none; a read never fails.
  * `reachable: false` is NOT "nothing left": the list is empty and the panel
- * says Descent could not be read in words. It must never render as "All filed".
+ * says the queue could not be read in words. It must never render as "All filed".
  */
 export type MemoryPending =
   | { reachable: true; candidates: MemoryCandidateLean[] }
@@ -1878,9 +1880,9 @@ export type MemoryPending =
 
 /**
  * One candidate read by id, or the calm reason there is none.
- * `candidate: null` is Descent answering `ok: false`, which means ONE thing: no row carries that
- * id. A card reviewed elsewhere is NOT null — Descent's by-id read has no status filter
- * (`store_memory.py:343-349`) — it reads WHOLE, with `status` saying `approved` or `rejected`.
+ * `candidate: null` means ONE thing: no row carries that
+ * id. A card reviewed elsewhere is NOT null — the by-id read has no status filter
+ * — it reads WHOLE, with `status` saying `approved` or `rejected`.
  * Both cases render `memory.gone`: the screen's words for "no longer waiting", never an error.
  */
 export type MemoryCandidateRead =
@@ -1889,8 +1891,8 @@ export type MemoryCandidateRead =
 
 /**
  * What one review answered, in the terms the screen has to say back.
- * `refused` is a 422 carrying Descent's OWN text verbatim, so the row can show what to trim and
- * the card stays pending; `gone` is a 404 (reviewed elsewhere); `unreachable` is a 503 or a
+ * `refused` is a 422 carrying the service's OWN text verbatim, so the row can show what to trim and
+ * the card stays pending; `gone` is a 404 (reviewed elsewhere); `unreachable` is a 5xx or a
  * thrown fetch, and it alone is a fault.
  */
 export type MemoryReviewOutcome =
@@ -2099,7 +2101,9 @@ export type UniverseNode = {
   n: string;
   /** Parent node index; `-1` for a repo, the sun or an endpoint, which hang off nothing. */
   p: number;
-  k: 'galaxy' | 'core' | 'dir' | 'endpoint' | 'source' | 'config' | 'docs' | 'data-sql' | 'assets' | 'other';
+  /** `system` is a directory the crawler's `systems.json` names as an integration folder — Drybook,
+   *  Xactimate, XactAnalysis — a body like `dir` in every way but the mark. */
+  k: 'galaxy' | 'core' | 'dir' | 'endpoint' | 'system' | 'source' | 'config' | 'docs' | 'data-sql' | 'assets' | 'other';
   /** Lines of the file; `0` for a directory or an endpoint, which have no length. */
   l: number;
   /** Epoch SECONDS of the newest commit touching it — what a star's brightness is read from. */
@@ -2195,23 +2199,25 @@ export type UniverseDigest = { edits: number; execs: number; at: number };
 // the four slots. The placement is a setting the client owns (it never reaches the server), so
 // these types describe a stored shape rather than a wire one.
 
-/** Where a widget may sit beside the chat transcript. Two slots per side, so a widget dragged to a
- *  new corner keeps its column and only changes its end. */
-export type GutterSlotId = 'top-left' | 'bottom-left' | 'top-right' | 'bottom-right';
+/** Which side of the transcript a widget sits on. Each side is ONE stack: a widget is dropped into
+ *  a place in it, and the rest close up or make room — there is no fixed number of berths. */
+export type GutterSide = 'left' | 'right';
 
 /** The three widgets a chat gutter can hold: the plan-runner runs of the open session, the
  *  memory-intake rows proposed by it, and the subagents that session has pinned. These are the ids
  *  the DOM carries as `data-widget`, and the keys `useGutterPlacements` stores its records under. */
 export type GutterWidgetId = 'runner' | 'memory' | 'subagents';
 
-/** One widget's corner and whether it is expanded. A collapsed widget is still placed — it draws as
- *  a tab in its slot, which is what makes `open` a separate fact from `slot` rather than a third
- *  value of it. */
-export type GutterWidgetPlacement = { slot: GutterSlotId; open: boolean };
+/** One widget's place in its side's stack and whether it is expanded. `order` is the sort key within
+ *  the side, dense from 0 after every move; a collapsed widget is still placed — it draws as a tab
+ *  where it stands, which is what makes `open` a separate fact from the place rather than a value of
+ *  it. */
+export type GutterWidgetPlacement = { side: GutterSide; order: number; open: boolean };
 
-/** Every widget's placement, as stored in `UserPreferences.chatGutters`. A record rather than a pair
- *  of fields because a widget is addressed by its own id everywhere else in this feature, and a
- *  widget added later costs one member here rather than a second parallel field. */
+/** Every widget's placement for ONE chat. A record rather than a pair of fields because a widget is
+ *  addressed by its own id everywhere else in this feature, and a widget added later costs one member
+ *  here rather than a second parallel field. `UserPreferences.chatGutters` holds a fallback of this
+ *  shape plus one per session — see `useGutterPlacements`, which owns the stored shape. */
 export type ChatGutterPlacements = Record<GutterWidgetId, GutterWidgetPlacement>;
 
 // ---------------------------

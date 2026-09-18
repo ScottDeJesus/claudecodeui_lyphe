@@ -1,5 +1,6 @@
 import { kanbanBoardsDb, kanbanEventsDb, kanbanIdsDb, projectsDb } from '@/modules/database/index.js';
 import {
+  clampKanbanConcurrency,
   KANBAN_LEASE_STALE_SECONDS,
   type KanbanBoard,
   type KanbanEventRow,
@@ -62,7 +63,7 @@ function requireBoardName(name: string): string {
 
 /**
  * The board verbs: create, list, read, update, select, resolve for a project, count a board's
- * cards per status, and read the audit log.
+ * cards per status, nudge, and read the audit log.
  *
  * EVERY write here goes through `writeKanban` — no verb in this file opens a transaction, inserts
  * an event or broadcasts. A write verb threads `context?.actor` straight into the seam, so the
@@ -125,6 +126,11 @@ export const kanbanBoardsService = {
    * and the update are one statement inside one transaction rather than a read followed by a
    * hopeful write. Archiving is its own event kind, because "the board was archived" is what the
    * audit log is read for.
+   *
+   * `concurrency` is CLAMPED on the way in — `[0, KANBAN_CONCURRENCY_MAX]`, through the one clamp
+   * the read side uses too — so the number this returns is the number every later tick compares
+   * against, and a `99` is stored as the `4` it was read back as rather than as a value the board
+   * would fan out to. Zero is a real setting: it means the board spawns nothing.
    */
   updateBoard(
     boardId: string,
@@ -132,12 +138,15 @@ export const kanbanBoardsService = {
       name?: string;
       autonomy?: boolean;
       deepseekFlash?: boolean;
+      concurrency?: number;
       projectId?: string | null;
       archived?: boolean;
     },
     context?: KanbanWriteContext
   ): KanbanBoard {
     const name = patch.name === undefined ? undefined : requireBoardName(patch.name);
+    const concurrency =
+      patch.concurrency === undefined ? undefined : clampKanbanConcurrency(patch.concurrency);
 
     return writeKanban(
       {
@@ -153,6 +162,7 @@ export const kanbanBoardsService = {
           name,
           autonomy: patch.autonomy,
           deepseekFlash: patch.deepseekFlash,
+          concurrency,
           projectId: patch.projectId,
           archived: patch.archived,
         });
@@ -184,6 +194,24 @@ export const kanbanBoardsService = {
     });
 
     return { currentBoardId: boardId };
+  },
+
+  /**
+   * The operator's "go now": one audit row on the board, and nothing else.
+   *
+   * `store_nudge.py`'s nudge collapses a daemon's sleep, and this is the same act against a driver
+   * that ticks on an interval: the caller records that a human asked, and wakes the loop itself
+   * (`kanban-metis.routes.ts` schedules the tick on the next macrotask). The write is here rather
+   * than in that route because every write on this board goes through the seam, which is what makes
+   * a nudge visible in the audit log and on the wire like every other act — the caller that wakes
+   * the driver is the only thing this verb does not do.
+   */
+  nudgeBoard(boardId: string, context?: KanbanWriteContext): void {
+    writeKanban({ kind: 'metis.nudged', boardId, actor: context?.actor }, () => {
+      // Inside the transaction, so a nudge for a board that is gone is a 404 rather than an audit
+      // row naming a board nothing can be nudged on.
+      requireBoard(boardId);
+    });
   },
 
   /**

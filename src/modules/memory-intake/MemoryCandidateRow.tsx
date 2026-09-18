@@ -19,7 +19,7 @@ import { cn } from '@/shared/utils';
 
 type MemoryCandidateRowProps = {
   candidate: MemoryCandidateLean;
-  /** The refusal to show: this tab's freshest one, or the copy Descent recorded on the row. */
+  /** The refusal to show: this tab's freshest one, or the copy the server recorded on the row. */
   refusal: string | null;
   busy: boolean;
   onReview: (id: string, approve: boolean) => void;
@@ -47,7 +47,7 @@ const TARGET_ICONS: Record<string, LucideIcon> = {
  * The list is LEAN by design: it carries no body, so the full text is fetched for the ONE card
  * that was opened rather than for all hundred. Every string here is operator-authored free
  * text and reaches the DOM as a text node; the body often LOOKS like markdown and is still
- * shown as what it is, which is how Descent's own panel draws it.
+ * shown as what it is, which is how the review surface has always drawn it.
  *
  * There is no confirmation dialog before filing. Expanding to read IS the deliberate step, and
  * the amber `global` badge is the guard on the one target that reaches every session.
@@ -59,8 +59,8 @@ export function MemoryCandidateRow({ candidate, refusal, busy, onReview }: Memor
   // outside the row acts on it, and lifting it would re-render the whole queue on a click.
   const [expanded, setExpanded] = useState(false);
   // The whole memory, once read. Three states, and they are three different sentences:
-  // `undefined` is "never asked" (so the next expand retries), `null` is Descent saying no row
-  // carries this id, and an object is the text itself.
+  // `undefined` is "never asked" (so the next expand retries), `null` is the server saying no
+  // row carries this id, and an object is the text itself.
   const [full, setFull] = useState<MemoryCandidateFull | null | undefined>(undefined);
   // True while the by-id read is in flight, so the card says it is reading rather than looking
   // empty for as long as the request takes.
@@ -94,7 +94,7 @@ export function MemoryCandidateRow({ candidate, refusal, busy, onReview }: Memor
     setReadFailed(false);
     void (async () => {
       try {
-        const response = await api.descent.memory.candidate(candidate.id);
+        const response = await api.memory.candidate(candidate.id);
         const answer = (await response.json()) as MemoryCandidateRead;
         if (!expandedRef.current || !mountedRef.current) return;
         if (answer.reachable) setFull(answer.candidate);
@@ -118,11 +118,11 @@ export function MemoryCandidateRow({ candidate, refusal, busy, onReview }: Memor
   const targetWords = t(`memory.target.${candidate.target}`, { defaultValue: candidate.target });
   const TargetIcon = TARGET_ICONS[candidate.target] ?? StickyNoteIcon;
 
-  // A card reviewed elsewhere reads WHOLE: Descent's by-id read has no status filter
+  // A card reviewed elsewhere reads WHOLE: the by-id read has no status filter
   // (store_memory.py:343-349), so a full read can land carrying `approved` or `rejected` rather
   // than a null. That is the same news as no-such-id — this memory is no longer waiting — so it
-  // gets the same words in place of the body. The buttons stay: a press answers 422 in Descent's
-  // own text through the refusal path, and the next refresh drops the row.
+  // gets the same words in place of the body. The buttons stay: a press answers 422 in the
+  // server's own text through the refusal path, and the next refresh drops the row.
   const noLongerPending = full === null || (full !== undefined && full.status !== 'pending');
 
   return (

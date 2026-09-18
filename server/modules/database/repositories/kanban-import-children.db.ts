@@ -5,19 +5,21 @@ import type {
   KanbanImportDecision,
   KanbanImportEvent,
   KanbanImportIssue,
+  KanbanImportLesson,
   KanbanImportQuestion,
 } from '@/modules/database/repositories/kanban-import-rows.db.js';
 
 /**
- * The Descent importer's child-table writes: the six tables that hang off a card, spread into
- * `kanbanImportDb` beside the board and card statements.
+ * The Descent importer's child-table writes: the six tables that hang off a card, and the lessons
+ * that hang off nothing at all, spread into `kanbanImportDb` beside the board and card statements.
  *
- * They are apart from those two for one reason, and it is a rule rather than a size: NONE of
- * these six carries a timestamp guard. Descent overwrites them every run, in full. A guarded
- * child would be worse than either rule applied whole — a card whose questions came from here and
- * whose issues came from there is a card nobody can reason about — and none of the six has a
- * local editing surface to protect anyway. Keeping the guarded pair and the unguarded six in
- * separate files is what makes that rule visible rather than remembered.
+ * They are apart from those two for one reason, and it is a rule rather than a size: NONE of them
+ * carries a timestamp guard. Descent overwrites them every run, in full. A guarded child would be
+ * worse than either rule applied whole — a card whose questions came from here and whose issues
+ * came from there is a card nobody can reason about — and none of them has a local edit a guard
+ * would protect: a lesson IS reviewed here, and a re-import still refreshes it from the install it
+ * came from, which is the whole truth about a row that carries its id. Keeping the guarded pair and
+ * the unguarded rest in separate files is what makes that rule visible rather than remembered.
  *
  * Every statement keys on `descent_id` (except the tags, whose pair is its own key) and returns
  * its `changes` count, so the caller can tell an insert from a refresh without a second read.
@@ -84,7 +86,7 @@ export const kanbanImportChildrenDb = {
   /**
    * Inserts or refreshes one decision.
    *
-   * `question_id` is a translated LypheCLI id and NOT Descent's own: the column is a local
+   * `question_id` is a translated Athena id and NOT Descent's own: the column is a local
    * pointer, and an id from another database in it would name a question that is not here.
    */
   upsertDecision(decision: KanbanImportDecision): number {
@@ -184,6 +186,53 @@ export const kanbanImportChildrenDb = {
         event.actor,
         event.payload,
         event.descentId
+      ).changes;
+  },
+
+  /**
+   * Inserts or refreshes one imported lesson — unguarded, like the six above it.
+   *
+   * `card_id` is translated from the source's `feature_id` and is NULL when that card never landed
+   * here: a lesson belongs to the estate rather than to a card, so its card is provenance and a
+   * missing one is a null rather than a reason to leave the note behind.
+   *
+   * `draft_path` travels as the string Descent recorded and no file is written: the import brings
+   * the corpus over, and a `kind = 'skill_draft'` row's bytes stay where the old install put them —
+   * promoting a draft is the lesson lane's own act, on a row a person staged here.
+   *
+   * Unreviewed by design, in the same words the six above use: the source is the whole truth about
+   * a row that carries a `descent_id`, so a re-import refreshes `status` and `reviewed_at` together
+   * and a review performed here does not outrank the install it was imported from.
+   */
+  upsertLesson(lesson: KanbanImportLesson): number {
+    const db = getConnection();
+    return db
+      .prepare(
+        `INSERT INTO kanban_lessons (id, card_id, name, summary, body, trigger, kind, tags, status,
+                                     source, draft_path, created_at, reviewed_at, descent_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT(descent_id) DO UPDATE SET
+           card_id = excluded.card_id, name = excluded.name, summary = excluded.summary,
+           body = excluded.body, trigger = excluded.trigger, kind = excluded.kind,
+           tags = excluded.tags, status = excluded.status, source = excluded.source,
+           draft_path = excluded.draft_path, created_at = excluded.created_at,
+           reviewed_at = excluded.reviewed_at`
+      )
+      .run(
+        lesson.id,
+        lesson.cardId,
+        lesson.name,
+        lesson.summary,
+        lesson.body,
+        lesson.trigger,
+        lesson.kind,
+        lesson.tags,
+        lesson.status,
+        lesson.source,
+        lesson.draftPath,
+        lesson.createdAt,
+        lesson.reviewedAt,
+        lesson.descentId
       ).changes;
   },
 };

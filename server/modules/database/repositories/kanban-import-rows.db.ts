@@ -124,6 +124,31 @@ export type KanbanImportEvent = {
 };
 
 /**
+ * One lesson as the importer writes it.
+ *
+ * `cardId` is NULLABLE where every card child above is not: a lesson is the ESTATE's, not a card's
+ * (`kanban_lessons.card_id` is `SET NULL` on the card's delete), so a lesson whose `feature_id`
+ * names a card this board never imported lands with no card rather than being dropped. `draftPath`
+ * is Descent's own file path, carried as it was found — this import writes no skill file.
+ */
+export type KanbanImportLesson = {
+  id: string;
+  cardId: string | null;
+  name: string;
+  summary: string;
+  body: string;
+  trigger: string;
+  kind: string;
+  tags: string;
+  status: string;
+  source: string;
+  draftPath: string | null;
+  createdAt: string;
+  reviewedAt: string | null;
+  descentId: string;
+};
+
+/**
  * The card's columns, in the order `KanbanImportCard` declares them — one spelling, so no
  * statement is the odd one out and the twenty-four placeholders below cannot drift from the list.
  */

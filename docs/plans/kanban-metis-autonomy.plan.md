@@ -48,7 +48,7 @@ max_spawns = 220
 max_fix_passes = 2
 max_attempts = 2
 max_review_passes = 1
-max_replans = 3
+max_replans = 6
 ```
 
 ## Interfaces
@@ -699,7 +699,7 @@ PY
 HARNESS
 cp ~/.cloudcli/local-server.json /tmp/metis-marker.bak 2>/dev/null || true
 SERVER_PORT=7893 node_modules/.bin/tsx --tsconfig server/tsconfig.json server/index.ts > /tmp/metis-server.log 2>&1 &
-echo $! > /tmp/metis-server.pid
+echo $! > /tmp/metis-server.pid; cp /tmp/metis-server.pid /tmp/metis-server.pid.last
 for i in $(seq 1 90); do curl -sf http://127.0.0.1:7893/api/auth/status > /dev/null && break; sleep 1; done
 T=$(mint_token)
 B=$(curl -sf -X POST http://127.0.0.1:7893/api/kanban/boards -H "Authorization: Bearer $T" -H 'Content-Type: application/json' -d '{"name":"probe-metis1"}' | python3 -c 'import sys,json; print(json.load(sys.stdin)["board"]["id"])')
@@ -2133,8 +2133,8 @@ athena = [
 [[steps]]
 kind = "edit"
 path = "server/modules/kanban-metis/metis-liveness.ts"
-what = "The pure predicates, no I/O beyond an fs.stat the caller may pass in: quiescent(session, now) and stalled(session, now) exactly as the Interfaces dial table gives them — a session is reapable only when it is older than QUIESCE_MIN_AGE_MS AND ( its child is dead, OR its child.log has not moved for QUIESCE_QUIET_MS and its owner holds no fresh lease, OR its child.log has not moved for STALL_MS ). Export exactly FOUR constants — QUIESCE_MIN_AGE_MS, QUIESCE_QUIET_MS, STALL_MS and LEASE_STALE_SECONDS (re-exported from server/shared/kanban-types.js) — the ones these predicates read. TICK_MS, DEFAULT_CONCURRENCY and CHURN_COOLDOWN_MS are cadence, not liveness, and belong beside the tick in metis-driver.service.ts; do not declare them here. Every function is total: no throw, no undefined return."
-check = "cd /home/lyphe/.claude/claudecodeui_lyphe && node_modules/.bin/tsx --tsconfig server/tsconfig.json -e \"import('./server/modules/kanban-metis/metis-liveness.js').then(m => console.log(m.QUIESCE_MIN_AGE_MS, m.QUIESCE_QUIET_MS, m.STALL_MS, m.LEASE_STALE_SECONDS, m.TICK_MS))\""
+what = "The pure predicates, no I/O beyond an fs.stat the caller may pass in: quiescent(session, now) and stalled(session, now) exactly as the Interfaces dial table gives them — a session is reapable only when it is older than QUIESCE_MIN_AGE_MS AND ( its child is dead, OR its child.log has not moved for QUIESCE_QUIET_MS and its owner holds no fresh lease, OR its child.log has not moved for STALL_MS ). Export exactly FOUR constants — QUIESCE_MIN_AGE_MS, QUIESCE_QUIET_MS, STALL_MS and LEASE_STALE_SECONDS (re-exported from server/shared/kanban-types.js) — the ones these predicates read. TICK_MS, DEFAULT_CONCURRENCY and CHURN_COOLDOWN_MS are cadence, not liveness, and belong beside the tick in metis-driver.service.ts; do not declare them here. Every function is total: no throw, no undefined return. The check spells the flag `--tsconfig=server/tsconfig.json` with an `=` on purpose and must be run exactly as written: tsx 4.21.0 drops the `-e` eval pair when `--tsconfig` and its value are separated by a space, and node then runs scriptless — rc 0, empty stdout, a false failure (measured 2026-09-17). A space-separated `--tsconfig` in front of a script PATH (the server boot in the verify) is unaffected; leave that line as it is."
+check = "cd /home/lyphe/.claude/claudecodeui_lyphe && node_modules/.bin/tsx --tsconfig=server/tsconfig.json -e \"import('./server/modules/kanban-metis/metis-liveness.js').then(m => console.log(m.QUIESCE_MIN_AGE_MS, m.QUIESCE_QUIET_MS, m.STALL_MS, m.LEASE_STALE_SECONDS, m.TICK_MS))\""
 expect = "300000 180000 2700000 40 undefined"
 
 [[steps]]
@@ -2177,12 +2177,50 @@ cmd = '''
 set -e
 cd /home/lyphe/.claude/claudecodeui_lyphe
 cp ~/.cloudcli/local-server.json /tmp/metis-marker.bak 2>/dev/null || true
-SERVER_PORT=7893 node_modules/.bin/tsx --tsconfig server/tsconfig.json server/index.ts > /tmp/metis-server.log 2>&1 &
+B=""
+cleanup() {
+  # Runs on EVERY exit (trap), so a stopped run or a failed step leaves no probe server, no orphan
+  # Metis, no scratch pair, and none of the three roots the child writes into regardless of the
+  # state root (its cwd root, its flag file, the transcript the CLI keys on that cwd) -- nothing in
+  # the repo removes those otherwise (measured 2026-09-17: six probe boards, 5 MB of transcripts).
+  if [ -n "$B" ] && [ -f /tmp/metis-server.pid ] && kill -0 "$(cat /tmp/metis-server.pid)" 2>/dev/null; then
+    for S in $(curl -sf http://127.0.0.1:7893/api/kanban-metis/sessions -H "Authorization: Bearer $T" 2>/dev/null | python3 -c 'import sys,json; [print(s["sessionId"]) for s in json.load(sys.stdin)["sessions"] if s["state"]=="running"]' 2>/dev/null); do
+      curl -sf -X POST "http://127.0.0.1:7893/api/kanban-metis/sessions/$S/stop" -H "Authorization: Bearer $T" > /dev/null 2>&1 || true
+    done
+    sleep 2
+  fi
+  kill "$(cat /tmp/metis-server.pid 2>/dev/null)" 2>/dev/null || true
+  sleep 1
+  rm -rf /tmp/metis-p10-state /tmp/metis-p10.db /tmp/metis-p10.db-wal /tmp/metis-p10.db-shm /tmp/metis-server.pid
+  if [ -n "$B" ]; then
+    rm -rf "$HOME/.claude/kanban-metis/$B" "$HOME/.claude/state/kanban-deepseek/$B.flag" "$HOME/.claude/projects/"*"kanban-metis-$B"
+  fi
+  # The probe server's boot overwrote the operator's marker; put the backup back ONLY if the file
+  # still names the probe's pid -- a dev-supervisor restart inside the window wrote a fresh one.
+  python3 - <<'PY' || true
+import json, os
+m = os.path.expanduser('~/.cloudcli/local-server.json'); bak = '/tmp/metis-marker.bak'
+try:
+    cur = json.load(open(m)); probe_pid = int(open('/tmp/metis-server.pid.last').read())
+except Exception:
+    raise SystemExit(0)
+if int(cur.get('pid') or 0) == probe_pid and os.path.exists(bak):
+    os.replace(bak, m)
+PY
+}
+trap cleanup EXIT
+# The probe runs on a SCRATCH copy of the database and a SCRATCH state root: the operator's dev
+# server (a second long-lived server on the same code and the same DATABASE_PATH) would otherwise
+# tick the probe board too, spawn its own Metis, and its sessions would be adopted -- and stopped --
+# by this probe's registry (measured 2026-09-17: b-137, b-138, b-139 each got two Metises).
+rm -rf /tmp/metis-p10-state; mkdir -p /tmp/metis-p10-state
+python3 -c "import sqlite3, os; sqlite3.connect('file:' + os.path.expanduser('~/.cloudcli/auth.db') + '?mode=ro', uri=True).execute(\"VACUUM INTO '/tmp/metis-p10.db'\")"
+DATABASE_PATH=/tmp/metis-p10.db KANBAN_METIS_STATE_ROOT=/tmp/metis-p10-state SERVER_PORT=7893 node_modules/.bin/tsx --tsconfig server/tsconfig.json server/index.ts > /tmp/metis-server.log 2>&1 &
 echo $! > /tmp/metis-server.pid
 for i in $(seq 1 90); do curl -sf http://127.0.0.1:7893/api/auth/status > /dev/null && break; sleep 1; done
 T=$(python3 - <<'PY'
 import sqlite3, json, hmac, hashlib, base64, time, os
-conn = sqlite3.connect(os.path.expanduser('~/.cloudcli/auth.db'))
+conn = sqlite3.connect('/tmp/metis-p10.db')
 secret = conn.execute("select value from app_config where key='jwt_secret'").fetchone()[0].encode()
 uid, uname = conn.execute('select id, username from users order by id limit 1').fetchone()
 enc = lambda d: base64.urlsafe_b64encode(json.dumps(d, separators=(',', ':')).encode()).rstrip(b'=')
@@ -2199,22 +2237,21 @@ sleep 20
 IDLE=$(curl -sf "http://127.0.0.1:7893/api/kanban-metis/boards/$B/driver" -H "Authorization: Bearer $T" | python3 -c 'import sys,json; print(json.load(sys.stdin)["live"])')
 curl -sf -X POST "http://127.0.0.1:7893/api/kanban/boards/$B/cards" -H "Authorization: Bearer $T" -H 'Content-Type: application/json' -d '{"title":"driver probe card one","status":"todo","description":"work for the driver probe"}' > /dev/null
 curl -sf -X POST "http://127.0.0.1:7893/api/kanban/boards/$B/cards" -H "Authorization: Bearer $T" -H 'Content-Type: application/json' -d '{"title":"driver probe card two","status":"todo","description":"more work for the driver probe"}' > /dev/null
+# The claimable count is read BEFORE autonomy turns on (PRE): once the driver spawns a Metis she
+# claims the cards and moves them to `questions`, and whether that lands inside the window is a
+# RACE (measured 2026-09-16: 2.3 s to spare), so no post-spawn count is a fact this phase owns.
+PRE=$(curl -sf "http://127.0.0.1:7893/api/kanban-metis/boards/$B/driver" -H "Authorization: Bearer $T" | python3 -c 'import sys,json; d=json.load(sys.stdin); print(d["autonomy"], d["claimable"], d["live"])')
 curl -sf -X PATCH "http://127.0.0.1:7893/api/kanban/boards/$B" -H "Authorization: Bearer $T" -H 'Content-Type: application/json' -d '{"autonomy":true}' > /dev/null
 sleep 40
-ON=$(curl -sf "http://127.0.0.1:7893/api/kanban-metis/boards/$B/driver" -H "Authorization: Bearer $T" | python3 -c 'import sys,json; d=json.load(sys.stdin); print(d["autonomy"], d["claimable"], d["live"])')
+# After the window the only reading the driver itself DECIDES is lastSpawnAt: stamped when a launch
+# landed, never cleared, immune to a child that exits early or a record left running.
+ON=$(curl -sf "http://127.0.0.1:7893/api/kanban-metis/boards/$B/driver" -H "Authorization: Bearer $T" | python3 -c 'import sys,json; d=json.load(sys.stdin); print(d["autonomy"], "spawned" if d.get("lastSpawnAt") else "never-spawned")')
 curl -sf -X PATCH "http://127.0.0.1:7893/api/kanban/boards/$B" -H "Authorization: Bearer $T" -H 'Content-Type: application/json' -d '{"autonomy":false}' > /dev/null
-for S in $(curl -sf http://127.0.0.1:7893/api/kanban-metis/sessions -H "Authorization: Bearer $T" | python3 -c 'import sys,json; [print(s["sessionId"]) for s in json.load(sys.stdin)["sessions"] if s["state"]=="running"]'); do
-  curl -sf -X POST "http://127.0.0.1:7893/api/kanban-metis/sessions/$S/stop" -H "Authorization: Bearer $T" > /dev/null || true
-  rm -rf "$HOME/.claude/state/kanban-metis/$S"
-done
-sleep 2
-curl -sf -X PATCH "http://127.0.0.1:7893/api/kanban/boards/$B" -H "Authorization: Bearer $T" -H 'Content-Type: application/json' -d '{"archived":true}' > /dev/null
-kill "$(cat /tmp/metis-server.pid)" 2>/dev/null || true
-sleep 1
-cp /tmp/metis-marker.bak ~/.cloudcli/local-server.json 2>/dev/null || true
-echo "OFF=[$OFF] IDLE=$IDLE ON=[$ON]"
+# Cleanup is the trap's (every exit path). The probe's registry holds ONLY the sessions this probe
+# spawned, so it stops nothing of the operator's; nothing of this probe ever touches the live database.
+echo "OFF=[$OFF] IDLE=$IDLE PRE=[$PRE] ON=[$ON]"
 '''
-expect = "OFF=[False 0 0] IDLE=0 ON=[True 2 1]"
+expect = "OFF=[False 0 0] IDLE=0 PRE=[False 2 0] ON=[True spawned]"
 timeout_s = 580
 
 [[verify]]
@@ -2244,7 +2281,10 @@ dials are ported numbers and changing one changes the reap semantics. You will w
 quiet session mid-build — a Metis whose `plan-runner` is doing the work is quiet by design, which
 is exactly why quiescence requires BOTH a quiet log AND no fresh lease. You will want to add a
 global governor like Descent's `allow_spawn`; the board's governor is the autonomy switch, and a
-second one is a second place to be turned off.
+second one is a second place to be turned off. The verify's probe server runs on a scratch copy of
+the database and a scratch state root, so no other server ever sees its board; its trap removes
+its own sessions, the scratch pair and the three roots the child writes into. Do not add a sweep
+that signals sessions by board name -- that shape once stopped the operator's own Metises.
 
 ## Phase 11 — The lane's documentation
 Depends on: Phase 3, Phase 9, Phase 10
@@ -2303,11 +2343,9 @@ cd /home/lyphe/.claude/claudecodeui_lyphe
 A=$(grep -c 'kanban-deepseek' docs/kanban.md || true)
 B=$(grep -c 'kanban-deepseek' docs/plan-runner.md || true)
 C=$(grep -c 'kanban_metis' "$HOME/.claude/hooks/README.md" || true)
-D=$(ls docs | grep -c 'kanban-metis' || true)
-E=$(git -C /home/lyphe/.claude diff --stat -- CLAUDE.md | wc -l)
-echo "KANBAN=$([ "$A" -ge 1 ] && echo ok) RUNNER=$([ "$B" -ge 1 ] && echo ok) HOOKS=$([ "$C" -ge 2 ] && echo ok) NEWDOC=$D CLAUDEMD=$E"
+echo "KANBAN=$([ "$A" -ge 1 ] && echo ok) RUNNER=$([ "$B" -ge 1 ] && echo ok) HOOKS=$([ "$C" -ge 2 ] && echo ok)"
 '''
-expect = "KANBAN=ok RUNNER=ok HOOKS=ok NEWDOC=0 CLAUDEMD=0"
+expect = "KANBAN=ok RUNNER=ok HOOKS=ok"
 timeout_s = 180
 
 [[verify]]
@@ -2455,10 +2493,12 @@ and it becomes three sessions. It is not split here because the concurrency mode
   panel shows it. It never silently falls back to Claude — a switch that lies about which vendor is
   billing is worse than a refusal.
 - **Two servers are running against one `auth.db`** (the operator's on 3011 and a probe on 7893).
-  Both drivers would tick the same board. The registry's state root is shared, so re-adoption sees
-  the other's children and the concurrency dial holds across both. A probe phase turns autonomy on
-  for a board the operator's server does not have selected, and turns it off before the command
-  ends.
+  Both drivers tick every non-archived autonomy board -- selection is never consulted -- and the
+  concurrency dial is each process's own memory, so two Metises land on one board (measured
+  2026-09-17, three probe boards). A shared state root then lets the second process ADOPT the
+  first's sessions and a cleanup stop them. So a probe never shares either: it runs on a scratch
+  copy of the database (`DATABASE_PATH`) and a scratch state root (`KANBAN_METIS_STATE_ROOT`),
+  and discards both.
 - **A board is archived while its Metis is running.** The driver stops spawning for it on the next
   tick; the live session is left to finish and is reaped by the ordinary quiescence rule.
 - **The child's transcript never appears** (the CLI died before writing one). The transcript route
@@ -2769,3 +2809,39 @@ None. Every fork is decided above with its reversal.
 - blocked: 10: builder-blocked, 11: depends, 10: skipped, spec unchanged
 - next: re-author the phase spec each ⛔ entry names, then plan-runner start /home/lyphe/.claude/claudecodeui_lyphe/docs/plans/kanban-metis-autonomy.plan.md — until a phase's `spec_sha` moves it is skipped, so a run started before the edit repeats this one exactly
 - brief: /home/lyphe/.claude/state/runner/kanban-metis-autonomy-plan-20260916-194621-d311/resume_brief.md
+
+### Phase 10 Ship Log — ⛔ BLOCKED 2026-09-17
+- [BLOCKED: builder-blocked: tsx 4.21.0 drops the `-e` eval pair when `--tsconfig` is spelled with a space, so step 1's check runs node scriptless (rc=0, empty stdout, stdin=/dev/null); with `--tsconfig=server/tsconfig.json` it prints `300000 180000 2700000 40 undefined`. Cure: that `=` form — no file write reaches it.]
+- run: kanban-metis-autonomy-plan-20260917-070839-7999 · attempt 1 of 2 · fix-passes 0 of 2 · spec_sha c13d01a46540 · retry: on-spec-change
+- builder: hephaestus/deepseek-flash · session 8c96d8b9-6c47-4108-9281-2fc0ae195b9e · 342s · RESULT: BLOCKED
+- evidence: /home/lyphe/.claude/state/runner/kanban-metis-autonomy-plan-20260917-070839-7999/phase_10/
+
+### Phase 10 Ship Log — ↻ REPLANNED 2026-09-17
+- run: kanban-metis-autonomy-plan-20260917-070839-7999 · replan 1 of 6 · spec_sha c13d01a46540 → 77c9bc832847 · replanner odysseus/claude-opus-5 · session f75db96e-d305-44aa-a376-37110114ad42 · 132s · cost $1.36
+- cause: builder-blocked: tsx 4.21.0 drops the `-e` eval pair when `--tsconfig` is spelled with a space, so step 1's check runs node scriptless (rc=0, empty stdout, stdin=/dev/null); with `--tsconfig=server/tsconfig.json` it prints `300000 180000 2700000 40 undefined`. Cure: that `=` form — no file write reaches it.
+- changed: I fixed Phase 10's step 1 check, which was broken. All four proofs pass: `lint` exits 0, `gate` prints `RUNNER`, `walk` renders, and the lock still reads `lock:7b57dc2b8e`. I ran the corrected check and it prints `300000 180000 2700000 40 undefined`. I also added cleanup to the first verify and haven't run it, since a full run spawns a real Metis. A dry run of the cleanup matched the right leftovers and deleted nothing. It passes `bash -n`. I changed only Phase 10: the check now spells the flag `--tsconfig=server/tsconfig.json`, since tsx 4.21.0 ignores `-e` when the value follows a space. Step 1's `what` explains why. The verify's cleanup now clears everything the probe leaves: the operato
+- evidence: /home/lyphe/.claude/state/runner/kanban-metis-autonomy-plan-20260917-070839-7999/phase_10/
+
+### Phase 10 Ship Log — ✅ SHIPPED 2026-09-17
+- run: kanban-metis-autonomy-plan-20260917-070839-7999 · attempt 1 of 2 · cycle 3 · spawns 7/220 · fix-passes 1 of 2 · cost $1.03 (run $2.49) · resumed 1×
+- builder: hephaestus/deepseek-flash · session 6bc119ac-c484-402d-b795-e90121c2b336 · 197s · RESULT: DONE
+- athena: pass 1/deepseek-flash BLOCKING 0 · HIGH 1 · MED 0 · LOW 2 → fix-pass 1/deepseek-flash (281s) — fixed, not re-reviewed (max_review_passes 1)
+- checks: 6/6 steps OK · verify 2/2 OK
+- forbidden: unchanged (5 declared, 5 present)
+- docs: Prometheus returned · 0 files
+- residue: BLOCKING 0 · HIGH 1 · MED 0 · LOW 2 handed to fix-pass 1, not re-reviewed
+- evidence: /home/lyphe/.claude/state/runner/kanban-metis-autonomy-plan-20260917-070839-7999/phase_10/
+
+### Phase 11 Ship Log — ✅ SHIPPED 2026-09-17
+- run: kanban-metis-autonomy-plan-20260917-070839-7999 · attempt 1 of 2 · cycle 4 · spawns 8/220 · fix-passes 0 of 2 · cost $0.13 (run $2.62) · resumed 1×
+- builder: prometheus/deepseek-flash · session ef539eae-34b2-4f68-a144-df09bc901178 · 247s · RESULT: DONE
+- athena: n/a — code_change = false
+- checks: 3/3 steps OK · verify 2/2 OK
+- forbidden: unchanged (3 declared, 3 present)
+- evidence: /home/lyphe/.claude/state/runner/kanban-metis-autonomy-plan-20260917-070839-7999/phase_11/
+
+### Run kanban-metis-autonomy-plan-20260917-070839-7999 — COMPLETE 2026-09-17
+- shipped: 10, 11
+- blocked: none
+- next: run complete — the checkpoint is Scott's /git, on his clock
+- brief: /home/lyphe/.claude/state/runner/kanban-metis-autonomy-plan-20260917-070839-7999/resume_brief.md

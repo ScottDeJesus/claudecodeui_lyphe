@@ -55,6 +55,8 @@ export type HostMeta = {
   profile?: Record<string, unknown> | null;
   deliveredSeq: number;
   pendingResults: number[];
+  /** Delivered `control_request`s the API has not answered on stdin; absent on a meta from before the field. */
+  pendingControl?: { seq: number; requestId: string }[];
   exited: { code: number | null; signal: string | null; at: number } | null;
 };
 

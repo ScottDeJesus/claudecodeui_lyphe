@@ -34,6 +34,22 @@ export const TOOL_OUTCOME_TONE: Record<ToolOutcome, Tone> = {
  * off the socket, one re-serialized through the transcript — and JSON key order
  * is not a promise either of them makes.
  */
+/**
+ * Every request id the run stream has settled — `permission_resolved` or `permission_cancelled` —
+ * for the life of the tab. A card that sent an answer cannot tell from its own state whether any
+ * server received it: an API handed over between the prompt and the tap holds no such request,
+ * the decision is a silent no-op, and the successor re-issues the prompt under a NEW id. Only a
+ * settlement names the answer as delivered; a card whose answer was never settled must offer the
+ * re-issued prompt (once — `QuestionAnswerContent` closes that door the moment the request it let
+ * through is settled by anyone).
+ * consumer: useChatRealtimeHandlers (mark), QuestionAnswerContent (ask)
+ */
+const settledPermissionRequests = new Set<string>();
+export const markPermissionSettled = (requestId: string): void => {
+  settledPermissionRequests.add(requestId);
+};
+export const wasPermissionSettled = (requestId: string): boolean => settledPermissionRequests.has(requestId);
+
 export function permissionKey(toolName: string | undefined, input: unknown): string {
   const parsed = typeof input === 'string' ? safeParse(input) : input;
   return `${toolName ?? ''}::${stableStringify(parsed)}`;

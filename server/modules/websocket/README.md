@@ -41,7 +41,7 @@ Benefits:
 |---|---|
 | `services/websocket-server.service.ts` | Creates `WebSocketServer`, binds `verifyClient`, routes connection by pathname |
 | `services/websocket-auth.service.ts` | Authenticates upgrade requests and attaches `request.user` |
-| `services/chat-websocket.service.ts` | Handles the `/ws` chat protocol (`chat.send` / `chat.edit-send` / `chat.abort` / `chat.subscribe` / `chat.permission-response` / `chat.presence`). A visible `chat.presence` also marks that session read when it was unread, and broadcasts `session_upserted` only when a row changed |
+| `services/chat-websocket.service.ts` | Handles the `/ws` chat protocol (`chat.send` / `chat.edit-send` / `chat.abort` / `chat.subscribe` / `chat.permission-response` / `chat.presence` / `chat.ping`). A visible `chat.presence` also marks that session read when it was unread, and broadcasts `session_upserted` only when a row changed |
 | `services/chat-run-registry.service.ts` | Tracks live provider runs per app session id: seq numbering, event replay buffer, provider-id mapping, completion state, and `lastEventAt` — the silence clock every recorded event resets. On the terminal `complete` it stamps `last_completed_at` once per run end (and `last_read_at` with it when the chat is on screen), then broadcasts `session_upserted` — except for a re-adopted run whose last turn end its host journal shows was already recorded (`completeRunIfCurrent(..., { alreadyRecorded: true })`, decided in `session-host/readopt.ts`), which closes without stamping |
 | `services/chat-session-writer.service.ts` | Gateway writer handed to provider runtimes: remaps provider session ids to app ids, swallows `session_created`, assigns `seq` |
 | `services/run-stall-watchdog.service.ts` | Polls the registry's running runs and announces one that has gone quiet past the threshold. A poller rather than a timer per run, so a run that ended cannot leak one |
@@ -117,7 +117,7 @@ When a chat socket connects:
 
 1. Add socket to `connectedClients`.
 2. Parse each incoming message with `parseIncomingJsonObject`.
-3. Dispatch by `data.type` (six message types, none provider-specific).
+3. Dispatch by `data.type` (seven message types, none provider-specific).
 4. On close, remove socket from `connectedClients` and drop this socket's presence record.
 
 ### Session identity model

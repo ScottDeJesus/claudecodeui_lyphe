@@ -1,7 +1,7 @@
 import { GLOW_MULT, GLOW_MULT_DEFAULT, bokehOf, coreOf, dopplerSwing, glowOf, isDustRegime } from '@/modules/universe/utils/universeStarGeometry';
 import { isFile } from '@/modules/universe/utils/universeGraph';
 import { STARS_FRAGMENT_SOURCE, STARS_VERTEX_SOURCE } from '@/modules/universe/utils/universeStarsShaders';
-import { KIND_TOKEN, bandedBrightness, channelsForNode, rgbOf } from '@/modules/universe/utils/universeTokens';
+import { bandedBrightness, channelsForNode, glowColorOf, rgbOf } from '@/modules/universe/utils/universeTokens';
 import { viewportBounds } from '@/modules/universe/utils/universeView';
 import type { UniverseGraph, UniverseGraphNode } from '@/modules/universe/utils/universeGraph';
 import type { UniverseTokens } from '@/modules/universe/utils/universeTokens';
@@ -88,7 +88,7 @@ const MIN_RECORDS = 256;
  */
 export const CORE_IRIS_RADII = 2.6;
 export const CORE_IRIS_ALPHA = 0.9;
-export const KIND_DIM: Record<string, number> = { docs: 0.8, dir: 0.9 };
+export const KIND_DIM: Record<string, number> = { docs: 0.8, dir: 0.9, system: 0.9 };
 
 /**
  * The alpha a star's disc is drawn at, by the rule the core pass draws it by — and the reason this
@@ -242,7 +242,7 @@ export function createStarsGL(canvas: HTMLCanvasElement): StarsGL | null {
     for (const node of graph.act) {
       if (node.x < bounds.x0 || node.x > bounds.x1 || node.y < bounds.y0 || node.y > bounds.y1) continue;
       const glow = glowOf(node, now, 0);
-      const color = rgbOf(tokens, KIND_TOKEN[node.kind]);
+      const color = rgbOf(tokens, glowColorOf(node, tokens));
       // THE GATE THE GLOW PASS ITSELF USES, read before anything is written: a file's glow under a
       // couple of screen pixels is a dot the 2D pass never drew. The bokeh and the iris ride it,
       // because both are drawn inside a glow's reach.

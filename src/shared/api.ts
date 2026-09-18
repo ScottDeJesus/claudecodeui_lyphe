@@ -138,6 +138,24 @@ const query = (params: Record<string, QueryValue>): string => {
 };
 
 /**
+ * The server's own sentence, out of whatever the envelope put in `error` or `details`.
+ *
+ * Two shapes arrive on this wire. A route that refuses by hand answers a plain string
+ * (`{ error: 'An attachment needs a file.' }`); the error middleware answers an object
+ * (`{ error: { code, message, details } }`). Both reach the reader through the same toast, and an
+ * object rendered as a string is `[object Object]` — a sentence that says nothing and buries the
+ * one the server wrote.
+ */
+function errorMessage(value: unknown): string | null {
+  if (typeof value === 'string') return value.trim() === '' ? null : value;
+  if (value !== null && typeof value === 'object') {
+    const message = (value as { message?: unknown }).message;
+    if (typeof message === 'string' && message.trim() !== '') return message;
+  }
+  return null;
+}
+
+/**
  * Reads a `{ success, error, details }` envelope response, throwing the server's
  * message when the request failed.
  *
@@ -149,7 +167,9 @@ const query = (params: Record<string, QueryValue>): string => {
 export async function readApiJson<T>(response: Response): Promise<T> {
   const data = await response.json();
   if (!response.ok || data.success === false) {
-    throw new Error(data.error || data.details || `Request failed (${response.status})`);
+    throw new Error(
+      errorMessage(data.error) ?? errorMessage(data.details) ?? `Request failed (${response.status})`
+    );
   }
   return data as T;
 }
@@ -622,30 +642,38 @@ export const api = {
     update: () => post('/api/system/update', undefined, { timeoutMs: NO_REQUEST_TIMEOUT }),
   },
 
-  // The Descent proxy (docs/descent-proxy.md). Both reads answer 200 even when Descent is
-  // down — the calm `{reachable:false, reason}` picture — so a caller reads the BODY rather
-  // than the status. Both writes carry Descent's OWN status and body through, which is why
-  // they are read from the raw response and never through `readApiJson`. The memory writes
-  // carry Descent's own status too, and a 422 there is a VERDICT the caller reads — the cap
-  // guard refusing in plain English, with the card left pending — never a failed request.
-  descent: {
-    accounts: () => get('/api/descent/accounts'),
-    usage: () => get('/api/descent/usage'),
-    switchAccount: (slug: string) => post('/api/descent/accounts/switch', { slug }),
-    capture: () => post('/api/descent/accounts/capture', {}),
-    memory: {
-      pending: () => get('/api/descent/memory'),
-      approved: () => get('/api/descent/memory?status=approved'),
-      candidate: (id: string) => get(`/api/descent/memory/${encodeURIComponent(id)}`),
-      approve: (id: string) => post(`/api/descent/memory/${encodeURIComponent(id)}/approve`, {}),
-      reject: (id: string) => post(`/api/descent/memory/${encodeURIComponent(id)}/reject`, {}),
-    },
+  // The Claude account switcher and its usage meter, served by the server's own accounts module.
+  // Both reads answer 200 whatever the state — the calm `{reachable:false, reason}` picture when
+  // nothing can be computed — so a caller reads the BODY rather than the status. Both writes carry
+  // the service's OWN status and body through, which is why they are read from the raw response and
+  // never through `readApiJson`.
+  accounts: {
+    // `picture`, not `accounts`: the group is already named for the lane, and the panel calls this
+    // body a picture everywhere it appears.
+    picture: () => get('/api/accounts'),
+    usage: () => get('/api/usage'),
+    switchAccount: (slug: string) => post('/api/accounts/switch', { slug }),
+    capture: () => post('/api/accounts/capture', {}),
+  },
+
+  // The memory-intake lane (docs/memory-intake.md): what a session PROPOSES and a person reviews.
+  // The reads answer 200 with the `reachable` envelope the panel, the tab gates and the command
+  // palette all branch on — it is a fact about the read now rather than about a remote server, and
+  // no shape moved when the lane moved here. The two writes are read from the RAW response for the
+  // same reason the accounts writes are: a 422 is a VERDICT the caller reads — the cap guard
+  // refusing in plain English, with the candidate left pending — never a failed request.
+  memory: {
+    pending: () => get('/api/memory'),
+    approved: () => get('/api/memory?status=approved'),
+    candidate: (id: string) => get(`/api/memory/${encodeURIComponent(id)}`),
+    approve: (id: string) => post(`/api/memory/${encodeURIComponent(id)}/approve`, {}),
+    reject: (id: string) => post(`/api/memory/${encodeURIComponent(id)}/reject`, {}),
   },
 
   // The plan-runner lane (docs/plan-runner.md). The server READS the runner's state directory and
   // relays two verbs to the runner's own binary; it never writes a state file and never starts a
   // run. The reads are plain gets. The two writes are read from the RAW response, like
-  // `descent.memory.approve` above and for the same reason: a 409 here carries the runner's own
+  // `memory.approve` above and for the same reason: a 409 here carries the runner's own
   // verdict — its refusal in its own `stderr`, with the run left exactly as it was — and putting it
   // through `readApiJson` would turn that verdict into a thrown error the caller cannot show.
   planRunner: {
@@ -671,6 +699,10 @@ export const api = {
       patch(`/api/kanban/boards/${encodeURIComponent(id)}`, body),
     selectBoard: (id: string) => post(`/api/kanban/boards/${encodeURIComponent(id)}/select`, {}),
     lanes: (id: string) => get(`/api/kanban/boards/${encodeURIComponent(id)}/lanes`),
+    // The header's six registers in one request — four of this board, two of the whole estate —
+    // and one card's plan cost, which is `null` for a card whose plan column is empty.
+    vitals: (id: string) => get(`/api/kanban/boards/${encodeURIComponent(id)}/vitals`),
+    cardPlanCost: (id: string) => get(`/api/kanban/cards/${encodeURIComponent(id)}/plan-cost`),
     laneCards: (id: string, statuses: string[], cursor?: string | null, limit = 50) =>
       get(`/api/kanban/boards/${encodeURIComponent(id)}/cards?status=${encodeURIComponent(statuses.join(','))}&limit=${limit}${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`),
     createCard: (id: string, body: Record<string, unknown>) => post(`/api/kanban/boards/${encodeURIComponent(id)}/cards`, body),
@@ -689,24 +721,72 @@ export const api = {
     updateChecklistItem: (id: string, body: Record<string, unknown>) => patch(`/api/kanban/checklist/${encodeURIComponent(id)}`, body),
     approveCard: (id: string) => post(`/api/kanban/cards/${encodeURIComponent(id)}/approve`, {}),
     unapproveCard: (id: string) => post(`/api/kanban/cards/${encodeURIComponent(id)}/unapprove`, {}),
+
+    // A card's attachment BYTES: the upload, the fetch and the removal.
+    //
+    // The upload is multipart on the field `file` — the route is multer's, so it cannot go through
+    // `post` (which JSON-encodes a body) and the browser has to set its own boundary.
+    //
+    // The fetch answers raw bytes behind the bearer token. There is no URL an `<img src>` could use
+    // here: the token cannot travel in one, so a caller reads the blob and mints its own object
+    // URL, exactly as chat's images do. It has no deadline, for `assets.file`'s reason — an eight
+    // megabyte file over a slow link would otherwise be aborted mid-body and read as a broken file.
+    //
+    // The removal answers `{ ok: true }`, or the 404 of an attachment that is not on the card.
+    uploadAttachment: (cardId: string, file: File) => {
+      const formData = new FormData();
+      formData.append('file', file);
+      return authenticatedFetch(`/api/kanban/cards/${encodeURIComponent(cardId)}/attachments`, {
+        method: 'POST',
+        headers: {}, // Let the browser set the multipart boundary.
+        body: formData,
+      });
+    },
+    attachmentBlob: (cardId: string, attachmentId: string, options: ApiRequestOptions = {}) =>
+      get(`/api/kanban/cards/${encodeURIComponent(cardId)}/attachments/${encodeURIComponent(attachmentId)}`, {
+        timeoutMs: NO_REQUEST_TIMEOUT,
+        ...options,
+      }),
+    removeAttachment: (cardId: string, attachmentId: string) =>
+      del(`/api/kanban/cards/${encodeURIComponent(cardId)}/attachments/${encodeURIComponent(attachmentId)}`),
+
     events: (query: string) => get(`/api/kanban/events${query}`),
     importDescent: (body: { dbPath?: string }) => post('/api/kanban/import/descent', body),
   },
 
-  // The board's Metis fleet (docs/kanban.md): who this board has out working for it, and the three
-  // verbs over a session. `sessions` is the SEED — the fleet is pushed on change as a
-  // `kanban_metis_state` frame, which a panel mounting between two changes would otherwise wait
-  // for with nothing on screen. `launch` is a board's act and answers the session the server
-  // minted, so the panel paints the new row without waiting for the frame behind it; `stop` and
-  // `resume` answer the same shape for the session they moved.
+  // The board's Metis fleet (docs/kanban.md): who this board has out working for it, the four verbs
+  // over a session, the nudge that wakes the driver, and the driver's own reading of the board.
+  // `sessions` is the SEED — the fleet is pushed on change as a `kanban_metis_state` frame, which a
+  // panel mounting between two changes would otherwise wait for with nothing on screen. `launch` is
+  // a board's act and answers the session the server minted, so the panel paints the new row
+  // without waiting for the frame behind it; `stop`, `resume` and `reply` answer the same shape for
+  // the session they moved.
   kanbanMetis: {
     sessions: () => get('/api/kanban-metis/sessions'),
+    // The driver's reading of one board: its autonomy, the dial that caps its sessions, how many are
+    // live, how much work is claimable, the churn cooldown, the rate-limit hold and whether the
+    // relaunch ledger still permits a spawn. The fleet panel reads it for the DIAL alone — its
+    // header's figure is this board's live count against that number — while the live count itself
+    // stays the fleet's own, so no two readings of one board can disagree about how many run.
+    driver: (boardId: string) =>
+      get(`/api/kanban-metis/boards/${encodeURIComponent(boardId)}/driver`),
     launch: (boardId: string) =>
       post(`/api/kanban-metis/boards/${encodeURIComponent(boardId)}/launch`, {}),
+    // Wakes this board's driver now rather than at its next tick, and answers `{ nudged, at }` —
+    // nothing about a session, because a nudge starts none: what the tick then reaps and claims is
+    // its own decision, and the fleet frame that follows carries it.
+    nudge: (boardId: string) =>
+      post(`/api/kanban-metis/boards/${encodeURIComponent(boardId)}/nudge`, {}),
     stop: (sessionId: string) =>
       post(`/api/kanban-metis/sessions/${encodeURIComponent(sessionId)}/stop`, {}),
     resume: (sessionId: string) =>
       post(`/api/kanban-metis/sessions/${encodeURIComponent(sessionId)}/resume`, {}),
+    // One person's words to a Metis whose child has stopped, as the turn she wakes up to. Answered
+    // with the same `{ session }` shape `resume` gives, and refusing in the same way a 409 does
+    // everywhere else on this board: `she is mid-turn — stop her first, then reply` while her child
+    // is running, or the board's dial in the server's own words when there is no room for her.
+    reply: (sessionId: string, text: string) =>
+      post(`/api/kanban-metis/sessions/${encodeURIComponent(sessionId)}/reply`, { text }),
     transcript: readKanbanMetisTranscript,
   },
 
@@ -764,9 +844,9 @@ export const api = {
   cliVersion: () => get('/api/cli-version'),
 
   // The money left on this host's DeepSeek account (docs/deepseek-balance.md). A different account
-  // from the Claude slots Descent holds, and a different origin: the server reads it from the
+  // from the Claude slots the switcher holds, and a different origin: the server reads it from the
   // vendor with the key it holds, so the key never reaches this side. Answers 200 always, for the
-  // same reason `descent.usage` does — no reading is a reading in words, never an error wall.
+  // same reason `accounts.usage` does — no reading is a reading in words, never an error wall.
   deepseek: {
     balance: () => get('/api/deepseek/balance'),
   },

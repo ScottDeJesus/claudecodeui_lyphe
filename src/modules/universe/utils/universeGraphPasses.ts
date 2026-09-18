@@ -1,5 +1,6 @@
-import { bandedBrightness, colorForNode, tokenOf } from '@/modules/universe/utils/universeTokens';
+import { bandedBrightness, colorForNode, glowColorOf, tokenOf } from '@/modules/universe/utils/universeTokens';
 import { isFile } from '@/modules/universe/utils/universeGraph';
+import { isHidden } from '@/modules/universe/utils/universeRegimes';
 import {
   GLOW_MULT,
   GLOW_MULT_DEFAULT,
@@ -158,6 +159,7 @@ export function drawEdges(frame: Frame): void {
     // draws — under a pixel, and at the fitted view there are thousands of them. The tree links stay:
     // they are what holds the shapes a visitor is actually looking at together.
     if (graph.coarse && isFile(a) && isFile(b)) continue;
+    if (isHidden(graph, a) || isHidden(graph, b)) continue;
     if (!frame.visible(a) && !frame.visible(b)) continue;
     const touched = near !== null && near.has(link.a) && near.has(link.b);
     if (!touched && mode !== 'all' && mode !== link.kind) continue;
@@ -312,7 +314,7 @@ export function drawGlow(frame: Frame, sky: UniverseSky, bokeh: boolean): void {
     const mult = GLOW_MULT[node.kind] ?? GLOW_MULT_DEFAULT;
     if (isFile(node) && node.r * mult * z < 2.5) continue;
     const glow = glowOf(node, now, 0);
-    const color = colorForNode(node, tokens, 1);
+    const color = glowColorOf(node, tokens);
     ctx.globalAlpha = glow.alpha;
     const sprite = glow.radius * z < 6 ? sky.small(color) : sky.sprite(color);
     ctx.drawImage(sprite, node.x - glow.radius, node.y - glow.radius, glow.radius * 2, glow.radius * 2);

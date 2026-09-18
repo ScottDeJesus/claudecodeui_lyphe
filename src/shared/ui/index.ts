@@ -10,12 +10,12 @@
  * the clearest use for it. The two-module rule is a bar for admission, not a
  * trigger for eviction.
  *
- * PromptInput, Queue and Confirmation did move out, on a different
- * test: they are not primitives at all but chat-domain compositions — the
- * composer form, the tool todo list and the
- * inline tool-permission request — with chat vocabulary in their prop names and
- * no plausible second consumer. Alert went with Confirmation, which was its only
- * importer and the reason it existed.
+ * PromptInput is a kit and not a primitive: the composer form, its header, body,
+ * textarea, footer, tools, button and submit, with no chat vocabulary in any of
+ * their props, and nothing of its own to import but cn, Button and Tooltip. Queue
+ * stays out, on the other test: it is a chat-domain composition — the tool todo
+ * list — with chat vocabulary in its prop names and one consumer, the chat's own
+ * TodoList.
  *
  * DockableFab and SplitPane came in with one consumer, the application switcher, on
  * the doctrine's other test: they are mechanism — pointer capture, a viewport clamp,
@@ -62,6 +62,22 @@ export { LLMProviderLogo } from '@/shared/ui/LLMProviderLogo';
 export { Menu } from '@/shared/ui/Menu';
 export { Meter } from '@/shared/ui/Meter';
 export { PillBar, Pill } from '@/shared/ui/PillBar';
+export {
+  PromptInput,
+  PromptInputHeader,
+  PromptInputBody,
+  PromptInputTextarea,
+  PromptInputFooter,
+  PromptInputTools,
+  PromptInputButton,
+  PromptInputSubmit,
+} from '@/shared/ui/PromptInput';
+export type {
+  PromptInputProps,
+  PromptInputButtonTooltip,
+  PromptInputButtonProps,
+  PromptInputSubmitProps,
+} from '@/shared/ui/PromptInput';
 export { ScrollArea } from '@/shared/ui/ScrollArea';
 export { Select } from '@/shared/ui/Select';
 export { Shimmer } from '@/shared/ui/Shimmer';

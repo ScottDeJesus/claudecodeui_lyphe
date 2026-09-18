@@ -2,31 +2,31 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { api } from '@/shared/api';
 import { useToast } from '@/shared/context/ToastContext';
-import type { DescentAccounts } from '@/shared/types';
+import type { ClaudeAccounts } from '@/shared/types';
 
 /**
  * How often the account picture is re-read. D7's floor, and deliberately slow: nothing here
- * changes except when a person switches, and the proxy's own 4 s ceiling per call is sized
- * against this interval so a stalled Descent costs one skipped reading, never a queue.
+ * changes except when a person switches, and the server answers off its own files — so a slow
+ * read costs one skipped picture, never a queue.
  */
 const ACCOUNTS_POLL_MS = 60_000;
 
 /**
  * What to say when a write did not land.
  *
- * Descent's own `error` is preferred whenever it sent one — it names the actual refusal
- * ("unknown account slot 'x'") in words a person can act on. Only when the proxy answered
- * for Descent (503 `{reachable:false, reason}`) does this translate the one word itself.
+ * The service's own `error` is preferred whenever it sent one — it names the actual refusal
+ * ("unknown account slot 'x'") in words a person can act on. Only when the route answered
+ * without a verdict (`{reachable:false, reason}`) does this translate the one word itself.
  */
 function writeRefusalInWords(body: unknown): string {
   const answer = (body ?? {}) as { error?: unknown; reason?: unknown };
   if (typeof answer.error === 'string' && answer.error.trim()) return answer.error.trim();
-  if (answer.reason === 'timeout') return 'Descent did not answer in time.';
-  if (answer.reason === 'bad-response') return 'Descent answered with something this app could not read.';
-  return 'Descent is not reachable.';
+  if (answer.reason === 'timeout') return 'The server did not answer in time.';
+  if (answer.reason === 'bad-response') return 'The server answered with something this app could not read.';
+  return 'The server is not reachable.';
 }
 
-/** A write's verdict is Descent's own body, so it is read before the status is judged — and a body that is not JSON must not throw over the status. */
+/** A write's verdict is the service's own body, so it is read before the status is judged — and a body that is not JSON must not throw over the status. */
 async function readBody(response: Response): Promise<unknown> {
   try {
     return await response.json();
@@ -47,10 +47,10 @@ async function readBody(response: Response): Promise<unknown> {
  * is a SECOND write while one is in flight, since a whole-box swap is not re-entrant.
  */
 export function useDescentAccounts() {
-  // The last picture the proxy answered with. Held because the footer row and the panel both
+  // The last picture the route answered with. Held because the footer row and the panel both
   // read it between polls, and because `null` (nothing asked yet) has to look different from
   // `{reachable:false}` (asked, and there was no picture to be had).
-  const [data, setData] = useState<DescentAccounts | null>(null);
+  const [data, setData] = useState<ClaudeAccounts | null>(null);
   // True while a switch or a capture is in flight, so the rows can refuse a second press.
   const [busy, setBusy] = useState(false);
   // Descent's refusal of the LAST write, shown inline as a warn banner. Cleared when the next
@@ -62,25 +62,25 @@ export function useDescentAccounts() {
   // The current picture as a ref so `switchTo` and `capture` can name a slug's label without
   // being rebuilt every time a poll lands — a callback whose identity changed each minute
   // would restart the polling effect below and turn one poller into a stutter of them.
-  const pictureRef = useRef<DescentAccounts | null>(null);
+  const pictureRef = useRef<ClaudeAccounts | null>(null);
   // Mount flag: a poll that resolves after the sidebar collapsed must not set state.
   const mountedRef = useRef(true);
   // The in-flight guard read synchronously — `busy` is a render value and lands too late to
   // stop a second press in the same tick.
   const writingRef = useRef(false);
 
-  const store = useCallback((next: DescentAccounts) => {
+  const store = useCallback((next: ClaudeAccounts) => {
     pictureRef.current = next;
     if (mountedRef.current) setData(next);
   }, []);
 
   const refresh = useCallback(async () => {
     try {
-      const response = await api.descent.accounts();
-      store((await response.json()) as DescentAccounts);
+      const response = await api.accounts.picture();
+      store((await response.json()) as ClaudeAccounts);
     } catch {
-      // The proxy answers 200 even when Descent is down, so a throw here is this app's own
-      // network or a body that is not JSON. Either way the honest reading is "no picture".
+      // The route answers 200 even when nothing can be computed, so a throw here is this app's
+      // own network or a body that is not JSON. Either way the honest reading is "no picture".
       store({ reachable: false, reason: 'unreachable' });
     }
   }, [store]);
@@ -97,7 +97,7 @@ export function useDescentAccounts() {
     };
   }, [refresh]);
 
-  /** The label Descent gave a slug, or the slug itself when the picture has not caught up (a capture can name a slot this app has never seen). */
+  /** The label the store gave a slug, or the slug itself when the picture has not caught up (a capture can name a slot this app has never seen). */
   const labelFor = useCallback((slug: string) => {
     const picture = pictureRef.current;
     if (!picture?.reachable) return slug;
@@ -110,7 +110,7 @@ export function useDescentAccounts() {
     setBusy(true);
     setError(null);
     try {
-      const response = await api.descent.switchAccount(slug);
+      const response = await api.accounts.switchAccount(slug);
       const body = await readBody(response);
       if (!response.ok) {
         setError(writeRefusalInWords(body));
@@ -126,7 +126,7 @@ export function useDescentAccounts() {
       });
       await refresh();
     } catch {
-      setError('Descent is not reachable.');
+      setError('The server is not reachable.');
     } finally {
       writingRef.current = false;
       if (mountedRef.current) setBusy(false);
@@ -139,16 +139,16 @@ export function useDescentAccounts() {
     setBusy(true);
     setError(null);
     try {
-      const response = await api.descent.capture();
+      const response = await api.accounts.capture();
       const body = await readBody(response);
       if (!response.ok) {
         setError(writeRefusalInWords(body));
         return;
       }
       const captured = (body as { captured?: unknown } | null)?.captured;
-      // Descent's capture is not a snapshot only: it also re-points its ACTIVE account to the
-      // slug it just saved (`server_api_accounts.py:101-102`). Under drift that MOVES which
-      // account is in use, so the toast says so rather than reporting a filing.
+      // A capture is not a snapshot only: the route also re-points the ACTIVE account to the
+      // slug it just saved (`accounts.routes.ts`, the capture route). Under drift that MOVES
+      // which account is in use, so the toast says so rather than reporting a filing.
       push({
         tone: 'positive',
         title: typeof captured === 'string' ? `Saved ${labelFor(captured)}` : 'Saved the login that is live now',
@@ -156,7 +156,7 @@ export function useDescentAccounts() {
       });
       await refresh();
     } catch {
-      setError('Descent is not reachable.');
+      setError('The server is not reachable.');
     } finally {
       writingRef.current = false;
       if (mountedRef.current) setBusy(false);

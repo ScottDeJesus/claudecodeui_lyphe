@@ -1,5 +1,10 @@
 import { getConnection } from '@/modules/database/connection.js';
-import type { KanbanBoard, KanbanLaneCount, KanbanStatus } from '@/shared/kanban-types.js';
+import {
+  clampKanbanConcurrency,
+  type KanbanBoard,
+  type KanbanLaneCount,
+  type KanbanStatus,
+} from '@/shared/kanban-types.js';
 import { AppError } from '@/shared/utils.js';
 
 /**
@@ -19,6 +24,7 @@ type KanbanBoardRow = {
   project_id: string | null;
   autonomy: number;
   deepseek_flash: number;
+  concurrency: number;
   sort_order: number;
   archived: number;
   created_at: string;
@@ -27,7 +33,7 @@ type KanbanBoardRow = {
 
 /** Every column of a board, in one spelling, so no query is the odd one out. */
 const BOARD_COLUMNS =
-  'id, name, project_id, autonomy, deepseek_flash, sort_order, archived, created_at, updated_at';
+  'id, name, project_id, autonomy, deepseek_flash, concurrency, sort_order, archived, created_at, updated_at';
 
 /**
  * One SQLite row to the `KanbanBoard` the rest of the server speaks.
@@ -35,6 +41,12 @@ const BOARD_COLUMNS =
  * `autonomy`, `deepseekFlash` and `archived` become real booleans here and nowhere else: a `0`
  * reaching the wire is a panel whose autonomy switch reads as stuck, which is what the check
  * asserting `autonomy=False` exists to catch.
+ *
+ * `concurrency` is CLAMPED here, and this mapper is the right place for it: every read of a board
+ * row in the whole server passes through this one conversion, so a value written by hand, left
+ * behind by an older schema or set absurdly by a future caller cannot reach a comparison without
+ * meeting the clamp first. The writes clamp too (`kanban-boards.service.ts`), because a number that
+ * is never in range should not be stored either.
  */
 function toKanbanBoard(row: KanbanBoardRow): KanbanBoard {
   return {
@@ -43,6 +55,7 @@ function toKanbanBoard(row: KanbanBoardRow): KanbanBoard {
     projectId: row.project_id,
     autonomy: row.autonomy === 1,
     deepseekFlash: row.deepseek_flash === 1,
+    concurrency: clampKanbanConcurrency(row.concurrency),
     sortOrder: row.sort_order,
     archived: row.archived === 1,
     createdAt: row.created_at,
@@ -55,6 +68,7 @@ const BOARD_PATCH_COLUMNS = {
   name: 'name',
   autonomy: 'autonomy',
   deepseekFlash: 'deepseek_flash',
+  concurrency: 'concurrency',
   projectId: 'project_id',
   archived: 'archived',
 } as const;
@@ -65,6 +79,7 @@ export type KanbanBoardUpdatePatch = {
   name?: string;
   autonomy?: boolean;
   deepseekFlash?: boolean;
+  concurrency?: number;
   projectId?: string | null;
   archived?: boolean;
 };
@@ -90,6 +105,10 @@ export const kanbanBoardsDb = {
    * and that is the order the board switcher would render. The gap is 1000 so a later reorder
    * can splice a board between two others by midpoint without renumbering, the same rule the
    * cards' `sort_order` follows.
+   *
+   * `deepseek_flash` and `concurrency` are left to their columns' own defaults: a new board runs on
+   * Claude and one session at a time, both of which are GOVERNORS its owner turns on rather than
+   * settings a create has any business guessing at `0` or `4` for.
    */
   insertBoard(input: {
     id: string;

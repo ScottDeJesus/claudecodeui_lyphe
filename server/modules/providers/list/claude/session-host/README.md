@@ -77,9 +77,21 @@ one reaching the CLI would be a second initialization of a session already runni
 
 ## The replay cursor, and the ack that moves it
 
-`cursorFor` (`host-journal.js`) resolves `"acked"` to `Math.min(deliveredSeq, pendingResults[0] - 1)`,
-and to plain `deliveredSeq` when nothing is outstanding. `deliveredSeq` is the last frame written to
-a client socket; `pendingResults` holds every delivered `result` seq no `note` has confirmed yet.
+`cursorFor` (`host-journal.js`) resolves `"acked"` to
+`Math.min(deliveredSeq, pendingResults[0] - 1, pendingControl[0].seq - 1)`, and to plain
+`deliveredSeq` when nothing is outstanding. `deliveredSeq` is the last frame written to a client
+socket; `pendingResults` holds every delivered `result` seq no `note` has confirmed yet;
+`pendingControl` holds every delivered `control_request` — every subtype: a `can_use_tool`
+waiting on a person, a `hook_callback`, an `mcp_message` — that is still open. Two things close
+one: the API's `control_response` reaching the CLI's stdin (`host-conn.js` reads each stdin line
+for exactly that, and releases only a line the CLI actually took), and the CLI's own
+`control_cancel_request` on ITS output (it withdraws a request it stopped waiting on — its abort
+listener, or after consuming the answer — and `markDelivered` releases on that line).
+
+The hold lives in `host.js` and `host-journal.js`, which are exec'd once per CLI: a host already
+running when this ships keeps the cursor it was born with until its CLI exits, and only a host
+spawned afterwards carries the rule. Case G's `cursor_held` reads `pendingControl` out of the
+live host's own meta, which is the one proof that the running host is a new one.
 
 The reason is asymmetric damage. A re-delivered stream delta is cosmetic — the browser refetches
 the transcript over REST anyway — while a LOST `result` wedges the run with no terminal event to
@@ -87,6 +99,31 @@ release it. So the ack is sent after the provider has finished handling the resu
 head of the loop: an ack that preceded the state flip would confirm a result a SIGKILL then loses.
 A graceful restart is therefore exactly-once; a hard kill between delivery and processing is
 at-least-once, for the `result` line alone (D-3).
+
+An unanswered `control_request` is the same asymmetry from the other side. The CLI waits on that
+request id and on nothing else, and the API that received it holds the only promise that can
+answer it; an API retired between the question and the answer — a dev-supervisor handover lands
+in under two seconds — leaves the CLI waiting forever, the browser's re-subscribe finds no pending
+prompt, and the card falls to its answered-looking summary. So the cursor holds at the oldest
+unanswered request until the answer is on stdin, and the successor replays it: the SDK's read loop
+handles a `control_request` whenever it arrives, `canUseTool` runs again, and the person is asked
+again under a fresh request id. A replay re-delivers the request under its original seq, which is
+why the entry is keyed by request id and not duplicated. A `hook_callback` replayed to a `Query`
+whose callback ids differ gets the SDK's error response — still a `control_response`, so it
+releases the entry rather than pinning the cursor for the life of the host.
+
+The browser's side of the same race: the person may have tapped the dead prompt in the gap, and a
+decision for a request no live API holds is a silent no-op on the server (logged, nothing more).
+The card that sent it would look answered and refuse the re-issued prompt — so, for the one
+purpose of offering a newer request for the same question, the card counts its own answer as
+delivered only once the run stream has settled it (`permission_resolved` or
+`permission_cancelled`), and while it is unsettled the card lets exactly ONE later request through;
+the settlement of that one closes the door (`QuestionAnswerContent.tsx`, `toolOutcome.ts`). The
+answer it shows in the meantime is still the one it sent. One window stays: a SIGKILL between the
+live API's `permission_resolved` and its `control_response` reaching stdin — microseconds, since
+both sit in one microtask chain — settles the id in the tab while the host still holds the
+request, and the prompt the successor re-issues then has no surface; only a re-issue tag on the
+`permission_request` would close it, and that is in the friction ledger, not here.
 
 The `note` carries both turn-state bits with it, so the ack and the bits land in one atomic
 rename (D-4) — a SIGKILL between them cannot leave an acked result beside stale bits. Correlation
@@ -99,7 +136,7 @@ cursor silently.
 ```json
 { "hostId": "…", "appSessionId": "…", "userId": null, "cwd": "…", "startedAt": 0, "pid": 0,
   "turnCompleteSent": false, "heldForBackgroundWork": false,
-  "deliveredSeq": 0, "pendingResults": [], "exited": null }
+  "deliveredSeq": 0, "pendingResults": [], "pendingControl": [], "exited": null }
 ```
 
 `exited` becomes `{code, signal, at}` when the CLI ends. The two bits are the provider's own
@@ -199,7 +236,7 @@ host.
 | API SIGKILLed between a line's delivery and the provider handling it | The `result` is re-delivered on re-attach; other lines are lost from the live stream but present in the transcript the browser refetches |
 | A `result` the provider deliberately skipped (the reconciliation phantom) | Acked by the skip branch's own note, bits unchanged; no re-delivery |
 | Hook callbacks after a re-attach | The CLI keeps the first `initialize`'s hook registrations; if the SDK's callback ids differ per `Query`, a Notification `hook_callback` gets an error response and that `agent.notification` is lost for the rest of that process. Accepted; re-registering hooks on re-attach is the cure, and a follow-up |
-| A permission request emitted during the outage | Journaled, delivered on re-attach, surfaced as usual; its `TOOL_APPROVAL_TIMEOUT_MS` window starts at re-attach |
+| A permission request in flight across the gap — emitted during it, or delivered to the API that then died without answering it | Held by the cursor until its `control_response` has reached stdin or the CLI withdraws it, so the successor replays it, `canUseTool` runs again and the prompt is re-issued under a fresh request id; the browser's re-subscribe drops the dead prompt and takes the live one, and a card whose answer to the dead prompt was never resolved offers the live one too; the `TOOL_APPROVAL_TIMEOUT_MS` window starts at re-attach. Case G of `.verify/keepalive-cases-p4.mjs` drives it |
 | `systemctl stop cloudcli-sessions-tmux` with live sessions | Every host and CLI dies. Each facade sees its socket close and emits `'exit'(null,'SIGHUP')`, and the client is told with an error frame rather than left hanging. This is the deliberate kill-everything switch |
 | API boots while the keepalive unit is down | Every meta's tmux session is dead, so all are swept; new turns run in fallback mode |
 | Two API processes at once (a manual `npm run server:dev` beside the unit) | The second connection replaces the first, and the first facade errors its run. Unsupported. The supervisor's own handover overlap is not this case: there the successor is spawned as a handover child and re-adopts nothing until the first process has exited |

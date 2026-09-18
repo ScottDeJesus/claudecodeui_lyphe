@@ -53,7 +53,7 @@ export type UniverseSky = {
   /** The field itself. The tiles are painted from it, but a twinkle cannot be baked into a tile, so
    *  the caller draws stars `480..519` live. */
   stars: readonly SkyStar[];
-  /** The cached radial glow for a colour: how a flare, a nebula and a comet are all drawn. */
+  /** The cached radial glow for a colour: how a flare and a comet are both drawn. */
   sprite(color: string): HTMLCanvasElement;
   /** The same glow at a quarter the side, for a light no wider than a few pixels: the large tile's
    *  texels would be thrown away by the sampler. */

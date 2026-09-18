@@ -33,6 +33,7 @@ import { useFileMentions } from '@/modules/chat/hooks/useFileMentions';
 import { useInputHistory } from '@/modules/chat/hooks/useInputHistory';
 import { useSlashCommands } from '@/modules/chat/hooks/useSlashCommands';
 import { useRestartOnInstalledCli } from '@/modules/chat/hooks/useRestartOnInstalledCli';
+import { useScopedAttachments } from '@/modules/chat/hooks/useScopedAttachments';
 
 type UseChatComposerStateArgs = {
   selectedProject: Project | null;
@@ -220,8 +221,6 @@ export function useChatComposerState({
     };
   });
   const input = inputState.value;
-  const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
-  const [fileErrors, setFileErrors] = useState<Map<string, string>>(new Map());
   const [isTextareaExpanded, setIsTextareaExpanded] = useState(false);
   const [commandModalPayload, setCommandModalPayload] = useState<CommandModalPayload | null>(null);
 
@@ -247,6 +246,9 @@ export function useChatComposerState({
   const draftScope = sessionKey ?? (selectedProjectId ? `project:${selectedProjectId}` : null);
   const draftScopeRef = useRef(draftScope);
   draftScopeRef.current = draftScope;
+  // Attachments belong to the same scope as the text, so a photo stays with the chat it was added to.
+  const { attachedFiles, setAttachedFiles, clearAttachmentsFor, fileErrors, setFileErrors } =
+    useScopedAttachments(draftScope);
   const setInput = useCallback<Dispatch<SetStateAction<string>>>((next) => {
     setInputState((previous) => ({
       scope: draftScopeRef.current,
@@ -644,6 +646,8 @@ export function useChatComposerState({
       queuedSubmission?: QueuedDraft,
     ) => {
       event.preventDefault();
+      // The chat this send was pressed in; an upload awaited below can outlast a switch to another.
+      const submitScope = draftScopeRef.current;
       const currentInput = queuedSubmission?.content ?? inputValueRef.current;
       const currentAttachments = queuedSubmission?.attachments ?? attachedFiles;
       const previouslyUploadedAttachments = queuedSubmission?.uploadedAttachments ?? [];
@@ -721,8 +725,7 @@ export function useChatComposerState({
         setQueuedDraft(durableDraft);
         setInput('');
         inputValueRef.current = '';
-        setAttachedFiles([]);
-        setFileErrors(new Map());
+        clearAttachmentsFor(submitScope);
         resetCommandMenuState();
         setIsTextareaExpanded(false);
         if (textareaRef.current) {
@@ -758,8 +761,7 @@ export function useChatComposerState({
           recordSentMessage(currentInput);
           setInput('');
           inputValueRef.current = '';
-          setAttachedFiles([]);
-          setFileErrors(new Map());
+          clearAttachmentsFor(submitScope);
           resetCommandMenuState();
           setIsTextareaExpanded(false);
           if (textareaRef.current) {
@@ -897,8 +899,7 @@ export function useChatComposerState({
       setInput('');
       inputValueRef.current = '';
       resetCommandMenuState();
-      setAttachedFiles([]);
-      setFileErrors(new Map());
+      clearAttachmentsFor(submitScope);
       setIsTextareaExpanded(false);
 
       if (textareaRef.current) {
@@ -913,6 +914,7 @@ export function useChatComposerState({
       selectedSession,
       attachedFiles,
       buildSendOptions,
+      clearAttachmentsFor,
       currentSessionId,
       editingAnchorId,
       executeCommand,
@@ -1228,6 +1230,9 @@ export function useChatComposerState({
       validIds.forEach((requestId) => {
         sendMessage({
           type: 'chat.permission-response',
+          // The server reads only the request id; the session is for the socket's outbox, which
+          // tells this conversation if the answer could not be delivered.
+          sessionId: selectedSession?.id || currentSessionId || undefined,
           requestId,
           allow: Boolean(decision?.allow),
           updatedInput: decision?.updatedInput,
@@ -1240,7 +1245,7 @@ export function useChatComposerState({
         previous.filter((request) => !validIds.includes(request.requestId)),
       );
     },
-    [sendMessage, setPendingPermissionRequests],
+    [currentSessionId, selectedSession?.id, sendMessage, setPendingPermissionRequests],
   );
 
   const [isInputFocused, setIsInputFocused] = useState(false);

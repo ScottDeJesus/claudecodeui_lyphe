@@ -4,7 +4,7 @@ import { accountInitials } from '@/modules/accounts/utils/accountInitials';
 import { useMinuteTick } from '@/modules/accounts/hooks/useMinuteTick';
 import { weeklyResetInWords } from '@/modules/accounts/utils/weeklyReset';
 import { Avatar, Banner, Button, Card } from '@/shared/ui';
-import type { DescentAccounts, DescentSlot, DescentUsage, DeepseekBalance } from '@/shared/types';
+import type { ClaudeAccounts, ClaudeAccountSlot, ClaudeUsage, DeepseekBalance } from '@/shared/types';
 
 /** The line that closes the switcher, because "will this lose my work?" is the only question a switch actually raises. */
 const SWITCH_REASSURANCE =
@@ -29,10 +29,10 @@ const SWITCH_REASSURANCE =
  * to be — every row below carries the phrase it disarms), so every line it costs pushes the
  * switcher and "+ Add another account" further down a panel that already scrolls.
  */
-const DATE_MEANING = 'A date in the past is normal — it is the expiry on the copy Descent holds.';
+const DATE_MEANING = 'A date in the past is normal — it is the expiry on the saved copy.';
 
 /** Said in words, because an empty switcher would otherwise read as "you have no accounts". */
-const UNREACHABLE_LINE = 'Descent is not reachable — accounts and usage are unknown.';
+const UNREACHABLE_LINE = 'The server could not read accounts or usage — both are unknown.';
 
 /** The panel's own id, so the trigger can point at it with `aria-controls`. */
 export const ACCOUNT_PANEL_ID = 'account-panel';
@@ -58,7 +58,7 @@ function activeMeta(liveSessions: number): string {
 }
 
 type AccountRowProps = {
-  slot: DescentSlot;
+  slot: ClaudeAccountSlot;
   hue: number;
   busy: boolean;
   onSwitch: (slug: string) => void;
@@ -93,8 +93,8 @@ function AccountRow({ slot, hue, busy, onSwitch, now }: AccountRowProps) {
 }
 
 type AccountPopoverProps = {
-  accounts: DescentAccounts | null;
-  usage: DescentUsage | null;
+  accounts: ClaudeAccounts | null;
+  usage: ClaudeUsage | null;
   /** The DeepSeek reading, held by the row. Not part of `usage`: a different account, from a route Descent never touches. */
   balance: DeepseekBalance | null;
   busy: boolean;
@@ -164,11 +164,11 @@ export function AccountPopover({
           <p className="pb-0.5 text-xs leading-relaxed text-ink-faint">{DATE_MEANING}</p>
         )}
 
-        {/* Descent answered, but its own account store would not read. The switcher is empty
+        {/* The server answered, but its own account store would not read. The switcher is empty
             for a reason the reader is owed in words. */}
         {picture?.unreadable && (
           <p className="text-xs leading-relaxed text-muted-foreground">
-            Descent answered, but it could not read its saved accounts — none can be listed.
+            The saved accounts could not be read — none can be listed.
           </p>
         )}
 

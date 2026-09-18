@@ -21,10 +21,7 @@ That is the law; this note only says how the law is wired into this repo.
 2. **Never declare a colour token twice.** `--accent`, `--canvas`, `--ink`, `--border` and
    their siblings are declared in `tokens.css` and nowhere else. `index.css` may *derive* — its
    `--nav-*` values are `color-mix()` over a Verve token — but a second declaration is a second
-   palette, and two palettes drift inside a single phase. One repeat is allowed and it is not a
-   screen: `public/logo.svg` is served from `/public` with no stylesheet to read a property from,
-   so it carries the accent's hex and names the token it copied in a comment beside it. One
-   asset, the token named next to the value, moved only when that token moves.
+   palette, and two palettes drift inside a single phase.
 
 3. **Colour reaches a screen through Tailwind, never as a literal.** `tailwind.config.js`
    maps every colour name (`bg-primary`, `text-muted-foreground`, `border-border`, …) to

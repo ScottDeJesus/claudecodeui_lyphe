@@ -53,8 +53,8 @@ both.
 | Descent answered | The panel draws |
 |---|---|
 | a picture with slots | the meters, `Switch account · N`, the date line, one row per slot, `+ Add another account` |
-| `unreadable: true` | the count reads `0` and no rows follow, under *Descent answered, but it could not read its saved accounts — none can be listed.* — said in words, because an empty switcher otherwise reads as "you have no accounts" |
-| `reachable: false` | *Descent is not reachable — accounts and usage are unknown.* in place of the meters, the count as an em-dash, no rows and no add button |
+| `unreadable: true` | the count reads `0` and no rows follow, under *The saved accounts could not be read — none can be listed.* — said in words, because an empty switcher otherwise reads as "you have no accounts" |
+| `reachable: false` | *The server could not read accounts or usage — both are unknown.* in place of the meters, the count as an em-dash, no rows and no add button |
 | nothing yet | the meters draw an em-dash and the count reads `—`; the first reading normally lands before anyone opens the panel |
 
 The balance block renders in EVERY one of those rows, including `reachable: false` — it is drawn
@@ -113,10 +113,10 @@ limit nobody set.
 **Switching.** A row press sends its slug and, on Descent's yes, raises a positive toast: title
 `Switched to <label>`, message *Running conversations finish on the account they started with. New
 messages use \<label\>.* That is the honest sentence rather than the comfortable one — the swap is
-whole-box, and a session already running keeps the tokens it holds in memory. On Descent's no, the
-panel shows a warn `Banner` carrying **Descent's own words** whenever it sent any; only a proxy-level
-`{reachable:false, reason}` is translated here (*Descent did not answer in time.*, *Descent answered
-with something this app could not read.*, *Descent is not reachable.*).
+whole-box, and a session already running keeps the tokens it holds in memory. On the server's no,
+the panel shows a warn `Banner` carrying **the store's own words** whenever it sent any; only a
+`{reachable:false, reason}` is translated here (*The server did not answer in time.*, *The server
+answered with something this app could not read.*, *The server is not reachable.*).
 
 **Capturing.** `+ Add another account` saves the login that is live now *before* the CLI can replace
 it, then opens `ProviderLoginModal`, which runs the provider's own `/login` in an embedded terminal.

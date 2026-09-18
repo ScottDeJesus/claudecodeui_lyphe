@@ -16,12 +16,6 @@ import type { UniverseCamera } from '@/modules/universe/utils/universeView';
  * resolved. The glow sprite cache the star layer borrows is that same object, which is why a sky
  * nobody can reach from here is the whole point of owning it above.
  *
- * THE NEBULAE ARE A FIXED LADDER, NOT A DRAW. The export seeded its six parallax clouds with its
- * generator; here each is a point on a golden-angle ladder, so the same six clouds hang in the
- * same six places on every load and the build's one pseudo-random number — the sky's own field —
- * stays the only one. They are the three cool slots of the chart series, drawn with `lighter`, at
- * the alphas the export used.
- *
  * THE TWINKLERS ARE THE NEAR LAYER ALONE. A twinkle cannot be baked into a tile, so the twenty
  * nearest field stars are drawn live over the blitted layers — the export's own range, 480 to 520,
  * which `universeStarfield` lays out on the near layer last.
@@ -38,28 +32,6 @@ const TWINKLE_LAST = 520;
 /** How bright a twinkler burns at its peak, and how large it is drawn. */
 const TWINKLE_PEAK = 0.5;
 const TWINKLE_SIZE = 1;
-/** The three chart slots the nebulae are drawn in, cycled across the six of them. */
-const ORB_TOKENS = ['--chart-5', '--chart-3', '--chart-4'];
-const ORB_COUNT = 6;
-const TAU = 6.283;
-const GOLDEN = 0.6180339887;
-
-/** A point on the unit square, taken from a ladder rather than a generator. */
-const fract = (value: number): number => value - Math.floor(value);
-
-type Nebula = { x: number; y: number; r: number; a: number; w: number; p: number; token: string };
-
-/** The six clouds, fixed: a place in the viewport, a size, an alpha, a slow drift and a phase. */
-const NEBULAE: readonly Nebula[] = Array.from({ length: ORB_COUNT }, (_, i) => ({
-  x: fract(0.31 + i * GOLDEN),
-  y: fract(0.19 + i * (1 - GOLDEN)),
-  r: 220 + ((i * 97) % 260),
-  a: 0.05 + ((i * 37) % 50) / 1000,
-  w: 0.00009 + ((i * 53) % 120) / 1_000_000,
-  p: (i * GOLDEN * TAU) % TAU,
-  token: ORB_TOKENS[i % ORB_TOKENS.length],
-}));
-
 /** Kept inside the viewport's own span, so a far-off camera does not slide the band off the tile. */
 const clamp = (value: number, limit: number): number => Math.max(-limit, Math.min(limit, value));
 
@@ -94,23 +66,6 @@ export function drawBackground(
     const oy = -0.2 * h + clamp(-camera.y * BAND_PARALLAX * zp, BAND_CLAMP * h);
     ctx.globalAlpha = 1;
     ctx.drawImage(sky.band, ox, oy, sky.bandW, sky.bandH);
-  }
-
-  // The nebulae are added to what is behind them rather than painted over it, and they are the
-  // only additive thing in the sky: a cloud of colour, not a wall.
-  ctx.globalCompositeOperation = 'lighter';
-  for (const orb of NEBULAE) {
-    const ox =
-      (((orb.x * w - camera.x * 0.09 * zp + 120 * Math.sin(now * orb.w + orb.p)) % (w + 600)) + w + 600) %
-        (w + 600) -
-      300;
-    const oy =
-      (((orb.y * h - camera.y * 0.09 * zp + 90 * Math.cos(now * orb.w * 1.3 + orb.p)) % (h + 600)) + h + 600) %
-        (h + 600) -
-      300;
-    const radius = orb.r * (0.85 + 0.15 * Math.sin(now * orb.w * 2 + orb.p)) * (0.7 + 0.3 * zp);
-    ctx.globalAlpha = orb.a;
-    ctx.drawImage(sky.sprite(tokenOf(tokens, orb.token)), ox - radius, oy - radius, radius * 2, radius * 2);
   }
 
   // Three star layers, each a tile blitted four times so the wrap never shows a seam.

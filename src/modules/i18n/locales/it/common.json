@@ -366,7 +366,7 @@
     },
     "open": "Apri {{name}}",
     "collapse": "Comprimi",
-    "dragHint": "Trascina in un'altra posizione",
+    "dragHint": "Trascina su un lato",
     "pin": {
       "label": "Questa sessione",
       "title": "Creato dalla chat che hai aperto"

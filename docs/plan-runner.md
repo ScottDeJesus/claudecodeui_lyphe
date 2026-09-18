@@ -82,8 +82,8 @@ reached through the same barrel from `server/modules/settings/index.ts` ([kanban
 must run different models and a switch that is one file the whole box shares cannot say that.
 `server/modules/kanban-metis/metis-env.service.ts`'s `writeBoardFlag` is that second caller: it
 calls the generalised writer with a board's own path, `~/.claude/state/kanban-deepseek/<boardId>.flag`,
-at every Metis spawn — which precedence a spawned plan-runner then reads by is not yet written up
-here or in [kanban.md](kanban.md).
+at every Metis spawn — and the precedence a plan-runner started from there then reads by is stated
+in §"The DeepSeek switch" below.
 
 Two client surfaces draw it, and neither holds a fetch of its own: **Settings → Agents → Claude** —
 `RunnerModelContent.tsx`, a `SettingsRow` + `SettingsToggle` — and the chat composer's own footer,
@@ -108,10 +108,19 @@ window `focus` re-read covers the one gap the epoch cannot: a second tab, left o
 flip made elsewhere. It belongs to the settings module and the chat module, not to this lane: no
 run's file is ever written, and this lane still reads and shells out and nothing more.
 
-**Host-wide, not per-user.** The routes read no `userId`, because the switch steers one plan-runner
-daemon and there is only one of it. It is a file rather than a row in `auth.db` for the same reason
-the lane shells out instead of importing: the runner is a separate program that must be able to read
-the switch from cron, with no database and no HTTP.
+**Host-wide, not per-user — with exactly one exception, and it is a board's own file.** The routes
+read no `userId`, because the switch steers one plan-runner daemon and there is only one of it. It
+is a file rather than a row in `auth.db` for the same reason the lane shells out instead of
+importing: the runner is a separate program that must be able to read the switch from cron, with no
+database and no HTTP. The exception is a matter of PRECEDENCE, not a second route: a plan-runner
+STARTED BY A BOARD'S METIS reads that board's own flag file,
+`~/.claude/state/kanban-deepseek/<boardId>.flag`, because the board hands its child the variable
+`PLAN_RUNNER_DEEPSEEK_FLAG_PATH`, and `flag_path()` in `~/.claude/hooks/plan_runner/deepseek.py`
+reads that variable **at call time** — so every plan-runner that child starts, and every re-read
+inside one of its runs, asks the board's file; this host-wide one is consulted only when the
+variable is unset. The board side of that rule — what writes the per-board file, and what a board's
+switch means for the sessions it launches — is stated once, in
+[kanban.md](kanban.md) §"The two switches".
 
 **The write is a rename, and each of its three parts answers a measured failure.** A plain
 `writeFile` is a truncate followed by a write, and the runner reads this file from another process —
@@ -134,10 +143,8 @@ carries one, and this reader then said ON while the runner went on spending Clau
 drops the C0 separators `\x1c`–`\x1f` that `trim()` keeps. Closed on both sides: an explicit trim
 class here, `utf-8-sig` there. Change either and change the other.
 
-**What the switch DOES is the runner's rule and lives there**, not in this repository: while it reads
-`on`, the plan runner dispatches its builder, that builder's fix-pass and Athena on DeepSeek's
-`deepseek-flash` instead of Claude Opus, and Prometheus, the scouts and the replanner stay on Claude.
-It is re-read at every builder spawn, so a flip here reaches the next phase with nothing restarted on
+**What the switch DOES is the runner's rule and lives there**, not in this repository. It is
+re-read at every builder spawn, so a flip here reaches the next phase with nothing restarted on
 either side; a phase already in flight keeps the provider its builder opened. The whole rule, its
 fallbacks and its cost accounting: `~/.claude/hooks/plan_runner/deepseek.py`, surfaced in
 `~/.claude/hooks/README.md` §Runner with its invariants at `~/.claude/hooks/GOTCHAS.md` #34.
@@ -356,10 +363,12 @@ announcement, so a failure leaves the rest due instead of marked. On a database 
 the key, the first picture seeds it with the current time and announces nothing — the receipts
 already on disk are history.
 
-**A watchdog restart is a new ending.** `runner_watchdog.py` restarts a run whose every block is
-transient (`crash`, `timeout`, `budget`, …); if the restart blocks again, the run ends again with a
-later `ended_at`, and that is another push. The watchdog's own cap on restarts that ship nothing
-bounds how many.
+**A watchdog restart is a new ending.** `runner_watchdog.py` restarts a run whose every remaining
+block is transient (`crash`, `timeout`, `budget`, …), or whose run still owes an unblock outing for
+a spec-bound one — the watchdog's `_owed` arm, which turns a spec-bound block from a wall into a
+restart while a door is still open (`~/.claude/hooks/GOTCHAS.md` #41); if the restart blocks again,
+the run ends again with a later `ended_at`, and that is another push. The watchdog's own cap on
+restarts that ship nothing bounds how many.
 
 ## The fixture
 

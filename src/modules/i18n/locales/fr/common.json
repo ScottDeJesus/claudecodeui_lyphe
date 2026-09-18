@@ -366,7 +366,7 @@
     },
     "open": "Ouvrir {{name}}",
     "collapse": "Réduire",
-    "dragHint": "Glisser vers un autre emplacement",
+    "dragHint": "Glisser vers un côté",
     "pin": {
       "label": "Cette session",
       "title": "Créé par la conversation que vous avez ouverte"

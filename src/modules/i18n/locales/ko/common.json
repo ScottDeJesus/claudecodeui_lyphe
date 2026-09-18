@@ -364,7 +364,7 @@
     },
     "open": "{{name}} 열기",
     "collapse": "접기",
-    "dragHint": "다른 슬롯으로 드래그",
+    "dragHint": "양쪽 중 한쪽으로 드래그",
     "pin": {
       "label": "이 세션",
       "title": "열어 둔 채팅에서 생성됨"

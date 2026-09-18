@@ -168,9 +168,9 @@ export function useGitDelegation(
       return;
     }
     if (!isConnected) {
-      // The send is fire-and-forget — a closed socket drops the frame with a console warning and
-      // nothing else. Refusing here is what stops a press becoming a card that reports a run the
-      // server was never told to start (and an empty conversation with it).
+      // The send is fire-and-forget — a frame sent without a connection waits a few seconds for it
+      // and is then given up. Refusing here is what stops a press becoming a card that reports a
+      // run the server may never be told to start (and an empty conversation with it).
       setRefusal({ message: 'There is no live connection to the server, so the command was not sent. Try again once it is back.', sessionId: null });
       return;
     }

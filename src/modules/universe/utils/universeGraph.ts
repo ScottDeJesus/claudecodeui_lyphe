@@ -3,19 +3,19 @@ import { birthRegimes } from '@/modules/universe/utils/universeRegimes';
 import {
   isBodyKind,
   isFileKind,
+  isSourceKind,
   makeNode,
   placeNodes,
-  ringFor,
-  seedFrom,
 } from '@/modules/universe/utils/universeBirth';
 
 /**
  * THE GRAPH THE SKY DRAWS — every node, every link, and how stiff the springs between them may be.
  * Built once from the map, never rebuilt: a tweak moves the frame, never the graph.
  *
- * WHERE A NODE IS BORN IS NOT THIS FILE'S. The seeds a star reads off its own history, the ring ladder
- * and the placement are `universeBirth` — where the export's `rnd()` went, and why the same tree gives
- * the same sky every load. What is here is the assembled model: the links, the stiffness bound, gravity.
+ * WHERE A NODE IS BORN IS NOT THIS FILE'S. The seeds a star reads off its own history, the room each
+ * subtree is measured for and the placement are `universeBirth` — where the export's `rnd()` went, and
+ * why the same tree gives the same sky every load. What is here is the assembled model: the links, the
+ * stiffness bound, gravity.
  *
  * WHAT A NODE IS BEYOND ITS KIND IS BORN IN THE SAME CALL. The regime outputs — `leaf`, `fr`, `dk` —
  * and the body list the regimes mark come from `universeRegimes`, derived from the tree the placement
@@ -32,6 +32,11 @@ export type UniverseGraphNode = {
   kind: UniverseNode['k'];
   /** Parent node index, `-1` for a root: the sun, a galaxy, an endpoint. */
   p: number;
+  /** The root of the tree this node hangs in — a repo, or itself for a root — which the pull-home reads. */
+  root: number;
+  /** Which repo's palette slot this node paints with: the repo's ordinal among the repos, the sun's
+   *  own one past them, inherited down the tree — the export's `cluster`. */
+  cluster: number;
   depth: number;
   lines: number;
   /** The instant git last saw this node change, epoch SECONDS — the crawler's own unit, carried
@@ -62,11 +67,23 @@ export type UniverseGraphNode = {
   oa: number; oc: number; os: number;
   ob: number; odir: number;
   okep: number; orest: number; prec: number;
-  /** The ring a body is held on around its anchor: its direction, radius factor, and the target. */
+  /** The ring a held node circles its anchor on: its direction, the radius it is held at before gravity
+   *  (`0` for a node no ring holds), and the target this frame. `rk` is where in its band a node
+   *  rests — a fraction of the parent's disc for a star, of the parent's ring for a body. */
   ux: number; uy: number;
-  rk: number; tx: number; ty: number;
-  /** THE REGIME OUTPUTS, born once and never recomputed: `leaf` (no directory children), `fr` (the
-   *  mean birth distance of its own file children — zero when it carries none) and `dk` (their mode). */
+  held: number; rk: number; tx: number; ty: number;
+  /** THE ROOM, measured at birth from the leaves up (`universeBirth`): `reach` is the radius of the disc
+   *  the whole subtree fits in, `cx`/`cy` where that disc's centre sits from the node (a folder whose one
+   *  child holds everything is at its room's edge, not its middle), `disc` the radius the body's own
+   *  files sit within, `ring` the outer radius of the annulus its child bodies sit in. Zero where there
+   *  is nothing to hold. */
+  reach: number; cx: number; cy: number; disc: number; ring: number;
+  /** The room's LIVE centre, re-measured by the relaxation from where the subtree is now — the
+   *  birth offset is stale the moment the orbit turns a child. */
+  lx: number; ly: number;
+  /** THE REGIME OUTPUTS, born once and never recomputed — save that `applyDistance` scales `fr` with
+   *  the sky: `leaf` (no directory children), `fr` (the mean birth distance of its own file children —
+   *  zero when it carries none) and `dk` (their mode). */
   leaf: boolean; fr: number; dk: UniverseNode['k'];
 };
 
@@ -90,14 +107,20 @@ export type UniverseGraph = {
   act: UniverseGraphNode[];
   /** The zoom is under `COARSE_Z`: every star is sub-pixel, so files are neither simulated nor drawn. */
   coarse: boolean;
+  /** Whether the files tweak is hiding every star but code this frame — written by `universeRegimes`
+   *  from the tweaks, read by the passes and the hit test, which have no tweaks in hand. */
+  codeOnly: boolean;
   /** Every body with its direct children — what the wobble sums and the transits test. */
   families: { p: UniverseGraphNode; kids: UniverseGraphNode[] }[];
+  /** Every set of two or more sibling bodies, the sun's repos included — what the relaxation keeps
+   *  from overlapping by their reach, so two subtrees born too close untangle as wholes. */
+  siblings: UniverseGraphNode[][];
   /** Every node's direct children by parent id, what the regimes measure a body's extent over and
    *  admit its files from. Not `families`: eight files on the merged map hang off the sun itself. */
   children: (UniverseGraphNode[] | undefined)[];
   core: UniverseGraphNode;
-  /** The galaxy's reach in world units, and the same divided by 290. */
-  radius: number; scale: number;
+  /** The sky's reach in world units — the outermost ring plus its margin, what the fitted view frames. */
+  radius: number;
   /** The camera's live world position, written by the caller — the parallax origin. */
   camX: number; camY: number;
   /** The node the depth of field focuses on (the selection, else the hover), and its depth. */
@@ -105,6 +128,8 @@ export type UniverseGraph = {
   focusZ: number; dofAmt: number;
   /** The frame's temperature and the gravity it is running under. */
   alpha: number; gv: number;
+  /** The distance the sky is currently scaled to — `applyDistance` returns at once when it matches. */
+  dv: number;
   /** The frame's clock and the last trail sample. */
   lastNow: number; lastTrail: number;
   /** The fastest node the last relaxation moved, in world units a frame; zero once nothing moves. */
@@ -129,12 +154,18 @@ export type UniverseGraphSource = {
 
 /** How far apart two nodes joined only by an import, a co-change or an endpoint edge settle. */
 const CROSS_REST = 170;
+/** The most a star's orbit may outpace its ring's. */
+const KEPLER_MAX = 4;
+/** An endpoint's drawn radius: a base, plus a log of the stars that reach it — a database with 500
+ *  draws near 85 units, an MCP server nothing reaches stays at the base. */
+const SOURCE_R_BASE = 14;
+const SOURCE_R_PER_LOG = 11;
 const EDGE_KINDS = ['tree', 'import', 'cochange', 'endpoint'] as const;
 
 export const isBody = (n: UniverseGraphNode): boolean => isBodyKind(n.kind);
 export const isFile = (n: UniverseGraphNode): boolean => isFileKind(n.kind);
-/** A body held on a ring by a spring: the sun's children, and the roots that orbit the sun. */
-export const isRing = (n: UniverseGraphNode): boolean => isBody(n) && n.depth <= 1;
+/** A node held on a ring by a spring: a repo and its top-level bodies, and every endpoint. */
+export const isRing = (n: UniverseGraphNode): boolean => (isBody(n) && n.depth <= 1) || isSourceKind(n.kind);
 
 /** Keplerian step: advance an offset along the node's own ellipse. Faster near periapsis, slower far
  *  out; families further from their parent turn slower overall. Some files run retrograde. */
@@ -160,18 +191,18 @@ export const anchorOf = (graph: UniverseGraph, n: UniverseGraphNode): UniverseGr
  *  so a galaxy carries its own subtree with it as the sun turns. */
 export function ringTarget(graph: UniverseGraph, h: UniverseGraphNode): void {
   const anchor = anchorOf(graph, h);
-  const reach = ringFor(graph.radius, h.depth) / Math.pow(graph.gv, 0.45);
-  h.tx = anchor.px + h.ux * reach * h.rk;
-  h.ty = anchor.py + h.uy * reach * h.rk;
+  // `held` is the exact radius the node was born at, so nothing scales it but gravity — `rk` is where
+  // it sits in its band, already inside `held`.
+  const reach = h.held / Math.pow(graph.gv, 0.45);
+  h.tx = anchor.px + h.ux * reach;
+  h.ty = anchor.py + h.uy * reach;
 }
 
 /** The graph, once. Nodes come whole from the map; positions are born in `universeBirth`. */
 export function buildGraph(source: UniverseGraphSource): UniverseGraph {
   const nodes = source.nodes.map(makeNode);
-  const scale = Math.sqrt(nodes.length / 320);
-  const radius = 290 * scale;
   const core = nodes.find((n) => n.kind === 'core') ?? nodes[0];
-  const childIds = placeNodes(nodes, core, radius);
+  const { children: childIds, radius } = placeNodes(nodes, core);
 
   const links: UniverseGraphLink[] = [];
   const stiffness: Record<UniverseGraphLink['kind'], number> = {
@@ -184,14 +215,17 @@ export function buildGraph(source: UniverseGraphSource): UniverseGraph {
     for (const [a, b] of source.edges[kind] ?? []) {
       if (a >= nodes.length || b >= nodes.length) continue;
       const child = nodes[b];
-      let rest = kind === 'tree' ? ringFor(radius, child.depth) : CROSS_REST;
+      let rest = CROSS_REST;
       if (kind === 'tree') {
-        // A body is held on its own ring; a star hangs where its own history puts it — the export's
-        // companion-star branch has no counterpart here, because the real map has no binaries.
-        const kk = isBody(child) ? child.rk : 0.45 + seedFrom(source.nodes[b], 12) * 1.3;
-        rest *= kk;
-        child.okep = Math.pow(kk, -1.5);
-        child.orest = rest;
+        // A tree spring rests where the child was born — `measureRoom` wrote the distance, a star in
+        // its parent's disc, a body in the annulus outside it — so a sky is born settled and the
+        // springs only hold it. The export's companion-star branch has no counterpart here, because
+        // the real map has no binaries.
+        rest = child.orest;
+        // Kepler's pace for a star in its disc, bounded: an innermost star at the disc floor would
+        // otherwise lap at eight times the ring, and a body's `rk` is its place in an annulus, not an
+        // orbit — a body turns at the ring's own pace.
+        child.okep = isBody(child) ? 1 : Math.min(KEPLER_MAX, Math.pow(child.rk, -1.5));
       }
       links.push({ a, b, rest, rest0: rest, k: stiffness[kind], kind });
       nodes[a].deg++;
@@ -201,6 +235,9 @@ export function buildGraph(source: UniverseGraphSource): UniverseGraph {
     }
   }
 
+  for (const n of nodes) {
+    if (isSourceKind(n.kind)) n.r = SOURCE_R_BASE + SOURCE_R_PER_LOG * Math.log1p(n.deg);
+  }
   boundStiffness(nodes, links);
 
   const byDepth = [...nodes].sort((a, b) => a.depth - b.depth);
@@ -218,11 +255,15 @@ export function buildGraph(source: UniverseGraphSource): UniverseGraph {
       .filter((f) => f.kids.length > 0 && isBody(f.p)),
     children,
     bodies,
+    siblings: [
+      nodes.filter((n) => n.p < 0 && isBody(n) && n !== core),
+      ...nodes.map((p) => childIds[p.id].map((id) => nodes[id]).filter(isBody)),
+    ].filter((set) => set.length > 1),
     act: [],
     coarse: false,
+    codeOnly: false,
     core,
     radius,
-    scale,
     camX: 0,
     camY: 0,
     focus: null,
@@ -232,6 +273,7 @@ export function buildGraph(source: UniverseGraphSource): UniverseGraph {
     // Born at zero, NOT at the 1 the birth call below hands in, so that call is not skipped as a
     // no-change: it is what writes every ring target and every spring rest on the first frame.
     gv: 0,
+    dv: 1,
     lastNow: 0,
     lastTrail: 0,
     speed: 0,
@@ -282,6 +324,35 @@ function boundStiffness(nodes: UniverseGraphNode[], links: UniverseGraphLink[]):
     const factor = Math.min(slack(l.a), slack(l.b));
     if (factor < 1) l.k *= factor;
   }
+}
+
+/**
+ * THE DISTANCE TWEAK: the whole sky scaled about the sun, rigidly and at once. Every resting and drawn
+ * position, every spring rest, every held ring, every room measure and every cloud extent is multiplied
+ * by the same factor, so nothing is left to fight — a spring whose rest and whose length both scaled is
+ * a spring at rest — and the change lands on the next frame at any zoom, including the fitted view,
+ * where the relaxation does not run at all. The cloud tiles are baked from `fr`, so the canvas rebakes
+ * them when the tweak moves. Every link's rest scales, the cross links' included (`CROSS_CAP` is what
+ * keeps a cross link from towing, not its rest — measured, holding the cross rests at 170 moves the
+ * farthest star three units of 9,204). What does NOT scale is the repulsion cell and a star's own drawn
+ * radius: at half the distance a star's neighbourhood is a little more crowded, which is what closer
+ * means.
+ */
+export function applyDistance(graph: UniverseGraph, distance: number): void {
+  if (distance === graph.dv || !Number.isFinite(distance) || distance <= 0) return;
+  const k = distance / graph.dv;
+  graph.dv = distance;
+  for (const n of graph.nodes) {
+    n.px *= k; n.py *= k; n.ox *= k; n.oy *= k; n.x *= k; n.y *= k;
+    n.lx *= k; n.ly *= k; n.cx *= k; n.cy *= k; n.tx *= k; n.ty *= k;
+    n.orest *= k; n.held *= k; n.reach *= k; n.disc *= k; n.ring *= k; n.fr *= k;
+    if (n.tr !== null) for (let i = 0; i < n.tr.length; i++) n.tr[i] *= k;
+  }
+  for (const l of graph.links) {
+    l.rest0 *= k;
+    l.rest *= k;
+  }
+  graph.radius *= k;
 }
 
 /** The export's `applyGravity()`: what the gravity tweak does to every ring and spring rest. */

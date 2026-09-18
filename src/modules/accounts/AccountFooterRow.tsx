@@ -9,7 +9,7 @@ import { accountInitials } from '@/modules/accounts/utils/accountInitials';
 import { formatWindowCountdown, windowPercent, windowTone } from '@/modules/accounts/utils/usageWindows';
 import { ProviderLoginModal } from '@/modules/provider-auth';
 import { Avatar, Meter } from '@/shared/ui';
-import type { DescentUsageWindow } from '@/shared/types';
+import type { ClaudeUsageWindow } from '@/shared/types';
 
 type GlanceWindow = { key: string; short: string; full: string };
 
@@ -125,7 +125,7 @@ export function AccountFooterRow({ collapsed = false, onExpand }: AccountFooterR
       const found = windows.find((usageWindow) => usageWindow.key === glance.key);
       return found ? { ...glance, usageWindow: found } : null;
     })
-    .filter((entry): entry is GlanceWindow & { usageWindow: DescentUsageWindow } => entry !== null);
+    .filter((entry): entry is GlanceWindow & { usageWindow: ClaudeUsageWindow } => entry !== null);
 
   const label = picture?.activeLabel ?? '—';
   const hasCountdown = glanceWindows.some(({ usageWindow }) => Boolean(usageWindow.resetsAt));

@@ -2,6 +2,7 @@ import type { UniverseTweaks } from '@/modules/universe/utils/universeTweaks';
 import { advanceTemperature, relax } from '@/modules/universe/utils/universeForces';
 import {
   anchorOf,
+  applyDistance,
   applyGravity,
   isBody,
   isFile,
@@ -15,7 +16,7 @@ import type { Viewport } from '@/modules/universe/utils/universeView';
 // The layout's public surface, unchanged by the split: this file is still where a caller asks for
 // the graph and for a frame of it. The graph itself lives in `universeGraph`, the relaxation in
 // `universeForces` — cut by cohesion, so the model, the forces and the frame each change together.
-export { applyGravity, buildGraph } from '@/modules/universe/utils/universeGraph';
+export { applyDistance, applyGravity, buildGraph } from '@/modules/universe/utils/universeGraph';
 export type {
   UniverseGraphLink,
   UniverseGraphNode,
@@ -110,13 +111,14 @@ export function stepLayout(
   // coarse regime is the one transition the temperature below cares about.
   const wasCoarse = graph.coarse;
   // The frame's regimes, from the camera it is drawn for, before any loop below reads a list.
-  updateRegimes(graph, view);
+  updateRegimes(graph, view, tweaks);
   // The parallax origin is the camera's own world position, taken from the viewport here: the float
   // pass slides every star against it and `dragTo` is its inverse. The owner writes the same two
   // fields before it calls in, because a drag is solved before this runs and must not lag a frame.
   graph.camX = view.x;
   graph.camY = view.y;
   applyGravity(graph, tweaks.gravity);
+  applyDistance(graph, tweaks.distance);
 
   // orbit — nested elliptical orbits: packages around the core, folders around packages, files
   // around folders. Every body has its own ellipse and pace; the weak physics below untangles them.

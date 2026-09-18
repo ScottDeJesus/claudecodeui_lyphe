@@ -10,6 +10,7 @@ import { resolveClaudeCodeExecutablePath } from '@/shared/claude-cli-path.js';
 import { expandHome } from '@/shared/utils.js';
 
 import { createPlanRunnerRouter } from './plan-runner.routes.js';
+import { sweepPlanArchive } from './plan-archive.service.js';
 import { createRunnerEndingsNotifier } from './runner-endings.service.js';
 import type { RunnerEnding } from './runner-endings.service.js';
 import { snapshotRuns } from './runner-state.service.js';
@@ -57,6 +58,19 @@ const VERB_TIMEOUT_MS = 20000;
 const ANNOUNCED_THROUGH_KEY = 'plan_runner_announced_through';
 
 /**
+ * How long the plans-archive sweep waits after construction before its first pass, in milliseconds.
+ *
+ * The plan-archive watcher's settle window (`plans_archive_watcher.py:67`, ~2 min), for its own
+ * reason: a boot still warming must not race the first sweep, and this server restarts far more
+ * often than once a day — so the pass AFTER THE SETTLE is what reliably runs, and a daily timer
+ * measured from boot would be reset by the next restart before it ever fired.
+ */
+const ARCHIVE_SETTLE_MS = 120_000;
+
+/** How often the sweep runs once that first pass has happened (`plans_archive_watcher.py:70`, 24 h). */
+const ARCHIVE_INTERVAL_MS = 86_400_000;
+
+/**
  * The orchestrator is JavaScript, so TypeScript reads `dedupeKey = null` as a parameter that
  * accepts only `null`. This alias states the contract it actually implements, the same way
  * `run-stall-watchdog.service.ts` does.
@@ -90,6 +104,19 @@ export type PlanRunnerModule = {
   stop(): void;
 };
 
+/** What the entrypoint hands this lane: the one reading that lives outside it. */
+export type PlanRunnerDependencies = {
+  /**
+   * The plan paths a card's plan or build lease is holding right now, asked afresh on EVERY pass —
+   * never captured here, so a lease taken after this module was built still stops the sweep.
+   *
+   * The board answers this from its own barrel and `server/index.ts` joins the two; nothing under
+   * this module imports the board, which is what keeps the sweep's one reach into board rows in the
+   * composition root where the join belongs.
+   */
+  heldPlanPaths: () => string[];
+};
+
 /**
  * The ONE place a run's launching session becomes an app id.
  *
@@ -121,11 +148,18 @@ function resolveLaunchingSessions(runs: RunnerRunSnapshot[]): RunnerRunSnapshot[
  * `wss.clients` set, which would also deliver it to `/shell`, `/plugin-ws` and
  * `/desktop-notifications`, where it would be parsed and dropped, and on `/plugin-ws` handed to
  * third-party plugin frontends that have no business seeing it (`taskmaster.routes.ts:30-50`).
+ *
+ * This construction is also where the plans-archive sweep is ARMED — its settle timer starts here,
+ * so the module it belongs to is the module that owns its cadence (`runArchivePass` below). It is
+ * read-only work on the plans corpus and it speaks to no socket, so it costs the lane nothing.
  */
-export function createPlanRunnerModule(): PlanRunnerModule {
+export function createPlanRunnerModule({ heldPlanPaths }: PlanRunnerDependencies): PlanRunnerModule {
   const stateDir = expandHome(process.env.PLAN_RUNNER_STATE_DIR || DEFAULT_STATE_DIR);
   const bin = expandHome(process.env.PLAN_RUNNER_BIN || DEFAULT_BIN);
   const claudeBinDir = resolveClaudeBinDir();
+
+  /** The daily sweep's interval, created once from the settle callback and cleared by `stop()`. */
+  let archiveTimer: NodeJS.Timeout | null = null;
 
   const broadcast = (frame: RunnerStateEvent): void => {
     const message = JSON.stringify(frame);
@@ -219,9 +253,45 @@ export function createPlanRunnerModule(): PlanRunnerModule {
       runRunnerVerb(verb, runId, { bin, timeoutMs: VERB_TIMEOUT_MS, claudeBinDir }),
   });
 
+  /**
+   * ONE pass of the plans-archive sweep. Never throws.
+   *
+   * The four clauses and the move live in `plan-archive.service.ts`; this only hands it the moment,
+   * the verdict that a pass may write, and the plan paths the board's leases hold as of now. A fault
+   * is logged once and swallowed — a sweep that ended the interval would silently stop archiving
+   * for the life of the process, and one bad day costs nothing but a day's worth of moved files.
+   */
+  const runArchivePass = (): void => {
+    try {
+      const sweep = sweepPlanArchive(Date.now(), true, new Set(heldPlanPaths()));
+      console.log(
+        `[PlanRunner] plans-archive swept — ${sweep.moved.length} finished plan(s) moved, ` +
+          `${Object.keys(sweep.held).length} left in place`
+      );
+    } catch (error) {
+      logErrorOnce(
+        `[PlanRunner] plans-archive sweep failed: ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
+  };
+
+  // Settle, then daily. The settle is what actually fires on a server that restarts often, and the
+  // interval is the backstop under one that lives long; both are unref'd, so neither keeps the
+  // process alive, and the interval is created ONCE per construction, from the settle callback.
+  const settleTimer = setTimeout(() => {
+    runArchivePass();
+    archiveTimer = setInterval(runArchivePass, ARCHIVE_INTERVAL_MS);
+    archiveTimer.unref();
+  }, ARCHIVE_SETTLE_MS);
+  settleTimer.unref();
+
   return {
     router,
     start: () => watcher.start(),
-    stop: () => watcher.stop(),
+    stop: () => {
+      watcher.stop();
+      clearTimeout(settleTimer);
+      if (archiveTimer !== null) clearInterval(archiveTimer);
+    },
   };
 }

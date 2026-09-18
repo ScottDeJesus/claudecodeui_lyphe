@@ -32,16 +32,22 @@ type BadgeProps = React.HTMLAttributes<HTMLDivElement> & {
   variant?: BadgeVariant;
   /** The state this badge reports. Where the two axes disagree, this one wins. */
   tone?: Tone;
+  /**
+   * The element to draw. A badge inside a `<button>` — a count on a header that is itself the
+   * control — must be phrasing content, and a `div` there is a content model the parser only
+   * tolerates. Paint and tone are identical either way.
+   */
+  as?: 'div' | 'span';
 };
 
 /** Used by the browser-use, chat, mcp, settings, sidebar and skills modules for short status labels. */
-export function Badge({ className, variant = 'default', tone, ...props }: BadgeProps) {
+export function Badge({ className, variant = 'default', tone, as: Element = 'div', ...props }: BadgeProps) {
   // `default` is the only variant whose paint is a FILL, so it is the only one that can fight
   // an explicit tone. A caller who names a tone means the tone, so the marker steps aside.
   const variantMarker = variant === 'default' && tone !== undefined ? undefined : `vv-badge--${variant}`;
 
   return (
-    <div
+    <Element
       className={cn(badgeVariants(), variantMarker, className)}
       data-tone={tone ?? VARIANT_TONES[variant]}
       {...props}

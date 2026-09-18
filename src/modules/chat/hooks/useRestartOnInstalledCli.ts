@@ -108,7 +108,7 @@ export function useRestartOnInstalledCli({
   restartedSessionId: string | null;
 } {
   const pushToast = useToast();
-  const { ws, subscribe } = useWebSocket();
+  const { subscribe } = useWebSocket();
   const { installed, staleVersionOf, refresh } = useCliVersion();
 
   // The restart in flight. State, so that setting it schedules the effects that carry it forward.
@@ -200,27 +200,13 @@ export function useRestartOnInstalledCli({
     }
 
     // The run has ended. This is the only moment the resume can go through the normal send: while
-    // the flag was up, `handleSubmit` would have stashed it for the server's 30 s dispatcher.
-    //
-    // `sendMessage` writes the frame if and only if the socket is OPEN, and when it is not it says
-    // so to the console and nowhere else. So the socket is asked FIRST — read here rather than
-    // after, where a 3 s reconnect would make a dropped frame look like a delivered one — and a
-    // send that cannot land is refused instead of made, which is what keeps an optimistic user row
-    // and a spinner that will never end off the screen.
-    if (ws?.readyState !== WebSocket.OPEN) {
-      moveTo(IDLE);
-      pushToast({
-        tone: 'warn',
-        title: 'Could not resume',
-        message: 'The connection dropped, so nothing was sent. The conversation is still here.',
-      });
-      return undefined;
-    }
-
+    // the flag was up, `handleSubmit` would have stashed it for the server's 30 s dispatcher. A
+    // dropped connection needs no check here: the socket holds the frame until it is back, and a
+    // frame it gives up is answered in the conversation like any refused send.
     submit(RESUME_PROMPT);
     moveTo({ phase: 'resuming', sessionId: intent.sessionId, staleVersion: intent.staleVersion, since: Date.now() });
     return undefined;
-  }, [completeTick, intent, moveTo, pushToast, sessionId, submit, ws]);
+  }, [completeTick, intent, moveTo, pushToast, sessionId, submit]);
 
   // ---------------------------------------------------------------- resuming → resumed, or not
   useEffect(() => {

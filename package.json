@@ -40,7 +40,7 @@
     "desktop:dist:mac": "npm run build && npm run desktop:stage && electron-builder --projectDir .desktop-build/desktop-app --mac dmg",
     "desktop:dist:win": "npm run build && npm run desktop:stage && electron-builder --projectDir .desktop-build/desktop-app --win nsis",
     "server:bundle": "npm run build && node scripts/release/build-server-bundle.js",
-    "desktop:icon:mac": "node electron/scripts/generate-macos-icon.js",
+    "icons": "node electron/scripts/generate-app-icons.js",
     "build": "npm run build:client && npm run build:server",
     "build:client": "vite build",
     "prebuild:server": "node -e \"require('node:fs').rmSync('dist-server.next', { recursive: true, force: true })\"",

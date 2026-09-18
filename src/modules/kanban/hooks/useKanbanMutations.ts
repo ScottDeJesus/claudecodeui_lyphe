@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type {
+  KanbanAttachment,
   KanbanCardSummary,
   KanbanChecklistItem,
   KanbanIssue,
@@ -77,6 +78,12 @@ export type KanbanMutations = {
     itemId: string,
     patch: { state?: KanbanChecklistItem['state']; note?: string }
   ) => Promise<KanbanChecklistItem | null>;
+  /** Posts one file's bytes to the card and answers the row the server stored, or `null` when the
+   *  door refused it — its sentence reaches the reader through the same toast every other verb's
+   *  refusal does. The card's own list is repainted by the frame the write broadcasts. */
+  uploadAttachment: (cardId: string, file: File) => Promise<KanbanAttachment | null>;
+  /** Destroys one attachment's row and its bytes. `true` when there was something to remove. */
+  removeAttachment: (cardId: string, attachmentId: string) => Promise<boolean>;
 };
 
 type KanbanMutationOptions = {
@@ -249,6 +256,28 @@ export function useKanbanMutations({ applyCard }: KanbanMutationOptions): Kanban
     [send]
   );
 
+  // The card's attachment bytes, on the same footing as the ledger verbs above: each answers WHAT
+  // THE ROUTE ANSWERED and nothing more — the stored row, or whether the bytes were there to
+  // destroy. Neither puts a card back: the upload's answer arrives before the card's own frame
+  // does, and the drawer paints the card, so the list comes right by the one path that can never
+  // disagree with the count on the card's face.
+
+  const uploadAttachment = useCallback(
+    async (cardId: string, file: File) => {
+      const body = await send<{ attachment: KanbanAttachment }>(() => api.kanban.uploadAttachment(cardId, file));
+      return body?.attachment ?? null;
+    },
+    [send]
+  );
+
+  const removeAttachment = useCallback(
+    async (cardId: string, attachmentId: string) => {
+      const body = await send<{ ok: boolean }>(() => api.kanban.removeAttachment(cardId, attachmentId));
+      return body?.ok ?? false;
+    },
+    [send]
+  );
+
   const clearLane = useCallback(
     async (cardIds: string[]) => {
       // One press, many writes: the lane's cards go one at a time, and each one that lands is
@@ -287,5 +316,7 @@ export function useKanbanMutations({ applyCard }: KanbanMutationOptions): Kanban
     resolveIssue,
     addChecklistItem,
     updateChecklistItem,
+    uploadAttachment,
+    removeAttachment,
   };
 }

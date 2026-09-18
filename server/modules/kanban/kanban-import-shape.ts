@@ -4,8 +4,9 @@ import { AppError } from '@/shared/utils.js';
 
 /**
  * WHAT SHAPE A DESCENT FILE MUST HAVE — the nine tables, and inside each one the columns the reads
- * name. One module, checked before a single row is read, so the wrong file is a 404 that says which
- * table or column is missing rather than a driver error thrown from four tables deep in the read.
+ * name, plus the two satellite tables checked only when they are there. One module, checked before
+ * a single row is read, so the wrong file is a 404 that says which table or column is missing rather
+ * than a driver error thrown from four tables deep in the read.
  *
  * The column half is not pedantry. Descent migrated its own `ov_features` in place (its `_migrate`
  * adds `closing_remarks`, the four `build_tokens_*` counters and the two plan-lease columns), so a
@@ -24,7 +25,10 @@ import { AppError } from '@/shared/utils.js';
  *
  * `ov_settings` is deliberately NOT one of them: it is read when it is there, but its absence
  * degrades one imported setting rather than making the file the wrong file, so it must never be
- * what a 404 is about.
+ * what a 404 is about. `ov_lessons` and `ov_memory_candidates` are absent for the same reason and
+ * one more: they are an INSTALL's satellites rather than a board's spine — a build's notes and its
+ * memory proposals — so a Descent old enough to predate either is still a board worth importing.
+ * Requiring them would refuse an import of every board over two tables it can do without.
  */
 export const REQUIRED_DESCENT_TABLES = [
   'ov_boards',
@@ -39,6 +43,19 @@ export const REQUIRED_DESCENT_TABLES = [
 ] as const;
 
 export type RequiredDescentTable = (typeof REQUIRED_DESCENT_TABLES)[number];
+
+/**
+ * The two tables an install keeps beside its board: the lessons a build learned, and the memory
+ * proposals a session made. Read when they are there, empty when they are not.
+ *
+ * Their COLUMNS are still checked, and that is the whole of the difference from the nine above: a
+ * missing TABLE means "this Descent never had that lane, import the rest", while a missing COLUMN
+ * on a table that IS there means the same thing a missing column anywhere means — a source this
+ * importer cannot read, refused in a sentence rather than by a driver error four tables deep.
+ */
+export const OPTIONAL_DESCENT_TABLES = ['ov_lessons', 'ov_memory_candidates'] as const;
+
+export type OptionalDescentTable = (typeof OPTIONAL_DESCENT_TABLES)[number];
 
 /**
  * Every column the transport's `SELECT`s name, table by table.
@@ -109,6 +126,47 @@ export const REQUIRED_DESCENT_COLUMNS: Record<RequiredDescentTable, readonly str
   ov_events: ['id', 'ts', 'kind', 'feature_id', 'actor', 'payload'],
 };
 
+/**
+ * Every column the two satellites' reads name, checked only when the table is present.
+ *
+ * It is a second map rather than a wider first one because the two lists answer different
+ * questions: `REQUIRED_DESCENT_COLUMNS` decides whether this file is a Descent board at all, and
+ * this one decides whether the lane that happens to be there can be read.
+ */
+export const OPTIONAL_DESCENT_COLUMNS: Record<OptionalDescentTable, readonly string[]> = {
+  ov_lessons: [
+    'id',
+    'feature_id',
+    'name',
+    'summary',
+    'body',
+    'trigger',
+    'kind',
+    'tags',
+    'status',
+    'source',
+    'draft_path',
+    'created_at',
+    'reviewed_at',
+  ],
+  ov_memory_candidates: [
+    'id',
+    'name',
+    'body',
+    'target',
+    'project',
+    'index_line',
+    'rationale',
+    'status',
+    'source',
+    'session_id',
+    'asserted_path',
+    'refusal',
+    'created_at',
+    'reviewed_at',
+  ],
+};
+
 /** The tables the file actually holds. A file that exists but is not a database fails here first. */
 function readTableNames(db: Database, dbPath: string): Set<string> {
   try {
@@ -131,7 +189,10 @@ function readTableNames(db: Database, dbPath: string): Set<string> {
  * `PRAGMA table_info` takes a table name, not a bound parameter, so the name is interpolated — it
  * comes from the `REQUIRED_DESCENT_TABLES` allowlist above and is never caller input.
  */
-function readColumnNames(db: Database, table: RequiredDescentTable): Set<string> {
+function readColumnNames(
+  db: Database,
+  table: RequiredDescentTable | OptionalDescentTable
+): Set<string> {
   const rows = db.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[];
   return new Set(rows.map((row) => row.name));
 }
@@ -161,6 +222,21 @@ export function requireDescentShape(db: Database, dbPath: string): Set<string> {
   for (const table of REQUIRED_DESCENT_TABLES) {
     const columns = readColumnNames(db, table);
     const missingColumn = REQUIRED_DESCENT_COLUMNS[table].find((column) => !columns.has(column));
+    if (missingColumn !== undefined) {
+      throw new AppError(
+        `The database at ${dbPath} was written by an older Descent: its "${table}" table has no "${missingColumn}" column.`,
+        { code: 'KANBAN_IMPORT_OUTDATED_SOURCE', statusCode: 404 }
+      );
+    }
+  }
+
+  // The two satellites: their ABSENCE is not this file's problem, but a lane that is there and
+  // unreadable is, in exactly the words the loop above uses — same class of surprise, same 404.
+  for (const table of OPTIONAL_DESCENT_TABLES) {
+    if (!present.has(table)) continue;
+
+    const columns = readColumnNames(db, table);
+    const missingColumn = OPTIONAL_DESCENT_COLUMNS[table].find((column) => !columns.has(column));
     if (missingColumn !== undefined) {
       throw new AppError(
         `The database at ${dbPath} was written by an older Descent: its "${table}" table has no "${missingColumn}" column.`,

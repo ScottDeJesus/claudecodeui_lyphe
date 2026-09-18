@@ -1,4 +1,5 @@
 import {
+  getConnection,
   kanbanCardsDb,
   kanbanCardTagsDb,
   kanbanChecklistDb,
@@ -9,6 +10,7 @@ import {
 } from '@/modules/database/index.js';
 import {
   KANBAN_LANE_LIMIT_DEFAULT,
+  KANBAN_LEASE_STALE_SECONDS,
   KANBAN_SORT_ORDER_GAP,
   KANBAN_SORT_ORDER_MIN_GAP,
   KANBAN_STATUSES,
@@ -83,6 +85,47 @@ function setCardArchived(
     if (!kanbanCardsDb.setArchived(cardId, archived)) throw cardNotFound(cardId);
     return requireSummary(cardId);
   });
+}
+
+/**
+ * One tick's four token deltas, as the telemetry watcher counted them out of a transcript.
+ *
+ * A DELTA, never a total: the card's four `build_tokens_*` columns are the sum of every session
+ * that ever worked the card, so a caller handing over a session's cumulative would erase the
+ * spend of the session before it. `metis-telemetry.service.ts` is the only caller.
+ */
+export type KanbanTokenDelta = {
+  tokensIn: number;
+  tokensOut: number;
+  cacheRead: number;
+  cacheCreate: number;
+};
+
+/**
+ * ONE accumulating statement: `col = col + ?`, never a read-modify-write.
+ *
+ * The read-then-write shape loses an increment whenever a tick races a claim, a move or another
+ * session's tick on the same row — SQLite serialises the write lock, so the additive UPDATE is the
+ * only shape that cannot drop a delta. Zero on a card the row no longer holds (a card deleted
+ * between the attribution read and this statement), which the verb turns into the caller's 404.
+ *
+ * `updated_at` is deliberately NOT stamped. It is what orders the Done lane (`kanban-cards.db.ts`'s
+ * `listLane` reads `updated_at DESC` for the statuses that live there), and a token count is not a
+ * card moving: stamping it would shuffle a lane every thirty seconds.
+ */
+function addBuildTokenCounters(cardId: string, delta: KanbanTokenDelta): boolean {
+  const changed = getConnection()
+    .prepare(
+      `UPDATE kanban_cards SET
+         build_tokens_in = build_tokens_in + ?,
+         build_tokens_out = build_tokens_out + ?,
+         build_tokens_cache_read = build_tokens_cache_read + ?,
+         build_tokens_cache_create = build_tokens_cache_create + ?
+       WHERE id = ?`
+    )
+    .run(delta.tokensIn, delta.tokensOut, delta.cacheRead, delta.cacheCreate, cardId).changes;
+
+  return changed > 0;
 }
 
 /** Adds or removes one tag. Its own write, because a tag change is its own audit line. */
@@ -242,6 +285,40 @@ export const kanbanCardsService = {
   },
 
   /**
+   * Adds one tick's token spend to a card's four build counters.
+   *
+   * The board's "◎" cost chip renders these four columns, and they are written by nothing else —
+   * the telemetry watcher is the one caller, and it hands over a DELTA it derived from the delta
+   * between the session's transcript and the session row it already stored. Two Metis sessions can
+   * work one card over its life, so the accumulate is the whole point: a verb that SET the columns
+   * to its own totals would erase the earlier session's spend.
+   *
+   * A card that has gone away between the attribution read and this write is the same 404 every
+   * other card verb answers, and the seam rolls the audit row back with it.
+   */
+  addCardTokens(
+    cardId: string,
+    delta: KanbanTokenDelta,
+    context?: KanbanWriteContext
+  ): KanbanCardSummary {
+    return writeKanban(
+      {
+        kind: 'card.updated',
+        cardId,
+        actor: context?.actor,
+        // Named in the audit row: the counters are the payload's only subject, and a `card.updated`
+        // line with an empty payload would say a tick happened without saying what it wrote.
+        payload: { tokens: delta },
+        boardId: (card) => card.boardId,
+      },
+      () => {
+        if (!addBuildTokenCounters(cardId, delta)) throw cardNotFound(cardId);
+        return requireSummary(cardId);
+      }
+    );
+  },
+
+  /**
    * Moves one card into a status, at the position its two neighbours describe. The move, its
    * renormalisation when the midpoint runs out of room, and the clearing of the build lease are ONE
    * `mutate` callback: one transaction, one event, one frame. A card leaving `active` loses its lease.
@@ -303,6 +380,45 @@ export const kanbanCardsService = {
     return setCardTag('tag.removed', cardId, tag, context);
   },
 };
+
+/**
+ * Every plan path a live card's lease is holding, right now.
+ *
+ * The plan-archive sweep moves a finished plan out of the corpus, and the ONE thing that must stop
+ * it is a build or a plan still running against that file: a card's lease can be fresh on a plan
+ * nobody has touched for a week, so age alone does not cover it. This is the board answering what
+ * its own leases hold, so that no other module has to read these rows sideways to find out.
+ *
+ * A lease is fresh by the SAME window a claim is granted by — `KANBAN_LEASE_STALE_SECONDS`, the one
+ * home for the number, compared here the way `kanban-leases.db.ts` compares it for a claim — so a
+ * card whose builder died does not hold a plan forever, and one whose builder is working does.
+ * A stamp that will not parse is not fresh, which is the reading `readLeaseState` already gives it.
+ *
+ * The paths are returned as the card's `plan` column spells them (`~` and all): the caller is what
+ * joins these to the corpus's own paths, and normalising here would put a second rule for "two
+ * spellings of one path" in the board's hands.
+ *
+ * READ-ONLY, and it names no card: an empty list means no live lease holds any plan, which is the
+ * ordinary answer on a quiet board rather than an error.
+ */
+export function plansHeldByLease(): string[] {
+  const staleBefore = new Date(Date.now() - KANBAN_LEASE_STALE_SECONDS * 1000).toISOString();
+
+  const rows = getConnection()
+    .prepare(
+      `SELECT DISTINCT plan FROM kanban_cards
+       WHERE archived = 0
+         AND TRIM(COALESCE(plan, '')) != ''
+         AND (
+           (plan_lease_at IS NOT NULL AND julianday(plan_lease_at) >= julianday(?))
+           OR (build_lease_at IS NOT NULL AND julianday(build_lease_at) >= julianday(?))
+         )
+       ORDER BY plan ASC`
+    )
+    .all(staleBefore, staleBefore) as { plan: string }[];
+
+  return rows.map((row) => row.plan);
+}
 
 /** What `routes/card.routes.ts` takes hold of. */
 export type KanbanCardsService = typeof kanbanCardsService;

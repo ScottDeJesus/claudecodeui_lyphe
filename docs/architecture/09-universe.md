@@ -26,7 +26,7 @@ it rather than restating it. See [07-live-widgets.md](./07-live-widgets.md) for 
 
 | File | Role |
 | --- | --- |
-| `scripts/universe-crawl:2`, `scripts/universe/{registry,gitcrawl,blobs,nodes,build,merge,resolve}.py`, `edges/`, `routedump.py` | The crawler: the registry and its entry shape, git facts per repo, the line cache, the node list, the four resolvers, the three derived lanes and their caps, one live app's route table, and the build — **the map schema's one home** (`build.py:1-95`) |
+| `scripts/universe-crawl:2`, `scripts/universe/{registry,gitcrawl,blobs,nodes,build,merge,resolve}.py`, `edges/`, `routedump.py` | The crawler: the registry and its entry shape, git facts per repo, the line cache, the node list, the four resolvers, the three derived lanes and their caps, one live app's route table, and the build — **the map schema's one home** (`build.py:1-103`) |
 | `server/modules/universe/universe-journal.tap.ts`, `universe-transcript.{tap,tail}.ts` | Tap 1: `journalctl -f -o json` per unit, resolved to a star (`:116-257`); tap 2: the byte-offset tail (`tail:1-17`), and what a tool call means (`tap:9-29`) |
 | `server/modules/universe/universe.module.ts`, `{universe-activity,universe-map,universe-route-match,universe-state,universe-registry}.service.ts`, `universe.routes.ts` | The lane: held map, route, HEADS watcher, taps, broadcast (`:48-148`); The throttle, the held map, route matching, the layout, the registry read (`activity:39-99`); `GET /api/universe/map`, and deliberately no rebuild endpoint (`routes:5-13`) |
 | `src/modules/universe/{UniverseFeed,UniversePanel,UniverseCanvas}.tsx`, `hooks/`, `utils/`, `src/shared/types.ts:425-506`, `src/modules/live-bus/topics.ts:19-37,56` | The live-bus door (`Feed:9-38`); the tab and its chrome (`Panel:19-43`); the sky — five stacked canvases and the cadence that repaints them, per its own header (`Canvas:43-78`); the hooks and the engine; the four universe types and `universe:*` in the bus allowlist; the frame's own cost, published every frame at `window.__universePerf` for a probe to read (`utils/universePerf.ts:1-51`) |
@@ -46,9 +46,14 @@ fork reads, and the line cache at `<state>/lines.json` (`build.py:111-113`, `scr
 "deploying a project to the universe" means: `id`, `path`, `role` (`sun` or `galaxy`), `units` (the systemd
 units whose journal lines belong to it), `entry_file` (the star a journal line pulses when nothing else
 matches), `apps` (uvicorn apps in the repo), and `pg` and `mcp` (endpoint names). Adding a galaxy is that one
-entry and nothing else — no change in the repo it names. `load()` sorts entries LONGEST PATH FIRST once
-(`registry.py:122-131`) and `repo_for_path` takes the first prefix hit at a path-component boundary
-(`:141-152`). The ordering IS the rule, which is why it ships as data in `index.json`'s `resolve` array
+entry and nothing else — no change in the repo it names. Beside it, `systems.json` names the INTEGRATION
+FOLDERS — `{repo, dirs}` with segment-exact globs, seeded as shadow-connector's `extractors/*` and
+`outbound/*` (`registry.py`, `SYSTEMS_SEED`) — and the crawler marks a matching directory node `system`
+(`resolve.system_dirs`): the folder it was, with its files and history, only marked, so the sky can draw
+Drybook, Xactimate and XactAnalysis large and apart. Nothing is invented; a first design that added synthetic
+platform nodes was struck by the operator (2026-09-17). `load()` sorts entries LONGEST PATH FIRST once
+(`registry.py:169`) and `repo_for_path` takes the first prefix hit at a path-component boundary
+(`:187`). The ordering IS the rule, which is why it ships as data in `index.json`'s `resolve` array
 (`build.py:31-35`) and the server walks that array rather than re-sorting it
 (`server/modules/universe/universe-map.service.ts:169-181`).
 
@@ -173,9 +178,13 @@ about whether a frame from a retired map is real (`utils/universeFrames.ts:3-23`
 
 **What a frame draws.** A star's radius is `2.4 + min(sqrt(max(lines, 1)), 120) / 9`
 (`utils/universeBirth.ts:57`) and its brightness is git recency — full inside `recencyBrightDays`, easing to
-0.18 by a fixed 180 days (`utils/universeTokens.ts:118,130-152`); its colour is its kind in the five chart
-slots, `other` falling back to ink (`:98-108`). Bodies take the ink ladder instead — a body is not a file kind,
-and a sixth chart slot would be a colour the design system does not have. An **edit is a flare** decaying
+0.18 by a fixed 180 days (`utils/universeTokens.ts`, `brightnessFor` and `bandedBrightness`); its colour is its temperature, the design
+export's own ramp from orange through warm white to blue keyed on its size with a stable per-star jitter
+(`baseColorOf`, `universeTokens.ts`) — never its kind. A folder is its repo's pastel mixed halfway to warm white,
+a repo warm white, the sun cream with a cool glow, and every glow below the sun is the repo's pastel (one of
+the export's seven, by the repo's ordinal, `node.cluster`); an endpoint and an integration folder keep a
+token each; on a light canvas every literal is pulled toward the ink (`onSky`), since the export was drawn for a
+dark sky. Restored at the operator's word, 2026-09-17. An **edit is a flare** decaying
 linearly to exactly zero in 2400 ms — not the export's asymptotic glow (`utils/universePulses.ts:7-28`) — and an
 **execution is a pulse** routed on the real graph: from the star it resolved to, to that star's endpoint when
 the graph carries an endpoint edge, and otherwise to its parent body, so an execution is one leg and never a
@@ -278,6 +287,48 @@ whole, never handed a zero that would read to `advanceTemperature` as a settled 
 good. `applyGravity` returns the moment the tweak already matches `graph.gv`, so a page that never touches the
 gravity control walks the links once, at birth (`utils/universeForces.ts`,
 `utils/universeGraph.ts:234,288-297`).
+
+**Every subtree is given the room it needs, and the sources stand outside the repos.** The export placed
+children on a ring that shrank by 0.55 per depth whatever hung beneath them, and on the merged map sibling
+subtrees drew their clouds through each other: measured after settling, 84% of the stars had a star from
+another folder as their nearest neighbour. `utils/universeBirth.ts` now measures every node's `reach` from
+the leaves up — a body's files pack an inner disc by area, its child bodies the annulus outside it, and the
+room is the disc enclosing all of that, whose centre need not be the body (with the body pinned at the
+centre a chain of single-child folders doubled per level and put cloudcli's room at 8,100 units; the enclosing
+disc puts it at 2,400 at the first packing, 1,505 at the tighter one shipped). Each child is born at the
+distance its tree spring rests at, the repos ring the sun by their rooms (largest first, at the top), the
+endpoints ring the repos at the bearing of the repo that named them. An integration folder (`system`) is a
+body like any other but drawn at 1.8× its size in the warn ink, given 1.35× its room, and
+packed AFTER its plain siblings — and a folder that holds integrations (`extractors/`) is packed after ITS
+siblings — so the estate's reach into its platforms takes the outer belt of the repo, an area of its own
+(`universeBirth.ts`, `SYSTEM_R`, `SYSTEM_BELT`, `SYSTEM_ROOM`); its name fades in from zoom 0.22, absent at the fitted view and whole before a plain directory's, and the names are placed largest first with any that would print over one already placed left off (`universeRenderer.ts`, `SYSTEM_LABEL_FROM`). A cross link moves only its star end, so five
+hundred capped links cannot tow a database off its ring, and an endpoint is drawn at a radius that grows with
+the log of the stars reaching it (`universeGraph.ts`, `SOURCE_R_BASE`). The sky's radius is the outermost ring
+and its margin (9,200 units on the merged map, against 1,670), so
+`MIN_ZOOM` is 0.01 and `fitZoom` no longer carries the export's `0.85 / scale` cap, which framed the sun's
+neighbourhood alone. Two forces keep it that way: a cross link's pull is capped (`CROSS_CAP`), so an import
+is a lean and not a tow out of the folder, and sibling subtrees repel by their reach (`SIBLING_K`), a lean that keeps
+the birth placement honest rather than a guarantee. The packing was tightened once at the operator's word (2026-09-17, "too spread out"): measured after 600
+settled frames at 16 ms steps, 2,079 stars whose nearest star has a different parent (from 8,145; the looser
+packing gave 1,240) and 7 pairs closer than the sum of their radii (from 256); the layout bench 0.4 ms at fit
+and 3-4 ms at folder zoom 1.8. The
+settled speed floor under the default orbit rises with the sky's size (2.6 at 1,670 units to 3.5-4.0 at 9,200) — the ellipse
+breathing against the spring rests, bounded by the relax cadence as before (`universeForces.ts` header).
+
+**Distance is a tweak, applied as one rigid scale.** The `distance` slider (0.3-1.5, default 1) multiplies every
+resting and drawn position, spring rest, held ring, room measure and cloud extent about the sun in one call
+(`applyDistance`, `universeGraph.ts`), so the sky closes in on Claude at any zoom — including the fitted view,
+where the relaxation never runs — with nothing left to fight, and the canvas rebakes the clouds for the new
+`fr`. Every link's rest scales, the cross links' included; the repulsion cell and a star's drawn radius do not,
+so closer means a little more crowded, and at 0.3 the dense folders merge into knots — the deliberate
+"star size is not distance". The number input commits on Enter or blur, so a change is one snap and the camera
+eases to the new fit. Operator's word, 2026-09-17.
+
+**Only code is drawn by default.** The `files` tweak (`code`) keeps every star but the `source` kind — config,
+docs, data, assets, 27% of the map — out of the active list, the hit test, the clouds' bake, the edges and the
+flares (`hiddenKind`, `universeTweaks.ts`; `graph.codeOnly`, written by the regimes). The map is unchanged: the
+stats strip still counts them, and switching the tweak to `all` draws them on the next frame and rebakes the
+clouds. Operator's word, 2026-09-17.
 
 **The viewport has one home, and the camera is an argument.** `utils/universeView.ts` owns the `Viewport`
 type, `SCREEN_PAD` and `viewportBounds`; `stepLayout(graph, now, tweaks, view)` and

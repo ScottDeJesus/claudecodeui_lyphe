@@ -6,8 +6,8 @@ import type { MemoryPending } from '@/shared/types';
 /**
  * How often the pending queue is re-read. Deliberately slow, and the same floor the accounts
  * poller keeps: nothing here moves except when a session proposes a memory or a person reviews
- * one, and the proxy's own per-call ceiling is sized against this interval so a stalled Descent
- * costs one skipped reading rather than a queue of them.
+ * one, and the lane answers out of this app's own database — so a slow read costs one skipped
+ * reading rather than a queue of them.
  */
 const MEMORY_POLL_MS = 60_000;
 
@@ -16,7 +16,7 @@ const MEMORY_POLL_MS = 60_000;
  *
  * `pending` is `null` until the first answer lands — "not asked yet", which a screen has to
  * tell apart from `{reachable: false}` ("asked, and there was no picture to be had"): the
- * first is a spinner, the second is words about Descent being unreachable.
+ * first is a spinner, the second is words about the memory queue being unreachable.
  */
 type MemoryIntakeValue = {
   pending: MemoryPending | null;
@@ -40,7 +40,7 @@ const MemoryIntakeContext = createContext<MemoryIntakeValue | null>(null);
  * out (hooks/useMemoryReview.ts) is what stops a button press re-rendering all four.
  */
 export function MemoryIntakeProvider({ children }: { children: ReactNode }) {
-  // The last queue the proxy answered with. Essential rather than derived: it is the only copy
+  // The last queue this app answered with. Essential rather than derived: it is the only copy
   // of the picture between polls, and `null` (nothing asked yet) has to look different on
   // screen from a reachable-false answer.
   const [pending, setPending] = useState<MemoryPending | null>(null);
@@ -63,10 +63,10 @@ export function MemoryIntakeProvider({ children }: { children: ReactNode }) {
     const token = ++newestReadRef.current;
     let next: MemoryPending;
     try {
-      const response = await api.descent.memory.pending();
+      const response = await api.memory.pending();
       next = (await response.json()) as MemoryPending;
     } catch {
-      // The proxy answers 200 even when Descent is down, so a throw here is this app's own
+      // The route answers 200 on every reading it can take, so a throw here is this app's own
       // network or a body that is not JSON. Either way the honest reading is "no picture".
       next = { reachable: false, reason: 'unreachable' };
     }
@@ -100,7 +100,7 @@ export function MemoryIntakeProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo<MemoryIntakeValue>(() => ({
     pending,
-    // Zero when there is no picture: an unreachable Descent is not "four waiting", and a count
+    // Zero when there is no picture: an unreadable queue is not "four waiting", and a count
     // carried over from the last good reading would keep a tab up that nothing can fill.
     pendingCount: pending?.reachable ? pending.candidates.length : 0,
     refresh,

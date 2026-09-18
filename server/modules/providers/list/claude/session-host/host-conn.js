@@ -9,6 +9,10 @@
  * - The cached initialize reply carries seq 0 and is never journaled: it answers ONE client's
  *   request, and giving it a real seq would make the next re-attach replay a control response
  *   nobody asked for (D-3's cursor covers CLI output only).
+ * - Every stdin line is read once on its way to the CLI, for one fact: a `control_response`
+ *   names the CLI request it settles, and once the CLI has actually taken that line the journal
+ *   may stop holding the cursor at that request (D-3). A line the CLI's closed stdin refused
+ *   settled nothing, so it releases nothing.
  */
 
 import { StringDecoder } from 'node:string_decoder';
@@ -138,7 +142,9 @@ export function handleConnection(socket, host) {
     if (!isInitialize) {
       // A false here means the CLI's stdin has already gone; host.js logs the dropped line,
       // and the `exit` frame still tells this client what actually became of the CLI.
-      host.writeStdin(Buffer.concat([line, NEWLINE_BUF]));
+      const taken = host.writeStdin(Buffer.concat([line, NEWLINE_BUF]));
+      const answeredId = parsed?.type === 'control_response' ? parsed.response?.request_id : null;
+      if (taken && typeof answeredId === 'string') host.journal.answered(answeredId);
       return;
     }
     const requestId = parsed.request_id;

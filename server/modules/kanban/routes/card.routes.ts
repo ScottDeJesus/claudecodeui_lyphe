@@ -12,8 +12,25 @@ import {
 
 import type { KanbanCardsService } from '../kanban-cards.service.js';
 
+/**
+ * What one card's plan cost, as the plan-runner's own reading answers it.
+ *
+ * Declared here — structurally, with no import across modules — because the board module's whole
+ * composition discipline is that everything below its constructor takes what it needs as an
+ * argument: `plan-runner`'s `planCostFor` satisfies this shape field for field, and the ONE
+ * cross-module import that joins them lives in the composition root (`server/index.ts`).
+ */
+export type KanbanPlanCostReader = (planPath: string) => {
+  totalUsd: number;
+  byKind: { planning: number; review: number; scouts: number; build: number };
+  runs: number;
+} | null;
+
 /** The dependencies this route package needs. `kanban.routes.ts` hands them over. */
-export type CardRouteDependencies = { cards: KanbanCardsService };
+export type CardRouteDependencies = {
+  cards: KanbanCardsService;
+  planCost: KanbanPlanCostReader;
+};
 
 /**
  * One handler, with its failure path attached once.
@@ -100,8 +117,8 @@ function optionalString(
 }
 
 /**
- * The card routes: the lane page, create, detail, patch, move, archive, restore and the two tag
- * writes.
+ * The card routes: the lane page, create, detail, the plan-cost read, patch, move, archive,
+ * restore and the two tag writes.
  *
  * Auth is the mount's (`authenticateToken` in `server/index.ts`): no file here imports the guard,
  * and no route reads an actor off the request — the write verbs take the optional trailing context
@@ -113,7 +130,7 @@ function optionalString(
  */
 export function createCardRoutes(dependencies: CardRouteDependencies): Router {
   const router = express.Router();
-  const { cards } = dependencies;
+  const { cards, planCost } = dependencies;
 
   router.get(
     '/boards/:boardId/cards',
@@ -178,6 +195,21 @@ export function createCardRoutes(dependencies: CardRouteDependencies): Router {
     '/cards/:cardId',
     handle<{ cardId: string }>((request, response) => {
       response.json({ card: cards.getCard(request.params.cardId) });
+    })
+  );
+
+  router.get(
+    '/cards/:cardId/plan-cost',
+    handle<{ cardId: string }>((request, response) => {
+      // The card's plan COLUMN is read first, and it is read from the card rather than from the
+      // query: a card with no plan is `null` — not a zero, which would be the drawer claiming a
+      // build that never happened cost nothing. `getCard` is also what answers the 404 for an id
+      // that names no card, so this route invents no refusal of its own.
+      const plan = cards.getCard(request.params.cardId).plan;
+
+      response.json({
+        planCost: plan === null || plan.trim().length === 0 ? null : planCost(plan),
+      });
     })
   );
 

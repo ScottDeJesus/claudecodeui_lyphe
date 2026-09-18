@@ -5,6 +5,7 @@ import react from '@vitejs/plugin-react'
 import { getConnectableHost, normalizeLoopbackHost } from './shared/networkHosts.js'
 import keepPageOnReconnect from './vite-plugins/keepPageOnReconnect.js'
 import compressResponses from './vite-plugins/compressResponses.js'
+import precompressedAssets from './vite-plugins/precompressedAssets.js'
 
 // The client shows the installed package version so it can be compared against the
 // version the server process is actually running. Reading package.json here and
@@ -33,7 +34,9 @@ export default defineConfig(({ mode }) => {
     // compressResponses: the dev server sends every transformed module uncompressed — 19.5 MB of
     // boot on the wire, ~39s of it pure transfer on a phone's Tailscale link. Same bytes, smaller
     // envelope; a save still lands through HMR exactly as before.
-    plugins: [react(), keepPageOnReconnect(), compressResponses()],
+    // precompressedAssets: the production client on :5184 (`vite preview`) — Brotli twins written at
+    // build time, served with a year's cache on hashed assets.
+    plugins: [react(), keepPageOnReconnect(), compressResponses(), precompressedAssets()],
     define: {
       __APP_VERSION__: JSON.stringify(pkg.version)
     },
@@ -49,6 +52,12 @@ export default defineConfig(({ mode }) => {
       // under those names on the LAN and the tailnet — the machine name and its MagicDNS name
       // included — so they must stay allowed or such a visit renders a 403 page.
       allowedHosts: ['eis1', 'eis1.tail8717cd.ts.net'],
+      // Pre-transform the entry module when the dev server starts, so the first visit after a restart
+      // does not wait on it. Vite warms the listed file; its imports still transform on first request.
+      warmup: { clientFiles: ['./src/main.tsx'] },
+      // The :5184 build tree lives in the repo; left watched, every production build rewrote three
+      // .html files there and full-reloaded every open :5183 tab.
+      watch: { ignored: [(file) => /[\\/](?:\.prod-client|dist-server)(?:[\\/]|$)/.test(file)] },
       proxy: {
         '/api': `http://${proxyHost}:${serverPort}`,
         '/ws': {
@@ -71,12 +80,10 @@ export default defineConfig(({ mode }) => {
       rollupOptions: {
         output: {
           manualChunks: {
+            // No CodeMirror chunk: a manual chunk collects shared helpers too (the JSX runtime among
+            // them), which made the entry preload all 616 kB of it. Left to Rollup, CodeMirror stays
+            // in the lazy PRD editor's own chunk.
             'vendor-react': ['react', 'react-dom', 'react-router-dom'],
-            'vendor-codemirror': [
-              '@uiw/react-codemirror',
-              '@codemirror/lang-markdown',
-              '@codemirror/theme-one-dark'
-            ],
             'vendor-xterm': ['@xterm/xterm', '@xterm/addon-fit', '@xterm/addon-clipboard', '@xterm/addon-webgl']
           }
         }

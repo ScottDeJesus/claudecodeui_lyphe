@@ -1,10 +1,10 @@
-import { useState } from 'react';
+import { Suspense, useState } from 'react';
 import { X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 import { Badge, Button } from '@/shared/ui';
-import { Shell } from '@/modules/shell';
 import type { TaskMasterProject } from '@/shared/types';
+import { Shell } from '@/modules/shell';
 
 type TaskMasterSetupModalProps = {
   isOpen: boolean;
@@ -50,6 +50,7 @@ export default function TaskMasterSetupModal({ isOpen, project, onClose, onAfter
 
         <div className="min-h-0 flex-1 p-4">
           <div className="h-full overflow-hidden rounded-xl border border-border">
+            <Suspense fallback={null}>
             <Shell
               selectedProject={project}
               selectedSession={null}
@@ -62,6 +63,7 @@ export default function TaskMasterSetupModal({ isOpen, project, onClose, onAfter
                 }
               }}
             />
+            </Suspense>
           </div>
         </div>
 

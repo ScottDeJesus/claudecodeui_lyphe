@@ -97,7 +97,7 @@ export function useSessionProtection() {
     });
   }, []);
 
-  const syncProcessingSessions = useCallback<SyncProcessingSessions>((sessions) => {
+  const syncProcessingSessions = useCallback<SyncProcessingSessions>((sessions, isStillSending) => {
     const now = Date.now();
 
     setProcessingSessions((prev) => {
@@ -127,7 +127,7 @@ export function useSessionProtection() {
       }
 
       for (const [sessionId, activity] of prev) {
-        if (!incoming.has(sessionId) && now - activity.startedAt < LOCAL_ACTIVITY_GRACE_MS) {
+        if (!incoming.has(sessionId) && (now - activity.startedAt < LOCAL_ACTIVITY_GRACE_MS || isStillSending?.(sessionId))) {
           updated.set(sessionId, activity);
         }
       }

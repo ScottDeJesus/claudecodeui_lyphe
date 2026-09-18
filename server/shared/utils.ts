@@ -424,6 +424,43 @@ export function resolvePathInsideProject(projectRoot: string, targetPath: string
   return resolvedPath;
 }
 
+/**
+ * Resolves caller-supplied path SEGMENTS under a fixed root, or null when any of them
+ * could step outside it.
+ *
+ * THE repository's containment predicate for a root this server owns outright — the
+ * global chat-assets folder and, now, a card's attachment folder. It is the same
+ * separator-and-resolve double gate twice over: every segment is refused if it is blank
+ * or carries a separator, a `..` or a backslash (so nothing the caller spells can name
+ * another directory), and the joined result must resolve to a path strictly under the
+ * root (so a symlink-free `path.resolve` can never land elsewhere).
+ *
+ * It lives here rather than in either caller because a security predicate with two
+ * copies is a predicate that gets fixed once: `image-assets.service.ts`'s
+ * `resolveImageAssetFile` was the first copy and this is that function, moved unchanged
+ * with its segment as the only argument.
+ */
+export function resolveUnderRoot(root: string, ...segments: string[]): string | null {
+  const resolvedRoot = path.resolve(root);
+  const parts: string[] = [];
+
+  for (const segment of segments) {
+    const trimmed = typeof segment === 'string' ? segment.trim() : '';
+    if (!trimmed || trimmed.includes('/') || trimmed.includes('\\') || trimmed.includes('..')) {
+      return null;
+    }
+    parts.push(trimmed);
+  }
+
+  // No segment at all would resolve to the root itself, which is a directory, not a file.
+  if (parts.length === 0) return null;
+
+  const resolved = path.resolve(resolvedRoot, ...parts);
+  if (!resolved.startsWith(resolvedRoot + path.sep)) return null;
+
+  return resolved;
+}
+
 // ---------------------------
 //----------------- NORMALIZED PROVIDER MESSAGE UTILITIES ------------
 /**

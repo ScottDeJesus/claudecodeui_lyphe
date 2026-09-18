@@ -3,6 +3,8 @@ import { SCREEN_PAD, viewportBounds } from '@/modules/universe/utils/universeVie
 import type { UniverseGraph, UniverseGraphNode } from '@/modules/universe/utils/universeGraph';
 import type { UniverseNode } from '@/shared/types';
 import type { Viewport } from '@/modules/universe/utils/universeView';
+import { hiddenKind } from '@/modules/universe/utils/universeTweaks';
+import type { UniverseTweaks } from '@/modules/universe/utils/universeTweaks';
 
 /**
  * THE TWO REGIMES THE CAMERA PUTS THE SKY IN — who is coarse, and who is on the active list.
@@ -101,7 +103,7 @@ export function birthRegimes(byDepth: UniverseGraphNode[]): {
     }
     const parent = byId[n.p];
     if (parent === undefined) continue;
-    if (n.kind === 'dir') dirChildren[parent.id] = 1;
+    if (n.kind === 'dir' || n.kind === 'system') dirChildren[parent.id] = 1;
     if (!isFileKind(n.kind)) continue;
     let counts = kinds.get(parent.id);
     if (counts === undefined) {
@@ -113,7 +115,7 @@ export function birthRegimes(byDepth: UniverseGraphNode[]): {
     carried[parent.id]++;
   }
   for (const n of byDepth) {
-    n.leaf = n.kind === 'dir' && dirChildren[n.id] === 0;
+    n.leaf = (n.kind === 'dir' || n.kind === 'system') && dirChildren[n.id] === 0;
     n.fr = carried[n.id] > 0 ? reach[n.id] / carried[n.id] : 0;
     n.dk = dominant(kinds.get(n.id));
   }
@@ -146,8 +148,16 @@ function marksFor(graph: UniverseGraph): Uint8Array {
  * place: the bodies first, in `byDepth` order, so a parent is stepped before its children by every
  * loop that follows; then, unless the sky is coarse, the files of every marked body.
  */
-export function updateRegimes(graph: UniverseGraph, view: Viewport): void {
+/** A node the files tweak hides this frame: neither in the active list nor drawn, so its `x`/`y` are
+ *  frozen where the float pass last wrote them — every light pass asks this before it draws at them.
+ *  Lives here, not on `universeGraph`, because `codeOnly` is written here and a value import back
+ *  from there would cycle. */
+export const isHidden = (graph: UniverseGraph, n: UniverseGraphNode): boolean =>
+  graph.codeOnly && n.kind !== 'source' && isFileKind(n.kind);
+
+export function updateRegimes(graph: UniverseGraph, view: Viewport, tweaks: UniverseTweaks): void {
   graph.coarse = view.z < COARSE_Z;
+  graph.codeOnly = tweaks.files === 'code';
   const act = graph.act;
   const bodies = graph.bodies;
   act.length = 0;
@@ -166,7 +176,7 @@ export function updateRegimes(graph: UniverseGraph, view: Viewport): void {
     let farX = 0;
     let farY = 0;
     for (const kid of kids) {
-      if (!isFileKind(kid.kind)) continue;
+      if (!isFileKind(kid.kind) || hiddenKind(kid.kind, tweaks)) continue;
       const dx = Math.abs(kid.x - body.x);
       const dy = Math.abs(kid.y - body.y);
       if (dx > farX) farX = dx;
@@ -181,7 +191,7 @@ export function updateRegimes(graph: UniverseGraph, view: Viewport): void {
       body.y < bounds.y1 + padY
     ) {
       marked[body.id] = 1;
-      for (const kid of kids) if (isFileKind(kid.kind)) act.push(kid);
+      for (const kid of kids) if (isFileKind(kid.kind) && !hiddenKind(kid.kind, tweaks)) act.push(kid);
     }
   }
 }
@@ -195,6 +205,7 @@ export function updateRegimes(graph: UniverseGraph, view: Viewport): void {
 export function isActive(graph: UniverseGraph, node: UniverseGraphNode): boolean {
   if (!isFileKind(node.kind)) return true;
   if (graph.coarse) return false;
+  if (isHidden(graph, node)) return false;
   const marked = marks.get(graph);
   return marked !== undefined && marked[node.p] === 1;
 }

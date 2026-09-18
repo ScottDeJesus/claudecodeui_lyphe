@@ -2,7 +2,7 @@ import React, { useCallback, useState } from 'react';
 
 import type { PermissionPanelProps, Question } from '@/shared/types';
 import { usePermission } from '@/modules/chat/context/PermissionContext';
-import { permissionKey } from '@/modules/chat/tools/toolOutcome';
+import { permissionKey, wasPermissionSettled } from '@/modules/chat/tools/toolOutcome';
 import { AskUserQuestionPanel } from '@/modules/chat/tools/InteractiveRenderers/AskUserQuestionPanel';
 
 /**
@@ -20,9 +20,15 @@ import { AskUserQuestionPanel } from '@/modules/chat/tools/InteractiveRenderers/
  * and the pending list is pruned regardless) leaves the server still waiting, and on reconnect
  * it re-sends the request under the same id — that request must be offered again, and a card
  * that already answered it is the one card allowed to offer it. A new request with a different
- * id is a new question, even if byte-identical, and only a fresh mount offers it.
+ * id is a new question, even if byte-identical, and only a fresh mount offers it — UNLESS this
+ * card's own answer was never settled by the run: an API handed over between the prompt and the
+ * tap held no such request, the decision was a silent no-op, and the successor re-issued the
+ * prompt under a new id (measured 2026-09-17). `wasPermissionSettled` is what tells the two
+ * apart, and that door opens ONCE: the first request it lets through is remembered (`hatchId`),
+ * and once anyone settles that one the card is closed for good, so a later byte-identical
+ * question in the same conversation belongs to its own fresh card and never doubles the panel.
  */
-const sentByRow = new Map<string, { requestId: string; answers: Record<string, string> }>();
+const sentByRow = new Map<string, { requestId: string; answers: Record<string, string>; hatchId?: string }>();
 const rowMemoryKey = (sessionId: string | null, rowKey: string) => `${sessionId ?? ''}::${rowKey}`;
 
 type QuestionAnswerContentProps = {
@@ -82,13 +88,22 @@ export const QuestionAnswerContent: React.FC<QuestionAnswerContentProps> = ({
   // card falls through to the answered summary below.
   const foldedAnswers = answers && typeof answers === 'object' ? answers : {};
   const remembered = sentByRow.get(memoryKey);
-  const mayOffer = (requestId: string) => sentAnswers === null || requestId === remembered?.requestId;
+  const answeredId = remembered?.requestId;
+  const hatchOpen = answeredId !== undefined
+    && !wasPermissionSettled(answeredId)
+    && (remembered?.hatchId === undefined || !wasPermissionSettled(remembered.hatchId));
+  const mayOffer = (requestId: string) =>
+    sentAnswers === null || requestId === answeredId || hatchOpen;
   const pendingRequest = Object.keys(foldedAnswers).length > 0 || !toolName
     ? undefined
     : permissionCtx?.pendingPermissionRequests.find(
         (r) => mayOffer(r.requestId) && permissionKey(r.toolName, r.input) === rowKey,
       );
   if (pendingRequest && permissionCtx) {
+    // The request the hatch let through: its settlement, by this card or any other, closes the hatch.
+    if (remembered && remembered.hatchId === undefined && pendingRequest.requestId !== answeredId) {
+      remembered.hatchId = pendingRequest.requestId;
+    }
     return <AskUserQuestionPanel request={pendingRequest} onDecision={decide} />;
   }
 

@@ -175,7 +175,9 @@ function actionsFor(userId: unknown, event: ChannelEvent, appUrl: string | null)
 
 function collapseKeyFor(userId: unknown, event: ChannelEvent): string | null {
   if (!COLLAPSIBLE_CODES.has(event.code ?? '')) return null;
-  return `${userId}:${event.provider}:${event.code}:${event.sessionId ?? 'none'}`;
+  // A limit push's title names its window, so two windows must never share one "×N" summary.
+  const window = typeof event.meta?.rateLimitType === 'string' ? `:${event.meta.rateLimitType}` : '';
+  return `${userId}:${event.provider}:${event.code}:${event.sessionId ?? 'none'}${window}`;
 }
 
 /** A tab reports its user id as the socket's; anything else cannot be watching. */

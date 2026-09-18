@@ -40,7 +40,7 @@ function SessionPin() {
 
 /**
  * Whether a row was proposed by the chat that is open. BOTH ids arrive already resolved to app
- * session ids (the server resolves Descent's unverified provenance column on the way out), so a
+ * session ids (the server resolves the row's unverified provenance column on the way out), so a
  * plain equality is the whole test — and a `null` session on either side is never a match:
  * "no session launched it" is not "this session launched it".
  */
@@ -64,8 +64,8 @@ function mineFirst(rows: MemoryCandidateLean[], sessionId: string | null): Memor
  * speaks for.
  *
  * A refusal and a card reviewed elsewhere are not faults: the first is the cap guard asking for a
- * shorter memory (warn, with Descent's own words under it), the second is simply news (neutral).
- * Only an unreachable Descent is a warning about the app's own footing.
+ * shorter memory (warn, with the server's own words under it), the second is simply news (neutral).
+ * Only an unreachable queue is a warning about the app's own footing.
  *
  * A second copy of the panel's own helper (it is module-private there, and this body is a second
  * surface for the same two verbs), still below the promote-on-the-third rule.
@@ -78,7 +78,7 @@ function toastFor(outcome: MemoryReviewOutcome, t: ReturnType<typeof useTranslat
       return { tone: 'positive', title: t('memory.toast.discarded') };
     case 'refused': {
       const title = t('memory.toast.refused');
-      // Descent's text goes under the headline, unless the headline IS it (no `error` was sent).
+      // The server's text goes under the headline, unless the headline IS it (no `error` was sent).
       return { tone: 'warn', title, message: outcome.reason === title ? undefined : outcome.reason };
     }
     case 'gone':
@@ -102,7 +102,7 @@ function toastFor(outcome: MemoryReviewOutcome, t: ReturnType<typeof useTranslat
  * exactly as the Memory tab asks for them, so a memory filed from the gutter is filed the same way
  * — same in-flight guard, same refusal text held per id, same words spoken afterwards.
  *
- * THE ONLY ORDERING THIS BODY DOES IS THE LIFT. Pending rows keep Descent's order; filed rows go
+ * THE ONLY ORDERING THIS BODY DOES IS THE LIFT. Pending rows keep the queue's order; filed rows go
  * newest first, by review day and falling back to the day they were proposed.
  */
 export function MemoryWidgetBody({ sessionId }: { sessionId: string | null }) {
@@ -116,8 +116,8 @@ export function MemoryWidgetBody({ sessionId }: { sessionId: string | null }) {
     push(toastFor(await review(id, approve), t));
   }, [push, review, t]);
 
-  // This chat's queue first, Descent's order inside each group. Nothing is re-sorted: the queue's
-  // order is Descent's, and a second opinion would only make the gutter disagree with the tab.
+  // This chat's queue first, the queue's order inside each group. Nothing is re-sorted: the order
+  // is the server's, and a second opinion would only make the gutter disagree with the tab.
   const pendingRows = useMemo(
     () => mineFirst(pending?.reachable ? pending.candidates : [], sessionId),
     [pending, sessionId],
@@ -165,7 +165,7 @@ export function MemoryWidgetBody({ sessionId }: { sessionId: string | null }) {
                     <MemoryCandidateRow
                       candidate={candidate}
                       // This surface's freshest refusal wins; the row's own copy is what every other
-                      // surface sees once Descent has recorded it.
+                      // surface sees once the server has recorded it.
                       refusal={refusals[candidate.id] ?? candidate.refusal}
                       busy={busyId !== null}
                       onReview={onReview}

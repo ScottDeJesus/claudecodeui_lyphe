@@ -101,6 +101,14 @@ function ChatInterface({
 }: ChatInterfaceProps) {
   const { tasksEnabled, isTaskMasterInstalled } = useTasksSettings();
   const { subscribe, isConnected } = useWebSocket();
+  // The transcript assembles what an export needs; two surfaces draw the button from it. On a phone
+  // that is the workspace header (published upward, as before); on a desktop it is the composer,
+  // beside the model and the edit mode, which is why it is also kept here.
+  const [exportSurface, setExportSurface] = useState<ChatExportSurface | null>(null);
+  const handleExportSurface = useCallback((surface: ChatExportSurface | null) => {
+    setExportSurface(surface);
+    onChatExportSurface?.(surface);
+  }, [onChatExportSurface]);
   useSessionPresence({ sessionId: isActive ? selectedSession?.id ?? null : null, sendMessage, isConnected });
   const { t } = useTranslation('chat');
   const processingSessions = useProcessingSessions();
@@ -600,7 +608,7 @@ function ChatInterface({
           onEditMessage={supportsMessageEditing && !isProcessing ? beginEditMessage : undefined}
           onForkFromMessage={supportsSessionForking ? handleForkFromMessage : undefined}
           onLoadFullTranscript={loadFullTranscript}
-          onExportSurface={onChatExportSurface}
+          onExportSurface={handleExportSurface}
         />
 
         <div className="relative flex-shrink-0">
@@ -619,6 +627,7 @@ function ChatInterface({
           )}
 
           <ChatComposer
+            exportSurface={exportSurface}
           pinnedAgents={stripClaimed ? null : <PinnedSubagents messages={agentMessages} soulLaunchIds={soulLaunchIds} sessionId={selectedSession?.id ?? null} />}
           pendingPermissionRequests={pendingPermissionRequests}
           handlePermissionDecision={handlePermissionDecision}

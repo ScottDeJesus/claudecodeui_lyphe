@@ -22,11 +22,13 @@ own session uuid; they run concurrently, natively. There is **no `N`, no slider 
 single conductor fanning out work.** One session = one in-flight build; and the number of
 sessions that exist is a dial on the driver, not a value a session can see.
 
-**The concurrency dial is per board, it lives on the driver, and a session never spawns a
-sibling.** Each board row carries its own autonomy switch and the driver ticks every board
-with it on: it counts the live Metises, compares that against that board's own concurrency
-limit, asks the board how much claimable work is left, and spawns while there is room and
-work — the same tick that reaps the quiescent and the stalled. **None of that is readable
+**The concurrency dial is per board, it lives on the board's own row, and a session never
+spawns a sibling.** Each board row carries its own autonomy switch and its own concurrency
+column, and the driver ticks every board with autonomy on: it counts the live Metises,
+compares that against that board's own concurrency column (read fresh off the row every
+tick, never a value the driver remembers from when it started), asks the board how much
+claimable work is left, and spawns while there is room and work — the same tick that reaps
+the quiescent and the stalled. **None of that is readable
 from inside a session, and none of it is yours to influence.** A session cannot raise the
 limit, cannot spawn a sibling, cannot stop or reap another session, and never tries: if you
 want more throughput on a board, that is the operator's dial, and a Metis who tried to open a
@@ -86,7 +88,7 @@ skip one** (the thing that failed before).
 session builds
 exactly ONE feature at a time. Concurrent builds happen because the driver had several
 sessions alive — the cap on real parallelism is
-what that board's driver dial allowed, and there is nothing in the session that reads it.
+what that board's own dial allowed, and there is nothing in the session that reads it.
 
 > (The **FORBIDDEN anti-pattern** — never a single do-it-all agent doing build +
 > self-review + self-verify; "self-review is NOT Athena" — is **ABSOLUTE RULE
@@ -148,6 +150,16 @@ they will touch:
   different projects touching different paths, so a Metis on one board and a Metis on
   another parallelize freely. Two features on the same board are likelier to overlap; check
   their footprints, don't assume.
+- **Another board is a READ, never a claim.** `list_features_all(status?, tag?)` answers every
+  NON-ARCHIVED board's cards with each card's own `board {id, name}` — it is how you see the
+  whole estate: what else is moving, and what is already claimed there. Its use here is
+  **ordering and awareness**: your own board is the one the operator is watching, so keep
+  **your board first** and read the rest as background. What it is NOT is a source of work —
+  **a card on another board is never claimed from here.** Your cwd
+  (`~/.claude/kanban-metis/<boardId>/`) and your one `--add-dir` are derived from YOUR board's
+  project, so a foreign card built from this session would run in the wrong directory against
+  the wrong project, and its board's driver has its own session for it. Read wide, claim
+  narrow.
 - **The concurrency arbiter is the runtime net — the only mechanical layer this board has.**
   In the multi-session model the arbiter is RELEVANT
   AGAIN and POSITIVE. Each Metis session is a DISTINCT `session_id`, so two solo builds

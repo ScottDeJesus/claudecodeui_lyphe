@@ -1,3 +1,4 @@
+import { Suspense } from 'react';
 import { X } from 'lucide-react';
 
 import { StandaloneShell } from '@/modules/standalone-shell';
@@ -107,7 +108,9 @@ export default function ProviderLoginModal({
         </div>
 
         <div className="flex-1 overflow-hidden">
-          <StandaloneShell project={DEFAULT_PROJECT_FOR_EMPTY_SHELL} command={command} onComplete={handleComplete} minimal={true} />
+          <Suspense fallback={null}>
+            <StandaloneShell project={DEFAULT_PROJECT_FOR_EMPTY_SHELL} command={command} onComplete={handleComplete} minimal={true} />
+          </Suspense>
         </div>
       </div>
     </div>

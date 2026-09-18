@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react';
+import React, { Suspense, useCallback, useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { ChatInterface, type ChatExportSurface, type TokenUsageSurface } from '@/modules/chat';
@@ -44,6 +44,10 @@ type WorkspaceMainProps = {
   externalMessageUpdate: number;
   newSessionTrigger: number;
 };
+
+function reloadPage() {
+  window.location.reload();
+}
 
 /** The largest file the chat previews inline, and how many reads — and bytes — it holds at once. */
 const MAX_PREVIEW_BYTES = 25 * 1024 * 1024;
@@ -349,85 +353,100 @@ function WorkspaceMain({
           </WorkspaceErrorBoundary>
         </div>
 
-        {activeTab === 'files' && (
-          <div className="h-full overflow-hidden">
-            <FileManager
-              selectedProject={selectedProject}
-              openRequest={openRequest}
-              onRequestHandled={handleRequestHandled}
-              onFileOpen={handleFileOpen}
-            />
-          </div>
-        )}
-
-        {shouldShowShellTab && activeTab === 'shell' && (
-          <div className="h-full w-full overflow-hidden">
-            <StandaloneShell
-              project={selectedProject}
-              session={selectedSession}
-              showHeader={false}
-              isActive={activeTab === 'shell'}
-            />
-          </div>
-        )}
-
-        {activeTab === 'git' && (
-          <div className="h-full overflow-hidden">
-            <GitRepositoriesPanel
-              repositories={gitRepositories}
-              selectedProjectPath={selectedProject.fullPath}
-              isMobile={isMobile}
-              onFileOpen={handleFileOpen}
-            />
-          </div>
-        )}
-
         {shouldShowTasksTab && <TaskMasterPanel isVisible={activeTab === 'tasks'} />}
 
-        {shouldShowBrowserTab && activeTab === 'browser' && (
-          <div className="h-full overflow-hidden">
-            <BrowserUsePanel isVisible={activeTab === 'browser'} onShowSettings={onShowSettings} />
-          </div>
-        )}
+        {/* Every panel below is lazy (its module's barrel exports it that way), so it loads on its
+            tab's first open. One boundary for them, and none around the chat above: a panel still
+            loading never blanks the conversation beside it, and a panel whose code fails to load
+            fails inside this pane instead of taking the whole app down. */}
+        {/* Keyed to the tab, so one panel's failure never paints over the next tab picked. Retry is
+            a reload: React.lazy keeps a failed load's error for the life of the page, so re-rendering
+            would only throw it again. */}
+        <WorkspaceErrorBoundary
+          message="This tab could not load. Reloading the page usually fixes it."
+          resetKeys={[activeTab]}
+          onRetry={reloadPage}
+        >
+        <Suspense fallback={null}>
+          {activeTab === 'files' && (
+            <div className="h-full overflow-hidden">
+              <FileManager
+                selectedProject={selectedProject}
+                openRequest={openRequest}
+                onRequestHandled={handleRequestHandled}
+                onFileOpen={handleFileOpen}
+              />
+            </div>
+          )}
 
-        {shouldShowMemoryTab && activeTab === 'memory' && (
-          <div className="h-full overflow-hidden">
-            <MemoryIntakePanel />
-          </div>
-        )}
+          {shouldShowShellTab && activeTab === 'shell' && (
+            <div className="h-full w-full overflow-hidden">
+              <StandaloneShell
+                project={selectedProject}
+                session={selectedSession}
+                showHeader={false}
+                isActive={activeTab === 'shell'}
+              />
+            </div>
+          )}
 
-        {shouldShowRunnerTab && activeTab === 'runner' && (
-          <div className="h-full overflow-hidden">
-            <RunnerPanel />
-          </div>
-        )}
+          {activeTab === 'git' && (
+            <div className="h-full overflow-hidden">
+              <GitRepositoriesPanel
+                repositories={gitRepositories}
+                selectedProjectPath={selectedProject.fullPath}
+                isMobile={isMobile}
+                onFileOpen={handleFileOpen}
+              />
+            </div>
+          )}
 
-        {/* No gate: the board is always on the strip, the way chat, files and git are. It is also
-            GLOBAL — the project it is handed is a first-run hint about which board to select, not
-            a filter — so nothing here unmounts or refetches when the open project changes. */}
-        {activeTab === 'kanban' && (
-          <div className="h-full overflow-hidden">
-            <KanbanPanel projectId={selectedProject.projectId} />
-          </div>
-        )}
+          {shouldShowBrowserTab && activeTab === 'browser' && (
+            <div className="h-full overflow-hidden">
+              <BrowserUsePanel isVisible={activeTab === 'browser'} onShowSettings={onShowSettings} />
+            </div>
+          )}
 
-        {/* No gate either, for the same reason: the sky is global, not a view of the open project,
-            so nothing here unmounts or refetches when the selected project changes. */}
-        {activeTab === 'universe' && (
-          <div className="h-full overflow-hidden">
-            <UniversePanel />
-          </div>
-        )}
+          {shouldShowMemoryTab && activeTab === 'memory' && (
+            <div className="h-full overflow-hidden">
+              <MemoryIntakePanel />
+            </div>
+          )}
 
-        {activeTab.startsWith('plugin:') && (
-          <div className="h-full overflow-hidden">
-            <PluginTabContent
-              pluginName={activeTab.replace('plugin:', '')}
-              selectedProject={selectedProject}
-              selectedSession={selectedSession}
-            />
-          </div>
-        )}
+          {shouldShowRunnerTab && activeTab === 'runner' && (
+            <div className="h-full overflow-hidden">
+              <RunnerPanel />
+            </div>
+          )}
+
+          {/* No gate: the board is always on the strip, the way chat, files and git are. It is also
+              GLOBAL — the project it is handed is a first-run hint about which board to select, not
+              a filter — so nothing here unmounts or refetches when the open project changes. */}
+          {activeTab === 'kanban' && (
+            <div className="h-full overflow-hidden">
+              <KanbanPanel projectId={selectedProject.projectId} />
+            </div>
+          )}
+
+          {/* No gate either, for the same reason: the sky is global, not a view of the open project,
+              so nothing here unmounts or refetches when the selected project changes. */}
+          {activeTab === 'universe' && (
+            <div className="h-full overflow-hidden">
+              <UniversePanel />
+            </div>
+          )}
+
+          {activeTab.startsWith('plugin:') && (
+            <div className="h-full overflow-hidden">
+              <PluginTabContent
+                pluginName={activeTab.replace('plugin:', '')}
+                selectedProject={selectedProject}
+                selectedSession={selectedSession}
+              />
+            </div>
+          )}
+        </Suspense>
+        </WorkspaceErrorBoundary>
       </div>
     </div>
   );

@@ -1,0 +1,9 @@
+[Unit]
+Description=Rebuild the CloudCLI production client (:5184) when its sources change
+
+[Timer]
+OnBootSec=2min
+OnUnitInactiveSec=2min
+
+[Install]
+WantedBy=timers.target

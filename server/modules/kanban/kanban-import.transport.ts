@@ -3,6 +3,7 @@ import path from 'node:path';
 
 import Database from 'better-sqlite3';
 
+import type { DescentMemoryRow } from '@/modules/database/index.js';
 import type { KanbanPriority, KanbanStatus } from '@/shared/kanban-types.js';
 import { AppError } from '@/shared/utils.js';
 
@@ -18,13 +19,13 @@ import { requireDescentShape } from './kanban-import-shape.js';
  *
  * FOUR THINGS MAKE THE SOURCE SAFE TO POINT AT, and each is load-bearing: the handle is opened
  * read-only and must already exist, so the worst a bug here can do to the operator's live Descent
- * install is fail to open it; the file's SHAPE — the nine tables and the columns each read names —
- * is checked before a single row is read (`kanban-import-shape.ts`), so the wrong file and the
- * older-Descent file are both a 404 naming what is missing rather than a driver error four tables
- * deep; a file holding no boards is refused rather than imported, so nothing here can file rows
- * under a board id that is the empty string; and the read is one pass into typed arrays, so a
- * caller wanting a projection or a filter does it in the service, where it can be read as a
- * decision.
+ * install is fail to open it; the file's SHAPE — the nine tables and the columns each read names,
+ * plus the two satellite tables' columns when those tables are there — is checked before a single
+ * row is read (`kanban-import-shape.ts`), so the wrong file and the older-Descent file are both a
+ * 404 naming what is missing rather than a driver error four tables deep; a file holding no boards
+ * is refused rather than imported, so nothing here can file rows under a board id that is the empty
+ * string; and the read is one pass into typed arrays, so a caller wanting a projection or a filter
+ * does it in the service, where it can be read as a decision.
  */
 
 /** Where a Descent install keeps its board, when the caller names no path. */
@@ -148,6 +149,30 @@ export type DescentEventRow = {
 /** One `ov_settings` row. Nineteen of them are Descent daemon state; one names the current board. */
 export type DescentSettingRow = { key: string; value: string | null };
 
+/**
+ * One `ov_lessons` row: a note a build staged, at whatever status a person reviewed it to.
+ *
+ * `feature_id` has no foreign key in Descent and may name a card this board never imported — the
+ * mapping's business, not this read's, and the reason a lesson lands with a null card rather than
+ * being dropped. `draft_path` is the file Descent wrote for a `kind = 'skill_draft'` lesson; it is
+ * carried as a string and this import writes no file of its own.
+ */
+export type DescentLessonRow = {
+  id: string;
+  feature_id: string | null;
+  name: string;
+  summary: string;
+  body: string;
+  trigger: string;
+  kind: string;
+  tags: string;
+  status: string;
+  source: string;
+  draft_path: string | null;
+  created_at: string | null;
+  reviewed_at: string | null;
+};
+
 /** Everything one pass over a Descent database yields, in the importer's own mapping order. */
 export type DescentSourceRows = {
   boards: DescentBoardRow[];
@@ -160,6 +185,24 @@ export type DescentSourceRows = {
   attachments: DescentAttachmentRow[];
   events: DescentEventRow[];
   settings: DescentSettingRow[];
+  lessons: DescentLessonRow[];
+  /**
+   * Descent's memory proposals, typed in the lane that owns them (`memory-candidates.db.ts`): the
+   * board's import hands these rows straight to `importDescentCandidates` and keeps no tally of
+   * its own beyond the count it reads back.
+   */
+  memoryCandidates: DescentMemoryRow[];
+  /**
+   * The imported install's OWN attachment root, resolved from the database path this read opened.
+   *
+   * Descent keeps its bytes beside its database — both `DB_PATH` and `ATTACHMENTS_ROOT` are
+   * `Path(__file__).resolve().parent` (`store_schema.py:48,70`) — so the source root is the
+   * directory of whichever database was read, never a path captured at module load: a `dbPath`
+   * naming another install must fetch THAT install's bytes. The default database resolves to
+   * `~/.claude/descent/attachments`; it is derived when the rows are read, so it is a fact about
+   * the pass rather than a second home for a global.
+   */
+  descentAttachmentsRoot: string;
 };
 
 /**
@@ -247,6 +290,31 @@ export function readDescentSource(input: { dbPath?: string }): DescentSourceRows
       settings: present.has('ov_settings')
         ? (db.prepare('SELECT key, value FROM ov_settings').all() as DescentSettingRow[])
         : [],
+      // The same rule for the install's two satellites, for a stronger reason: they are not the
+      // board at all — a build's notes and a session's memory proposals — so a Descent old enough
+      // to predate either is still an install whose boards are worth importing. Columns are checked
+      // when the table IS there (`kanban-import-shape.ts`), never the table itself.
+      lessons: present.has('ov_lessons')
+        ? (db
+            .prepare(
+              `SELECT id, feature_id, name, summary, body, trigger, kind, tags, status, source,
+                      draft_path, created_at, reviewed_at
+               FROM ov_lessons`
+            )
+            .all() as DescentLessonRow[])
+        : [],
+      memoryCandidates: present.has('ov_memory_candidates')
+        ? (db
+            .prepare(
+              `SELECT id, name, body, target, project, index_line, rationale, status, source,
+                      session_id, asserted_path, refusal, created_at, reviewed_at
+               FROM ov_memory_candidates`
+            )
+            .all() as DescentMemoryRow[])
+        : [],
+      // The install's bytes live beside its database (Descent derives both from `__file__`), so the
+      // root follows the file that was actually read rather than a path this module captured.
+      descentAttachmentsRoot: path.resolve(path.dirname(dbPath), 'attachments'),
     };
 
     // A file with the right shape and no boards in it is refused HERE, at the door, rather than

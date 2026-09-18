@@ -1,8 +1,9 @@
-# Hosting — the dev server, as a service
+# Hosting — the dev server and the production client, as services
 
-CloudCLI is hosted as a **development** build, on purpose: the operator asked for edits to land
-instantly rather than through a rebuild. Nothing here runs `npm run build`; the production
-`dist/` path is unused.
+CloudCLI is hosted twice from one API. The **development** client on :5183 is where an edit lands
+instantly, through HMR. The **production** client on :5184 is the built app, rebuilt in the
+background, for fast everyday loads. Nothing here runs `npm run build`: the :5184 build goes into
+`.prod-client/`, and the `dist/` path stays unused.
 
 ## What runs
 
@@ -10,17 +11,19 @@ instantly rather than through a rebuild. Nothing here runs `npm run build`; the 
 |---|---|---|
 | `cloudcli-server-dev.service` | `/usr/bin/node deploy/dev-supervisor/supervisor.mjs` — the handover supervisor: it boots each edited server beside the running one and retires the old one only when the new one reports READY; the API and WebSocket gateway are its child | `127.0.0.1:3011` (loopback only) |
 | `cloudcli-client-dev.service` | `node_modules/.bin/vite --host 0.0.0.0 --port 5183 --strictPort` — the client with HMR, its responses compressed by `vite-plugins/compressResponses.js` (see Rules) | `0.0.0.0:5183`, minus the Docker bridges (see below) |
-| `cloudcli-dev-watchdog.timer` → `.service` | every 60 s, `/usr/local/bin/cloudcli-dev-watchdog.sh` re-asserts the bridge drop, probes `/api/cli-version` on :3011 (any HTTP answer = alive; three misses 5 s apart = dead) and `/src/main.tsx` on :5183 (200; two misses), and restarts the one unit whose canary failed — the supervisor survives a boot that never listened and never boots a replacement of its own, so a FIRST boot that fails leaves `:3011` unanswered with the supervisor still running (a later boot that fails is harmless: the previous server keeps serving), and Vite's transform can wedge, and in every case systemd still reads `active`. After three heals in a row it stops healing and leaves the unit `failed` with one distinct journal line | — |
+| `cloudcli-client-prod.service` | `vite preview --host 0.0.0.0 --port 5184 --strictPort --outDir .prod-client/current` — the BUILT client: ~50 requests on a fresh load instead of ~700 unbundled modules, Brotli-precompressed at build time (the page document included), every `/assets/*` file cached for a year and everything else revalidated by ETag, by `vite-plugins/precompressedAssets.js`. Same `.env`, so it proxies `/api`, `/ws`, `/shell` and `/plugin-ws` to :3011 exactly as :5183 does. No HMR: an edit reaches it through the rebuild below | `0.0.0.0:5184`, minus the Docker bridges |
+| `cloudcli-client-prod-build.timer` → `.service` | every 2 min, `scripts/prod-client-build.sh`: builds only when a build input (`src`, `public`, `shared`, `index.html`, `vite.config.js`, `vite-plugins`, `tailwind.config.js`, `postcss.config.js`, `tsconfig.json`, `.env`, `package.json`, `package-lock.json`) changed since the last build's START (~30 s, `Nice=10`; one build at a time under `flock`, a failed build leaves nothing behind), into `.prod-client/builds/<id>`, then re-points the `.prod-client/current` symlink in one rename. The previous build's hashed assets are carried forward for two days, so a tab opened before a swap can still load its lazy chunks. `--force` builds regardless | — |
+| `cloudcli-dev-watchdog.timer` → `.service` | every 60 s, `/usr/local/bin/cloudcli-dev-watchdog.sh` re-asserts the bridge drops on :5183 and :5184, probes `/api/cli-version` on :3011 (any HTTP answer = alive; three misses 5 s apart = dead) `/src/main.tsx` on :5183 (200; two misses) and `/` on :5184 (200; two misses), and restarts the one unit whose canary failed — the supervisor survives a boot that never listened and never boots a replacement of its own, so a FIRST boot that fails leaves `:3011` unanswered with the supervisor still running (a later boot that fails is harmless: the previous server keeps serving), and Vite's transform can wedge, and in every case systemd still reads `active`. After three heals in a row it stops healing and leaves the unit `failed` with one distinct journal line | — |
 | `cloudcli-sessions-tmux.service` | `/usr/bin/tmux -L cloudcli-sessions -f /dev/null new-session -d -s _keepalive sleep infinity` — a do-nothing session holding the tmux server that every chat CLI is spawned into, in a cgroup of its own so the API's restart cannot reach them. Each live turn adds a `<app session id>-<base36>` session beside `_keepalive`, with its socket, journal and meta under `~/.cloudcli/sessions` (mode 0700; `CLOUDCLI_SESSIONS_DIR` moves the directory). `sudo systemctl stop cloudcli-sessions-tmux` is the deliberate "end every live chat session" switch, and `CLOUDCLI_SESSION_KEEPALIVE=0` (or `off`/`false`) in the API's `.env` — unset here, so the feature is on — puts new turns back inside the API process | — (unix sockets under `~/.cloudcli/sessions`) |
 
-The first two units read `.env` (`SERVER_PORT=3011`, `VITE_PORT=5183`, `HOST=127.0.0.1`,
-`CLAUDE_CLI_PATH`, …), run as `lyphe` with `NODE_ENV=development`, the interactive shell's full
+The API and both client units read `.env` (`SERVER_PORT=3011`, `VITE_PORT=5183`, `HOST=127.0.0.1`,
+`CLAUDE_CLI_PATH`, …), run as `lyphe` with `NODE_ENV=development` (the production client: `production`), the interactive shell's full
 `PATH` (the app's shell tab and every spawned Claude session inherit the API unit's environment —
 a chat CLI sits in the keepalive's cgroup but is handed that same environment when it is spawned),
 `Restart=always`, `StartLimitBurst=5` in a 120 s window (a crash loop latches `failed` instead of
-restarting unseen forever; the watchdog resets and retries), and start at boot. The client and
+restarting unseen forever; the watchdog resets and retries), and start at boot. The dev client and
 the watchdog live in `/etc/systemd/system/` only — no copy of either is kept in this repo. Two
-units this repo does ship, each installed by copying into `/etc/systemd/system/` and each
+more units this repo ships (the three production-client units are covered above), each installed by copying into `/etc/systemd/system/` and each
 carrying its own exact commands in its header comment:
 [`deploy/systemd/cloudcli-server-dev.service`](../deploy/systemd/cloudcli-server-dev.service) —
 the `ExecStart` that runs the supervisor, an *existing* unit, so `daemon-reload` + `restart`
@@ -28,7 +31,11 @@ rather than `enable --now` — and
 [`deploy/systemd/cloudcli-sessions-tmux.service`](../deploy/systemd/cloudcli-sessions-tmux.service),
 which is new to systemd and therefore `enable --now`. Both commands are in the Runbook below.
 
-The client is the only port the LAN needs: `vite.config.js` proxies `/api`, `/ws`, `/shell` and
+The three `cloudcli-client-prod*` units ship in `deploy/systemd/`, installed with the commands in
+the service's header. The dev client (:5183) is for watching an edit land live; the production
+client (:5184) is the fast one for everyday use, at most one rebuild (≈2.5 min) behind the source.
+
+The clients are the only ports the LAN needs: `vite.config.js` proxies `/api`, `/ws`, `/shell` and
 `/plugin-ws` to the API on loopback, so the API never faces the LAN. The app is reachable at
 `http://<this host>:5183` on the LAN and over Tailscale, and as the **CloudCLI** row of the
 application drawer this app serves — `apps.local.json`, git-ignored; the drawer's one
@@ -176,7 +183,10 @@ documentation home is [`applications.md`](applications.md).
 
 ```
 systemctl status cloudcli-server-dev cloudcli-client-dev cloudcli-dev-watchdog.timer cloudcli-sessions-tmux
-sudo iptables -S INPUT | grep 5183           # the two bridge drops (docker0, br-+)
+sudo iptables -S INPUT | grep -E '518[34]'   # the bridge drops (docker0, br-+) on both client ports
+systemctl status cloudcli-client-prod cloudcli-client-prod-build.timer
+scripts/prod-client-build.sh --force            # rebuild :5184 now instead of waiting for the timer
+readlink .prod-client/current                   # the build :5184 is serving
 cat /run/cloudcli-dev-watchdog/*.heals 2>/dev/null   # consecutive heals per unit, absent when healthy
 tmux -L cloudcli-sessions ls                 # the truthful liveness probe (see "A dead tmux keepalive…"); `_keepalive` alone = no chat CLI running
                                              # one `<app session id>-<base36>` per live CONVERSATION (every message joins it; it closes two hours after the last one, never mid-task); a restart re-adopts or retires the rest, so a lingering one means the gate is off (see "A server heal…")

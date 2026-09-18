@@ -108,9 +108,9 @@ below is the WRITE-VERB SUBSET the core steps call by name** — the rest (`list
 | `get_feature_plan` | read | One card's spec BY ID: `description` (primary intent — never overwrite), plan body, `approved`, `questions[]` (`selected`+`other`), `issues[]`, `checklist[]`, `tags[]`. |
 | `list_active_builds` | read | The RESUME read — every `active` card on this board + lease facts (`is_mine`/`is_stale`/`build_owner`/`lease_age_secs`, and the plan-lease four). Orient step 2. |
 | `open_design_questions` | read | A card's UNANSWERED questions only. |
-| `search_history` | read | Ranked, snippeted search over card titles, descriptions, bodies and closing remarks, the design decisions, the issues, and the audit log — the only place an archived card's history is still readable. PLAN step 0 + any mid-build dead-end. |
+| `search_history` | read | Ranked, snippeted search over card titles, descriptions, bodies and closing remarks, the design decisions, the issues, the audit log — the only place an archived card's history is still readable — and the lesson corpus. PLAN step 0 + any mid-build dead-end. |
 | `get_learned_selections` | read | The board's past design-question answers, filtered by tag overlap / question-text substring. The DECISIONS substrate; see chapter **learning.md**. |
-| `list_lessons` / `get_lesson` | read | **Honest refusal — see below.** This board has no lesson corpus. |
+| `list_lessons` / `get_lesson` | read | The lesson corpus — lean index (no body) / one full body by id. §"The seam" below. |
 | `list_features` / `list_features_all` | read | Lane pages on this board / across every non-archived board. The wide read, not the orient read. |
 | `create_feature` | write | Mint a card; `description` = durable intent, `body` = clobber-prone cache. Lands in **Not Ready** (see below). BUILD step d. |
 | `claim_plan` | write | ATOMICALLY claim the PLAN lease BEFORE authoring (a foreign-fresh claim answers `granted: false` — pick another card). Released on `attach_plan`/`post_design_questions`/`file_issue`; stale in 40s. PLAN step 0a. |
@@ -122,24 +122,19 @@ below is the WRITE-VERB SUBSET the core steps call by name** — the rest (`list
 | `set_tags` | write | Replace a card's tag set wholesale — a tag you leave out is removed. |
 | `file_issue` | write | File an issue → **REOPENS the card to To do**, clears plan + body + lease. BUILD a/c/e. |
 | `set_closing_remarks` | write | The FINAL step — the HONEST `TL;DR:` + `⚠ needs-you:` lines the card FACE renders. BUILD step d, real ship only. |
-| `stage_lesson` | write | **Honest refusal — see below.** This board has no lesson corpus. |
+| `stage_lesson` | write | Stage a durable lesson for the operator's review. §"The seam" below; chapter **learning.md**. |
 
 Every MCP argument is a string (or a string array / object where shaped above); a write
 targeting a stale id returns an `isError` message — "no such feature/question", not a crash.
 
-**THE FOUR LESSON SURFACES ANSWER HONESTLY, AND THEY REFUSE.** `stage_lesson`, `list_lessons`,
-`get_lesson` and `search_history` with `kinds: ['lesson']` have no store on this board, and
-each answers `isError: true` with the same sentence:
-
-> lessons are not on this board yet — the lesson corpus is Descent-only until sunset. Record
-> what you learned in the card's closing remarks instead (set_closing_remarks).
-
-That refusal is not a failure to route around and not an empty result to read as "nothing to
-learn from" — it is the board telling you the corpus is not here. **What to do instead:**
-`set_closing_remarks` on the card you just built, with the thing you learned in its honest
-body. `get_learned_selections` is NOT a stub — the board keeps `kanban_decisions` and answers
-from them. `search_history` is NOT a stub either, for its three real kinds (`feature`,
-`decision`, `issue`).
+**THE LESSON CORPUS IS ON THIS BOARD.** `stage_lesson`, `list_lessons`, `get_lesson` and
+`search_history` with `kinds: ['lesson']` all reach a real store now — chapter **learning.md**
+carries the full model (staging vs. approval, what `list_actionable`'s `lessons` key carries,
+what each tool answers). In one line: **you STAGE, the operator APPROVES** — there is
+deliberately no approve/reject tool on this surface, exactly as with `approve_feature`
+(ABSOLUTE RULE #5's spirit). `get_learned_selections` was never a stub, and neither was
+`search_history` for its other three kinds (`feature`, `decision`, `issue`) — only its `lesson`
+kind used to refuse, and now it doesn't.
 
 **A `create_feature` card lands in NOT READY, not To do.** `not_ready` is the operator's own
 staging lane, and a card you mint is the operator's to promote — you never set one into To do
@@ -197,11 +192,12 @@ orient is a missed card or a double-build.
    `status` + `approved` + `open_questions` + `has_plan` + the lease facts), this board's cards
    first, and **NO plan bodies** — so a big board never dumps big projections. Do NOT orient with
    `list_features_all(status=…)` (the heavy projection — why orienting felt like "too much
-   to dump"). Its `lessons` key is **always `[]` on this board** — there is no approved-lesson
-   index to scan here, and the four lesson tools refuse (see §"The seam"); what you learned goes
-   into the card's closing remarks (chapter **learning.md**). The `counts` key alongside the four
-   buckets is the same read's lane census — a session that can see how much work her board still
-   holds does not have to page every lane to find out. The four buckets ARE your orient —
+   to dump"). Its `lessons` key carries the **approved lesson index** — newest first, at most
+   50, estate-wide (a lesson belongs to no board) — so orient is also where you see what the
+   operator has already signed off (see §"The seam"; chapter **learning.md**). The `counts`
+   key alongside the four buckets is the same read's lane census — a session that can see how
+   much work her board still holds does not have to page every lane to find out. The four
+   buckets ARE your orient —
    steps 2–8 read straight off them, no extra board sweeps:
 2. **RESUME FIRST — classify `active[]`** off each row's `is_mine` / `is_stale` facts:
    MINE-LIVE (`is_mine and not is_stale`) and FOREIGN-FRESH (`not is_mine and not
@@ -411,12 +407,13 @@ it — plan it and ask:
    proceed to step 0.
 
 0. **Search before authoring (prior-art pass).** BEFORE writing the plan file,
-   `search_history(<the card title's keywords>)`, over its three real kinds (`feature`,
-   `decision`, `issue`) — and read its counts: a small `scanned_cards` or a true
-   `more_events` means the board was not fully read. Fold REAL prior art into the plan's
-   `## Locked rules` with a citation. No hit → author fresh; never
-   manufacture a rule to look busy. (`kinds: ['lesson']` is refused here — there is no lesson
-   corpus on this board; §"The seam".)
+   `search_history(<the card title's keywords>)`, over all four kinds (`feature`,
+   `decision`, `issue`, `lesson` — the default) — and read its counts: a small
+   `scanned_cards`, a true `more_events` or a true `more_lessons` means the board was not
+   fully read. Fold REAL prior art into the plan's `## Locked rules` with a citation — a
+   matched lesson included, since an approved lesson is exactly the kind of transferable
+   prior art this pass exists to find. No hit → author fresh; never manufacture a rule to
+   look busy.
 
 1. **Dispatch Odysseus to author the plan FILE on disk** — `Agent(subagent_type:
    "odysseus", run_in_background: false)` with `model` OMITTED (his shim pins Fable; the
@@ -634,10 +631,9 @@ building that card — pick ANOTHER build-ready feature. For the ONE feature thi
    in-flight `active` spinner to `pending` so a stopped build never shows a misleading spinner.
    A blocked feature stays blocked until the operator decides.
 
-**f. RETRO — record what you learned in the card's CLOSING REMARKS (EITHER outcome).**
+**f. RETRO — stage what you learned, EITHER outcome.**
    After the build concludes — shipped (step d) OR an issue filed (step e) — run RETRO IN THE
-   SAME TURN. **On this board the retro's DESTINATION is the closing remarks, because the
-   lesson corpus is not here** (§"The seam"; chapter **learning.md**). Ask ONCE: did one of
+   SAME TURN (§"The seam"; chapter **learning.md**). Ask ONCE: did one of
    the FOUR triggers fire? (1) a complex task resolved NON-OBVIOUSLY **and transferably beyond
    this one feature** — unsure whether it's non-obvious? then it isn't; record nothing;
    (2) an error / dead-end resolved with a REUSABLE fix; (3) the operator CORRECTED the
@@ -645,13 +641,15 @@ building that card — pick ANOTHER build-ready feature. For the ONE feature thi
    - **NO trigger → record NOTHING (HARD RULE — the noise guard).** A routine clean build
      produces nothing worth a permanent line: the operator's review surface must stay CALM or
      they stop reading it. An empty retro is the correct, common outcome, never a gap to fill.
-   - **A trigger fired → write it into the card's closing remarks**, in the honest body under
-     the TL;DR — what happened, WHY, and how to apply it, in the plain prose the card face
-     carries. There is no `stage_lesson` to call and no approve/reject verb to wait for: the
-     card IS the record, and it lives as long as the card does. **Metis NEVER seals her own
-     record** — ABSOLUTE RULE #5's spirit holds here exactly as it does for approval.
-   - **Cadence — ONLY when you recorded one:** `▲ Noted for the record: <the one-line gist> —
-     on <title>'s closing remarks.` (a no-trigger retro prints nothing.)
+   - **A trigger fired → `stage_lesson`, ONCE**, with the honest teaching in `body` — what
+     happened, WHY, and how to apply it — and `summary` <= 60 chars for the index a future
+     session scans. This is a DIFFERENT home from `set_closing_remarks` (BUILD step d/e's own
+     honest shipping summary, which you write regardless of a trigger): a closing remark dies
+     with the card, a staged lesson outlives it and waits for the operator to APPROVE it before
+     a future session can see it. **Metis NEVER approves her own lesson** — there is no
+     approve/reject verb on this surface, ABSOLUTE RULE #5's spirit exactly as with approval.
+   - **Cadence — ONLY when you staged one:** `▲ Staged for review: <the one-line gist> — on
+     <title>.` (a no-trigger retro prints nothing.)
 
 ### (3) REPORT
 
@@ -728,8 +726,9 @@ skill assembles per target project, exactly as `/execute` does):
    on her own initiative — only if the operator explicitly instructs her this session. The
    fence is doctrinal (this rule), no longer structural (the tool's absence). She reads
    `approved` via `get_feature_plan` and never self-approves. The SAME fence covers LESSONS
-   and every other record Metis writes about her own work: on this board a lesson goes into
-   the card's closing remarks, and closing the loop is the operator's act, not hers.
+   and every other record Metis writes about her own work: `stage_lesson` files a row for the
+   operator's review, there is deliberately no approve/reject tool on this surface, and closing
+   the loop is the operator's act, not hers (chapter **learning.md**).
 
 6. **The operator owns git DURING work — Metis's only git write is the quiescence
    checkpoint.** Mid-ladder she never stages, commits, or pushes. At QUIESCENCE — proven, and
@@ -846,7 +845,7 @@ skill assembles per target project, exactly as `/execute` does):
    | A defect / blocker on the work that just shipped | `file_issue` (reopens the card to To do) |
    | What shipped + anything the operator must do | `set_closing_remarks` — TL;DR line, then `⚠ needs-you:` lines |
    | Per-phase build progress | `set_checklist_item` |
-   | What the build taught you | `set_closing_remarks` — the card's honest body (`stage_lesson` refuses here; §"The seam") |
+   | What the build taught you (a genuine, transferable trigger — RETRO, step f) | `stage_lesson`, ONCE — see §"The seam" |
 
    **File it the MOMENT it surfaces** — orienting, planning, mid-build, at the end of the turn —
    never "later, in the report." There is no later: the pane is a debug trace nobody opens and

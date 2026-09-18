@@ -51,13 +51,14 @@ import {
 } from './modules/scheduled-messages/index.js';
 import browserUseRoutes from './modules/browser-use/browser-use.routes.js';
 import { assetsRoutes } from './modules/assets/index.js';
+import { createAccountsModule } from './modules/accounts/index.js';
 import { createCliVersionModule } from './modules/cli-version/index.js';
 import { createDeepseekModule } from './modules/deepseek/index.js';
-import { createDescentModule } from './modules/descent/index.js';
-import { createKanbanModule } from './modules/kanban/index.js';
+import { createKanbanModule, plansHeldByLease } from './modules/kanban/index.js';
 import { createKanbanMetisModule, kanbanMetisSecretGuard } from './modules/kanban-metis/index.js';
+import { createMemoryIntakeModule, listMemoryCandidates } from './modules/memory-intake/index.js';
 import { createDispatchSoulsModule } from './modules/dispatch-souls/index.js';
-import { createPlanRunnerModule } from './modules/plan-runner/index.js';
+import { createPlanRunnerModule, planCostFor } from './modules/plan-runner/index.js';
 import { createUniverseModule } from './modules/universe/index.js';
 import { fileTreeRoutes } from './modules/file-tree/index.js';
 import { worktreesRoutes } from './modules/worktrees/index.js';
@@ -186,21 +187,57 @@ app.use('/api/settings', authenticateToken, settingsRoutes);
 
 app.use('/api/system', authenticateToken, systemRoutes);
 
-// Descent account/usage proxy (protected)
-app.use('/api/descent', authenticateToken, createDescentModule());
+// The Claude account switcher and its usage meter (protected), mounted at `/api` so its four paths
+// land at `/api/accounts`, `/api/usage`, `/api/accounts/switch` and `/api/accounts/capture`.
+//
+// ⚠ THE GUARD IS SCOPED TO THOSE FOUR PATHS, and that is deliberate: `app.use('/api', authenticateToken,
+// …)` would run the JWT check in front of every mount declared BELOW this line as well — and
+// `/api/kanban-pm` (a board Metis holds no user token), `/api/ntfy/act` (signed buttons), `/api/agent`
+// and `/api/browser-use-mcp` are public by design. A bare `/api` mount here locks all four out.
+// Scoped this way the guard covers the switcher and nothing else, wherever this line sits.
+const ACCOUNT_PATHS = new Set(['/accounts', '/usage', '/accounts/switch', '/accounts/capture']);
+
+app.use(
+    '/api',
+    (request, response, next) => {
+        if (!ACCOUNT_PATHS.has(request.path)) return next();
+        return authenticateToken(request, response, next);
+    },
+    createAccountsModule()
+);
+
+// The two readings the board cannot take for itself, built HERE because this is the one place that
+// may reach across modules. The plan-runner owns what a plan cost — it reads the ledgers on disk —
+// and the memory-intake lane owns how many candidates are waiting on a person; neither module
+// imports the other, and the board imports neither of them.
+//
+// `memoryPending` is a REGISTER, not a page, so it asks the lane's read for no ceiling at all: the
+// lane's list verb defaults to 100 rows, and a count taken off that page silently stops at 100 —
+// measured on the probe, 105 pending candidates read as 100 while the queue held 105. The cap is
+// the caller's to lift (the verb takes `limit`), and a count has no page to stop at. What remains
+// is the lane's own read resolving a row's session id as it hands it back; that cost is the lane's
+// shape, and a count verb of its own belongs in the lane's module, which this phase does not own.
+const memoryPending = (): number =>
+  listMemoryCandidates({ status: 'pending', limit: Number.MAX_SAFE_INTEGER }).length;
+const kanbanReadings = { planCost: planCostFor, memoryPending };
 
 // The Kanban board (protected). The guard rides the MOUNT rather than each route, so no file in
 // the module imports `authenticateToken` and a sibling route package cannot forget it.
-app.use('/api/kanban', authenticateToken, createKanbanModule());
+app.use('/api/kanban', authenticateToken, createKanbanModule(kanbanReadings));
 
 // A board's own Metis: launching one by hand, watching her, stopping and resuming her (protected).
 app.use('/api/kanban-metis', authenticateToken, createKanbanMetisModule());
+
+// The memory-intake lane (protected), at ONE address and never on the board's router — so the second
+// kanban mount a board Metis can reach cannot see it. Its proposals wait on a person's approval here,
+// and nothing reaches a shelf or a project's memory directory until one is given.
+app.use('/api/memory', authenticateToken, createMemoryIntakeModule());
 
 // The SAME board router behind a second door, for the `kanban-pm` MCP child and nothing else —
 // no verb is duplicated here, and there is deliberately NO `authenticateToken`: a Metis is not a
 // user and holds no user token. `kanbanMetisSecretGuard` is that door's own credential check, on a
 // secret derived from the session id, and it refuses the descent importer outright.
-app.use('/api/kanban-pm', kanbanMetisSecretGuard, createKanbanModule());
+app.use('/api/kanban-pm', kanbanMetisSecretGuard, createKanbanModule(kanbanReadings));
 
 // The applications this host serves, and the registry file the switcher's drawer reads (protected).
 // The registry file is created at module creation, so it exists from the first boot.
@@ -216,7 +253,12 @@ app.use('/api/deepseek', authenticateToken, createDeepseekModule());
 // The plan runner's live runs, and the relay for its own stop/resume (protected).
 // Built once here rather than inline: the poll behind its websocket frame is started after
 // `listen` and stopped on shutdown, so the module has to be something both can name.
-const planRunner = createPlanRunnerModule();
+//
+// Its plans-archive sweep moves finished plans out of the corpus, and the one thing that must stop
+// it is a card still building or planning against one — so the board answers which plans its leases
+// hold (`plansHeldByLease`) and this is the single place the two modules are joined. The arrow
+// points one way: the runner is handed a reading, and neither module imports the other.
+const planRunner = createPlanRunnerModule({ heldPlanPaths: plansHeldByLease });
 app.use('/api/plan-runner', authenticateToken, planRunner.router);
 
 // The launcher souls a `/dispatch` started — the poll behind the `soul_launch_state` frame that

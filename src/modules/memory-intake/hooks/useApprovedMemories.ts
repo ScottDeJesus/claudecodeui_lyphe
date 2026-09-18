@@ -17,12 +17,12 @@ import type { MemoryPending } from '@/shared/types';
  * only a token newer than the newest ANSWER lands. Answers arriving after unmount are dropped too.
  *
  * `null` is "not asked yet" and is a different sentence on screen from `{reachable: false}` — the
- * one is a spinner, the other is words about Descent being out of reach.
+ * one is a spinner, the other is words about the memory queue being out of reach.
  */
 export function useApprovedMemories(): MemoryPending | null {
   const { pending } = useMemoryIntake();
 
-  // The last filed list the proxy answered with. Essential rather than derived: it is the only copy
+  // The last filed list this app answered with. Essential rather than derived: it is the only copy
   // of that picture between reads, and `null` has to look different from each real answer.
   const [approved, setApproved] = useState<MemoryPending | null>(null);
 
@@ -48,10 +48,10 @@ export function useApprovedMemories(): MemoryPending | null {
     void (async () => {
       let next: MemoryPending;
       try {
-        const response = await api.descent.memory.approved();
+        const response = await api.memory.approved();
         next = (await response.json()) as MemoryPending;
       } catch {
-        // The proxy answers 200 even when Descent is down, so a throw here is this app's own
+        // The route answers 200 on every reading it can take, so a throw here is this app's own
         // network or a body that is not JSON. Either way the honest reading is "no picture".
         next = { reachable: false, reason: 'unreachable' };
       }

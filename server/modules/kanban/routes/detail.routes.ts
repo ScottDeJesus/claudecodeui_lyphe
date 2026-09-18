@@ -103,18 +103,6 @@ function readOptionalBoolean(body: Record<string, unknown>, name: string): boole
   return raw;
 }
 
-/**
- * An attachment's size in bytes — required, as the route table declares it, so a caller that omits
- * it is told rather than silently recording a zero-byte attachment.
- */
-function readSize(body: Record<string, unknown>, name: string): number {
-  const raw = body[name];
-  if (typeof raw !== 'number' || !Number.isInteger(raw) || raw < 0) {
-    throw new BadRequest(`${name} must be a whole number of bytes`);
-  }
-  return raw;
-}
-
 /** An optional checklist state, refused here rather than by the column's CHECK as a 500. */
 function readOptionalState(
   body: Record<string, unknown>,
@@ -151,7 +139,11 @@ function leaseRoute(
 
 /**
  * The detail routes: a card's questions and their answers, its issues and their resolutions, its
- * checklist and its attachments, its approval, and the five leases.
+ * checklist, its approval, and the five leases.
+ *
+ * A card's attachment BYTES are not here: they are their own route file
+ * (`attachment.routes.ts`), because they are the only routes in the package that handle a
+ * multipart body and stream a file rather than parse JSON.
  *
  * Auth is the mount's (`authenticateToken` in `server/index.ts`): no file here imports the guard,
  * and no route reads an actor off the request — the write verbs take the optional trailing context
@@ -253,21 +245,6 @@ export function createDetailRoutes(dependencies: DetailRouteDependencies): Route
     handle<{ itemId: string }>((request, response) => {
       checklist.removeChecklistItem(request.params.itemId);
       response.json({ ok: true });
-    })
-  );
-
-  router.post(
-    '/cards/:cardId/attachments',
-    handle<{ cardId: string }>((request, response) => {
-      const body = readBody(request);
-
-      response.json({
-        attachment: checklist.addAttachment(request.params.cardId, {
-          filename: readString(body, 'filename'),
-          mime: readString(body, 'mime'),
-          size: readSize(body, 'size'),
-        }),
-      });
     })
   );
 

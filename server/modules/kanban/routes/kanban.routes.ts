@@ -1,17 +1,23 @@
 import express from 'express';
 import type { Router } from 'express';
 
+import type { KanbanAttachmentsService } from '../kanban-attachments.service.js';
 import type { KanbanBoardsService } from '../kanban-boards.service.js';
 import type { KanbanCardsService } from '../kanban-cards.service.js';
 import type { KanbanChecklistService } from '../kanban-checklist.service.js';
 import type { KanbanImportService } from '../kanban-import.service.js';
 import type { KanbanLeasesService } from '../kanban-leases.service.js';
+import type { KanbanLessonsService } from '../kanban-lessons.service.js';
 import type { KanbanQuestionsService } from '../kanban-questions.service.js';
 
+import { createAttachmentRoutes } from './attachment.routes.js';
 import { createBoardRoutes } from './board.routes.js';
+import type { KanbanMemoryPendingReader } from './board.routes.js';
 import * as cardRoutes from './card.routes.js';
+import type { KanbanPlanCostReader } from './card.routes.js';
 import * as detailRoutes from './detail.routes.js';
 import * as importRoutes from './import.routes.js';
+import { createLearningRoutes } from './learning.routes.js';
 
 /**
  * What the route package is built from.
@@ -25,8 +31,17 @@ export type KanbanServices = {
   cards: KanbanCardsService;
   questions: KanbanQuestionsService;
   checklist: KanbanChecklistService;
+  attachments: KanbanAttachmentsService;
   leases: KanbanLeasesService;
   importer: KanbanImportService;
+  lessons: KanbanLessonsService;
+  // The two READINGS the board cannot take for itself, handed in by the composition root rather
+  // than imported: a card's plan cost lives in the plan-runner's ledgers and the estate's pending
+  // memories live in the memory-intake lane's table, and this module imports neither. Each route
+  // factory declares the one it uses (`board.routes.ts`, `card.routes.ts`); they ride here
+  // because this bag is what the module hands every factory.
+  planCost: KanbanPlanCostReader;
+  memoryPending: KanbanMemoryPendingReader;
 };
 
 /**
@@ -37,7 +52,8 @@ export type KanbanServices = {
  * this file is the mount: it builds one router and hands the services to each sibling factory.
  * It holds no route handler of its own, ever, and it decides no paths of its own either — the
  * prefixes are the siblings' (`board.routes.ts` owns `/boards`, `/projects/:projectId/board` and
- * `/events`), which is what keeps a path from being declared in two places.
+ * `/events`; `learning.routes.ts` owns `/lessons` and its two reviews), which is what keeps a path
+ * from being declared in two places.
  */
 export function createKanbanRouter(services: KanbanServices): Router {
   const router = express.Router();
@@ -45,7 +61,11 @@ export function createKanbanRouter(services: KanbanServices): Router {
   router.use(createBoardRoutes(services));
   router.use(cardRoutes.createCardRoutes(services));
   router.use(detailRoutes.createDetailRoutes(services));
+  // The card's ATTACHMENT BYTES: the one mount in this package that takes a multipart body and
+  // streams a file. Its paths are its own, so its position here decides nothing.
+  router.use(createAttachmentRoutes(services));
   router.use(importRoutes.createImportRoutes(services));
+  router.use(createLearningRoutes(services));
 
   return router;
 }

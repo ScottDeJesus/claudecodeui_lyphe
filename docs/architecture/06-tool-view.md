@@ -549,8 +549,9 @@ the server reports the file still growing (`inFlight`), and stops re-reading onc
 /api/dispatch-souls/launches/:launchId/transcript` ([dispatch-souls.md](../dispatch-souls.md)
 §"The routes and the frame"); and the view's third target kind, a board's Metis, through `GET
 /api/kanban-metis/sessions/:sessionId/transcript` — opened from outside this module entirely, by
-the kanban module's `KanbanMetisPanel.tsx` with `sessionId` null, since a board's Metis belongs to
-no chat ([kanban.md](../kanban.md) §"The panel"). Only the newest 100 entries draw at first, with a "show earlier" step
+the kanban module's `KanbanMetisConversation.tsx` (mounted beside the fleet list by
+`KanbanMetisPanel.tsx` once a row is opened) with `sessionId` null, since a board's Metis belongs to
+no chat ([kanban.md](../kanban.md) §"The pilot panel"). Only the newest 100 entries draw at first, with a "show earlier" step
 of 100 more, because a single entry can expand into a diff and mounting all 1000 the server may hold
 at once would be a thousand tool renderers the moment the row opens. The entries reuse the same
 drawing the panel uses: `tools/SubagentNote.tsx` for prose and reasoning, `ToolRenderer` in

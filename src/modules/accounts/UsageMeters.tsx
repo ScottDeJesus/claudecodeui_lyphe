@@ -1,6 +1,6 @@
 import { Meter } from '@/shared/ui';
 import { windowPercent, windowTone } from '@/modules/accounts/utils/usageWindows';
-import type { DescentUsage, DescentUsageWindow } from '@/shared/types';
+import type { ClaudeUsage, ClaudeUsageWindow } from '@/shared/types';
 
 /** The line that closes the block, because a blank bar has to be readable as "unknown" and not as "you have used nothing". */
 const CLOSING_LINE =
@@ -15,7 +15,7 @@ const CLOSING_LINE =
  */
 const DEGRADED_REASONS: Record<string, string> = {
   pending: 'a fresh reading is on its way',
-  shape: 'the provider answered in a shape Descent did not recognise',
+  shape: 'the provider answered in a shape this app did not recognise',
   credentials: 'the saved login could not be read',
   auth: 'the provider refused the login',
   network: 'the provider could not be reached',
@@ -30,14 +30,14 @@ function degradedReasonInWords(reason: string): string {
 
 /** The proxy's own three words for a read it could not make, in plain English. */
 function unreachableReasonInWords(reason: string): string {
-  if (reason === 'timeout') return 'Descent did not answer in time.';
-  if (reason === 'bad-response') return 'Descent answered with something this app could not read.';
-  return 'Descent is not reachable.';
+  if (reason === 'timeout') return 'The server did not answer in time.';
+  if (reason === 'bad-response') return 'The server answered with something this app could not read.';
+  return 'The server is not reachable.';
 }
 
 /**
  * `staleSince` and `checkedAt` are epoch SECONDS — Descent's own stamps, passed through the
- * proxy unconverted, unlike `DescentSlot.expiresAt`, which is already milliseconds. The
+ * proxy unconverted, unlike `ClaudeAccountSlot.expiresAt`, which is already milliseconds. The
  * `* 1000` is what keeps this line out of January 1970.
  */
 function secondsStampInWords(seconds: number): string {
@@ -45,7 +45,7 @@ function secondsStampInWords(seconds: number): string {
 }
 
 /** The two windows this app has its own name for; everything else keeps Descent's label, which is the only place a `weekly_scoped:*` plan is named. */
-function windowLabel(usageWindow: DescentUsageWindow): string {
+function windowLabel(usageWindow: ClaudeUsageWindow): string {
   if (usageWindow.key === 'five_hour') return 'Current 5-hour window';
   if (usageWindow.key === 'seven_day') return 'This week';
   return usageWindow.label;
@@ -136,7 +136,7 @@ function UsageNote({ children }: { children: string }) {
  * There is deliberately no flexible-spend bar: Descent reports no such window, and a third
  * bar reading "—" would invent a limit nobody set.
  */
-export function UsageMeters({ usage }: { usage: DescentUsage | null }) {
+export function UsageMeters({ usage }: { usage: ClaudeUsage | null }) {
   return (
     <div className="flex flex-col gap-3">
       <div className="text-[11px] uppercase tracking-[0.14em] text-ink-faint">Usage on this account</div>
@@ -146,7 +146,7 @@ export function UsageMeters({ usage }: { usage: DescentUsage | null }) {
   );
 }
 
-function renderReading(usage: DescentUsage | null) {
+function renderReading(usage: ClaudeUsage | null) {
   // Nothing has been asked yet. An em-dash, not a spinner: the first reading normally lands
   // before the panel is ever opened, and a bar animating in from zero would say "none used".
   if (!usage) return <UsageNote>—</UsageNote>;

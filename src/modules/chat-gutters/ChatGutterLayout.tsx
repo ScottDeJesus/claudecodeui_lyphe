@@ -1,15 +1,15 @@
 import { ActivityIcon, BotIcon, BrainIcon, type LucideIcon } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ComponentType, ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { SubagentWidgetBody, useClaimSubagentStrip, useSubagentWidgetCount } from '@/modules/chat';
-import { GUTTER_WIDGET_ORDER, useGutterPlacements } from '@/modules/chat-gutters/hooks/useGutterPlacements';
-import { GutterSlot } from '@/modules/chat-gutters/GutterSlot';
+import { GUTTER_SIDES, useGutterPlacements, widgetsOn } from '@/modules/chat-gutters/hooks/useGutterPlacements';
+import { GutterColumn } from '@/modules/chat-gutters/GutterColumn';
 import { GutterWidgetFrame } from '@/modules/chat-gutters/GutterWidgetFrame';
 import { MemoryWidgetBody, useMemoryIntake } from '@/modules/memory-intake';
 import { RunnerWidgetBody, useRunnerRuns } from '@/modules/plan-runner';
-import type { GutterSlotId, GutterWidgetId } from '@/shared/types';
+import type { GutterSide, GutterWidgetId } from '@/shared/types';
 import { cn } from '@/shared/utils';
 
 /**
@@ -37,7 +37,7 @@ const MIN_REGION_PX = CHAT_COLUMN_PX + 2 * (GUTTER_MIN_PX + GUTTER_GAP_PX);
 
 /**
  * The desktop chat's side gutters: the runner, memory and subagents widgets beside the transcript,
- * each of them draggable between the four corners.
+ * each of them draggable into either side's stack, at any place in it.
  *
  * MOUNTED AROUND THE CHAT, NEVER OVER IT. The chat cell is the grid's first child at every width —
  * the grid is drawn whether or not the gutters are — so crossing the threshold adds and removes the
@@ -69,7 +69,7 @@ export function ChatGutterLayout({
   children: ReactNode;
 }) {
   const { t } = useTranslation();
-  const { placements, moveWidget, toggleWidget } = useGutterPlacements();
+  const { placements, moveWidget, toggleWidget } = useGutterPlacements(sessionId);
   const { count: runnerCount } = useRunnerRuns();
   const { pendingCount } = useMemoryIntake();
   const subagentCount = useSubagentWidgetCount(sessionId);
@@ -87,16 +87,14 @@ export function ChatGutterLayout({
   // widget — a region too narrow for the gutters keeps the strip.
   useClaimSubagentStrip(wide);
 
-  // Which widget a drag is carrying, or null when nothing is in flight. It exists so the slots a
-  // widget could land in can offer themselves while it is being moved.
-  const [dragging, setDragging] = useState<GutterWidgetId | null>(null);
+  // Which widget a drag is carrying, or null when nothing is in flight. It exists so the places a
+  // widget could land in can offer themselves while it is being moved, and nowhere else.
+  const [draggingState, setDragging] = useState<GutterWidgetId | null>(null);
 
-  // Which corner the drag is OVER, or null while it is over none of them. One value for the whole
-  // layout, so exactly one corner is ever open, and it is the one the pointer is standing in: a
-  // corner that opens only under the pointer cannot take height from a widget nobody is touching —
-  // including the widget on the far side of the chat, which a drag used to halve from across the
-  // room and re-lay-out under a pointer that never came near it.
-  const [hovered, setHovered] = useState<GutterSlotId | null>(null);
+  // The drop place the pointer is in — a side and the rank it would take — or null while it is in
+  // none. One value for the whole layout, so exactly one place is ever lit, and it is the one under
+  // the pointer: a place that lights anywhere else would promise a landing the drop would not make.
+  const [hoveredState, setHovered] = useState<{ side: GutterSide; index: number } | null>(null);
 
   useEffect(() => {
     const root = rootRef.current;
@@ -117,36 +115,58 @@ export function ChatGutterLayout({
       if (width === 0) return;
       const next = enabled && width >= MIN_REGION_PX;
       setWide((previous) => (previous === next ? previous : next));
+      // The gutters going away ends any drag they were carrying — the handle is unmounted and the
+      // browser sends no `dragend` — so the state is dropped HERE, with the measurement that caused
+      // it. Left standing, it came back with the columns when the region widened again: both lit,
+      // both advertising a drop, still holding a widget nobody was dragging.
+      if (!next) {
+        setDragging(null);
+        setHovered(null);
+      }
     });
     observer.observe(root);
     return () => observer.disconnect();
   }, [enabled]);
 
+  // What the columns are told, which is nothing at all while the gutters are not drawn.
+  const dragging = wide ? draggingState : null;
+  const hovered = wide ? hoveredState : null;
+
   // A capitalised local, because JSX reads a lowercase tag as an intrinsic element: this is what
   // lets the boundary arrive as a prop instead of this module importing the workspace's own.
   const Boundary = boundary;
 
-  // Which widget a corner draws, in the one order the modules agree on. The list is the layout's
-  // and the repair's (`useGutterPlacements`), so a slot and a repaired record can never disagree
-  // about who holds a corner.
-  const widgetIn = (slot: GutterSlotId): GutterWidgetId | null =>
-    GUTTER_WIDGET_ORDER.find((widget) => placements[widget].slot === slot) ?? null;
-
   // A drag ends the same way wherever it ends — dropped, cancelled, or carried off the window —
-  // so the invitation closes with it and no corner is left standing open.
-  const endDrag = () => {
+  // so the invitation closes with it and no place is left standing open.
+  const endDrag = useCallback(() => {
     setDragging(null);
     setHovered(null);
-  };
+  }, []);
 
-  const dropWidget = (widget: GutterWidgetId, slot: GutterSlotId) => {
-    moveWidget(widget, slot);
+  // A drag whose handle is torn out mid-gesture — the region narrowing past the threshold unmounts
+  // both asides — never delivers `dragend` to it, so the columns came back still lit, still
+  // advertising a drop, and still holding the widget they were carrying. The window hears the end of
+  // every drag; the measurement that takes the gutters away drops the state itself (above).
+  useEffect(() => {
+    if (dragging === null) return undefined;
+    window.addEventListener('dragend', endDrag);
+    window.addEventListener('drop', endDrag);
+    return () => {
+      window.removeEventListener('dragend', endDrag);
+      window.removeEventListener('drop', endDrag);
+    };
+  }, [dragging, endDrag]);
+
+  const dropWidget = (widget: GutterWidgetId, side: GutterSide, index: number) => {
+    moveWidget(widget, side, index);
     endDrag();
   };
 
   // Only a CHANGE reaches state: `dragover` fires continuously on the element under the pointer.
-  const hoverSlot = (slot: GutterSlotId | null) =>
-    setHovered((previous) => (previous === slot ? previous : slot));
+  const hoverDrop = (place: { side: GutterSide; index: number } | null) =>
+    setHovered((previous) => (
+      previous?.side === place?.side && previous?.index === place?.index ? previous : place
+    ));
 
   // WHAT A WIDGET IS, in one table: a third widget costs one entry here and nothing else in this
   // file. The hooks stay at the top level — a table cannot call one conditionally — so the entries
@@ -198,22 +218,18 @@ export function ChatGutterLayout({
     );
   };
 
-  const renderSlot = (slot: GutterSlotId) => {
-    const widget = widgetIn(slot);
-    return (
-      <GutterSlot
-        key={slot}
-        slot={slot}
-        widget={widget}
-        open={widget === null ? false : placements[widget].open}
-        hovered={hovered === slot}
-        dragging={dragging}
-        onHoverSlot={hoverSlot}
-        onDropWidget={dropWidget}
-        renderWidget={renderWidget}
-      />
-    );
-  };
+  const renderColumn = (side: GutterSide) => (
+    <GutterColumn
+      key={side}
+      side={side}
+      widgets={widgetsOn(placements, side)}
+      dragging={dragging}
+      hovered={hovered}
+      onHoverDrop={hoverDrop}
+      onDropWidget={dropWidget}
+      renderWidget={renderWidget}
+    />
+  );
 
   return (
     <div ref={rootRef} className="flex h-full min-h-0 justify-center">
@@ -246,25 +262,14 @@ export function ChatGutterLayout({
             the centred `max-w-[1860px]` above stops at 480px — 1860 is 868 + 2 * (480 + 16), and
             past 480 a run list is a list spread across a screen it does not fill. What is left over
             sits OUTSIDE the three columns, never between a widget and the chat. */}
-        {wide && (
-          <aside
-            data-testid="chat-gutter-left"
-            className="col-start-1 row-start-1 flex h-full min-h-0 flex-col gap-4 py-3"
+        {wide && GUTTER_SIDES.map((side) => (
+          <div
+            key={side}
+            className={cn('row-start-1 h-full min-h-0', side === 'left' ? 'col-start-1' : 'col-start-3')}
           >
-            {renderSlot('top-left')}
-            {renderSlot('bottom-left')}
-          </aside>
-        )}
-
-        {wide && (
-          <aside
-            data-testid="chat-gutter-right"
-            className="col-start-3 row-start-1 flex h-full min-h-0 flex-col gap-4 py-3"
-          >
-            {renderSlot('top-right')}
-            {renderSlot('bottom-right')}
-          </aside>
-        )}
+            {renderColumn(side)}
+          </div>
+        ))}
       </div>
     </div>
   );

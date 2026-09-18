@@ -3,7 +3,7 @@ import { Card } from '@/shared/ui';
 
 /**
  * When a filed memory landed, in the reader's own locale — the review's day, or the day it was
- * proposed when Descent recorded no review at all. `null` rather than "Invalid Date" for a stamp
+ * proposed when the row carries no review at all. `null` rather than "Invalid Date" for a stamp
  * this app cannot parse: a broken line is worse than a shorter one.
  */
 function filedDate(candidate: MemoryCandidateLean): string | null {

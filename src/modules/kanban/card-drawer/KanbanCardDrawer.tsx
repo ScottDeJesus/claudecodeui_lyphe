@@ -2,6 +2,7 @@ import { CloudOff, X } from 'lucide-react';
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { DrawerAttachments } from '@/modules/kanban/card-drawer/DrawerAttachments';
 import { DrawerBody } from '@/modules/kanban/card-drawer/DrawerBody';
 import { DrawerChecklist } from '@/modules/kanban/card-drawer/DrawerChecklist';
 import { DrawerIssuesAndTokens } from '@/modules/kanban/card-drawer/DrawerIssuesAndTokens';
@@ -18,13 +19,14 @@ import { Button, Dialog, DialogContent, DialogTitle, EmptyState, ScrollArea } fr
  *
  * IT IS A SHELL AND NOTHING ELSE. No field lives in this file. It owns the frame, the header, the
  * scroll container, the three states a card can be in before it is readable, and the ONE decision
- * the four sections below it cannot make for themselves: which of them the board's autonomy
+ * the five sections below it cannot make for themselves: which of them the board's autonomy
  * setting lets the reader see at all. `DrawerBody` is the card every board has — a title, what it
- * is for, its tags and how urgent it is. The other three are the autonomous run's own ledger, and
+ * is for, its tags and how urgent it is — and `DrawerAttachments` is what a person pinned to it,
+ * on every board for the same reason. The other three are the autonomous run's own ledger, and
  * with autonomy off they are not hidden detail, they are not this board's vocabulary.
  *
  * IT IS THE ONLY FETCHER. One read when the card opens, handed down whole; a section that fetched
- * the slice it needed would cost five requests per open and let the checklist disagree with the
+ * the slice it needed would cost six requests per open and let the checklist disagree with the
  * count on the card's face. The same read answers a write made anywhere inside it — one path in,
  * one path back.
  *
@@ -47,7 +49,7 @@ type KanbanCardDrawerProps = {
   /** The board's own setting. It decides which SECTIONS render, and gates no write: every verb
    *  behind them stays reachable on the server with autonomy off. */
   autonomy: boolean;
-  /** The board's write verbs, handed to the four sections below. This shell owns the READ; the
+  /** The board's write verbs, handed to the five sections below. This shell owns the READ; the
    *  panel owns the writes, because a second `useKanbanMutations` here would be a second
    *  `applyCard` and two ideas about where a card sits. */
   writes: KanbanMutations;
@@ -104,7 +106,7 @@ export function KanbanCardDrawer({ cardId, autonomy, writes, onClose }: KanbanCa
    * holding.
    *
    * IT NEVER BLANKS THE SHEET, and that is deliberate twice over. A frame arrives for the card
-   * already on screen, so a read that cleared before answering would unmount the four sections
+   * already on screen, so a read that cleared before answering would unmount the five sections
    * below and take every half-typed draft with them; and a read that cleared for a DIFFERENT card
    * would be too late anyway, because the render below has already cleared for the new one.
    */
@@ -233,8 +235,9 @@ export function KanbanCardDrawer({ cardId, autonomy, writes, onClose }: KanbanCa
                     another. A re-read of the SAME card keeps the key and so keeps the drafts —
                     which is what stops a websocket frame from deleting a half-typed sentence. */}
                 <DrawerBody key={`body-${detail.id}`} detail={detail} writes={writes} />
+                <DrawerAttachments key={`attachments-${detail.id}`} detail={detail} writes={writes} />
 
-                {/* The autonomous run's ledger. With autonomy off these four are not collapsed or
+                {/* The autonomous run's ledger. With autonomy off these three are not collapsed or
                     dimmed — they are absent, because a board that is not running itself has no
                     questions to answer, no checklist being walked, no lease and no spend. */}
                 {autonomy && (

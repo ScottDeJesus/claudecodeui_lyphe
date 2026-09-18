@@ -4,6 +4,7 @@ import path from 'node:path';
 import mime from 'mime-types';
 
 import { getGlobalImageAssetsDir, toPosixPath } from '@/shared/image-attachments.js';
+import { resolveUnderRoot } from '@/shared/utils.js';
 
 /**
  * Image mime types accepted for chat attachment uploads. SVG is allowed for
@@ -78,20 +79,13 @@ export function buildStoredAttachmentRecords(files: UploadedAttachmentFile[]): S
  * folder, or null when the name is empty, contains path separators/traversal,
  * or would escape the folder. This is the only lookup the serving route uses,
  * so nothing outside `~/.cloudcli/assets` can ever be read through it.
+ *
+ * The gate itself is `resolveUnderRoot` in `@/shared/utils.js` — the same
+ * separator-and-resolve double check the card attachments resolve through, kept
+ * in one place so the two can never drift apart.
  */
 export function resolveImageAssetFile(filename: string): string | null {
-  const trimmed = typeof filename === 'string' ? filename.trim() : '';
-  if (!trimmed || trimmed.includes('/') || trimmed.includes('\\') || trimmed.includes('..')) {
-    return null;
-  }
-
-  const assetsDir = path.resolve(getGlobalImageAssetsDir());
-  const resolved = path.resolve(assetsDir, trimmed);
-  if (!resolved.startsWith(assetsDir + path.sep)) {
-    return null;
-  }
-
-  return resolved;
+  return resolveUnderRoot(getGlobalImageAssetsDir(), filename);
 }
 
 /**

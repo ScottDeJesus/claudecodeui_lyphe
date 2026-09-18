@@ -12,10 +12,10 @@ import type { UniverseTweaks } from '@/modules/universe/utils/universeTweaks';
  * The canvas redraws the sky when the palette's identity changes, which is why the cache is
  * dropped rather than mutated in place.
  *
- * WHAT A STAR'S COLOUR IS. Its file kind, in the five slots the chart series carries — the exact
- * table the Interfaces section gives, and the only place that mapping exists. Directory and repo
- * bodies take the ink ladder instead, because a body is not a file kind and inventing a sixth
- * chart slot would be a colour the design system does not have.
+ * WHAT A STAR'S COLOUR IS. Its temperature — the export's ramp from orange to blue, keyed on its
+ * size — never its kind; a folder is its repo's pastel warmed halfway, a repo warm white, the sun
+ * cream with a cool glow, and every glow the repo's pastel (`baseColorOf`, `glowColorOf` below).
+ * The two kinds the export never drew, an endpoint and an integration folder, keep a token each.
  *
  * WHAT A STAR'S BRIGHTNESS IS. How recently git saw it change, against the frame's clock: bright
  * inside `recencyBrightDays`, easing to the middle of the curve by `recencyDimDays`, easing again
@@ -86,27 +86,115 @@ export function tokenOf(tokens: UniverseTokens, name: string): string {
 }
 
 /**
- * Every kind the map carries, and the token it is drawn in. Frozen: this table is the contract
- * between the crawler's vocabulary and the design system's, and a pass that wrote to it would be
- * a second opinion about what a kind looks like.
+ * THE EXPORT'S OWN COLOURING, restored at the operator's word (2026-09-17): a star is not its kind's
+ * colour but its TEMPERATURE — a ramp from orange through warm white to blue, keyed on its size, so a
+ * small file burns orange and a large one blue, with a little jitter so a folder of equal files is not
+ * one shade; a folder is its repo's pastel mixed half toward warm white; a repo is warm white; the sun
+ * is the palest cream with a cool glow; and every glow below the sun is the repo's own pastel, which
+ * is what tells the repos apart at a distance. The literals are the export's, kept as literals: the
+ * design system's tokens have no star temperature and no seven pastels, and a token that meant "the
+ * third repo" would be a second opinion about what a repo looks like.
  *
- * The five file kinds take the chart series in the order the Interfaces give (source, config,
- * docs, data-sql, assets), `other` takes the faintest ink because it is the kind nothing claimed,
- * and the three bodies take the ink ladder: a directory one step down from the sun, a galaxy
- * between them, an endpoint the info tone — an endpoint is a machine answering, not a file.
+ * On a light canvas every literal is pulled toward the ink (`onSky`): the export was drawn for a dark
+ * sky, and cream on paper is nothing.
+ *
+ * The two kinds the export never drew keep their tokens: an endpoint the info tone — a machine
+ * answering, not a file — and an integration folder (`system`) the warn tone, the estate's reach into a
+ * platform. Only these two rows are read from the table now; the star ramp and the palettes below are
+ * the rest.
  */
-export const KIND_TOKEN: Readonly<Record<UniverseNode['k'], string>> = Object.freeze({
-  source: '--chart-1',
-  config: '--chart-2',
-  docs: '--chart-5',
-  'data-sql': '--chart-3',
-  assets: '--chart-4',
-  other: '--ink-faint',
-  dir: '--ink-mid',
-  galaxy: '--ink-muted',
-  core: '--ink',
+export const KIND_TOKEN: Readonly<Partial<Record<UniverseNode['k'], string>>> = Object.freeze({
   endpoint: '--info-ink',
+  system: '--warn-ink',
 });
+
+/** The export's star ramp, orange to blue, and where a star's size lands on it. */
+const STAR_RAMP = ['#ff9c5a', '#ffcf9a', '#fff3e0', '#eef2ff', '#b9c8ff'] as const;
+/** One pastel per repo, cycled; the export's seven. */
+const PACKAGE_PALETTE = ['#9fb3d9', '#7fb8c4', '#c9899b', '#a394c9', '#8fbfa6', '#c9ad7f', '#c98f7f'] as const;
+/** Warm white — a repo's own colour, and what a folder is mixed halfway toward. */
+const HUB_COLOR = '#fff3e0';
+/** The sun: the palest cream, glowing cool. */
+const CORE_COLOR = '#f4f1ea';
+const CORE_GLOW = '#c8d6ff';
+/** How far along the ramp a file's size takes it, and how much its own jitter moves it. */
+const RAMP_SCALE = 52;
+const RAMP_JITTER = 0.28;
+/** The export's literals are lights on a dark sky: on a LIGHT canvas the sun (241), a repo (244) and
+ *  the ramp's warm-white middle sit within ten luminance of the paper and vanish (measured 920 of
+ *  10,616 stars under the margin, the sun and every repo among them). So on a light canvas every
+ *  literal is pulled this far toward the ink, which keeps the hue relationships — orange still warmer
+ *  than blue, each repo's pastel still its own — while every light becomes a mark on paper. */
+const LIGHT_SKY_MIX = 0.62;
+/** The canvas luminance above which the sky counts as light. */
+const LIGHT_SKY_LUMINANCE = 128;
+
+/** What a node needs to be coloured: the fields a graph node carries; a caller with a bare kind gets
+ *  the ramp's middle and the first palette slot. */
+export type Colourable = { kind: UniverseNode['k']; lines?: number; id?: number; cluster?: number };
+
+/** Two hex colours mixed, `t` of the way from the first to the second — the export's `mix`. */
+function mixHex(a: string, b: string, t: number): string {
+  const pa = Number.parseInt(a.slice(1), 16);
+  const pb = Number.parseInt(b.slice(1), 16);
+  const ch = (s: number): number => Math.round(((pa >> s) & 255) * (1 - t) + ((pb >> s) & 255) * t);
+  return '#' + [16, 8, 0].map((s) => ch(s).toString(16).padStart(2, '0')).join('');
+}
+
+/** The ramp at `t` in `[0, 1)`, quantised to thirds between stops the way the export did. */
+function rampAt(t: number): string {
+  const at = Math.max(0, Math.min(0.999, t)) * (STAR_RAMP.length - 1);
+  const i = Math.floor(at);
+  return mixHex(STAR_RAMP[i], STAR_RAMP[i + 1], Math.round((at - i) * 3) / 3);
+}
+
+/** A stable value in `[0, 1)` from a node's id — the export's `rnd()` for the jitter, made repeatable. */
+const jitterOf = (id: number): number => (Math.imul(id + 1, 2654435761) >>> 0) / 4294967296;
+
+/** The pastel a node's repo paints with. */
+const palette = (node: Colourable): string => PACKAGE_PALETTE[(node.cluster ?? 0) % PACKAGE_PALETTE.length];
+
+/** What a palette's sky is — light or not, and the ink a light sky pulls literals toward, as hex — held
+ *  per palette: one read per theme, not per star. `null` for the ink means the literal stands. */
+const skyOf = new WeakMap<UniverseTokens, { light: boolean; ink: string | null }>();
+function skyFor(tokens: UniverseTokens): { light: boolean; ink: string | null } {
+  let sky = skyOf.get(tokens);
+  if (sky === undefined) {
+    const canvas = channels(tokenOf(tokens, '--canvas'));
+    const light = canvas !== null && 0.2126 * canvas[0] + 0.7152 * canvas[1] + 0.0722 * canvas[2] > LIGHT_SKY_LUMINANCE;
+    const ink = channels(tokenOf(tokens, '--ink'));
+    sky = { light, ink: ink === null ? null : '#' + ink.map((c) => c.toString(16).padStart(2, '0')).join('') };
+    skyOf.set(tokens, sky);
+  }
+  return sky;
+}
+
+/** One of the export's literals as this sky draws it: as written on a dark canvas, pulled toward the
+ *  ink on a light one. The ink is asked of the palette so it is the theme's own dark, never a guess. */
+function onSky(literal: string, tokens: UniverseTokens): string {
+  const sky = skyFor(tokens);
+  if (!sky.light || sky.ink === null) return literal;
+  return mixHex(literal, sky.ink, LIGHT_SKY_MIX);
+}
+
+/** A node's own colour at full brightness, before the recency dim. */
+export function baseColorOf(node: Colourable, tokens: UniverseTokens): string {
+  const token = KIND_TOKEN[node.kind];
+  if (token !== undefined) return tokenOf(tokens, token);
+  if (node.kind === 'core') return onSky(CORE_COLOR, tokens);
+  if (node.kind === 'galaxy') return onSky(HUB_COLOR, tokens);
+  if (node.kind === 'dir') return onSky(mixHex(palette(node), HUB_COLOR, 0.5), tokens);
+  if (node.lines === undefined || node.id === undefined) return onSky(HUB_COLOR, tokens);
+  return onSky(rampAt(Math.sqrt(node.lines) / RAMP_SCALE + (jitterOf(node.id) - 0.5) * RAMP_JITTER), tokens);
+}
+
+/** The colour a node's glow is drawn in: the sun's cool halo, a source's own tone, else the repo's pastel. */
+export function glowColorOf(node: Colourable, tokens: UniverseTokens): string {
+  const token = KIND_TOKEN[node.kind];
+  if (token !== undefined) return tokenOf(tokens, token);
+  if (node.kind === 'core') return onSky(CORE_GLOW, tokens);
+  return onSky(palette(node), tokens);
+}
 
 /** A node as this end of the lane knows it: the instant the crawler last stamped it — epoch
  *  SECONDS, its own unit, which is why the caller does not convert and this does. */
@@ -217,8 +305,8 @@ function component(part: string): number | null {
 }
 
 /**
- * The colour a node is drawn in: its kind's token, dimmed toward the canvas by however far its
- * brightness has fallen.
+ * The colour a node is drawn in: its own colour (`baseColorOf`), dimmed toward the canvas by however
+ * far its brightness has fallen.
  *
  * Dimming toward the canvas (rather than toward black, or by alpha) is what makes the curve work
  * in both themes: an old star fades into the sky it is actually drawn on, and the same code gives
@@ -228,12 +316,8 @@ function component(part: string): number | null {
  * What once reached that branch does not any more, which is the whole of what the extension bought:
  * a token spelled `rgb(…)`, `#rgba` or `#rrggbbaa` now dims like every other.
  */
-export function colorForNode(
-  node: { kind: UniverseNode['k'] },
-  tokens: UniverseTokens,
-  brightness: number,
-): string {
-  const color = tokenOf(tokens, KIND_TOKEN[node.kind]);
+export function colorForNode(node: Colourable, tokens: UniverseTokens, brightness: number): string {
+  const color = baseColorOf(node, tokens);
   const weight = Math.max(0, Math.min(1, brightness));
   if (weight >= 1) return color;
   const from = channels(color);
@@ -250,7 +334,7 @@ const UNREADABLE_FROM: readonly [number, number, number] = [255, 255, 255];
 const UNREADABLE_TO: readonly [number, number, number] = [0, 0, 0];
 
 /**
- * A star's colour as three channels of 0..1 — the same kind token, dimmed by the same curve and
+ * A star's colour as three channels of 0..1 — the same colour, dimmed by the same curve and
  * through the same parser `colorForNode` paints with, in the unit the GPU wants.
  *
  * `brightness` IS THE CURVE'S OWN ANSWER, handed in and never read here, so a GPU record and the
@@ -259,12 +343,12 @@ const UNREADABLE_TO: readonly [number, number, number] = [0, 0, 0];
  * mix toward the canvas and nothing else, exactly as the 2D path's is.
  */
 export function channelsForNode(
-  node: { kind: UniverseNode['k'] },
+  node: Colourable,
   tokens: UniverseTokens,
   brightness: number,
 ): readonly [number, number, number] {
   const weight = Math.max(0, Math.min(1, brightness));
-  const from = channels(tokenOf(tokens, KIND_TOKEN[node.kind])) ?? UNREADABLE_FROM;
+  const from = channels(baseColorOf(node, tokens)) ?? UNREADABLE_FROM;
   const to = channels(tokenOf(tokens, '--canvas')) ?? UNREADABLE_TO;
   return [
     (from[0] * weight + to[0] * (1 - weight)) / 255,
@@ -291,7 +375,9 @@ export function rgbOf(tokens: UniverseTokens, token: string): readonly [number, 
   }
   const cached = held.get(token);
   if (cached !== undefined) return cached;
-  const [red, green, blue] = channels(tokenOf(tokens, token)) ?? UNREADABLE_FROM;
+  // A token name is read from the palette; a literal colour — the star ramp, a repo's pastel — is
+  // parsed as it stands. Both are cached under the string they were asked by.
+  const [red, green, blue] = channels(token.startsWith('--') ? tokenOf(tokens, token) : token) ?? UNREADABLE_FROM;
   const rgb: readonly [number, number, number] = [red / 255, green / 255, blue / 255];
   held.set(token, rgb);
   return rgb;

@@ -270,7 +270,7 @@
       "title": "All filed",
       "message": "Nothing is waiting for review."
     },
-    "unreachable": "Descent is not reachable right now.",
+    "unreachable": "The memory queue is not reachable right now.",
     "target": {
       "memory": "memory note + index pointer",
       "topic": "memory note",
@@ -298,7 +298,7 @@
       "discarded": "discarded — nothing was written",
       "refused": "couldn't file that memory",
       "gone": "already reviewed elsewhere",
-      "unreachable": "Descent is not reachable."
+      "unreachable": "The memory queue is not reachable."
     }
   },
   "runner": {
@@ -600,7 +600,7 @@
     },
     "open": "Open {{name}}",
     "collapse": "Collapse",
-    "dragHint": "Drag to another slot",
+    "dragHint": "Drag to either side",
     "pin": {
       "label": "This session",
       "title": "Created by the chat you have open"

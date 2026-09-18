@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { Suspense, useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useToast } from '@/shared/context/ToastContext';
@@ -95,26 +95,28 @@ export default function TaskMasterPanel({ isVisible }: TaskMasterPanelProps) {
       />
 
       {isPrdEditorOpen && (
-        <PRDEditor
-          project={currentProject}
-          projectPath={currentProject?.fullPath || currentProject?.path}
-          onClose={() => {
-            setIsPrdEditorOpen(false);
-            setSelectedPrd(null);
-          }}
-          isNewFile={!selectedPrd?.isExisting}
-          file={{
-            name: selectedPrd?.name || 'prd.txt',
-            content: selectedPrd?.content || '',
-            isExisting: selectedPrd?.isExisting,
-          }}
-          onSave={async () => {
-            setIsPrdEditorOpen(false);
-            setSelectedPrd(null);
-            await refreshPrdData(true);
-            await refreshTasks();
-          }}
-        />
+        <Suspense fallback={null}>
+          <PRDEditor
+            project={currentProject}
+            projectPath={currentProject?.fullPath || currentProject?.path}
+            onClose={() => {
+              setIsPrdEditorOpen(false);
+              setSelectedPrd(null);
+            }}
+            isNewFile={!selectedPrd?.isExisting}
+            file={{
+              name: selectedPrd?.name || 'prd.txt',
+              content: selectedPrd?.content || '',
+              isExisting: selectedPrd?.isExisting,
+            }}
+            onSave={async () => {
+              setIsPrdEditorOpen(false);
+              setSelectedPrd(null);
+              await refreshPrdData(true);
+              await refreshTasks();
+            }}
+          />
+        </Suspense>
       )}
     </>
   );

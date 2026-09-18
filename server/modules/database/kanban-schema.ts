@@ -29,6 +29,7 @@ CREATE TABLE IF NOT EXISTS kanban_boards (
     project_id TEXT NULL REFERENCES projects(project_id) ON DELETE SET NULL,
     autonomy INTEGER NOT NULL DEFAULT 0,
     deepseek_flash INTEGER NOT NULL DEFAULT 0,
+    concurrency INTEGER NOT NULL DEFAULT 1,
     sort_order REAL NOT NULL DEFAULT 0,
     archived INTEGER NOT NULL DEFAULT 0,
     created_at TEXT NOT NULL,
@@ -153,6 +154,46 @@ CREATE TABLE IF NOT EXISTS kanban_id_seq (
     next INTEGER NOT NULL DEFAULT 0
 );
 
+-- The lesson store: what a build learned, staged for a person's review before any later session
+-- reads it back. card_id is ON DELETE SET NULL, never CASCADE — a lesson OUTLIVES the card it was
+-- learned on, and the pointer to a deleted card simply goes NULL. descent_id carries the ov_lessons
+-- row this one came from, like every other imported table here.
+-- There is NO CHECK on status, kind or trigger: Descent's lesson vocabulary grew a value twice, and
+-- a CHECK would fail the whole import transaction on a value it forbids. The doors validate instead.
+CREATE TABLE IF NOT EXISTS kanban_lessons (
+    id TEXT PRIMARY KEY NOT NULL,
+    card_id TEXT NULL REFERENCES kanban_cards(id) ON DELETE SET NULL,
+    name TEXT NOT NULL DEFAULT '',
+    summary TEXT NOT NULL DEFAULT '',
+    body TEXT NOT NULL DEFAULT '',
+    trigger TEXT NOT NULL DEFAULT '',
+    kind TEXT NOT NULL DEFAULT 'note',
+    tags TEXT NOT NULL DEFAULT '[]',
+    status TEXT NOT NULL DEFAULT 'staged',
+    source TEXT NOT NULL DEFAULT 'metis',
+    draft_path TEXT NULL,
+    created_at TEXT NOT NULL,
+    reviewed_at TEXT NULL,
+    descent_id TEXT NULL UNIQUE
+);
+
+-- What one Metis session has spent, read from its transcript: the per-session ledger behind the
+-- card's rolled-up token chips. session_id is the primary key because a session has exactly one
+-- row, upserted as the transcript grows; byte_offset is how far the reader has consumed it, so a
+-- second tick resumes rather than re-counting. board_id and card_id are provenance and may be NULL
+-- — a session whose card is deleted keeps its row, and the row's tokens are not the card's.
+CREATE TABLE IF NOT EXISTS kanban_session_usage (
+    session_id TEXT PRIMARY KEY NOT NULL,
+    board_id TEXT NULL,
+    card_id TEXT NULL,
+    tokens_in INTEGER NOT NULL DEFAULT 0,
+    tokens_out INTEGER NOT NULL DEFAULT 0,
+    cache_read INTEGER NOT NULL DEFAULT 0,
+    cache_create INTEGER NOT NULL DEFAULT 0,
+    byte_offset INTEGER NOT NULL DEFAULT 0,
+    updated_at TEXT NOT NULL
+);
+
 CREATE INDEX IF NOT EXISTS ix_kanban_cards_board_status ON kanban_cards(board_id, status, sort_order);
 CREATE INDEX IF NOT EXISTS ix_kanban_cards_board_updated ON kanban_cards(board_id, status, updated_at);
 CREATE INDEX IF NOT EXISTS ix_kanban_card_tags_tag ON kanban_card_tags(tag);
@@ -162,4 +203,7 @@ CREATE INDEX IF NOT EXISTS ix_kanban_decisions_card ON kanban_decisions(card_id)
 CREATE INDEX IF NOT EXISTS ix_kanban_checklist_card ON kanban_checklist_items(card_id);
 CREATE INDEX IF NOT EXISTS ix_kanban_attachments_card ON kanban_attachments(card_id);
 CREATE INDEX IF NOT EXISTS ix_kanban_events_board ON kanban_events(board_id, id);
+-- The lesson index read is always "this status, newest first"; the whole index read is this one
+-- index. kanban_session_usage needs none: its reads are all by its own primary key.
+CREATE INDEX IF NOT EXISTS ix_kanban_lessons_status ON kanban_lessons(status, created_at);
 `;

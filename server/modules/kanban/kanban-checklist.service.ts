@@ -1,6 +1,5 @@
 import { kanbanChecklistDb, kanbanIdsDb } from '@/modules/database/index.js';
 import type {
-  KanbanAttachment,
   KanbanChecklistItem,
   KanbanIssue,
   KanbanWriteContext,
@@ -50,18 +49,6 @@ function requireChecklistText(text: string): string {
   return trimmed;
 }
 
-/** An attachment with no filename is not a file. The bytes are never read here — only the name is. */
-function requireFilename(filename: string): string {
-  const trimmed = filename.trim();
-  if (trimmed.length === 0) {
-    throw new AppError('An attachment needs a filename.', {
-      code: 'KANBAN_ATTACHMENT_FILENAME_REQUIRED',
-      statusCode: 400,
-    });
-  }
-  return trimmed;
-}
-
 /** One checklist item, when the id is known to name one. */
 function requireChecklistItem(itemId: string): KanbanChecklistItem {
   const item = kanbanChecklistDb.getChecklistItem(itemId);
@@ -70,11 +57,15 @@ function requireChecklistItem(itemId: string): KanbanChecklistItem {
 }
 
 /**
- * The checklist, the attachments and the issues a card's drawer carries.
+ * The checklist and the issues a card's drawer carries.
  *
- * The three sit in one service because they are one subject — what a card has beside its text —
- * and because each verb is small: they would be three files of one verb each. The two heavier
- * surfaces are their own files, and the write seam is shared by all of them.
+ * A card's ATTACHMENTS are no longer here: their bytes, their route and their own service live in
+ * `kanban-attachments.service.ts`, because a verb that has to place a file on disk beside its row is
+ * a different subject from a list of text rows — and the metadata-only verb that used to sit here
+ * could never produce those bytes at all.
+ *
+ * The two that remain sit in one service because they share a reader and a shape, and because each
+ * verb is small: they would be two files of one verb each. The write seam is shared by all of them.
  *
  * EVERY write here goes through `writeKanban` — no verb in this file opens a transaction, appends
  * an audit row or sends a frame — and every one threads `context?.actor` into the seam.
@@ -219,40 +210,6 @@ export const kanbanChecklistService = {
         if (!kanbanChecklistDb.deleteChecklistItem(itemId)) throw checklistItemNotFound(itemId);
         requireSummary(item.cardId);
       }
-    );
-  },
-
-  /**
-   * Records one attachment's metadata.
-   *
-   * The bytes are not this verb's: the drawer lists what a card carries, and where those bytes
-   * live is not a question this board answers yet. A row whose file is not there is still the
-   * honest record of what was attached.
-   */
-  addAttachment(
-    cardId: string,
-    input: { filename: string; mime: string; size: number },
-    context?: KanbanWriteContext
-  ): KanbanAttachment {
-    const filename = requireFilename(input.filename);
-    const card = requireCardRow(cardId);
-
-    return writeKanban(
-      {
-        kind: 'attachment.added',
-        cardId,
-        boardId: card.board_id,
-        actor: context?.actor,
-        payload: { filename },
-      },
-      () =>
-        kanbanChecklistDb.insertAttachment({
-          id: kanbanIdsDb.mintId('a'),
-          cardId,
-          filename,
-          mime: input.mime,
-          size: input.size,
-        })
     );
   },
 };

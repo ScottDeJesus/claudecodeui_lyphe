@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { Suspense, useMemo } from 'react';
 import ReactDOM from 'react-dom';
 import { AlertTriangle, EyeOff, Trash2 } from 'lucide-react';
 import type { TFunction } from 'i18next';
@@ -75,21 +75,25 @@ export default function SidebarModals({
     <>
       {showNewProject &&
         ReactDOM.createPortal(
-          <ProjectCreationWizard
-            onClose={onCloseNewProject}
-            onProjectCreated={onProjectCreated}
-          />,
+          <Suspense fallback={null}>
+            <ProjectCreationWizard
+              onClose={onCloseNewProject}
+              onProjectCreated={onProjectCreated}
+            />
+          </Suspense>,
           document.body,
         )}
 
       {showSettings &&
         ReactDOM.createPortal(
-          <TypedSettings
-            isOpen={showSettings}
-            onClose={onCloseSettings}
-            projects={settingsProjects}
-            initialTab={settingsInitialTab}
-          />,
+          <Suspense fallback={null}>
+            <TypedSettings
+              isOpen={showSettings}
+              onClose={onCloseSettings}
+              projects={settingsProjects}
+              initialTab={settingsInitialTab}
+            />
+          </Suspense>,
           document.body,
         )}
 

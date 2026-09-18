@@ -112,8 +112,21 @@
   background: var(--accent-deep);
   box-shadow: 0 0 0 3px var(--accent-soft), var(--vv-fab-elev);
 }
-/* The kit draws no icon; the caller's glyph is sized to the circle it lands in. */
+/* The kit draws no icon; the caller's glyph is sized to the circle it lands in. The svg rule is the
+ * kit's contract for a glyph caller. An image glyph is a face, not a mark: it fills the circle inside
+ * the 1px border, so the accent shows only as a rim. It resolves `inset: 0` against the button itself
+ * (fixed, so positioned): the wrapper span must stay `position: static`, or the face collapses to 0×0. */
 .vv-fab__glyph > svg { width: var(--vv-fab-glyph); height: var(--vv-fab-glyph); }
+.vv-fab__glyph > img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: var(--radius-pill);
+  object-fit: cover;
+  pointer-events: none;
+  -webkit-user-drag: none;
+}
 
 /* ---------------------------------------------------------------- SplitPane */
 /* `isolation` keeps the divider's z-index inside the split: its focus ring and hover cue only have to
