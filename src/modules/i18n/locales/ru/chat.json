@@ -280,6 +280,9 @@
     "showLess": "Показать меньше",
     "openFile": "Открыть {{path}}",
     "openInArchPulse": "Открыть в ArchPulse",
+    "openExternal": "Открыть страницу",
+    "fullscreen": "Полный экран",
+    "exitFullscreen": "Выйти из полноэкранного режима",
     "titles": {
       "table": "Таблица",
       "options": "Варианты",
@@ -296,7 +299,8 @@
       "diagram": "Диаграмма",
       "code": "Код",
       "widget": "Виджет",
-      "docspace": "Блок DocSpace"
+      "docspace": "Блок DocSpace",
+      "embed": "Встроенная страница"
     },
     "alert": {
       "note": "Заметка",

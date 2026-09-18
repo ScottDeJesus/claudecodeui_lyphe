@@ -364,13 +364,26 @@
       "showEarlier": "Mostra i passaggi precedenti",
       "openRow": "Leggi la trascrizione di {{name}}"
     },
+    "embed": {
+      "title": "Incorporato",
+      "empty": "Niente di incorporato in questa chat",
+      "placeholder": "Indirizzo da incorporare…",
+      "address": "Indirizzo da incorporare",
+      "pick": "Quale incorporato mostrare",
+      "choose": "Scegli una pagina…",
+      "custom": "Digita un indirizzo…",
+      "open": "Apri la pagina in una nuova scheda",
+      "rejected": "Non è un indirizzo http:// o https://"
+    },
     "open": "Apri {{name}}",
     "collapse": "Comprimi",
     "dragHint": "Trascina su un lato",
     "pin": {
       "label": "Questa sessione",
       "title": "Creato dalla chat che hai aperto"
-    }
+    },
+    "fullscreen": "Schermo intero",
+    "exitFullscreen": "Esci da schermo intero"
   },
   "applications": {
     "fabLabel": "Applicazioni",

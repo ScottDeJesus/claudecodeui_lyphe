@@ -2,7 +2,8 @@ import { CheckIcon, ChevronDownIcon, FileCodeIcon, LightbulbIcon, PlugZapIcon, X
 import { useId, useState, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import type { KanbanLesson, KanbanLessonLean } from '@/shared/kanban-types';
+import { useLessonReview, type LessonBody } from '@/modules/memory-intake/hooks/useLessonReview';
+import type { KanbanLessonLean } from '@/shared/kanban-types';
 import { Badge, Button, Card, Spinner } from '@/shared/ui';
 import { cn } from '@/shared/utils';
 
@@ -17,7 +18,8 @@ import { cn } from '@/shared/utils';
  * THE LIST IS LEAN AND STAYS LEAN ON SCREEN. A row is the lesson's name, its one-line summary, when
  * it applies, and its card when it has one — summary and trigger clamped to two lines each, so a
  * long one never pushes the next lesson off the pane. The BODY is never in the list: it is read
- * for the one row a person opens, and drawn only there.
+ * for the one row a person opens, and drawn only there — inside a cap that scrolls, so the two
+ * buttons the row was opened for stay within a screen of its name however long the lesson runs.
  *
  * EVERY STATE IS A DIFFERENT SENTENCE: still reading, could not be read, none staged, and the rows.
  * "None staged" is a quiet line and not the kit's dashed EmptyState — that frame belongs to the
@@ -28,42 +30,16 @@ import { cn } from '@/shared/utils';
  * row stays where it was: the lesson was not reviewed, and a row that vanished would say it had been.
  */
 
-/** `null` before the first read lands, `'unread'` when it could not be made, else the staged
- *  lessons in the server's own order. Never `[]` for "not asked yet". */
-type StagedLessons = KanbanLessonLean[] | 'unread' | null;
-
-/** The one opened lesson's by-id read. `gone` is a lesson reviewed elsewhere since the list was
- *  read — no longer `staged`, or no longer a row at all. */
-type LessonBody =
-  | { state: 'reading' }
-  | { state: 'unread' }
-  | { state: 'gone' }
-  | { state: 'read'; lesson: KanbanLesson };
-
-/** What the scaffold draws while nothing is wired: a plain lesson on a card, a skill draft with a
- *  write in flight, and a long one whose review was refused — every row state at once. */
-const SCAFFOLD_LESSONS: KanbanLessonLean[] = [
-  { id: 'ls-scaffold-1', cardId: 'c-142', name: 'Probe against a scratch database', summary: 'A probe that boots the server must point it at a copy, never the live file.', trigger: 'Before any command that starts a second server', kind: 'note', tags: ['probe', 'sqlite'], status: 'staged', source: 'metis', createdAt: '2026-09-17T18:04:00Z', reviewedAt: null },
-  { id: 'ls-scaffold-2', cardId: null, name: 'Scaffold then fill', summary: 'Split a screen into a composition phase and a wiring phase.', trigger: 'Planning any UI phase', kind: 'skill_draft', tags: ['planning'], status: 'staged', source: 'metis', createdAt: '2026-09-17T17:40:00Z', reviewedAt: null },
-  { id: 'ls-scaffold-3', cardId: 'c-97', name: 'Read the failing rows first', summary: 'When a migration check fails, read the rows it failed on before touching the migration: three of the last four failures were data the plan never described, and the migration itself was right every time.', trigger: 'A verify step fails on a count, a sum, or any figure derived from rows rather than from code', kind: 'note', tags: ['migrations', 'root-cause', 'verify'], status: 'staged', source: 'spill', createdAt: '2026-09-16T09:12:00Z', reviewedAt: null },
-];
-const SCAFFOLD_REFUSALS: Record<string, string> = { 'ls-scaffold-3': 'lesson ls-scaffold-3 is approved, not staged — it was reviewed elsewhere' };
-const SCAFFOLD_BODIES: Record<string, LessonBody> = {
-  'ls-scaffold-1': { state: 'read', lesson: { ...SCAFFOLD_LESSONS[0], body: 'The live database is the operator\'s.\n\n1. Copy it to /tmp and disarm every board on the copy.\n2. Boot the second server on its own port against the copy.\n3. Trap the teardown before the boot, so a failed read never strands it.', draftPath: null } },
-  'ls-scaffold-3': { state: 'unread' },
-};
-
 /** Rendered by MemoryIntakePanel, beneath the memory queue and inside its scroll. Nothing else mounts it. */
 export function LessonReviewList() {
   const { t } = useTranslation();
   const headingId = useId();
 
-  // ── The wires. Each line below is the fill phase's; the composition around them is not. ──
-  const lessons = SCAFFOLD_LESSONS as StagedLessons; // FILL: lessons
-  const busyId: string | null = 'ls-scaffold-2'; // FILL: busy
-  const refusals: Record<string, string> = SCAFFOLD_REFUSALS; // FILL: refusals
-  const onApprove = (_lessonId: string): void => {}; // FILL: onApprove
-  const onReject = (_lessonId: string): void => {}; // FILL: onReject
+  // ── The wires: every line that carries data or acts is here, and none of the composition below
+  //    does. The rows are handed what they draw and raise what they are asked. ──
+  const { lessons, capped, bodies, onOpen, busyId, refusals, review } = useLessonReview();
+  const onApprove = (lessonId: string): void => { void review(lessonId, true); };
+  const onReject = (lessonId: string): void => { void review(lessonId, false); };
 
   return (
     // The memory queue's own column — `max-w-2xl`, centred, `px-4` — so the two sections share one
@@ -75,10 +51,14 @@ export function LessonReviewList() {
           {t('memory.lessons.title', { defaultValue: 'Lessons' })}
         </h3>
         {/* A count only over a list that was read: "0 staged" above "could not be read" would
-            have the section contradict itself in two adjacent lines. */}
+            have the section contradict itself in two adjacent lines. Over a list cut at the route's
+            ceiling it says "at least": the badge is read against the strip's estate count, and a
+            number this list cannot stand behind is exactly what must not be printed there. */}
         {Array.isArray(lessons) && (
           <Badge tone="neutral">
-            {t('memory.lessons.staged', { defaultValue: '{{count}} staged', count: lessons.length })}
+            {capped
+              ? t('memory.lessons.stagedCapped', { defaultValue: '{{count}}+ staged', count: lessons.length })
+              : t('memory.lessons.staged', { defaultValue: '{{count}} staged', count: lessons.length })}
           </Badge>
         )}
       </div>
@@ -110,6 +90,10 @@ export function LessonReviewList() {
               // Every row, not just the one being written: one write runs at a time, so a row
               // that still looked pressable would turn a refused press into one that vanished.
               busy={busyId !== null}
+              // Asked for and not yet in is `reading`, which is also what a row shows the instant
+              // it opens — so an entry that is simply absent draws the truth.
+              body={bodies[lesson.id] ?? { state: 'reading' }}
+              onOpen={onOpen}
               onApprove={onApprove}
               onReject={onReject}
             />
@@ -128,6 +112,10 @@ type LessonRowProps = {
   writing: boolean;
   /** Some row's write is in flight, so every row's buttons refuse. */
   busy: boolean;
+  /** This lesson read whole, as far as that read has got. Drawn only while the row is open. */
+  body: LessonBody;
+  /** Raised when the row OPENS — the moment its body is wanted. Closing raises nothing. */
+  onOpen: (lessonId: string) => void;
   onApprove: (lessonId: string) => void;
   onReject: (lessonId: string) => void;
 };
@@ -137,15 +125,15 @@ type LessonRowProps = {
  * is the expander, exactly as a memory's is: opening to read IS the deliberate step, so there is no
  * confirmation dialog. Every string is a build's free text and reaches the DOM as a text node.
  */
-function LessonRow({ lesson, refusal, writing, busy, onApprove, onReject }: LessonRowProps) {
+function LessonRow({ lesson, refusal, writing, busy, body, onOpen, onApprove, onReject }: LessonRowProps) {
   const { t } = useTranslation();
   // One person's place in one list: nothing outside the row acts on it.
   const [expanded, setExpanded] = useState(false);
 
-  // The by-id read of THIS lesson, asked for when the row opens and kept once it lands.
-  const body: LessonBody = expanded ? (SCAFFOLD_BODIES[lesson.id] ?? { state: 'reading' }) : { state: 'reading' }; // FILL: body
-
-  const toggle = () => setExpanded((open) => !open);
+  const toggle = () => {
+    if (!expanded) onOpen(lesson.id);
+    setExpanded((open) => !open);
+  };
   const onHeadingKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
     if (event.key !== 'Enter' && event.key !== ' ') return;
     event.preventDefault();
@@ -173,8 +161,11 @@ function LessonRow({ lesson, refusal, writing, busy, onApprove, onReject }: Less
 
           <span className="min-w-0 flex-1">
             <span className="flex flex-wrap items-center gap-2">
-              {/* A lesson staged without a name still has to be something a person can point at. */}
-              <span className="break-words text-sm font-medium">{lesson.name || lesson.id}</span>
+              {/* A lesson staged without a name still has to be something a person can point at.
+                  `anywhere` and not `break-words`: this span is a flex item, and only `anywhere`
+                  lowers the width a flex item refuses to go under — a snake_case name with no
+                  space in it otherwise runs off the card and over the chevron. */}
+              <span className="min-w-0 text-sm font-medium [overflow-wrap:anywhere]">{lesson.name || lesson.id}</span>
               {isDraft && (
                 <Badge as="span" tone="info" title={t('memory.lessons.draftTitle', { defaultValue: 'also staged as a SKILL.md draft to promote' })}>
                   {t('memory.lessons.draft', { defaultValue: 'skill draft' })}
@@ -217,7 +208,16 @@ function LessonRow({ lesson, refusal, writing, busy, onApprove, onReject }: Less
         )}
 
         {expanded && (
-          <div className="mx-4 mb-3 rounded-xl border border-border bg-muted/50 p-3">
+          // Capped, and it scrolls inside the cap: a lesson runs to 4000 characters, which uncapped
+          // is a row 2200px tall on a phone — and Approve and Reject, the reason the row was opened,
+          // two and a half screens below the name. At `max-h-80` they stay within one screen of it.
+          // Focusable because it scrolls: a keyboard has no other way to read past the fold.
+          <div
+            role="region"
+            tabIndex={0}
+            aria-label={t('memory.lessons.bodyLabel', { defaultValue: 'the whole lesson' })}
+            className="mx-4 mb-3 max-h-80 overflow-y-auto rounded-xl border border-border bg-muted/50 p-3"
+          >
             {body.state === 'reading' && <Spinner size={20} label={t('memory.reading')} />}
             {body.state === 'unread' && (
               <p className="text-xs text-muted-foreground">{t('memory.lessons.bodyUnread', { defaultValue: 'This lesson could not be read right now.' })}</p>

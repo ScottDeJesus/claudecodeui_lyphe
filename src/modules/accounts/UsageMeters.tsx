@@ -1,5 +1,5 @@
 import { Meter } from '@/shared/ui';
-import { windowPercent, windowTone } from '@/modules/accounts/utils/usageWindows';
+import { resetInstant, windowPercent, windowTone } from '@/modules/accounts/utils/usageWindows';
 import type { ClaudeUsage, ClaudeUsageWindow } from '@/shared/types';
 
 /** The line that closes the block, because a blank bar has to be readable as "unknown" and not as "you have used nothing". */
@@ -7,10 +7,10 @@ const CLOSING_LINE =
   'Figures come from the provider and can lag a few minutes. A blank reading means unknown, never zero.';
 
 /**
- * Descent's words for a degraded reading, in the app's.
+ * The server's words for a degraded reading, in the app's.
  *
  * `pending` is the one that is NOT a fault — a poll is in flight and the numbers are simply
- * not here yet. An unrecognised word is quoted rather than swallowed: a new Descent reason
+ * not here yet. An unrecognised word is quoted rather than swallowed: a new server reason
  * should reach the reader intact, not be flattened into "something went wrong".
  */
 const DEGRADED_REASONS: Record<string, string> = {
@@ -25,10 +25,10 @@ const DEGRADED_REASONS: Record<string, string> = {
 
 function degradedReasonInWords(reason: string): string {
   if (!reason) return 'the provider gave no figures';
-  return DEGRADED_REASONS[reason] ?? `Descent reported “${reason}”`;
+  return DEGRADED_REASONS[reason] ?? `The server reported “${reason}”`;
 }
 
-/** The proxy's own three words for a read it could not make, in plain English. */
+/** The server's own three words for a read it could not make, in plain English. */
 function unreachableReasonInWords(reason: string): string {
   if (reason === 'timeout') return 'The server did not answer in time.';
   if (reason === 'bad-response') return 'The server answered with something this app could not read.';
@@ -36,15 +36,15 @@ function unreachableReasonInWords(reason: string): string {
 }
 
 /**
- * `staleSince` and `checkedAt` are epoch SECONDS — Descent's own stamps, passed through the
- * proxy unconverted, unlike `ClaudeAccountSlot.expiresAt`, which is already milliseconds. The
- * `* 1000` is what keeps this line out of January 1970.
+ * `staleSince` and `checkedAt` arrive in epoch SECONDS — the wire's own unit, unlike
+ * `ClaudeAccountSlot.expiresAt`, which is already milliseconds. The `* 1000` is what keeps this
+ * line out of January 1970.
  */
 function secondsStampInWords(seconds: number): string {
   return new Date(seconds * 1000).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
 }
 
-/** The two windows this app has its own name for; everything else keeps Descent's label, which is the only place a `weekly_scoped:*` plan is named. */
+/** The two windows this app has its own name for; everything else keeps the provider's label, which is the only place a `weekly_scoped:*` plan is named. */
 function windowLabel(usageWindow: ClaudeUsageWindow): string {
   if (usageWindow.key === 'five_hour') return 'Current 5-hour window';
   if (usageWindow.key === 'seven_day') return 'This week';
@@ -83,15 +83,18 @@ function heavyLine(tone: 'accent' | 'warn', sub: string | undefined): string | u
  * When the window turns over, and how far away that is in words.
  *
  * A weekly window is days out, so "about 133 hours left" would be arithmetic rather than
- * English; past a day this says the weekday and counts in days instead. `null` means Descent
+ * English; past a day this says the weekday and counts in days instead. `null` means the meter
  * has no reset time, and then the line is simply not drawn.
+ *
+ * The instant comes from `resetInstant`, the one reader this module has, so the countdown here
+ * and the `rolled` flag the server set describe the same moment.
  */
 function resetsLine(resetsAt: string | null): string | undefined {
   if (!resetsAt) return undefined;
-  const at = new Date(resetsAt);
+  const at = new Date(resetInstant(resetsAt));
   if (Number.isNaN(at.getTime())) return undefined;
 
-  // Rounded to the nearest minute before it is printed. Descent computes `resets_at` as
+  // Rounded to the nearest minute before it is printed. The provider computes `resets_at` as
   // "now + remaining", so the same boundary arrives as 13:59:59.6 on one poll and 14:00:00.4 on
   // the next; `toLocaleTimeString` TRUNCATES, so the untouched stamp made one reset read
   // "01:59 PM" and "02:00 PM" on alternating reads. The countdown below still measures from the
@@ -113,7 +116,7 @@ function resetsLine(resetsAt: string | null): string | undefined {
 /**
  * The one sentence a degraded reading owes the reader: how old these figures are, and why
  * there are no newer ones. `null` when the reading is healthy, and the stamp is dropped
- * rather than invented when Descent has no `staleSince` to give.
+ * rather than invented when the meter has no `staleSince` to give.
  */
 function degradedLine(degraded: boolean, staleSince: number | null, reason: string): string | null {
   if (!degraded) return null;
@@ -133,7 +136,7 @@ function UsageNote({ children }: { children: string }) {
  * it is a separate file because the account rows below it are a different subject and this
  * one is all about what a number does and does not mean.
  *
- * There is deliberately no flexible-spend bar: Descent reports no such window, and a third
+ * There is deliberately no flexible-spend bar: the provider reports no such window, and a third
  * bar reading "—" would invent a limit nobody set.
  */
 export function UsageMeters({ usage }: { usage: ClaudeUsage | null }) {
@@ -158,8 +161,13 @@ function renderReading(usage: ClaudeUsage | null) {
   const asOf = degradedLine(usage.degraded, usage.staleSince, usage.reason);
 
   if (usage.windows.length === 0) {
-    // Two different silences: a poll in flight is calm, a degraded read has surrendered.
+    // Three different silences: a poll in flight is calm, a reading the meter could not parse
+    // KNOWS why it is empty, and a degraded read has surrendered.
     if (usage.reason === 'pending') return <UsageNote>A fresh reading is on its way.</UsageNote>;
+    if (usage.reason === 'shape') {
+      const why = degradedReasonInWords(usage.reason);
+      return <UsageNote>{`${why.charAt(0).toUpperCase()}${why.slice(1)}.`}</UsageNote>;
+    }
     if (usage.degraded) {
       return (
         <>

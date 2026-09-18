@@ -26,11 +26,14 @@ import type { ClaudeUsageWindow } from '@/shared/types.js';
  *   2. A 200 nobody can parse is still REACHED. Empty rows, `degraded` stays FALSE — the meter got an
  *      answer it could not read, which is a different fact from a meter that could not ask, and only
  *      the second one means the numbers on screen are stale.
- *   3. `limits[]` is a FALLBACK, never an override. It fills a window the top level did not supply and
- *      never replaces one it did. Its `severity` is carried as a FLOOR on the colour ramp — a window
- *      the vendor flags while the percentage still reads comfortable may escalate the ink, never
- *      soften it. An unknown `kind` is DRAWN, in the payload's own words: dropping it is what renders
- *      a green gauge beside a window sitting at 98 %.
+ *   3. `limits[]` is a FALLBACK for the NUMBER, never an override: it fills a window the top level
+ *      did not supply and never replaces one it did. Its `severity` ALWAYS crosses, because an alarm
+ *      is not a number and it belongs to the WINDOW the vendor named rather than to the entry that
+ *      happened to carry the figure — a window the vendor flags while the percentage still reads
+ *      comfortable escalates the ink, never softens it, and discarding the entry whole is how the
+ *      warn-floor went inert for the two rows the panel actually draws. An unknown `kind` is DRAWN,
+ *      in the payload's own words: dropping it is what renders a green gauge beside a window sitting
+ *      at 98 %.
  *
  * ⚠ SCALE. This endpoint reports `utilization` as a PERCENT (measured: 14.0 for a 14 % window). The
  * CLI's own rate-limit events report the same quantity as a FRACTION (0.14). Two feeds, two scales,
@@ -165,6 +168,18 @@ export function parseWindows(payload: unknown): ClaudeUsageWindow[] {
           filled.set(target, kind);
           severity.delete(target); // the previous entry's alarm loses with its number
           noteSeverity(severity, target, row);
+        } else {
+          // ⚠ The entry names a window we ALREADY draw, so rule 3 discards its number — but an alarm
+          // is not a number. It belongs to the window the vendor flagged, not to the entry that lost
+          // the precedence contest, and this leg is the ordinary case rather than an exotic one: the
+          // top level supplies `five_hour` and `seven_day` on every live payload, so BOTH rows the
+          // footer and the panel render land here whenever `limits[]` flags them. Measured
+          // 2026-09-18: `weekly_all` at 86 % with `severity: 'warning'` beside a non-null top-level
+          // `seven_day: 86.0` served a `seven_day` row carrying NO severity, while a limits-only
+          // `weekly_scoped` row kept its `critical` — so the warn-floor was inert exactly where it
+          // matters, and a flagged window below the 80 % threshold would have drawn comfortable
+          // green. Record the alarm; leave the figure alone.
+          noteSeverity(severity, target, row);
         }
         continue;
       }
@@ -210,8 +225,10 @@ export function parseWindows(payload: unknown): ClaudeUsageWindow[] {
   return rows;
 }
 
-/** Carry a chosen row's alarm onto its window. Top-level windows carry no severity of their own, so
- *  the only place one can come from is the `limits[]` entry that won. */
+/** Carry an entry's alarm onto the window it named. Top-level windows carry no severity of their
+ *  own, so `limits[]` is the only place one can come from — and it comes from every entry that
+ *  named a window we draw, the ones that lost the number included, because `row.severity` is set
+ *  only for a NON-benign word, so every call here is an escalation and none can soften. */
 function noteSeverity(severity: Map<string, string>, target: string, row: WindowRow): void {
   if (row.severity !== undefined) severity.set(target, row.severity);
 }
@@ -222,10 +239,13 @@ const HAS_ZONE = /(?:Z|[+-]\d{2}:?\d{2})$/i;
 
 /** One `resetsAt` string → a UTC epoch in MILLISECONDS, or `null` if there is no usable instant.
  *
- *  ⚠ A timestamp with NO offset is read as UTC, matching `resetsIn()` in the panel. The live payload
- *  carries `+00:00`, but this file's whole premise is that the shape may change, and reading a UTC
- *  instant as local would move a reset by hours in either direction. `Date` does the opposite by
- *  default, which is what the appended `Z` is for. */
+ *  ⚠ A timestamp with NO offset is read as UTC, the same rule the panel's `resetInstant()` applies
+ *  (`src/modules/accounts/utils/usageWindows.ts`). The two MUST agree: this function decides
+ *  `markRolled`'s flag from the same string the panel counts down to, so a second reading of it
+ *  would put "was 88 % used" beside a countdown to a different instant. `Date` does the opposite by
+ *  default — it reads a zoneless stamp as LOCAL, which on this box would move a reset by seven
+ *  hours, so a payload that ever drops its `+00:00` buys that divergence silently. The appended `Z`
+ *  is the whole guard, and it is the same one on both sides of the wire. */
 export function resetEpoch(value: unknown): number | null {
   if (typeof value !== 'string' || !value) return null;
   const at = new Date(HAS_ZONE.test(value) ? value : `${value}Z`);

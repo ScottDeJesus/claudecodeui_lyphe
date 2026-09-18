@@ -362,13 +362,26 @@
       "showEarlier": "顯示更早的步驟",
       "openRow": "閱讀 {{name}} 的逐字稿"
     },
+    "embed": {
+      "title": "嵌入",
+      "empty": "此對話中尚無嵌入內容",
+      "placeholder": "要嵌入的網址…",
+      "address": "要嵌入的網址",
+      "pick": "顯示哪個嵌入",
+      "choose": "選擇頁面…",
+      "custom": "輸入網址…",
+      "open": "在新分頁中開啟頁面",
+      "rejected": "這不是 http:// 或 https:// 網址"
+    },
     "open": "開啟 {{name}}",
     "collapse": "收合",
     "dragHint": "拖曳到任一側",
     "pin": {
       "label": "本次工作階段",
       "title": "由你開啟的對話建立"
-    }
+    },
+    "fullscreen": "全螢幕",
+    "exitFullscreen": "離開全螢幕"
   },
   "applications": {
     "fabLabel": "應用程式",

@@ -267,6 +267,9 @@
     "showLess": "表示を減らす",
     "openFile": "{{path}} を開く",
     "openInArchPulse": "ArchPulse で開く",
+    "openExternal": "ページを開く",
+    "fullscreen": "全画面",
+    "exitFullscreen": "全画面を終了",
     "titles": {
       "table": "テーブル",
       "options": "選択肢",
@@ -283,7 +286,8 @@
       "diagram": "図",
       "code": "コード",
       "widget": "ウィジェット",
-      "docspace": "DocSpace ブロック"
+      "docspace": "DocSpace ブロック",
+      "embed": "埋め込み"
     },
     "alert": {
       "note": "ノート",

@@ -12,6 +12,7 @@ import {
   Gauge,
   Gavel,
   GitCompareArrows,
+  Globe,
   Info,
   LayoutPanelTop,
   List,
@@ -25,6 +26,7 @@ import type { LucideIcon } from 'lucide-react';
 
 import type { Tone } from '@/shared/types';
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/shared/ui';
+import { OWNS_ESCAPE } from '@/shared/ui/overlayEscape';
 import { cn } from '@/shared/utils';
 import { ChipsSuppressedContext } from '@/modules/chat/transcript/shapes/chipContext';
 import { LeadInTitleContext } from '@/modules/chat/transcript/shapes/leadInContext';
@@ -40,7 +42,7 @@ import { useShapeCollapse } from '@/modules/chat/transcript/shapes/useShapeColla
 type ShapeKind =
   | 'table' | 'data-bars' | 'decision-matrix' | 'before-after' | 'callout' | 'tasks' | 'checks'
   | 'timeline' | 'facts' | 'verdict' | 'stats' | 'diff' | 'tabbed-code' | 'diagram'
-  | 'list' | 'widget' | 'docspace';
+  | 'list' | 'widget' | 'docspace' | 'embed';
 
 /**
  * The icon and the tone every kind wears, so one shape's frame says what it is before a word is
@@ -70,6 +72,7 @@ const SHAPE_KINDS: Record<ShapeKind, { icon: LucideIcon; tone: Tone | 'accent' }
   list: { icon: List, tone: 'accent' },
   widget: { icon: AppWindow, tone: 'accent' },
   docspace: { icon: LayoutPanelTop, tone: 'accent' },
+  embed: { icon: Globe, tone: 'accent' },
 };
 
 type ShapeFrameProps = {
@@ -102,6 +105,22 @@ type ShapeFrameProps = {
   prose?: boolean;
   /** True for a frame whose own content reaches its own edge — `EmbedFrame`'s live iframe, and nothing else. The body then drops its inset. */
   flush?: boolean;
+  /**
+   * True while this card has been given the whole viewport.
+   *
+   * ONE PROP, FOUR CONSEQUENCES, because they are one thing: the root becomes a fixed, opaque,
+   * square-cornered panel over the page; the card's boxes become a flex column so the BODY can be
+   * told to fill what is left under the header; the fold is forced open, since a fullscreen card
+   * showing only its own header is a screen of nothing; and the root claims Escape
+   * (`OWNS_ESCAPE`), so a dialog behind it stands down and the reader's press dismisses what is in
+   * front of them — a modal dialog excepted, which sits above this layer and keeps its own key. The
+   * KEY ITSELF is handled by whoever owns the flag — for an embed that is `WidgetFrame` — because this
+   * component cannot turn its own fullscreen off.
+   *
+   * It changes no element's position in the tree, and that is the requirement the whole shape
+   * follows from: `EmbedFrame`'s child is a live iframe, and React moving an iframe reloads it.
+   */
+  fullscreen?: boolean;
 };
 
 /**
@@ -144,9 +163,15 @@ function TitleSpan({ className, children }: { className: string; children: React
  * own tone instead of inheriting the frame's — which is the whole reason `data-tone` is written
  * there and nowhere else.
  */
-export function ShapeFrame({ kind, title, collapseKey, actions, children, className, tone, icon, prose, flush }: ShapeFrameProps) {
+export function ShapeFrame({ kind, title, collapseKey, actions, children, className, tone, icon, prose, flush, fullscreen }: ShapeFrameProps) {
   const { t } = useTranslation('chat');
-  const { collapsed, toggle, interactive, enter } = useShapeCollapse(collapseKey);
+  const { collapsed: folded, toggle, interactive: foldable, enter } = useShapeCollapse(collapseKey);
+  // A fullscreen card is open, whatever the fold remembers, and it draws no chevron: a control that
+  // cannot change what the reader sees is worse than no control. The memory itself is untouched —
+  // nothing is written here — so leaving fullscreen returns the card to exactly the fold it was left
+  // in. `interactive` is already false on an export, where there is nothing to click at all.
+  const collapsed = fullscreen ? false : folded;
+  const interactive = foldable && !fullscreen;
   // A lead-in's words win over the caller's own label: this frame IS the block below a paragraph, and
   // the paragraph is the header the reader wrote. Provided by `LeadIn`, and `null` everywhere else.
   const leadIn = useContext(LeadInTitleContext);
@@ -192,19 +217,42 @@ export function ShapeFrame({ kind, title, collapseKey, actions, children, classN
       data-collapsed={String(collapsed)}
       data-text-scale="flow"
       data-vv-enter={enter ? '' : undefined}
+      data-shape-fullscreen={fullscreen ? '' : undefined}
+      {...(fullscreen ? OWNS_ESCAPE : null)}
       className={cn(
         'my-3 overflow-hidden rounded-xl border border-border bg-card/50 shadow-sm',
         !prose && 'not-prose',
+        // `tailwind-merge` is what makes this a REPLACEMENT rather than a pile-up: `m-0` beats the
+        // `my-3` above it, `rounded-none` the `rounded-xl`, and the opaque `bg-card` the `bg-card/50`
+        // a card can be translucent in but a panel over the whole page cannot.
+        //
+        // `z-[45]`: over everything the workspace draws (its sticky rows are z-10/20, the app
+        // switcher's layer z-40) and UNDER the dialog layer (z-50). Fullscreen is a mode the reader
+        // sits in with the app live around it, so a dialog opened from it — the command palette, a
+        // confirm — must still come up in front; at a higher layer it opened invisibly and kept the
+        // keyboard (measured by Athena's review). Shared with the gutter widgets' fullscreen.
+        fullscreen && 'fixed inset-0 z-[45] m-0 flex flex-col rounded-none border-0 bg-card shadow-none',
         className
       )}
     >
-      <Collapsible open={!collapsed} onOpenChange={toggle}>
+      {/* The flex chain, and it has to be unbroken: an iframe asked for `height: 100%` gets it only
+          if every box between it and the fixed root has a definite height. Root → this → the
+          collapsible's content → the body → the frame's own wrapper. `min-h-0` at each link is what
+          stops a flex child from refusing to shrink below its content and pushing the card off the
+          bottom of the screen. */}
+      <Collapsible
+        open={!collapsed}
+        onOpenChange={toggle}
+        className={cn(fullscreen && 'flex min-h-0 flex-1 flex-col')}
+      >
         <div
           data-shape-header
           data-tone={accent ? undefined : effectiveTone}
           className={cn(
             'flex items-center gap-2 px-3 py-2 text-md-body text-muted-foreground',
-            accent ? 'bg-primary/[0.06]' : 'bg-[color:var(--tone-soft)]'
+            accent ? 'bg-primary/[0.06]' : 'bg-[color:var(--tone-soft)]',
+            // The one row that keeps its own height while the body takes the rest of the screen.
+            fullscreen && 'flex-shrink-0'
           )}
         >
           {interactive && !titleHasLink ? (
@@ -241,7 +289,10 @@ export function ShapeFrame({ kind, title, collapseKey, actions, children, classN
             <span data-shape-actions className="flex flex-shrink-0 items-center gap-1 text-md-meta">{actions}</span>
           ) : null}
         </div>
-        <CollapsibleContent>
+        {/* `[&>div]:h-full` reaches the one box this file cannot name: `CollapsibleContent` wraps its
+            children in an `overflow-hidden` div of its own, and without a height that div is the
+            link where the chain breaks. */}
+        <CollapsibleContent className={cn(fullscreen && 'min-h-0 flex-1 [&>div]:h-full')}>
           {/* The body re-provides a null title: a frame nested under a titled one — a list inside a
               section, a shape inside a callout — must wear its OWN label, never the block's above it. */}
           <LeadInTitleContext.Provider value={null}>
@@ -250,7 +301,8 @@ export function ShapeFrame({ kind, title, collapseKey, actions, children, classN
               className={cn(
                 'border-t border-border/70 text-md-body text-foreground',
                 !flush && 'px-3 py-2',
-                prose && '[&>*:first-child]:mt-0 [&>*:last-child]:mb-0'
+                prose && '[&>*:first-child]:mt-0 [&>*:last-child]:mb-0',
+                fullscreen && 'h-full'
               )}
             >
               {children}

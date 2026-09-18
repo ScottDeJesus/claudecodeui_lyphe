@@ -9,7 +9,7 @@ import type { DocSpaceBlockRef } from '@/shared/types';
 /**
  * The SECOND fence: one DocSpace block, embedded live in the transcript and editable in place.
  *
- * TWO FENCES, NOT ONE, AND THEY ARE NOT INTERCHANGEABLE. The HTML widget next door
+ * THE KINDS ARE NOT INTERCHANGEABLE, and this one is the middle of the three. The HTML widget next door
  * (`WidgetFrameLive`) is model output — a document this app composes and hands to the frame
  * inline, on an opaque origin, under a CSP that refuses the network. Everything it is given is
  * everything it may ever have. This frame is the opposite shape: it navigates to a REAL page on
@@ -32,8 +32,11 @@ import type { DocSpaceBlockRef } from '@/shared/types';
  * DocSpace port must never be proxied through this app's Express or Vite to "reach the phone":
  * proxying makes the frame same-origin and hands it the token. It is reached directly instead.
  *
- * Nothing here weakens the other fence. This file adds a second, differently-shaped frame beside
- * the first; it does not touch `WidgetFrameLive`, its sandbox, or the CSP its document carries.
+ * The third kind, `EmbedUrlFrame`, sits at the far end of the same line: an address this app knows
+ * nothing about, so it gets this frame's origin gate and none of its protocol.
+ *
+ * Nothing here weakens the other fences. Each file adds a differently-shaped frame beside the
+ * others; none of them touches `WidgetFrameLive`, its sandbox, or the CSP its document carries.
  */
 
 /**
@@ -71,10 +74,17 @@ export const DOCSPACE_READY_TIMEOUT_MS = 8000;
  *
  * `framed` is set by `WidgetFrame` when the chat has handed it a frame to draw: the element is then
  * placed inside a card that is already the border, so this wrapper keeps only the clipping and the
- * fill. It changes no attribute on the frame itself — the sandbox, the `src` and the ready timer are
- * the same either way.
+ * fill. `fill` is set when the caller owns the height — a card the reader has given the whole
+ * screen — and it makes this element take all of it. Neither changes an attribute on the frame itself — the sandbox, the `src` and the
+ * ready timer are the same either way, which is what keeps a fullscreen toggle from reloading a
+ * block the reader is part-way through editing.
  */
-export function DocSpaceFrame({ pageId, blockId, framed }: DocSpaceBlockRef & { framed?: boolean }) {
+export function DocSpaceFrame({
+  pageId,
+  blockId,
+  framed,
+  fill,
+}: DocSpaceBlockRef & { framed?: boolean; fill?: boolean }) {
   const frameRef = useRef<HTMLIFrameElement>(null);
   const { isDarkMode } = useTheme();
 
@@ -156,7 +166,11 @@ export function DocSpaceFrame({ pageId, blockId, framed }: DocSpaceBlockRef & { 
     // collapsed block keeps its iframe, its scroll position and anything typed into the block.
     <div
       className={
-        framed ? 'overflow-hidden bg-card' : 'my-3 overflow-hidden rounded-xl border border-border bg-card'
+        fill
+          ? 'h-full overflow-hidden bg-card'
+          : framed
+            ? 'overflow-hidden bg-card'
+            : 'my-3 overflow-hidden rounded-xl border border-border bg-card'
       }
     >
       <iframe
@@ -171,7 +185,10 @@ export function DocSpaceFrame({ pageId, blockId, framed }: DocSpaceBlockRef & { 
         // loading — an effect could attach after the first load and would then miscount.
         onLoad={onFrameLoad}
         className="block w-full"
-        style={{ height }}
+        // The block's own reported height, except where the caller owns it — a fullscreen card — and
+        // the frame fills its box. The reports keep arriving underneath, so leaving fullscreen
+        // restores the height the block last asked for without a reload.
+        style={{ height: fill ? '100%' : height }}
       />
     </div>
   );

@@ -26,6 +26,25 @@ export function windowTone(usageWindow: ClaudeUsageWindow, percent: number | nul
 }
 
 /**
+ * `Z` or a numeric offset at the end of an ISO stamp — the difference between a UTC instant and one
+ * `Date` would read as local time. Mirrored from the server's own `HAS_ZONE`
+ * (`server/modules/accounts/usage-windows.ts`), because the two ends must agree.
+ */
+const HAS_ZONE = /(?:Z|[+-]\d{2}:?\d{2})$/i;
+
+/**
+ * One `resetsAt` string → the instant it names, in epoch MILLISECONDS — or `NaN` when it names none.
+ *
+ * ⚠ A stamp carrying NO offset is read as UTC, which is the rule the server's `resetEpoch` applies
+ * too. The server decides `rolled` from this same string, so a reader that answered differently
+ * would put "was 88 % used" beside a countdown to a different moment. The live payload carries
+ * `+00:00`; this is the rule for the day it stops.
+ */
+export function resetInstant(resetsAt: string): number {
+  return new Date(HAS_ZONE.test(resetsAt) ? resetsAt : `${resetsAt}Z`).getTime();
+}
+
+/**
  * How long until a window turns over, in the largest unit that still says something true:
  * days past a day, hours past an hour, minutes below that.
  *
@@ -41,7 +60,7 @@ export function windowTone(usageWindow: ClaudeUsageWindow, percent: number | nul
 export function formatWindowCountdown(resetsAt: string | null, now: number = Date.now()): string | null {
   if (!resetsAt) return null;
 
-  const at = new Date(resetsAt).getTime();
+  const at = resetInstant(resetsAt);
   if (Number.isNaN(at)) return null;
 
   const msLeft = at - now;

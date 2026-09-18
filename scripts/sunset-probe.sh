@@ -18,9 +18,9 @@
 # rather than opens the live file.
 #
 # WHAT IT LEAVES BEHIND ON A BAD DAY: nothing. `stop_probe_server` runs on every exit path, the
-# aborted one included, and deletes the scratch database and every scratch root. It also restores
-# the operator's `~/.cloudcli/local-server.json` marker, which booting a second server would
-# otherwise overwrite.
+# aborted one included, and deletes the scratch database and every scratch root. The operator's
+# `~/.cloudcli/local-server.json` marker is never touched: the probe writes its own to a scratch path
+# (`CLOUDCLI_LOCAL_SERVER_MARKER`), because a probe that wrote the real one deleted it at shutdown.
 #
 # This file has NO top-level side effects and sets no shell options of its own: a sourced file that
 # called `set -e` would change the sourcing script's failure semantics, and one that booted on
@@ -51,12 +51,16 @@ print((head + b'.' + body + b'.' + sig).decode())
 PY
 }
 
-# (c) Boot a SECOND server on 7893 against the scratch database and scratch roots, keeping the
-#     operator's local-server.json marker intact.
+# (c) Boot a SECOND server on 7893 against the scratch database and scratch roots. Two of them guard
+#     the operator's own server rather than the data: its marker file (`CLOUDCLI_LOCAL_SERVER_MARKER`)
+#     and its chat sessions (`CLOUDCLI_SESSIONS_DIR`). A server booted without a supervisor claims the
+#     keepalive whenever the operator's server is not holding it — across its restart on every
+#     `server/` save — and then re-adopts every host in the directory: on this scratch database it
+#     finds no session row and RETIRES the operator's chats (measured nine times, `readopt.ts`).
 boot_probe_server() {
-  cp ~/.cloudcli/local-server.json /tmp/sunset-marker.bak 2>/dev/null || true
-  rm -rf /tmp/sunset-state /tmp/sunset-att && mkdir -p /tmp/sunset-state /tmp/sunset-att
+  rm -rf /tmp/sunset-state /tmp/sunset-att /tmp/sunset-sessions && mkdir -p /tmp/sunset-state /tmp/sunset-att /tmp/sunset-sessions
   rm -rf /tmp/sunset-spill && mkdir -p /tmp/sunset-spill
+  CLOUDCLI_LOCAL_SERVER_MARKER=/tmp/sunset-marker.json CLOUDCLI_SESSIONS_DIR=/tmp/sunset-sessions \
   SERVER_PORT=7893 DATABASE_PATH=/tmp/sunset-probe.db KANBAN_METIS_STATE_ROOT=/tmp/sunset-state \
   KANBAN_ATTACHMENTS_ROOT=/tmp/sunset-att CLOUDCLI_ACCOUNTS_ROOT=/tmp/sunset-accounts \
   CLOUDCLI_SPILL_ROOT=/tmp/sunset-spill CLOUDCLI_RATE_LIMIT_PATH=/tmp/sunset-ratelimit.json \
@@ -65,10 +69,9 @@ boot_probe_server() {
   for i in $(seq 1 90); do curl -sf http://127.0.0.1:7893/api/auth/status > /dev/null && break; sleep 1; done
 }
 
-# (d) Stop it and put the marker back. Runs on EVERY exit path, including the aborted one.
+# (d) Stop it and delete every scratch root. Runs on EVERY exit path, including the aborted one.
 stop_probe_server() {
   kill "$(cat /tmp/sunset-server.pid 2>/dev/null)" 2>/dev/null || true
   sleep 1
-  cp /tmp/sunset-marker.bak ~/.cloudcli/local-server.json 2>/dev/null || true
-  rm -rf /tmp/sunset-state /tmp/sunset-att /tmp/sunset-accounts /tmp/sunset-spill /tmp/sunset-probe.db /tmp/sunset-ratelimit.json
+  rm -rf /tmp/sunset-state /tmp/sunset-att /tmp/sunset-accounts /tmp/sunset-spill /tmp/sunset-probe.db /tmp/sunset-ratelimit.json /tmp/sunset-sessions /tmp/sunset-marker.json
 }

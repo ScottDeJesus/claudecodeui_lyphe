@@ -64,7 +64,8 @@ unmount-only effect declared AFTER it flushes that write through `saveSettingsRe
 A turn knows it is running inside CloudCLI's chat, rather than a terminal, from two things
 `claude-runtime.provider.js` sets on `sdkOptions` inside `mapCliOptionsToSDK`, per turn: the SDK
 child's env carries `CLAUDE_SURFACE=cloudcli`, and its system prompt gains `SURFACE_PROMPT_APPEND`
-— one sentence naming the fence and the bus (`WIDGET_SIGNAL`), then a short paragraph naming the
+— one sentence naming the fence and the bus (`WIDGET_SIGNAL`), one naming the embed body and the
+fullscreen switch (`EMBED_SIGNAL`), then a short paragraph naming the
 four markdown conventions this surface draws as components (`MARKDOWN_SIGNAL`; what it names, and
 why only four, is [architecture/08-rendered-shapes.md](architecture/08-rendered-shapes.md)
 §"The triggers"). Both come from `surface-signal.ts` and nowhere else — never `.env`,
@@ -82,15 +83,19 @@ exist anywhere `CLAUDE_SURFACE` is not `cloudcli`.
 What a widget is allowed to do is narrower still, and it is the BODY that decides — the tag admits,
 it never widens. Raw HTML is the default and is what it has always been: its sandbox is
 `allow-scripts` and nothing else — no `allow-same-origin`, no network of any kind — and it reaches
-the rest of the app only by naming a TOPIC through `live.subscribe`, never a URL. The one other
-shape is a body that parses as JSON naming a DocSpace block
-(`{ "kind": "docspace", "pageId": …, "blockId": … }`), and it is a DIFFERENT frame rather than a
-loosened one: it navigates to ArchPulse's own origin so the block can save what the reader edits,
-it subscribes to no topics at all, and the origin it lands on must differ from this app's before
-any iframe is rendered. Everything else — a body that fails to parse, one whose `kind` is something
-else, one that merely contains the word — is HTML, so nothing that renders today can change shape.
-The full shape of the fence, both sandboxes, the origin invariant and the bus it talks to is
-[architecture/07-live-widgets.md](architecture/07-live-widgets.md) §"The DocSpace kind".
+the rest of the app only by naming a TOPIC through `live.subscribe`, never a URL. The two other
+shapes are REFERENCES, and each is a DIFFERENT frame rather than a loosened one. A body naming a
+DocSpace block (`{ "kind": "docspace", "pageId": …, "blockId": … }`) navigates to ArchPulse's own
+origin so the block can save what the reader edits. A body naming an address
+(`{ "kind": "embed", "url": … }`, with optional `title` and `height`) navigates to whatever page
+that is — an absolute `http:`/`https:` address, checked by parsing, so no `javascript:` or `data:`
+URL can reach a frame. Both subscribe to no topics at all, and for both the origin they land on
+must differ from this app's before any iframe is rendered. Everything else — a body that fails to
+parse, one whose `kind` is a word the classifier does not know, one that merely contains the word —
+is HTML, so nothing that renders today can change shape. The full shape of the fence, all three
+sandboxes, the origin invariant and the bus it talks to is
+[architecture/07-live-widgets.md](architecture/07-live-widgets.md) §"The DocSpace kind" and
+§"The embed kind".
 
 That second body shape — a fence whose content is the JSON naming a DocSpace block — renders
 through `DocSpaceFrame`, an iframe pointed at ArchPulse's own origin and never at this app's:
@@ -104,10 +109,13 @@ later turn is steered toward a DocSpace block instead of a one-off HTML fence. T
 both frames speak is still [architecture/07-live-widgets.md](architecture/07-live-widgets.md)
 §"The DocSpace kind".
 
-A LIVE embed of either kind wears the same card header every other shape in the transcript wears:
+A LIVE embed of any kind wears the same card header every other shape in the transcript wears:
 the chat hands `WidgetFrame` an `EmbedFrame`, which draws one `ShapeFrame` — `Widget` for an HTML
-fence, `DocSpace block` for a DocSpace one — and, for a DocSpace block, an `Open in ArchPulse`
-action pointing at that block's own studio deep link. It stops short of the two cases where there
+fence, `DocSpace block` for a DocSpace one, the model's own title (or `Embed`) for an address — a
+way out where there is one (`Open in ArchPulse` for a block's studio deep link, `Open page` for an
+embedded address, and nothing at all for an HTML widget, which is output this app composed), and a
+fullscreen switch on all three. Fullscreen is a class change on that card and never a move in the
+React tree, because reparenting an iframe reloads it; `Escape` leaves. It stops short of the two cases where there
 is no live element to dress: a fence still being streamed and a fence in an exported document both
 keep the raw source they have always had, with no header and no card over it. That is why the frame
 is a FUNCTION passed in rather than a wrapper drawn around `WidgetFrame` — it is applied from

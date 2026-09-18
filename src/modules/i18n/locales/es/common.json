@@ -364,13 +364,26 @@
       "showEarlier": "Mostrar pasos anteriores",
       "openRow": "Leer la transcripción de {{name}}"
     },
+    "embed": {
+      "title": "Incrustación",
+      "empty": "Aún no hay nada incrustado en este chat",
+      "placeholder": "Dirección para incrustar…",
+      "address": "Dirección para incrustar",
+      "pick": "Qué incrustación mostrar",
+      "choose": "Elegir una página…",
+      "custom": "Escribir una dirección…",
+      "open": "Abrir la página en una pestaña nueva",
+      "rejected": "Esa no es una dirección http:// o https://"
+    },
     "open": "Abrir {{name}}",
     "collapse": "Contraer",
     "dragHint": "Arrastra a cualquier lado",
     "pin": {
       "label": "Esta sesión",
       "title": "Creado por el chat que tienes abierto"
-    }
+    },
+    "fullscreen": "Pantalla completa",
+    "exitFullscreen": "Salir de pantalla completa"
   },
   "applications": {
     "fabLabel": "Aplicaciones",

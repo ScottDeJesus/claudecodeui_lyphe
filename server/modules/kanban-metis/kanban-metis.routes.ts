@@ -6,6 +6,7 @@ import type { NextFunction, Request, RequestHandler, Response, Router } from 'ex
 import { appConfigDb } from '@/modules/database/index.js';
 import { kanbanBoardsService } from '@/modules/kanban/index.js';
 import { readClaudeTranscriptBySessionId } from '@/modules/providers/index.js';
+import { KANBAN_CONCURRENCY_MAX } from '@/shared/kanban-types.js';
 import { AppError } from '@/shared/utils.js';
 
 import { deriveMetisSecret } from './metis-env.service.js';
@@ -264,7 +265,8 @@ export function createKanbanMetisRouter(dependencies: KanbanMetisRouteDependenci
    * Why this board is or is not being worked on, in the driver's own numbers.
    *
    * The tick's decision is five dials, a timestamp and two gate answers, and every one of them is
-   * answered here: autonomy (the board's governor), concurrency (how many sessions it may run), live
+   * answered here: autonomy (the board's governor), concurrency (how many sessions it may run, with
+   * `concurrencyMax` — the clamp's ceiling — beside it so the panel's dial stops where the clamp does), live
    * (how many it has), claimable (how much work is waiting), lastSpawnAt (how recently the cooldown
    * was stamped), rateLimitUntil (how long the account cap holds spawning back) and relaunchAllowed
    * (whether the board's ledger still permits a launch). Without the last two, an operator watching
@@ -289,6 +291,7 @@ export function createKanbanMetisRouter(dependencies: KanbanMetisRouteDependenci
       response.json({
         autonomy: reading.autonomy,
         concurrency: reading.concurrency,
+        concurrencyMax: KANBAN_CONCURRENCY_MAX,
         claimable: reading.claimable,
         live: reading.live,
         lastSpawnAt: reading.lastSpawnAt,

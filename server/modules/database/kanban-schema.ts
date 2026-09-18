@@ -179,9 +179,10 @@ CREATE TABLE IF NOT EXISTS kanban_lessons (
 
 -- What one Metis session has spent, read from its transcript: the per-session ledger behind the
 -- card's rolled-up token chips. session_id is the primary key because a session has exactly one
--- row, upserted as the transcript grows; byte_offset is how far the reader has consumed it, so a
--- second tick resumes rather than re-counting. board_id and card_id are provenance and may be NULL
--- — a session whose card is deleted keeps its row, and the row's tokens are not the card's.
+-- row, upserted as the transcript grows; the counters are TOTALS the next tick subtracts from, and
+-- byte_offset is where the main transcript's cursor stood at that write (never read back to resume).
+-- board_id and card_id are provenance and may be NULL — a session whose card is deleted keeps its
+-- row, and the row's tokens are not the card's.
 CREATE TABLE IF NOT EXISTS kanban_session_usage (
     session_id TEXT PRIMARY KEY NOT NULL,
     board_id TEXT NULL,

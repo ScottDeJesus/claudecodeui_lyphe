@@ -364,13 +364,26 @@
       "showEarlier": "Afficher les étapes précédentes",
       "openRow": "Lire la transcription de {{name}}"
     },
+    "embed": {
+      "title": "Intégration",
+      "empty": "Rien d'intégré dans cette conversation",
+      "placeholder": "Adresse à intégrer…",
+      "address": "Adresse à intégrer",
+      "pick": "Quelle intégration afficher",
+      "choose": "Choisir une page…",
+      "custom": "Saisir une adresse…",
+      "open": "Ouvrir la page dans un nouvel onglet",
+      "rejected": "Ce n'est pas une adresse http:// ou https://"
+    },
     "open": "Ouvrir {{name}}",
     "collapse": "Réduire",
     "dragHint": "Glisser vers un côté",
     "pin": {
       "label": "Cette session",
       "title": "Créé par la conversation que vous avez ouverte"
-    }
+    },
+    "fullscreen": "Plein écran",
+    "exitFullscreen": "Quitter le plein écran"
   },
   "applications": {
     "fabLabel": "Applications",

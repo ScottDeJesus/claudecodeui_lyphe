@@ -244,7 +244,8 @@ export const kanbanLearningDb = {
    * An upsert keyed on `session_id`, never an insert-then-update: the telemetry tick runs against a
    * transcript that only grows, so the second tick must find the first tick's row rather than
    * collide with it. The counters are TOTALS the caller accumulated, and `byte_offset` moves with
-   * them, which is what lets the next tick resume instead of re-reading from the file's start.
+   * them as a record of the main transcript's cursor — the watcher resumes from its own in-memory
+   * cursors, never from this column.
    */
   upsertSessionUsage(input: {
     sessionId: string;

@@ -2,7 +2,7 @@ import { MoreHorizontal } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 import { KanbanVitalsStrip } from '@/modules/kanban/KanbanVitalsStrip';
-import type { KanbanBoard, KanbanVitals } from '@/shared/kanban-types';
+import type { KanbanBoard } from '@/shared/kanban-types';
 import { ActionMenu, type ActionMenuItem, LLMProviderLogo, Select, Switch, Tooltip } from '@/shared/ui';
 
 /**
@@ -54,10 +54,6 @@ type KanbanBoardHeaderProps = {
   /** The board row's `deepseek_flash`: where this board's Metis, and every plan runner she
    *  starts, are billed. It moves nothing already running — a child reads it at its next spawn. */
   deepseekFlash: boolean;
-  /** The selected board's six counts, handed straight to the strip: an object is a reading, `null`
-   *  is a first reading still on its way, and absent is no reading at all — which the strip draws
-   *  as em-dashes, never as zeros. */
-  vitals?: KanbanVitals | null;
   /** Boards are GLOBAL: selecting one is never scoped to the open project. */
   onSelectBoard: (boardId: string) => void;
   onToggleAutonomy: (next: boolean) => void;
@@ -76,7 +72,6 @@ export function KanbanBoardHeader({
   currentBoardId,
   autonomy,
   deepseekFlash,
-  vitals,
   onSelectBoard,
   onToggleAutonomy,
   onToggleDeepseekFlash,
@@ -123,10 +118,13 @@ export function KanbanBoardHeader({
       </div>
 
       {/* The board's counts sit against its name, because they are ABOUT the board: identity, then
-          the state of that identity, then — across the gap — the controls that change it. The strip
-          never shrinks; below `xl` it stands down to its two amber registers on its own, so the
-          switcher still truncates by its own rule and the cluster to the right never moves. */}
-      <KanbanVitalsStrip vitals={vitals} />
+          the state of that identity, then — across the gap — the controls that change it. It is
+          handed the board's id and nothing else: this header holds no counts and calls no hook, and
+          the id it already has is enough for the strip to find the reading. Where the row has room
+          the strip stands in it and never shrinks; where it has none the strip leaves the row for
+          the switcher's corner and takes no width at all — so the switcher truncates by its own
+          rule, exactly as it did alone, and the cluster to the right never moves. */}
+      <KanbanVitalsStrip boardId={currentBoardId} />
 
       {/* Identity left, mode right, and the gap between them deliberate: the board's name is what
           a reader arrives on, and the autonomy switch is the one control here that changes what

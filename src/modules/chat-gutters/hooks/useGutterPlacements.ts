@@ -21,7 +21,8 @@ import { readUserPreference, subscribeToUserPreferences, writeUserPreference } f
  * that is missing, names no usable side, or carries an `open` that is not a boolean falls back to
  * that widget's default, and ranks are renumbered so two widgets can never claim one place. The
  * defaults put `runner` first on the left and `memory` first on the right, both collapsed — the
- * state that costs the chat nothing — and `subagents` under the runner, open.
+ * state that costs the chat nothing — `subagents` under the runner, open, and `embed` under memory,
+ * collapsed until a chat names a page for it.
  *
  * THE STORED SHAPE is `{ fallback, sessions: { <sessionId>: placements } }`, and an older build's
  * flat record reads as the fallback with no sessions — so an arrangement made before this is the one
@@ -48,6 +49,10 @@ const DEFAULT_PLACEMENTS: ChatGutterPlacements = {
   runner: { side: 'left', order: 0, open: false },
   memory: { side: 'right', order: 0, open: false },
   subagents: { side: 'left', order: 1, open: true },
+  // Collapsed, and on the right under memory: an embed is a page the chat has yet to name, so a
+  // widget that opened itself would give a column's height to an empty frame in every chat that
+  // never uses one. It opens itself the moment a chat declares an address — see `ChatGutterLayout`.
+  embed: { side: 'right', order: 1, open: false },
 };
 
 /** Every widget there is, in the order a repair falls back to. */

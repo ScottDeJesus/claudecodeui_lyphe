@@ -27,10 +27,11 @@ import type { KanbanMetisSession } from '@/shared/types';
  * nothing. The person's send is the exception and `MetisOutcome` is why: its surface holds a strip a
  * refusal belongs in, so the sentence is handed back to the caller instead of toasted over it.
  *
- * THE DIAL IS READ, NEVER GUESSED. The panel's header divides this board's live count by the cap it
- * may run, and that cap is a column on the board's row which the driver reads at CALL time — so it
- * comes from the driver's own reading: once per board, and again when a `board.updated` frame says
- * somebody moved it. Never `0`: an unreadable reading is `null`, an UNKNOWN cap, because zero is a
+ * THE DIAL IS READ, AND MOVED WHERE IT IS READ. The panel's header divides this board's live count
+ * by the cap it may run, and that cap is a column on the board's row which the driver reads at CALL
+ * time — so it comes from the driver's own reading: once per board, again when a `board.updated`
+ * frame says somebody moved it, and again after a reconnect. `setDial` draws the reader's own press
+ * at once; the write's frame re-reads it, and a refusal is put back by a fresh reading. Never `0`: an unreadable reading is `null`, an UNKNOWN cap, because zero is a
  * board switched off and the header would refuse every launch on a board open for work.
  *
  * THE READING IS THE SERVER'S; THE BOARD IS THE PANEL'S QUESTION ABOUT IT. What is held is the fleet
@@ -88,6 +89,11 @@ export type KanbanMetis = {
    *  THIS BOARD: one not yet asked for, or one that could not be fetched. Both draw as the plain
    *  count, which is the point: only a reading taken for this board may cap it. */
   dial: number | null;
+  /** The dial's ceiling, as the same reading carries it (`concurrencyMax`). `null` with the dial. */
+  dialMax: number | null;
+  /** Moves this board's dial — a PATCH of its row's `concurrency`. Drawn at once, and put back by
+   *  the next reading if the server refused it. */
+  setDial: (value: number) => void;
   /** Asks the driver to put a Metis on this board. */
   launch: () => void;
   /** Asks the driver to end one session. */
@@ -124,7 +130,7 @@ export function useKanbanMetis(boardId: string): KanbanMetis {
   // number would be painted against whichever board is on screen — the board just left, divided into
   // this board's live count, disabling its Launch with a title that is false for it. Tagged, a
   // reading belongs to the board that asked for it and to no other; see where `dial` is derived.
-  const [dialRead, setDialRead] = useState<{ boardId: string; value: number | null } | null>(null);
+  const [dialRead, setDialRead] = useState<{ boardId: string; value: number | null; max: number | null } | null>(null);
 
   // The stamp of the last picture the SERVER sent, 0 before any. A ref, not state: the seed's guard
   // reads it inside an async tail and nothing about the drawing depends on it.
@@ -163,14 +169,18 @@ export function useKanbanMetis(boardId: string): KanbanMetis {
   const readDial = useCallback(async (id: string): Promise<void> => {
     const ask = ++dialAskRef.current;
     try {
-      const body = await readApiJson<{ concurrency?: unknown }>(await api.kanbanMetis.driver(id));
+      const body = await readApiJson<{ concurrency?: unknown; concurrencyMax?: unknown }>(await api.kanbanMetis.driver(id));
       if (ask !== dialAskRef.current || !mountedRef.current) return;
-      setDialRead({ boardId: id, value: typeof body.concurrency === 'number' ? body.concurrency : null });
+      setDialRead({
+        boardId: id,
+        value: typeof body.concurrency === 'number' ? body.concurrency : null,
+        max: typeof body.concurrencyMax === 'number' ? body.concurrencyMax : null,
+      });
     } catch (error) {
       // An unreadable reading is an UNKNOWN cap, never a zero; see the module comment.
       console.warn('[useKanbanMetis] the driver reading could not be read:', error);
       if (ask !== dialAskRef.current || !mountedRef.current) return;
-      setDialRead({ boardId: id, value: null });
+      setDialRead({ boardId: id, value: null, max: null });
     }
   }, []);
 
@@ -221,6 +231,9 @@ export function useKanbanMetis(boardId: string): KanbanMetis {
       // stay invisible until the fleet moved again. Re-seeding closes exactly that gap.
       if (event.kind === 'websocket_reconnected') {
         void seed();
+        // The dial's own frame may have been among the missed ones: a dial moved elsewhere during
+        // the outage would otherwise stay drawn at the old number until the next board write.
+        void readDial(boardRef.current);
         return;
       }
       // A board write can move the dial — it is that board's own column — so the ONE frame that can
@@ -344,6 +357,33 @@ export function useKanbanMetis(boardId: string): KanbanMetis {
     [verb, t],
   );
 
+  // The dial, moved from the header. DRAWN AT ONCE — a stepper that waits a round trip per press
+  // reads as a stuck control — and put back by a fresh reading when the PATCH is refused; a landed
+  // one is confirmed by the `board.updated` frame the write broadcasts, which re-reads the dial
+  // above. One ask per board in flight: a press during it is dropped BEFORE the number moves, so
+  // the figure never shows a value nobody sent.
+  const setDial = useCallback(
+    (value: number) => {
+      const key = `dial:${boardId}`;
+      if (busyRef.current.has(key)) return;
+      // Readings already in flight were taken BEFORE this press: retire them, or one landing after
+      // the optimistic write repaints the old number under the reader's finger. Every later
+      // `readDial` takes the next ask, so the write's frame and a refusal's re-read still land.
+      dialAskRef.current += 1;
+      setDialRead((previous) =>
+        previous !== null && previous.boardId === boardId ? { ...previous, value } : previous,
+      );
+      void verb(
+        key,
+        () => api.kanban.updateBoard(boardId, { concurrency: value }),
+        t('kanban.metis.dial.notMoved', { defaultValue: 'The dial was not moved' }),
+      ).then((outcome) => {
+        if (outcome.status === 'refused') void readDial(boardId);
+      });
+    },
+    [verb, boardId, t, readDial],
+  );
+
   // Woken now instead of at the driver's next tick, and toasted like the row verbs: a bolt in a
   // header has nowhere to put a sentence.
   const nudge = useCallback(
@@ -367,6 +407,7 @@ export function useKanbanMetis(boardId: string): KanbanMetis {
   // this board's number. It is not this board's ZERO either: an unknown cap draws the plain count,
   // where a cap of zero would say the board is switched off and refuse every launch on it.
   const dial = dialRead !== null && dialRead.boardId === boardId ? dialRead.value : null;
+  const dialMax = dialRead !== null && dialRead.boardId === boardId ? dialRead.max : null;
 
-  return { sessions: forBoard, loading, dial, launch, stop, resume, reply, nudge };
+  return { sessions: forBoard, loading, dial, dialMax, setDial, launch, stop, resume, reply, nudge };
 }

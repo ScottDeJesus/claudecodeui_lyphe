@@ -299,6 +299,9 @@
     "showLess": "收起部分",
     "openFile": "打开 {{path}}",
     "openInArchPulse": "在 ArchPulse 中打开",
+    "openExternal": "打开页面",
+    "fullscreen": "全屏",
+    "exitFullscreen": "退出全屏",
     "titles": {
       "table": "表格",
       "options": "选项",
@@ -315,7 +318,8 @@
       "diagram": "图表",
       "code": "代码",
       "widget": "小组件",
-      "docspace": "DocSpace 区块"
+      "docspace": "DocSpace 区块",
+      "embed": "嵌入"
     },
     "alert": {
       "note": "备注",

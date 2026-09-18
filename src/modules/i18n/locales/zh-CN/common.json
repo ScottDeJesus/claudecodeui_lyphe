@@ -362,13 +362,26 @@
       "showEarlier": "显示更早的步骤",
       "openRow": "阅读 {{name}} 的记录"
     },
+    "embed": {
+      "title": "嵌入",
+      "empty": "此对话中还没有嵌入内容",
+      "placeholder": "要嵌入的地址…",
+      "address": "要嵌入的地址",
+      "pick": "显示哪个嵌入",
+      "choose": "选择页面…",
+      "custom": "输入地址…",
+      "open": "在新标签页中打开页面",
+      "rejected": "这不是 http:// 或 https:// 地址"
+    },
     "open": "打开 {{name}}",
     "collapse": "折叠",
     "dragHint": "拖到任意一侧",
     "pin": {
       "label": "本次会话",
       "title": "由你打开的会话创建"
-    }
+    },
+    "fullscreen": "全屏",
+    "exitFullscreen": "退出全屏"
   },
   "applications": {
     "fabLabel": "应用",

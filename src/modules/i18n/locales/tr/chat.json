@@ -280,6 +280,9 @@
     "showLess": "Daha az göster",
     "openFile": "{{path}} dosyasını aç",
     "openInArchPulse": "ArchPulse'ta aç",
+    "openExternal": "Sayfayı aç",
+    "fullscreen": "Tam ekran",
+    "exitFullscreen": "Tam ekrandan çık",
     "titles": {
       "table": "Tablo",
       "options": "Seçenekler",
@@ -296,7 +299,8 @@
       "diagram": "Diyagram",
       "code": "Kod",
       "widget": "Widget",
-      "docspace": "DocSpace bloğu"
+      "docspace": "DocSpace bloğu",
+      "embed": "Gömülü sayfa"
     },
     "alert": {
       "note": "Not",

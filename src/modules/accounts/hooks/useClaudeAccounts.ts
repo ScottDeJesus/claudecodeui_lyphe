@@ -46,14 +46,14 @@ async function readBody(response: Response): Promise<unknown> {
  * ("in use now · 8 sessions running"), not a modal (Descent GOTCHAS #174). What IS guarded
  * is a SECOND write while one is in flight, since a whole-box swap is not re-entrant.
  */
-export function useDescentAccounts() {
+export function useClaudeAccounts() {
   // The last picture the route answered with. Held because the footer row and the panel both
   // read it between polls, and because `null` (nothing asked yet) has to look different from
   // `{reachable:false}` (asked, and there was no picture to be had).
   const [data, setData] = useState<ClaudeAccounts | null>(null);
   // True while a switch or a capture is in flight, so the rows can refuse a second press.
   const [busy, setBusy] = useState(false);
-  // Descent's refusal of the LAST write, shown inline as a warn banner. Cleared when the next
+  // The server's refusal of the LAST write, shown inline as a warn banner. Cleared when the next
   // write starts and when the panel closes: a refusal describes one attempt, never the panel's
   // standing state, and one left standing would greet the next person who opens it.
   const [error, setError] = useState<string | null>(null);

@@ -305,6 +305,9 @@
     "showLess": "Mostrar menos",
     "openFile": "Abrir {{path}}",
     "openInArchPulse": "Abrir en ArchPulse",
+    "openExternal": "Abrir página",
+    "fullscreen": "Pantalla completa",
+    "exitFullscreen": "Salir de pantalla completa",
     "titles": {
       "table": "Tabla",
       "options": "Opciones",
@@ -321,7 +324,8 @@
       "diagram": "Diagrama",
       "code": "Código",
       "widget": "Widget",
-      "docspace": "Bloque de DocSpace"
+      "docspace": "Bloque de DocSpace",
+      "embed": "Incrustación"
     },
     "alert": {
       "note": "Nota",

@@ -14,3 +14,10 @@ export { useClaimSubagentStrip } from '@/modules/chat/subagents/subagentSource';
 // and in the pinned dialog, and it is the same view a board Metis's row opens. Consumer: the
 // kanban module's `KanbanMetisPanel.tsx`, which reads it through this barrel.
 export { SubagentTranscriptView } from '@/modules/chat/subagents/SubagentTranscriptView';
+// The Embed widget: the live page the chat named or the reader typed, as the desktop gutter draws
+// it, plus what its layout reads — the count, the newest address, and whether the chat's list has
+// arrived. Consumer: the chat-gutters module, which mounts it as the fourth widget. The publisher
+// and the collector are NOT here — `ChatInterface` is their only caller and it is inside this
+// module, so exporting them would be a door nobody walks through.
+export { EmbedWidgetBody } from '@/modules/chat/embeds/EmbedWidgetBody';
+export { useEmbedWidgetState } from '@/modules/chat/embeds/embedSource';

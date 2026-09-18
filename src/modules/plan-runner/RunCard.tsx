@@ -4,6 +4,7 @@ import { useElapsed } from '@/shared/hooks/useElapsed';
 import { useRunnerVerbs } from '@/modules/plan-runner/hooks/useRunnerVerbs';
 import { PhaseRow } from '@/modules/plan-runner/PhaseRow';
 import { PipelineStrip } from '@/modules/plan-runner/PipelineStrip';
+import { RepairBanner } from '@/modules/plan-runner/RepairBanner';
 import {
   PHASE_GLYPH,
   phaseProgress,
@@ -58,6 +59,10 @@ function planFileName(planPath: string): string {
  * pending, read off the PHASES and never off the receipt's word: the runner's `complete` means
  * something shipped, not that nothing is left (`runUnfinished`). Dismiss is rendered only
  * when the caller passes `onDismiss`: the card does not know the lane, and the panel does.
+ *
+ * A FIX-IT SESSION IS SAID ABOVE EVERYTHING ELSE. When the runner sends an unblock at a blocked
+ * phase, `RepairBanner` leads the card — repairing, then finished — so a blocked run that is being
+ * worked on never reads the same as one nobody is touching.
  *
  * AN ENDED CARD SHOWS ITS OUTCOME where a moving run shows its state: the runner's own word for the
  * ending, in the outcome's tone, with how long ago it ended in place of how long it has run. The
@@ -151,6 +156,7 @@ export function RunCard({
       </CardHeader>
 
       <CardContent className="flex min-w-0 flex-col gap-3 p-3 pt-0">
+        {run.repair && <RepairBanner repair={run.repair} runLive={run.state === 'live'} />}
         <Meter
           percent={progress.percent}
           tone={anyBlocked ? 'warn' : 'accent'}

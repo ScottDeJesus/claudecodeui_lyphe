@@ -13,7 +13,10 @@ const DISPLAY_HOST = 'localhost';
 const HEALTH_TIMEOUT_MS = 1000;
 const SERVER_START_TIMEOUT_MS = 30000;
 const MAX_STARTUP_LOG_LINES = 300;
-const SERVER_MARKER_PATH = path.join(os.homedir(), '.cloudcli', 'local-server.json');
+// The same override the server's writer honours (`server/index.ts`), so a reader and a writer of one
+// path never disagree.
+const SERVER_MARKER_PATH =
+  process.env.CLOUDCLI_LOCAL_SERVER_MARKER || path.join(os.homedir(), '.cloudcli', 'local-server.json');
 const LOCAL_SERVER_URL_ENV_KEYS = [
   'CLOUDCLI_DESKTOP_LOCAL_SERVER_URL',
   'CLOUDCLI_LOCAL_SERVER_URL',

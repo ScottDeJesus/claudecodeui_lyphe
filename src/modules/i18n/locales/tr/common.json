@@ -363,13 +363,26 @@
       "showEarlier": "Önceki adımları göster",
       "openRow": "{{name}} transkriptini oku"
     },
+    "embed": {
+      "title": "Gömülü sayfa",
+      "empty": "Bu sohbette henüz gömülü bir şey yok",
+      "placeholder": "Gömülecek adres…",
+      "address": "Gömülecek adres",
+      "pick": "Hangi gömülü sayfa gösterilsin",
+      "choose": "Bir sayfa seç…",
+      "custom": "Adres yaz…",
+      "open": "Sayfayı yeni sekmede aç",
+      "rejected": "Bu bir http:// veya https:// adresi değil"
+    },
     "open": "{{name}} aç",
     "collapse": "Daralt",
     "dragHint": "İki yandan birine sürükleyin",
     "pin": {
       "label": "Bu oturum",
       "title": "Açık olan sohbet tarafından oluşturuldu"
-    }
+    },
+    "fullscreen": "Tam ekran",
+    "exitFullscreen": "Tam ekrandan çık"
   },
   "applications": {
     "fabLabel": "Uygulamalar",

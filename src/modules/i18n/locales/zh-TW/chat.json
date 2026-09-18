@@ -316,6 +316,9 @@
     "showLess": "顯示較少",
     "openFile": "開啟 {{path}}",
     "openInArchPulse": "在 ArchPulse 中開啟",
+    "openExternal": "開啟頁面",
+    "fullscreen": "全螢幕",
+    "exitFullscreen": "離開全螢幕",
     "titles": {
       "table": "表格",
       "options": "選項",
@@ -332,7 +335,8 @@
       "diagram": "圖表",
       "code": "程式碼",
       "widget": "小工具",
-      "docspace": "DocSpace 區塊"
+      "docspace": "DocSpace 區塊",
+      "embed": "嵌入"
     },
     "alert": {
       "note": "備註",

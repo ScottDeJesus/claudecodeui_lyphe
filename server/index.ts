@@ -190,21 +190,21 @@ app.use('/api/system', authenticateToken, systemRoutes);
 // The Claude account switcher and its usage meter (protected), mounted at `/api` so its four paths
 // land at `/api/accounts`, `/api/usage`, `/api/accounts/switch` and `/api/accounts/capture`.
 //
-// ⚠ THE GUARD IS SCOPED TO THOSE FOUR PATHS, and that is deliberate: `app.use('/api', authenticateToken,
-// …)` would run the JWT check in front of every mount declared BELOW this line as well — and
-// `/api/kanban-pm` (a board Metis holds no user token), `/api/ntfy/act` (signed buttons), `/api/agent`
-// and `/api/browser-use-mcp` are public by design. A bare `/api` mount here locks all four out.
-// Scoped this way the guard covers the switcher and nothing else, wherever this line sits.
-const ACCOUNT_PATHS = new Set(['/accounts', '/usage', '/accounts/switch', '/accounts/capture']);
-
-app.use(
-    '/api',
-    (request, response, next) => {
-        if (!ACCOUNT_PATHS.has(request.path)) return next();
-        return authenticateToken(request, response, next);
-    },
-    createAccountsModule()
-);
+// ⚠ THE GUARD IS APPLIED BY PREFIX, AND THAT IS A SECURITY PROPERTY RATHER THAN A STYLE CHOICE.
+// Express routes are matched case-insensitively with an optional trailing slash, so a guard that
+// compares `request.path` against a list of spellings guards the spellings it was taught and lets
+// every other one through unauthenticated — measured 2026-09-18: `/api/accounts/`, `/api/ACCOUNTS`,
+// `/api/accounts//` and `POST /api/accounts/capture/` all answered 200/201 with no token, leaking
+// the live slots and able to re-point the active mark. A prefix mount cannot have that gap: the
+// guard is matched by the SAME matcher that admits the request to the router below, so any spelling
+// Express routes is a spelling that has already passed the JWT check.
+//
+// ⚠ NOT `app.use('/api', authenticateToken, …)`: that would run the check in front of every mount
+// declared BELOW this line too — `/api/kanban-pm` (a board Metis holds no user token),
+// `/api/ntfy/act` (signed buttons), `/api/agent` and `/api/browser-use-mcp` are public by design.
+app.use('/api/accounts', authenticateToken);
+app.use('/api/usage', authenticateToken);
+app.use('/api', createAccountsModule());
 
 // The two readings the board cannot take for itself, built HERE because this is the one place that
 // may reach across modules. The plan-runner owns what a plan cost — it reads the ledgers on disk —
@@ -376,7 +376,11 @@ const SERVER_PORT = Number.parseInt(process.env.SERVER_PORT || '3001', 10);
 const HOST = process.env.HOST || '0.0.0.0';
 const DISPLAY_HOST = getConnectableHost(HOST);
 const VITE_PORT = process.env.VITE_PORT || 5173;
-const LOCAL_SERVER_MARKER_PATH = path.join(os.homedir(), '.cloudcli', 'local-server.json');
+// `CLOUDCLI_LOCAL_SERVER_MARKER` points a PROBE server's marker at a scratch path. Without it a probe
+// on another port overwrites the operator's marker at boot and deletes it at shutdown — its remover
+// keys on its own pid, which the operator's backup never carries (measured 2026-09-18, three times).
+const LOCAL_SERVER_MARKER_PATH =
+    process.env.CLOUDCLI_LOCAL_SERVER_MARKER || path.join(os.homedir(), '.cloudcli', 'local-server.json');
 
 function getErrorCode(error: unknown): string | undefined {
     if (typeof error !== 'object' || error === null || !('code' in error)) {

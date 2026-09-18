@@ -40,6 +40,21 @@ import type { RunnerRunSnapshot } from '@/shared/types';
  * new card if it ends anew — a moving run is never something the operator asked to stop seeing, and
  * a second ending is news they have not seen.
  */
+/**
+ * The one switch that lets a TEST see test runs. A browser probe sets it before the app loads
+ * (`.verify/lib/console.mjs`); the operator never does, so their lists hold only their own runs —
+ * a probe's fake run used to blink onto their widgets for the seconds it lived (2026-09-18).
+ */
+const SHOW_TEST_RUNS_KEY = 'cloudcli:show-test-runs';
+
+function showTestRuns(): boolean {
+  try {
+    return localStorage.getItem(SHOW_TEST_RUNS_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
 export function useRunnerRuns(): {
   runs: RunnerRunSnapshot[];
   count: number;
@@ -52,7 +67,8 @@ export function useRunnerRuns(): {
   const dismissed = useDismissedEndings();
 
   return useMemo(() => {
-    const carried = Array.isArray(value?.payload) ? value.payload : [];
+    const lane = Array.isArray(value?.payload) ? value.payload : [];
+    const carried = showTestRuns() ? lane : lane.filter((run) => !run.test_run);
     const runs = carried.filter((run) => !isDismissed(run, dismissed));
 
     // One pass per state rather than a sort: the list is a handful of runs, and picking the

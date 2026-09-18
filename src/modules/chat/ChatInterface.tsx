@@ -37,6 +37,8 @@ import {
   publishSubagentSource,
   useSubagentStripClaimed,
 } from '@/modules/chat/subagents/subagentSource';
+import { collectEmbedTargets } from '@/modules/chat/embeds/collectEmbedTargets';
+import { publishEmbedSource } from '@/modules/chat/embeds/embedSource';
 import ChatComposer from '@/modules/chat/composer/ChatComposer';
 import CommandResultModal from '@/modules/chat/modals/CommandResultModal';
 
@@ -223,6 +225,20 @@ function ChatInterface({
     publishSubagentSource({ sessionId, agentMessages, soulLaunchIds });
     return () => publishSubagentSource(null);
   }, [selectedSession?.id, agentMessages, soulLaunchIds]);
+
+  // The addresses this chat has declared in embed fences, for the Embed widget in the gutter. Read
+  // off the MESSAGES rather than off the rendered transcript, because the transcript unmounts rows
+  // that scroll away and the widget's list must not move with the reader's scrollbar —
+  // `collectEmbedTargets` says the rest. Memoised on the message array's identity: the scan skips
+  // any message without the fence in it, so a chat that never uses one pays a substring test per
+  // message per store update and nothing more.
+  const embedTargets = useMemo(() => collectEmbedTargets(chatMessages), [chatMessages]);
+  useEffect(() => {
+    const sessionId = selectedSession?.id;
+    if (typeof sessionId !== 'string') { publishEmbedSource(null); return; }
+    publishEmbedSource({ sessionId, targets: embedTargets });
+    return () => publishEmbedSource(null);
+  }, [selectedSession?.id, embedTargets]);
   // While a gutter shows the Subagents widget it draws these same rows: the strip stands down.
   const stripClaimed = useSubagentStripClaimed();
 

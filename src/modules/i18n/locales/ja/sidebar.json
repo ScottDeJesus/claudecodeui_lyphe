@@ -22,7 +22,7 @@
     "conversationCount_other": "{{count}} 件の会話"
   },
   "app": {
-    "title": "Athena",
+    "title": "LypheCLI",
     "subtitle": "AIコーディングアシスタント"
   },
   "sessions": {

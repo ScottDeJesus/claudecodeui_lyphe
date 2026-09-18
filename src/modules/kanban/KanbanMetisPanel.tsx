@@ -15,6 +15,7 @@ import {
   CollapsibleTrigger,
   EmptyState,
   Spinner,
+  Stepper,
 } from '@/shared/ui';
 import { cn } from '@/shared/utils';
 
@@ -53,7 +54,14 @@ import { cn } from '@/shared/utils';
  * A dial of zero is the board switched off and says so. `info` while anything runs, `neutral`
  * otherwise: a full board is healthy, not a warning, and the word carries the cap (doctrine §6).
  *
- * TWO BUTTONS ON THE HEADER, ONE FILL. Launch is the primary action and the only accent fill;
+ * THE DIAL IS MOVED WHERE IT IS READ. A stepper sits beside the figure it caps, 1 to the server's
+ * ceiling (`concurrencyMax` on the driver reading — the clamp's own number, never a copy): the board
+ * that runs one Metis and the board that runs six are the same header with a different number. It
+ * never steps to zero — the autonomy switch is how a board stops — and it is not drawn while the
+ * dial is unread, because a stepper over an unknown number would move a value nobody has seen. On a
+ * phone the header has no room for it, so it is the first row of the body there instead.
+ *
+ * A STEPPER BESIDE THE FIGURE, TWO BUTTONS AT THE EDGE, ONE FILL. Launch is the primary action and the only accent fill;
  * every row verb sits below it on the ladder (`KanbanMetisRow`). Nudge — ⚡ — wakes the driver's
  * tick now rather than at its next fifteen seconds; an outline, because it starts nothing the dial
  * and the board's governor would not have started anyway. On a phone it keeps the bolt and drops
@@ -70,6 +78,9 @@ type KanbanMetisPanelProps = {
   boardId: string;
   boardName: string;
 };
+
+/** The stepper's floor. Zero is the dial OFF, and a board is stopped by its autonomy switch, not here. */
+const DIAL_MIN = 1;
 
 /** Triage order: spending first, then needs a look, then put down by hand, then finished on its own. */
 const STATE_RANK: Record<KanbanMetisSession['state'], number> = {
@@ -172,6 +183,24 @@ export function KanbanMetisPanel({ boardId, boardName }: KanbanMetisPanelProps) 
   // it. A session the board no longer lists — reaped, or dropped by a seed — leaves this
   // `undefined`, and the conversation is then a finished transcript with nothing live to follow.
   const openSession = openedId === null ? undefined : metis.sessions.find((session) => session.sessionId === openedId);
+
+  // The dial's control, built once and placed twice by width (the header from `sm` up, the body's
+  // first row below it). `null` while the dial or its ceiling is unread: a stepper over an unknown
+  // number would move a value nobody has seen.
+  const dialMax = metis.dialMax;
+  const dialStepper =
+    dial === null || dialMax === null ? null : (
+      <Stepper
+        value={String(dial)}
+        onDecrease={() => metis.setDial(Math.max(DIAL_MIN, dial - 1))}
+        onIncrease={() => metis.setDial(Math.min(dialMax, dial + 1))}
+        canDecrease={dial > DIAL_MIN}
+        canIncrease={dial < dialMax}
+        decreaseLabel={t('kanban.metis.dial.decrease', { defaultValue: 'Run fewer Metis at once' })}
+        increaseLabel={t('kanban.metis.dial.increase', { defaultValue: 'Run more Metis at once' })}
+        ariaLabel={t('kanban.metis.dial.stepper', { defaultValue: 'Metis sessions this board may run at once' })}
+      />
+    );
 
   /** Loading, empty, the list — and the list with a conversation beside it. Four pieces of news. */
   const body = () => {
@@ -277,6 +306,15 @@ export function KanbanMetisPanel({ boardId, boardName }: KanbanMetisPanelProps) 
           {reading.why !== null && <span className="sm:hidden">{reading.short}</span>}
         </Badge>
 
+        {/* From `sm` up the dial sits beside the figure it caps. Below it, the header has no slack left
+            for a 117px control — the board's name would vanish and the title overprint the badge —
+            so the phone gets the same stepper as the first row of the body instead. */}
+        {dialStepper !== null && (
+          <div className="hidden shrink-0 sm:block" data-kanban-metis-dial>
+            {dialStepper}
+          </div>
+        )}
+
         <div className="ml-auto flex shrink-0 items-center gap-1">
           <Button
             variant="outline"
@@ -305,7 +343,22 @@ export function KanbanMetisPanel({ boardId, boardName }: KanbanMetisPanelProps) 
         </div>
       </header>
 
-      <CollapsibleContent>{body()}</CollapsibleContent>
+      <CollapsibleContent>
+        {dialStepper !== null && (
+          <div
+            // Label and control together at the START of the row: the app's floating button docks
+            // over the right edge on a phone and would cover the plus.
+            className="flex items-center gap-3 border-b border-border px-3 py-1.5 sm:hidden"
+            data-kanban-metis-dial-phone
+          >
+            <span className="text-xs text-muted-foreground">
+              {t('kanban.metis.dial.phoneLabel', { defaultValue: 'At once' })}
+            </span>
+            {dialStepper}
+          </div>
+        )}
+        {body()}
+      </CollapsibleContent>
     </Collapsible>
   );
 }

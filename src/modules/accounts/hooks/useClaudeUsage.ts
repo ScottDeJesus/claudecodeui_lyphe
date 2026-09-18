@@ -19,7 +19,7 @@ const USAGE_POLL_MS = 180_000;
  * the whole reading to the panel. The row holds the ONE instance, so the panel opening and
  * closing never starts or stops a poller.
  */
-export function useDescentUsage() {
+export function useClaudeUsage() {
   // The last reading the route answered with. Held for the same reason the account picture
   // is: `null` (not asked yet) and `{reachable:false}` (asked, no reading) are different
   // things to say, and neither of them is zero.

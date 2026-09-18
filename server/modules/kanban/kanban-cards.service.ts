@@ -287,11 +287,11 @@ export const kanbanCardsService = {
   /**
    * Adds one tick's token spend to a card's four build counters.
    *
-   * The board's "◎" cost chip renders these four columns, and they are written by nothing else —
-   * the telemetry watcher is the one caller, and it hands over a DELTA it derived from the delta
-   * between the session's transcript and the session row it already stored. Two Metis sessions can
-   * work one card over its life, so the accumulate is the whole point: a verb that SET the columns
-   * to its own totals would erase the earlier session's spend.
+   * The card face's token figure and the drawer's four-counter ledger render these columns. The
+   * import lands Descent's own values once; this is the only LIVE writer, and the telemetry watcher
+   * is its one caller, handing over a DELTA (the session's transcript against the row it stored last
+   * tick). Two Metis sessions can work one card over its life, so the accumulate is the whole point:
+   * a verb that SET the columns to its own totals would erase the earlier session's spend.
    *
    * A card that has gone away between the attribution read and this write is the same 404 every
    * other card verb answers, and the seam rolls the audit row back with it.

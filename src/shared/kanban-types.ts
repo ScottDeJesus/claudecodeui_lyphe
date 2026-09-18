@@ -51,8 +51,9 @@ export type KanbanBoard = {
    *  whole box shares cannot say that. */
   deepseekFlash: boolean;
   /** This board's own Metis dial: how many sessions it may run at once, clamped by the server to
-   *  `[0, 4]` at every read and every write. Zero is a real value and means the board spawns
-   *  NOTHING, so the panel draws it as a number rather than as an absence. */
+   *  `[0, KANBAN_CONCURRENCY_MAX]` at every read and every write — the ceiling reaches the client as
+   *  the driver reading's `concurrencyMax`, never as a copy here. Zero is a real value and means the
+   *  board spawns NOTHING, so the panel draws it as a number rather than as an absence. */
   concurrency: number;
   sortOrder: number;
   archived: boolean;
@@ -349,8 +350,8 @@ export type KanbanLessonLean = {
  * What one Metis session has spent, as the reader last counted it.
  *
  * One row per session, upserted as the session's transcript grows: the four counters are TOTALS,
- * never a delta, and `byteOffset` is how far into the transcript this reading consumed — the next
- * tick resumes there rather than re-counting a file that only ever gets longer.
+ * never a delta, and `byteOffset` is where the main transcript's read cursor stood at that write —
+ * recorded for the reader, never read back to resume.
  */
 export type KanbanSessionUsage = {
   sessionId: string;

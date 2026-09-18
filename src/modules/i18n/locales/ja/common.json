@@ -362,13 +362,26 @@
       "showEarlier": "以前のステップを表示",
       "openRow": "{{name}} のトランスクリプトを読む"
     },
+    "embed": {
+      "title": "埋め込み",
+      "empty": "このチャットにはまだ埋め込みがありません",
+      "placeholder": "埋め込むアドレス…",
+      "address": "埋め込むアドレス",
+      "pick": "表示する埋め込み",
+      "choose": "ページを選択…",
+      "custom": "アドレスを入力…",
+      "open": "ページを新しいタブで開く",
+      "rejected": "http:// または https:// のアドレスではありません"
+    },
     "open": "{{name}} を開く",
     "collapse": "折りたたむ",
     "dragHint": "どちらかの側へドラッグ",
     "pin": {
       "label": "このセッション",
       "title": "開いているチャットで作成されました"
-    }
+    },
+    "fullscreen": "全画面",
+    "exitFullscreen": "全画面を終了"
   },
   "applications": {
     "fabLabel": "アプリケーション",

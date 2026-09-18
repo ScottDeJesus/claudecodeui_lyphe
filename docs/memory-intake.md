@@ -9,12 +9,13 @@ it — the Memory tab's pane (`MemoryIntakePanel`) and the desktop chat gutter's
 [plan-runner.md](plan-runner.md) §"The runner card") — two rows (`MemoryCandidateRow` for a pending
 candidate, the read-only `MemoryApprovedRow` for one already filed) and two hooks: `useMemoryReview`,
 the write lifecycle both bodies share, and `useApprovedMemories`, which reads the filed list beside
-the provider's own queue. The barrel exports the provider, its hook, `MemoryIntakePanel` and
-`MemoryWidgetBody`. The server half — the four routes, the read/write contracts, the failure
-vocabulary — is the native module this page describes in §"The native module"; the proxy's own
-memory path is no longer called from `src/` (what remains on the proxy is the accounts and usage
-surface [descent-proxy.md](descent-proxy.md) describes). The shapes on the wire are read from their
-declarations, not from a copy here (see §"Where the shapes live").
+the provider's own queue. The pane also mounts `LessonReviewList`, a section of its own beneath the
+queue (§"What the panel says"); it is the pane's alone, so the barrel does not export it. The barrel
+exports the provider, its hook, `MemoryIntakePanel` and `MemoryWidgetBody`. The server half — the four routes, the read/write contracts, the failure
+vocabulary — is the native module this page describes in §"The native module"; nothing in `src/` is
+served by a proxy any more. The accounts and usage reads are the sibling module's, documented at
+[accounts.md](accounts.md). The shapes on the wire are read from their declarations, not from a copy
+here (see §"Where the shapes live").
 
 **One provider, one poller.** `App.tsx` mounts `MemoryIntakeProvider` inside `ProtectedRoute`, so
 the queue is never asked for against the login screen. The provider holds the READING alone: four
@@ -32,7 +33,9 @@ carries the pending count. The strip's built-in tabs are icon-only, so that coun
 Verve's `.vv-tabs__count` pill — `Tabs` draws that for word tabs only. The glyph wears a bare accent
 dot instead, and the number is spelled out in the tab's `title` (`Memory (2)`), which is what
 anything reading this strip's count reads. Both are absent below 1: a queue that has just been
-emptied leaves a plain glyph rather than a zero nobody needs to read.
+emptied leaves a plain glyph rather than a zero nobody needs to read. That count is the memory
+queue's alone (`pendingCount` in the provider): a staged lesson, though the pane now lists it,
+neither adds to it nor keeps the tab on the strip.
 `useWorkspaceTabGates(activeTab)` is the one place the rule lives; `ProjectSidebarRegion` (which
 hands the strip its props), `WorkspaceMain` and `ProjectCommandPalette` all read it, so the strip,
 the pane and the palette cannot disagree about whether the tab exists.
@@ -85,17 +88,43 @@ a spinner, the second is words.
 ## What the panel says
 
 A header carrying *Memory intake* and, when there is a picture at all, a neutral `N pending` badge.
-Below it, one of four things:
+Below it, ONE `ScrollArea` for the whole tab, holding two sections: the memory queue, then the
+lessons. The queue draws one of four things:
 
-| The provider holds | The panel draws |
+| The provider holds | The queue draws |
 |---|---|
 | `null` — nothing asked yet | a `Spinner` reading *reading…* |
 | `reachable: false` | *The memory queue is not reachable right now.* — never *All filed* |
 | a picture with no rows | *All filed* / *Nothing is waiting for review.* |
-| a picture with rows | one `MemoryCandidateRow` each, in the server's own order, in a `ScrollArea` |
+| a picture with rows | one `MemoryCandidateRow` each, in the server's own order |
+
+The first three are blocks of their own height, not the pane's: a state that filled the pane would
+push the lessons below the fold on the very visit where the queue has nothing to show.
 
 The badge is drawn only on `reachable === true`. Stating "0 pending" above *The memory queue is not
 reachable* would have the panel contradict itself in two adjacent lines.
+
+**Beneath the queue, the lessons.** `LessonReviewList` is a SECTION of this tab — an `h3` under the
+panel's `h2`, in the queue's own `max-w-2xl` column — and neither a third tab nor a second provider.
+`MemoryIntakePanel` mounts it after the queue, inside the same scroll, whatever the queue holds, and
+it draws its own four states: reading, could not be read, none staged, and the rows. The lifecycle —
+the staged list, the one lesson opened whole, and the two reviews — is `useLessonReview`
+(`hooks/useLessonReview.ts`), shaped like `useMemoryReview` one section over; it holds no interval of
+its own, reading on mount and again after every write. Its badge reads `N staged` against the list it
+read, or `N+ staged` when that read landed at the route's own ceiling (500 rows) — the most the client
+can honestly claim without a total from the server. Its docstring carries the row and state design.
+The lessons themselves — the store and its routes — belong to the board: [kanban.md](kanban.md)
+§"The lessons lane".
+
+**Its two verbs are the review itself.** `useLessonReview` reads the staged list on mount and again
+after every write, then drives one write per lesson through `api.kanban.approveLesson` /
+`rejectLesson` — `POST /api/kanban/lessons/:id/approve` and `…/reject` — which is the whole of the
+REVIEW surface: the store, the staging door and the three read tools are the board's, and only the
+person's two verdicts are answered here. Approving is what puts a lesson in the index a Metis's
+`list_actionable` reads; rejecting discards the proposal. Both are refused before the credential
+check on the board's own narrow mount (`kanbanMetisSecretGuard`,
+`server/modules/kanban-metis/kanban-metis.routes.ts`), because reviewing is a person's act and which
+credential arrived is not the question.
 
 ## One row
 
@@ -118,10 +147,33 @@ badge is the blast mark and the only guard on the one target that reaches every 
 project and takes no size cap; its `title` says so. There is no confirmation dialog anywhere here:
 expanding to read IS the deliberate step.
 
+**The five targets, and what each is capped at.** `memory-caps.ts::MEMORY_CAPS` is the one home for
+the numbers, keyed by file:
+
+| Target | Capped at | Why |
+|---|---|---|
+| `memory` (a project's `MEMORY.md`) | 200 lines, 250 chars per line | it is an INDEX of one-line router pointers, so both dimensions are real |
+| `topic` (the note it points at) | nothing measured | the shed the index points AT — length there is the point |
+| `rules` (the RULES.md shelf) | 60 lines, 2,000 total chars | `hooks/load_main_shelves.py` injects each shelf whole on every SessionStart, and 60 / 2,000 is the budget each shelf's own header states |
+| `requirements` (the REQUIREMENTS.md shelf) | 60 lines, 2,000 total chars | the same, the two shelves split by subject rather than by size |
+| `claude` (global `CLAUDE.md`) | nothing measured here | its fences are elsewhere and deliberate — the 4,000-character `body` bound every candidate passes at staging, and the panel's own **global** warning |
+
+A per-line budget belongs to exactly one file because a memory is PROSE and markdown prose is one long
+line per paragraph: a per-line budget on `topic` or `claude` would refuse this lane's own happy path.
+An entry that measures nothing produces no refusal, and fail-CLOSED applies only where a budget exists
+— which here is absolute, since this predicate is compiled into the module, so there is no load that
+could fail and no path on which a budgeted file is written unmeasured. The numbers and the ratchet are
+PORTED from `~/.claude/hooks/enforce_memory_limits.py` (the predicate that guards a session's own
+`MEMORY.md` edits, under the same lockstep `MEMORY_MAX_LINES=200` / `MEMORY_MAX_LINE_CHARS=250`), so
+change a number in one and change the other in the same diff — the rule `store_memory_caps.py` states
+of itself. Only the wording is ours: each refusal names the real file, the real number and a remedy
+that exists, because that text becomes the candidate's recorded refusal — the words a person reads to
+decide what to trim.
+
 Expanded, the row shows the body in a `<pre>` that wraps, then *Why* (`rationale`) and *Index line*
 (`indexLine`) where the server sent them. Every one of those strings is operator-authored free text and
 reaches the DOM as a text node — never as markdown and never as markup, however much like markdown
-it looks, which is how the proxy's own panel drew it too.
+it looks.
 
 Three answers are not a body, and each gets its own sentence: a read that could not be made says
 *The memory queue is not reachable right now.* and is retried on the next expand; a `candidate: null` and a
@@ -150,8 +202,8 @@ disabled while any write is in flight, and each raises one toast:
 what to trim; the card stays PENDING, the text is held per id for this tab's next paint, and the
 refresh that follows also picks up the copy the server recorded on the row for every other tab. A
 generic sentence in its place would leave the person with a pending card and no reason. That text
-reaches the screen untouched — the rule [descent-proxy.md](descent-proxy.md) §"The rules that bite",
-rule 8 states for the proxy, which the native module keeps.
+reaches the screen untouched: a refusal is the module's own plain English, the same rule the account
+switcher's writes follow ([accounts.md](accounts.md) §"The two writes").
 
 Two presses are handled by identity, not by a flag. The in-flight guard is a ref, read
 synchronously, because `busyId` is a render value and lands too late to stop a second press in the
@@ -200,22 +252,21 @@ no tally of its own for this table — only the count this verb reports back —
 ([kanban.md](kanban.md) §"Importing from Descent").
 
 The four routes are `GET /`, `GET /:candidateId`, `POST /:candidateId/approve` and
-`POST /:candidateId/reject` — the same four contracts this page and `descent-proxy.md` describe, and
+`POST /:candidateId/reject` — the four contracts this page describes, and
 a refusal answers the same shape a person reads: `{ error: "<words>" }`, a thrown `MemoryRefusal`
 caught at the route rather than the app's `{ success: false, error: { code, message } }` envelope. A
-malformed id (`/^[A-Za-z0-9_-]{1,64}$/`) is refused at the door on all four, matching the proxy's own
-fence.
+malformed id (`/^[A-Za-z0-9_-]{1,64}$/`) is refused at the door on all four.
 
 **The client points here, and only here.** `MemoryIntakeContext`, `useApprovedMemories`,
 `useMemoryReview` and the row all read and write through `api.memory` in `src/shared/api.ts`, whose
-five calls are the four routes below. Nothing in `src/` calls the proxy's memory path any more; the
-proxy's remaining surface is the accounts and usage reads `descent-proxy.md` describes.
+five calls are the four routes below. Nothing in `src/` calls a proxy any more, for this lane or any
+other: the accounts and usage reads are `server/modules/accounts/` ([accounts.md](accounts.md)).
 
 ## Where the shapes live
 
 `MemoryCandidateLean`, `MemoryCandidateFull`, `MemoryPending`, `MemoryCandidateRead` and
-`MemoryReviewOutcome` are declared in `src/shared/types.ts` § DESCENT MEMORY INTAKE, mirroring
-`server/shared/types.ts` § DESCENT CONTRACTS field for field. The server file is the source and
+`MemoryReviewOutcome` are declared in `src/shared/types.ts` § MEMORY INTAKE CONTRACTS, mirroring
+`server/shared/types.ts` § MEMORY INTAKE CONTRACTS field for field. The server file is the source and
 carries the per-field documentation; a change to either shape belongs in both files at once. The
 native module (§"The native module") imports the server-side declarations too — `MemoryCandidateFull`
 and `MemoryCandidateLean` are read from `server/shared/types.ts`, never re-declared beside
@@ -230,11 +281,14 @@ nothing — so a list can mark the memories the open chat proposed. Both lists c
 one `list(status)` verb: `GET /api/memory?status=approved` reads the filed list, and any other status
 reads the pending queue.
 
-Every string is in `src/modules/i18n/locales/en/common.json` under `memory.*`, with the tab's own
-label at `tabs.memory`. English only, deliberately: the other ten locales fall back to `en`
-(`i18n/config.ts`), which is a readable English word rather than a missing key.
+Every string but the lessons section's is in `src/modules/i18n/locales/en/common.json` under
+`memory.*`, with the tab's own label at `tabs.memory`. English only, deliberately: the other ten
+locales fall back to `en` (`i18n/config.ts`), which is a readable English word rather than a missing
+key. The lessons section's `memory.lessons.*` strings are in no locale file: `LessonReviewList`
+carries each one's English as the `defaultValue` of its own `t(...)` call and looks up only
+`memory.reading`, which it shares with the queue.
 
-The desktop chat gutter's own strings are the one exception. `gutters.memory.*` — which
+The desktop chat gutter's own strings are the opposite case. `gutters.memory.*` — which
 `MemoryWidgetBody` draws — and the `gutters.pin.*` marker it shares with the Runner widget are
 written in all eleven locales, per the operator's instruction for this plan.
 
@@ -251,7 +305,7 @@ written in all eleven locales, per the operator's instruction for this plan.
 - **A read that failed is retried, a read that succeeded is not.** `readFailed` leaves the card
   counting as "never asked", so the next expand tries again; a body already read is kept for the
   panel's life, including across a refresh that re-renders the row.
-- **The panel is one flat list, in the server's order.** No grouping by target or project, no filter,
+- **The queue is one flat list, in the server's order.** No grouping by target or project, no filter,
   no search — a queue that outgrows one screen is scrolled. Nothing here paginates.
 - **`useBrowserUseEnabled` is three copies of one boolean.** Not this tab's, but it shares the hook:
   it is a per-call-site `useState` + fetch rather than a context, so the three `useWorkspaceTabGates`

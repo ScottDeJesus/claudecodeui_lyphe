@@ -1,15 +1,16 @@
-import { ActivityIcon, BotIcon, BrainIcon, type LucideIcon } from 'lucide-react';
+import { ActivityIcon, BotIcon, BrainIcon, GlobeIcon, type LucideIcon } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ComponentType, ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { SubagentWidgetBody, useClaimSubagentStrip, useSubagentWidgetCount } from '@/modules/chat';
+import { EmbedWidgetBody, SubagentWidgetBody, useClaimSubagentStrip, useEmbedWidgetState, useSubagentWidgetCount } from '@/modules/chat';
 import { GUTTER_SIDES, useGutterPlacements, widgetsOn } from '@/modules/chat-gutters/hooks/useGutterPlacements';
 import { GutterColumn } from '@/modules/chat-gutters/GutterColumn';
 import { GutterWidgetFrame } from '@/modules/chat-gutters/GutterWidgetFrame';
 import { MemoryWidgetBody, useMemoryIntake } from '@/modules/memory-intake';
 import { RunnerWidgetBody, useRunnerRuns } from '@/modules/plan-runner';
 import type { GutterSide, GutterWidgetId } from '@/shared/types';
+import { otherOverlayHoldsEscape } from '@/shared/ui/overlayEscape';
 import { cn } from '@/shared/utils';
 
 /**
@@ -36,8 +37,9 @@ const GUTTER_MIN_PX = 300;
 const MIN_REGION_PX = CHAT_COLUMN_PX + 2 * (GUTTER_MIN_PX + GUTTER_GAP_PX);
 
 /**
- * The desktop chat's side gutters: the runner, memory and subagents widgets beside the transcript,
- * each of them draggable into either side's stack, at any place in it.
+ * The desktop chat's side gutters: the runner, memory, subagents and embed widgets beside the
+ * transcript, each of them draggable into either side's stack, at any place in it, and any one of
+ * them able to take the whole viewport for as long as the reader wants it.
  *
  * MOUNTED AROUND THE CHAT, NEVER OVER IT. The chat cell is the grid's first child at every width —
  * the grid is drawn whether or not the gutters are — so crossing the threshold adds and removes the
@@ -73,6 +75,7 @@ export function ChatGutterLayout({
   const { count: runnerCount } = useRunnerRuns();
   const { pendingCount } = useMemoryIntake();
   const subagentCount = useSubagentWidgetCount(sessionId);
+  const { count: embedCount, newest: newestEmbed, known: embedsKnown } = useEmbedWidgetState(sessionId);
 
   const rootRef = useRef<HTMLDivElement | null>(null);
 
@@ -95,6 +98,56 @@ export function ChatGutterLayout({
   // none. One value for the whole layout, so exactly one place is ever lit, and it is the one under
   // the pointer: a place that lights anywhere else would promise a landing the drop would not make.
   const [hoveredState, setHovered] = useState<{ side: GutterSide; index: number } | null>(null);
+
+  // WHICH gutter widget has the whole viewport, or null. One value rather than a flag per card, so two
+  // fullscreen WIDGETS is a state this layout cannot represent. It is not the whole app's answer: a
+  // transcript embed card keeps its own fullscreen flag (`WidgetFrame`), so a card and a widget CAN
+  // both be fullscreen at once — two identical panels on one layer, the later in the document on top,
+  // and one Escape leaving both. Harmless, and recorded here so no one reasons from "only one". It is
+  // not a placement either: fullscreen is a thing the reader is doing now, not an arrangement to keep.
+  const [fullscreen, setFullscreen] = useState<GutterWidgetId | null>(null);
+
+  // Escape leaves fullscreen, in the capture phase, and stops there: the card covers the viewport, so
+  // nothing behind it should act on the same press. What is IN FRONT of it keeps the key: a modal
+  // dialog (the card sits under the dialog layer) or a panel that owns Escape — the widget's own
+  // dropdown, the composer's menu — so while one is up this stands down (`otherOverlayHoldsEscape`);
+  // stopping propagation cannot win that race, because they listen on the same window capture stage. The listener exists only while something is fullscreen.
+  useEffect(() => {
+    if (fullscreen === null) return undefined;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape' || otherOverlayHoldsEscape()) return;
+      event.stopPropagation();
+      setFullscreen(null);
+    };
+    window.addEventListener('keydown', onKeyDown, true);
+    return () => window.removeEventListener('keydown', onKeyDown, true);
+  }, [fullscreen]);
+
+  // A NEWLY NAMED address opens the Embed widget, once. The whole point of the embed fence is that
+  // the model can put a page in front of the reader, and a widget that stayed collapsed would make it
+  // a page nobody sees. It writes the same placement a press on the header writes; there is no second
+  // way for a widget to be open.
+  //
+  // THE SIGNAL IS "THE NEWEST ADDRESS CHANGED, IN THIS CHAT, AFTER ITS LIST WAS KNOWN" — and each of
+  // the three clauses is a way the obvious version fought the reader:
+  //  - a COUNT is the wrong measure: loading older history grows it, and would open the widget for
+  //    addresses nobody just named;
+  //  - the baseline is PER CHAT: this layout stays mounted across a chat switch, and comparing one
+  //    chat's addresses with another's re-opened a widget the reader had shut, writing it open to the
+  //    server (Athena's review);
+  //  - and only once the chat's list has ARRIVED (`known`): the arriving chat publishes a commit after
+  //    the layout re-renders with its id, so without this its whole history read as brand new.
+  // A chat opened with addresses already in it therefore opens the widget only if its remembered
+  // placement says so; the next address the model names is what opens it.
+  const embedsSeen = useRef<{ sessionId: string | null; newest: string | null } | null>(null);
+  const embedOpen = placements.embed.open;
+  useEffect(() => {
+    if (!embedsKnown) return;
+    const seen = embedsSeen.current;
+    const fresh = seen !== null && seen.sessionId === sessionId && newestEmbed !== null && newestEmbed !== seen.newest;
+    embedsSeen.current = { sessionId, newest: newestEmbed };
+    if (fresh && wide && !embedOpen) toggleWidget('embed');
+  }, [sessionId, embedsKnown, newestEmbed, wide, embedOpen, toggleWidget]);
 
   useEffect(() => {
     const root = rootRef.current;
@@ -122,6 +175,9 @@ export function ChatGutterLayout({
       if (!next) {
         setDragging(null);
         setHovered(null);
+        // A fullscreen card whose column is about to be unmounted would otherwise leave the flag set
+        // and re-open over the chat the moment the region widened again.
+        setFullscreen(null);
       }
     });
     observer.observe(root);
@@ -173,7 +229,14 @@ export function ChatGutterLayout({
   // only read what they returned.
   const widgets: Record<
     GutterWidgetId,
-    { title: string; count: number; icon: LucideIcon; Body: ComponentType<{ sessionId: string | null }> }
+    {
+      title: string;
+      count: number;
+      icon: LucideIcon;
+      Body: ComponentType<{ sessionId: string | null }>;
+      /** Set by a widget whose body is itself a frame: the card gives it its whole inside. */
+      flush?: boolean;
+    }
   > = {
     runner: {
       title: t('gutters.runner.title'),
@@ -193,10 +256,19 @@ export function ChatGutterLayout({
       icon: BotIcon,
       Body: SubagentWidgetBody,
     },
+    embed: {
+      title: t('gutters.embed.title'),
+      count: embedCount,
+      icon: GlobeIcon,
+      Body: EmbedWidgetBody,
+      // The one widget whose body is a live iframe: it takes the card's whole inside, and it is
+      // where the fullscreen switch earns its keep — a dashboard in a 300px column is a thumbnail.
+      flush: true,
+    },
   };
 
   const renderWidget = (widget: GutterWidgetId): ReactNode => {
-    const { title, count, icon, Body } = widgets[widget];
+    const { title, count, icon, Body, flush } = widgets[widget];
 
     return (
       <GutterWidgetFrame
@@ -208,6 +280,9 @@ export function ChatGutterLayout({
         onToggle={() => toggleWidget(widget)}
         onDragStart={setDragging}
         onDragEnd={endDrag}
+        fullscreen={fullscreen === widget}
+        onToggleFullscreen={() => setFullscreen((current) => (current === widget ? null : widget))}
+        flush={flush}
       >
         {/* Its own boundary, inside its own frame: a body that throws costs this gutter and leaves
             the chat and the other widgets standing. */}

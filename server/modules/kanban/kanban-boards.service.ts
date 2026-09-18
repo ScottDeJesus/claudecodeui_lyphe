@@ -129,7 +129,7 @@ export const kanbanBoardsService = {
    *
    * `concurrency` is CLAMPED on the way in — `[0, KANBAN_CONCURRENCY_MAX]`, through the one clamp
    * the read side uses too — so the number this returns is the number every later tick compares
-   * against, and a `99` is stored as the `4` it was read back as rather than as a value the board
+   * against, and a `99` is stored as the ceiling it was read back as rather than as a value the board
    * would fan out to. Zero is a real setting: it means the board spawns nothing.
    */
   updateBoard(

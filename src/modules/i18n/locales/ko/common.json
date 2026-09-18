@@ -362,13 +362,26 @@
       "showEarlier": "이전 단계 표시",
       "openRow": "{{name}}의 트랜스크립트 읽기"
     },
+    "embed": {
+      "title": "임베드",
+      "empty": "이 대화에는 아직 임베드가 없습니다",
+      "placeholder": "임베드할 주소…",
+      "address": "임베드할 주소",
+      "pick": "표시할 임베드",
+      "choose": "페이지 선택…",
+      "custom": "주소 입력…",
+      "open": "새 탭에서 페이지 열기",
+      "rejected": "http:// 또는 https:// 주소가 아닙니다"
+    },
     "open": "{{name}} 열기",
     "collapse": "접기",
     "dragHint": "양쪽 중 한쪽으로 드래그",
     "pin": {
       "label": "이 세션",
       "title": "열어 둔 채팅에서 생성됨"
-    }
+    },
+    "fullscreen": "전체 화면",
+    "exitFullscreen": "전체 화면 종료"
   },
   "applications": {
     "fabLabel": "애플리케이션",

@@ -145,8 +145,12 @@ const query = (params: Record<string, QueryValue>): string => {
  * (`{ error: { code, message, details } }`). Both reach the reader through the same toast, and an
  * object rendered as a string is `[object Object]` — a sentence that says nothing and buries the
  * one the server wrote.
+ *
+ * Exported for the callers that read a REFUSAL out of a body they had to inspect themselves —
+ * `readApiJson` is the whole story only where the status is not the caller's business, and a
+ * 422 whose words are the entire point is not.
  */
-function errorMessage(value: unknown): string | null {
+export function errorMessage(value: unknown): string | null {
   if (typeof value === 'string') return value.trim() === '' ? null : value;
   if (value !== null && typeof value === 'object') {
     const message = (value as { message?: unknown }).message;
@@ -236,6 +240,17 @@ const readKanbanMetisTranscript = async (sessionId: string): Promise<SubagentTra
   readApiJson<SubagentTranscriptResult>(
     await get(`/api/kanban-metis/sessions/${encodeURIComponent(sessionId)}/transcript`),
   );
+
+/**
+ * The lesson index's ceiling, as the route states it (`learning.routes.ts` — a larger `limit` is
+ * REFUSED there, not clamped, so this is as much of the corpus as one read can carry).
+ *
+ * It is exported because the index answers with rows and no total: a caller that receives exactly
+ * this many rows cannot tell a corpus of this size from a cut one, and the only honest thing to say
+ * about the list is then "at least this many". The reader that says it lives in
+ * `memory-intake/hooks/useLessonReview.ts`; the number lives here, beside the call that sends it.
+ */
+export const LESSON_LIST_LIMIT = 500;
 
 // ─── API endpoints ──────────────────────────────────────────────────────────
 // Every `/api/...` path the frontend talks to is declared here; components
@@ -703,6 +718,28 @@ export const api = {
     // and one card's plan cost, which is `null` for a card whose plan column is empty.
     vitals: (id: string) => get(`/api/kanban/boards/${encodeURIComponent(id)}/vitals`),
     cardPlanCost: (id: string) => get(`/api/kanban/cards/${encodeURIComponent(id)}/plan-cost`),
+
+    // The lessons lane's REVIEW surface (docs/memory-intake.md; the store itself is
+    // docs/kanban.md's). Every call here is a person's: STAGING a lesson is the agent's, over MCP,
+    // and this app never writes one.
+    //
+    // `lessons` asks for `staged` and nothing else, at the route's own ceiling rather than its
+    // default of a hundred — a review list that quietly stops at a hundred while the strip above it
+    // counts the whole estate is two screens disagreeing about one number. The corpus a session
+    // scans is the server's own `approvedIndex`, never a reading this client makes. `lesson` is the
+    // ONE route here that carries a body: the list is lean by contract, so a row is read whole only
+    // when somebody opens it.
+    //
+    // Both reviews are read from the RAW response, for the reason `memory.approve` above is: a 422
+    // is a VERDICT — the server's own sentence naming the state the lesson is actually in — and a
+    // 404 is a lesson reviewed elsewhere and now nothing. Neither is a failed request a caller
+    // should have to dig a status out of an exception for.
+    lessons: () => get(`/api/kanban/lessons?status=staged&limit=${LESSON_LIST_LIMIT}`),
+    lesson: (lessonId: string) => get(`/api/kanban/lessons/${encodeURIComponent(lessonId)}`),
+    approveLesson: (lessonId: string) =>
+      post(`/api/kanban/lessons/${encodeURIComponent(lessonId)}/approve`, {}),
+    rejectLesson: (lessonId: string) =>
+      post(`/api/kanban/lessons/${encodeURIComponent(lessonId)}/reject`, {}),
     laneCards: (id: string, statuses: string[], cursor?: string | null, limit = 50) =>
       get(`/api/kanban/boards/${encodeURIComponent(id)}/cards?status=${encodeURIComponent(statuses.join(','))}&limit=${limit}${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`),
     createCard: (id: string, body: Record<string, unknown>) => post(`/api/kanban/boards/${encodeURIComponent(id)}/cards`, body),

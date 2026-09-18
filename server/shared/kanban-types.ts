@@ -125,16 +125,17 @@ export const KANBAN_SORT_ORDER_MIN_GAP = 1e-6;
 /**
  * How many Metis sessions one board may run at once — the dial's ceiling, and its ONE home.
  *
- * `[0, 4]` is Descent's own range (`~/.claude/descent/pm_capacity.py:196-202`, `MAX_AUTONOMOUS_
- * SESSIONS`), and the ceiling exists for the outcome rather than for the number: two children of one
- * board share a cwd (`~/.claude/kanban-metis/<boardId>/`) and claim cards against each other, so a
- * board runs in parallel only as far as its owner says. Zero is inside the range and means the dial
- * is OFF — a board that is never spawned for.
+ * `[0, 6]` (operator ruling 2026-09-18: the panel's dial moves 1 to 6), and the ceiling exists for
+ * the outcome rather than for the number: two children of one board share a cwd
+ * (`~/.claude/kanban-metis/<boardId>/`) and claim cards against each other through the lease CAS, so
+ * a board runs in parallel only as far as its owner says. Zero is inside the range and means the dial
+ * is OFF — a board that is never spawned for; the panel's stepper never sets it, a PATCH still may.
  *
- * Consumers: `kanban-boards.db.ts` (the row mapper), `kanban-boards.service.ts` (a PATCH) and
- * `metis-driver.service.ts` (the tick's comparison, and the reading the panel shows).
+ * Consumers: `kanban-boards.db.ts` (the row mapper), `kanban-boards.service.ts` (a PATCH),
+ * `metis-driver.service.ts` (the tick's comparison) and the driver route, which hands it to the panel
+ * as `concurrencyMax` so the client's stepper stops where the clamp does without a second copy.
  */
-export const KANBAN_CONCURRENCY_MAX = 4;
+export const KANBAN_CONCURRENCY_MAX = 6;
 
 /**
  * What a board's dial reads as until something moves it — the column's own `DEFAULT 1`, quoted here
@@ -518,10 +519,10 @@ export type KanbanLessonLean = {
  * What one Metis session has spent, as the reader last counted it.
  *
  * One row per session, upserted as the session's transcript grows: the four token counters are
- * TOTALS for the session, never a delta, and `byteOffset` is how far into the transcript this
- * reading consumed — which is what lets the next tick resume instead of re-counting a file that only
- * ever gets longer. `boardId` and `cardId` are provenance and may be null: a session whose card has
- * been deleted keeps its row.
+ * TOTALS for the session, never a delta — the watcher subtracts the stored row from what it counted
+ * now — and `byteOffset` is where the main transcript's cursor stood at that write, recorded and never
+ * read back to resume. `boardId` and `cardId` are provenance and may be null: a session whose card
+ * has been deleted keeps its row.
  *
  * Consumers: `kanban-learning.db.ts` (the upsert and the by-session read),
  * `metis-telemetry.service.ts` (the writer), the vitals and cost reads, and

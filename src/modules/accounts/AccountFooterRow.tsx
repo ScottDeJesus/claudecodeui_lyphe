@@ -2,8 +2,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { ACCOUNT_PANEL_ID, AccountPopover } from '@/modules/accounts/AccountPopover';
 import { DeepseekBalanceReadout } from '@/modules/accounts/DeepseekBalanceReadout';
-import { useDescentAccounts } from '@/modules/accounts/hooks/useDescentAccounts';
-import { useDescentUsage } from '@/modules/accounts/hooks/useDescentUsage';
+import { useClaudeAccounts } from '@/modules/accounts/hooks/useClaudeAccounts';
+import { useClaudeUsage } from '@/modules/accounts/hooks/useClaudeUsage';
 import { useDeepseekBalance } from '@/modules/accounts/hooks/useDeepseekBalance';
 import { accountInitials } from '@/modules/accounts/utils/accountInitials';
 import { formatWindowCountdown, windowPercent, windowTone } from '@/modules/accounts/utils/usageWindows';
@@ -15,7 +15,7 @@ type GlanceWindow = { key: string; short: string; full: string };
 
 /**
  * The windows the collapsed row shows, in the order it shows them. `short` is the fallback for
- * a window Descent gives no reset time for — normally the label is the countdown to that reset.
+ * a window the meter gives no reset time for — normally the label is the countdown to that reset.
  * `full` is the accessible name, because "5h" read aloud is not a window anyone knows.
  */
 const GLANCE_WINDOWS: GlanceWindow[] = [
@@ -35,14 +35,14 @@ type AccountFooterRowProps = {
  *
  * Used by the sidebar module twice, and never both at once: SidebarFooter renders the full
  * row above Settings, and SidebarCollapsed renders it as the rail's avatar. That mutual
- * exclusion is what keeps ONE Descent poller in the app — mounting this in the footer's
+ * exclusion is what keeps ONE account poller in the app — mounting this in the footer's
  * desktop and mobile blocks separately would double the read rate D7 caps.
  */
 export function AccountFooterRow({ collapsed = false, onExpand }: AccountFooterRowProps) {
-  const { data: accounts, switchTo, capture, busy, error, clearError } = useDescentAccounts();
-  const { data: usage, refresh: refreshUsage } = useDescentUsage();
-  // A different account from the one above, from a route that never touches Descent — held here
-  // so the row and the panel share their ONE reading, and so neither is hidden by a Descent outage.
+  const { data: accounts, switchTo, capture, busy, error, clearError } = useClaudeAccounts();
+  const { data: usage, refresh: refreshUsage } = useClaudeUsage();
+  // A different account from the one above, from a route of its own — held here so the row and
+  // the panel share their ONE reading, and so neither is hidden when the account lane cannot answer.
   const { data: balance, refresh: refreshBalance } = useDeepseekBalance();
 
   // Whether the account panel is showing. Not derivable from the picture: the picture says
@@ -114,7 +114,7 @@ export function AccountFooterRow({ collapsed = false, onExpand }: AccountFooterR
   const picture = accounts?.reachable ? accounts : null;
 
   // The two windows worth a glance, as bars. `weekly_scoped:*` plans are deliberately left out:
-  // the row has space for two, and the panel below carries every window Descent reports.
+  // the row has space for two, and the panel below carries every window the provider reports.
   //
   // A window is drawn only when it is actually in the reading — an absent one is not a bar at
   // zero. `percent: null` DOES get a bar: the Meter draws an empty track and an em-dash for it,
@@ -151,8 +151,8 @@ export function AccountFooterRow({ collapsed = false, onExpand }: AccountFooterR
   };
 
   // "Add another account": save the login that is live NOW before the CLI can replace it, then
-  // run the provider's own login. Descent's capture also re-points its ACTIVE account to
-  // whatever it just saved (`server_api_accounts.py:101`), which is why the toast says so.
+  // run the provider's own login. The capture also re-points the ACTIVE account at whatever it
+  // just saved (`accounts.routes.ts`), which is why the toast says so.
   const handleAddAccount = useCallback(async () => {
     loginCompletedRef.current = false;
     await capture();
@@ -160,10 +160,10 @@ export function AccountFooterRow({ collapsed = false, onExpand }: AccountFooterR
   }, [capture]);
 
   // Closing the modal saves again ONLY when the login command exited CLEANLY. A capture is
-  // never a no-op at the far end — it rewrites both slot files, appends an audit row and
-  // repaints every Descent client — so neither a modal opened and closed without signing in
-  // NOR a login the operator cancelled (which exits non-zero, and still fires `onComplete`)
-  // churns Descent's store for a login that did not change.
+  // never a no-op at the far end — it rewrites both slot files and moves the active mark — so
+  // neither a modal opened and closed without signing in NOR a login the operator cancelled
+  // (which exits non-zero, and still fires `onComplete`) churns the store for a login that did
+  // not change.
   const handleLoginClose = useCallback(async () => {
     setLoginOpen(false);
     if (!loginCompletedRef.current) return;
@@ -228,7 +228,7 @@ export function AccountFooterRow({ collapsed = false, onExpand }: AccountFooterR
               readings live: the windows above are what is LEFT of this Claude account, and this
               line is what is LEFT of the DeepSeek one that pays for builds. It draws while the
               meters are unknown — the two sources fail independently, and this is the one that
-              still answers when Descent does not. */}
+              still answers when the account lane does not. */}
           <span className="mt-1 block">
             <DeepseekBalanceReadout balance={balance} variant="inline" />
           </span>
