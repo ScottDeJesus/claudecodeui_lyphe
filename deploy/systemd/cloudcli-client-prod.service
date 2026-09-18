@@ -1,5 +1,5 @@
 # DEPLOY:
-#   sudo cp /home/lyphe/.claude/claudecodeui_lyphe/deploy/systemd/cloudcli-client-prod*.{service,timer} /etc/systemd/system/
+#   deploy/systemd/install.sh cloudcli-client-prod.service cloudcli-client-prod-build.service cloudcli-client-prod-build.timer
 #   sudo systemctl daemon-reload && sudo systemctl enable --now cloudcli-client-prod.service cloudcli-client-prod-build.timer
 [Unit]
 Description=CloudCLI production client (vite preview of the built app, :5184 on the LAN and Tailscale; Docker bridges dropped)
@@ -10,12 +10,12 @@ StartLimitBurst=5
 
 [Service]
 Type=simple
-WorkingDirectory=/home/lyphe/.claude/claudecodeui_lyphe
+WorkingDirectory=__REPO__
 # The same .env as the dev client, so the preview proxies /api, /ws, /shell and /plugin-ws to the
 # same loopback API on :3011 and allows the same host names.
-EnvironmentFile=/home/lyphe/.claude/claudecodeui_lyphe/.env
+EnvironmentFile=__REPO__/.env
 Environment=NODE_ENV=production
-Environment=PATH=/home/lyphe/.claude/claudecodeui_lyphe/node_modules/.bin:/home/lyphe/.npm-global/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+Environment=PATH=__REPO__/node_modules/.bin:__HOME__/.npm-global/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 # Same exposure as :5183 — a login in front of a pty and the filesystem — so the Docker bridges are
 # dropped the same way, by interface. The watchdog re-asserts these rules every minute.
 ExecStartPre=+/bin/sh -c 'for i in docker0 br-+; do /usr/sbin/iptables -C INPUT -p tcp --dport 5184 -i $i -j DROP 2>/dev/null || /usr/sbin/iptables -I INPUT -p tcp --dport 5184 -i $i -j DROP; done'
@@ -23,11 +23,11 @@ ExecStartPre=+/bin/sh -c 'for i in docker0 br-+; do /usr/sbin/iptables -C INPUT 
 ExecStartPre=/bin/sh -c 'test -L .prod-client/current || scripts/prod-client-build.sh --force'
 # Vite 7 exits on stdin EOF, and systemd hands services /dev/null — the same never-ending stdin as
 # the dev client. --outDir names the symlink the build script swaps; every request re-resolves it.
-ExecStart=/bin/bash -c 'exec /home/lyphe/.claude/claudecodeui_lyphe/node_modules/.bin/vite preview --host 0.0.0.0 --port 5184 --strictPort --outDir .prod-client/current < <(sleep infinity)'
+ExecStart=/bin/bash -c 'exec __REPO__/node_modules/.bin/vite preview --host 0.0.0.0 --port 5184 --strictPort --outDir .prod-client/current < <(sleep infinity)'
 Restart=always
 RestartSec=5
 TimeoutStartSec=180
-User=lyphe
+User=__USER__
 
 [Install]
 WantedBy=multi-user.target

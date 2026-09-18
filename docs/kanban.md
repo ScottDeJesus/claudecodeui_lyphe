@@ -43,7 +43,7 @@ later change needs an explicit `ALTER TABLE` in `migrations.ts` beside the `sess
 | Table | What it holds |
 |---|---|
 | `kanban_boards` | A board: its name, the project it is ABOUT (`project_id` — never a lane filter, but no longer inert either: it resolves to the ONE `--add-dir` this board's Metis is given, and a board with a null `project_id` gives her none, so she works only inside her own session directory — §"A board's Metis, launched"), `autonomy` (the driver's governor — §"The driver"), `deepseek_flash` (the board's own switch — §"The two switches"), `concurrency` (the board's own Metis dial — §"The driver"), `sort_order`, `archived`, `descent_id`. |
-| `kanban_cards` | The card, every column of Descent's `ov_features` including the ones its own `_migrate` adds: title, `status` with a five-value CHECK, `priority` with a three-value CHECK, description, `closing_remarks`, `plan`, `body`, approval, `archived`, `sort_order`, the four token counters, both leases (`build_lease_at`/`build_owner`, `plan_lease_at`/`plan_owner`), and the timestamps. |
+| `kanban_cards` | The card, every column of Descent's `ov_features` including the ones its own `_migrate` adds: title, `status` with a five-value CHECK, `priority` with a three-value CHECK, description, `closing_remarks`, `plan`, `body`, approval, `archived`, `sort_order`, the four token counters (`build_tokens_in`, `_out`, `_cache_read`, `_cache_create` — accumulated by the token watcher, §"The token watcher"), both leases (`build_lease_at`/`build_owner`, `plan_lease_at`/`plan_owner`), and the timestamps. |
 | `kanban_card_tags` | The card/tag join. Descent's `ov_tags` IS a join table, so there is no tag entity here either: `(card_id, tag)` is the primary key and a tag exists only as a name attached to a card. |
 | `kanban_questions` | A card's questions: `text`, `multi`, `options` and `selected` as JSON text arrays, the free-text `other`, and `answered`. |
 | `kanban_issues` | Issues filed against a card, with `filed_at`, `resolved`, and who resolved it. |
@@ -54,7 +54,7 @@ later change needs an explicit `ALTER TABLE` in `migrations.ts` beside the `sess
 | `kanban_settings` | `key` / `value`. Exactly one key is live: `current_board`, the selected board — the reason boards are global (§"The panel"). |
 | `kanban_id_seq` | `prefix` / `next`. The id minting arithmetic and nothing else. |
 | `kanban_lessons` | The lesson STORE: what a build learned, staged for a person's review — `name`, `summary`, `body`, `trigger`, `kind` (`note` or `skill_draft`), `tags`, `status`, `source`, an optional `draft_path`. `card_id` is `ON DELETE SET NULL`, never CASCADE — a lesson OUTLIVES the card it was learned on. No CHECK on `status`, `kind` or `trigger`: Descent's lesson vocabulary grew a value twice, so the doors validate instead of a constraint. |
-| `kanban_session_usage` | What one Metis session has spent, read from its transcript: the per-session ledger behind the card's rolled-up token chips. `session_id` is the primary key — one row per session, upserted as the transcript grows — and `byte_offset` is how far the reader has consumed it, so a later tick resumes rather than re-counting. `board_id` and `card_id` are provenance and may be NULL. |
+| `kanban_session_usage` | What one Metis session has spent, read from its transcript: the per-session ledger behind the card's rolled-up token chips. `session_id` is the primary key — one row per session, upserted as the transcript grows — and the four counters are the session's running TOTALS, never a delta: the watcher subtracts the row it stored last tick from what it counted now (§"The token watcher"). `byte_offset` records where the MAIN transcript's read cursor stood at that write; the watcher resumes from its own in-memory cursors and never reads the column back. `board_id` and `card_id` are provenance and may be NULL — `card_id` is the last card this session's spend was attributed to, and a tick that finds none leaves it alone. |
 
 The ten indexes are all named `ix_kanban_*` so one query can count them:
 `cards_board_status` and `cards_board_updated` on the two lane orderings, `card_tags_tag` for a
@@ -109,9 +109,15 @@ names is deleted, and the same clause that unlabels a board when its project goe
 - **A lease is claimable when it is unclaimed, already the caller's, or STALE** — stale meaning the
   stamp is null, unparseable, or older than `KANBAN_LEASE_STALE_SECONDS` (**40**, Descent's own
   `DEFAULT_STALE_SECS`, written once in `server/shared/kanban-types.ts` and imported by every
-  consumer — the lease verbs, the card summaries, `claimableCount`, and the plan-runner module's
-  plans-archive sweep, which reads it through `plansHeldByLease` rather than a second staleness
-  rule of its own (§"The services")). A claim
+  TypeScript consumer — the lease verbs, the card summaries, `claimableCount`, and the plan-runner
+  module's plans-archive sweep, which reads it through `plansHeldByLease` rather than a second
+  staleness rule of its own (§"The services")). One reader outside this codebase MIRRORS the value
+  rather than importing it: `~/.claude/hooks/concurrency_arbiter/presence_resolve.py`'s
+  `KANBAN_LEASE_STALE_SECONDS`, which the arbiter's presence ladder reads against `kanban_cards`'
+  own lease columns to derive a `/pm` session's held card — a second copy of the SAME number is
+  the cost of a Python hook reading this table without a shared module, so a change here must be
+  carried there by hand (`concurrency_arbiter/OPERATOR.md` §"How a session's intent is resolved
+  (the ladder)"). A claim
   against a fresh foreign lease returns `{ granted: false }` with the current
   card — the ordinary answer, never an exception, and never an event: a refused claim writes
   nothing. Moving a card off `active` clears the build lease. The `leaseState` a `KanbanCardSummary`
@@ -204,6 +210,7 @@ moveCard(cardId, input: { status, afterId?, beforeId? }, context?) -> KanbanCard
 archiveCard(cardId, context?) / restoreCard(cardId, context?) -> KanbanCardSummary
 addTag(cardId, tag, context?) / removeTag(cardId, tag, context?) -> KanbanCardSummary
 plansHeldByLease() -> string[]
+addCardTokens(cardId, delta: { tokensIn, tokensOut, cacheRead, cacheCreate }, context?) -> KanbanCardSummary
 ```
 
 `listLaneCards` is the ONLY place a status list reaches SQL, and it builds its placeholder list
@@ -217,6 +224,18 @@ called afresh on every pass, never captured, so a lease taken after that module 
 stops the plan it is on from moving (see [plan-runner.md](plan-runner.md)). It answers every plan
 path a live, non-archived card's plan or build lease is holding, fresh by the same staleness
 window above, and names no card: an empty list is the ordinary answer on a quiet board.
+
+`addCardTokens` has ONE caller — the token watcher (§"The token watcher"), reaching it as
+`kanbanCardsService.addCardTokens` with `actor: 'telemetry'`. It ACCUMULATES: one statement over the
+four columns of the shape `build_tokens_in = build_tokens_in + ?`. Never a SET — two Metis sessions
+can work one card over its life, and a SET to a session's own totals would erase the earlier one's
+spend — and never a read-then-write, which drops an increment whenever a tick races a claim, a move
+or another session's tick. It is an ordinary `card.updated` write and costs what any write costs:
+one audit row whose payload is `{ tokens: delta }` and one `kanban_event` frame. (Descent's
+telemetry wrote no event; this board has no second way to write a card — §"The one write seam".) It
+does NOT stamp `updated_at`, because that column orders the Done lane and a token count is not a
+card moving. A card deleted between the watcher's read and this write answers the same 404 every
+card verb does, and the seam rolls the audit row back with it.
 
 `kanban-questions.service.ts` — questions, the decisions they write, and the approve gate
 
@@ -415,7 +434,10 @@ tab is active.
 
 ## The panel
 
-`src/modules/kanban/` composes the tab's pane, its header, its import dialog, the card drawer under
+`src/modules/kanban/` composes the tab's pane, its header — which mounts `KanbanVitalsStrip`, the
+board's six counts, its design carried in its own docstring, wired through `useBoardVitals` off a
+publish/subscribe store the lane feed keeps rather than a prop the header would have to carry — its
+import dialog, the card drawer under
 `card-drawer/`, six hooks — `useKanbanMetis` is the newest, reading the board's own Metis fleet —
 and four module-private utilities under `utils/`. The barrel exports
 `KanbanPanel` and nothing else — a second export is how a policy that must be decided in one place
@@ -485,10 +507,42 @@ one purpose: **on FIRST mount only, when `currentBoardId` is null, the panel ask
 convenience and nothing more — it fires at most once per mount, it never fires when a board is
 already selected, and it never fires on a project switch.
 
-**Lazy loading.** On mount the panel fetches EXACTLY two things: the board list and the current
-board's lane counts. Each lane then fetches its OWN first page of summaries for the status set its
-lane spec names. A card's DETAIL is fetched only when the drawer opens on it. The one extra
-first-mount call is `boardForProject`, above.
+**Lazy loading.** On mount the panel fetches the board list, then the current board's lane counts
+and its vitals together (`Promise.all`, `useKanbanLaneFeed.ts`). Each lane then fetches its OWN first
+page of summaries for the status set its lane spec names. A card's DETAIL is fetched only when the
+drawer opens on it. The one extra first-mount call is `boardForProject`, above. The vitals read
+repeats after every lane-counts write that lands — coalesced behind one in-flight request rather than
+a timer of its own — and reaches the strip through the small publish/subscribe store that file keeps,
+never through this hook's own returned state; the shape is in the file's own docstring.
+
+**The vitals strip's six registers, in ONE round trip.** `vitalsCounts`
+(`kanban-vitals.service.ts`) answers the header's strip from five scalar sub-SELECTs in one
+statement, every one of them excluding archived cards:
+
+- `building` — cards in the Building lane (`status = 'active'`), where a build lease puts them and
+  where they stay until the builder moves them on.
+- `awaitingAnswer` — cards with at least one question nobody has answered: the operator's turn, and
+  the panel's own `needsAnswer`.
+- `awaitingApprove` — the SAFE approve subset (Descent's "GOTCHAS #48" mirror): not yet approved, no
+  open question, sitting in a claimable/staging lane (`todo`/`questions`/`not_ready`), and
+  content-complete — a non-blank plan, body or description, because an intake card carries its intent
+  in `description` with `body` empty.
+- `claimable` — the same predicate and the same staleness window the driver's own green light uses
+  (`kanbanBoardsDb.countClaimable`), so this register and the driver can never disagree.
+- `lessonsPendingEstate` — STAGED lessons awaiting a person's review. It reads the board's own lesson
+  table and is NOT board-scoped: a lesson belongs to the estate and its card is provenance, so there
+  is no board filter here to get wrong.
+- `memoryPendingEstate` — handed IN by the composition root rather than computed here, because the
+  rows behind it are `memory_candidates` and this module never imports `memory-intake`: the board
+  cannot see that lane's table, and a count it computed for itself would be the board reading a
+  sibling's rows sideways (§[memory-intake.md](memory-intake.md)).
+
+Every estate-wide key carries the word ESTATE in its name, so no caller can read a number taken across
+the whole install as one board's own. The read is read-only — no transaction, no audit row, no frame —
+and a missing board is the board's ordinary 404, never zeros: "no such board" and "a board with
+nothing on it" are different answers. A fault is NOT caught, and that is the ruling rather than an
+omission: the strip draws an unknown reading as an em-dash, and the wire shape has no null to say
+"unknown" with, so a refusal is the only honest way this read can say "I could not count".
 
 Every lane then pages through the same tail, which the kit owns: an 8px sentinel inside the lane
 body, observed by an `IntersectionObserver` that fires ONE request per intersection and re-arms when
@@ -637,6 +691,12 @@ the same way that guard already refused the importer (§"The kanban-pm MCP surfa
 door, and the child's credential"). Staging and reading are ungated on that mount — filing a lesson
 and reading the corpus are exactly what a build is for.
 
+**Reviewed from the Memory tab, not from the board.** The two review routes' one caller in this app
+is `LessonReviewList` ([memory-intake.md](memory-intake.md) §"Beneath the queue, the lessons") — a
+section of the Memory tab rather than a control on the board itself, the same estate-not-board
+placement above. It reads the staged list at the route's own ceiling through `useLessonReview` and
+calls the two review verbs through the same hook.
+
 **Reachable from a tool call, as of Phase 7.** The MCP surface's `stage_lesson`, `list_lessons` and
 `get_lesson` are real tools now (§"The kanban-pm MCP surface") — `kanban-pm-tools-lessons.ts` is
 the wiring from a Metis's own tool call to the store and HTTP doors this lane built.
@@ -681,14 +741,14 @@ The dials — four liveness, beside the predicates that read them; three cadence
 | `STALL_MS` | `metis-liveness.ts` | 2 700 000 | silent this long is a turn that WEDGED — the stronger proof, and the one reported first |
 | `LEASE_STALE_SECONDS` | `server/shared/kanban-types.ts` (**40**), re-exported by `metis-liveness.ts` | 40 | the same staleness the lease verbs and the card summaries use; the reaper judges a board's PLAN lease with it too, so no second staleness rule exists |
 | `TICK_MS` | `metis-driver.service.ts` | 15 000 | the loop's whole cadence, and the longest a click on Launch can wait |
-| `kanban_boards.concurrency` | the board's own row, clamped by `clampKanbanConcurrency` in `server/shared/kanban-types.ts` | `KANBAN_CONCURRENCY_DEFAULT` 1, clamped `[0, KANBAN_CONCURRENCY_MAX]` (4) | how many sessions THIS board may run at once, read off the row at call time by the driver's `dialOf` and the spawner's `canSpawn` alike — never a driver-held constant; 0 is the dial switched off |
+| `kanban_boards.concurrency` | the board's own row, clamped by `clampKanbanConcurrency` in `server/shared/kanban-types.ts` | `KANBAN_CONCURRENCY_DEFAULT` 1, clamped `[0, KANBAN_CONCURRENCY_MAX]` (6), moved 1–6 by the pilot panel's stepper | how many sessions THIS board may run at once, read off the row at call time by the driver's `dialOf` and the spawner's `canSpawn` alike — never a driver-held constant; 0 is the dial switched off |
 | `CHURN_COOLDOWN_MS` | `metis-driver.service.ts` | 60 000 | PER BOARD, never global — a global one lets one busy board's spawns starve every other board, and this window is what stops a board whose work cannot actually be claimed from being respawned every tick |
 | `RELAUNCH_MAX_ATTEMPTS` | `metis-relaunch.service.ts` | 3 | launches for one board that THREW before the driver stops retrying it; a session of that board reaching a COMPLETED ending clears its row |
 | `RELAUNCH_BACKOFF_BASE_MS` / `..._CAP_MS` | `metis-relaunch.service.ts` | 600 000, doubling, capped at 3 600 000 | how long a board waits after each recorded failed launch |
 | `RATE_LIMIT_GRACE_MS` / `..._BLIND_HOLD_MS` / `..._RESET_BUFFER_MS` | `metis-relaunch.service.ts` | 120 000 / 1 800 000 / 30 000 | the hold armed by `notify_api_error.sh`'s signal: a short grace on a `reset_at` that has passed, the long window when the signal carries none, and the margin added to a future one |
 
 `GET /api/kanban-metis/boards/:boardId/driver` answers the tick's own arithmetic for one board —
-`{ autonomy, concurrency, claimable, live, lastSpawnAt, rateLimitUntil, relaunchAllowed }` — because
+`{ autonomy, concurrency, concurrencyMax, claimable, live, lastSpawnAt, rateLimitUntil, relaunchAllowed }` — because
 "nothing to do", "the driver is not running", "the cooldown is holding it", "the account is capped"
 and "this board has spent its relaunch attempts" all look the same from outside, and each has a
 different fix. The last two are the SAME predicates the spawn path asks, so the route cannot explain
@@ -698,7 +758,7 @@ The eight routes, all behind `authenticateToken` on the mount (`server/index.ts:
 
 ```
 GET  /api/kanban-metis/sessions                          -> { sessions, at }
-GET  /api/kanban-metis/boards/:boardId/driver            -> { autonomy, concurrency, claimable, live, lastSpawnAt, rateLimitUntil, relaunchAllowed }
+GET  /api/kanban-metis/boards/:boardId/driver            -> { autonomy, concurrency, concurrencyMax, claimable, live, lastSpawnAt, rateLimitUntil, relaunchAllowed }
 POST /api/kanban-metis/boards/:boardId/launch            -> { session }
 POST /api/kanban-metis/boards/:boardId/nudge             -> { nudged: true, at }
 POST /api/kanban-metis/sessions/:sessionId/stop          -> { session }
@@ -739,6 +799,57 @@ session record carries `sessionId`, `boardId`, `boardName`, `provider` (`'deepse
 'stopped' | 'failed'`), `pid`, `startedAt`, `endedAt`, `lastActivityAt` (the `child.log` mtime) and
 `exitCode`; the type lives in `server/shared/types.ts` beside `SoulLaunchSnapshot` and is mirrored
 into `src/shared/types.ts`.
+
+## The token watcher
+
+`metis-telemetry.service.ts` is `~/.claude/descent/pm_telemetry.py` ported in-process: the module's
+second interval, started once beside the driver's — `startTelemetryWatcher()`, called at
+construction in `kanban-metis.module.ts` after the registry and the driver exist. It ticks at once,
+so a build already in flight at boot starts accruing on the first pass, and then every
+`TELEMETRY_TICK_MS` (30 000). The interval is unreferenced, like the driver's, and a second call is
+a no-op rather than a second watcher over the same tallies. It has no route and no frame of its own;
+what it leaves behind is the `kanban_session_usage` row and the card's four `build_tokens_*`
+counters (§"The tables"), which the card face's token signal and the drawer's token ledger read
+(§"The panel"). Its service header carries the design in full; this is the map, and the three rules
+that must not move.
+
+**What it reads.** Every session the registry holds in state `running` — and only those, so what a
+session spends between its last tick and its exit is not counted: at most one tick's worth, and
+never a double count. For each, the transcript `~/.claude/projects/<cwd slug>/<sessionId>.jsonl`
+PLUS every subagent transcript beside it, `<cwd slug>/<sessionId>/subagents/agent-*.jsonl`:
+subagents log separately, and a main-file-only tally undercounts badly. The directory is found by
+scanning the projects root once per session, and for a board Metis that scan is the ONLY path — she
+has no `sessions` row (§"Seclusion").
+
+**How it counts.** `accumulateUsage(jsonlPath, fromOffset)` is the stateless one-shot reading —
+`{ tokensIn, tokensOut, cacheRead, cacheCreate, seen, offset }` — and a tick reads through a
+per-file tally it keeps in memory instead (a byte cursor, a `seen` set, the running counters),
+because the one-shot holds no dedup state and a range read twice is counted twice.
+
+- **Dedup on `message.id`, never on the line.** One assistant message spans several JSONL lines, one
+  per content block, and every one repeats the message's whole `usage`; summing lines counts a
+  message two or three times. The `seen` set persists across ticks, so a message split over a tick
+  boundary still counts once. A usage-bearing line with no id is counted rather than dropped.
+- **The cursor moves only past a newline.** What follows the last complete line is a half-flushed
+  write: it is re-read whole next tick — never parsed as JSON, never dropped. A file that shrank
+  restarts from zero.
+- **The stored row is the truth, never memory.** The tallies reset on a restart and the next tick
+  re-reads each transcript from byte 0, once, so the step is `delta = max(fresh, stored) − stored`
+  per counter: zero after a restart, never negative, and only new spend is ever written.
+
+**Where a delta lands.** The session row first — it is the baseline the next tick subtracts from —
+through `kanbanLearningDb`, silently: no event, no frame. Then the card, best-effort, through
+`addCardTokens` (§"The services"), the only half of this the board hears. A delta goes on a card
+only when the session's derived lease owner (§"A board's Metis, launched") holds a FRESH build lease
+on an `active` card of its own board (§"Ids, order and time"), found by paging that board's lanes
+through the barrel, at most `LEASE_SCAN_PAGES` (25) pages. A session between cards — orienting, or
+holding a lease that went stale — and a board too long for that scan both attribute nothing on that
+tick, and the spend stays at the session level: a smaller loss than a number written onto a card
+nobody is building. A tick whose four deltas are all zero writes nothing at all.
+
+**It never raises.** The registry read has its own guard and so does each session, so one corrupt
+transcript or a locked database ends neither the interval nor the sessions behind it. Each distinct
+fault is written to the server log once, as `[KanbanMetis] telemetry: …`, not once per tick.
 
 ## A board's Metis, launched
 
@@ -875,6 +986,15 @@ Writes:
 | `claim_plan` | `POST /cards/:id/plan-lease/claim { owner }` |
 | `stage_lesson` | `POST /lessons` |
 
+**The one cross-board read — and what it does not grant.** `list_features_all` is the only tool whose
+reach exceeds the board the child was launched on: it reads `GET /boards` and then every NON-ARCHIVED
+board's lane pages, pushing each card with its own `board { id, name }`, so she can put her own board
+first and see what else is moving. The widening is sight, never REACH — no tool takes a board id, and
+every write (`create_feature`, `set_status`, `claim_plan` and the rest) addresses `client.boardId`, the
+single board in `KANBAN_PM_BOARD_ID`. A card on another board can be read and is never claimed from
+here, because her `cwd` and her one `--add-dir` are her board's (§"A board's Metis, launched"). The
+descriptor says the rest: read-only, and it does not change which board is current.
+
 **The lesson tools are real, as of Phase 7.** `stage_lesson`, `list_lessons`, `get_lesson` and
 `search_history`'s `lesson` kind all reach the store this lane built (§"The lessons lane") — the
 three straight reads/write live in `kanban-pm-tools-lessons.ts`, and the fourth is
@@ -928,8 +1048,17 @@ from the source tree whether the server runs under `tsx` or from `dist-server`. 
 concatenated under their own headings into ONE string and handed over as a single
 `--append-system-prompt`; its path and sha256 are recorded in `spec.json`, and a resume re-reads the
 brief from disk, so a resumed Metis runs the board as it stands now rather than as it stood when she
-was first launched. `~/.claude/commands/pm.md` and `~/.claude/descent/pm-chapters/` are Descent's and
-are not touched by any of this — the board has its own brief, its own chapters and its own home.
+was first launched. `~/.claude/descent/pm-chapters/` is the retired Descent board's and
+is not touched by any of this — the board has its own brief, its own chapters and its own home.
+
+**The brief is the same for every board; what is true of ONE project is not in it.** A database
+connection, the vendor systems a build must not write to, who receives a notification, which repos
+a checkpoint covers — these reach a Metis as `CLAUDE.md` files, from two places. The board's
+project arrives as `--add-dir`, and the child's environment carries
+`CLAUDE_CODE_ADDITIONAL_DIRECTORIES_CLAUDE_MD=1` (`metis-env.service.ts`), which is what makes the
+CLI read the `CLAUDE.md` of an added directory. And her cwd, `~/.claude/kanban-metis/<board id>/`,
+is read the way any cwd is: a `CLAUDE.md` placed there is that board's own file, outside this
+repository. A board with no project and no such file runs on the brief alone.
 
 ## Seclusion
 
@@ -1002,15 +1131,19 @@ has running or has run recently — each row carrying its state badge, its provi
 the clock, its board name, and — while it runs or can be resumed — a Stop or Resume button. A PANEL,
 not a dialog, because watching is the whole job and a dialog cannot be watched while the board moves.
 
-It is a reader only. `useKanbanMetis` seeds once by REST (`api.kanbanMetis`, beside `api.kanban` in
+It reads, and it moves one number. `useKanbanMetis` seeds once by REST (`api.kanbanMetis`, beside `api.kanban` in
 `src/shared/api.ts`) and then listens for the `kanban_metis_state` frame; `launch`, `stop`, `resume`
 and `reply` each answer with the session they moved so a row (or the open conversation) repaints
 without waiting for the frame behind it, while `nudge` answers `{ nudged, at }` and moves no session
 at all (§"The nudge"). The hook also reads this board's own dial off the driver's own reading
-(§"The driver"'s `/driver` route) — once per board and again on that board's own `board.updated`
-frame, never on a plain fleet frame — and hands it back as `dial: number | null`, `null` standing for
-a reading not yet taken or one the driver could not answer, which the header draws as the plain live
-count rather than a false cap.
+(§"The driver"'s `/driver` route) — once per board, again on that board's own `board.updated`
+frame and after a reconnect, never on a plain fleet frame — and hands it back as `dial: number | null`
+with its ceiling beside it (`dialMax`, the route's `concurrencyMax`), `null` standing for a reading
+not yet taken or one the driver could not answer, which the header draws as the plain live count
+rather than a false cap. `setDial` is the one write: the panel's stepper (1 to the ceiling; beside
+the figure from `sm` up, the body's first row on a phone) PATCHes the board's `concurrency`, draws
+the press at once after retiring any reading already in flight, is confirmed by the `board.updated`
+frame the write broadcasts, and is put back by a fresh reading when the server refuses it.
 
 **A row is the door to its conversation, not a line with a transcript button on it.**
 `KanbanMetisRow`'s whole body — mark, state badge, model, clock, board name — is one button

@@ -102,7 +102,7 @@ function overLongLines(text: string, cap: number): { count: number; overflow: nu
  * Plain-English reasons for every budget `next` would breach. An empty list means the write is
  * compliant and may go ahead.
  *
- * `display` is what a person calls this file ("your RULES.md shelf", "the -opt-shadow-connector
+ * `display` is what a person calls this file ("your RULES.md shelf", "the -opt-my-project
  * memory index MEMORY.md") — every reason names it, so a refusal can never be about a file nobody
  * was writing to.
  *

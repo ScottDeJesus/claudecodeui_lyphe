@@ -17,22 +17,23 @@ background, for fast everyday loads. Nothing here runs `npm run build`: the :518
 | `cloudcli-sessions-tmux.service` | `/usr/bin/tmux -L cloudcli-sessions -f /dev/null new-session -d -s _keepalive sleep infinity` — a do-nothing session holding the tmux server that every chat CLI is spawned into, in a cgroup of its own so the API's restart cannot reach them. Each live turn adds a `<app session id>-<base36>` session beside `_keepalive`, with its socket, journal and meta under `~/.cloudcli/sessions` (mode 0700; `CLOUDCLI_SESSIONS_DIR` moves the directory). `sudo systemctl stop cloudcli-sessions-tmux` is the deliberate "end every live chat session" switch, and `CLOUDCLI_SESSION_KEEPALIVE=0` (or `off`/`false`) in the API's `.env` — unset here, so the feature is on — puts new turns back inside the API process | — (unix sockets under `~/.cloudcli/sessions`) |
 
 The API and both client units read `.env` (`SERVER_PORT=3011`, `VITE_PORT=5183`, `HOST=127.0.0.1`,
-`CLAUDE_CLI_PATH`, …), run as `lyphe` with `NODE_ENV=development` (the production client: `production`), the interactive shell's full
+`CLAUDE_CLI_PATH`, …), run as the host's own user with `NODE_ENV=development` (the production client: `production`), the interactive shell's full
 `PATH` (the app's shell tab and every spawned Claude session inherit the API unit's environment —
 a chat CLI sits in the keepalive's cgroup but is handed that same environment when it is spawned),
 `Restart=always`, `StartLimitBurst=5` in a 120 s window (a crash loop latches `failed` instead of
 restarting unseen forever; the watchdog resets and retries), and start at boot. The dev client and
 the watchdog live in `/etc/systemd/system/` only — no copy of either is kept in this repo. Two
-more units this repo ships (the three production-client units are covered above), each installed by copying into `/etc/systemd/system/` and each
-carrying its own exact commands in its header comment:
+more units this repo ships (the three production-client units are covered above), each installed
+with [`deploy/systemd/install.sh`](../deploy/systemd/install.sh) and each carrying its own exact
+commands in its header comment:
 [`deploy/systemd/cloudcli-server-dev.service`](../deploy/systemd/cloudcli-server-dev.service) —
 the `ExecStart` that runs the supervisor, an *existing* unit, so `daemon-reload` + `restart`
 rather than `enable --now` — and
 [`deploy/systemd/cloudcli-sessions-tmux.service`](../deploy/systemd/cloudcli-sessions-tmux.service),
 which is new to systemd and therefore `enable --now`. Both commands are in the Runbook below.
 
-The three `cloudcli-client-prod*` units ship in `deploy/systemd/`, installed with the commands in
-the service's header. The dev client (:5183) is for watching an edit land live; the production
+The three `cloudcli-client-prod*` units ship in `deploy/systemd/`, installed with `install.sh` and
+the commands in the service's header. The dev client (:5183) is for watching an edit land live; the production
 client (:5184) is the fast one for everyday use, at most one rebuild (≈2.5 min) behind the source.
 
 The clients are the only ports the LAN needs: `vite.config.js` proxies `/api`, `/ws`, `/shell` and
@@ -48,7 +49,8 @@ documentation home is [`applications.md`](applications.md).
   exits 0 within half a second and restart-loops forever. The client unit therefore runs
   `bash -c 'exec node_modules/.bin/vite … < <(sleep infinity)'` — the bin itself, not `npx`, so
   the main PID is node running Vite and `Restart=` sees Vite die; the `sleep` is a sibling in the
-  cgroup and dies with it on stop. The EIS dev unit needs none of this because it runs Vite 5.
+  cgroup and dies with it on stop. A sibling app's dev unit on this host needs none of this
+  because it runs Vite 5.
 - **A dropped HMR socket does not reload the page unless it has to.** Vite's client reloads the
   whole page whenever its socket drops and the server answers again, and a phone drops that
   socket every time it puts a background tab to sleep. `vite-plugins/keepPageOnReconnect.js`
@@ -89,15 +91,17 @@ documentation home is [`applications.md`](applications.md).
 - **`--strictPort` is deliberate.** The `.verify/` harness and the application drawer's CloudCLI
   row are pinned to 5183; a drift to 5184 would pass silently and break both.
 - **Vite 7 refuses any `Host` header that is not an IP or `localhost`.** The app is opened
-  directly under those names on the LAN and the tailnet, so `vite.config.js` allows `eis1` and
-  this tailnet's MagicDNS name, `eis1.tail8717cd.ts.net` (`server.allowedHosts`); any other name
-  renders Vite's "Blocked request" page.
+  directly under those names on the LAN and the VPN, so `vite.config.js` allows the
+  comma-separated `VITE_ALLOWED_HOSTS` — for example the host's plain name, `myhost`, and its
+  VPN's MagicDNS name, `myhost.example.ts.net` (`server.allowedHosts`); any other name renders
+  Vite's "Blocked request" page.
 - **The wildcard bind reaches the Docker bridges too** (`172.17-20.0.1`, 19 containers, several
   third-party images, no host firewall). The client unit's root `ExecStartPre` inserts
   `iptables -I INPUT -p tcp --dport 5183 -s 172.16.0.0/12 -j DROP` idempotently before Vite
-  binds, so a container cannot reach the login. What sits behind that login is a pty as `lyphe`,
-  a file browser rooted at `/`, the real `/git` push and the operator's Claude credentials, and
-  the server has no login throttle — the LAN and Tailscale are trusted; nothing else is. The
+  binds, so a container cannot reach the login. What sits behind that login is a pty as the
+  host's own user, a file browser rooted at `/`, the real `/git` push and the operator's Claude
+  credentials, and the server has no login throttle — the LAN and the VPN are trusted; nothing
+  else is. The
   rules are by INTERFACE (`-i docker0`, `-i br-+`), not by subnet: Docker's allocator walks
   `172.17-31.0.0/16` and then falls back to `192.168.0.0/16` — the LAN's own range — so a subnet
   rule could neither cover a 16th network nor be widened. The watchdog re-inserts the two rules
@@ -163,21 +167,18 @@ documentation home is [`applications.md`](applications.md).
   [verification.md](verification.md) §"The dev server", the page's title fence and what an
   ArchPulse restart mid-run does are in its §"What bites people".
 - **Never kill the client by pattern.** `pkill -f 'sleep infinity'` reaches every such process
-  on the box, and two tmux keepalives now hold one each: Descent's `/pm` server
-  (`descent-pm-tmux.service` — its own `descent-pm-tmux-watchdog.timer` restores it, but the
-  board's MCP server drops in the meantime) and this fork's chat-session server on the private
-  `-L cloudcli-sessions` socket, which nothing watches. Use
+  on the box, and this fork's chat-session server holds one on the private `-L cloudcli-sessions`
+  socket, which nothing watches. Use
   `systemctl restart cloudcli-client-dev` instead.
-- **A dead tmux keepalive still reads `active`.** Both keepalive units above set
+- **A dead tmux keepalive still reads `active`.** The keepalive unit above sets
   `Restart=always` *and* `RemainAfterExit=yes`, and the second defeats the first: kill the
   `sleep` and the tmux server exits, but systemd parks the unit at `active (exited)` with
   `MainPID=0` and never restarts it. `systemctl is-active` then answers `active` with nothing
   behind it, and `systemctl start` is a no-op on a unit already reading `active` — exit 0,
   nothing revived. The truthful probe is `tmux -L <socket> ls` (`no server running on
   /tmp/tmux-1000/<socket>` when it is gone), and `systemctl restart` is the only cure. Measured
-  on this host 2026-09-08. Descent's twin carries a watchdog timer for exactly this failure;
-  this fork's keepalive has no watcher — `cloudcli-dev-watchdog.sh` does not know it — so it
-  stays silently dead until a human restarts it.
+  on this host 2026-09-08. Nothing watches this fork's keepalive — `cloudcli-dev-watchdog.sh`
+  does not know it — so it stays silently dead until a human restarts it.
 
 ## Runbook
 
@@ -203,13 +204,14 @@ curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:5183/            # 200
 curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:5183/api/cli-version  # 401 = alive, auth-gated
 sudo systemctl restart cloudcli-sessions-tmux   # the only cure for a silently dead keepalive — takes every live chat CLI with it
 sudo systemctl stop cloudcli-sessions-tmux      # deliberate: end every live chat session at once
-# installing the keepalive (new to systemd, so enable --now):
-sudo cp deploy/systemd/cloudcli-sessions-tmux.service /etc/systemd/system/
-sudo systemctl daemon-reload && sudo systemctl enable --now cloudcli-sessions-tmux
+# installing the keepalive (new to systemd, so enable --now — install.sh renders the template and
+# daemon-reloads on its own):
+deploy/systemd/install.sh cloudcli-sessions-tmux.service
+sudo systemctl enable --now cloudcli-sessions-tmux
 tmux -L cloudcli-sessions ls                    # proves the install: `_keepalive` is there
-# redeploying the API unit (already enabled, so daemon-reload + restart — never enable):
-sudo cp deploy/systemd/cloudcli-server-dev.service /etc/systemd/system/
-sudo systemctl daemon-reload && sudo systemctl restart cloudcli-server-dev
+# redeploying the API unit (already enabled, so restart — never enable):
+deploy/systemd/install.sh cloudcli-server-dev.service
+sudo systemctl restart cloudcli-server-dev
 journalctl -u cloudcli-server-dev -n 5 --no-pager  # proves it: `[supervisor] serving pid <n>`
 ```
 
@@ -229,8 +231,8 @@ server (`.env`, `.git` and `/@fs/` outside the root are 403); the stale `mission
 registration logs three git errors per poll and stays because two probes use it as their
 "directory gone" fixture.
 
-Proven 2026-09-06: both units active after boot-enable; `192.168.1.95:5183` and
-`100.103.222.79:5183` answer 200 with the API 401 through the proxy; a `touch` on a client
+Proven 2026-09-06: both units active after boot-enable; `10.0.0.5:5183` answers 200 with the
+API 401 through the proxy on both the LAN and the VPN; a `touch` on a client
 file logged `[vite] (client) hmr update … GitStatusHeader.tsx` within 3 s; a `touch` on
 `server/index.ts` restarted the API through `tsx watch` with the systemd MainPID unchanged and
 `/api/cli-version` back at 401 within 2 s; the former `cloudcli-dev` tmux session is gone.

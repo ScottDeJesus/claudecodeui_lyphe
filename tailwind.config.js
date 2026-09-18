@@ -125,7 +125,7 @@ export default {
           to: { opacity: '1', transform: 'translateY(0)' },
         },
         // A sheet pinned to the LEFT edge arriving: a short slide in from the edge it hangs on, not a
-        // full-width sweep — the applications drawer's entrance in design/Applications Hub.dc.html.
+        // full-width sweep — the applications drawer's entrance.
         'sheet-in-left': {
           from: { opacity: '0', transform: 'translateX(-22px)' },
           to: { opacity: '1', transform: 'none' },

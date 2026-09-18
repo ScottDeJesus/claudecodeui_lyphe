@@ -4,25 +4,85 @@ The foot of the sidebar: which Claude account signs the next request, how much o
 account has spent, what is left on the DeepSeek account this host's builds spend, and the two writes
 that change the first of those. `src/modules/accounts/` is `AccountPopover` (with `UsageMeters`, its
 own `AccountRow`, and `DeepseekBalanceReadout`) under the one `AccountFooterRow` its barrel exports,
-with `hooks/useDescentAccounts` holding the picture and the writes, `hooks/useDescentUsage` holding
+with `hooks/useClaudeAccounts` holding the picture and the writes, `hooks/useClaudeUsage` holding
 the readings, `hooks/useDeepseekBalance` holding the balance, and `utils/accountInitials` drawing the
-two letters on the avatar. Everything but the balance comes from Descent: the server half of those —
-the four accounts routes, the null discipline, the units — is [descent-proxy.md](descent-proxy.md),
-which now carries a second lane this screen does not use. The balance does not, and its own server
-half is [deepseek-balance.md](deepseek-balance.md).
+two letters on the avatar. Everything but the balance comes from this app's own server, in
+`server/modules/accounts/`: `accounts.routes.ts` holds the four routes and the calm 200,
+`usage.service.ts` the reading and its cache, `account-store.service.ts` the slots (under
+`CLOUDCLI_ACCOUNTS_ROOT`, default `~/.cloudcli/accounts`). `server/index.ts` mounts them at `/api`
+behind `authenticateToken`, applied by PREFIX — the comment at the mount says why a list of paths is
+not enough. What the client must do with what they answer is §"The rules that bite" below. The
+balance does not come from there, and its own server half is [deepseek-balance.md](deepseek-balance.md).
 
-**Two origins, one panel.** The balance is not a third Descent window and not a second reading of the
-same account — it is a different account, at a different vendor, reached by a route Descent never
-touches. So the panel draws it OUTSIDE the branch that replaces the meters when Descent is
-unreachable, and a Descent outage cannot take the money down with it. The two also fail in opposite
-directions: Descent is local and this route goes out to api.deepseek.com.
+**Two origins, one panel.** The balance is not a third usage window and not a second reading of the
+same account — it is a different account, at a different vendor, reached by a route of its own. So
+the panel draws it OUTSIDE the branch that replaces the meters when the accounts lane cannot answer,
+and a meter that fails cannot take the money down with it. The two also fail differently: the
+accounts picture is read off local files and the usage figures from Anthropic through a cache, while
+this route goes out to api.deepseek.com for every reading the server takes.
 
 **One row, one poller.** `SidebarFooter` renders `AccountFooterRow` above Settings and
 `SidebarCollapsed` renders the same component as the rail's avatar, and never both at once. That
 mutual exclusion is the whole design: all three hooks live inside the row, so the app holds exactly
-one Descent poller and one balance poller no matter how often the panel is opened or the sidebar
-collapsed. The row hands its ONE balance reading to both registers it draws, so the line under the
+one poller per reading no matter how often the panel is opened or the sidebar collapsed. The row hands its ONE balance reading to both registers it draws, so the line under the
 account name and the block in the panel cannot disagree.
+
+## The nine rules the server half keeps
+
+These are the lane's own rules — what the server may answer and what it may never claim. They came
+over with the routes when the lane moved in-house, and they are kept because the CLIENT is built on
+them: the panel's branches on `reachable`, on `unreadable` and on a window's `percent` were not
+touched, so the answers may not change underneath it. What each answer looks like on screen is
+§"The rules that bite" below; the two sets are about different halves and neither restates the other.
+
+1. **A read never fails.** The `{ reachable }` envelope is kept: `true` with the picture, or `false`
+   with a ONE-WORD reason — never a 5xx, never a 503. An outage used to be a remote that stopped
+   answering; there is no remote now, so a read that cannot be computed still answers 200 and says
+   so, and the panel draws its calm unknown rather than an error wall. A picture is whole or it is
+   none: `stateSummary()` answering `null` is the *unreadable* branch (`slots: []`, every label
+   `null`, `unreadable: true`), which is a different answer from `{ reachable: false }`.
+2. **A write's verdict is its own body.** A refusal answers `{ error: "<words>" }` with the store's
+   422, carrying the store's own plain English — the most useful thing an operator can be handed —
+   and never the global handler's nested shape. A genuine fault on a WRITE goes to `next`: unlike
+   the reads, a write that did not happen must not read as one that did.
+3. **Unknown is `null`, never `0`.** `percent`, `expiresAt`, `liveExpiresAt`, `staleSince` and
+   `resetsAt` stay null when there is none; a `0` is a reading and says so. Units differ and are not
+   converted: `expiresAt`/`liveExpiresAt` are epoch MILLISECONDS, `checkedAt`/`staleSince` epoch
+   SECONDS, `resetsAt` an ISO-8601 string.
+4. **`rolled: true` is not zero.** The percent is real but historical, its window since ended, and it
+   survives intact — `markRolled` (`usage-windows.ts`) decides it from the window's own stamp, taking
+   an offset-less stamp as UTC, the same rule the client's countdown applies.
+5. **`severity` is present only when the vendor flagged that window.** Its mere PRESENCE is the
+   signal, and it may ESCALATE a meter's tone, never soften it.
+6. **Three answers are neither a picture nor a failure**, all arriving `reachable: true` with nobody's
+   word but the reading's: `unreadable: true` (the store would not read), `windows: []` with
+   `reason: 'pending'` (a poll in flight — reading, not broken), and `windows: []` with
+   `degraded: true` (no figures under this account, but an older reading survives). `reason` is ours
+   when `reachable` is false, and never a vendor's claim when it is true.
+7. **The token seam, and its five bounds.** `usage.service.ts` is the ONE place in this server that
+   holds a credential, because the vendor's endpoint wants a Bearer header: one reader
+   (`readCredentials`, the only token read server-side), never logged, never persisted, never on an
+   error path (every failure collapses to a fixed reason vocabulary and a status int), and never
+   following a redirect (`redirect: 'manual'`, so a 3xx is read and never chased — a
+   redirect-following fetch copies its headers onto the next hop). An expired token, a 401 or a dead
+   network keeps the last good number on screen with `degraded: true` and `staleSince`, and
+   SURRENDERS it the moment the credential stamp moves. The account store beside it takes the
+   opposite stance — the credential BYTES are copies, never readings.
+8. **The store's three rules, all load-bearing.** CAPTURE-FIRST: `install()` files the live pair
+   under the slug of the live file's OWN identity before a byte moves, so the login being replaced is
+   saved first. DRIFT IS A FULL-EMAIL COMPARE against the ACTIVE SLOT's stored identity and never one
+   re-derived from a slug, and unprovable drift reads FALSE — an alarm that fires on every poll is
+   worse than a missed one. THE CREDENTIAL BYTES ARE COPIES, NEVER READINGS: the pair is copied
+   file-to-file, and the one value ever read out of a credentials file is `claudeAiOauth.expiresAt`,
+   a freshness clock and not a secret. Every write is temp-file-then-rename (the server is one JS
+   thread, so the staging order is the lock), slots are `0700` and files `0600`, and
+   `CLOUDCLI_ACCOUNTS_ROOT` is read at CALL time so a probe gets the scratch root it set — while the
+   live pair is deliberately NOT redirectable, since a variable that moved it could swap a login
+   nobody named.
+9. **Nothing in this lane is callable by an agent.** The four routes sit behind `authenticateToken`
+   on the app's own mount, and no MCP verb, no dispatch path and no board tool reaches them: a
+   switch or a capture is a person pressing a row. The same fence over the memory lane's own two
+   verbs is [memory-intake.md](memory-intake.md) §"The fence".
 
 ## What the footer row says
 
@@ -30,7 +90,7 @@ The avatar's initials come from the local part of the active label and nothing e
 shares a domain, so a domain letter hides identity rather than carrying it. The label sits beside
 it, truncated, with the full address in a `title`. Under the label are the two windows worth a
 glance, as inline `Meter`s: the `five_hour` and `seven_day` windows, each labelled with its reset
-countdown where Descent gives one and with `5h`/`7d` where it does not, and `usage —` on the line
+countdown where the reading gives one and with `5h`/`7d` where it does not, and `usage —` on the line
 instead when neither window is in the reading. A window absent from the reading draws no bar at all;
 a window present with `percent: null` draws an empty track and an em-dash, which is the one honest
 picture of "nobody has this number".
@@ -50,7 +110,7 @@ A `Card` with `role="dialog"`, anchored `bottom-full` above the row, capped at `
 from a top edge the reader can see. Usage first, the DeepSeek balance under it, the switcher below
 both.
 
-| Descent answered | The panel draws |
+| The server answered | The panel draws |
 |---|---|
 | a picture with slots | the meters, `Switch account · N`, the date line, one row per slot, `+ Add another account` |
 | `unreadable: true` | the count reads `0` and no rows follow, under *The saved accounts could not be read — none can be listed.* — said in words, because an empty switcher otherwise reads as "you have no accounts" |
@@ -75,19 +135,29 @@ own for exactly that reason: `UsageMeters` draws windows, and this is not one.
 Every non-active slot is one button carrying its slug — the whole row, since there is no second
 control on it to nest. The account in use is not a button at all: it carries a `✓` glyph, its own
 tint, and `in use now · N sessions running` (or `· none proven running`, which is a fact the row
-states and never a gate). Under every other row is `Saved copy expires`/`expired <local date>`, and
-`—` where Descent never read one.
+states and never a gate). The route always states `0` sessions — this server has no session registry
+to count (`LIVE_SESSIONS_UNKNOWN` in `accounts.routes.ts`) — so today the row always reads `none
+proven running`. Under every other row is `Saved copy expires`/`expired <local date>`, and `—` where
+the store never read one.
+
+Under that, every row — active or not — carries its own weekly-quota reset line when one is
+configured: `Weekly · Fri 2:00 PM · 2d 21h 14m`. It is not read from anywhere — a docked slot's
+credentials are a snapshot whose access token has already expired, so there is no live quota to
+poll — it is computed from the operator's own `VITE_ACCOUNT_WEEKLY_RESETS`, comma-separated
+`<slot slug>=<Weekday>@<HH:MM>` entries (`work=Friday@14:00,home=Tuesday@00:00`), anchored as
+wall-clock time in `VITE_ACCOUNT_RESET_ZONE` (an IANA name; unset defaults to the reader's own
+zone). A slug with no entry draws no line at all (`src/modules/accounts/utils/weeklyReset.ts`).
 
 Two closing lines render only where there is something to switch between: the date line above the
 rows, and the reassurance below them — *Switching changes only which account signs the requests.
 Your projects, conversations and running work stay exactly as they are — open conversations keep
 their history and resume on the new account.* Codex is deliberately absent; these are the Claude
-slots Descent holds, and Codex stays in Settings → Agents.
+slots the store holds, and Codex stays in Settings → Agents.
 
 ## The usage meters
 
 `five_hour` reads *Current 5-hour window* and `seven_day` reads *This week*. Everything else keeps
-Descent's own label, which is the only place a `weekly_scoped:*` plan is ever named.
+the provider's own label, which is the only place a `weekly_scoped:*` plan is ever named.
 
 | The window said | The meter draws |
 |---|---|
@@ -99,18 +169,21 @@ Descent's own label, which is the only place a `weekly_scoped:*` plan is ever na
 | `rolled: true` | the real percent, dimmed, as "was 36% used" — draining it would draw a full tank nobody measured |
 | `degraded: true` | the last figures at 60 % opacity under *As of \<local time\> — \<why\>.* |
 | `windows: []` + `reason: 'pending'` | *A fresh reading is on its way.* — reading, not broken |
+| `windows: []` + `reason: 'shape'` | *The provider answered in a shape this app did not recognise.* — the meter KNOWS why it is empty, so it says so instead of the generic line below |
 | `windows: []` + `degraded` | *No figures are available under this account.* |
-| `reachable: false` | *Usage is unknown — \<the proxy's own word, in English\>* |
+| `reachable: false` | *Usage is unknown — \<the reason, in English\>* |
 
 A window with a `resetsAt` also says when it turns over, counted in hours inside a day and in
-weekdays past one. The block closes with the sentence that makes a blank bar readable: *Figures come
-from the provider and can lag a few minutes. A blank reading means unknown, never zero.* There is no
-flexible-spend bar — Descent reports no such window, and a third bar reading "—" would invent a
-limit nobody set.
+weekdays past one. The instant is read by `resetInstant` (`utils/usageWindows.ts`), which takes a
+stamp carrying no offset as UTC — the rule `server/modules/accounts/usage-windows.ts` applies when it
+decides `rolled` — so the countdown and the *was 36% used* dimming describe one moment. The block
+closes with the sentence that makes a blank bar readable: *Figures come from the provider and can lag
+a few minutes. A blank reading means unknown, never zero.* There is no flexible-spend bar — the
+provider reports no such window, and a third bar reading "—" would invent a limit nobody set.
 
 ## The two writes
 
-**Switching.** A row press sends its slug and, on Descent's yes, raises a positive toast: title
+**Switching.** A row press sends its slug and, on the server's yes, raises a positive toast: title
 `Switched to <label>`, message *Running conversations finish on the account they started with. New
 messages use \<label\>.* That is the honest sentence rather than the comfortable one — the swap is
 whole-box, and a session already running keeps the tokens it holds in memory. On the server's no,
@@ -121,19 +194,19 @@ answered with something this app could not read.*, *The server is not reachable.
 **Capturing.** `+ Add another account` saves the login that is live now *before* the CLI can replace
 it, then opens `ProviderLoginModal`, which runs the provider's own `/login` in an embedded terminal.
 Closing the modal captures a second time — and only when the login command exited cleanly. Either
-capture raises `Saved <label>` (or *Saved the login that is live now* when Descent named no slug)
-with the message *It is now the account in use.*: Descent's capture is not a snapshot only, it also
-re-points its active account at whatever it just saved.
+capture raises `Saved <label>` (or *Saved the login that is live now* when the reply named no slug)
+with the message *It is now the account in use.*: the capture is not a snapshot only, it also
+re-points the active account at whatever it just saved (`accounts.routes.ts`).
 
-**Drift.** When Descent reports the live login differs from its saved copy, a warn `Banner` names
+**Drift.** When the picture reports the live login differs from its saved copy, a warn `Banner` names
 both — the one in use and the one *Save it* would adopt — and `Save it` is the same capture.
 
 ## The rules that bite
 
-1. **The date on a row is the age of a saved copy, and never an alarm.** Descent calls `expiresAt`
-   "a freshness clock, not a secret" (`account_store.py::_read_expires_at`) — the provider's expiry
-   inside the COPY it holds, read from that slot's own file — and raises no warning from it anywhere
-   in its own switcher. A docked slot's stamp is normally in the past, and is in the FUTURE for
+1. **The date on a row is the age of a saved copy, and never an alarm.** The account store calls
+   `expiresAt` "a freshness clock, not a secret" (`account-store.service.ts`, rule 3 of its header)
+   — the provider's expiry inside the COPY it holds, read from that slot's own file — and nothing in
+   the switcher raises a warning from it. A docked slot's stamp is normally in the past, and is in the FUTURE for
    hours after a switch, because `install()` snapshots the OUTGOING login into its own slot before
    copying the target over live. So there is no "sign in again" line and no inline sign-in button
    here: an alarm that is always on is not an alarm. The panel states what the date IS, once, above
@@ -158,12 +231,13 @@ both — the one in use and the one *Save it* would adopt — and `Save it` is t
    at. The shared `Dialog` does stop it, because a modal has nothing in front of it.
 
 5. **A switch is unguarded by a dialog; a second write is not.** The soft gate is the fact on the
-   row — *in use now · 8 sessions running* — rather than a modal. What is refused is a write while
+   row — *in use now · none proven running*, the only count the server can state — rather than a
+   modal. What is refused is a write while
    one is in flight, read from a ref rather than from `busy`, since a render value lands too late to
    stop a second press in the same tick.
 
-6. **A capture is never free at the far end.** It rewrites both slot files, appends an audit row and
-   repaints every Descent client, so the second capture is gated on the login command's exit code
+6. **A capture is never free at the far end.** It rewrites both slot files and moves the active
+   mark, so the second capture is gated on the login command's exit code
    rather than on the bare fact that it exited. A modal opened and closed without signing in, and a
    login the operator cancelled, both leave the store untouched.
 
@@ -172,7 +246,8 @@ both — the one in use and the one *Save it* would adopt — and `Save it` is t
 
 8. **The floors are 60 s, 180 s and five, and opening the panel is worth two readings.** The picture
    is re-read every minute, and usage and the balance every three, because both move slowly — usage
-   comes through Descent's own cache, and money moves on the scale of a build. `togglePanel` forces
+   comes through the server's own three-minute cache (`HEALTHY_TTL_MS` in `usage.service.ts`), and
+   money moves on the scale of a build. `togglePanel` forces
    a fresh reading of BOTH on open — on open only, so a close costs nothing — so what a person looks
    at is current without paying for it every minute. The balance is the one a person would otherwise
    check twice by hand: a figure that only moves on a timer reads as stale the moment it is the
@@ -201,7 +276,7 @@ both — the one in use and the one *Save it* would adopt — and `Save it` is t
   `onComplete` handler instead of its behaviour.
 - **Capture-on-success rides the terminal's exit-line scrape.** `useShellConnection` matches
   `Process exited with code (\d+)` in the shell's own output; a login whose exit line never prints
-  captures nothing. It self-heals rather than losing anything — Descent then reports `drift`, and
+  captures nothing. It self-heals rather than losing anything — the picture then reports `drift`, and
   the banner's *Save it* adopts the live login.
 - **The avatar hue is positional.** The footer always draws hue 0 and the panel indexes by row, so
   the same account can carry one colour in the footer and another in the list.
@@ -217,7 +292,7 @@ both — the one in use and the one *Save it* would adopt — and `Save it` is t
 - **Two library gaps, left in the library.** `Banner` carries no `role` or `aria-live`, so a refusal
   is not announced; `Meter` emits `role="meter"` with no `aria-valuenow` on a null percent, which is
   correct-by-omission but reads as an incomplete widget to a strict validator.
-- **Lint reads one of this class, on the sibling.** `useDescentUsage.ts:44` carries a
+- **Lint reads one of this class, on the sibling.** `useClaudeUsage.ts:44` carries a
   `react(set-state-in-effect)` on its mount fetch — the shape this repo's other pollers already
   have, and the module's only finding. The balance hook beside it, of the same shape, reads clean.
   The repo reads 129 warnings and 0 errors, one fewer than before this pass, and nothing here added
@@ -225,14 +300,19 @@ both — the one in use and the one *Save it* would adopt — and `Save it` is t
 
 ## Proving it
 
-`node .verify/phase-13.mjs`, headless Chromium against the running dev server. The dark pass reads
-the screen against Descent and stops there; the light one carries the rest. It never presses the
-Switch of another slot and never presses *Save it* — either would swap the
-operator's whole live login mid-run — and it never logs in: the login modal is opened by its own
-title and closed without typing. Everything the operator's own Descent can answer is read live
-through the proxy; everything it is not doing today — `percent: 0`, a null, a rolled window, a
-flagged one, a degraded reading, four shapes of expiry, drift, and a Descent that is down — is
-replayed into the two READS in the browser, touching no server and no account. Shots are
+`node .verify/phase-13.mjs`, headless Chromium against the running dev server. **It no longer runs
+green:** it was written against the proxy this lane has since replaced, and its live reads, its two
+`page.route` replays and its capture counter all still name that proxy's retired URL prefix — the
+strings live in the probe's own source, and they must be re-pointed at `/api/accounts`, `/api/usage`
+and `/api/accounts/capture` before any gate means anything. What it measures once they are: the dark
+pass reads the screen against the live picture
+and stops there; the light one carries the rest. It never presses the Switch of another slot and
+never presses *Save it* — either would swap the operator's whole live login mid-run — and it never
+logs in: the login modal is opened by its own title and closed without typing. Everything the
+accounts lane can answer is read live through the server; everything it is not doing today —
+`percent: 0`, a null, a rolled window, a flagged one, a degraded reading, four shapes of expiry,
+drift, and a lane that cannot answer — is replayed into the two READS in the browser, touching no
+server and no account. Shots are
 `13-footer`, `13-popover`, `13-popover-unreachable` and `13-rail`. See
 [verification.md](verification.md).
 

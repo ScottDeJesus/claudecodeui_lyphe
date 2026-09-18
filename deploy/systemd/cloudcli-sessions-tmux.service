@@ -33,7 +33,7 @@
 # sweep deletes a dead host's files on the next API boot anyway.
 #
 # DEPLOY (a NEW unit — needs a full install, not just daemon-reload):
-#   sudo cp /home/lyphe/.claude/claudecodeui_lyphe/deploy/systemd/cloudcli-sessions-tmux.service /etc/systemd/system/
+#   deploy/systemd/install.sh cloudcli-sessions-tmux.service
 #   sudo systemctl daemon-reload && sudo systemctl enable --now cloudcli-sessions-tmux
 #   systemctl status cloudcli-sessions-tmux   # → active; tmux -L cloudcli-sessions ls → _keepalive
 
@@ -43,8 +43,8 @@ After=network.target
 
 [Service]
 Type=forking
-User=lyphe
-Group=lyphe
+User=__USER__
+Group=__USER__
 # Hold a tmux server on the private socket with one no-op keepalive session. The forked
 # server reparents to PID 1; Type=forking + RemainAfterExit keep the unit ACTIVE.
 ExecStart=/usr/bin/tmux -L cloudcli-sessions -f /dev/null new-session -d -s _keepalive sleep infinity

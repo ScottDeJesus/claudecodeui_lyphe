@@ -17,7 +17,7 @@ type NavItem = {
 };
 
 /**
- * The prototype's order (design/CloudCLI Verve.dc.html:871-880): Agents, Appearance, Git,
+ * The prototype's order: Agents, Appearance, Git,
  * Tasks, Notifications, Keys and credentials, Voice, Plugins, About.
  *
  * Browser has no row in the prototype — the design predates the tab — so it sits with the

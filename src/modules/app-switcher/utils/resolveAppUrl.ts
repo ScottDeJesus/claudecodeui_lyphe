@@ -13,7 +13,7 @@
  * (`src/modules/widgets/docspaceOrigin.ts`).
  */
 
-/** `http://{host}:7878` + `100.103.222.79` -> `http://100.103.222.79:7878`. Case-insensitive. */
+/** `http://{host}:8004` + `10.0.0.5` -> `http://10.0.0.5:8004`. Case-insensitive. */
 export function resolveAppUrl(url: string, host: string): string {
   // GLOBAL and case-insensitive, both deliberately. The hub's own rule was the same
   // (`seed.js:34`, `/\{host\}/gi`): a registry carrying `{HOST}` must resolve, and a URL naming
@@ -67,7 +67,7 @@ export function isSelfOrigin(resolvedUrl: string, pageOrigin: string, selfPorts:
 /**
  * A URL's port, defaulted from its scheme when the URL omits it.
  *
- * `URL.port` is the empty string for `http://eis1/x`, and an empty string is not a port: without
+ * `URL.port` is the empty string for `http://myhost/x`, and an empty string is not a port: without
  * this, a row written without one falls out of every comparison against a numeric port set.
  */
 function portOf(url: URL): number {

@@ -37,7 +37,7 @@ type RemoveRefusal = {
 };
 
 /**
- * The applications drawer, opened from the FAB — design/Applications Hub.dc.html's drawer, on the kit.
+ * The applications drawer, opened from the FAB, on the kit.
  *
  * A SHEET DOWN THE LEFT, min(88vw, 364px) on the canvas ground: the FAB it answers docks in the left
  * rail, so the sheet opens from the side the reader's hand is already on, and the strip of backdrop

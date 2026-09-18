@@ -1,19 +1,37 @@
 /**
  * When each account's weekly quota turns over.
  *
- * Descent meters ONLY the live account — the other slots hold credential snapshots whose
+ * The meter reads ONLY the live account — the other slots hold credential snapshots whose
  * access tokens expired days ago, and refreshing one would mutate the very auth state the
  * switcher exists to hold still (`~/.claude/descent/server_api_usage.py`, "ONLY THE LIVE
  * ACCOUNT CAN BE METERED"). So there is no reading to fetch for a docked account, and the
- * schedule below is the operator's own, given directly.
+ * schedule is the operator's own, given directly in `VITE_ACCOUNT_WEEKLY_RESETS`:
+ * comma-separated `<slot slug>=<Weekday>@<HH:MM>` entries (`work=Friday@14:00,home=Tuesday@00:00`).
+ * An account with no entry draws no reset line.
  *
- * The anchors are PACIFIC WALL-CLOCK times, not fixed UTC offsets. That is the whole reason
- * this file resolves them through `America/Los_Angeles` rather than storing an hour offset:
- * "Friday 2:00 PM" is 21:00 UTC in PDT and 22:00 UTC in PST, and an account whose reset drifts
- * an hour twice a year is worse than no line at all.
+ * The anchors are WALL-CLOCK times in `VITE_ACCOUNT_RESET_ZONE` (an IANA name; unset = the
+ * reader's own zone), not fixed UTC offsets. That is the whole reason this file resolves them
+ * through a zone rather than storing an hour offset: "Friday 2:00 PM" Pacific is 21:00 UTC in
+ * PDT and 22:00 UTC in PST, and an account whose reset drifts an hour twice a year is worse than
+ * no line at all.
  */
 
-const ZONE = 'America/Los_Angeles';
+/** A name `Intl` refuses (`PDT`, a typo) falls back to the reader's zone: thrown from here it
+ *  would reach render, and the whole app would go down over one config line. */
+function resolveZone(): string {
+  const own = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const given = String(import.meta.env?.VITE_ACCOUNT_RESET_ZONE ?? '').trim();
+  if (given === '') return own;
+  try {
+    new Intl.DateTimeFormat('en-US', { timeZone: given });
+    return given;
+  } catch {
+    console.warn(`VITE_ACCOUNT_RESET_ZONE "${given}" is not an IANA zone name; using ${own}.`);
+    return own;
+  }
+}
+
+const ZONE = resolveZone();
 
 /** Sunday-first, matching `Date.prototype.getUTCDay`. */
 const WEEKDAY_INDEX: Record<string, number> = {
@@ -22,12 +40,21 @@ const WEEKDAY_INDEX: Record<string, number> = {
 
 type WeeklyAnchor = { weekday: number; hour: number; minute: number };
 
-/** Keyed by Descent's slot slug. Given by the operator; these do not change. */
-const WEEKLY_RESETS: Record<string, WeeklyAnchor> = {
-  'sdjesus89': { weekday: WEEKDAY_INDEX.Friday, hour: 14, minute: 0 },
-  'scottdejesus': { weekday: WEEKDAY_INDEX.Tuesday, hour: 0, minute: 0 },
-  'scottdejesus.dev': { weekday: WEEKDAY_INDEX.Friday, hour: 22, minute: 0 },
-};
+/** Keyed by the store's slot slug. A malformed entry is dropped rather than guessed at. */
+const WEEKLY_RESETS: Record<string, WeeklyAnchor> = Object.fromEntries(
+  String(import.meta.env?.VITE_ACCOUNT_WEEKLY_RESETS ?? '')
+    .split(',')
+    .flatMap((entry): [string, WeeklyAnchor][] => {
+      const match = /^\s*([^=]+?)\s*=\s*([A-Za-z]+)@(\d{1,2}):(\d{2})\s*$/.exec(entry);
+      const weekday = match
+        ? WEEKDAY_INDEX[match[2][0].toUpperCase() + match[2].slice(1).toLowerCase()]
+        : undefined;
+      if (!match || weekday === undefined || Number(match[3]) > 23 || Number(match[4]) > 59) {
+        return [];
+      }
+      return [[match[1], { weekday, hour: Number(match[3]), minute: Number(match[4]) }]];
+    }),
+);
 
 /**
  * How far `ZONE` is from UTC at one instant, in milliseconds.
@@ -54,7 +81,7 @@ function zoneOffsetMs(instant: number): number {
 }
 
 /**
- * The instant at which the Pacific wall clock reads the given date and time.
+ * The instant at which the zone's wall clock reads the given date and time.
  *
  * Resolved twice on purpose. The first pass guesses the offset from the naive timestamp; on a
  * changeover weekend that guess can sit on the wrong side of the boundary, and the second pass
@@ -68,7 +95,7 @@ function instantForZonedWallClock(year: number, month: number, day: number, hour
   return naive - zoneOffsetMs(firstPass);
 }
 
-/** Today's Pacific calendar date and weekday, as the zone itself sees them right now. */
+/** Today's calendar date and weekday in the zone, as the zone itself sees them right now. */
 function pacificToday(now: number): { year: number; month: number; day: number; weekday: number } {
   const parts = new Intl.DateTimeFormat('en-US', {
     timeZone: ZONE,
@@ -88,7 +115,7 @@ function pacificToday(now: number): { year: number; month: number; day: number; 
 /**
  * The next time this account's weekly window turns over, or `null` for a slug with no anchor.
  *
- * A new account Descent starts holding is exactly that `null` case: it gets no line rather than
+ * A new account the store starts holding is exactly that `null` case: it gets no line rather than
  * a borrowed one, because a reset time under the wrong account's name is worse than none.
  */
 export function nextWeeklyReset(slug: string, now: number = Date.now()): Date | null {

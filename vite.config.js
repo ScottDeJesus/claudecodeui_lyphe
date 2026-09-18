@@ -49,9 +49,9 @@ export default defineConfig(({ mode }) => {
       host,
       port: parseInt(env.VITE_PORT) || 5173,
       // Vite 7 refuses any Host header that is not an IP or localhost. This app is opened directly
-      // under those names on the LAN and the tailnet — the machine name and its MagicDNS name
-      // included — so they must stay allowed or such a visit renders a 403 page.
-      allowedHosts: ['eis1', 'eis1.tail8717cd.ts.net'],
+      // under those names on the LAN and a VPN — the machine name and its DNS name included — so
+      // they are listed in the comma-separated VITE_ALLOWED_HOSTS or such a visit renders a 403 page.
+      allowedHosts: (env.VITE_ALLOWED_HOSTS || '').split(',').map((name) => name.trim()).filter(Boolean),
       // Pre-transform the entry module when the dev server starts, so the first visit after a restart
       // does not wait on it. Vite warms the listed file; its imports still transform on first request.
       warmup: { clientFiles: ['./src/main.tsx'] },

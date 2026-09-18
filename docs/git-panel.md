@@ -4,13 +4,13 @@ The Git tab: which branch this is, how it stands against its upstream, what is w
 pushed, what each change looks like, and the one button that asks Claude to commit and push it.
 
 **It is not tied to the session.** The tab sits in the workspace beside Chat and Files, but its
-own strip of repositories decides what is on screen: four, in a fixed order — `/opt/shadow-connector`,
-`/home/lyphe/.claude/claudecodeui_lyphe`, `/home/lyphe/.claude`, `/opt/eis-app` (`GIT_REPO_PATHS` in
-`src/shared/constants.ts`) — each matched by path to a registered project from the workspace's own
+own strip of repositories decides what is on screen: the comma-separated `VITE_GIT_REPO_PATHS`
+(`src/shared/constants.ts`), each matched by path to a registered project from the workspace's own
 project list, since every git route reads a project by its database id. A path the app has not
-registered is left off the strip. The match is made once, in the workspace's state provider, and
-memoised on the three fields the tab reads (`GitRepository`), so the background refreshes that
-rebuild the project list do not re-render the tab.
+registered is left off the strip; when the env is unset or empty, every registered project is on
+the strip. The match is made once, in the workspace's state provider, and memoised on the three
+fields the tab reads (`GitRepository`), so the background refreshes that rebuild the project list
+do not re-render the tab.
 
 Changing session or project leaves the tab on the repository it was showing. The choice lives at
 module scope in `hooks/useSelectedGitRepository.ts` (the tab is unmounted whenever another tab is
@@ -118,9 +118,10 @@ created. The literal has to *begin* with `/git` or the estate's push guard
 (`~/.claude/hooks/enforce_push_via_git_command.py`) refuses the run the one thing it exists for,
 so a trailing space, a newline, or the command's expanded text each cost it the push.
 
-**What it starts is the estate's checkpoint, not this repository's.** `/git` commits and pushes
-all four repositories `~/.claude/commands/git.md` lists — the same four the tab's strip carries.
-The card is headed by its title alone, so the list above it keeps the room; the caption under the
+**What it starts is the operator's own checkpoint, not this repository's.** `/git` commits and
+pushes whatever repositories the operator's own `/git` command lists — typically the same
+repositories `VITE_GIT_REPO_PATHS` names, when the two are kept in sync. The card is headed by its
+title alone, so the list above it keeps the room; the caption under the
 button counts only what is here: *N files here · commits are grouped by intent, then pushed to
 main*. Having nothing waiting in this repository is
 therefore never a reason to disable the button, and the caption says so in its own words rather
@@ -159,7 +160,7 @@ the sidebar's activity chip. A running session IS a delegation run when its `sum
 command or — every sidebar row can be renamed, including this one while it runs — when its first
 user row is, read as two bounded head pages rather than as a transcript (the largest conversation
 on this host is 86 MB). The question is asked host-wide, because `/git` is one checkpoint across
-all four repositories: a run in this project is adopted and narrated here, a run in another
+every repository it covers: a run in this project is adopted and narrated here, a run in another
 project is named and refuses the press (*A checkpoint is already running in …*, with the way into
 it beside the button), and a guard that cannot be read refuses too — *We couldn't check whether a
 run is already going, so nothing was started.* Dismiss asks the same question before it lets go of

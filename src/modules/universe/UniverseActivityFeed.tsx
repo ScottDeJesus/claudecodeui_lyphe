@@ -52,7 +52,7 @@ function clock(at: number): string {
   return new Date(at).toLocaleTimeString(undefined, { hour12: false });
 }
 
-/** `eis-app.service` reads as `eis-app`: the suffix says nothing the column does not. */
+/** `web-app.service` reads as `web-app`: the suffix says nothing the column does not. */
 function sourceWord(source: string): string {
   return source.endsWith('.service') ? source.slice(0, -'.service'.length) : source;
 }

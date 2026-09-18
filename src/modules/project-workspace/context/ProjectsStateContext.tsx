@@ -107,10 +107,11 @@ export function ProjectsStateProvider({
   // is written to avoid. So the list is keyed on a string of just those fields, and its identity
   // moves only when one of them does.
   const gitRepositoriesKey = JSON.stringify(
-    GIT_REPO_PATHS.flatMap((repoPath) => {
-      const project = state.projects.find((candidate) => candidate.fullPath === repoPath);
-      return project ? [[project.projectId, project.fullPath, project.displayName]] : [];
-    }),
+    (GIT_REPO_PATHS.length === 0 ? state.projects.map((project) => project.fullPath) : GIT_REPO_PATHS)
+      .flatMap((repoPath) => {
+        const project = state.projects.find((candidate) => candidate.fullPath === repoPath);
+        return project ? [[project.projectId, project.fullPath, project.displayName]] : [];
+      }),
   );
   const gitRepositories = useMemo<GitRepository[]>(
     () => (JSON.parse(gitRepositoriesKey) as [string, string, string][])

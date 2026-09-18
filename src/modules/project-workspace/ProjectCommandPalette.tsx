@@ -31,7 +31,7 @@ function ProjectCommandPalette() {
   // the same path does not hand the palette a new function.
   const selectedRepoPath = selectedProject?.fullPath ?? null;
   const showSelectedRepoInGitTab = useMemo(
-    () => (selectedRepoPath && GIT_REPO_PATHS.includes(selectedRepoPath)
+    () => (selectedRepoPath && (GIT_REPO_PATHS.length === 0 || GIT_REPO_PATHS.includes(selectedRepoPath))
       ? () => {
         selectGitRepository(selectedRepoPath);
         setActiveTab('git');

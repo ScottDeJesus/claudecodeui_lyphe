@@ -20,7 +20,7 @@
 // nothing that ties a row to a cause. So `frames`, `rows`, `edit` and `exec` say the lane is live and
 // delivering — that history, edits and requests really reach a browser over `/ws` — and they can
 // never say that any particular request produced any particular row. The estate talks on its own:
-// measured over one quiet minute on this box, shadow-connector.service alone was worth 151 exec rows
+// measured over one quiet minute on the box it was written on, one busy unit alone was worth 151 exec rows
 // with nothing driving it, so `exec=yes` is not evidence that the requests you made arrived. Read it
 // as "the exec lane carried traffic while we listened".
 //

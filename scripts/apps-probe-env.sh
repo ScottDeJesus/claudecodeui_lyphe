@@ -1,10 +1,9 @@
-# The real-system harness for the application switcher, SOURCED by every verify command in
-# `docs/plans/application-switcher.plan.md` — never executed as a program, and imported by no
-# application code. It is a library: `. scripts/apps-probe-env.sh` and call its three functions.
+# The real-system harness for the application switcher, SOURCED by its verify commands — never
+# executed as a program, and imported by no application code. It is a library: `. scripts/apps-probe-env.sh` and call its three functions.
 #
 #   mint_token         an HS256 JWT for the first user, read from the real database's own secret
 #   boot_probe_server  a SECOND server on $PROBE_PORT, reusing one only when this script started it
-#   stop_probe_server  kills that server and puts the operator's server marker back
+#   stop_probe_server  kills that server and deletes its scratch marker and sessions dir
 #
 # Why a second server and not the operator's: the operator's own API runs on 3011 under
 # `cloudcli-server-dev.service`, which hot-restarts it on any save under `server/`. A phase that
@@ -19,14 +18,21 @@ PROBE_PORT="${PROBE_PORT:-7893}"
 APPS_REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 APPS_PID_FILE="/tmp/apps-server.pid"
 APPS_LOG="/tmp/apps-server.log"
-APPS_MARKER_BAK="/tmp/apps-marker.bak"
-APPS_MARKER_LIVE="$HOME/.cloudcli/local-server.json"
+APPS_MARKER="/tmp/apps-marker.json"
+APPS_SESSIONS_DIR="/tmp/apps-sessions"
 APPS_STATUS_URL="http://127.0.0.1:${PROBE_PORT}/api/auth/status"
 
-# The server writes ~/.cloudcli/local-server.json on boot and DELETES it on exit when the pid in it
-# is its own (server/index.ts:322,350-366), so a second server erases the operator's marker just by
-# stopping. The backup copy taken at boot and copied back at stop is this repo's alternative to a
-# `git restore` — the runs hold no git writes at all.
+# Two redirects protect the operator's own server. The server writes its marker on boot and DELETES
+# it on exit, so the probe's goes to a scratch path (`CLOUDCLI_LOCAL_SERVER_MARKER`) and the
+# operator's `~/.cloudcli/local-server.json` is never touched — the backup-and-copy-back this
+# replaced also copied a days-old backup over a live marker whenever a verify called the stop blind.
+# And a server booted without a supervisor claims the keepalive (`readopt.ts`'s `.owner` claim,
+# which fails closed only while the operator's server holds it — not across its restart on every
+# `server/` save): once claimed, it re-adopts every host in the sessions directory and either takes
+# its socket (newest wins) or, finding no session row, retires it. So the probe gets an empty
+# sessions directory of its own (`CLOUDCLI_SESSIONS_DIR`). The tmux server is still the shared one
+# (its socket name is a constant), so the scratch directory is deleted at stop.
+# NOTE: this harness still runs against the LIVE database — neither redirect isolates that.
 #
 # mint_token: proven on this box during the Kanban build (2026-09-15). `jwt_secret` and the first
 # `users` row come from the real `~/.cloudcli/auth.db`, so the token is one the live
@@ -65,7 +71,7 @@ boot_probe_server() {
     fi
   fi
 
-  cp "$APPS_MARKER_LIVE" "$APPS_MARKER_BAK" 2>/dev/null || true
+  mkdir -p "$APPS_SESSIONS_DIR"
 
   # `exec` inside the subshell, so "$!" IS the server's pid rather than a wrapper's: a kill that
   # reached only the wrapper would leave an orphan holding $PROBE_PORT and poison every later
@@ -73,6 +79,8 @@ boot_probe_server() {
   (
     cd "$APPS_REPO_ROOT" || exit 1
     export SERVER_PORT="$PROBE_PORT"
+    export CLOUDCLI_LOCAL_SERVER_MARKER="$APPS_MARKER"
+    export CLOUDCLI_SESSIONS_DIR="$APPS_SESSIONS_DIR"
     exec node_modules/.bin/tsx --tsconfig server/tsconfig.json server/index.ts
   ) >"$APPS_LOG" 2>&1 &
   echo $! >"$APPS_PID_FILE"
@@ -88,9 +96,8 @@ boot_probe_server() {
 }
 
 # stop_probe_server: kills the pid this script wrote, removes the pid file (so the next
-# `boot_probe_server` can never reuse a corpse), waits for the port to fall silent, then puts the
-# operator's marker back. Safe to call when nothing is running — the verifies call it first,
-# blind, for exactly that reason.
+# `boot_probe_server` can never reuse a corpse), and waits for the port to fall silent. Safe to call
+# when nothing is running — the verifies call it first, blind, for exactly that reason.
 stop_probe_server() {
   if [ -f "$APPS_PID_FILE" ]; then
     local running_pid
@@ -105,6 +112,5 @@ stop_probe_server() {
     fi
     rm -f "$APPS_PID_FILE"
   fi
-
-  cp "$APPS_MARKER_BAK" "$APPS_MARKER_LIVE" 2>/dev/null || true
+  rm -rf /tmp/apps-marker.json /tmp/apps-sessions
 }

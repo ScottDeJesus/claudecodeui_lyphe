@@ -157,3 +157,7 @@ electron/*.tar.gz
 # every completed write, so one left behind is a killed process, not a file to notice in the status.
 apps.local.json
 apps.local.json.tmp
+
+# Per-box build records and design exports: kept on disk, never published.
+/docs/plans/
+/design/

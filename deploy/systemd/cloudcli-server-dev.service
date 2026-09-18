@@ -1,5 +1,5 @@
 # DEPLOY (an EXISTING unit — the ExecStart changed, so systemd must re-read it):
-#   sudo cp /home/lyphe/.claude/claudecodeui_lyphe/deploy/systemd/cloudcli-server-dev.service /etc/systemd/system/
+#   deploy/systemd/install.sh cloudcli-server-dev.service
 #   sudo systemctl daemon-reload && sudo systemctl restart cloudcli-server-dev
 #   systemctl status cloudcli-server-dev   # → active; journal shows '[supervisor] serving pid <n>'
 [Unit]
@@ -12,25 +12,25 @@ StartLimitBurst=5
 
 [Service]
 Type=simple
-WorkingDirectory=/home/lyphe/.claude/claudecodeui_lyphe
+WorkingDirectory=__REPO__
 # .env carries SERVER_PORT=3011, VITE_PORT=5183, HOST=127.0.0.1, CLAUDE_CLI_PATH — the same file
 # the tmux dev session used. HOST stays loopback: every LAN request reaches the API through Vite's
 # proxy on :5183, so the API itself never has to face the LAN.
-EnvironmentFile=/home/lyphe/.claude/claudecodeui_lyphe/.env
+EnvironmentFile=__REPO__/.env
 Environment=NODE_ENV=development
 # The interactive shell's PATH, in full: the app's shell tab and every spawned Claude session
 # inherit this process env, so a narrower list silently loses tools (pnpm, the sbin dirs).
-Environment=PATH=/home/lyphe/.claude/claudecodeui_lyphe/node_modules/.bin:/home/lyphe/.npm-global/bin:/home/lyphe/.local/share/pnpm:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/snap/bin
+Environment=PATH=__REPO__/node_modules/.bin:__HOME__/.npm-global/bin:__HOME__/.local/share/pnpm:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/snap/bin
 # The supervisor, not the API itself: it boots an edited server BESIDE the running one and
 # retires the old only once the new one is listening, so a save under server/ never leaves the
 # port unanswered and a broken edit is a logged line instead of an outage
 # (deploy/dev-supervisor/README.md). Like the watcher it replaces it OUTLIVES a dead child and
 # waits for the next edit — so a dead API still leaves this unit 'active', and the watchdog's
 # API canary on /api/cli-version is what catches that (Restart= cannot).
-ExecStart=/usr/bin/node /home/lyphe/.claude/claudecodeui_lyphe/deploy/dev-supervisor/supervisor.mjs
+ExecStart=/usr/bin/node __REPO__/deploy/dev-supervisor/supervisor.mjs
 Restart=always
 RestartSec=5
-User=lyphe
+User=__USER__
 
 [Install]
 WantedBy=multi-user.target

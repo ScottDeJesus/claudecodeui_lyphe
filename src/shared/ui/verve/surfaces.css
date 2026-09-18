@@ -48,10 +48,18 @@
  * VersionUpgradeModal (rendered by SidebarModals.tsx) and BrowserUsePanel.tsx's fullscreen view —
  * so the FAB stays sharp and clickable over their backdrops too. That is accepted: pressing it opens
  * a portalled Dialog above the modal, and closing that returns the reader to the modal untouched.
- * A modal that must cover the FAB portals itself the way Dialog does; this number does not drop. */
+ * A modal that must cover the FAB portals itself the way Dialog does; this number does not drop.
+ *
+ * The fullscreen embed surfaces are a sixth neighbour, in-tree at `z-[45]` — a transcript embed card
+ * (ShapeFrame) or a chat gutter widget (GutterWidgetFrame) given the whole viewport. They sit under
+ * the dialog layer on purpose, so the FAB stays live over them, as it does over BrowserUsePanel's
+ * fullscreen view. Accepted with one consequence: an application launched from the FAB draws on
+ * AppSwitcherLayer (z-40), behind the opaque card, until the reader leaves fullscreen. The number
+ * cannot be both above this FAB and below Dialog, and staying below Dialog is the one that matters:
+ * above it, a dialog opened from fullscreen comes up invisibly and keeps the keyboard. */
 .vv-fab {
-  /* 28px drawn, at every width, docked or floating — the size design/Applications Hub.dc.html draws
-   * it (the `fabDown` button). It is a way in and out, never the screen's subject, so it stays the
+  /* 28px drawn, at every width, docked or floating — the size the design draws
+   * it. It is a way in and out, never the screen's subject, so it stays the
    * smallest thing in the rail beside the wordmark; the 44px catch below is what a finger needs. */
   --vv-fab-size: 28px;
   --vv-fab-glyph: 12px;

@@ -86,6 +86,50 @@ export raises `react(only-export-components)` — the shape thirteen of this rep
 files already have, so the number was re-recorded rather than waived. The file says why in
 full. `npm run build` is not part of verification and the dev server never needs it.
 
+## The sunset probe harness
+
+```bash
+set -e
+source scripts/sunset-probe.sh
+trap stop_probe_server EXIT
+probe_db
+boot_probe_server
+TOK=$(mint_token)
+# curl against http://127.0.0.1:7893 with "$TOK"
+```
+
+`scripts/sunset-probe.sh` is the harness the sunset work is proven with, and it is four SOURCEABLE
+functions with no top-level side effects of their own — it sets no shell option and boots nothing on
+source, so a probe sources it, calls what it needs and traps its own teardown.
+
+- **`probe_db`** copies the live `~/.cloudcli/auth.db` to `/tmp/sunset-probe.db` and then DISARMS it
+  (`update kanban_boards set autonomy=0`), so no board on the scratch copy can spawn a Metis while a
+  probe drives it. It COPIES the live file; nothing here opens it.
+- **`mint_token`** reads the JWT secret out of the SCRATCH database and prints a bearer for its first
+  user, so the token is valid only against the probe server it was minted alongside.
+- **`boot_probe_server`** boots a SECOND server on port **7893** against the scratch database and
+  scratch roots — `KANBAN_METIS_STATE_ROOT`, `KANBAN_ATTACHMENTS_ROOT`, `CLOUDCLI_ACCOUNTS_ROOT`,
+  `CLOUDCLI_SPILL_ROOT`, `CLOUDCLI_RATE_LIMIT_PATH`, `CLOUDCLI_SESSIONS_DIR` and
+  `CLOUDCLI_LOCAL_SERVER_MARKER`, all under `/tmp` — and waits for
+  `/api/auth/status` before returning. Every runtime root the server reads is redirected by an
+  environment variable; the operator's own server on 3011 never sees the scratch copy, and the probe
+  server is started with `tsx` directly rather than through `npm run dev`.
+- **`stop_probe_server`** kills the probe server and deletes every scratch root. It runs on EVERY
+  exit path, the aborted one included. Two of the redirects protect the operator's server rather than
+  its data: `CLOUDCLI_SESSIONS_DIR`, because a server booted without a supervisor claims the keepalive
+  whenever the operator's server is not holding it (`readopt.ts`'s `.owner` claim fails closed only
+  while it is held, not across the restart every `server/` save causes) and then re-adopts every host
+  in the directory — retiring each one whose session row its scratch database lacks, taking the
+  socket of each one it finds; and
+  `CLOUDCLI_LOCAL_SERVER_MARKER`, because a probe that writes the real `~/.cloudcli/local-server.json`
+  deletes it again at shutdown (measured 2026-09-18).
+
+**The rule is that no probe ever touches the live ones.** The live database, the live state root and
+the live attachments root are never opened by a probe, and a probe's scratch database is disarmed
+before anything runs against it; a probe's own boards are named `probe-sunset<N>` so nothing it
+creates can be mistaken for the operator's. Nothing is left behind on a bad day: the teardown deletes
+the scratch database, every scratch root and the scratch rate-limit file.
+
 ## The browser harness
 
 ```bash
@@ -114,7 +158,7 @@ than a number for anything translucent.
 `.verify/` is git-ignored on purpose: the screenshots are large binaries that churn on every
 run, and the scripts describe one operator's machine. Nothing in the shipped application
 imports from it. Playwright is not a dependency of this repo either — `console.mjs` imports
-it by absolute path from `/opt/shadow-connector/node_modules/playwright/index.js` (1.58.2,
+it by absolute path from another checkout's `node_modules/playwright/index.js` (1.58.2,
 Chromium build 1208 already cached), so `npm install` here pulls no browser stack.
 
 Screenshots land in `.verify/shots/` as `<phase>-<screen>[-<width>]-<light|dark>.png`;
@@ -228,28 +272,37 @@ real `/git` was said somewhere. The shots are `11-git-idle` (light and dark), `-
 `-dismiss-held-by-the-server` and `-refused-checkpoint-elsewhere`. Its contract is at
 [git-panel.md](git-panel.md).
 
-Phase 12 opens no browser either: the Descent proxy's accounts lane is four HTTP contracts, so
-`phase-12.mjs` signs in through the real login route and drives them with `fetch`. What the live
-picture cannot show — the null discipline, a rolled percent, a vendor `severity`, a Descent that is
-down — it measures under `tsx` against bodies copied from Descent's own handlers, a closed port and a
+Phase 12 opens no browser either, and it no longer runs green: it was written against the proxy this
+lane has since replaced, so `phase-12.mjs` still names that proxy's retired URL prefix and imports the
+server module it lived in, both deleted with it, and it needs re-pointing at the accounts lane's own routes (`/api/accounts`, `/api/usage`,
+`/api/accounts/switch`, `/api/accounts/capture` — [accounts.md](accounts.md)) before it measures
+anything. As written, the lane is four HTTP contracts, so it signs in through the real login route
+and drives them with `fetch`. What the live
+picture cannot show — the null discipline, a rolled percent, a vendor `severity`, a lane that cannot
+answer — it measures under `tsx` against bodies copied from the lane's own handlers, a closed port and a
 socket that stalls mid-body. It never calls `capture` nor sends `switch` a real slug, since either
-moves the operator's live Claude login; the refused `__no_such_slug__` is how Descent's own verdict
+moves the operator's live Claude login; the refused `__no_such_slug__` is how the store's own verdict
 is shown to travel through intact. Its 40 gates are the accounts lane's alone, and stayed 40 when the
-memory lane joined the router: what changed is the down-Descent snippet, which now mounts the real
-router the way `descent.module.ts` mounts it — BOTH lanes — because a probe left constructing it one
-argument short measures a proxy nobody ships. That snippet is also why its `tsx` runs name
+memory lane joined the router: what changed is the down path's snippet, which mounts the real
+module — BOTH lanes — because a probe left constructing it one
+argument short measures a server nobody ships. That snippet is also why its `tsx` runs name
 `server/tsconfig.json` through `TSX_TSCONFIG_PATH`: the repo root maps `@/` to `src/`, so without it
 the memory service's runtime import of `readObjectRecord` from `@/shared/utils.js` loads the frontend
 file instead. Nothing under `runTsx` here reaches the memory mapper, so no assertion in this file
 would catch that — deleting the env leaves all 40 green — which is the reason the line is commented
 where it sits rather than left to look like decoration. Its contract is at
-[descent-proxy.md](descent-proxy.md).
+[accounts.md](accounts.md).
 
 Phase 13 is back in the browser, and it splits its evidence in two rather than choosing between
-them. Everything the operator's own Descent can answer — the label on the footer row, the figure
-beside it, which row carries the tick, how many slots there are, and which of them sit past their
-stamp — `phase-13.mjs` reads live through the proxy with the page's own token and holds the screen
-against it. Everything Descent is not doing today it replays into the two READS with `page.route`,
+them. It no longer runs green either: `phase-13.mjs` reads and replays that same retired prefix's
+accounts and usage paths and counts captures at its capture path, none of them called since the proxy
+went, so its live reads miss the lane and its replays never catch a request —
+the three URLs must follow the routes to `/api/accounts`, `/api/usage` and `/api/accounts/capture`
+before any gate means anything. Everything the accounts lane can answer for the live login — the
+label on the footer row, the figure beside it, which row carries the tick, how many slots there are,
+and which of them sit past their stamp — it reads live through the app's own server with the page's
+own token and holds the screen against it. Everything the lane is not doing today it replays into
+the two READS with `page.route`,
 so a `percent: 0`, a null, a rolled window, a vendor `severity`, a degraded reading, a drifted login
 and four shapes of expiry are all measured without a server, an environment or an account being
 touched. It presses no Switch and no "Save it", and it does not log in: the provider's login modal
@@ -354,31 +407,36 @@ over `[PASS] C1` … `[PASS] C7`, dragging a row with `page.mouse` on desktop an
 three is in `all.mjs`, which collects `phase-<n>.mjs` alone, so each is run by hand like every
 other `probe-*.mjs`; their contract is at [simple-chat-list.md](simple-chat-list.md).
 
-Phase 19 is the Descent proxy's other lane — memory intake — and it opens no browser either: four
+Phase 19 is the memory lane — memory intake — and it opens no browser either: four
 more HTTP contracts with nothing visual about them, driven with `fetch` behind a token from the real
-login route. Its first duty is to decide no real card. Approving one writes into a file every future
+login route. It no longer runs green: written against the proxy, `phase-19.mjs` still names that
+proxy's retired memory path and imports the server module it lived in, so it needs re-pointing at
+`/api/memory`
+and the native module before it measures anything. Its first duty is to decide no real card. Approving one writes into a file every future
 session in a project reads, and rejecting one destroys a proposal, so the write path is proven
-against ids that cannot move anything: one Descent does not have, a malformed one refused at the
-route, and one Descent already lists as approved, which it refuses before touching disk with its CAS
+against ids that cannot move anything: one the module does not have, a malformed one refused at the
+route, and one it already lists as approved, which it refuses before touching disk with its CAS
 matching zero rows. Twelve gates, in this order: the lane sits behind the app's auth like its
-accounts sibling (1); the live list's count matches Descent's own and every row carries exactly the
+accounts sibling (1); the live list's count matches the service's own and every row carries exactly the
 lean key set (2-3) — a key-set inspection over the parsed rows, never a substring scan of the
-response text, since an operator-authored `name` containing "body" would redden a proxy behaving
-correctly; one candidate reads whole by id, body and all (4); an unknown id is a calm 200
-`candidate:null` rather than a 404, because a read never fails (5); a write carries DESCENT's verdict
-— its 404 and the cap guard's 422 arriving in its own words, with item 10 comparing the proxy's body
-against Descent's byte for byte, since a rewritten refusal is one the reviewer cannot act on (6-7,
-10); a malformed id never travels, on approve AND on reject (8-9); and the lane stays calm when
-Descent is down, item 11 measuring the service and item 12 the MOUNTED router with both lanes wired —
+response text, since an operator-authored `name` containing "body" would redden a correct answer; one candidate reads whole by id, body and all (4); an unknown id is a calm 200
+`candidate:null` rather than a 404, because a read never fails (5); a write carries the SERVER's verdict
+— its 404 and the cap guard's 422 arriving in its own words, with item 10 comparing the route's body
+against the module's byte for byte, since a rewritten refusal is one the reviewer cannot act on (6-7,
+10); a malformed id never travels, on approve AND on reject (8-9); and the lane stays calm when the
+lane cannot answer, item 11 measuring the service and item 12 the MOUNTED router with both lanes wired —
 200 on both reads, 503 only on the write (11-12). Items 3, 4 and 7 depend on what the board holds:
 with an empty pending queue, or nothing approved, each prints a `[NOTE]` and no gate, so the PASS
 count moves with the queue rather than staying pinned. Like phase 12, the down path is measured
-against a closed port and never by stopping the operator's Descent — which, with nothing pending ever
+against a closed port and never by stopping the operator's own server — which, with nothing pending ever
 written to, is what makes this one safe to run while the operator is in the app: it toggles no
 preference, moves no card and opens no browser. Its contract is at
-[descent-proxy.md](descent-proxy.md).
+[memory-intake.md](memory-intake.md).
 
-Phase 20 is that lane's screen — the Memory tab — and it is back in Chromium. Eleven gates, in
+Phase 20 is that lane's screen — the Memory tab — and it is back in Chromium, and like Phase 19 it
+no longer runs green: its `page.route` globs and its whole-card read still name the retired proxy's
+memory path, a path the client stopped calling, so they need re-pointing at `/api/memory`
+first. Eleven gates, in
 three movements: the tab is on the strip and carries the pending count while its `aria-label` stays
 the bare word `Memory` (1-3), and it selects (4); the panel behind it draws one
 row per waiting candidate, marks the global-blast one, reads a body whole on expand and offers both
@@ -388,7 +446,7 @@ on the first tab change (10), back the moment something waits again (11). Gate 6
 queue holds: with nothing targeting the global file it prints a `[NOTE]` and no gate. It reviews
 nothing, and the run's whole shape is built around that — filing a card writes into a file every
 future session reads and discarding one destroys a proposal — so the zero-count half is produced by
-answering `GET /api/descent/memory` inside the page and re-reading through a dispatched
+answering the memory read inside the page and re-reading through a dispatched
 `visibilitychange`, the provider's own return-to-the-foreground path, rather than by emptying the
 queue. When the operator's own Descent has nothing pending, the UI half runs on a synthetic two-row
 list injected the same way, since a probe that quietly passed on an empty queue would be measuring
@@ -789,10 +847,11 @@ own database and an empty `CLOUDCLI_SESSIONS_DIR`, so `listLiveHosts()` returns 
 never re-adopt, which is to say steal, a host the live server is serving; never point it at the
 real sessions directory to "see a real re-adoption". Every mode also reads the live API's own
 `/api/cli-version` as a canary, so a run that disturbed :3011 says so rather than passing quietly.
-And the one file the two instances share is the local server marker `~/.cloudcli/local-server.json`:
-the child clobbers it on boot and removes its own on the way out, so the probe puts the original
-back in a `finally` — except where the live API restarted mid-probe and wrote a fresher one, a
-marker naming a living process being better truth than a snapshot naming a dead pid.
+And the two instances share no file: the child writes its local server marker into the scratch
+directory (`CLOUDCLI_LOCAL_SERVER_MARKER`, set after the environment spread so a caller's export
+cannot redirect it), and the probe's `marker_untouched` key measures that the operator's
+`~/.cloudcli/local-server.json` came through byte-identical — or was rewritten by a live process that
+is not the child, which a `server/` save mid-probe does.
 
 **`probe-widget-theme.mjs` proves a live widget is REDRESSED by a theme flip, not merely told about
 it.** `useWidgetHost` posts `{ dark, tokens }` from an ordinary effect keyed on `isDarkMode`, and
@@ -945,9 +1004,8 @@ It prints a `[PASS]`/`[FAIL]` line per gate and closes with the one `BASELINE:` 
 with `tail -1`, exiting non-zero on any failure. Zero Claude turns; `openConsole` writes the dev
 account's own preferences on the way in, and no other account (§"What bites people"). One screenshot
 (`shots/probe-shapes-baseline-light.png`). `all.mjs` collects
-`phase-<n>.mjs` only, so like every other `probe-*.mjs` it is run by hand — and every later phase of
-[the shapes plan](plans/markdown-shapes.plan.md) runs it as a verify step, expecting
-`BASELINE: DOM identical`.
+`phase-<n>.mjs` only, so like every other `probe-*.mjs` it is run by hand, as a verify step after any change to the
+shapes, expecting `BASELINE: DOM identical`.
 
 **`probe-shapes-tables.mjs` proves the three table shapes — and the tables that must NOT become
 them.** Twelve tables in one document, mounted once through the same `shapes-fixture.mjs`, answer
@@ -1684,7 +1742,7 @@ operator's. Run directly, it is a small CLI:
 ```bash
 node .verify/lib/ntfy.mjs whoami                 # verve
 node .verify/lib/ntfy.mjs topic                  # the scratch topic
-node .verify/lib/ntfy.mjs configure [minutes]    # configured=true topicMasked=… hasToken=false enabled=true appUrl=http://100.103.222.79:5183
+node .verify/lib/ntfy.mjs configure [minutes]    # configured=true topicMasked=… hasToken=false enabled=true appUrl=http://10.0.0.5:5183
 node .verify/lib/ntfy.mjs test                   # ok=true status=200
 node .verify/lib/ntfy.mjs prefs                  # limits=true
 node .verify/lib/ntfy.mjs endpoints              # GET /api/notifications/endpoints?channel=ntfy, raw JSON
@@ -1878,7 +1936,7 @@ Eight things to know before running one:
   cost nothing. Its per-mode waits are
   generous (180 s for a turn, 60 s for the push), so a failure is reported rather than hidden by
   a short timeout, and a hung run holds the terminal for minutes before it says so.
-- **`configure` writes the instance-wide `public_app_url`** as `http://100.103.222.79:5183`, the
+- **`configure` writes the instance-wide `public_app_url`** as `http://10.0.0.5:5183`, the
   value this box uses anyway. On another host it would change every user's tap-through.
 - **The run-failed probe depends on the Cursor CLI being absent** (`which cursor-agent` and
   `which agent` both empty). Install it and the turn runs for real, no crash arrives, and the probe
@@ -1921,7 +1979,7 @@ Eight things to know before running one:
 | **There is no logout control** | Nothing in `src/` consumes `AuthContext`'s `logout`, so the harness removes the `auth-token` key the app itself wrote and reloads. No token is forged and no route is bypassed. |
 | **Project rows are desktop-only** | The `PROJECT_ROW` selector matches nothing below 768px, where the compact sidebar renders a card instead of a button. Counting rows at 390px and reading `0` is that blind spot, not an empty sidebar. |
 | **A hand-written module specifier forks the module** | Vite stamps `?t=<timestamp>` on every module it has re-transformed since the server started, so an `import('/src/…')` written without that query resolves to a *second* instance — two React contexts, and a provider stops seeing its own consumer. `phase-3.mjs` reads the specifier back out of the served consumer file instead of typing one. Editing a context file with the server already up is what makes this bite. |
-| **Most registered projects answer 413, and a dead one answers 404** | `GET /api/projects` lists seven directories on this host, and the recursive tree route (`…/files`) refuses `/`, `/home/lyphe`, `/home/lyphe/.claude` and `/tmp` with a 413 at its 10,000-entry cap, while `mission-control` no longer exists on disk and 404s. Neither is a defect, and neither is a reason to re-register anything. The `…/list` route answers 200 for all four wide ones — it reads a single directory rather than a tree, which is what makes those projects browsable at all. |
+| **Most registered projects answer 413, and a dead one answers 404** | `GET /api/projects` lists seven directories on this host, and the recursive tree route (`…/files`) refuses `/`, `/home/me`, `/home/me/.claude` and `/tmp` with a 413 at its 10,000-entry cap, while `mission-control` no longer exists on disk and 404s. Neither is a defect, and neither is a reason to re-register anything. The `…/list` route answers 200 for all four wide ones — it reads a single directory rather than a tree, which is what makes those projects browsable at all. |
 | **A colour read mid-transition is a colour between two tokens** | `.vv-button` transitions `background-color`, `border-color` and `color` over 0.2s and `.vv-tabs__tab` over 0.35s, so a `getComputedStyle` taken right after a click or hover reports the blend, not either token. Read a freshly inserted element, or wait the transition out. |
 | **A shot taken right after an unfold catches the element at half its height** | The sibling of the row above, for pixels rather than colour: `CollapsibleContent` re-opens over a 200 ms `grid-template-rows` transition (`src/shared/ui/Collapsible.tsx`), and the two-`requestAnimationFrame` settle a probe uses to wait for React is not 200 ms. `probe-shapes-tables.mjs` and `probe-shapes-lists.mjs` wait 300 ms before they shoot a shape they have just re-opened. Nothing in a gate list ever reddens for this — the DOM is complete and correct the whole time — so the only thing it damages is the picture a person judges the work by. React settled is not CSS settled. |
 | **A ratio read with the pointer on the row is the hover's ratio** | `.vv-button--ghost:hover:not(:disabled)` paints `--accent-soft`, and at `(0,3,0)` it out-specifies a call site's own `hover:bg-…` utility at `(0,2,0)` — nothing here is in a cascade layer, so specificity alone decides. A hovered project row is therefore standing on Verve's wash, not on the ground its own classes name, and `page.click()` leaves the cursor exactly where it clicked. Park it off the surface before measuring, or measure a row nothing is over. |

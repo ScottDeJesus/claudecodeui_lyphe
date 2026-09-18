@@ -82,7 +82,7 @@ Rules for the template:
   plan (chapter **recovery.md** §"Resume on reconnect / rate-limit").
 - **Declare FILES, not symbols — the `PATH::SYMBOL` narrowing does not reach this board.**
   Descent let a Footprint entry narrow from a whole file to a single symbol with a `::`
-  suffix (`config/parser_features.py::flag_a`, `eis_backend/routes/jobs.py::get_job_detail`),
+  suffix (`config/features.py::flag_a`, `backend/routes/orders.py::get_order_detail`),
   so that two builds on the SAME file under DISTINCT symbols stopped colliding. That is a
   property of Descent's footprint guard, which keys on Descent's own `set_status` tool name
   and **does not fire for a `kanban-pm` session** (chapter **parallelism.md**) — so on this
@@ -109,7 +109,7 @@ Rules for the template:
   with no blank line it scans the heading line + the first body line. The
   conservative truth — **keep both keywords out of the heading, the line above it,
   AND the first non-blank body line.** Two ways this bites:
-  - A feature titled e.g. "Deferred maintenance dashboard" / "Awaiting carrier
+  - A feature titled e.g. "Deferred maintenance dashboard" / "Awaiting vendor
     confirmation" MUST be reworded out of the phase headers. Paste the raw title
     into every header and ALL phases classify DEFERRED → `unshipped == 0` → the build
     ships NOTHING. The title is safe in the doc title + scope map only.

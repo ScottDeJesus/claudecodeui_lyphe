@@ -7,9 +7,9 @@ logo row, a drawer of rows, and one or two framed panes over the main region. Th
 one group in `src/shared/api.ts` (`api.apps`, built on the same `get`/`post`/`del` helpers the rest
 of that file uses, with the bearer token attached by `authenticatedFetch` — no caller passes one).
 
-**It replaced the Applications Hub**, the page the same seven applications used to be opened from
-as links off a sheet of their own (`~/.claude/hub`). That page and its directory are deleted, its
-rows were carried over character for character, and nothing here reads it. Where the hub left the
+**It replaced the Applications Hub**, the page the operator's own applications used to be opened
+from as links off a sheet of their own (`~/.claude/hub`). That page and its directory are deleted,
+and nothing here reads it. Where the hub left the
 workspace, the switcher frames an application INSIDE it: the sidebar, the project list and a chat
 streaming its answer all keep running while an application is up, because the panes are a layer
 over the main region rather than a route away from it.
@@ -21,7 +21,7 @@ and its store — with nothing else in it:
 
 | File | What it holds |
 |---|---|
-| `apps.seed.ts` | `DEFAULT_APPS`: the seven rows the registry file is created from, and nothing that reads them. |
+| `apps.seed.ts` | `DEFAULT_APPS`: the one row the registry file is created from — this app itself — and nothing that reads them. |
 | `apps.store.ts` | The file itself: `resolveAppsFile`, `ensureAppsFile`, `readApps`, `writeApps`. |
 | `apps.service.ts` | `listApps` · `addApp` · `removeApp`, and EVERY judgement about what a caller may send. |
 | `apps.routes.ts` | `createAppsRouter()` — three thin routes that call one verb and hand anything thrown to `next`. |
@@ -38,7 +38,7 @@ together, always: a change on one side alone is a response the drawer cannot rea
 non-alphanumerics folded to `-`, trimmed, and stepped around the ids already in the file with a
 `-2` suffix rather than refused as a duplicate). A `name` is 1–64 characters after trimming. A
 `url` must parse as an absolute `http:`/`https:` URL **after `{host}` is replaced by `localhost`**,
-so `http://{host}:7878` is a valid row and `descent` is not. A duplicate `id` on create is a 409; an
+so `http://{host}:8003` is a valid row and a bare word carrying no scheme is not. A duplicate `id` on create is a 409; an
 unknown `id` on delete is a 404; both are `AppError`s with an explicit `statusCode`, rendered by the
 global handler as `{ success: false, error: { code, message } }`.
 
@@ -81,15 +81,14 @@ The seed, and the file the first boot writes, is:
 
 ```json
 [
-  {"id": "descent", "name": "Descent", "url": "http://{host}:7878"},
-  {"id": "eis-app", "name": "EIS App", "url": "http://{host}:8004"},
-  {"id": "dispatch", "name": "Dispatch", "url": "http://{host}:8003"},
-  {"id": "cerberus", "name": "Cerberus", "url": "http://{host}:8001/dashboard"},
-  {"id": "archpulse", "name": "ArchPulse", "url": "http://{host}:8005"},
-  {"id": "storybook", "name": "EIS Storybook", "url": "http://{host}:6006"},
   {"id": "cloudcli", "name": "CloudCLI", "url": "http://{host}:5183"}
 ]
 ```
+
+This app alone — every other row is the operator's own, added through the drawer or the
+registry file by hand. A row may carry a path, not just a bare origin, when an app's root is
+not the page worth opening (`{"id": "dashboard", "name": "Dashboard", "url":
+"http://{host}:9001/dashboard"}`).
 
 **Adding an application is a POST, a curl, or one line in that file**, and the three are the same
 act. Nothing is cached on the server and nothing is cached for long on the client: the drawer
@@ -117,13 +116,13 @@ in §"Proving it" mints a real one from the live database's own secret:
 TOKEN=$(bash -c '. scripts/apps-probe-env.sh; mint_token')
 
 curl -s -H "Authorization: Bearer $TOKEN" http://127.0.0.1:3011/api/apps
-# {"apps":[{"id":"descent","name":"Descent","url":"http://{host}:7878"}, …],"selfPorts":[3011,5183]}
+# {"apps":[{"id":"cloudcli","name":"CloudCLI","url":"http://{host}:5183"}, …],"selfPorts":[3011,5183]}
 
 curl -s -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
-  -d '{"name":"Cerberus","url":"http://{host}:9001"}' http://127.0.0.1:3011/api/apps
-# {"app":{"id":"cerberus-2","name":"Cerberus","url":"http://{host}:9001}}   <- the id was taken, so one was minted
+  -d '{"name":"CloudCLI","url":"http://{host}:9001/dashboard"}' http://127.0.0.1:3011/api/apps
+# {"app":{"id":"cloudcli-2","name":"CloudCLI","url":"http://{host}:9001/dashboard"}}   <- the id was taken, so one was minted
 
-curl -s -X DELETE -H "Authorization: Bearer $TOKEN" http://127.0.0.1:3011/api/apps/cerberus-2
+curl -s -X DELETE -H "Authorization: Bearer $TOKEN" http://127.0.0.1:3011/api/apps/cloudcli-2
 # {"ok":true}
 ```
 
@@ -137,9 +136,10 @@ never on the server**. `resolveAppUrl(url, host)` in
 `src/modules/app-switcher/utils/resolveAppUrl.ts` is the whole rule: a case-insensitive, GLOBAL
 replace of `{host}` with `window.location.hostname`, made at the moment a row is opened.
 
-That is what lets ONE registry file serve every address this host answers to. Opened on the LAN the
-row is `http://192.168.1.95:7878`, over Tailscale it is `http://100.103.222.79:7878`, on the box
-itself it is `http://localhost:7878` — all of them from the same seven rows and the same file. A
+That is what lets ONE registry file serve every address this host answers to. Opened on the LAN or
+over the VPN the row resolves to `http://10.0.0.5:8004` — this host's own address on either
+network — and on the box itself it is `http://localhost:8004`, every one of them from the same
+rows and the same file. A
 url with a host baked in would pin every reader to whichever address it was written from. The
 server checks the shape of a `{host}` url by substituting `localhost` (`apps.service.ts`), because
 that is the one address it can resolve on its own; the stored row keeps the placeholder.
@@ -173,8 +173,8 @@ differ — widgets asks origin-only, where being conservative is right because t
 
 One control, and it is the reader's way in and out of every pane.
 
-- **It is 28px drawn, docked or floating, inside a 44px round catch** — the size
-  `design/Applications Hub.dc.html` draws. Its face is the app's logo (`/logo-64.png`), filling the
+- **It is 28px drawn, docked or floating, inside a 44px round catch** — the size measured off the
+  retired hub's own design reference. Its face is the app's logo (`/logo-64.png`), filling the
   circle inside a 1px accent rim. The catch is a transparent `::before` on `.vv-fab`,
   so a press up to 22px from the centre starts a drag while `getBoundingClientRect()` still answers
   28px, and every rect the drag, the clamp and the dock snap read is the circle the reader sees.
@@ -232,15 +232,15 @@ the middle of the conversation, where a press meant for the text moves the butto
 
 ## The drawer
 
-The retired hub's drawer, on the kit. `design/Applications Hub.dc.html` and its captured
-screenshot, `design/applications-hub-drawer-reference.png`, are this screen's visual spec — every
-measurement below (the sheet's width, the 22px slide, the row height, the tile size) is read off
-one of the two rather than guessed. A sheet down the LEFT, `min(88vw, 364px)` on the canvas
+The retired hub's drawer, on the kit. Its design reference and a captured screenshot of its layout
+are this screen's visual spec — every measurement below (the sheet's width, the 22px slide, the
+row height, the tile size) is read off one of the two rather than guessed. A sheet down the LEFT,
+`min(88vw, 364px)` on the canvas
 ground, sliding in 22px from the edge the FAB docks on. Top to bottom in the order a reader's
 questions are asked — what is this and how do I leave, how will what I pick be shown, what can I
 pick, how do I add one:
 
-- **"Your *apps*"** in the display serif, a count line (**7 apps · single screen** / **dual screen
+- **"Your *apps*"** in the display serif, a count line (**3 apps · single screen** / **dual screen
   on**), and a round **✕** that closes the sheet and leaves the panes standing, as Escape and the
   backdrop do. While anything is up, **Close all** sits on the count line: it takes every pane down
   and returns to the workspace, and says "all" because it is not the same act as the ✕. Drawn by
@@ -313,12 +313,12 @@ opening or closing the second pane never remounts what the first is showing.
 ```
 
 - **`allow="geolocation"`** is there for a measured reason: the hub's frames carried no `allow`
-  attribute at all, so Descent's weather tile was refused the geolocation it asks for.
+  attribute at all, so a framed app asking for the operator's location was refused it outright.
 - **There is deliberately no `sandbox` attribute**, and `AppPane.tsx` says so in a comment, because
   an unexplained absence beside the house's other two cross-origin frames reads as an oversight. A
   sandbox without `allow-same-origin` would cut the framed app's `SameSite=Lax` session cookie,
-  which is the whole premise of the EIS grant below. These are the operator's own applications on
-  his own host, not untrusted embeds.
+  which is the whole premise of the framing grant below. These are the operator's own applications
+  on the operator's own host, not untrusted embeds.
 - **Reload** bumps a per-pane counter used in the frame's React key, which remounts the element.
   **Open in a new tab** is `window.open(resolved, '_blank', 'noopener')`.
 - **The way out is the FAB**, which floats above every pane and is never covered.
@@ -328,15 +328,16 @@ opening or closing the second pane never remounts what the first is showing.
 Framing is the framed application's decision, not this one's, so it is a fact per row rather than a
 setting here:
 
-- **The EIS app can be framed, by grant.** `EIS_FRAME_ANCESTORS` in
-  `/opt/shadow-connector/.eis_backend.env` names CloudCLI's origins — the port the browser actually
-  uses under every name this host answers to, plus both loopback forms of the API port — and the
-  EIS backend parses it at import, writes `frame-ancestors <origins>` into its CSP and DELETES its
-  `X-Frame-Options` when the list is non-empty. That rule is `R-EISBE-7`, and CloudCLI is the
-  embedder it names.
-- **Dispatch can never be framed.** It answers `X-Frame-Options: DENY` and a `frame-ancestors
-  'none'` CSP, and nothing about it is changed here. Its row opens in a new tab, which is an
-  accepted property of that application rather than a defect to route around.
+- **An application can be framed, by grant.** An env var in that application's own backend config
+  (its equivalent of `<APP>_FRAME_ANCESTORS`) names CloudCLI's origins — the port the browser
+  actually uses under every name this host answers to, plus both loopback forms of the API port —
+  and a backend that reads such a variable at import writes `frame-ancestors <origins>` into its
+  CSP and deletes its `X-Frame-Options` when the list is non-empty, naming CloudCLI as the
+  embedder it grants.
+- **Some applications can never be framed.** An application that answers `X-Frame-Options: DENY`
+  and a `frame-ancestors 'none'` CSP stays that way; nothing about it is changed here. Its row
+  opens in a new tab, which is an accepted property of that application rather than a defect to
+  route around.
 - **Any other row** opens in a pane and shows whatever its own headers allow. An application that
   refuses framing paints a blank pane; that is its answer, and the row's menu still offers Open in a
   new tab.
@@ -417,7 +418,10 @@ builds an HS256 JWT for the first user from the live database's own `jwt_secret`
 one the running `authenticateToken` accepts; `boot_probe_server` boots a SECOND server on
 `$PROBE_PORT` (`7893` by default) and reuses one only when this script started it, because a phase
 that changed server code must not be verified against a process another phase left running;
-`stop_probe_server` kills that server and puts the operator's own marker file back.
+`stop_probe_server` kills that server. The probe writes its marker to a scratch path
+(`CLOUDCLI_LOCAL_SERVER_MARKER`) and keeps its chat hosts in a scratch sessions directory
+(`CLOUDCLI_SESSIONS_DIR`), so neither the operator's marker nor the operator's running chats are
+ever touched. It still runs against the live database; neither redirect isolates that.
 
 **`scripts/apps-ui-probe.mjs`** walks the switcher in a real browser over the DevTools protocol —
 no playwright runner, no test framework — because everything it checks (a FAB paints, a drawer opens
@@ -431,8 +435,8 @@ node scripts/apps-ui-probe.mjs <app-url> <token> <fab-label> [row-a] [row-b]  | 
 It prints one `KEY=value` line per reading and then exactly one verdict line, `PROBE OK` or `PROBE
 FAILED`; everything that explains a failure goes to stderr. `--selftest` runs the plumbing alone —
 launch, seed the token, load the app, assert the wordmark renders — so the driver can be proven
-without the feature. The two rows the split is built from default to `Descent` and `ArchPulse` and
-are arguments, because the registry is a file the operator edits by hand.
+without the feature. The two rows the split is built from are ARGUMENTS rather than constants,
+because the registry is a file the operator edits by hand — pass the two rows a run is about.
 
 Two things about it are contracts rather than conveniences. **The window is set to 1280×900 before
 any reading is taken** — below 768px the desktop header is `display: none`, the FAB defaults to

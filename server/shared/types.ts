@@ -415,8 +415,8 @@ export type UniverseNode = {
   n: string;
   /** Parent node index, `-1` for a node that hangs off nothing: a repo, the sun, an endpoint. */
   p: number;
-  /** `system` is a directory the crawler's `systems.json` names as an integration folder — Drybook,
-   *  Xactimate, XactAnalysis — a body like `dir` in every way but the mark. */
+  /** `system` is a directory the crawler's `systems.json` names as an integration folder — one
+   *  per outside system the repo talks to — a body like `dir` in every way but the mark. */
   k: 'galaxy' | 'core' | 'dir' | 'endpoint' | 'system' | 'source' | 'config' | 'docs' | 'data-sql' | 'assets' | 'other';
   /** Lines of the file; `0` for a directory or an endpoint, which have no length. */
   l: number;
@@ -437,7 +437,7 @@ export type UniverseNode = {
  *
  * `resolve` is shipped as DATA rather than restated as code: a consumer takes the FIRST entry its
  * path starts with, and never re-sorts. The entries are ordered longest path first because the
- * ordering IS the rule — without it `/home/lyphe/.claude` swallows the repo inside it.
+ * ordering IS the rule — without it `/home/me/.claude` swallows the repo inside it.
  */
 export type UniverseMap = {
   mapId: string;
@@ -526,12 +526,12 @@ export type UniverseMapEvent = { kind: 'universe_map'; mapId: string; builtAt: n
  * One uvicorn app living in a registered repo, as `repos.json` declares it.
  *
  * `unit` is the pairing the journal tap needs: a systemd unit's HTTP access lines are routed to the
- * routes of the app served BY that unit, which is how a request to `eis-app.service` pulses a star
- * in `shadow-connector` — the two apps in that repo listen on two different units.
+ * routes of the app served BY that unit, which is how a request to `web-app.service` pulses a star
+ * in `backend-repo` — the two apps in that repo listen on two different units.
  */
 export type UniverseRegistryApp = {
   name: string;
-  /** The ASGI target, e.g. `eis_backend.main:app`. */
+  /** The ASGI target, e.g. `backend.main:app`. */
   module: string;
   python: string;
   cwd: string;

@@ -1,8 +1,8 @@
 /* Verve design tokens — the app's ONE colour, type, space and motion source.
  *
- * Copied BY VALUE from design/_ds/verve-design-system-845c78a0-5042-416e-b31e-e608179402c3/
- * tokens/{colors,typography,spacing,motion,base}.css. Copied, not imported: `design/` is the
- * design source of truth and nothing in it is ever loaded at runtime.
+ * Copied BY VALUE from the Verve design system's own token files
+ * ({colors,typography,spacing,motion,base}.css). Copied, not imported: the design source is
+ * never loaded at runtime.
  *
  * Four deliberate changes from the source, and only four:
  *   1. Verve's `.vv-dark, body.vv-dark` selector is written as `.dark` — the one dark selector

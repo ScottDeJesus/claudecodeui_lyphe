@@ -146,6 +146,10 @@ export function buildMetisEnv(spec: MetisChildSpec): NodeJS.ProcessEnv {
     // The board's OWN switch, never the host-wide one: `deepseek.py`'s `flag_path()` reads this
     // variable at call time, so every plan-runner the child starts asks this board's file.
     PLAN_RUNNER_DEEPSEEK_FLAG_PATH: boardFlagPath(spec.boardId),
+    // The brief is the same for every board; what is true of ONE project arrives as that
+    // project's `CLAUDE.md`. The project reaches the child as `--add-dir`, not as its cwd, and the
+    // CLI reads a `CLAUDE.md` out of an added directory only when this is set.
+    CLAUDE_CODE_ADDITIONAL_DIRECTORIES_CLAUDE_MD: '1',
   };
 
   if (spec.deepseekFlash) {

@@ -35,7 +35,7 @@ it on this box is in [verification.md](verification.md) §"The ntfy probes".
 
    curl -s -X PUT http://127.0.0.1:3011/api/notifications/ntfy \
      -H "Authorization: Bearer $TOKEN" -H 'content-type: application/json' \
-     -d '{"topic":"<your-topic>","appUrl":"http://100.103.222.79:5183"}'
+     -d '{"topic":"<your-topic>","appUrl":"http://10.0.0.5:5183"}'
    ```
 
    `appUrl` is where a tapped push opens CloudCLI, and the test push is one more call:
@@ -387,7 +387,7 @@ also exported from the module's `index.ts` for any caller that has to show an ev
 - **Setting `API_KEY` breaks answering from the phone.** `app.use('/api', validateApiKey)` covers
   `/api/ntfy/act` too, and the phone sends no `x-api-key`, so every tap gets a 401
   `Invalid API key`. `API_KEY` is unset on this box.
-- **Behind Vite, every phone has the same address.** A tap on `http://100.103.222.79:5183` reaches
+- **Behind Vite, every phone has the same address.** A tap on `http://10.0.0.5:5183` reaches
   the API through the Vite proxy, which adds no `X-Forwarded-For` (it is not configured with
   `xfwd`), and the API binds `127.0.0.1` only — so the route sees one address for every caller and
   they share one guess budget. That cannot cost a phone its answer (a signed token is never refused

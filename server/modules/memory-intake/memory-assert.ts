@@ -83,7 +83,7 @@ export const PROJECT_TARGETS: readonly string[] = ['memory', 'topic'];
 
 /**
  * A project slug as Claude Code encodes it: a leading `-`, then path segments joined by `-`
- * (`/opt/shadow-connector` → `-opt-shadow-connector`).
+ * (`/opt/my-project` → `-opt-my-project`).
  *
  * The anchored character class is the SECURITY shape — no `/`, no `.`, no `..` — so a slug can never
  * climb out of `projects/`. In JavaScript, `$` without the `m` flag matches only at the very end of
@@ -185,7 +185,7 @@ function stepsFor(
     if (project === null || !PROJECT_SLUG_RE.test(project)) {
       throw new MemoryRefusal(
         `Refused — target “${target}” writes into a project's memory directory, so it needs a project `
-          + `slug like “-opt-shadow-connector” (a leading “-”, then letters, digits and hyphens). This `
+          + `slug like “-opt-my-project” (a leading “-”, then letters, digits and hyphens). This `
           + `candidate carries ${JSON.stringify(project)}, which names no such directory, so there is `
           + `nowhere safe to write it. Nothing was changed.`
       );

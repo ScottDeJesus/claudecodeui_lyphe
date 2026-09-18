@@ -1,15 +1,14 @@
 /**
  * Two letters for a label nobody wrote initials for.
  *
- * The letters come from the LOCAL PART only — never the domain. Everyone here shares
- * `gmail.com`, so a domain letter says nothing about identity and actively hides it:
- * `scottdejesus@gmail.com` and `sdjesus89@gmail.com` both drew "SG" until this took the
+ * The letters come from the LOCAL PART only — never the domain. When every account shares
+ * one domain, a domain letter says nothing about identity and actively hides it:
+ * `janedoe@gmail.com` and `jdoe89@gmail.com` both drew "JG" until this took the
  * domain out. Within the local part the second letter follows the first separator when there
- * is one (`scottdejesus.dev` → SD), and is otherwise the second character (`sdjesus89` → SD).
+ * is one (`jane.doe` → JD), and is otherwise the second character (`jdoe89` → JD).
  *
  * Two addresses can still land on the same pair — that is a property of the addresses, not of
- * this rule: on the live set `scottdejesus.dev` and `sdjesus89` BOTH read SD, one of them the
- * account in use. What keeps that from costing anything is the pair of mitigations every site
+ * this rule: `jane.doe` and `jdoe89` BOTH read JD. What keeps that from costing anything is the pair of mitigations every site
  * carries: a different avatar hue per row, and the full label in a `title` on the label beside
  * it (the labels truncate at this width, so the `title` is the only way back to the address).
  * An empty label gets the em-dash the rest of the panel uses for "we do not know", never a

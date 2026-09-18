@@ -106,7 +106,7 @@ function buildSubjects(entries: UniverseRegistryEntry[]): Map<string, UnitSubjec
   for (const entry of entries) {
     const subject = { repoId: entry.id, entryFile: entry.entry_file };
     for (const unit of entry.units) add(unit, subject);
-    // An app's own unit: `eis-app.service` serves an app that LIVES in shadow-connector, so the
+    // An app's own unit: `web-app.service` serves an app that LIVES in backend-repo, so the
     // unit's lines pulse that repo's stars even though the unit is named for another repo.
     for (const app of entry.apps) add(app.unit, subject);
   }

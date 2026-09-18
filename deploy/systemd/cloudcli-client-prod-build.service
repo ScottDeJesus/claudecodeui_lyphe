@@ -3,12 +3,12 @@ Description=CloudCLI production client rebuild (builds only when a client input 
 
 [Service]
 Type=oneshot
-WorkingDirectory=/home/lyphe/.claude/claudecodeui_lyphe
+WorkingDirectory=__REPO__
 Environment=NODE_ENV=production
-Environment=PATH=/home/lyphe/.claude/claudecodeui_lyphe/node_modules/.bin:/home/lyphe/.npm-global/bin:/usr/local/bin:/usr/bin:/bin
+Environment=PATH=__REPO__/node_modules/.bin:__HOME__/.npm-global/bin:/usr/local/bin:/usr/bin:/bin
 # A build competes with the live chat for CPU; it can wait.
 Nice=10
 # A build is ~30 s idle and can be several times that under load; never kill one mid-write.
 TimeoutStartSec=600
-ExecStart=/home/lyphe/.claude/claudecodeui_lyphe/scripts/prod-client-build.sh
-User=lyphe
+ExecStart=__REPO__/scripts/prod-client-build.sh
+User=__USER__

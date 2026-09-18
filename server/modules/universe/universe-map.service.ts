@@ -170,10 +170,10 @@ export function createUniverseMapService(): UniverseMapService {
       // `resolve` is the crawler's path-to-repo rule shipped as DATA, sorted longest path first.
       // The ordering IS the rule, so it is taken as given: walk it in order and take the first
       // entry this path is under. Re-sorting here would not be a second opinion, it would be the
-      // bug that puts every `claudecodeui_lyphe` file inside the sun.
+      // bug that puts every file of a repo nested in the sun inside the sun.
       for (const entry of held.resolve) {
-        // A path is under a repo only at a segment BOUNDARY: `/opt/eis-app-old` does not live in
-        // `/opt/eis-app`, and a bare `startsWith` would say it did.
+        // A path is under a repo only at a segment BOUNDARY: `/opt/web-app-old` does not live in
+        // `/opt/web-app`, and a bare `startsWith` would say it did.
         if (!absolutePath.startsWith(`${entry.path}/`)) continue;
         return nodeAt(entry.id, absolutePath.slice(entry.path.length + 1));
       }

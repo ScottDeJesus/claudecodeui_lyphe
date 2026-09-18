@@ -44,16 +44,16 @@ export const APP_VERSION: string = typeof __APP_VERSION__ === 'string' ? __APP_V
 //----------------- GIT TAB ------------
 
 /**
- * The repositories the git tab's strip tabs through, in strip order, by absolute path. The git
- * tab matches them to registered projects; the command palette offers its commit and branch rows
- * only for a project on this list, since those rows bring the git tab forward on it.
+ * The repositories the git tab's strip tabs through, in strip order, by absolute path — the
+ * comma-separated `VITE_GIT_REPO_PATHS`. The git tab matches them to registered projects; the
+ * command palette offers its commit and branch rows only for a project on this list, since those
+ * rows bring the git tab forward on it. EMPTY means no list was configured, and every registered
+ * project is on the strip.
  */
-export const GIT_REPO_PATHS: readonly string[] = [
-  '/opt/shadow-connector',
-  '/home/lyphe/.claude/claudecodeui_lyphe',
-  '/home/lyphe/.claude',
-  '/opt/eis-app',
-];
+export const GIT_REPO_PATHS: readonly string[] = String(import.meta.env?.VITE_GIT_REPO_PATHS ?? '')
+  .split(',')
+  .map((repoPath) => repoPath.trim())
+  .filter((repoPath) => repoPath !== '');
 
 // ---------------------------
 

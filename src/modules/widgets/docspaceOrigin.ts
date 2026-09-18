@@ -52,7 +52,7 @@ export const DOCSPACE_EMBED_DEFAULT_PORT = 8005;
  * this variable and is quietly given the default gets no signal at all: the embed works, so
  * nothing looks wrong, and if it does not the timeout card names the DERIVED origin — a host
  * they never typed — which actively points the investigation away from the setting that was
- * dropped. `eis1:8005` (no scheme) is the easy way to land there. So a rejected value is warned
+ * dropped. `myhost:8005` (no scheme) is the easy way to land there. So a rejected value is warned
  * about, naming the value and what was expected.
  */
 export function resolveDocSpaceOrigin(): string {

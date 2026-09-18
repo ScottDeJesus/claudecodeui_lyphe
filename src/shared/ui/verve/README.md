@@ -9,8 +9,7 @@ A few hard-coded colours still survive in screens the theme layer has not reache
 Settings. They are counted, not ignored: the harness holds their number as a ceiling, so a new
 one fails the run. Clearing an old one as you pass is welcome; the count only goes down.
 
-The design language the tokens serve is written down at `~/.claude/design/DESIGN_DOCTRINE.md`.
-That is the law; this note only says how the law is wired into this repo.
+This note says how the Verve design language is wired into this repo.
 
 ## The rules that keep it one source
 
@@ -198,6 +197,5 @@ counted one carries one plural key per category `Intl.PluralRules` gives its lan
 
 ## Where the rest lives
 
-- Design provenance — the canvas, the prototype, the handoff: [`design/README.md`](../../../../design/README.md)
 - How the numbers above are measured, and the baselines a change must not regress:
   [`docs/verification.md`](../../../../docs/verification.md)

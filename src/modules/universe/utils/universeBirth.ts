@@ -25,7 +25,7 @@ import type { UniverseGraphNode } from '@/modules/universe/utils/universeGraph';
  * child folders' clouds, and each child is born at the distance its spring will rest at.
  *
  * THE INTEGRATIONS ARE THE OUTER BELT OF THEIR OWN FOLDER. A directory the crawler marked `system` —
- * Drybook, Xactimate, XactAnalysis under `extractors/` — is a body like any other, only drawn larger
+ * one per outside system under `extractors/` — is a body like any other, only drawn larger
  * (`SYSTEM_R`) and packed AFTER its plain siblings, so the integrations sit together on the outside
  * of the folder that holds them, a belt of their own, `SYSTEM_BELT` further out. The operator's word
  * (2026-09-17): these are what make the system functional, and they were reading as ordinary folders.

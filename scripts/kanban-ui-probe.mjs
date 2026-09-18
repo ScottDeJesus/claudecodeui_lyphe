@@ -19,14 +19,14 @@
 import { spawn } from 'node:child_process';
 import { once } from 'node:events';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
+import { homedir, tmpdir } from 'node:os';
 import path from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 
 import WebSocket from 'ws';
 
 const SHELL = process.env.CHROME_HEADLESS_SHELL
-  || '/home/lyphe/.cache/ms-playwright/chromium_headless_shell-1243/chrome-headless-shell-linux64/chrome-headless-shell';
+  || path.join(homedir(), '.cache/ms-playwright/chromium_headless_shell-1243/chrome-headless-shell-linux64/chrome-headless-shell');
 
 /** How long any single wait — the browser's port, the app's first paint, one string — may take. */
 const WAIT_MS = 30_000;

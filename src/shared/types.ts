@@ -2130,8 +2130,8 @@ export type UniverseNode = {
   n: string;
   /** Parent node index; `-1` for a repo, the sun or an endpoint, which hang off nothing. */
   p: number;
-  /** `system` is a directory the crawler's `systems.json` names as an integration folder — Drybook,
-   *  Xactimate, XactAnalysis — a body like `dir` in every way but the mark. */
+  /** `system` is a directory the crawler's `systems.json` names as an integration folder — one
+   *  per outside system the repo talks to — a body like `dir` in every way but the mark. */
   k: 'galaxy' | 'core' | 'dir' | 'endpoint' | 'system' | 'source' | 'config' | 'docs' | 'data-sql' | 'assets' | 'other';
   /** Lines of the file; `0` for a directory or an endpoint, which have no length. */
   l: number;

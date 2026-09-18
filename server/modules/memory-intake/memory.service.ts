@@ -149,7 +149,7 @@ export function validateMemoryArgs(input: unknown): MemoryCandidateInput {
     const rawProject = data.project;
     if (typeof rawProject !== 'string' || !PROJECT_SLUG_RE.test(rawProject)) {
       throw new MemoryRefusal(
-        `target "${target}" requires a project slug like '-opt-shadow-connector' (a leading '-', `
+        `target "${target}" requires a project slug like '-opt-my-project' (a leading '-', `
           + `then letters, digits and hyphens) — got ${JSON.stringify(rawProject)}`
       );
     }

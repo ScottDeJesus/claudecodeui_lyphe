@@ -3,7 +3,7 @@
 ## In one paragraph
 
 Four repositories are crawled into one map — every tracked file a *star*, every directory and repo a *body*, the
-estate a galaxy around the sun at `/home/lyphe/.claude` — and that map is drawn as a live sky in a tab of its
+estate a galaxy around the sun at `/home/me/.claude` — and that map is drawn as a live sky in a tab of its
 own. Two taps read what the estate is *doing*: the systemd journal and the Claude transcripts, whose rows
 resolve onto map stars and reach the canvas over one websocket frame kind, while the map arrives over a second
 frame kind and over REST. Nothing on the sky is invented — an edit flares its star, an execution sends a comet
@@ -47,10 +47,10 @@ fork reads, and the line cache at `<state>/lines.json` (`build.py:111-113`, `scr
 units whose journal lines belong to it), `entry_file` (the star a journal line pulses when nothing else
 matches), `apps` (uvicorn apps in the repo), and `pg` and `mcp` (endpoint names). Adding a galaxy is that one
 entry and nothing else — no change in the repo it names. Beside it, `systems.json` names the INTEGRATION
-FOLDERS — `{repo, dirs}` with segment-exact globs, seeded as shadow-connector's `extractors/*` and
+FOLDERS — `{repo, dirs}` with segment-exact globs, seeded as `backend-repo`'s `extractors/*` and
 `outbound/*` (`registry.py`, `SYSTEMS_SEED`) — and the crawler marks a matching directory node `system`
 (`resolve.system_dirs`): the folder it was, with its files and history, only marked, so the sky can draw
-Drybook, Xactimate and XactAnalysis large and apart. Nothing is invented; a first design that added synthetic
+a repo's named third-party integrations large and apart. Nothing is invented; a first design that added synthetic
 platform nodes was struck by the operator (2026-09-17). `load()` sorts entries LONGEST PATH FIRST once
 (`registry.py:169`) and `repo_for_path` takes the first prefix hit at a path-component boundary
 (`:187`). The ordering IS the rule, which is why it ships as data in `index.json`'s `resolve` array
@@ -391,8 +391,8 @@ T=$(node scripts/universe-token.mjs); node scripts/universe-fps-probe.mjs http:/
 - **The live apps' `/openapi.json`.** The route table comes from importing the app in a bounded subprocess,
   because the assembled paths exist only inside its `APIRouter(prefix=…)` constructors
   (`scripts/universe/routedump.py:1-12`).
-- **Descent's SSE stream at `:7878/api/events`.** Its requests already arrive as journal lines from
-  `descent.service` (`universe-journal.tap.ts:35`), so a second transport would double-count them.
+- **An SSE transport per app.** Every unit's requests already arrive as journal lines
+  (`universe-journal.tap.ts:35`), so a second transport would double-count them.
 - **`Read` and `Bash` tool calls.** Dropped by the transcript tap on purpose: thousands a day, and neither is an
   edit (`universe-transcript.tap.ts:12-16`).
 
@@ -400,7 +400,7 @@ T=$(node scripts/universe-token.mjs); node scripts/universe-fps-probe.mjs http:/
 
 | If you touch | Also check |
 | --- | --- |
-| The registry's entry shape | The crawler's docstring, the server's tolerant reader (`universe-registry.service.ts:7-20`) and the seed all agree, and nothing has grown a path into `/opt/eis-app` or `/opt/shadow-connector` |
+| The registry's entry shape | The crawler's docstring, the server's tolerant reader (`universe-registry.service.ts:7-20`) and the seed all agree, and nothing has grown a path into `/opt/web-app` or `/opt/backend-repo` |
 | The edge caps | The four constants are still named in `edges/`, and co-change is still capped on the SHARED pair set |
 | `ADMITTED_TOOLS` | `Read` and `Bash` are still out, and a new tool is added in that one array rather than in the resolver |
 | `reconcile`, the coalescer, `TWEAK_RANGES` | The comparison is still against the held map's heads; a quiet estate still sends nothing and the cap still counts the rows it drops; every key of `UniverseTweaks` is still in the range table, and a zero still skips its pass whole |

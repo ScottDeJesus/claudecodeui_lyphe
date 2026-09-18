@@ -4,7 +4,7 @@
 // exactly one verdict line — `PROBE OK` or `PROBE FAILED` — so a caller greps the result instead of
 // reading a log; everything that explains a failure goes to stderr.
 //
-//   node scripts/apps-ui-probe.mjs <app-url> <token> <fab-label> [row-a] [row-b]  |  --selftest <app-url> <token>
+//   node scripts/apps-ui-probe.mjs <app-url> <token> <fab-label> <row-a> <row-b>  |  --selftest <app-url> <token>
 //
 // `--selftest` runs the plumbing alone — launch, seed the token, load the app, assert the wordmark
 // renders — printing `BOOT=1` and the verdict, so the phase that WROTE this driver also RUNS it, rather
@@ -19,13 +19,13 @@
 import { spawn } from 'node:child_process';
 import { once } from 'node:events';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
+import { homedir, tmpdir } from 'node:os';
 import path from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 
 import WebSocket from 'ws';
 
-const SHELL = process.env.CHROME_HEADLESS_SHELL || '/home/lyphe/.cache/ms-playwright/chromium_headless_shell-1243/chrome-headless-shell-linux64/chrome-headless-shell';
+const SHELL = process.env.CHROME_HEADLESS_SHELL || path.join(homedir(), '.cache/ms-playwright/chromium_headless_shell-1243/chrome-headless-shell-linux64/chrome-headless-shell');
 /** The window every reading is taken in, and the narrow one step 10 measures the wordmark at. */
 const DESKTOP = { width: 1280, height: 900 };
 const NARROW = { width: 320, height: 900 };
@@ -43,11 +43,11 @@ const RATIO_TOLERANCE = 0.03;
 
 const argv = process.argv.slice(2);
 const selftest = argv[0] === '--selftest';
-// The two rows the split is built from: named, because the seed registry is what this feature ships with,
-// and overridable, because that registry is a file the operator edits by hand.
-const [appUrl, token, fabLabel, rowA = 'Descent', rowB = 'ArchPulse'] = selftest ? argv.slice(1) : argv;
-if (!appUrl || !token || (!selftest && !fabLabel)) {
-  console.error('usage: node scripts/apps-ui-probe.mjs <app-url> <token> <fab-label> [row-a] [row-b]');
+// The two rows the split is built from, by the names they carry in the registry — a file the
+// operator edits by hand, so they arrive as arguments. The seed ships ONE row; a split needs two.
+const [appUrl, token, fabLabel, rowA, rowB] = selftest ? argv.slice(1) : argv;
+if (!appUrl || !token || (!selftest && (!fabLabel || !rowA || !rowB))) {
+  console.error('usage: node scripts/apps-ui-probe.mjs <app-url> <token> <fab-label> <row-a> <row-b>');
   console.error('       node scripts/apps-ui-probe.mjs --selftest <app-url> <token>');
   process.exit(2);
 }

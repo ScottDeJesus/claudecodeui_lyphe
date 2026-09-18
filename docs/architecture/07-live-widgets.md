@@ -13,6 +13,14 @@ small message protocol — the app's design tokens copied in as values, a theme 
 page, an iframe that grows and shrinks with its content, and a `live.subscribe(topic, fn)` door
 onto named topics. The widget names topics; it never names URLs.
 
+The same fence has two other body shapes, and both are REFERENCES rather than documents: JSON
+naming a DocSpace block, which embeds that block from ArchPulse live and editable, and JSON naming
+a URL, which draws any page at all in a frame. They are not variations on the HTML widget — the
+first is untrusted output that must reach nothing, the other two are real pages on origins that
+are never this app's — and `classifyWidgetBody` is the one place the three are told apart. Every
+one of them is drawn inside the transcript's ordinary shape card, which carries a fullscreen
+switch that hands the frame the whole viewport without reloading it.
+
 Read [the realtime stream](./02-realtime-stream.md) for how a reply arrives, and
 [tool views](./06-tool-view.md) for the other way a block of model output becomes UI.
 
@@ -49,13 +57,18 @@ Read [the realtime stream](./02-realtime-stream.md) for how a reply arrives, and
 9. **The bus knows no producer.** It retains values, dispatches them and admits topics — that is
    all it does. What fills it is a FEED, a headless component owned by the module whose data it
    carries, and the first is `RunnerFeed` in `src/modules/plan-runner/`.
-10. **Two body shapes, two fences.** The info string says *widget*; the BODY says which kind. Raw
+10. **Three body shapes, one fence.** The info string says *widget*; the BODY says which kind. Raw
     HTML is the default and everything above describes it — an opaque-origin frame carrying a
     document this app composed inline. A body that parses as JSON naming a DocSpace block instead
-    renders as a `src` frame on ArchPulse's OWN origin, which is never this app's. They are not
-    variations on one frame: the first is untrusted output that must be able to reach nothing, the
-    second is another of the operator's services that must be able to reach itself. **The DocSpace
-    kind** below is the whole of it, and `isForeignOrigin` is the line between them.
+    renders as a `src` frame on ArchPulse's OWN origin; a body naming a URL renders as a `src`
+    frame on whatever origin that is. They are not variations on one frame: the first is untrusted
+    output that must be able to reach nothing, the other two are real pages that must be able to
+    reach themselves. **The DocSpace kind** and **The embed kind** below are the whole of it, and
+    `isForeignOrigin` is the line all three are on the right side of.
+11. **The reader can always make the frame bigger.** A declared height is a guess and a reported
+    one is a request; either can be wrong, and the answer to both is the same switch. Fullscreen is
+    a CLASS CHANGE on the card that is already there — never a move in the React tree, because
+    reparenting an iframe reloads it and would throw away a part-typed edit. **Fullscreen** below.
 
 ## The pieces
 
@@ -69,6 +82,12 @@ Read [the realtime stream](./02-realtime-stream.md) for how a reply arrives, and
 | `src/modules/widgets/hooks/useWidgetHost.ts` | `useWidgetHost` — the page's half: one message listener, the height, the theme post, and the `load` counter that revokes a frame which navigated itself away |
 | `src/modules/widgets/hooks/useWidgetBridge.ts` | `useWidgetBridge` — one frame's subscriptions: the two refusals, the per-frame cap, and the unmount sweep |
 | `src/modules/widgets/classifyWidgetBody.ts` | `DOCSPACE_ID_RE` and `classifyWidgetBody` — which KIND a settled fence body is. The raw path is the default |
+| `src/modules/widgets/EmbedUrlFrame.tsx` | `EMBED_SANDBOX`, `EMBED_MIN_HEIGHT` / `EMBED_MAX_HEIGHT` / `EMBED_DEFAULT_HEIGHT` and `EmbedUrlFrame` — the third frame: any address, the origin gate, a DECLARED height, and no protocol at all |
+| `src/modules/chat/embeds/collectEmbedTargets.ts` | `collectEmbedTargets` — every embed a chat has declared, read out of its own messages through the one classifier |
+| `src/modules/chat/embeds/embedSource.ts` | `publishEmbedSource`, `useChatEmbedTargets`, `useEmbedWidgetState` — the chat's list, published for the widget that draws it, and whether it has arrived at all |
+| `src/modules/chat/embeds/EmbedWidgetBody.tsx` | `EmbedWidgetBody` — the gutter widget: the follow latch, the one-row dropdown (house presets, the chat's addresses, `Type an address…`), the way out, and `EmbedUrlFrame` filling the card |
+| `src/modules/chat-gutters/GutterWidgetFrame.tsx` | The gutter card, and its `fullscreen` / `onToggleFullscreen` / `flush` props |
+| `src/modules/widgets/embedUrl.ts` | `isLoopbackHost` and `resolveEmbedUrl` — a loopback address moved onto the host that reached this page, because an `src` is resolved by the reader's browser |
 | `src/modules/widgets/docspaceOrigin.ts` | `DOCSPACE_EMBED_DEFAULT_PORT`, `resolveDocSpaceOrigin`, `docspaceEmbedUrl`, `docspaceStudioUrl`, and `isForeignOrigin` — the gate on `allow-same-origin` |
 | `src/modules/widgets/DocSpaceFrame.tsx` | `DOCSPACE_SANDBOX`, `DOCSPACE_READY_TIMEOUT_MS` and `DocSpaceFrame` — the second frame: a `src` on ArchPulse's origin, the latched theme, the ready timer, and the `framed` prop that drops its own border where a card already draws one |
 | `src/modules/widgets/WidgetErrorCard.tsx` | `WidgetErrorCard` — the two-sentence card shown where a widget was asked for and cannot be drawn |
@@ -77,11 +96,12 @@ Read [the realtime stream](./02-realtime-stream.md) for how a reply arrives, and
 | `src/modules/live-bus/hooks/useLiveTopic.ts` | `useLiveTopic` — the module's ONE render trigger, for a React component reading a topic |
 | `src/modules/live-bus/index.ts` | The barrel. The provider, the bus hook, `useLiveTopic`, and the vocabulary |
 | `src/modules/chat/transcript/shapes/code/index.tsx` | `CodeBlock` — the `code` override's routing decision, and the widget branch inside it, which hands `EmbedFrame` down as `WidgetFrame`'s `frame` |
-| `src/modules/chat/transcript/shapes/code/EmbedFrame.tsx` | `EmbedFrame` — the card a LIVE embed wears: the one `ShapeFrame` header every shape draws (flush), plus the `Open in ArchPulse` action a DocSpace block's studio link earns it. It imports nothing from this module |
+| `src/modules/chat/transcript/shapes/code/EmbedFrame.tsx` | `EmbedFrame` — the card a LIVE embed wears: the one `ShapeFrame` header every shape draws (flush), the way out (`Open in ArchPulse` for a block, `Open page` for an embed), and the fullscreen switch. It imports nothing from this module |
+| `src/modules/chat/transcript/shapes/ShapeFrame.tsx` | The card itself, and its `fullscreen` prop — the fixed panel at `z-[45]`, the flex chain that lets a frame fill it, the forced-open fold and the `data-owns-escape` claim |
 | `src/modules/chat/transcript/shapes/markdownStreaming.ts` | `MarkdownStreamingContext`, in its own module. `CodeBlock` is the last consumer left in the tree |
 | `src/modules/chat/transcript/Markdown.tsx` | Provides that context around its `ReactMarkdown`, and names `CodeBlock` as the `code` override in both component maps |
 | `src/modules/chat/transcript/StreamingMarkdown.tsx` | Marks the pending half streaming; the settled half is untouched |
-| `src/shared/types.ts` | `WidgetFrameMessage`, `WidgetHostMessage`, `WidgetHostHandlers`, `DocSpaceBlockRef`, `WidgetBodyShape`, `WidgetEmbed`, `WidgetEmbedFramer`, `LiveTopic`, `LiveValue`, `LiveBus`, under `LIVE WIDGETS` |
+| `src/shared/types.ts` | `WidgetFrameMessage`, `WidgetHostMessage`, `WidgetHostHandlers`, `DocSpaceBlockRef`, `EmbedUrlRef`, `WidgetBodyShape`, `WidgetEmbed`, `WidgetEmbedFramer`, `LiveTopic`, `LiveValue`, `LiveBus`, under `LIVE WIDGETS` |
 | `.verify/phase-22.mjs` | The fence probe: the sandbox, the opaque origin, the CSP refusal, height, theme, streaming, export, and the revoke rule from both sides |
 | `.verify/phase-24.mjs` | The bus probe: a stage written to disk read back inside a sandboxed widget, both refusals, the cap, the unmount sweep, the REST seed and the retirement |
 | `.verify/phase-28.mjs` | The kind probe: the exact sandbox, the foreign origin, the error card, the raw path left alone, the streaming gate, the exports, and that a theme flip never rewrites `src` |
@@ -353,8 +373,9 @@ built from, and only for a LIVE block: `EmbedFrame` draws it as an `a[data-docsp
 `target="_blank"` and `rel="noopener noreferrer"`, so the studio opens in a new tab on ArchPulse's
 origin and receives neither this window's handle nor this page's referrer. It points at the studio
 and never at the embed route; port 8005 is never proxied through this app. The HTML widget has no
-such link and gets no action at all — `studioUrl` is `null` there, because a widget is model output
-this app composed rather than a page another service owns.
+such link and gets no action at all — `openUrl` is `null` there, because a widget is model output
+this app composed rather than a page another service owns. (An embed's `openUrl` is its own address;
+see the next section, where the link is not a convenience but the reader's only recourse.)
 
 **A framed block drops its OWN border, and nothing else.** `DocSpaceFrame` and `WidgetFrameLive`
 each draw their own `my-3 rounded-xl border` wrapper when they stand alone, because a border on the
@@ -383,6 +404,196 @@ in [verification.md](../verification.md) §"The browser harness" and §"What bit
 half of this contract — the embed route, the two block types that behave differently there, the
 `resize` height being the body's border box rather than the document's `scrollHeight` — is
 `~/.claude/ArchPulse/README.md` §"Embedding one block", which points back here for this half.
+
+## The embed kind
+
+The third body shape, and the one the app knows least about. A `widget` fence whose body is JSON of
+this shape draws that address in a frame inside the card:
+
+```json
+{ "kind": "embed", "url": "http://10.0.0.5:8005/", "title": "ArchPulse — DocSpace hub", "height": 420 }
+```
+
+`url` is the only required field. `title` becomes the card's heading and the frame's accessible
+name — worth setting, because "Embed" tells a reader nothing and only the writer knows the page is
+a Grafana panel. `height` is the drawn height in CSS pixels: default `EMBED_DEFAULT_HEIGHT` (420),
+clamped between `EMBED_MIN_HEIGHT` (120) and `EMBED_MAX_HEIGHT` (2000). A `height` that is not a
+finite positive number is DROPPED rather than refused — a cosmetic mistake should not cost the
+reader the page — while a `url` that is not an absolute `http:`/`https:` address, or is longer
+than 2048 characters, makes the whole body `invalid` and draws `WidgetErrorCard`. The scheme is
+checked by PARSING (`new URL`), never by matching a prefix, because `javascript:`, `data:` and
+`blob:` are exactly what must never reach an `src` and a prefix test is defeated by case and
+whitespace. That parse needs no `window`, which is what lets `classifyWidgetBody` keep running
+inside the HTML transcript export where there is none.
+
+**A loopback address is corrected, not warned about.** An `src` is resolved by the READER'S
+browser. A model writing a reply runs on this box, where `http://127.0.0.1:8005` is ArchPulse; the
+same string in a frame on a phone over the VPN is the PHONE'S port 8005, which is nothing, and it
+fails in the one mode nothing here can detect. `resolveEmbedUrl` (`embedUrl.ts`) therefore moves a
+loopback host onto whatever hostname reached this page — the same trick `resolveDocSpaceOrigin`
+plays, for the same reason — leaving the scheme, port, path and query alone. The one exception is a
+reader who is themself on loopback, where the address already means what it says. A non-loopback
+host is never second-guessed. The address the model SHOULD write is `CLOUDCLI_PUBLIC_HOST`, when
+the operator has set one — the surface prompt names it verbatim (`use this host's address <host>
+for anything running here`); unset, the prompt instead tells the model to use whatever LAN or VPN
+address (or hostname) this host is reached on, since none is named. Either way the rewrite above is
+the net under that, not a substitute for it.
+
+**The origin gate is the DocSpace kind's, unchanged.** `EMBED_SANDBOX` is the same
+`allow-scripts allow-same-origin allow-forms`, for the same reason and under the same condition:
+the frame keeps the origin of the document it loads, which is safe exactly while that document is
+not CloudCLI's — a same-origin frame reads `localStorage['auth-token']`. `isForeignOrigin` is
+consulted in `EmbedUrlFrame` before the iframe is rendered, and an address on this app's own origin
+draws an error card and no frame. It is asked THERE and not in the classifier because it is the one
+question that needs the live page to answer it. `allow-popups` and `allow-top-navigation` are
+withheld: an embed may not spray windows over the operator's browser, and may not steer the tab it
+sits in away from the chat. The one grant made through `allow` is `fullscreen`, so an embedded
+video's own control keeps working — a different mechanism from the card's switch, which never
+touches the frame.
+
+**The height is DECLARED, not reported, and it has to be.** A page that never heard of this app
+will never post `resize`, so `useWidgetHost`'s protocol has nothing to say here and the frame would
+otherwise sit at the host's 24-pixel floor, reading as a thin empty line rather than as a fault.
+The fence body carries the number instead. This is also why the kind mounts no host at all: there
+is no `ready` to wait for, no theme to post, and no topic to answer.
+
+**Two silent failures, one answer.** An address that refuses to be framed — `X-Frame-Options`,
+`frame-ancestors`, which is most of the public web — still fires `load` on the element, and the
+document is cross-origin, so nothing in this page can tell a refusal from a blank page from a
+perfectly rendered one. A `http://` address inside a page served over `https://` is blocked by the
+browser before the element sees anything, for the same undetectable-from-here reason. So there is
+deliberately NO ready timeout on this kind: a timer would be a coin toss dressed as a diagnosis.
+What the card carries instead is the address itself as an `a[data-embed-open]` `Open page` link,
+which is why `openUrl` on this kind is not a convenience — it is the reader's only recourse when
+the frame shows nothing.
+
+`EmbedUrlFrame` is keyed on the fence body by `WidgetFrame`, exactly like its two neighbours, so a
+changed address arrives as a NEW element rather than as a reassigned `src`: the frame navigates
+once in its life and a re-render can never throw away what the reader did inside it.
+
+## The Embed widget
+
+The same address, in the gutter beside the transcript rather than inline in it — the fourth chat
+gutter widget, next to Runs, Memory and Subagents.
+
+**Why a widget and not only a card.** An inline card is part of the reply: it scrolls away with the
+message that declared it, and it is as wide as the transcript column. A page the reader is *working
+against* — a board they are moving cards on, a dashboard they are watching while the model talks —
+wants to stay put and to be as big as they like. So the same declaration feeds both: the card is the
+receipt in the conversation, the widget is the place the page lives.
+
+**The chat publishes, the widget reads.** `ChatInterface` derives the addresses with
+`collectEmbedTargets` over its own messages and publishes them through `embeds/embedSource.ts`,
+tagged with its app session id; `EmbedWidgetBody` asks for one id and is handed nothing for any
+other. It is the same shape, in the same place, as the Subagents widget's `subagentSource` — and for
+the same reason: the messages live in a `useRef` store private to `ChatInterface`.
+
+**The derivation is over the MESSAGES, never the DOM.** The obvious channel — have the inline card
+register itself as it mounts — is wrong: the transcript unmounts rows that scroll far from the
+viewport, so the widget's list would grow and shrink with the reader's scrollbar and a fence nobody
+had scrolled to would not exist. Fences are found by the SAME parser that renders them —
+`unified` + `remark-parse` + `remark-gfm`, reading `code` nodes whose `lang` is exactly `widget` —
+behind a cheap pre-filter that must stay LOOSER than the parser (backtick or tilde, spaces or tabs
+allowed before the word, because CommonMark trims the info string — a tighter hint drops a
+declaration the transcript draws, in silence). A second parser — a line-anchored regex, say — can
+only agree with the first by accident: it misses a fence in a list item, a blockquote or an indented
+block, which then draws its card and never reaches the widget. Each body then goes through
+`classifyWidgetBody` — the one classifier — so the widget can never list an address the card would
+have refused. Only the model's own replies declare, and that is asked of `isProseReply`
+(`chat/utils/toolGrouping.ts`), the app's one answer to "is this the model's reply": a user's paste, a
+tool's output, a thinking row, a task notification and the synthetic placeholder never steer the
+frame. Addresses collapse on the URL and stand where they were LAST named, so re-declaring one brings
+it back to the front; the list is capped at 12. Each message's addresses are cached by its text, so a
+streaming turn re-parses only the reply being written — parsing every fence-bearing reply on every
+100ms flush cost 66ms for a 300-message chat.
+
+**The newest declaration wins, and a reader's choice survives until there is a newer one.** A widget
+that ignored new declarations would make the fence useless; one that discarded the reader's pick on
+every render would snatch a page away mid-read. The follow is latched: a CHANGE in the newest
+address adopts it, and until then whatever the reader chose stands. A newly named address also
+OPENS the widget, once — and the trigger is precise because each looser one fought the reader: the
+NEWEST address changing (a count grows when older history loads), within ONE chat (the layout stays
+mounted across a switch, and comparing two chats re-opened a widget the reader had shut, writing it
+open to the server), after that chat's list has ARRIVED (`useEmbedWidgetState().known` — the arriving
+chat publishes a commit after the layout re-renders, and without it a whole history reads as new).
+
+**It is also a generic viewer, and it opens on a dropdown.** The row is a dropdown that is there
+before any chat has said anything: the house's own services first — ArchPulse, whose address comes
+from `resolveDocSpaceOrigin` (the same answer the DocSpace embed uses, so it is the page's own
+Tailscale host, or `VITE_DOCSPACE_EMBED_ORIGIN` when set) — then every address this chat declared,
+deduplicated on the URL with the chat's entry winning (it carries the model's title), then a last
+entry, `Type an address…`, that swaps the row to a field. A typed value is validated by building the
+fence body it is equivalent to and handing it to the same classifier; a value with no scheme is
+retried once as `http://`, because someone typing `myhost:8005` means a host. Descent is deliberately
+not offered: the descent-sunset plan ends with `:7878` dark. The row is ONE row with two modes
+because two rows of chrome took 92px of a 242px card, measured, in a 300px column.
+
+**A flush card takes the column's spare height.** `GutterWidgetFrame` grew two props for this:
+`flush`, which gives a body that is itself a frame the card's whole inside (no padding, no scroll
+area — a live iframe scrolls itself), and the `flex-1` that goes with it, because a frame asking for
+`height: 100%` has no intrinsic height to grow its card with and sat at the 9rem floor with the page
+peeking through a slot. It KEEPS a floor while it grows — a taller one, 16rem or 45% of the column —
+because growth and a floor do not conflict and dropping the floor (`min-h-0`) let a taller neighbour
+crush the card to 2px, header and switches clipped out of reach, with nothing left to reopen it
+(Athena's review, memory 658 / embed 2 in a 700px column). The other three widgets stay
+content-sized.
+
+
+## Fullscreen
+
+Every LIVE embed — an HTML widget, a DocSpace block and a URL embed alike — wears a switch in its
+card header that gives it the whole viewport, and so does every chat gutter widget. `Escape` leaves.
+
+**It is a class change, never a move.** React reparenting an iframe destroys and recreates the
+element: a fullscreen toggle that lifted the frame into an overlay would reload the widget, drop a
+DocSpace edit in progress and restart a video. So nothing moves in the tree — `ShapeFrame`'s root
+becomes `fixed inset-0 z-[45]`, opaque and square-cornered (`tailwind-merge` replaces the card's
+`my-3 rounded-xl bg-card/50` rather than piling on), and the boxes between that root and the frame
+become a flex column so the body can be told to fill what is left under the header. The chain is
+root → `Collapsible` → `CollapsibleContent` (whose own inner `overflow-hidden` div is reached with
+`[&>div]:h-full`, the one box the file cannot otherwise name) → the body → the frame's wrapper →
+the iframe at `height: 100%`. A break anywhere in it leaves the frame at its old height in a
+screen-sized box. `.verify` measured the round trip: the same DOM node before, during and after,
+and the declared height restored on exit.
+
+**The flag is `WidgetFrame`'s and the chrome is the card's**, because only `WidgetFrame` knows which
+live element exists and only the card draws a box. Both halves travel in the `WidgetEmbed` handed to
+the framer (`fullscreen`, `onToggleFullscreen`), so a caller that draws no frame never offers the
+switch and an unframed embed's `fullscreen` is false forever — the right answer for a box nobody
+drew.
+
+**The layer is `z-[45]`, under the dialogs on purpose.** Over everything the workspace draws (sticky
+rows at z-10/20, the app switcher's layer at z-40) and UNDER `Dialog`'s z-50. Fullscreen is a mode
+the reader sits in with the app live around it, so a dialog opened from it — the command palette, a
+confirm — must come up in front of it; on a layer above the dialogs the palette opens invisibly
+behind the card and keeps the keyboard, so every keystroke lands in a list the reader cannot see.
+
+**A fullscreen card is open and claims Escape.** The fold is forced open while it is up — a
+full-screen card showing only its own header is a screen of nothing — and the chevron is not drawn
+at all rather than drawn dead; the fold MEMORY is untouched, so leaving fullscreen returns the card
+to exactly the state it was left in. The root carries `data-owns-escape` (`shared/ui/overlayEscape`)
+while it is up, and `WidgetFrame`'s own listener takes the key in the capture phase and stops it
+there, so the transcript's turn-abort Escape behind the card never fires. A modal DIALOG is the
+exception, because it is not behind — and so is any panel that owns the key (`OWNS_ESCAPE`): the
+widget's own dropdown, the composer's menu. The listener asks `otherOverlayHoldsEscape()` and stands
+down, so the press closes what is in front and leaves the card fullscreen. It cannot win that by `stopPropagation` — the
+dialog listens on the same window capture stage, and stopping propagation there does not stop a
+second listener on the same node, so without the stand-down one press closes the dialog AND leaves
+fullscreen.
+The listener exists only while fullscreen is on.
+
+**The gutter widgets answer to the same rule, in their own file.** `GutterWidgetFrame` takes
+`fullscreen` and `onToggleFullscreen`; `ChatGutterLayout` holds WHICH widget has the screen (one
+value, so two fullscreen WIDGETS cannot happen — though a transcript card and a widget can both be
+fullscreen at once, two identical panels on one layer that one Escape leaves together) and owns the
+Escape listener, with the same dialog stand-down, and drops it when the region narrows past the
+gutters' threshold. The switch is a second control, so it
+is a second button beside the header's toggle rather than inside it — a button within a button is
+invalid markup — which is the one change to a header that used to be entirely one control.
+
+A retraction is the one thing that ends fullscreen without the reader: a fence that flashes back to
+the streaming half unmounts `WidgetFrame` entirely, and the card comes back as a card. That is the
+same restart the widget itself suffers there, and curing it is `StreamingMarkdown`'s shape to change.
 
 ## The live bus
 
@@ -459,6 +670,10 @@ listeners in the bus for every later publish to walk.
 - **The height is the height, not a `min-height`.** A widget that shrinks must shrink the element
   around it, which a minimum would prevent.
 - **`loading="lazy"` is deliberately absent.** A lazy frame subscribes late.
+- **An embed that renders nothing is indistinguishable from one that rendered.** `X-Frame-Options`,
+  `frame-ancestors` and mixed-content blocking all fire `load` on the element and leave a
+  cross-origin document nothing here can read. Do not add a timeout to guess at it — the `Open page`
+  link is the honest answer. See §"The embed kind".
 - **The token list is not sized to what a widget happens to use.** It is also the payload of the
   `theme` message, so trimming it silently narrows what a widget can restyle itself with.
 - **Any sandboxed frame on this page raises one `SecurityError: Failed to read the 'serviceWorker'
@@ -496,4 +711,9 @@ listeners in the bus for every later publish to walk.
 | `DOCSPACE_SANDBOX` | It still carries EXACTLY `allow-scripts allow-same-origin allow-forms` and the frame still has no inline document. Gate 1 of `.verify/phase-28.mjs` compares the attribute with `===`, never `includes`, so a quietly added `allow-popups` or `allow-top-navigation` reddens it |
 | `isForeignOrigin` | It still compares ORIGINS (not hostnames — the two services differ only by port here), still treats an unparseable URL as not-foreign, and is still consulted BEFORE the iframe renders. It is the only thing standing between a same-origin `VITE_DOCSPACE_EMBED_ORIGIN` and `localStorage['auth-token']`; gate 2 of the probe asserts the rendered frame's origin is not the page's |
 | The `src` memo in `DocSpaceFrame` | It is keyed on the ids ALONE and the theme is still read from a ref latched at mount. Adding anything theme-shaped to that key turns every flip into a reload that discards the reader's unsaved edit — gate 8 of `phase-28.mjs` flips the theme and requires `src` to come back byte-identical, with the flip itself asserted so the gate cannot pass by not happening. Gate 3 of `phase-29.mjs` flips it again on a frame holding a REAL block, where a reload is a fault the reader would see and not only an attribute that changed |
+| `EMBED_SANDBOX` or the embed's URL validation | The sandbox is still EXACTLY `allow-scripts allow-same-origin allow-forms` (no `allow-popups`, no `allow-top-navigation`), the scheme is still checked by PARSING rather than by a prefix, and `isForeignOrigin` still runs before the iframe renders. The same-origin refusal is what keeps `allow-same-origin` away from `localStorage['auth-token']` |
+| The embed's declared height | The clamp is still applied and the `EMBED_*` constants are still the only spelling of it. The kind mounts no `useWidgetHost`, so nothing else can correct a wrong number — only the reader, through fullscreen |
+| `ShapeFrame`'s `fullscreen` prop | The flex chain is unbroken (root → `Collapsible` → `CollapsibleContent` + its inner `[&>div]` → body → wrapper → iframe at `height: 100%`), the fold is still forced open with the MEMORY untouched, and the root still carries `data-owns-escape` while it is up. A break in the chain leaves the frame at its card height inside a screen-sized box |
+| The fullscreen layer or the flush floor | The card still sits at `z-[45]`, under `Dialog`'s z-50 — raise it and a dialog opened from fullscreen comes up behind it holding the keyboard. The flush gutter card still has a floor under its `flex-1` — drop it and a tall neighbour crushes the Embed widget to 2px with no control left to reopen it |
+| `WidgetFrame`'s fullscreen state | It is still a class change and never a move: the live element must keep its position in the React tree across the toggle, or the iframe reloads and a part-typed DocSpace edit is gone. Toggle it and assert the SAME DOM node before and after |
 | The `key` on `WidgetFrameLive` OR on `DocSpaceFrame` | BOTH forks carry `key={code}` and both rest on the same premise — the revoke rule, not a reconciliation nicety. Without it a changed fence body is applied to the SAME element: `srcDoc` reassigned in place for an HTML widget, a new `src` for a DocSpace block. Either fires a second `load`, which the host cannot tell from the frame navigating itself away, and it silently revokes a healthy frame forever. Gate 9c rebuilds a body and requires `live.theme` to be set inside the new document — the sentinel half of that gate passes either way, because an in-place swap is also a new document, so `live.theme` is the read that matters |

@@ -32,8 +32,8 @@ function mintId(name: string, takenIds: Set<string>): string {
     });
   }
 
-  // The suffix is why this is not a one-liner: a caller adding a second "Descent" gets
-  // `descent-2` rather than a 409 he did not ask for. The name that collides is an ordinary
+  // The suffix is why this is not a one-liner: a caller adding a second "Dispatch" gets
+  // `dispatch-2` rather than a 409 he did not ask for. The name that collides is an ordinary
   // event — the file holds two builds of one app — while the ID must stay unique, so the id is
   // what yields. The base is re-trimmed to the ceiling once the suffix is on, so a 64-character
   // name cannot mint a 66-character id.
@@ -67,7 +67,7 @@ function requireName(raw: unknown): string {
  * The url, checked as it will actually be opened rather than as it is stored.
  *
  * `{host}` is substituted with `localhost` before parsing, because that is the one address a
- * server can resolve on its own: `http://{host}:7878` is a valid address and `descent` is not.
+ * server can resolve on its own: `http://{host}:8004` is a valid address and `my-app` is not.
  * The stored row keeps `{host}` — the substitution exists to prove the shape, not to resolve it.
  */
 function requireUrl(raw: unknown): string {

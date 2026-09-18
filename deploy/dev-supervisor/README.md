@@ -200,8 +200,8 @@ not tsx, so the child's SIGTERM reaches `server/index.ts`'s own handler unchange
 ## Install
 
 ```sh
-sudo cp /home/lyphe/.claude/claudecodeui_lyphe/deploy/systemd/cloudcli-server-dev.service /etc/systemd/system/
-sudo systemctl daemon-reload && sudo systemctl restart cloudcli-server-dev
+deploy/systemd/install.sh cloudcli-server-dev.service
+sudo systemctl restart cloudcli-server-dev
 systemctl status cloudcli-server-dev            # → active
 journalctl -u cloudcli-server-dev -f            # → [supervisor] serving pid <n>
 ```
