@@ -2,8 +2,8 @@
 
 One route, `GET /api/deepseek/balance`, mounted behind `authenticateToken` in `server/index.ts` and
 wired in `server/modules/deepseek/deepseek.module.ts`. It answers the money left on the DeepSeek
-account this host's `deepseek-flash` builds spend — a different account from the Claude slots Descent
-holds, at a different vendor, reached by a route Descent never touches. It answers 200 always: a key
+account this host's `deepseek-flash` builds spend — a different account from the Claude slots
+[accounts.md](accounts.md) describes, at a different vendor, reached by a route of its own. It answers 200 always: a key
 this host does not hold, a key the vendor refused, a timeout and an unreadable body are five facts in
 words, never an error wall.
 
@@ -116,7 +116,7 @@ where declared. Read it there, not a copy here. The client mirrors it in `src/sh
 
 8. **Nothing is persisted and nothing is cached.** No column, no migration, no file: a reading is
    true for the request that carried it. `checkedAt` is epoch MILLISECONDS (`Date.now()`), unlike
-   `DescentUsage.checkedAt`, which is seconds.
+   `ClaudeUsage.checkedAt`, which is seconds.
 
 ## The client's one reading
 
@@ -160,6 +160,25 @@ figure has nothing else to explain: the panel is where someone checks the money 
 stopped, and a frozen tab would otherwise hold a five-minute-old number that looks fresh.
 `DeepseekBalanceReadout` is deliberately not a `Meter` — a balance has no limit to be a share of —
 and it is the one component this feature added rather than composed from what was there.
+
+## The rate beside the balance
+
+DeepSeek bills two rates. Peak is 01:00–04:00 and 06:00–10:00 UTC, Monday through Friday; every
+other hour, and the whole weekend, is off-peak and costs HALF as much, for every model and token
+type. The rule lives once, in UTC, in `src/shared/deepseekPeakHours.ts` —
+`deepseekPeakStatus(now)` answers whether the peak rate is on and the instant that changes — and is
+turned into the reader's own clock only where it is drawn, so daylight saving moves the words and
+nobody edits them (Pacific reads `Sun to Thu, 6 PM to 9 PM` and `Sun to Thu, 11 PM to 3 AM` in
+summer, an hour earlier in winter).
+
+Two surfaces wear it, off that one rule. `DeepseekPeakHours` sits directly under the balance in the
+account panel: a badge — green `Off-peak — half price`, amber `Peak — full price` — then a line saying
+until when, and the full-price hours one per line, re-read on the panel's minute tick. And the
+composer's Flash chip (`ComposerDeepSeekSwitch`) takes the same tone as its outline, in both
+positions of the switch, with the rate as the first sentence of its tooltip: the warning is on the
+control that would spend the money. The chip re-renders through `useRateChangeTick`, one timer set
+to the next boundary, not a minute tick — the colour changes four times a day. When DeepSeek moves
+its hours, `PEAK_WINDOWS_UTC` is the one line to change.
 
 ## What is left standing
 

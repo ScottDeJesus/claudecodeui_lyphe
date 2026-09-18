@@ -1,6 +1,8 @@
 import { useTranslation } from 'react-i18next';
 
+import { deepseekPeakStatus, deepseekRateChangeInWords } from '@/shared/deepseekPeakHours';
 import { useDeepSeekFlashSwitch } from '@/shared/hooks/useDeepSeekFlashSwitch';
+import { useRateChangeTick } from '@/shared/hooks/useRateChangeTick';
 import { Chip, LLMProviderLogo } from '@/shared/ui';
 
 /**
@@ -50,12 +52,23 @@ export default function ComposerDeepSeekSwitch({ yieldsToVoice }: Props) {
   // nothing to flip from — so it asks again instead, which is the only press that can be honoured.
   const unknown = enabled === null;
 
+  // The chip's outline is DeepSeek's price right now: green while it bills half, amber at peak —
+  // the warning sits on the very control that would spend the money. Worn in both positions of
+  // the switch, because the moment to read it is BEFORE turning Flash on for heavy work.
+  const now = useRateChangeTick();
+  const { peak, changesAt } = deepseekPeakStatus(now);
+  const changes = deepseekRateChangeInWords(now, changesAt);
+  const rateInWords = peak
+    ? t('input.deepseekFlashPeak', { defaultValue: 'Peak hours right now: DeepSeek is full price until {{time}}.', time: changes })
+    : t('input.deepseekFlashOffPeak', { defaultValue: 'Off-peak right now: DeepSeek is half price until {{time}}.', time: changes });
+
   return (
     <Chip
       size="sm"
       className={`vv-chip--compact hidden h-8 shrink-0 ${yieldsToVoice ? 'min-[388px]:inline-flex' : 'min-[352px]:inline-flex'}`}
       // The last position the server confirmed, never an assumed one.
       selected={enabled === true}
+      tone={unknown ? undefined : peak ? 'warn' : 'positive'}
       indeterminate={unknown}
       // Busy only while a write is in flight. It refuses the press without leaving the tab order,
       // so a keyboard reader's next Enter still lands here instead of at the top of the page.
@@ -78,16 +91,20 @@ export default function ComposerDeepSeekSwitch({ yieldsToVoice }: Props) {
             // fill, and this is what says why and what to do about it.
             ? t('input.deepseekFlashUnreadable', { defaultValue: 'The switch could not be read — press to try again.' })
             : t('input.deepseekFlashReading', { defaultValue: 'Reading the switch…' })
-          : t('input.deepseekFlashTooltip', {
+          : `${rateInWords} ${t('input.deepseekFlashTooltip', {
               // The fallback is the shipped English string verbatim: a missing key must not quietly
               // render a DIFFERENT sentence than the one every locale was translated from.
               defaultValue: "While this is on, the plan runner's build souls — the builder, its fix-pass and Athena — run on DeepSeek Flash. Prometheus and the scouts stay on Claude.",
-            })
+            })}`
       }
     >
       {/* Through the shared provider logo rather than DeepSeekLogo directly: it is the door that
           branches on a provider name, and the mark's own file records it as the only one. */}
       <LLMProviderLogo provider="deepseek" className="h-4 w-4 shrink-0" />
+      {/* The rate's second channel: green and amber are one grey to a red-green colour-blind
+          reader, so peak also wears the warn tone's own glyph. Off-peak wears none — the mark to
+          notice is the expensive one. */}
+      {!unknown && peak && <span aria-hidden="true" className="text-[10px] leading-none">▲</span>}
       <span className="hidden sm:inline">
         {t('input.deepseekFlashShort', { defaultValue: 'Flash' })}
       </span>

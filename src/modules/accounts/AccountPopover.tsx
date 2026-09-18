@@ -1,4 +1,5 @@
 import { DeepseekBalanceReadout } from '@/modules/accounts/DeepseekBalanceReadout';
+import { DeepseekPeakHours } from '@/modules/accounts/DeepseekPeakHours';
 import { UsageMeters } from '@/modules/accounts/UsageMeters';
 import { accountInitials } from '@/modules/accounts/utils/accountInitials';
 import { useMinuteTick } from '@/modules/accounts/hooks/useMinuteTick';
@@ -13,10 +14,11 @@ const SWITCH_REASSURANCE =
 /**
  * What the date on a row means, said once so no row has to imply it.
  *
- * Descent calls `expiresAt` "a freshness clock, not a secret" (`account_store.py:148`) and
- * renders no warning from it anywhere in its own switcher. It is the provider's expiry inside the
- * COPY Descent holds, read from that slot's own file — so the date is the age of the copy and
- * nothing more. On the live store, two of three sit in the past.
+ * The account store calls `expiresAt` "a freshness clock, not a secret" — the rule it kept from
+ * `account_store.py:148`, where the switcher said it aloud — and renders no warning from it
+ * anywhere. It is the provider's expiry inside the COPY the store holds, read from that slot's own
+ * file — so the date is the age of the copy and nothing more. On the live store, two of three sit
+ * in the past.
  *
  * It says what the date IS and draws no contrast, deliberately. Every clause that sorted the rows
  * into "the one in use" and "the rest" turned out false: nothing refreshes a copy on a clock, so
@@ -95,7 +97,7 @@ function AccountRow({ slot, hue, busy, onSwitch, now }: AccountRowProps) {
 type AccountPopoverProps = {
   accounts: ClaudeAccounts | null;
   usage: ClaudeUsage | null;
-  /** The DeepSeek reading, held by the row. Not part of `usage`: a different account, from a route Descent never touches. */
+  /** The DeepSeek reading, held by the row. Not part of `usage`: a different account, from a route of its own. */
   balance: DeepseekBalance | null;
   busy: boolean;
   error: string | null;
@@ -111,7 +113,7 @@ type AccountPopoverProps = {
  *
  * It composes Card rather than adopting the library's Menu: a Menu is a list of labelled
  * choices, and this panel carries meters, avatars and buttons. Codex is deliberately absent —
- * these are the Claude slots Descent holds, and Codex stays in Settings → Agents (D6).
+ * these are the Claude slots the store holds, and Codex stays in Settings → Agents (D6).
  */
 export function AccountPopover({
   accounts,
@@ -146,10 +148,12 @@ export function AccountPopover({
     >
       {unknown ? <p className="text-xs leading-relaxed text-muted-foreground">{UNREACHABLE_LINE}</p> : <UsageMeters usage={usage} />}
 
-      {/* OUTSIDE that branch on purpose. This reading does not come from Descent, so a Descent
-          outage must not take it down with the meters — the two fail independently, and the
-          panel is where a person checks the money precisely when something else has stopped. */}
+      {/* OUTSIDE that branch on purpose. This reading comes from another vendor and another
+          route, so a meter that cannot answer must not take it down with them — the two fail
+          independently, and the panel is where a person checks the money precisely when
+          something else has stopped. */}
       <DeepseekBalanceReadout balance={balance} />
+      <DeepseekPeakHours now={now} />
 
       <div className="flex flex-col gap-1.5">
         <div className="text-[11px] uppercase tracking-[0.14em] text-ink-faint">
