@@ -1976,21 +1976,48 @@ export type WidgetHostHandlers = {
 /** A widget fence whose body is JSON naming one DocSpace block — the chat embeds it from ArchPulse instead of rendering HTML. */
 export type DocSpaceBlockRef = { pageId: string; blockId: string };
 
-/** What a widget fence body turned out to be: raw HTML (the default), a DocSpace reference, or a DocSpace reference that does not parse. */
+/**
+ * A widget fence whose body is JSON naming one ADDRESS — the chat draws that page in a frame and
+ * knows nothing else about it.
+ *
+ * `title` is the card's heading when the model gave one, because "Embed" tells a reader nothing and
+ * only the writer knows the page is a Grafana panel or a run's log tail. `height` is the drawn
+ * height in CSS pixels, clamped where it is used (`EmbedUrlFrame`): a foreign page speaks none of
+ * the widget protocol, so it can never report its own height and something has to say how tall it
+ * is. Both are optional and both have a default; the address is the only required field.
+ */
+export type EmbedUrlRef = { url: string; title?: string; height?: number };
+
+/** What a widget fence body turned out to be: raw HTML (the default), a DocSpace reference, an arbitrary address to embed, or a reference that does not parse. */
 export type WidgetBodyShape =
   | { kind: 'html' }
   | { kind: 'docspace'; ref: DocSpaceBlockRef }
+  | { kind: 'embed'; ref: EmbedUrlRef }
   | { kind: 'invalid'; reason: string };
 
 /**
- * A live embed's identity, handed to a caller's framer: which kind it is, and the studio link for a
- * DocSpace block (null for an HTML widget). Built by WidgetFrame; read by the chat transcript's
- * EmbedFrame.
+ * A live embed's identity, handed to a caller's framer: which kind it is, where a reader can open
+ * it OUTSIDE this app, what to call it, and the fullscreen switch it wears.
+ *
+ * `openUrl` is null exactly for the HTML widget, which is model output this app composed inline and
+ * so has nowhere else to be; it is ArchPulse's studio deep link for a DocSpace block and the address
+ * itself for an embed. `title` is the model's own words for an embed and null for the other two,
+ * whose names are fixed. `fullscreen`/`onToggleFullscreen` are owned by WidgetFrame — the component
+ * that owns the live element — because a framer that held the state would have to move the frame in
+ * the tree to draw it, and a moved iframe is a reloaded iframe.
+ *
+ * Built by WidgetFrame; read by the chat transcript's EmbedFrame.
  */
-export type WidgetEmbed = { kind: 'html' | 'docspace'; studioUrl: string | null };
+export type WidgetEmbed = {
+  kind: 'html' | 'docspace' | 'embed';
+  openUrl: string | null;
+  title: string | null;
+  fullscreen: boolean;
+  onToggleFullscreen: () => void;
+};
 
 /**
- * Wraps a LIVE embed. WidgetFrame calls it on its two live branches only, behind its mount and
+ * Wraps a LIVE embed. WidgetFrame calls it on its three live branches only, behind its mount and
  * streaming gates, never for the source `<pre>` or the error card. Passed by the chat transcript's
  * CodeBlock.
  */
@@ -2036,7 +2063,9 @@ export type RunnerTimelineEntry = { at: string; phase_id: string; stage: string;
 /** Where the run stands, from `progress.json.position`. `stage_since` is epoch SECONDS, like every timestamp inside a snapshot. */
 export type RunnerPosition = { rank: number; total: number; phase_id: string; title: string; remain: number; pipeline: string; stage: string; stage_detail: string; stage_since: number };
 /** One run as the lane reads it off disk. `position` is `null` while the runner has not composed one yet, which a live run does show in its first seconds. `blocked_causes` is the receipt's phase id → cause map, `{}` until the run ends — the only record of a phase halted on a crash or a budget, whose row never turns `blocked`. `launched_by_session` is the APP session id of the chat whose turn launched the run — the server resolves it before the snapshot is sent, so it is safe to compare against the open chat; `null` when the run names none. */
-export type RunnerRunSnapshot = { run_id: string; plan_path: string; plan_title: string; state: RunnerRunState; status: string; started_at: number; heartbeat_at: number; stopped_at: number | null; launched_by_session: string | null; outcome: string | null; ended_at: number | null; blocked_causes: Record<string, string>; pid: number | null; position: RunnerPosition | null; phases: RunnerPhaseRow[]; spawns: number; max_spawns: number; cost_usd: number; plan_runs: number; plan_spawns: number; plan_cost_usd: number; plan_planning_usd: number; plan_review_usd: number; plan_scouts_usd: number; plan_total_usd: number; tokens: number; plan_tokens: number; line: string; timeline: RunnerTimelineEntry[] };
+/** The fix-it session on a blocked phase, from `progress.json.repair`: the one IN FLIGHT (`repairing`, `step` the sub-stage it is on; `paused` while the run waits out a rate limit), else the last one finished (`fixed` — the phase walks again — or `failed`). `by` says whose session it is: `unblock` is the run's own outing, walked by the run's process; `heal` is the heal drain's, which works while the run itself is halted. `live` is whether the process doing a `heal` repair is alive right now (always `false` for an `unblock`, whose liveness is the run's). `resumed` is whether a finished repair put the phase back on the walk: a cleared unblock always did, a heal only when it re-armed the phase's spec — a heal can cure the cause and leave the phase standing; `null` when the heal never measured it. `since` and `ended_at` are epoch SECONDS; `k` is the number of the outing this repair belongs to, and `limit` its per-phase ceiling (0 = none carried, as for a heal). */
+export type RunnerRepair = { phase_id: string; state: 'repairing' | 'paused' | 'fixed' | 'failed'; by: 'unblock' | 'heal'; live: boolean; resumed: boolean | null; step: string; k: number; limit: number; since: number | null; ended_at: number | null; reason: string };
+export type RunnerRunSnapshot = { run_id: string; plan_path: string; plan_title: string; /** A test's run, never the operator's: its plan sits in a scratch root (the runner's own fixtures under the temp dir) or its id is a probe's `fixture-` run. Hidden from every runs list unless a probe opts in, and never pushed as a notification. */ test_run: boolean; state: RunnerRunState; status: string; started_at: number; heartbeat_at: number; stopped_at: number | null; launched_by_session: string | null; outcome: string | null; ended_at: number | null; blocked_causes: Record<string, string>; pid: number | null; position: RunnerPosition | null; repair: RunnerRepair | null; phases: RunnerPhaseRow[]; spawns: number; max_spawns: number; cost_usd: number; plan_runs: number; plan_spawns: number; plan_cost_usd: number; plan_planning_usd: number; plan_review_usd: number; plan_scouts_usd: number; plan_total_usd: number; tokens: number; plan_tokens: number; line: string; timeline: RunnerTimelineEntry[] };
 /** The whole picture, pushed on change over `/ws`. `runs` is ordered by `started_at` ascending. `at` is epoch MILLISECONDS, unlike every field inside a snapshot. */
 export type RunnerStateEvent = { kind: 'runner_state'; runs: RunnerRunSnapshot[]; at: number };
 /** The two verbs the server may relay. Starting a run is `/execute`'s act, never a button's. */
@@ -2203,10 +2232,11 @@ export type UniverseDigest = { edits: number; execs: number; at: number };
  *  a place in it, and the rest close up or make room — there is no fixed number of berths. */
 export type GutterSide = 'left' | 'right';
 
-/** The three widgets a chat gutter can hold: the plan-runner runs of the open session, the
- *  memory-intake rows proposed by it, and the subagents that session has pinned. These are the ids
- *  the DOM carries as `data-widget`, and the keys `useGutterPlacements` stores its records under. */
-export type GutterWidgetId = 'runner' | 'memory' | 'subagents';
+/** The widgets a chat gutter can hold: the plan-runner runs of the open session, the memory-intake
+ *  rows proposed by it, the subagents that session has pinned, and the embed — a live page the chat
+ *  named, or the reader typed in. These are the ids the DOM carries as `data-widget`, and the keys
+ *  `useGutterPlacements` stores its records under. */
+export type GutterWidgetId = 'runner' | 'memory' | 'subagents' | 'embed';
 
 /** One widget's place in its side's stack and whether it is expanded. `order` is the sort key within
  *  the side, dense from 0 after every move; a collapsed widget is still placed — it draws as a tab
@@ -2229,6 +2259,20 @@ export type SubagentTranscriptResult = { found: boolean; activity: SubagentActiv
 //----------------- CHAT SUBAGENT WIDGET ------------
 /** What the chat publishes for its Subagents widget: the session the rows belong to, the agent container rows of the history the chat has loaded, and the launcher-soul ids that same history anchored. Scoped by `sessionId`, which the widget checks before drawing anything — rows tagged with another chat are refused, not shown. */
 export type ChatSubagentSource = { sessionId: string; agentMessages: ChatMessage[]; soulLaunchIds: string[] };
+
+// ---------------------------
+//----------------- CHAT EMBED WIDGET ------------
+/**
+ * What the chat publishes for its Embed widget: the session the addresses belong to, and every
+ * embed fence that session's loaded history declares, oldest first.
+ *
+ * Scoped by `sessionId` exactly as `ChatSubagentSource` is, and checked the same way — a list tagged
+ * with another chat is refused rather than shown, which is what stops the widget carrying one
+ * conversation's dashboards into the next. The targets are `EmbedUrlRef`s, the SAME shape
+ * `classifyWidgetBody` produces for the inline card, because the widget and the card must never
+ * disagree about what an address, a title or a height is.
+ */
+export type ChatEmbedSource = { sessionId: string; targets: EmbedUrlRef[] };
 
 /** What the widget's transcript view is open on: an `Agent`-tool row addressed by the tool call that spawned it (`id` is that call's `tool_id`), a launcher soul addressed by its launch id, or a board's Metis addressed by the session id the board minted. Its third consumer is the kanban module's `KanbanMetisPanel.tsx`, which opens a fleet row into the same view rather than a copy of it. */
 export type SubagentTranscriptTarget = { kind: 'agent' | 'soul' | 'metis'; id: string };

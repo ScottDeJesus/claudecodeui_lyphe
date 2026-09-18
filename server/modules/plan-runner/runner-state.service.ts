@@ -4,10 +4,12 @@ import type {
   RunnerPhaseRow,
   RunnerPhaseState,
   RunnerPosition,
+  RunnerRepair,
   RunnerRunSnapshot,
   RunnerRunState,
   RunnerTimelineEntry,
 } from '@/shared/types.js';
+import { isHiddenProjectPath } from '@/shared/hidden-project-paths.js';
 
 import {
   listRunDirs,
@@ -25,7 +27,8 @@ import {
  *
  * Nothing here touches a socket, an HTTP request or the runner itself. Given the bytes on disk
  * and a clock, it answers with snapshots — which is what lets a fixture run prove the whole
- * classification without a runner process existing.
+ * classification without a runner process existing. One field is the exception: `repair.live`
+ * probes the process table (`pidAlive`), and a fixture pins it by carrying a real pid or none.
  */
 
 /** One `runner.log` line: a local ISO stamp, the ◆ line, and the stage word with its optional detail. */
@@ -127,6 +130,63 @@ function readPosition(raw: unknown): RunnerPosition | null {
   };
 }
 
+/** The prefix every probe-made run carries (`.verify/lib/runner-fixture.mjs`'s one fence). */
+const FIXTURE_RUN_PREFIX = 'fixture-';
+
+/**
+ * A run a test made rather than the operator: one of the runner's own fixtures (a plan minted in a
+ * scratch root, `shared/hidden-project-paths.ts`) or a browser probe's fake run (a `fixture-` id,
+ * its plan under the repo's `.verify/`). ONE rule for both, read by the notifications and by every
+ * runs list: on 2026-09-18 a probe's fake run blinked onto the operator's widgets and pushed
+ * "Plan blocked · Fixture — live widgets" to the phone twice, because only the first kind was known.
+ */
+function isTestRun(runId: string, planPath: string): boolean {
+  return runId.startsWith(FIXTURE_RUN_PREFIX) || isHiddenProjectPath(planPath);
+}
+
+const REPAIR_STATES: readonly RunnerRepair['state'][] = ['repairing', 'paused', 'fixed', 'failed'];
+
+/** Is this process alive? Signal 0 delivers nothing; EPERM still means it exists. */
+function pidAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    return (error as NodeJS.ErrnoException).code === 'EPERM';
+  }
+}
+
+/**
+ * The fix-it session on a blocked phase, or `null` when the run never sent one. An unknown state
+ * word is `null` too: a card must never say "repairing" over something it cannot read.
+ *
+ * A `heal` repair is worked by the heal drain while the run itself is halted, so the run's own
+ * liveness says nothing about it: `live` is read off the drain's pid, which the stamp carries.
+ */
+function readRepair(raw: unknown): RunnerRepair | null {
+  if (raw === null || typeof raw !== 'object') return null;
+  const state = readString(field(raw, 'state')) as RunnerRepair['state'];
+  if (!REPAIR_STATES.includes(state)) return null;
+  const by = readString(field(raw, 'by')) === 'heal' ? 'heal' : 'unblock';
+  const pid = readNumberOrNull(field(raw, 'pid'));
+  return {
+    phase_id: readString(field(raw, 'phase_id')),
+    state,
+    by,
+    live: by === 'heal' && state === 'repairing' && pid !== null && pid > 0 && pidAlive(pid),
+    // A cleared unblock always re-walked its phase, and blocks written before `resumed` existed say
+    // nothing; an unknown is carried as `null`, never inverted into a claim.
+    resumed: by === 'unblock' ? state === 'fixed'
+      : typeof field(raw, 'resumed') === 'boolean' ? (field(raw, 'resumed') as boolean) : null,
+    step: readString(field(raw, 'step')),
+    k: readNumber(field(raw, 'k'), 0),
+    limit: readNumber(field(raw, 'limit'), 0),
+    since: readNumberOrNull(field(raw, 'since')),
+    ended_at: readNumberOrNull(field(raw, 'ended_at')),
+    reason: readString(field(raw, 'reason')),
+  };
+}
+
 /**
  * The stage history of one run, newest last, capped at the most recent {@link TIMELINE_LIMIT}.
  *
@@ -220,6 +280,7 @@ export function classifyRun(
   return {
     run_id: runId,
     plan_path: planPath,
+    test_run: isTestRun(runId, planPath),
     plan_title: readString(field(progress, 'plan_title')),
     state,
     status: readString(field(progress, 'status')),
@@ -234,6 +295,7 @@ export function classifyRun(
     blocked_causes: ending !== null ? readBlockedCauses(files.receipt) : {},
     pid: readNumberOrNull(field(progress, 'pid')),
     position: readPosition(field(progress, 'position')),
+    repair: readRepair(field(progress, 'repair')),
     phases: Array.isArray(phases) ? phases.map(readPhaseRow) : [],
     spawns: readNumber(field(progress, 'spawns'), 0),
     max_spawns: readNumber(field(progress, 'max_spawns'), 0),

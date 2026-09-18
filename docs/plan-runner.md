@@ -64,6 +64,89 @@ there, in one copy. The siblings are the launcher-souls lane
 cadence, and a board's own Metis sessions (`kanban-metis/kanban-metis.module.ts`, the
 `kanban_metis_state` frame) — a different root and a different frame each time, the same loop.
 
+## The plan-archive sweep
+
+The plans corpus grows unbounded — every `/plan` session and every runner plan lands in it, and nothing
+prunes it — so this module moves the FINISHED ones into the corpus's `archive/` subdirectory
+(`plan-archive.service.ts`). It is armed where the module is constructed, it speaks to no socket, and it
+does no work a request pays for.
+
+**The selection rule is four clauses, and all four must hold AFFIRMATIVELY.** Anything else STAYS PUT,
+because every doubt here costs a kept file and a wrong answer costs a plan:
+
+1. **COLD** — the file's mtime is older than 48 h (`COLD_HOURS`), which protects the plan being written
+   now.
+2. **ZERO UNSHIPPED PHASES** — per the runner's own classifier, which protects a paused build.
+3. **NO LIVE LEASE** — no card's plan or build lease holds that path (below).
+4. **POSITIVE DONE-EVIDENCE** — the file carries a ship-log date stamp (`SHIPPED_DATE_RE`). Cold and
+   unshipped are absences; this is the one PRESENCE the sweep requires, and without it a notes file that
+   happens to be `.md` and happens to be old would be swept away from a person still reading it.
+
+**Clause 2 is not implemented in this file.** The count comes from `~/.claude/hooks/auto_execute_plan.py`'s
+`_count_unshipped_phases` — the exact reader `/execute` trusts — run as a CHILD PROCESS against the plan's
+text, with the hooks directory passed as argv and the plan arriving on stdin, so a plan containing
+quotes, backticks or a `#!` line is data and never code. That reader changes whenever the plan format
+changes, and a TypeScript copy of it would answer differently from the thing that walks the file. A child
+that cannot be reached at all moves NOTHING: an unanswerable clause 2 keeps every plan, which is the
+port's own fail-safe.
+
+**Clause 3 arrives as a PARAMETER, and the sweep never learns where it came from.** Age alone does not
+cover this clause — a build can hold a fresh lease on a plan nobody has touched for a week — and the paths
+the board's leases hold are handed IN (`heldPlanPaths`, read afresh on every pass) rather than read by this
+module: the board answers what its own leases hold, and no other module reads those rows sideways to find
+out. A lease is fresh by the same window a claim is granted by (`KANBAN_LEASE_STALE_SECONDS`, compared the
+way `kanban-leases.db.ts` compares it for a claim), so a card whose builder died holds no plan forever and
+one whose builder is working does; a stamp that will not parse is not fresh. The paths arrive as the
+card's `plan` column spells them, `~` and all, because the caller is what joins them to the corpus's own
+paths. `server/index.ts` is the single place the two modules meet — the sweep opens no database, reads no
+table and imports nothing from the board.
+
+**The cadence is settle-then-daily.** The first pass runs 120 s after construction and arms a 24 h interval
+from there: the settle is what actually fires on a server that restarts far more often than once a day (a
+daily timer measured from boot would be reset by the next restart before it ever fired), and the interval
+is the backstop under one that lives long. Both timers are `unref`'d so neither keeps the process alive,
+`stop()` clears both, and a pass that threw is logged once and swallowed — a sweep that ended its own
+interval would silently stop archiving for the life of the process.
+
+**The only write is the MOVE, and it is reversible — never a delete.** `archive/<name>` that already exists
+is HELD rather than clobbered, so a second copy of a plan is never lost to a name collision, and a dry run
+(`apply: false`) writes nothing at all, not even the destination directory.
+
+## The plan-cost read
+
+`plan-cost.service.ts` answers what a whole PLAN cost — the reading behind the card drawer's cost line,
+handed to the board as `kanbanReadings.planCost` and served by `GET /api/kanban/cards/:cardId/plan-cost`
+([kanban.md](kanban.md) §"The routes"). It is a READ of books that already exist, and it keeps no books of
+its own: a second ledger would be a second answer to "what did this cost", and two answers drift.
+
+**Every row it sums is ALREADY PRICED.** A `claude -p` child reports its own bill, and a ledger row was
+priced from its transcript when its outing stopped — so nothing here prices a token and nothing here writes
+a ledger. Three sources make one number:
+
+- `planning` · `review` · `scouts` — the plan's own ledger's sums
+  (`~/.claude/state/plan_costs/<slug>.json`, `readPlanLedger`), the live truth while the file is there,
+  read on every call.
+- `build` — every matching run's own `cost_usd`, summed: a receipted run from its `receipt.json`, a live run
+  (no receipt yet) from its `progress.json`.
+- the NEWEST matching receipt's own `plan_cost` — the runner's precomputed whole-plan reading, taken at
+  close by the same code, and the only copy that survives the ledger's pruning. It is read as a FLOOR under
+  all four kinds: a run directory that has left the state root, a pruned ledger, a run scanned while its own
+  file is mid-rewrite — each of those would silently shrink a sum, and the receipt still holds what was
+  spent. Spend only grows, so of two readings of one quantity the larger is the later, and a floor can never
+  double-count: it either agrees with the sum or replaces a reading that has lost ground.
+
+**A plan is its PATH, and matching a run to a plan is the one place a bare string comparison is WRONG.** A
+card stores `~/.claude/plans/foo.md`; a receipt stores whatever absolute path the runner was launched with,
+and `~` expanded after a `realpath` resolves under the CALLER's cwd — a different answer per process. So the
+home is expanded FIRST and resolved second, and both sides of the comparison go through that one door
+(`_plan_key`).
+
+**The result is cached per plan for 20 seconds** (`COST_TTL_MS`, the same TTL the hooks tree's
+`plan_costs.py` uses): opening a drawer must not walk two hundred run directories on every click, and a
+reading twenty seconds stale on a surface that reports dollars is not a lie. The reading never throws — a
+plan with nothing behind it answers `null`, which is what the route hands the drawer, so a card whose plan
+was never run reads "no cost yet" rather than `$0.00`.
+
 ## The DeepSeek switch — the one state file this server writes
 
 `~/.claude/state/deepseek_flash.flag` is written by `server/modules/settings/deepseek-flash-switch.ts`,
@@ -481,7 +564,12 @@ each.
 run and phase states, `Meter` for shipped-of-total with spawns and spend beneath it, `Chip` +
 `Shimmer` for the stage strip (`PipelineStrip`), `Collapsible` + `CollapsibleTrigger` +
 `CollapsibleContent` twice — once around the phase list, once inside each `PhaseRow` around its
-timeline — and `Button` for the one verb. Every string reaches the DOM as a text node: a plan
+timeline — `Banner` + `Spinner` for the repair strip (`RepairBanner`: the unblock outing on a
+blocked phase, or the heal the drain works while the run is halted (`by`), read off
+`progress.json.repair` — repairing with its step and clock while its process lives (the run's for an
+unblock, the drain's pid for a heal), paused while it waits, then the ending: unblocked and running
+again, cured with the phase still standing (`resumed` false), or still blocked with the reason)
+— and `Button` for the one verb. Every string reaches the DOM as a text node: a plan
 title, a phase title, a stage word and the runner's own stderr are all free text written by a
 program this app does not control, so none of it is ever handed to a raw-HTML sink or rendered as
 markdown.

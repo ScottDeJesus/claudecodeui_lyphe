@@ -88,7 +88,14 @@
       "expand": "Show the fleet",
       "notLaunched": "The Metis was not launched",
       "notStopped": "The Metis was not stopped",
-      "notResumed": "The Metis was not resumed"
+      "notResumed": "The Metis was not resumed",
+      "dial": {
+        "stepper": "Metis sessions this board may run at once",
+        "decrease": "Run fewer Metis at once",
+        "increase": "Run more Metis at once",
+        "notMoved": "The dial was not moved",
+        "phoneLabel": "At once"
+      }
     },
     "lanes": {
       "todo": "To Do",
@@ -349,7 +356,29 @@
     "planTotal": "plan ${{total}}",
     "planSplit_one": "planning ${{planning}} · review ${{review}} · scouts ${{scouts}} · build ${{build}} in {{count}} run",
     "planSplit": "planning ${{planning}} · review ${{review}} · scouts ${{scouts}} · build ${{build}} in {{count}} runs",
-    "tokens": "⛁ {{n}} tok"
+    "tokens": "⛁ {{n}} tok",
+    "repair": {
+      "repairing": "Repairing Phase {{phase}}",
+      "fixed": "Repair finished — Phase {{phase}} unblocked, running again",
+      "healed": "Heal finished — the cause behind Phase {{phase}}'s block is cured",
+      "cured": "Heal finished — the cause is cured; Phase {{phase}} stays blocked until its spec changes",
+      "failed": "Repair finished — Phase {{phase}} is still blocked",
+      "attempt": "attempt {{k}} of {{limit}}",
+      "step": {
+        "unblock": "a fix-it session is working on it",
+        "unblock-review": "Athena is reviewing the fix",
+        "unblock-fix": "applying the review's fixes",
+        "guard": "checking nothing it may not touch moved",
+        "stamp": "recording the result",
+        "heal": "a heal session is curing the cause",
+        "heal-review": "Athena is reviewing the heal",
+        "heal-fix": "applying the review's fixes",
+        "close": "merging the plan repair"
+      },
+      "paused": "Repair of Phase {{phase}} paused — it resumes with the run",
+      "pausedHeal": "Heal of Phase {{phase}} is waiting for the heal drain",
+      "ended": "finished {{elapsed}} ago"
+    }
   },
   "navigation": {
     "settings": "Settings",
@@ -598,13 +627,26 @@
       "showEarlier": "Show earlier steps",
       "openRow": "Read {{name}}'s transcript"
     },
+    "embed": {
+      "title": "Embed",
+      "empty": "Nothing embedded in this chat yet",
+      "placeholder": "Address to embed…",
+      "address": "Address to embed",
+      "pick": "Which embed to show",
+      "choose": "Choose a page…",
+      "custom": "Type an address…",
+      "open": "Open the page in a new tab",
+      "rejected": "That is not an http:// or https:// address"
+    },
     "open": "Open {{name}}",
     "collapse": "Collapse",
     "dragHint": "Drag to either side",
     "pin": {
       "label": "This session",
       "title": "Created by the chat you have open"
-    }
+    },
+    "fullscreen": "Fullscreen",
+    "exitFullscreen": "Leave fullscreen"
   },
   "applications": {
     "fabLabel": "Applications",
