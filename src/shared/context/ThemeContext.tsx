@@ -90,6 +90,14 @@ export const ThemeProvider = ({ children }: { children: ReactNode }) => {
   // reader in its own layout effect, or at render time, still would not — read the
   // tokens in an ordinary effect.
   useLayoutEffect(() => {
+    // The tab icon wears the theme's tile (`npm run icons` writes both). Rewritten in place so a
+    // path-prefixed deployment keeps its prefix.
+    const favicon = document.querySelector('link[rel="icon"]');
+    const href = favicon?.getAttribute('href');
+    if (favicon && href) {
+      favicon.setAttribute('href', href.replace(/favicon(?:-dark)?\.png$/, isDarkMode ? 'favicon-dark.png' : 'favicon.png'));
+    }
+
     if (isDarkMode) {
       document.documentElement.classList.add('dark');
 

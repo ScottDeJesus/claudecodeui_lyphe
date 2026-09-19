@@ -360,7 +360,7 @@
       "master": {
         "label": "Jev 语义判断",
         "description": "脚本与会话可以请 TypeSafe 的 Jev 回答是/否、二选一，或在读取前过滤大量输出。关闭：任何内容都不会离开本机。",
-        "armsPrompts": "打开此项还会开始将提示文本发送给 Jev：下方的提示 opt-in 保存为开启。此项关闭期间，不会向 Jev 发送任何内容。"
+        "armsPrompts": "打开此项还会让下方所有保存为开启的 opt-in 开始向 Jev 发送。此项关闭期间，不会向 Jev 发送任何内容。"
       },
       "prompts": {
         "label": "允许钩子将我的提示文本发送给 Jev",
@@ -368,9 +368,18 @@
         "gatedOn": "被上方的总开关拦住——但该 opt-in 保存为开启，因此一旦打开 Jev 就会立即发送提示文本。关闭：钩子仅匹配该词。",
         "gatedOff": "被上方的总开关拦住：请先打开 Jev 再更改此项。关闭：钩子仅匹配该词。"
       },
+      "toolOutput": {
+        "label": "允许钩子将命令输出发送给 Jev",
+        "description": "命令以零退出码结束后，钩子可以发送其输出，以判断它是否其实失败了。绝不会从 no-send 路径发送（~/.claude/state/jev_no_send_paths — 默认是业务数据仓库）。",
+        "gatedOn": "被上方的总开关拦住——但该 opt-in 保存为开启，因此一旦打开 Jev 就会立即发送命令输出。",
+        "gatedOff": "被上方的总开关拦住：请先打开 Jev 再更改此项。"
+      },
       "unreadable": "无法从服务器读取这些开关，因此其位置未知——这与关闭不同。每当此页面重新获得焦点时都会重试。",
       "stats": "Jev 账本：{{calls}} 次调用 · 消耗 {{tokens}} 个 Jev token · 过滤 {{linesIn}} 行 → 保留 {{linesKept}} 行",
-      "statsEmpty": "Jev 账本：尚无调用记录。"
+      "statsEmpty": "Jev 账本：尚无调用记录。",
+      "net": "Jev 净额：{{chars}} 字符 ≈ 会话 {{tokens}} token（+ 省下，− 增加）",
+      "consumer": "{{caller}}：{{chars}} 字符",
+      "consumerMore": "… 另有 {{more}} 个 — 完整列表见 `jev stats`。"
     },
     "login": {
       "title": "登录",

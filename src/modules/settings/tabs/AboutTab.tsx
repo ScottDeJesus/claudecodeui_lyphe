@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 
 import { CLOUDCLI_WORDMARK_FONT_FAMILY } from '@/shared/constants';
 import { IS_PLATFORM } from '@/shared/utils';
+import { AppLogo } from '@/shared/ui';
 import { useVersionCheck } from '@/shared/hooks/useVersionCheck';
 import PremiumFeatureCard from '@/modules/settings/PremiumFeatureCard';
 
@@ -37,14 +38,14 @@ export default function AboutTab() {
     <div className="space-y-6">
       {/* Logo + name + version */}
       <div className="flex items-center gap-3">
-        <img src="/logo-128.png" alt="" aria-hidden className="h-10 w-10 flex-shrink-0 shadow-sm" style={{ borderRadius: '25%' }} />
+        <AppLogo size={128} className="h-10 w-10 flex-shrink-0 shadow-sm" style={{ borderRadius: '25%' }} />
         <div>
           <div className="flex items-center gap-2">
             <span
               className="text-base font-semibold text-foreground"
               style={{ fontFamily: CLOUDCLI_WORDMARK_FONT_FAMILY }}
             >
-              CloudCLI
+              LypheCLI
             </span>
             <a
               href={releasesUrl}

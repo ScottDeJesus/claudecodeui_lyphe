@@ -9,7 +9,7 @@ import {
   writeAppSwitcherRecord,
 } from '@/modules/app-switcher/utils/appSwitcherStorage';
 import { dockableRect, sameRect } from '@/modules/app-switcher/utils/dockRect';
-import type { AppEntry } from '@/shared/app-types';
+import type { AppEntry, RegistryRow } from '@/shared/app-types';
 import type { DockableFabPosition } from '@/shared/ui';
 
 /** One half of the layer. With dual screen off only `left` is ever drawn. */
@@ -29,7 +29,11 @@ export type PaneSlot = { appId: string | null; src: string | null; reloadNonce: 
 type AppSwitcherValue = {
   /** The registry, in file order. A failed read keeps the last good list beside the error. */
   apps: AppEntry[];
+  /** The drawer's list in file order, dividers included; see `useAppRegistry`. */
+  rows: RegistryRow[];
   selfPorts: number[];
+  /** Each app's own tab icon, remembered by the server; see `useAppRegistry`. */
+  icons: Record<string, string>;
   registryError: string | null;
   /**
    * True once the first registry read has answered — with rows, or with a refusal. The drawer paints
@@ -113,7 +117,7 @@ function loneAppOnTheLeft(panes: Record<PaneSide, PaneSlot>): Record<PaneSide, P
  * otherwise; the dock re-measures on `registerDock`'s identity, so that one must never change.
  */
 export function AppSwitcherProvider({ children }: { children: ReactNode }) {
-  const { apps, selfPorts, error: registryError, registryRead, refresh } = useAppRegistry();
+  const { apps, rows, selfPorts, icons, error: registryError, registryRead, refresh } = useAppRegistry();
   // The stored record, read once: only the first render's initial values come from it.
   const initial = useMemo(() => readAppSwitcherRecord(), []);
 
@@ -251,7 +255,9 @@ export function AppSwitcherProvider({ children }: { children: ReactNode }) {
   const value = useMemo<AppSwitcherValue>(
     () => ({
       apps,
+      rows,
       selfPorts,
+      icons,
       registryError,
       registryRead,
       refresh,
@@ -274,7 +280,7 @@ export function AppSwitcherProvider({ children }: { children: ReactNode }) {
       setDrawerOpen,
     }),
     [
-      apps, selfPorts, registryError, registryRead, refresh, panes, dual, ratio, fabPosition, dockRect,
+      apps, rows, selfPorts, icons, registryError, registryRead, refresh, panes, dual, ratio, fabPosition, dockRect,
       nextSide, drawerOpenValue, open, close, toggleDual, openInDualScreen, setRatio, reload, moveFab,
       registerDock, chooseSide, setDrawerOpen,
     ],

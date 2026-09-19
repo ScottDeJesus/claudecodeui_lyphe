@@ -74,6 +74,24 @@ lie on someone else's wall.
 `server/modules/providers/services/session-soul-launches.service.ts` (the server collector). One
 regex, one marker constant, one segment rule, in both files. Change one and change the other.
 
+### The stamp: ownership recorded at the door, for a launch the receipt scan cannot see
+
+A launch is now ALSO pinned when its `spec.json`'s `launched_by` equals the chat's own provider
+session id, stamped by the launcher itself (`hooks/plan_runner/solo/launch.py`, from
+`CLAUDE_CODE_SESSION_ID`) at the moment it mints the launch — never read back from the transcript.
+`collectStampedSoulLaunches` (`server/modules/providers/services/session-soul-launches.service.ts`)
+walks the newest `dispatch-*` dirs under the launch root, reads each `spec.json`, and keeps the ids
+whose `launched_by` matches the session asking; `sessions.service.ts` merges its result into
+`soulLaunches` beside `collectSessionSoulLaunches`'s transcript scan on every LATEST page.
+
+This is what makes a **wrapper-script launch** visible: the ownership test above requires a `Bash`
+command segment that OPENS with the launcher, so a launch made through a wrapper's own name (the
+Bash result carries the wrapper's command, not `plan-runner soul …`) fails that test and is never
+anchored by the receipt scan alone — however plainly the receipt itself printed inside the wrapper's
+output. The stamp does not read the command at all: it is written by the process that minted the id,
+so it holds regardless of how the launcher was invoked, and a transcript that merely quotes an id
+cannot forge it.
+
 ### Whole history, not the loaded page
 
 A page loads history from the TAIL, twenty rows at a time, and a soul runs for minutes after the row

@@ -5,8 +5,8 @@ import { useTranslation } from 'react-i18next';
 import type { AppEntry } from '@/shared/app-types';
 import { Banner, Button, Field, Input } from '@/shared/ui';
 
-/** What the form hands over: a name and an address the registry will accept, both already trimmed. */
-type NewApplicationDraft = Pick<AppEntry, 'name' | 'url'>;
+/** What the form hands over: a name and an address the registry will accept, and an optional description, all trimmed. */
+type NewApplicationDraft = Pick<AppEntry, 'name' | 'url' | 'description'>;
 
 type NewApplicationFormProps = {
   /** Resolves once the row is in the registry; rejects with the sentence the reader should see. */
@@ -54,7 +54,7 @@ function addressReads(address: string): boolean {
 /**
  * The inline "New application" form, in the list's place while it is open. Rendered by AppDrawer only.
  *
- * Two fields and two buttons, top to bottom in the order the reader fills them. A field that is wrong
+ * Three fields (the description optional) and two buttons, top to bottom in the order the reader fills them. A field that is wrong
  * says why under itself, in amber (Field's own error line), and takes the focus; a refusal from the
  * server — a duplicate, a store it could not write — is a Banner above the buttons, carrying the
  * server's own sentence, with both fields kept as typed so nothing has to be written twice.
@@ -64,11 +64,13 @@ export function NewApplicationForm({ onSubmit, onCancel }: NewApplicationFormPro
   const titleId = useId();
   const nameId = useId();
   const urlId = useId();
+  const descriptionId = useId();
   const nameRef = useRef<HTMLInputElement>(null);
   const urlRef = useRef<HTMLInputElement>(null);
   // What the reader has typed, kept exactly as typed: trimmed and completed only at send.
   const [name, setName] = useState('');
   const [url, setUrl] = useState('');
+  const [description, setDescription] = useState('');
   // The per-field sentences from the last refused send. A field's own sentence clears as it is edited,
   // so a corrected field stops accusing the reader while the other one still can.
   const [errors, setErrors] = useState<FieldErrors>({});
@@ -82,6 +84,7 @@ export function NewApplicationForm({ onSubmit, onCancel }: NewApplicationFormPro
     if (sending) return;
 
     const draft: NewApplicationDraft = { name: name.trim(), url: completeAddress(url) };
+    if (description.trim()) draft.description = description.trim();
     const next: FieldErrors = {};
     if (draft.name.length === 0) next.name = t('applications.form.nameRequired');
     if (draft.url.length === 0) next.url = t('applications.form.urlRequired');
@@ -155,6 +158,19 @@ export function NewApplicationForm({ onSubmit, onCancel }: NewApplicationFormPro
           autoCapitalize="off"
           autoCorrect="off"
           spellCheck={false}
+          className="h-11 text-[15px]"
+        />
+      </Field>
+
+      <Field label={t('applications.form.descriptionLabel')} htmlFor={descriptionId} helper={t('applications.form.descriptionHelper')}>
+        <Input
+          id={descriptionId}
+          value={description}
+          onChange={(event) => setDescription(event.target.value)}
+          placeholder={t('applications.form.descriptionPlaceholder')}
+          aria-describedby={`${descriptionId}-helper`}
+          maxLength={160}
+          autoComplete="off"
           className="h-11 text-[15px]"
         />
       </Field>

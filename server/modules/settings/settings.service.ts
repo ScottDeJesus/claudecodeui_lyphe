@@ -1,7 +1,15 @@
 import { AppError } from '@/shared/utils.js';
 
 import type { JevLedgerStats } from './jev-ledger.js';
-import type { JevSwitches } from './jev-switches.js';
+import { JEV_SCOPES } from './jev-switches.js';
+import type { JevScopeKey, JevSwitches } from './jev-switches.js';
+
+/**
+ * Every field a `PUT /jev` body may name — the master plus each scope in the table — for the two
+ * messages that have to enumerate them. Derived from `JEV_SCOPES` so a scope added there is named
+ * here without an edit.
+ */
+const JEV_SWITCH_FIELDS = ['master', ...Object.keys(JEV_SCOPES)].join(', ');
 
 type ApiKeyRow = Record<string, unknown> & { api_key: string };
 type NotificationPreferences = Record<string, unknown> & {
@@ -47,14 +55,14 @@ type SettingsDependencies = {
     write(enabled: boolean): Promise<void>;
   };
   /**
-   * The house Jev switches, in the same shape and for the same reason: two flag files that steer
-   * hooks and scripts running on this host, so they are machine-wide rather than a row any signed-in
-   * operator owns. The two are separate files with separate blast radii — see `jev-switches.ts`.
+   * The house Jev switches, in the same shape and for the same reason: flag files that steer hooks
+   * and scripts running on this host, so they are machine-wide rather than a row any signed-in
+   * operator owns. Each scope is its own file with its own blast radius — see `jev-switches.ts`.
    */
   jev: {
     read(): Promise<JevSwitches>;
     writeMaster(enabled: boolean): Promise<void>;
-    writePrompts(enabled: boolean): Promise<void>;
+    writeScope(scope: JevScopeKey, enabled: boolean): Promise<void>;
     readStats(): Promise<JevLedgerStats>;
   };
   getVapidPublicKey(): string | null;
@@ -208,57 +216,96 @@ export function createSettingsService(dependencies: SettingsDependencies) {
     },
     async setJev(input: unknown) {
       if (typeof input !== 'object' || input === null || Array.isArray(input)) {
-        throw new AppError('master and/or prompts must be sent as a JSON object', {
+        throw new AppError(`${JEV_SWITCH_FIELDS} must be sent as a JSON object`, {
           code: 'INVALID_JEV_SWITCH_STATE',
           statusCode: 400,
         });
       }
       const body = input as Record<string, unknown>;
+      // Every field is parsed BEFORE any of them is written, so a body naming one switch correctly
+      // and another as `"on"` is refused whole rather than half-applied.
       const master = optionalBoolean(body, 'master');
-      const prompts = optionalBoolean(body, 'prompts');
-      if (master === undefined && prompts === undefined) {
-        throw new AppError('master or prompts must be a boolean', {
+      const scopes: { scope: JevScopeKey; enabled: boolean }[] = [];
+      for (const scope of Object.keys(JEV_SCOPES) as JevScopeKey[]) {
+        const enabled = optionalBoolean(body, scope);
+        if (enabled !== undefined) scopes.push({ scope, enabled });
+      }
+      if (master === undefined && scopes.length === 0) {
+        throw new AppError(`${JEV_SWITCH_FIELDS} must be a boolean`, {
           code: 'INVALID_JEV_SWITCH_STATE',
           statusCode: 400,
         });
       }
-      // Both positions as they stand, taken before either write: the compensating write below needs
-      // the master's previous value, and it must be the value from BEFORE this request, not whatever
-      // a failed half left behind.
+      // Every position as it stands, taken before any write: the compensating write below needs the
+      // master's previous value, and it must be the value from BEFORE this request, not whatever a
+      // failed half left behind.
       const before = await dependencies.jev.read();
 
-      // Only the fields that came in are written. The two switches are separate files with separate
-      // meanings, so a PUT naming one must not be able to move the other as a side effect.
+      // Only the fields that came in are written. Each switch is a separate file with its own
+      // meaning, so a PUT naming one must not be able to move another as a side effect.
       //
-      // They are also two FILES, with no transaction between them, and the order below is the one
-      // that can be compensated. A failure on the prompts write would leave `{master:true,prompts:false}`
-      // half-landed: the master on (so Python reads the pair as live) with prompt sending still armed
-      // from the stored file. The master is therefore put back where it was. Writing prompts FIRST is
-      // not the cure — that direction arms prompt sending in the window between the two writes.
+      // They are also separate FILES, with no transaction between them, and the order below is the
+      // one that can be compensated. A failure on a scope write would leave `{master:true,prompts:false}`
+      // half-landed: the master on (so Python reads that scope as live) with its sending still armed
+      // from the stored file. Writing a scope FIRST is not the cure — that direction arms it in the
+      // window before the master's own write lands, with the master already on from a moment ago.
+      //
+      // So the master goes first and every file this request moved is put back on failure — the
+      // master, then the scopes already written, each read from `before`. That is the one shape that
+      // stays all-or-nothing however long the table gets: with N scopes, restoring the master alone
+      // would leave an armed scope behind whenever the master was already on.
+      //
+      // The restore is gated on NOTHING HAVING BEEN WRITTEN, never on `masterWritten` alone. A body
+      // naming scopes and no master sets no such flag, and this loop is not one write long any more:
+      // the first scope would land, the second would throw, and the guard would rethrow with the
+      // first scope armed — and, if the master was already on, LIVE. `written` is the honest test of
+      // "nothing was written": it is appended before each write, so it is empty exactly when the
+      // request has nothing to put back.
       let masterWritten = false;
+      const written: JevScopeKey[] = [];
       try {
         if (master !== undefined) {
           await dependencies.jev.writeMaster(master);
           masterWritten = true;
         }
-        if (prompts !== undefined) await dependencies.jev.writePrompts(prompts);
+        for (const { scope, enabled } of scopes) {
+          // Recorded BEFORE its write: a scope whose write threw is put back too, which is a no-op
+          // if its file never moved. A flag file lands by rename, so it is one or the other.
+          written.push(scope);
+          await dependencies.jev.writeScope(scope, enabled);
+        }
       } catch (error) {
-        if (!masterWritten) throw error;
+        // Nothing this request touched: rethrow the real error rather than report a restore that had
+        // nothing to restore. `masterWritten` is belt to `written`'s braces — the master is in
+        // `written`'s world too, and the pair reads as one thought: anything written, put it back.
+        if (!masterWritten && written.length === 0) throw error;
+        const stranded: string[] = [];
         try {
           await dependencies.jev.writeMaster(before.master);
         } catch (restoreError) {
-          // Both halves are now unknown to the caller, so say what is actually on disk rather than
-          // letting the original error imply nothing was changed.
-          console.error('Jev: the prompt switch could not be written, and the master could not be restored:', restoreError);
+          console.error('Jev: the master switch could not be restored:', restoreError);
+          stranded.push('master');
+        }
+        for (const scope of written.reverse()) {
+          try {
+            await dependencies.jev.writeScope(scope, before[scope]);
+          } catch (restoreError) {
+            console.error(`Jev: the ${scope} switch could not be restored:`, restoreError);
+            stranded.push(scope);
+          }
+        }
+        if (stranded.length > 0) {
+          // The position is unknown to the caller now, so say which files are unknown rather than
+          // letting the original error imply the switches are where they were.
           throw new AppError(
-            `The Jev switches could not be updated: the master switch was left ${master ? 'on' : 'off'}. Check ~/.claude/state/jev.flag before relying on it.`,
+            `The Jev switches could not be updated and ${stranded.join(', ')} could not be put back. Check ~/.claude/state/jev*.flag before relying on them.`,
             { code: 'JEV_SWITCH_WRITE_PARTIAL', statusCode: 500 },
           );
         }
         throw error;
       }
       // Read back rather than echo the request: these are files another process reads at call time,
-      // and the answer the panel renders — `promptsLive` included — should be what is on disk now.
+      // and the answer the panel renders — the live fields included — should be what is on disk now.
       return dependencies.jev.read();
     },
     async getJevStats() {

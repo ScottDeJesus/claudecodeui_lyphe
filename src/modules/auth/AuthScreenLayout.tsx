@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 
-import { Card } from '@/shared/ui';
+import { AppLogo, Card } from '@/shared/ui';
 import { IS_PLATFORM } from '@/shared/utils';
 
 type AuthScreenLayoutProps = {
@@ -33,8 +33,8 @@ export default function AuthScreenLayout({
       <div className="relative mx-auto flex min-h-full w-full max-w-[26rem] flex-col justify-center gap-5 p-4 py-8">
         <div className="flex flex-col gap-1.5">
           <div className="flex items-center gap-2.5">
-            {logo ?? <img src="/logo-64.png" alt="" aria-hidden className="h-6 w-6" />}
-            <span className="text-xs uppercase tracking-[0.14em] text-ink-faint">CloudCLI</span>
+            {logo ?? <AppLogo size={64} className="h-6 w-6" />}
+            <span className="text-xs uppercase tracking-[0.14em] text-ink-faint">LypheCLI</span>
           </div>
           <h1 className="font-serif text-[38px] leading-[1.1] text-foreground">{title}</h1>
           <p className="text-sm leading-relaxed text-muted-foreground">{description}</p>

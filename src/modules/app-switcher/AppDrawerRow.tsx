@@ -1,15 +1,19 @@
-import { Columns2, ExternalLink, MoreHorizontal, PanelRightClose, RotateCw, Trash2 } from 'lucide-react';
+import { useState } from 'react';
+import type { KeyboardEvent } from 'react';
+import { Columns2, ExternalLink, MoreHorizontal, PanelRightClose, Pencil, RotateCw, Trash2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 import { useAppSwitcher } from '@/modules/app-switcher/context/AppSwitcherContext';
+import { moveItems } from '@/modules/app-switcher/utils/moveItems';
+import { describeRegistryApp } from '@/modules/app-switcher/utils/registryRequests';
 import { isSelfOrigin, resolveAppUrl } from '@/modules/app-switcher/utils/resolveAppUrl';
 import type { AppEntry } from '@/shared/app-types';
-import { ActionMenu, Card } from '@/shared/ui';
+import { ActionMenu, Card, Input } from '@/shared/ui';
 import type { ActionMenuItem } from '@/shared/ui';
 import { cn } from '@/shared/utils';
 
 /**
- * A resolved url's `host:port` — the row's second line, where the application answers.
+ * A resolved url's `host:port` — where the application answers, the second line of a row with no description.
  *
  * An address that will not parse reads as itself. The registry is a file the operator and a builder
  * edit by hand, and a row that says `descent` is more useful to its reader than a row that says
@@ -31,6 +35,10 @@ function initialOf(name: string): string {
 
 type AppDrawerRowProps = {
   app: AppEntry;
+  /** Where the row sits in the list, which greys the Move up / Move down at its end. */
+  position: { first: boolean; last: boolean };
+  /** Moves the row one place. The drawer owns it, beside the dividers. */
+  onMove: (direction: 'up' | 'down') => void;
   /** Takes the row out of the registry. The drawer owns it, so a refusal is reported in one place. */
   onRemove: (appId: string) => void;
   /** Turns dual screen on with this app in the second half. The drawer owns it. */
@@ -38,8 +46,13 @@ type AppDrawerRowProps = {
 };
 
 /**
- * One application, as a card: a lettered tile, the name over where it answers, and a kebab holding
+ * One application, as a card: its tile, the name over its description, and a kebab holding
  * everything the body cannot say. Rendered by AppDrawer only.
+ *
+ * THE TILE is the app's own tab icon when the server found one (`apps.icons.ts`), else its letter.
+ * THE SECOND LINE is the operator's description, or where the app answers when it has none. "Edit
+ * description" in the kebab turns that line into a field in place: Enter or leaving the field saves,
+ * Escape puts it back, and a blank one clears it.
  *
  * THE BODY IS ONE BUTTON — tile, name and host — and a toggle: an app already on screen reads
  * "· on screen" and comes down when it is pressed again, so `aria-pressed` carries the same fact the
@@ -51,9 +64,13 @@ type AppDrawerRowProps = {
  * starts with the app's name: that is what a reader's screen reader says first, and what the UI probe
  * matches a row by.
  */
-export function AppDrawerRow({ app, onRemove, onOpenInDualScreen }: AppDrawerRowProps) {
+export function AppDrawerRow({ app, position, onMove, onRemove, onOpenInDualScreen }: AppDrawerRowProps) {
   const { t } = useTranslation();
-  const { panes, dual, selfPorts, open, reload, toggleDual, setDrawerOpen } = useAppSwitcher();
+  const { panes, dual, selfPorts, icons, open, reload, toggleDual, setDrawerOpen, refresh } = useAppSwitcher();
+  // The description field's text while it is open; null while the line is just a line.
+  const [draft, setDraft] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const icon = icons[app.id];
 
   // THE MODULE'S ONE PLACE THAT READS THE PAGE'S OWN ADDRESS, and both readings happen here because
   // this is the open site. `{host}` is substituted where the viewer is, which is what lets one
@@ -99,6 +116,40 @@ export function AppDrawerRow({ app, onRemove, onOpenInDualScreen }: AppDrawerRow
     onRemove(app.id);
   }
 
+  function handleEditDescription() {
+    setSaveError(null);
+    setDraft(app.description ?? '');
+  }
+
+  // Saved only when it changed; the row keeps the field open with the refusal under it on a failure.
+  async function saveDescription() {
+    if (draft === null) return;
+    const next = draft.trim();
+    if (next === (app.description ?? '')) {
+      setDraft(null);
+      return;
+    }
+    try {
+      await describeRegistryApp(app.id, next);
+      await refresh();
+      setDraft(null);
+    } catch (failure) {
+      setSaveError(failure instanceof Error ? failure.message : String(failure));
+    }
+  }
+
+  function handleDescriptionKey(event: KeyboardEvent<HTMLInputElement>) {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      void saveDescription();
+    } else if (event.key === 'Escape') {
+      // The field's own Escape: it must not also close the sheet around it.
+      event.preventDefault();
+      event.stopPropagation();
+      setDraft(null);
+    }
+  }
+
   const newTabItem: ActionMenuItem = {
     key: 'open-in-new-tab',
     label: t('applications.openInNewTab'),
@@ -114,19 +165,68 @@ export function AppDrawerRow({ app, onRemove, onOpenInDualScreen }: AppDrawerRow
     showDividerBefore: true,
     onSelect: handleRemove,
   };
+  const describeItem: ActionMenuItem = {
+    key: 'edit-description',
+    label: t('applications.editDescription'),
+    icon: Pencil,
+    onSelect: handleEditDescription,
+  };
   const dualItem: ActionMenuItem = holdsSecondHalf
     ? { key: 'close-dual', label: t('applications.closeDual'), icon: PanelRightClose, onSelect: handleCloseDualScreen }
     : { key: 'open-in-dual', label: t('applications.openInDual'), icon: Columns2, onSelect: handleOpenInDualScreen };
   // Reload is shown on every framed row and live only while that app is up: a greyed item says
   // "nothing to reload" where a missing one would not.
   const items: ActionMenuItem[] = isSelf
-    ? [newTabItem, removeItem]
+    ? [newTabItem, describeItem, ...moveItems(t, position, onMove), removeItem]
     : [
         { key: 'reload', label: t('applications.reload'), icon: RotateCw, disabled: !onScreen, onSelect: handleReload },
         newTabItem,
         dualItem,
+        describeItem,
+        ...moveItems(t, position, onMove),
         removeItem,
       ];
+  const secondLine = app.description || host;
+
+  const tile = (
+    // Green while it is up: the one row a returning reader is looking for reads first.
+    <span
+      aria-hidden="true"
+      data-initial={icon ? undefined : initialOf(app.name)}
+      className={cn(
+        'grid h-9 w-9 flex-none place-items-center overflow-hidden rounded-[9px] border font-serif text-[19px] leading-none',
+        !icon && 'before:content-[attr(data-initial)]',
+        onScreen ? 'border-primary/30 bg-primary/10 text-accent-ink' : 'border-border bg-secondary text-muted-foreground',
+      )}
+    >
+      {icon && <img src={icon} alt="" className="h-6 w-6 object-contain" />}
+    </span>
+  );
+
+  if (draft !== null) {
+    return (
+      <li>
+        <Card className="flex min-h-[58px] items-center gap-3 py-2.5 pl-3 pr-2">
+          {tile}
+          <span className="flex min-w-0 flex-1 flex-col gap-1">
+            <span className="truncate text-[14.5px] font-medium leading-[1.65] text-foreground">{app.name}</span>
+            <Input
+              value={draft}
+              onChange={(event) => setDraft(event.target.value)}
+              onKeyDown={handleDescriptionKey}
+              onBlur={() => void saveDescription()}
+              placeholder={host}
+              aria-label={t('applications.descriptionLabel', { name: app.name })}
+              maxLength={160}
+              autoFocus
+              className="h-8 text-xs"
+            />
+            {saveError && <span className="break-words text-xs text-warn-ink">▲ {saveError}</span>}
+          </span>
+        </Card>
+      </li>
+    );
+  }
 
   return (
     <li>
@@ -137,22 +237,14 @@ export function AppDrawerRow({ app, onRemove, onOpenInDualScreen }: AppDrawerRow
           onClick={handleSelect}
           className="flex min-w-0 flex-1 items-center gap-3 self-stretch rounded-[11px] py-2.5 pl-3 text-left"
         >
-          {/* Green while it is up: the one row a returning reader is looking for reads first. */}
-          <span
-            aria-hidden="true"
-            data-initial={initialOf(app.name)}
-            className={cn(
-              'grid h-9 w-9 flex-none place-items-center rounded-[9px] border font-serif text-[19px] leading-none before:content-[attr(data-initial)]',
-              onScreen ? 'border-primary/30 bg-primary/10 text-accent-ink' : 'border-border bg-secondary text-muted-foreground',
-            )}
-          />
+          {tile}
           <span className="flex min-w-0 flex-col gap-0.5">
             <span className="flex min-w-0 items-center gap-1.5">
               <span className="truncate text-[14.5px] font-medium leading-[1.65] text-foreground">{app.name}</span>
               {isSelf && <ExternalLink className="h-3 w-3 flex-none text-ink-faint" aria-hidden="true" />}
             </span>
             <span className="truncate text-xs leading-[1.65] text-ink-faint">
-              {onScreen ? t('applications.hostOnScreen', { host }) : host}
+              {onScreen ? t('applications.hostOnScreen', { host: secondLine }) : secondLine}
             </span>
           </span>
         </button>

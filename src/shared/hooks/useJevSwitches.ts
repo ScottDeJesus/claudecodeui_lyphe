@@ -1,33 +1,52 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { api } from '@/shared/api';
-import type { JevLedgerStats, JevSwitchState } from '@/shared/types';
+import type { JevConsumerNet, JevLedgerStats, JevSwitchState } from '@/shared/types';
+
+/**
+ * The narrower opt-ins, in the order the panel draws them, and the ONE list this hook loops.
+ *
+ * They mirror the server's table (`server/modules/settings/jev-switches.ts`), which is where the
+ * files and the live rule live: a scope added there arrives as two more fields, and adding it here
+ * is this entry plus a row in `JevContent.tsx`'s own table. That panel is the second consumer, which
+ * is why the list is exported: it draws one row per scope, in this order.
+ */
+export const JEV_SCOPES = ['prompts', 'toolOutput'] as const;
+
+/** A narrower opt-in: the field it stores, and the field its effect is reported in. */
+export type JevScopeName = (typeof JEV_SCOPES)[number];
 
 /** Which switch a write in flight belongs to, so a row can tell its own press from its neighbour's. */
-type JevSwitchName = 'master' | 'prompts';
+type JevSwitchName = 'master' | JevScopeName;
+
+/** The fields one write names — only the switches moved, never their neighbours. */
+type JevSwitchPatch = Partial<Record<JevSwitchName, boolean>>;
+
+/** The live field a scope's effect is reported in, which the server derives and this hook predicts. */
+const liveKeyOf = (scope: JevScopeName): `${JevScopeName}Live` => `${scope}Live`;
 
 type JevSwitches = {
-  /** The two switches as the server last read them off disk, or `null` while no read has succeeded. */
+  /** The switches as the server last read them off disk, or `null` while no read has succeeded. */
   state: JevSwitchState | null;
   /** The ledger totals, or `null` until a read has answered. Optional furniture: it never blocks a row. */
   stats: JevLedgerStats | null;
   /** True once a read has failed: the position is unknown, which is not the same as off. */
   unreadable: boolean;
-  /** The switch whose write is crossing the wire, so both rows can refuse a second flip until it lands. */
+  /** The switch whose write is crossing the wire, so every row can refuse a second flip until it lands. */
   saving: JevSwitchName | null;
   /** Move the master switch — the file that decides whether anything leaves this machine at all. */
   setMaster: (next: boolean) => Promise<void>;
-  /** Move the prompt-text opt-in. Its stored value is kept and shown even while the master is off. */
-  setPrompts: (next: boolean) => Promise<void>;
-  /** Ask the server again — the way out of an unreadable pair, and the only press a control with no
-   * position can honour. */
+  /** Move one narrower opt-in. Its stored value is kept and shown even while the master is off. */
+  setScope: (scope: JevScopeName, next: boolean) => Promise<void>;
+  /** Ask the server again — the way out of an unreadable set of rows, and the only press a control
+   * with no position can honour. */
   refresh: () => Promise<void>;
 };
 
 /**
  * How long to wait before asking a second time. A read is a request to a server that has already
  * answered this same question on the write path, so a single failure is far more often a lost packet
- * than a missing file — and the cost of not retrying is a pair of controls with no position, which
+ * than a missing file — and the cost of not retrying is a set of controls with no position, which
  * cannot be used at all. Short enough that nobody presses twice first.
  */
 const READ_RETRY_MS = 1200;
@@ -35,28 +54,57 @@ const READ_RETRY_MS = 1200;
 /** A GET body as a position, or `null` when the server did not answer the contract at all. */
 function positionOf(body: unknown): JevSwitchState | null {
   if (typeof body !== 'object' || body === null) return null;
-  const { master, prompts, promptsLive } = body as Record<string, unknown>;
-  if (typeof master !== 'boolean' || typeof prompts !== 'boolean' || typeof promptsLive !== 'boolean') {
-    return null;
+  const record = body as Record<string, unknown>;
+  if (typeof record.master !== 'boolean') return null;
+
+  // Every scope's stored value AND its live field, each a real boolean: a body missing one of them
+  // is a server this hook does not understand, and half a row drawn from it would be a guess.
+  const position: Record<string, boolean> = { master: record.master };
+  for (const scope of JEV_SCOPES) {
+    const stored = record[scope];
+    const live = record[liveKeyOf(scope)];
+    if (typeof stored !== 'boolean' || typeof live !== 'boolean') return null;
+    position[scope] = stored;
+    position[liveKeyOf(scope)] = live;
   }
-  return { master, prompts, promptsLive };
+  return position as JevSwitchState;
+}
+
+/** A consumer's net as the panel draws it, or `null` when the field is not the shape it claims. */
+function consumerNetOf(value: unknown): JevConsumerNet | null {
+  if (typeof value !== 'object' || value === null) return null;
+  const { caller, chars } = value as Record<string, unknown>;
+  if (typeof caller !== 'string' || typeof chars !== 'number') return null;
+  return { caller, chars };
 }
 
 /** A stats body as totals, or `null` when it is not the shape the panel draws. */
 function ledgerOf(body: unknown): JevLedgerStats | null {
   if (typeof body !== 'object' || body === null) return null;
-  const { present, calls, tokens, linesIn, linesKept } = body as Record<string, unknown>;
+  const { present, calls, tokens, linesIn, linesKept, netChars, byCaller } = body as Record<string, unknown>;
   if (
     typeof present !== 'boolean' || typeof calls !== 'number' || typeof tokens !== 'number'
-    || typeof linesIn !== 'number' || typeof linesKept !== 'number'
+    || typeof linesIn !== 'number' || typeof linesKept !== 'number' || typeof netChars !== 'number'
+    || !Array.isArray(byCaller)
   ) {
     return null;
   }
-  return { present, calls, tokens, linesIn, linesKept };
+  // One malformed consumer is the whole line refused: a list drawn from half-parsed rows would show
+  // a total the ledger does not hold.
+  const consumers: JevConsumerNet[] = [];
+  for (const entry of byCaller) {
+    const consumer = consumerNetOf(entry);
+    if (consumer === null) return null;
+    consumers.push(consumer);
+  }
+  // The balance is the accounts row's reading (`useJevBalance`); here it is carried, not judged.
+  const raw = (body as { balance?: JevLedgerStats['balance'] }).balance;
+  const balance = raw && typeof raw.leftUsd === 'number' ? raw : null;
+  return { present, calls, tokens, linesIn, linesKept, netChars, byCaller: consumers, balance };
 }
 
 /**
- * The two house Jev switches and their ledger, read and written from one place.
+ * The house Jev switches and their ledger, read and written from one place.
  *
  * They are flag FILES on this host, read by Python at call time, which is why every read here is a
  * request to the server rather than a value the browser already holds — and why the write
@@ -118,7 +166,7 @@ export function useJevSwitches(): JevSwitches {
   /**
    * Ask the server where the switches are, and draw the answer.
    *
-   * One read at a time: two rows asking the same question of the same files is a second request that
+   * One read at a time: a second row asking the same question of the same files is a request that
    * cannot say anything the first will not, and it is what puts two answers in flight whose arrival
    * order would decide what is shown. A question asked while one is out is remembered and asked for
    * real the moment the one in flight lands — dropping it is how a slow answer gets to decide.
@@ -160,13 +208,13 @@ export function useJevSwitches(): JevSwitches {
   /**
    * Flip one switch, and draw the position the server read back off the files.
    *
-   * Only the switch named is sent, so moving one row can never move the other as a side effect —
-   * they are separate files with separate blast radii, and the prompt opt-in's stored value has to
-   * survive its neighbour being turned off.
+   * Only the switch named is sent, so moving one row can never move another as a side effect — they
+   * are separate files with separate blast radii, and an opt-in's stored value has to survive its
+   * neighbour being turned off.
    */
   const write = useCallback(async (
     which: JevSwitchName,
-    patch: { master?: boolean; prompts?: boolean },
+    patch: JevSwitchPatch,
   ): Promise<void> => {
     // Dropped rather than queued: two flips racing onto the same file would leave whichever answer
     // landed last to decide, and the loser's optimistic position to be corrected by it.
@@ -176,12 +224,24 @@ export function useJevSwitches(): JevSwitches {
     // write's answer and put the row back on the side the file is in the middle of leaving.
     epochRef.current += 1;
     setSaving(which);
-    // Optimistic, then corrected: the server answers with what it read back off disk.
-    setState((previous) => (previous === null ? previous : {
-      ...previous,
-      ...patch,
-      promptsLive: (patch.master ?? previous.master) && (patch.prompts ?? previous.prompts),
-    }));
+    // Optimistic, then corrected: the server answers with what it read back off disk. Each live
+    // field is re-derived here rather than carried over, because the press that just happened may
+    // have moved the switch every scope's liveness is multiplied by.
+    setState((previous) => {
+      if (previous === null) return previous;
+      const optimistic: JevSwitchState = { ...previous };
+      if (patch.master !== undefined) optimistic.master = patch.master;
+      for (const scope of JEV_SCOPES) {
+        const stored = patch[scope];
+        if (stored !== undefined) optimistic[scope] = stored;
+      }
+      // Derived after every stored value is placed, and for every scope: a press on the master alone
+      // changes what each stored opt-in adds up to.
+      for (const scope of JEV_SCOPES) {
+        optimistic[liveKeyOf(scope)] = optimistic.master && optimistic[scope];
+      }
+      return optimistic;
+    });
     setUnreadable(false);
 
     let next: JevSwitchState | null = null;
@@ -263,10 +323,16 @@ export function useJevSwitches(): JevSwitches {
     (next: boolean) => write('master', { master: next }),
     [write],
   );
-  const setPrompts = useCallback(
-    (next: boolean) => write('prompts', { prompts: next }),
+  // One setter for every scope rather than one per scope: the patch names the scope it moves, and a
+  // scope added to the list above needs nothing here.
+  const setScope = useCallback(
+    (scope: JevScopeName, next: boolean) => {
+      const patch: JevSwitchPatch = {};
+      patch[scope] = next;
+      return write(scope, patch);
+    },
     [write],
   );
 
-  return { state, stats, unreadable, saving, setMaster, setPrompts, refresh };
+  return { state, stats, unreadable, saving, setMaster, setScope, refresh };
 }

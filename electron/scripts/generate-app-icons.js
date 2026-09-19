@@ -13,8 +13,39 @@ import sharp from 'sharp';
  */
 
 const SOURCE = 'electron/assets/app-icon-source.png';
+const DARK_SOURCE = darkSource();
 const PUBLIC = 'public';
 const ELECTRON = 'electron/assets';
+
+/**
+ * The dark-mode mark, recoloured from the one source rather than kept as a second file to drift.
+ * The source is three colours and their antialiased blends — the white tile and the mark's two
+ * greens. Each pixel is split into its share of those three (barycentric, least squares on the
+ * plane they span) and rebuilt from the dark palette, so every edge blend lands on the matching
+ * dark blend. The tile is Verve dark `--surface2`, a step off the dark card so the tile still
+ * reads; the greens are the dark theme's accent pair.
+ */
+async function darkSource() {
+  const light = [[255, 255, 255], [28, 125, 84], [76, 196, 147]];
+  const dark = [[36, 37, 47], [76, 196, 147], [169, 232, 203]];
+  const { data, info } = await sharp(SOURCE).removeAlpha().raw().toBuffer({ resolveWithObject: true });
+  const [w, a, b] = light;
+  const u = a.map((v, i) => v - w[i]);
+  const v = b.map((x, i) => x - w[i]);
+  const dot = (p, q) => p[0] * q[0] + p[1] * q[1] + p[2] * q[2];
+  const uu = dot(u, u), uv = dot(u, v), vv = dot(v, v), det = uu * vv - uv * uv;
+  const out = Buffer.alloc(data.length);
+  for (let i = 0; i < data.length; i += 3) {
+    const p = [data[i] - w[0], data[i + 1] - w[1], data[i + 2] - w[2]];
+    const pu = dot(p, u), pv = dot(p, v);
+    const s = Math.min(1, Math.max(0, (vv * pu - uv * pv) / det));
+    const t = Math.min(1 - s, Math.max(0, (uu * pv - uv * pu) / det));
+    for (let c = 0; c < 3; c += 1) {
+      out[i + c] = Math.round(dark[0][c] * (1 - s - t) + dark[1][c] * s + dark[2][c] * t);
+    }
+  }
+  return sharp(out, { raw: info }).png().toBuffer();
+}
 
 function roundedMask(size) {
   const radius = Math.round(size * 0.25);
@@ -27,8 +58,8 @@ function encode(image, web) {
   return image.png(web ? { compressionLevel: 9, palette: true, quality: 90, effort: 10 } : { compressionLevel: 9 });
 }
 
-function rounded(size, web = true) {
-  const image = sharp(SOURCE).resize(size, size, { kernel: 'lanczos3' })
+function rounded(size, web = true, source = SOURCE) {
+  const image = sharp(source).resize(size, size, { kernel: 'lanczos3' })
     .composite([{ input: roundedMask(size), blend: 'dest-in' }]);
   return encode(image, web).toBuffer();
 }
@@ -90,10 +121,16 @@ async function ico(sizes) {
   return Buffer.concat([header, ...pngs]);
 }
 
+const darkMark = await DARK_SOURCE;
+
 await Promise.all([
   ...[72, 96, 128, 144, 152, 192, 384, 512].map((size) => write(`${PUBLIC}/icons/icon-${size}x${size}.png`, rounded(size))),
   ...[32, 64, 128, 256, 512].map((size) => write(`${PUBLIC}/logo-${size}.png`, rounded(size))),
   write(`${PUBLIC}/favicon.png`, rounded(64)),
+  // The dark theme's tab icon and in-app logos (`AppLogo`, ThemeContext's favicon swap). The PWA,
+  // iOS and desktop icons stay light: the OS draws them, and none of them can follow a theme.
+  ...[32, 64, 128, 256, 512].map((size) => write(`${PUBLIC}/logo-dark-${size}.png`, rounded(size, true, darkMark))),
+  write(`${PUBLIC}/favicon-dark.png`, rounded(64, true, darkMark)),
   write(`${PUBLIC}/icons/apple-touch-icon.png`, square(180)),
   write(`${PUBLIC}/icons/icon-maskable-512x512.png`, square(512)),
   write(`${ELECTRON}/logo-macos.png`, macRounded(1024)),

@@ -1,5 +1,7 @@
 import { DeepseekBalanceReadout } from '@/modules/accounts/DeepseekBalanceReadout';
 import { DeepseekPeakHours } from '@/modules/accounts/DeepseekPeakHours';
+import type { JevBalance } from '@/modules/accounts/hooks/useJevBalance';
+import { JevBalanceReadout } from '@/modules/accounts/JevBalanceReadout';
 import { UsageMeters } from '@/modules/accounts/UsageMeters';
 import { accountInitials } from '@/modules/accounts/utils/accountInitials';
 import { useMinuteTick } from '@/modules/accounts/hooks/useMinuteTick';
@@ -99,6 +101,8 @@ type AccountPopoverProps = {
   usage: ClaudeUsage | null;
   /** The DeepSeek reading, held by the row. Not part of `usage`: a different account, from a route of its own. */
   balance: DeepseekBalance | null;
+  /** The Jev estimate, held by the row for the same reason. */
+  jevBalance: JevBalance | null;
   busy: boolean;
   error: string | null;
   onSwitch: (slug: string) => void;
@@ -119,6 +123,7 @@ export function AccountPopover({
   accounts,
   usage,
   balance,
+  jevBalance,
   busy,
   error,
   onSwitch,
@@ -154,6 +159,7 @@ export function AccountPopover({
           something else has stopped. */}
       <DeepseekBalanceReadout balance={balance} />
       <DeepseekPeakHours now={now} />
+      <JevBalanceReadout balance={jevBalance} />
 
       <div className="flex flex-col gap-1.5">
         <div className="text-[11px] uppercase tracking-[0.14em] text-ink-faint">

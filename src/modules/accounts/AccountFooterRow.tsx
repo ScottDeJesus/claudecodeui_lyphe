@@ -5,6 +5,8 @@ import { DeepseekBalanceReadout } from '@/modules/accounts/DeepseekBalanceReadou
 import { useClaudeAccounts } from '@/modules/accounts/hooks/useClaudeAccounts';
 import { useClaudeUsage } from '@/modules/accounts/hooks/useClaudeUsage';
 import { useDeepseekBalance } from '@/modules/accounts/hooks/useDeepseekBalance';
+import { useJevBalance } from '@/modules/accounts/hooks/useJevBalance';
+import { JevBalanceReadout } from '@/modules/accounts/JevBalanceReadout';
 import { accountInitials } from '@/modules/accounts/utils/accountInitials';
 import { formatWindowCountdown, windowPercent, windowTone } from '@/modules/accounts/utils/usageWindows';
 import { ProviderLoginModal } from '@/modules/provider-auth';
@@ -44,6 +46,8 @@ export function AccountFooterRow({ collapsed = false, onExpand }: AccountFooterR
   // A different account from the one above, from a route of its own — held here so the row and
   // the panel share their ONE reading, and so neither is hidden when the account lane cannot answer.
   const { data: balance, refresh: refreshBalance } = useDeepseekBalance();
+  // The third account on this row: a seeded credit metered locally, read from a local route.
+  const { data: jevBalance, refresh: refreshJevBalance } = useJevBalance();
 
   // Whether the account panel is showing. Not derivable from the picture: the picture says
   // which account is live, and the panel is open precisely while that is being reconsidered.
@@ -148,6 +152,7 @@ export function AccountFooterRow({ collapsed = false, onExpand }: AccountFooterR
     // check twice.
     void refreshUsage();
     void refreshBalance();
+    void refreshJevBalance();
   };
 
   // "Add another account": save the login that is live NOW before the CLI can replace it, then
@@ -232,6 +237,9 @@ export function AccountFooterRow({ collapsed = false, onExpand }: AccountFooterR
           <span className="mt-1 block">
             <DeepseekBalanceReadout balance={balance} variant="inline" />
           </span>
+          <span className="mt-0.5 block">
+            <JevBalanceReadout balance={jevBalance} variant="inline" />
+          </span>
         </span>
         <span aria-hidden="true" className="flex-none text-[9px] text-ink-faint">▼</span>
       </button>
@@ -243,6 +251,7 @@ export function AccountFooterRow({ collapsed = false, onExpand }: AccountFooterR
           accounts={accounts}
           usage={usage}
           balance={balance}
+          jevBalance={jevBalance}
           busy={busy}
           error={error}
           onSwitch={(slug) => { void switchTo(slug); }}

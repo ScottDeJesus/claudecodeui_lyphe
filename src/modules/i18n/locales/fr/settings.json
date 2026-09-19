@@ -335,7 +335,7 @@
       "master": {
         "label": "Jugement sémantique de Jev",
         "description": "Les scripts et les sessions peuvent demander à Jev de TypeSafe un oui/non, un choix, ou de filtrer une sortie volumineuse avant de la lire. Désactivé : rien ne quitte cette machine.",
-        "armsPrompts": "Activer ceci envoie aussi le texte du prompt à Jev : l’opt-in de prompt ci-dessous est mémorisé activé. Rien n’est envoyé à Jev tant que ceci est désactivé."
+        "armsPrompts": "Activer ceci envoie aussi à Jev depuis chaque option mémorisée activée ci-dessous. Rien n’est envoyé à Jev tant que ceci est désactivé."
       },
       "prompts": {
         "label": "Autoriser les hooks à envoyer mon prompt à Jev",
@@ -343,9 +343,18 @@
         "gatedOn": "Retenu par l’interrupteur maître ci-dessus — mais cette option est mémorisée activée : activer Jev enverra donc immédiatement le texte du prompt. Désactivé : le hook se contente de comparer le mot.",
         "gatedOff": "Retenu par l’interrupteur maître ci-dessus : activez Jev pour modifier ceci. Désactivé : le hook se contente de comparer le mot."
       },
+      "toolOutput": {
+        "label": "Autoriser les hooks à envoyer la sortie des commandes à Jev",
+        "description": "Après une commande terminée proprement, un hook peut envoyer sa sortie pour décider si elle a réellement échoué. Jamais envoyée depuis un chemin sans envoi (~/.claude/state/jev_no_send_paths — dépôts de données de chantier par défaut).",
+        "gatedOn": "Retenu par l’interrupteur maître ci-dessus — mais cette option est mémorisée activée : activer Jev enverra donc immédiatement la sortie des commandes.",
+        "gatedOff": "Retenu par l’interrupteur maître ci-dessus : activez Jev pour modifier ceci."
+      },
       "unreadable": "Les interrupteurs n’ont pas pu être lus depuis le serveur : leur position est inconnue — ce n’est pas la même chose que désactivé. Une nouvelle tentative a lieu chaque fois que cette page reprend le focus.",
       "stats": "Journal Jev : {{calls}} appels · {{tokens}} jetons Jev dépensés · {{linesIn}} lignes filtrées → {{linesKept}} conservées",
-      "statsEmpty": "Journal Jev : aucun appel enregistré pour l’instant."
+      "statsEmpty": "Journal Jev : aucun appel enregistré pour l’instant.",
+      "net": "Net Jev : {{chars}} caractères ≈ {{tokens}} jetons de session (+ conservés, − ajoutés)",
+      "consumer": "{{caller}} : {{chars}} caractères",
+      "consumerMore": "… et {{more}} de plus — `jev stats` les liste tous."
     },
     "login": {
       "title": "Connexion",

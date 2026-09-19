@@ -1,7 +1,7 @@
 import { readFileSync, renameSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 
-import type { AppEntry } from '@/shared/app-types.js';
+import type { AppEntry, DividerEntry } from '@/shared/app-types.js';
 import { AppError, findApplicationRoot, getModuleDirectory } from '@/shared/utils.js';
 
 import { DEFAULT_APPS } from './apps.seed.js';
@@ -37,14 +37,14 @@ const APPS_FILE_NAME = 'apps.local.json';
  * Read on every call rather than captured in a constant, so the environment that is set when the
  * process starts is the environment that is honored, probes included.
  */
-function resolveAppsFile(): string {
+export function resolveAppsFile(): string {
   const override = process.env.APPS_FILE;
   if (override) return override;
   return path.join(findApplicationRoot(getModuleDirectory(import.meta.url)), APPS_FILE_NAME);
 }
 
 /** The registry file as JSON text, two-space indented and newline-terminated — the seed's shape too. */
-function serializeApps(entries: AppEntry[]): string {
+function serializeApps(entries: Array<AppEntry | DividerEntry>): string {
   return `${JSON.stringify(entries, null, 2)}\n`;
 }
 
@@ -67,7 +67,10 @@ export function ensureAppsFile(): void {
   }
 }
 
-/** An entry is a row of three non-empty strings. Anything else is a broken row, not a row. */
+/**
+ * An entry is a row of three non-empty strings, and an optional `description` that is a string when
+ * present. Anything else is a broken row, not a row.
+ */
 function isAppEntry(value: unknown): value is AppEntry {
   if (typeof value !== 'object' || value === null) return false;
   const candidate = value as Record<string, unknown>;
@@ -77,12 +80,22 @@ function isAppEntry(value: unknown): value is AppEntry {
     typeof candidate.name === 'string' &&
     candidate.name.length > 0 &&
     typeof candidate.url === 'string' &&
-    candidate.url.length > 0
+    candidate.url.length > 0 &&
+    (candidate.description === undefined || typeof candidate.description === 'string')
   );
 }
 
+/** A divider is an id and a title string (blank allowed), and no address. */
+export function isDividerEntry(value: unknown): value is DividerEntry {
+  if (typeof value !== 'object' || value === null) return false;
+  const candidate = value as Record<string, unknown>;
+  return typeof candidate.id === 'string' && candidate.id.length > 0 && typeof candidate.divider === 'string'
+    && candidate.url === undefined;
+}
+
 /**
- * The registry, as the file holds it — in file order, with no sorting and no defaults filled in.
+ * The registry, as the file holds it — apps and dividers in file order, with no sorting and no
+ * defaults filled in.
  *
  * A file that cannot be read as a registry is a 500 and is NEVER overwritten with the seed: the
  * operator has a list, and the one thing this module must never do is trade his rows for a clean
@@ -93,7 +106,7 @@ function isAppEntry(value: unknown): value is AppEntry {
  * non-empty strings: the pattern is the contract for an id a caller POSTs, while a row the
  * operator typed by hand is his to name, and a capital letter there must not 500 the whole list.
  */
-export function readApps(): AppEntry[] {
+export function readEntries(): Array<AppEntry | DividerEntry> {
   ensureAppsFile();
 
   const appsFile = resolveAppsFile();
@@ -119,9 +132,9 @@ export function readApps(): AppEntry[] {
     });
   }
 
-  const entries: AppEntry[] = [];
+  const entries: Array<AppEntry | DividerEntry> = [];
   for (const [index, value] of parsed.entries()) {
-    if (!isAppEntry(value)) {
+    if (!isAppEntry(value) && !isDividerEntry(value)) {
       const label = typeof (value as { id?: unknown })?.id === 'string'
         ? String((value as { id: unknown }).id)
         : String(index);
@@ -138,7 +151,7 @@ export function readApps(): AppEntry[] {
 }
 
 /** The registry, replaced wholesale — the file is the order, so a caller hands back the whole list. */
-export function writeApps(entries: AppEntry[]): void {
+export function writeEntries(entries: Array<AppEntry | DividerEntry>): void {
   const appsFile = resolveAppsFile();
   const scratch = `${appsFile}.tmp`;
   writeFileSync(scratch, serializeApps(entries));

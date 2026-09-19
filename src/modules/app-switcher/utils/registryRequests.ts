@@ -2,7 +2,7 @@ import { api } from '@/shared/api';
 import type { AppEntry } from '@/shared/app-types';
 
 /**
- * The registry's two WRITE verbs, and the one reader of a refusal that every registry request in
+ * The registry's WRITE verbs, and the one reader of a refusal that every registry request in
  * this module answers with.
  *
  * Three callers, one sentence each: the drawer's add and remove handlers call the verbs, and the
@@ -19,9 +19,40 @@ import type { AppEntry } from '@/shared/app-types';
  */
 
 /** Appends one row. Resolves once the registry holds it; rejects with the server's own sentence. */
-export async function addRegistryApp(draft: Pick<AppEntry, 'name' | 'url'>): Promise<void> {
+export async function addRegistryApp(draft: Pick<AppEntry, 'name' | 'url' | 'description'>): Promise<void> {
   const response = await api.apps.add(draft);
   if (!response.ok) throw new Error(await refusalInWords(response, 'The application was not added'));
+}
+
+/** Sets one row's description, or clears it when blank. Rejects with the server's own sentence. */
+export async function describeRegistryApp(appId: string, description: string): Promise<void> {
+  const response = await api.apps.describe(appId, description);
+  if (!response.ok) throw new Error(await refusalInWords(response, 'The description was not saved'));
+}
+
+/** Moves any row, app or divider, one place up or down. */
+export async function moveRegistryRow(rowId: string, direction: 'up' | 'down'): Promise<void> {
+  const response = await api.apps.move(rowId, direction);
+  if (!response.ok) throw new Error(await refusalInWords(response, 'The row was not moved'));
+}
+
+/** Adds a divider at the end of the list; resolves with its id. */
+export async function addRegistryDivider(title: string): Promise<string> {
+  const response = await api.apps.addDivider(title);
+  if (!response.ok) throw new Error(await refusalInWords(response, 'The divider was not added'));
+  const body = (await response.json()) as { divider: { id: string } };
+  return body.divider.id;
+}
+
+/** Sets a divider's title; blank leaves a plain line. */
+export async function renameRegistryDivider(dividerId: string, title: string): Promise<void> {
+  const response = await api.apps.renameDivider(dividerId, title);
+  if (!response.ok) throw new Error(await refusalInWords(response, 'The divider title was not saved'));
+}
+
+export async function removeRegistryDivider(dividerId: string): Promise<void> {
+  const response = await api.apps.removeDivider(dividerId);
+  if (!response.ok) throw new Error(await refusalInWords(response, 'The divider was not removed'));
 }
 
 /**

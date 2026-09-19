@@ -1,3 +1,7 @@
+import { readdir, readFile } from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
+
 import type { NormalizedMessage } from '@/shared/types.js';
 
 /**
@@ -101,4 +105,51 @@ export function collectSessionSoulLaunches(messages: NormalizedMessage[]): strin
   }
   // The newest, when a session has outgrown the bound: the strip draws what is recent.
   return ids.slice(-MAX_LAUNCHES);
+}
+
+/** The launcher's root (`hooks/plan_runner/solo/record.py:DISPATCH_DIR`), with the dispatch-souls lane's probe seam. */
+function launchRoot(): string {
+  const raw = process.env.DISPATCH_SOULS_STATE_DIR || '~/.claude/state/dispatch-souls';
+  return raw.startsWith('~') ? path.join(os.homedir(), raw.slice(1)) : raw;
+}
+
+/** How many of the newest launch dirs are opened: ids sort by their timestamp, and the strip draws what is recent. */
+const MAX_SPECS_READ = 200;
+
+/**
+ * The launches whose `spec.json` names this conversation as the caller (`launched_by`, stamped by
+ * the launcher from its own environment), oldest first.
+ *
+ * The receipt rule above cannot see a launch made through a wrapper script: the Bash command is
+ * the wrapper's name, so its receipt fails the ownership test and the soul is never pinned. The
+ * stamp is ownership recorded at the door itself, by the process that minted the id — it holds
+ * however the launcher was called, and a transcript that merely quotes an id cannot forge it.
+ */
+export async function collectStampedSoulLaunches(providerSessionId: string | null | undefined): Promise<string[]> {
+  if (!providerSessionId) {
+    return [];
+  }
+  const root = launchRoot();
+  let names: string[];
+  try {
+    names = (await readdir(root)).filter((name) => name.startsWith('dispatch-'));
+  } catch {
+    return [];
+  }
+  // `dispatch-<agent>-<YYYYMMDD>-<HHMMSS>-<hex>`: the stamp after the agent orders them.
+  const stampOf = (name: string): string => name.match(/-(\d{8}-\d{6})-/)?.[1] ?? '';
+  names.sort((a, b) => stampOf(a).localeCompare(stampOf(b)));
+  const owned: string[] = [];
+  await Promise.all(names.slice(-MAX_SPECS_READ).map(async (name) => {
+    try {
+      const spec = JSON.parse(await readFile(path.join(root, name, 'spec.json'), 'utf8'));
+      if (spec?.launched_by === providerSessionId && typeof spec.id === 'string') {
+        owned.push(spec.id);
+      }
+    } catch {
+      // A dir mid-creation or a torn spec is a launch not yet pinned, never an error.
+    }
+  }));
+  owned.sort((a, b) => stampOf(a).localeCompare(stampOf(b)));
+  return owned.slice(-MAX_LAUNCHES);
 }

@@ -360,7 +360,7 @@
       "master": {
         "label": "Juicio semántico de Jev",
         "description": "Los scripts y las sesiones pueden pedirle a Jev de TypeSafe un sí/no, una elección o que filtre una salida grande antes de leerla. Apagado: nada sale de esta máquina.",
-        "armsPrompts": "Activar esto también empieza a enviar texto de prompt a Jev: la opción de prompt de abajo está guardada como activada. Mientras esto esté apagado no se envía nada a Jev."
+        "armsPrompts": "Activar esto también empieza a enviar a Jev desde cada opción guardada como activada abajo. Mientras esto esté apagado no se envía nada a Jev."
       },
       "prompts": {
         "label": "Permitir que los hooks envíen mi texto de prompt a Jev",
@@ -368,9 +368,18 @@
         "gatedOn": "Retenido por el interruptor maestro de arriba — pero esta opción está guardada como activada, así que encender Jev envía el texto del prompt de inmediato. Apagado: el hook solo coincide con la palabra.",
         "gatedOff": "Retenido por el interruptor maestro de arriba: enciende Jev para cambiar esto. Apagado: el hook solo coincide con la palabra."
       },
+      "toolOutput": {
+        "label": "Permitir que los hooks envíen la salida de comandos a Jev",
+        "description": "Tras un comando que terminó limpiamente, un hook puede enviar su salida para decidir si en realidad falló. Nunca se envía desde una ruta de no envío (~/.claude/state/jev_no_send_paths — repositorios de datos de trabajos por defecto).",
+        "gatedOn": "Retenido por el interruptor maestro de arriba — pero esta opción está guardada como activada, así que encender Jev envía la salida de comandos de inmediato.",
+        "gatedOff": "Retenido por el interruptor maestro de arriba: enciende Jev para cambiar esto."
+      },
       "unreadable": "No se pudieron leer los interruptores del servidor, así que su posición es desconocida — no es lo mismo que apagado. Se reintentan cada vez que esta página recupera el foco.",
       "stats": "Registro de Jev: {{calls}} llamadas · {{tokens}} tokens de Jev gastados · {{linesIn}} líneas filtradas → {{linesKept}} conservadas",
-      "statsEmpty": "Registro de Jev: aún no hay llamadas registradas."
+      "statsEmpty": "Registro de Jev: aún no hay llamadas registradas.",
+      "net": "Neto de Jev: {{chars}} caracteres ≈ {{tokens}} tokens de sesión (+ conservados, − añadidos)",
+      "consumer": "{{caller}}: {{chars}} caracteres",
+      "consumerMore": "… y {{more}} más — `jev stats` los enumera todos."
     },
     "login": {
       "title": "Iniciar sesión",

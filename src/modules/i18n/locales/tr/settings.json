@@ -333,7 +333,7 @@
       "master": {
         "label": "Jev anlamsal yargısı",
         "description": "Betikler ve oturumlar TypeSafe'in Jev'inden evet/hayır, tek seçim ya da büyük bir çıktıyı okumadan önce süzmesini isteyebilir. Kapalı: bu makineden hiçbir şey çıkmaz.",
-        "armsPrompts": "Bunu açmak, prompt metnini de Jev'e göndermeye başlar: aşağıdaki prompt opt-in'i açık olarak kayıtlı. Bu kapalıyken Jev'e hiçbir şey gönderilmez."
+        "armsPrompts": "Bunu açmak, aşağıda açık olarak kayıtlı her opt-in'den Jev'e göndermeye de başlar. Bu kapalıyken Jev'e hiçbir şey gönderilmez."
       },
       "prompts": {
         "label": "Kancalar prompt metnimi Jev'e gönderebilsin",
@@ -341,9 +341,18 @@
         "gatedOn": "Yukarıdaki ana anahtar tarafından tutuluyor — ancak bu opt-in açık olarak kayıtlı, dolayısıyla Jev'i açmak prompt metnini hemen gönderir. Kapalı: kanca yalnızca kelimeyi eşler.",
         "gatedOff": "Yukarıdaki ana anahtar tarafından tutuluyor: bunu değiştirmek için önce Jev'i açın. Kapalı: kanca yalnızca kelimeyi eşler."
       },
+      "toolOutput": {
+        "label": "Kancalar komut çıktısını Jev'e gönderebilsin",
+        "description": "Temiz çıkan bir komuttan sonra bir kanca, gerçekten başarısız olup olmadığına karar vermek için çıktısını gönderebilir. Gönderimsiz yollardan asla gönderilmez (~/.claude/state/jev_no_send_paths — varsayılan olarak iş verisi depoları).",
+        "gatedOn": "Yukarıdaki ana anahtar tarafından tutuluyor — ancak bu opt-in açık olarak kayıtlı, dolayısıyla Jev'i açmak komut çıktısını hemen gönderir.",
+        "gatedOff": "Yukarıdaki ana anahtar tarafından tutuluyor: bunu değiştirmek için önce Jev'i açın."
+      },
       "unreadable": "Anahtarlar sunucudan okunamadı, bu yüzden konumları bilinmiyor — kapalı olmakla aynı şey değil. Bu sayfa odağı her geri aldığında yeniden denenir.",
       "stats": "Jev defteri: {{calls}} çağrı · {{tokens}} Jev token harcandı · {{linesIn}} satır süzüldü → {{linesKept}} tutuldu",
-      "statsEmpty": "Jev defteri: henüz çağrı kaydedilmedi."
+      "statsEmpty": "Jev defteri: henüz çağrı kaydedilmedi.",
+      "net": "Jev net: {{chars}} karakter ≈ {{tokens}} oturum tokenı (+ tutulan, − eklenen)",
+      "consumer": "{{caller}}: {{chars}} karakter",
+      "consumerMore": "… ve {{more}} tane daha — hepsini `jev stats` listeler."
     },
     "login": {
       "title": "Giriş Yap",

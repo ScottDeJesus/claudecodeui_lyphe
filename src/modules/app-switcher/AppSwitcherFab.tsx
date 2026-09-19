@@ -2,7 +2,7 @@ import { useTranslation } from 'react-i18next';
 
 import { AppDrawer } from '@/modules/app-switcher/AppDrawer';
 import { useAppSwitcher } from '@/modules/app-switcher/context/AppSwitcherContext';
-import { DockableFab } from '@/shared/ui';
+import { AppLogo, DockableFab } from '@/shared/ui';
 import type { DockableFabPosition } from '@/shared/ui';
 
 /**
@@ -32,7 +32,7 @@ export function AppSwitcherFab() {
       <DockableFab
         label={t('applications.fabLabel')}
         // The app's own logo is the switcher's face; the kit fills the circle with an image glyph.
-        icon={<img src="/logo-64.png" alt="" />}
+        icon={<AppLogo size={64} />}
         position={fabPosition}
         dockRect={dockRect}
         active={drawerOpen}

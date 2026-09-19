@@ -591,11 +591,12 @@ export const api = {
     deepseekFlash: () => get('/api/settings/deepseek-flash'),
     saveDeepseekFlash: (enabled: boolean) => put('/api/settings/deepseek-flash', { enabled }),
 
-    // The house Jev switches, same shape of answer for the same reason: two flag files on this
-    // host, not per-user preferences. `saveJev` sends only the switches named, so a PUT that moves
-    // one never moves the other, and both calls answer with the state read back off disk.
+    // The house Jev switches, same shape of answer for the same reason: flag files on this host,
+    // not per-user preferences. `saveJev` sends only the switches named, so a PUT that moves one
+    // never moves another, and both calls answer with the state read back off disk.
     jev: () => get('/api/settings/jev'),
-    saveJev: (patch: { master?: boolean; prompts?: boolean }) => put('/api/settings/jev', patch),
+    saveJev: (patch: { master?: boolean; prompts?: boolean; toolOutput?: boolean }) =>
+      put('/api/settings/jev', patch),
     jevStats: () => get('/api/settings/jev/stats'),
 
     push: {
@@ -847,7 +848,12 @@ export const api = {
   // minute after the edit is a row nobody is waiting for. The shapes are `@/shared/app-types`.
   apps: {
     list: () => get('/api/apps'),
-    add: (body: { id?: string; name: string; url: string }) => post('/api/apps', body),
+    add: (body: { id?: string; name: string; url: string; description?: string }) => post('/api/apps', body),
+    describe: (id: string, description: string) => patch(`/api/apps/${encodeURIComponent(id)}`, { description }),
+    move: (id: string, direction: 'up' | 'down') => post(`/api/apps/${encodeURIComponent(id)}/move`, { direction }),
+    addDivider: (title: string) => post('/api/apps/dividers', { title }),
+    renameDivider: (id: string, title: string) => patch(`/api/apps/dividers/${encodeURIComponent(id)}`, { title }),
+    removeDivider: (id: string) => del(`/api/apps/dividers/${encodeURIComponent(id)}`),
     remove: (id: string) => del(`/api/apps/${encodeURIComponent(id)}`),
   },
 

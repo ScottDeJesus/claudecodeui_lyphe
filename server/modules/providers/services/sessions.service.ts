@@ -7,7 +7,7 @@ import { broadcastSessionUpserted, chatRunRegistry } from '@/modules/websocket/i
 import { providerRegistry } from '@/modules/providers/provider.registry.js';
 import { sessionHistoryCache } from '@/modules/providers/services/session-history-cache.service.js';
 import { collectSessionAgents, readSubagentStamp } from '@/modules/providers/services/session-agents.service.js';
-import { collectSessionSoulLaunches } from '@/modules/providers/services/session-soul-launches.service.js';
+import { collectSessionSoulLaunches, collectStampedSoulLaunches } from '@/modules/providers/services/session-soul-launches.service.js';
 import type {
   FetchHistoryOptions,
   FetchHistoryResult,
@@ -577,7 +577,11 @@ export const sessionsService = {
     // reason: their receipt is one row, and the chat's pinned rows must find it whatever window of
     // rows is loaded.
     const soulLaunches = requestedOffset === 0 && fullHistory
-      ? collectSessionSoulLaunches(fullHistory.messages)
+      ? [...new Set([
+        ...collectSessionSoulLaunches(fullHistory.messages),
+        // and the ones the launcher itself stamped with this session, however it was called
+        ...await collectStampedSoulLaunches(providerSessionId ?? sessionId),
+      ])]
       : undefined;
 
     return {

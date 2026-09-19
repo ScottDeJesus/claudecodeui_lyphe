@@ -48,6 +48,7 @@ export { Chip } from '@/shared/ui/Chip';
 export { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/shared/ui/Collapsible';
 export { Command, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem } from '@/shared/ui/Command';
 export { DarkModeToggle } from '@/shared/ui/DarkModeToggle';
+export { AppLogo } from '@/shared/ui/AppLogo';
 export { default as DeepSeekLogo } from '@/shared/ui/DeepSeekLogo';
 export { Dialog, DialogTrigger, DialogContent, DialogTitle } from '@/shared/ui/Dialog';
 export { DockableFab } from '@/shared/ui/DockableFab';

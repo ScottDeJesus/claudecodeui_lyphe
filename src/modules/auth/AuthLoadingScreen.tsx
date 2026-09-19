@@ -1,4 +1,5 @@
 import { CLOUDCLI_WORDMARK_FONT_FAMILY } from '@/shared/constants';
+import { AppLogo } from '@/shared/ui';
 
 const loadingDotAnimationDelays = ['0s', '0.15s', '0.3s'];
 
@@ -18,14 +19,14 @@ export default function AuthLoadingScreen({ reconnecting = false }: { reconnecti
 
       <div className="relative text-center" role="status" aria-live="polite">
         <div className="mb-5 flex justify-center">
-          <img src="/logo-128.png" alt="CloudCLI" className="h-16 w-16 shadow-lg shadow-primary/25" style={{ borderRadius: '25%' }} />
+          <AppLogo size={128} alt="LypheCLI" className="h-16 w-16 shadow-lg shadow-primary/25" style={{ borderRadius: '25%' }} />
         </div>
 
         <h1
           className="mb-4 text-2xl font-bold tracking-tight text-foreground"
           style={{ fontFamily: CLOUDCLI_WORDMARK_FONT_FAMILY }}
         >
-          CloudCLI
+          LypheCLI
         </h1>
         {/* One line, not two: the visible message IS the announcement once there is one, and
           * rendering both had a reader hear "Reconnecting to the server" twice. */}

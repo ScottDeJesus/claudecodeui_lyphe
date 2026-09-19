@@ -22,13 +22,16 @@ and its store — with nothing else in it:
 | File | What it holds |
 |---|---|
 | `apps.seed.ts` | `DEFAULT_APPS`: the one row the registry file is created from — this app itself — and nothing that reads them. |
-| `apps.store.ts` | The file itself: `resolveAppsFile`, `ensureAppsFile`, `readApps`, `writeApps`. |
-| `apps.service.ts` | `listApps` · `addApp` · `removeApp`, and EVERY judgement about what a caller may send. |
-| `apps.routes.ts` | `createAppsRouter()` — three thin routes that call one verb and hand anything thrown to `next`. |
+| `apps.store.ts` | The file itself: `resolveAppsFile`, `ensureAppsFile`, `readEntries`, `writeEntries`, `isDividerEntry`. |
+| `apps.service.ts` | `listApps` · `addApp` · `updateDescription` · `removeApp`, and EVERY judgement about what a caller may send. |
+| `apps.dividers.ts` | `addDivider` · `renameDivider` · `removeDivider` · `moveRow`: where rows sit (§"Dividers and order"). |
+| `apps.icons.ts` | `appIcons`: each app's own tab icon, found on the app and remembered in `apps.icons.local.json` (§"App icons"). |
+| `apps.routes.ts` | `createAppsRouter()` — thin routes that call one verb and hand anything thrown to `next`. |
 | `apps.module.ts` · `index.ts` | `createAppsModule()` and the barrel the server entrypoint imports. |
 
 `server/shared/app-types.ts` carries the two shapes that go on the wire — `AppEntry` (`{ id, name,
-url }`) and `AppRegistryResponse` (`{ apps, selfPorts }`) — as a sibling of `server/shared/types.ts`
+url, description? }`), `DividerEntry` (`{ id, divider }`), `RegistryRow` and `AppRegistryResponse`
+(`{ apps, rows, selfPorts, icons }`) — as a sibling of `server/shared/types.ts`
 rather than an addition to it, which is the pattern `kanban-types.ts` established beside the other
 ten. `src/shared/app-types.ts` is a field-for-field mirror of that file, and the two are edited
 together, always: a change on one side alone is a response the drawer cannot read.
@@ -99,12 +102,18 @@ while the drawer stood closed is in the list the next time it is opened.
 ## The routes
 
 ```
-GET    /api/apps              -> { apps: AppEntry[], selfPorts: number[] }
-POST   /api/apps              { name, url, id? }   -> { app: AppEntry }
+GET    /api/apps              -> { apps: AppEntry[], rows: RegistryRow[], selfPorts: number[], icons: { [id]: dataUrl } }
+POST   /api/apps              { name, url, description?, id? }   -> { app: AppEntry }
+PATCH  /api/apps/:id          { description }   -> { app: AppEntry }   (blank clears it)
 DELETE /api/apps/:id          -> { ok: true }
+POST   /api/apps/:id/move     { direction: 'up' | 'down' }   -> { ok: true }   (any row, app or divider)
+POST   /api/apps/dividers     { title? }   -> { divider: DividerEntry }   (appended at the end)
+PATCH  /api/apps/dividers/:id { title }    -> { divider: DividerEntry }   (blank = a plain line)
+DELETE /api/apps/dividers/:id              -> { ok: true }
 ```
 
-There is no `PATCH`. Editing a row is a DELETE plus a POST, or one line in the file. The mount
+The one `PATCH` sets a row's description (at most 160 characters), the only field the drawer edits
+in place; renaming or readdressing a row is a DELETE plus a POST, or one line in the file. The mount
 carries the guard (`app.use('/api/apps', authenticateToken, createAppsModule())`), so a route added
 to the file later cannot be the one that forgot it, and `express.json()` is already global — no
 body parser is added here.
@@ -128,6 +137,29 @@ curl -s -X DELETE -H "Authorization: Bearer $TOKEN" http://127.0.0.1:3011/api/ap
 
 Without a token the same GET answers 401 — the guard is on the mount, and it is the whole reason
 these routes are three lines each.
+
+## Dividers and order
+
+A divider is a row of the registry file like an app is — `{ "id": "divider-x1y2", "divider": "Work" }`,
+with no `url` — so its place is its position in the file, and a hand-edit can add one. The title
+may be blank, which draws a plain line. `readEntries` returns apps and dividers in file order;
+`GET /api/apps` answers the apps alone in `apps` (what the panes read) and the whole list in `rows`
+(what the drawer draws). Dividers share the app id space, so `/:id/move` names either kind: it swaps
+the row with its neighbour, and a row already at that end stays put. A new divider is appended at
+the end and opens straight into its title field; the kebab moves it into place.
+
+## App icons
+
+Each row's tile shows the app's own tab icon when the app publishes one. The browser cannot read
+another origin's page, so the server finds it (`apps.icons.ts`): it fetches the app's page with
+`{host}` resolved to `127.0.0.1`, takes the `<link rel="icon">` / `apple-touch-icon` hrefs (an SVG
+first), then `/favicon.ico`, and keeps the first answer whose content type is `image/*` and whose
+size is at most 256 KB. The type check matters: an SPA answers `/favicon.ico` with its index page at 200.
+
+Icons are REMEMBERED in `apps.icons.local.json` beside the registry (git-ignored), by app id and
+url: a found icon is re-checked after a week, a missing one after an hour, and a changed url
+fetches afresh. `GET /api/apps` carries them as data URLs in `icons`, and waits only for the probes
+that are due, each bounded by a 3-second timeout. An app with no icon keeps its letter tile.
 
 ## `{host}`, resolved in the browser
 
@@ -247,17 +279,23 @@ pick, how do I add one:
   `AppDrawerHeader.tsx`, extracted out of the drawer at the 300-line ceiling — the count line's two
   readings of the registry (has the first read landed; did it fail) are its own, the list below only
   asks whether that first read happened at all.
-- A **Dual screen** card — the switch, "Two apps side by side, divider draggable.", and while it is
-  on a pill bar reading **Opens in — Left / Right**, naming which half the next choice fills.
-- A scrolling list of cards in file order: a lettered tile, the name, and the resolved host, which
-  reads **host · on screen** while the app is up (the tile turns accent then). Pressing a card puts
+- While dual screen is on, a card with a pill bar reading **Opens in — Left / Right**, naming which
+  half the next choice fills. There is no on/off switch: a row's **Open in dual screen** turns it
+  on and **Close dual screen** turns it off.
+- A scrolling list of cards in file order: the app's icon (or its letter), the name, and its
+  description — the resolved host when it has none — which reads **… · on screen** while the app is up (the tile turns accent then). Pressing a card puts
   it in its half, or takes it down again. Until `registryRead` (the context flag `useAppRegistry.ts`
   sets once the FIRST read has answered, with rows or with a refusal) turns true, the list draws
   three skeleton rows instead — never the empty state, because an unmeasured registry is not an
   empty one.
+- **Dividers** among the cards (`AppDrawerDivider.tsx`): a hairline with its title, or a plain line.
+  Pressing the title, or **Rename** in its kebab, edits it in place; the kebab also moves and
+  removes it. **Add divider** sits beside **Add application** in the footer.
 - A **kebab menu** per card: **Reload** (live only while that app is up), **Open in a new tab**,
-  **Open in dual screen** — or **Close dual screen** on the app holding the second half — and
-  **Remove**, which calls `removeRegistryApp` (`utils/registryRequests.ts`) — `DELETE
+  **Open in dual screen** — or **Close dual screen** on the app holding the second half —
+  **Edit description**, which turns the second line into a field in place (Enter or leaving it
+  saves, Escape puts it back, blank clears it), **Move up** / **Move down** (greyed at the list's
+  ends), and **Remove**, which calls `removeRegistryApp` (`utils/registryRequests.ts`) — `DELETE
   /api/apps/:id` — and then `refresh()`. **Open in dual screen** turns dual screen on with THIS
   app in the second half in one update — the context's own `openInDualScreen` — because it cannot
   be composed from `toggleDual(true)` followed by `open(...)`: `open` reads `dual` and the "opens
@@ -394,10 +432,11 @@ FAB and the layer — and nothing else:
 | `AppSwitcherDock.tsx` | The empty 28px box in the logo row. It paints nothing; it holds the space open and reports its rect. |
 | `AppSwitcherFab.tsx` · `AppDrawer.tsx` | The kit's FAB wearing the app logo, wired to the drawer it opens. |
 | `AppDrawerHeader.tsx` | The sheet's "Your apps" heading, the count line and Close all — extracted out of `AppDrawer.tsx` at the 300-line ceiling. |
-| `AppDrawerRow.tsx` · `NewApplicationForm.tsx` | One application's card and kebab; the inline New application form and its field checks. |
+| `AppDrawerDivider.tsx` · `hooks/useDrawerLayout.ts` · `utils/moveItems.ts` | One divider row with its in-place title; the drawer's layout acts (add/rename/remove a divider, move a row) with their one refusal banner; the kebab's shared Move up / Move down pair. |
+| `AppDrawerRow.tsx` · `NewApplicationForm.tsx` | One application's card, kebab and in-place description edit; the inline New application form (name, address, optional description) and its field checks. |
 | `AppPane.tsx` · `AppSwitcherLayer.tsx` | One framed application; the panes composed over the main region. |
 | `hooks/useAppRegistry.ts` | `GET /api/apps` on mount and on every drawer open — no polling, no websocket. A failed read keeps the last good list and raises an error beside it; `registryRead` is set once, after the first read settles either way. |
-| `utils/registryRequests.ts` | The registry's two WRITE verbs — `addRegistryApp`, `removeRegistryApp` — and `refusalInWords`, the one reader of a refusal's sentence every registry request in this module shares. |
+| `utils/registryRequests.ts` | The registry's WRITE verbs — `addRegistryApp`, `describeRegistryApp`, `removeRegistryApp`, `moveRegistryRow` and the three divider verbs — and `refusalInWords`, the one reader of a refusal's sentence every registry request in this module shares. |
 | `utils/resolveAppUrl.ts` · `utils/appSwitcherStorage.ts` · `utils/dockRect.ts` | The pure functions of §"`{host}`…", the `localStorage` record, and the two rules (`dockableRect`, `sameRect`) a measured dock rect passes before the provider believes it. |
 
 The context lives in `context/` and no file here ends in `Provider.tsx`, which is what the frontend

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { refusalInWords } from '@/modules/app-switcher/utils/registryRequests';
-import type { AppEntry, AppRegistryResponse } from '@/shared/app-types';
+import type { AppEntry, AppRegistryResponse, RegistryRow } from '@/shared/app-types';
 import { api } from '@/shared/api';
 
 /**
@@ -21,7 +21,11 @@ import { api } from '@/shared/api';
  */
 export function useAppRegistry(): {
   apps: AppEntry[];
+  /** The drawer's list in file order, dividers included. */
+  rows: RegistryRow[];
   selfPorts: number[];
+  /** Each app's own tab icon as a data URL, by app id; an app that publishes none is absent. */
+  icons: Record<string, string>;
   /** Why the registry could not be read — the server's own message when it sent one, this file's
    *  own sentence when it answered with something that is not a registry. Null once a read lands. */
   error: string | null;
@@ -42,7 +46,7 @@ export function useAppRegistry(): {
   /** Re-reads the registry. Called on every drawer open, and safe to call at any other time. */
   refresh: () => Promise<void>;
 } {
-  const [registry, setRegistry] = useState<AppRegistryResponse>({ apps: [], selfPorts: [] });
+  const [registry, setRegistry] = useState<AppRegistryResponse>({ apps: [], rows: [], selfPorts: [], icons: {} });
   const [error, setError] = useState<string | null>(null);
   const [registryRead, setRegistryRead] = useState(false);
   // Mount flag: a read that resolves after the drawer's tree is gone must not set state.
@@ -71,7 +75,7 @@ export function useAppRegistry(): {
     };
   }, [refresh]);
 
-  return { apps: registry.apps, selfPorts: registry.selfPorts, error, registryRead, refresh };
+  return { apps: registry.apps, rows: registry.rows, selfPorts: registry.selfPorts, icons: registry.icons, error, registryRead, refresh };
 }
 
 /**
@@ -99,5 +103,9 @@ async function readRegistry(response: Response): Promise<AppRegistryResponse> {
   if (body === null || !Array.isArray(body.apps) || !Array.isArray(body.selfPorts)) {
     throw new Error('The application registry answered in a shape this app cannot read.');
   }
-  return { apps: body.apps, selfPorts: body.selfPorts };
+  // `icons` is optional on read: a server from before icons answers without it, and has none to show.
+  const icons = typeof body.icons === 'object' && body.icons !== null ? body.icons : {};
+  // `rows` likewise: without it the list is the apps alone, in their order.
+  const rows: RegistryRow[] = Array.isArray(body.rows) ? body.rows : body.apps.map((app) => ({ kind: 'app', id: app.id }));
+  return { apps: body.apps, rows, selfPorts: body.selfPorts, icons };
 }

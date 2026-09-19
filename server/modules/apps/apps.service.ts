@@ -1,10 +1,12 @@
-import type { AppEntry, AppRegistryResponse } from '@/shared/app-types.js';
+import type { AppEntry, AppRegistryResponse, RegistryRow } from '@/shared/app-types.js';
 import { AppError } from '@/shared/utils.js';
 
-import { readApps, writeApps } from './apps.store.js';
+import { appIcons } from './apps.icons.js';
+import { isDividerEntry, readEntries, writeEntries } from './apps.store.js';
 
 /**
- * The application registry's three verbs, and EVERY judgement about what a caller may send.
+ * The application registry's APPLICATION verbs, and EVERY judgement about what a caller may send
+ * as an app row. Dividers and moving rows are `apps.dividers.ts`.
  *
  * The routes are thin and the store knows only the file, so a rule lives here or nowhere: an id
  * that has to look like an id, a name that has to be a name, a url that has to be an address, a
@@ -16,6 +18,23 @@ import { readApps, writeApps } from './apps.store.js';
  */
 const APP_ID_PATTERN = /^[a-z0-9][a-z0-9-]{0,63}$/;
 const NAME_MAX_LENGTH = 64;
+const DESCRIPTION_MAX_LENGTH = 160;
+
+/** A description as stored: trimmed, and absent when blank — a blank one is no description. */
+function optionalDescription(raw: unknown): string | undefined {
+  if (raw === undefined || raw === null) return undefined;
+  if (typeof raw !== 'string') {
+    throw new AppError('A description must be text.', { code: 'APPS_DESCRIPTION_INVALID', statusCode: 400 });
+  }
+  const description = raw.trim();
+  if (description.length > DESCRIPTION_MAX_LENGTH) {
+    throw new AppError(`A description may be at most ${DESCRIPTION_MAX_LENGTH} characters.`, {
+      code: 'APPS_DESCRIPTION_TOO_LONG',
+      statusCode: 400,
+    });
+  }
+  return description.length > 0 ? description : undefined;
+}
 
 /** An id is minted from the name when the caller sends none; a name that mints nothing is a 400. */
 function mintId(name: string, takenIds: Set<string>): string {
@@ -107,9 +126,17 @@ function selfPorts(): number[] {
 }
 
 export const appsService = {
-  /** What `GET /api/apps` answers: the registry in file order, plus this app's own two ports. */
-  listApps(): AppRegistryResponse {
-    return { apps: readApps(), selfPorts: selfPorts() };
+  /**
+   * What `GET /api/apps` answers: the registry in file order, this app's own two ports, and each
+   * app's remembered tab icon (`apps.icons.ts`).
+   */
+  async listApps(): Promise<AppRegistryResponse> {
+    const entries = readEntries();
+    const apps = entries.filter((entry): entry is AppEntry => !isDividerEntry(entry));
+    const rows: RegistryRow[] = entries.map((entry) => (isDividerEntry(entry)
+      ? { kind: 'divider', id: entry.id, title: entry.divider }
+      : { kind: 'app', id: entry.id }));
+    return { apps, rows, selfPorts: selfPorts(), icons: await appIcons(apps) };
   },
 
   /**
@@ -117,12 +144,14 @@ export const appsService = {
    * checked against and what a minted one steps around; a collision with the operator's own row
    * is a 409, never an overwrite.
    */
-  addApp(input: { id?: string; name: string; url: string }): AppEntry {
+  addApp(input: { id?: string; name: string; url: string; description?: string }): AppEntry {
     const name = requireName(input?.name);
     const url = requireUrl(input?.url);
+    const description = optionalDescription(input?.description);
 
-    const apps = readApps();
-    const takenIds = new Set(apps.map((app) => app.id));
+    // Dividers share the id space: a move or a removal names a row by id, whichever kind it is.
+    const entries = readEntries();
+    const takenIds = new Set(entries.map((entry) => entry.id));
 
     let id: string;
     if (input?.id === undefined || input.id === null || input.id === '') {
@@ -143,23 +172,40 @@ export const appsService = {
       }
     }
 
-    const app: AppEntry = { id, name, url };
-    writeApps([...apps, app]);
+    const app: AppEntry = description ? { id, name, url, description } : { id, name, url };
+    writeEntries([...entries, app]);
     return app;
+  },
+
+  /**
+   * Sets or clears one row's description, leaving its place in the file and every other field as
+   * they were. A blank description removes the field, and the row shows its address again.
+   */
+  updateDescription(id: string, raw: unknown): AppEntry {
+    const description = optionalDescription(raw);
+    const entries = readEntries();
+    const index = entries.findIndex((entry) => entry.id === id && !isDividerEntry(entry));
+    if (index === -1) {
+      throw new AppError(`No application with id "${id}".`, { code: 'APPS_APP_NOT_FOUND', statusCode: 404 });
+    }
+    const { description: _previous, ...rest } = entries[index] as AppEntry;
+    const next: AppEntry = description ? { ...rest, description } : rest;
+    writeEntries(entries.map((entry, at) => (at === index ? next : entry)));
+    return next;
   },
 
   /** Removes one row. An id that names nothing is a 404 rather than a silent success. */
   removeApp(id: string): void {
-    const apps = readApps();
-    const remaining = apps.filter((app) => app.id !== id);
+    const entries = readEntries();
+    const remaining = entries.filter((entry) => entry.id !== id || isDividerEntry(entry));
 
-    if (remaining.length === apps.length) {
+    if (remaining.length === entries.length) {
       throw new AppError(`No application with id "${id}".`, {
         code: 'APPS_APP_NOT_FOUND',
         statusCode: 404,
       });
     }
 
-    writeApps(remaining);
+    writeEntries(remaining);
   },
 };

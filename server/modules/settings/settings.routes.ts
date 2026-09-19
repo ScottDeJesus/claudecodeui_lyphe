@@ -45,8 +45,8 @@ export function createSettingsRouter(
   // Host-wide, not per-user: the switch steers one plan-runner daemon, so no `userId` is read.
   router.get('/deepseek-flash', respond(() => service.getDeepseekFlash()));
   router.put('/deepseek-flash', respond((req) => service.setDeepseekFlash(req.body?.enabled)));
-  // Also host-wide, and for the same reason: these two flag files steer hooks and scripts on this
-  // host, so no `userId` is read. A PUT carries only the switch or switches it means to move.
+  // Also host-wide, and for the same reason: these flag files steer hooks and scripts on this host,
+  // so no `userId` is read. A PUT carries only the switch or switches it means to move.
   router.get('/jev', respond(() => service.getJev()));
   router.put('/jev', respond((req) => service.setJev(req.body)));
   router.get('/jev/stats', respond(() => service.getJevStats()));

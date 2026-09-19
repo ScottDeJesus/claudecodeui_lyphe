@@ -2469,10 +2469,29 @@ export type ChatEmbedSource = { sessionId: string; targets: EmbedUrlRef[] };
 export type SubagentTranscriptTarget = { kind: 'agent' | 'soul' | 'metis'; id: string };
 
 //----------------- JEV SEMANTIC JUDGMENT: switches and ledger ------------
-/** The two house Jev switches as one answer, mirrored from the server's `JevSwitches`. `promptsLive` is the pair's actual effect (`master && prompts`), not a third file: the prompt opt-in counts only while the master is on, and that rule is derived server-side so the panel cannot hold a second opinion about it. */
-export type JevSwitchState = { master: boolean; prompts: boolean; promptsLive: boolean };
+/** The house Jev switches as one answer, mirrored from the server's `JevSwitches`: the master, each scope's STORED value, and each scope's LIVE one. A live field is the pair's actual effect (`master && stored`), not a file of its own — a narrower opt-in counts only while the master is on, and that rule is derived server-side so the panel cannot hold a second opinion about it. A scope added on the server arrives here as two more fields, which is why `JevContent.tsx` draws its rows from a table rather than field by field. */
+export type JevSwitchState = {
+  master: boolean;
+  prompts: boolean;
+  promptsLive: boolean;
+  toolOutput: boolean;
+  toolOutputLive: boolean;
+};
 
-/** The Jev ledger totaled, mirrored from the server's `JevLedgerStats`: `present` is false only while no call has ever been recorded, and `linesIn`/`linesKept` are the filter's own totals (`filter_kept` lines), which are kept out of `calls` exactly as `scripts/jev stats` keeps them. */
-export type JevLedgerStats = { present: boolean; calls: number; tokens: number; linesIn: number; linesKept: number };
+/** One Jev consumer's net effect on what sessions read, in characters — positive for text kept OUT of a session's context, negative for text ADDED to it. `caller` is the name it passes to Jev, and the pair is one row of the per-consumer list `/jev/stats` answers with. */
+export type JevConsumerNet = { caller: string; chars: number };
+
+/** The Jev ledger totaled, mirrored from the server's `JevLedgerStats`: `present` is false only while no call has ever been recorded, and `linesIn`/`linesKept` are the filter's own totals (`filter_kept` lines), which are kept out of `calls` — as are `saved` lines, which are reports about a call rather than one — exactly as `scripts/jev stats` keeps them. `netChars` and `byCaller` are that command's `NET context` line: every `saved` line's `chars_saved`, totaled and split by consumer, largest first. */
+export type JevLedgerStats = {
+  present: boolean;
+  calls: number;
+  tokens: number;
+  linesIn: number;
+  linesKept: number;
+  netChars: number;
+  byCaller: JevConsumerNet[];
+  /** What is left of the credit the operator seeded, by this host's own metering; `null` until `~/.claude/state/jev_account.json` exists. TypeSafe has no balance route, so this is an estimate and is drawn as one. */
+  balance: { creditUsd: number; spentUsd: number; leftUsd: number } | null;
+};
 
 // ---------------------------

@@ -1,9 +1,11 @@
 import { useId, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { AppDrawerDivider } from '@/modules/app-switcher/AppDrawerDivider';
 import { AppDrawerHeader } from '@/modules/app-switcher/AppDrawerHeader';
 import { AppDrawerRow } from '@/modules/app-switcher/AppDrawerRow';
 import { useAppSwitcher } from '@/modules/app-switcher/context/AppSwitcherContext';
+import { useDrawerLayout } from '@/modules/app-switcher/hooks/useDrawerLayout';
 import type { PaneSide, PaneSlot } from '@/modules/app-switcher/context/AppSwitcherContext';
 import { NewApplicationForm } from '@/modules/app-switcher/NewApplicationForm';
 import { addRegistryApp, removeRegistryApp } from '@/modules/app-switcher/utils/registryRequests';
@@ -44,7 +46,7 @@ type RemoveRefusal = {
  * left showing is how a reader dismisses it without touching the panes.
  *
  * Read top to bottom it answers the reader's questions in the order they are asked: what is this and
- * how do I leave (the header), how will what I pick be shown (the Dual screen card, and which side),
+ * how do I leave (the header), which half what I pick lands in (the Opens-in strip, while dual screen is on),
  * what can I pick (the rows, in the registry file's own order), and — pinned below the scroll — how
  * do I add one and which appearance am I in.
  *
@@ -55,10 +57,11 @@ export function AppDrawer() {
   const titleId = useId();
   const addButtonRef = useRef<HTMLButtonElement>(null);
   const {
-    apps, registryError, registryRead, panes, dual, nextSide, drawerOpen, setDrawerOpen,
-    toggleDual, openInDualScreen, open, refresh, chooseSide,
+    apps, rows, registryError, registryRead, panes, dual, nextSide, drawerOpen, setDrawerOpen,
+    openInDualScreen, open, refresh, chooseSide,
   } = useAppSwitcher();
   const { isDarkMode, toggleDarkMode } = useTheme();
+  const layout = useDrawerLayout();
   // Whether the New application form stands in the list's place. The drawer's own, never persisted:
   // a half-typed form is not furniture, and the sheet opens onto the list every time.
   const [formOpen, setFormOpen] = useState(false);
@@ -74,10 +77,6 @@ export function AppDrawer() {
 
   function handleDismiss() {
     handleOpenChange(false);
-  }
-
-  function handleDualChange(next: boolean) {
-    toggleDual(next);
   }
 
   function handleChooseSide(side: PaneSide) {
@@ -97,13 +96,13 @@ export function AppDrawer() {
 
   // Must RESOLVE once the row is in the registry and the drawer's list will show it, and REJECT with
   // an Error whose message is the server's own sentence — NewApplicationForm prints that message.
-  async function handleAddApplication(draft: Pick<AppEntry, 'name' | 'url'>): Promise<void> {
+  async function handleAddApplication(draft: Pick<AppEntry, 'name' | 'url' | 'description'>): Promise<void> {
     // POST, then re-read: the row the list draws comes from the registry, never from this draft.
     await addRegistryApp(draft);
     await refresh();
   }
 
-  async function handleSubmitNewApplication(draft: Pick<AppEntry, 'name' | 'url'>): Promise<void> {
+  async function handleSubmitNewApplication(draft: Pick<AppEntry, 'name' | 'url' | 'description'>): Promise<void> {
     await handleAddApplication(draft);
     handleCloseForm();
   }
@@ -166,42 +165,33 @@ export function AppDrawer() {
       >
         <AppDrawerHeader titleId={titleId} onDismiss={handleDismiss} />
 
-        <div className="shrink-0 px-[22px] pb-3.5">
-          <Card className="flex flex-col gap-3 px-4 py-3.5">
-            <div className="flex items-center justify-between gap-3.5">
-              <div className="flex min-w-0 flex-col gap-[3px]">
-                <span className="text-[14.5px] font-medium leading-[1.65] text-foreground">{t('applications.dualScreen')}</span>
-                <span className="text-[12.5px] leading-[1.45] text-ink-faint">{t('applications.dualScreenHint')}</span>
-              </div>
-              <Switch checked={dual} onChange={handleDualChange} label={t('applications.dualScreen')} />
-            </div>
-
-            {/* Only with dual screen on: with one pane there is no side to choose. */}
-            {dual && (
-              <div className="flex items-center gap-2 pt-0.5">
-                <span className="flex-none text-xs uppercase tracking-[0.14em] text-ink-faint">{t('applications.opensIn')}</span>
-                <PillBar role="group" aria-label={t('applications.opensIn')} className="rounded-full">
-                  <Pill
-                    isActive={nextSide === 'left'}
-                    aria-pressed={nextSide === 'left'}
-                    onClick={() => handleChooseSide('left')}
-                    className="min-h-[34px] rounded-full px-3.5 py-1.5 text-[12.5px]"
-                  >
-                    {t('applications.left')}
-                  </Pill>
-                  <Pill
-                    isActive={nextSide === 'right'}
-                    aria-pressed={nextSide === 'right'}
-                    onClick={() => handleChooseSide('right')}
-                    className="min-h-[34px] rounded-full px-3.5 py-1.5 text-[12.5px]"
-                  >
-                    {t('applications.right')}
-                  </Pill>
-                </PillBar>
-              </div>
-            )}
-          </Card>
-        </div>
+        {/* Only while dual screen is on — a row's "Open in dual screen" turns it on, its "Close dual
+            screen" off. With one pane there is no side to choose. */}
+        {dual && (
+          <div className="shrink-0 px-[22px] pb-3.5">
+            <Card className="flex items-center gap-2 px-4 py-3.5">
+              <span className="flex-none text-xs uppercase tracking-[0.14em] text-ink-faint">{t('applications.opensIn')}</span>
+              <PillBar role="group" aria-label={t('applications.opensIn')} className="rounded-full">
+                <Pill
+                  isActive={nextSide === 'left'}
+                  aria-pressed={nextSide === 'left'}
+                  onClick={() => handleChooseSide('left')}
+                  className="min-h-[34px] rounded-full px-3.5 py-1.5 text-[12.5px]"
+                >
+                  {t('applications.left')}
+                </Pill>
+                <Pill
+                  isActive={nextSide === 'right'}
+                  aria-pressed={nextSide === 'right'}
+                  onClick={() => handleChooseSide('right')}
+                  className="min-h-[34px] rounded-full px-3.5 py-1.5 text-[12.5px]"
+                >
+                  {t('applications.right')}
+                </Pill>
+              </PillBar>
+            </Card>
+          </div>
+        )}
 
         <ScrollArea className="min-h-0 flex-1">
           <div className="flex flex-col gap-2 px-[22px] pb-2 pt-0.5">
@@ -227,6 +217,12 @@ export function AppDrawer() {
               </Banner>
             )}
 
+            {layout.layoutError !== null && (
+              <Banner tone="warn" onClose={layout.clearLayoutError}>
+                <p className="break-words text-sm">{layout.layoutError}</p>
+              </Banner>
+            )}
+
             {formOpen ? (
               <NewApplicationForm onSubmit={handleSubmitNewApplication} onCancel={handleCloseForm} />
             ) : !registryRead ? (
@@ -246,14 +242,34 @@ export function AppDrawer() {
               </div>
             ) : (
               <ul className="flex flex-col gap-2">
-                {apps.map((app) => (
-                  <AppDrawerRow
-                    key={app.id}
-                    app={app}
-                    onRemove={handleRemove}
-                    onOpenInDualScreen={handleOpenInDualScreen}
-                  />
-                ))}
+                {/* File order, dividers among the apps. A row whose app is missing from `apps` is skipped. */}
+                {rows.map((row, index) => {
+                  const position = { first: index === 0, last: index === rows.length - 1 };
+                  if (row.kind === 'divider') {
+                    return (
+                      <AppDrawerDivider
+                        key={row.id}
+                        title={row.title}
+                        startEditing={row.id === layout.addedDividerId}
+                        position={position}
+                        onRename={(title) => layout.renameDivider(row.id, title)}
+                        onMove={(direction) => layout.moveRow(row.id, direction)}
+                        onRemove={() => layout.removeDivider(row.id)}
+                      />
+                    );
+                  }
+                  const app = apps.find((candidate) => candidate.id === row.id);
+                  return app ? (
+                    <AppDrawerRow
+                      key={app.id}
+                      app={app}
+                      position={position}
+                      onMove={(direction) => layout.moveRow(app.id, direction)}
+                      onRemove={handleRemove}
+                      onOpenInDualScreen={handleOpenInDualScreen}
+                    />
+                  ) : null;
+                })}
               </ul>
             )}
           </div>
@@ -261,9 +277,14 @@ export function AppDrawer() {
 
         <footer className="flex shrink-0 flex-col gap-3 border-t border-border bg-card px-[22px] pb-[calc(env(safe-area-inset-bottom)+18px)] pt-3.5">
           {!formOpen && (
-            <Button ref={addButtonRef} className="h-11 w-full text-[15px]" onClick={handleStartAdd}>
-              {t('applications.addApplication')}
-            </Button>
+            <div className="flex gap-2.5">
+              <Button ref={addButtonRef} className="h-11 flex-1 text-[15px]" onClick={handleStartAdd}>
+                {t('applications.addApplication')}
+              </Button>
+              <Button variant="outline" className="h-11 text-[15px]" onClick={layout.addDivider}>
+                {t('applications.addDivider')}
+              </Button>
+            </div>
           )}
           {/* Named by the appearance on screen, so what is read aloud is what is written beside it. */}
           <div className="flex items-center justify-between gap-3">

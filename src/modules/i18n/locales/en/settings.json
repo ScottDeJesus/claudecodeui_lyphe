@@ -394,7 +394,7 @@
       "master": {
         "label": "Jev semantic judgment",
         "description": "Scripts and sessions may ask TypeSafe’s Jev for a yes/no, a pick-one, or to filter a large output before reading it. Off: nothing leaves this machine.",
-        "armsPrompts": "Turning this on also starts sending prompt text to Jev: the prompt opt-in below is stored on. Nothing is sent to Jev while this is off."
+        "armsPrompts": "Turning this on also starts sending to Jev from every opt-in stored on below. Nothing is sent to Jev while this is off."
       },
       "prompts": {
         "label": "Let hooks send my prompt text to Jev",
@@ -402,9 +402,18 @@
         "gatedOn": "Held off by the master switch above — but this opt-in is stored on, so turning Jev on sends prompt text immediately. Off: the hook matches the word only.",
         "gatedOff": "Held off by the master switch above: turn Jev on to change this. Off: the hook matches the word only."
       },
+      "toolOutput": {
+        "label": "Let hooks send command output to Jev",
+        "description": "After a command that exited clean, a hook may send its output to decide whether it actually failed. Never sent from a no-send path (~/.claude/state/jev_no_send_paths — job-data repos by default).",
+        "gatedOn": "Held off by the master switch above — but this opt-in is stored on, so turning Jev on sends command output immediately.",
+        "gatedOff": "Held off by the master switch above: turn Jev on to change this."
+      },
       "unreadable": "The switches could not be read from the server, so their position is unknown — this is not the same as off. They are retried whenever this page regains focus.",
       "stats": "Jev ledger: {{calls}} calls · {{tokens}} Jev tokens spent · {{linesIn}} lines filtered → {{linesKept}} kept",
-      "statsEmpty": "Jev ledger: no calls recorded yet."
+      "statsEmpty": "Jev ledger: no calls recorded yet.",
+      "net": "Jev net: {{chars}} chars ≈ {{tokens}} session tokens (+ kept out, − added)",
+      "consumer": "{{caller}}: {{chars}} chars",
+      "consumerMore": "… and {{more}} more — `jev stats` lists every consumer."
     }
   },
   "permissions": {
