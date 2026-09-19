@@ -373,11 +373,15 @@
         "heal": "a heal session is curing the cause",
         "heal-review": "Athena is reviewing the heal",
         "heal-fix": "applying the review's fixes",
-        "close": "merging the plan repair"
+        "close": "merging the plan repair",
+        "measuring": "re-running the phase's checks for fresh evidence",
+        "replanning": "Odysseus is rewriting the phase"
       },
       "paused": "Repair of Phase {{phase}} paused — it resumes with the run",
       "pausedHeal": "Heal of Phase {{phase}} is waiting for the heal drain",
-      "ended": "finished {{elapsed}} ago"
+      "ended": "finished {{elapsed}} ago",
+      "replanning": "Replanning Phase {{phase}}",
+      "pausedReplan": "Replan of Phase {{phase}} paused — it resumes with the run"
     }
   },
   "navigation": {

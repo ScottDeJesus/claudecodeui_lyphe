@@ -1,10 +1,14 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { Suspense, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { RefObject } from 'react';
 
 import { api } from '@/shared/api';
-import { Button, EmptyState, Spinner } from '@/shared/ui';
-import { formatBytes, formatRelativeTime } from '@/shared/utils';
-import type { FilePreview } from '@/shared/types';
+import { EmptyState, Spinner } from '@/shared/ui';
+import { cn, formatBytes, formatRelativeTime } from '@/shared/utils';
+import type { EditSessionStatus, FilePreview, PreviewView } from '@/shared/types';
+import { DocumentPreview } from '@/modules/document-preview';
+import { FileEditor } from '@/modules/file-editor';
+import { PreviewHeader } from '@/modules/file-manager/PreviewHeader';
+import { choosePreviewBody } from '@/modules/file-manager/utils/previewBody';
 
 /** What the preview pane needs; rendered by the file-manager module's FileManager. */
 type PreviewPaneProps = {
@@ -30,6 +34,12 @@ type PreviewPaneProps = {
   /** The server's own sentence when this file could not be read. */
   error: string | null;
   onDownload: () => void;
+  /** The one edit session, when it belongs to this project; the pane shows the editor for its file. */
+  editing: EditSessionStatus | null;
+  /** Asks to open `path` in the editor at `anchorLine`; the file manager guards it against a dirty session. */
+  onRequestEdit: (path: string, anchorLine: number) => void;
+  /** The editor closed; the outcome says whether the file on disk changed. */
+  onEditorClosed: (outcome: 'saved' | 'discarded' | 'clean') => void;
 };
 
 /**
@@ -72,18 +82,22 @@ const imageKindLabel = (mime: string) => {
 };
 
 /**
- * The right-hand pane: what one file looks like, read-only.
+ * The right-hand pane: what one file looks like, and the editor when the reader edits it.
  *
  * Used by the file-manager module's FileManager, which owns the selection this reads.
  *
- * Three arms and nothing else, because `FilePreview` has three: text is shown with its line
- * numbers and told plainly that it cannot be edited here, an image is loaded through the content
- * stream and MEASURED by the browser, and a binary is offered as a download. A figure the app has
- * not learned yet is not drawn at all — the `1440 × 900` appears only once `onLoad` has fired,
- * never as a pair of zeros while the bytes are still arriving.
+ * Its body is one of three, chosen once per render (`choice`): the editor, a document preview (a
+ * PDF, Word file, sheet or media file, or a Markdown/CSV file's rendered view), or the read-only
+ * ARMS. The arms are three because `FilePreview` has three: text is shown with its line numbers,
+ * an image is loaded through the content stream and MEASURED by the browser, and a binary is
+ * offered as a download. A figure the app has not learned yet is not drawn at all — the
+ * `1440 × 900` appears only once `onLoad` has fired, never as a pair of zeros while the bytes are
+ * still arriving. While the editor is up the pane takes its arranger's whole height, so the
+ * editor's own scroller — not the arranger — is the one that scrolls.
  */
 export function PreviewPane({
   paneScrollRef, projectId, selectedPath, preview, targetLine, targetNonce, missedLine, error, onDownload,
+  editing, onRequestEdit, onEditorClosed,
 }: PreviewPaneProps) {
   // The rows' own scroller, and this pane's outermost element. Held so revealing a line is two
   // bounded writes to two NAMED nodes — see the effect below for why that matters.
@@ -194,140 +208,197 @@ export function PreviewPane({
   }, [paneScrollRef, preview, targetLine, targetNonce]);
 
   const fileName = selectedPath?.split('/').pop() ?? '';
+  // Which view of a Markdown/CSV file shows: 'rendered' first, and again whenever the path changes.
+  // Tagged with the path it was chosen for, like the two image records above: the file the reader
+  // has just left is not the file arriving, so a second CSV opens on its table rather than
+  // inheriting the first one's Source view.
+  const [viewChoice, setViewChoice] = useState<{ path: string | null; view: PreviewView }>({ path: null, view: 'rendered' });
+  const view = viewChoice.path === selectedPath ? viewChoice.view : 'rendered';
+  const setView = (next: PreviewView) => setViewChoice({ path: selectedPath, view: next });
+  // True when the app's one edit session is this file: the pane then shows the editor in place of
+  // the arms, and the header's Edit button is not drawn over it.
+  const editingThis = editing !== null && editing.path === selectedPath;
+  // The pane's whole routing rule, in one call: the header's Edit and toggle and the body below
+  // are all read off this answer, so the buttons and what they sit above cannot disagree.
+  const choice = choosePreviewBody({ preview, path: selectedPath, editingThis, view });
+  // Edit opens the session where the reader is looking: the line a file reference named, else the
+  // top of the window on screen, and line 1 for a file whose preview shows no lines at all. The
+  // file manager guards it against a session left dirty in another project.
+  const handleEdit = () => {
+    if (selectedPath === null) {
+      return;
+    }
+    onRequestEdit(selectedPath, targetLine ?? (preview?.kind === 'text' ? preview.startLine : null) ?? 1);
+  };
+  // The outcome is the file manager's business: only a save moved the file, and it re-reads the
+  // listing and the preview for it. The pane keeps nothing of the session that has just ended.
+  const handleEditorClosed = (outcome: 'saved' | 'discarded' | 'clean') => onEditorClosed(outcome);
+  // The session's own file and line, held so the editor branch reads them without a cast: the body
+  // is `editor` only while `editingThis` holds, and these are its values whenever it is drawn.
+  const editingPath = editing?.path ?? '';
+  const editingAnchorLine = editing?.anchorLine ?? 1;
+  // The document body's bytes, for the file on screen. Rebuilt on every selection, and
+  // `DocumentPreview` reads its loader through a ref and keys the fetch on the NAME, so a slow file
+  // the reader has left cannot land its bytes under the file they opened in its place.
+  const documentPath = selectedPath ?? '';
+  const loadDocument = useCallback(async (signal: AbortSignal): Promise<Blob> => {
+    const response = await api.readFileBlob(projectId, documentPath, { signal });
+    if (!response.ok) {
+      throw new Error(`Request failed with status ${response.status}`);
+    }
+    return response.blob();
+  }, [projectId, documentPath]);
+  const opening = <div className="p-4"><Spinner label={`Opening ${fileName}…`} /></div>;
 
   return (
     // The height that makes the `overflow-y-auto` below a REAL scroller is imposed by the pane
     // ARRANGER (`FileManager`), not here — see the comment on the wrapper there for why it has to
     // be applied to both panes at once rather than by each pane to itself.
-    <section ref={sectionRef} aria-label="File preview" className="flex min-h-[260px] min-w-0 flex-1 basis-[260px] flex-col overflow-hidden">
-      <div className="flex flex-none flex-wrap items-center gap-2.5 border-b border-border px-3.5 py-2.5">
-        <span className="text-xs uppercase tracking-[0.14em] text-ink-faint">Preview</span>
-        {selectedPath && (
-          <div className="ml-auto flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={onDownload}>Download</Button>
-          </div>
-        )}
-      </div>
+    <section
+      ref={sectionRef}
+      aria-label="File preview"
+      className={cn('flex min-h-[260px] min-w-0 flex-1 basis-[260px] flex-col overflow-hidden', choice.body.kind === 'editor' && 'h-full')}
+    >
+      <PreviewHeader selectedPath={selectedPath} canEdit={choice.canEdit} onEdit={handleEdit} toggle={choice.toggle}
+        view={view} onViewChange={setView} onDownload={onDownload} />
 
-      <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto">
-        {!selectedPath && (
-          <div className="p-4">
-            <EmptyState title="No file chosen" message="Pick a file on the left to read it here." />
-          </div>
-        )}
+      {choice.body.kind === 'editor' && (
+        <Suspense fallback={opening}>
+          <FileEditor
+            projectId={projectId}
+            path={editingPath}
+            anchorLine={editingAnchorLine}
+            onClose={handleEditorClosed}
+          />
+        </Suspense>
+      )}
 
-        {selectedPath && error && (
-          <p className="px-4 py-4 text-[13px] text-warn-ink">▲ {error}</p>
-        )}
+      {choice.body.kind === 'document' && (
+        <Suspense fallback={opening}>
+          <DocumentPreview kind={choice.body.document} name={fileName} bytes={preview?.bytes ?? null} load={loadDocument} onDownload={onDownload} />
+        </Suspense>
+      )}
 
-        {selectedPath && !error && !preview && (
-          <div className="flex items-center gap-2 px-4 py-4 text-[13px] text-ink-faint">
-            <Spinner />
-            <span>Reading {fileName}…</span>
-          </div>
-        )}
-
-        {preview?.kind === 'text' && (
-          <div className="flex flex-col">
-            <div className="flex flex-col gap-1 border-b border-border px-4 pb-2.5 pt-3.5">
-              <div className="text-sm font-medium">{fileName}</div>
-              <div className="text-[12.5px] text-muted-foreground">
-                {metaLine([
-                  preview.language,
-                  preview.bytes !== null && formatBytes(preview.bytes),
-                  preview.totalLines !== null && `${preview.totalLines} lines`,
-                  preview.mtime !== null && `changed ${formatRelativeTime(preview.mtime)}`,
-                ])}
-              </div>
+      {choice.body.kind === 'arms' && (
+        <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto">
+          {!selectedPath && (
+            <div className="p-4">
+              <EmptyState title="No file chosen" message="Pick a file on the left to read it here." />
             </div>
+          )}
 
-            <div className="overflow-x-auto py-3 font-mono text-[12.5px] leading-[1.85]">
-              {preview.lines.map((line, index) => {
-                // The file's OWN line number, not the row's position: the window can start
-                // anywhere, and a gutter counting from 1 in the middle of a file is a lie the
-                // reader would carry straight back into their editor.
-                const lineNumber = preview.startLine + index;
-                const isTarget = lineNumber === targetLine;
-                return (
-                  // That absolute number is also the identity: this body is replaced whole when the
-                  // file or the window changes, and a file has no other key for a row that may
-                  // repeat verbatim.
-                  <div
-                    key={lineNumber}
-                    data-line={lineNumber}
-                    data-target-line={isTarget ? 'true' : undefined}
-                    className={`flex gap-3.5 px-4${isTarget ? ' bg-primary/10' : ''}`}
-                  >
-                    <span className={`w-12 flex-none select-none text-right ${isTarget ? 'text-accent-ink' : 'text-ink-faint'}`}>
-                      {lineNumber}
-                    </span>
-                    <span className="whitespace-pre text-muted-foreground">{line}</span>
-                  </div>
-                );
-              })}
+          {selectedPath && error && (
+            <p className="px-4 py-4 text-[13px] text-warn-ink">▲ {error}</p>
+          )}
+
+          {selectedPath && !error && !preview && (
+            <div className="flex items-center gap-2 px-4 py-4 text-[13px] text-ink-faint">
+              <Spinner />
+              <span>Reading {fileName}…</span>
             </div>
+          )}
 
-            <div className="px-4 pb-4 text-[12.5px] text-ink-faint">
-              {/* `targetLine` IS the line the ask settled on once `missedLine` is set — the hook
-                  clamps one to the other — so the footer names both without a third prop. */}
-              {lineRangeLabel(preview, missedLine, targetLine)}
-              {' '}Editing happens in your own editor — ask an agent here to change the file.
-            </div>
-          </div>
-        )}
-
-        {preview?.kind === 'image' && imagePath && (
-          <div className="flex flex-col">
-            <div className="flex flex-col gap-1 border-b border-border px-4 pb-2.5 pt-3.5">
-              <div className="text-sm font-medium">{fileName}</div>
-              <div className="text-[12.5px] text-muted-foreground">
-                {metaLine([
-                  imageKindLabel(preview.mime),
-                  preview.bytes !== null && formatBytes(preview.bytes),
-                  // Only once the browser has measured it. A figure before then would be a guess.
-                  dimensions && `${dimensions.width} × ${dimensions.height}`,
-                  preview.mtime !== null && formatRelativeTime(preview.mtime),
-                ])}
-              </div>
-            </div>
-
-            <div className="flex items-center justify-center p-4">
-              {imageUrl && (
-                <img
-                  src={imageUrl}
-                  alt={fileName}
-                  className="max-h-[50vh] max-w-full rounded-[10px] border border-border object-contain"
-                  onLoad={(event) => setMeasured({
-                    path: imagePath,
-                    width: event.currentTarget.naturalWidth,
-                    height: event.currentTarget.naturalHeight,
-                  })}
-                />
-              )}
-              {!imageUrl && imageFailed && (
-                <p className="text-[12.5px] text-warn-ink">▲ The image could not be loaded.</p>
-              )}
-              {!imageUrl && !imageFailed && (
-                <div className="flex items-center gap-2 text-[12.5px] text-ink-faint">
-                  <Spinner />
-                  <span>Loading the image…</span>
+          {preview?.kind === 'text' && (
+            <div className="flex flex-col">
+              <div className="flex flex-col gap-1 border-b border-border px-4 pb-2.5 pt-3.5">
+                <div className="text-sm font-medium">{fileName}</div>
+                <div className="text-[12.5px] text-muted-foreground">
+                  {metaLine([
+                    preview.language,
+                    preview.bytes !== null && formatBytes(preview.bytes),
+                    preview.totalLines !== null && `${preview.totalLines} lines`,
+                    preview.mtime !== null && `changed ${formatRelativeTime(preview.mtime)}`,
+                  ])}
                 </div>
-              )}
-            </div>
-          </div>
-        )}
+              </div>
 
-        {preview?.kind === 'none' && (
-          <div className="p-5">
-            <EmptyState
-              title="No preview for this file"
-              message={`${metaLine([fileName, preview.bytes !== null && formatBytes(preview.bytes)])}. Download it to open it in a tool that understands the format.`}
-              actionLabel="Download the file"
-              onAction={onDownload}
-            />
-          </div>
-        )}
-      </div>
+              <div className="overflow-x-auto py-3 font-mono text-[12.5px] leading-[1.85]">
+                {preview.lines.map((line, index) => {
+                  // The file's OWN line number, not the row's position: the window can start
+                  // anywhere, and a gutter counting from 1 in the middle of a file is a lie the
+                  // reader would carry straight back into their editor.
+                  const lineNumber = preview.startLine + index;
+                  const isTarget = lineNumber === targetLine;
+                  return (
+                    // That absolute number is also the identity: this body is replaced whole when the
+                    // file or the window changes, and a file has no other key for a row that may
+                    // repeat verbatim.
+                    <div
+                      key={lineNumber}
+                      data-line={lineNumber}
+                      data-target-line={isTarget ? 'true' : undefined}
+                      className={`flex gap-3.5 px-4${isTarget ? ' bg-primary/10' : ''}`}
+                    >
+                      <span className={`w-12 flex-none select-none text-right ${isTarget ? 'text-accent-ink' : 'text-ink-faint'}`}>
+                        {lineNumber}
+                      </span>
+                      <span className="whitespace-pre text-muted-foreground">{line}</span>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="px-4 pb-4 text-[12.5px] text-ink-faint">
+                {/* `targetLine` IS the line the ask settled on once `missedLine` is set — the hook
+                    clamps one to the other — so the footer names both without a third prop. */}
+                {lineRangeLabel(preview, missedLine, targetLine)}
+              </div>
+            </div>
+          )}
+
+          {preview?.kind === 'image' && imagePath && (
+            <div className="flex flex-col">
+              <div className="flex flex-col gap-1 border-b border-border px-4 pb-2.5 pt-3.5">
+                <div className="text-sm font-medium">{fileName}</div>
+                <div className="text-[12.5px] text-muted-foreground">
+                  {metaLine([
+                    imageKindLabel(preview.mime),
+                    preview.bytes !== null && formatBytes(preview.bytes),
+                    // Only once the browser has measured it. A figure before then would be a guess.
+                    dimensions && `${dimensions.width} × ${dimensions.height}`,
+                    preview.mtime !== null && formatRelativeTime(preview.mtime),
+                  ])}
+                </div>
+              </div>
+
+              <div className="flex items-center justify-center p-4">
+                {imageUrl && (
+                  <img
+                    src={imageUrl}
+                    alt={fileName}
+                    className="max-h-[50vh] max-w-full rounded-[10px] border border-border object-contain"
+                    onLoad={(event) => setMeasured({
+                      path: imagePath,
+                      width: event.currentTarget.naturalWidth,
+                      height: event.currentTarget.naturalHeight,
+                    })}
+                  />
+                )}
+                {!imageUrl && imageFailed && (
+                  <p className="text-[12.5px] text-warn-ink">▲ The image could not be loaded.</p>
+                )}
+                {!imageUrl && !imageFailed && (
+                  <div className="flex items-center gap-2 text-[12.5px] text-ink-faint">
+                    <Spinner />
+                    <span>Loading the image…</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {preview?.kind === 'none' && (
+            <div className="p-5">
+              <EmptyState
+                title="No preview for this file"
+                message={`${metaLine([fileName, preview.bytes !== null && formatBytes(preview.bytes)])}. Download it to open it in a tool that understands the format.`}
+                actionLabel="Download the file"
+                onAction={onDownload}
+              />
+            </div>
+          )}
+        </div>
+      )}
     </section>
   );
 }

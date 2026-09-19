@@ -40,6 +40,24 @@ export default defineConfig(({ mode }) => {
     define: {
       __APP_VERSION__: JSON.stringify(pkg.version)
     },
+    // The file editor reaches every grammar through a dynamic import() and the file previews reach
+    // their renderers the same way, so Vite would discover each one only when Edit is first pressed
+    // on a file of that kind or a PDF is first opened — and the discovery reloads the page. Naming
+    // them here pre-bundles them at server start instead.
+    optimizeDeps: {
+      include: [
+        '@codemirror/lang-css',
+        '@codemirror/lang-html',
+        '@codemirror/lang-javascript',
+        '@codemirror/lang-json',
+        '@codemirror/lang-markdown',
+        '@codemirror/lang-python',
+        '@codemirror/lang-yaml',
+        'docx-preview',
+        'pdfjs-dist',
+        'xlsx'
+      ]
+    },
     resolve: {
       alias: {
         '@': fileURLToPath(new URL('./src', import.meta.url))

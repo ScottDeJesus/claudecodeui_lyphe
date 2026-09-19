@@ -1,5 +1,6 @@
 import { drawBackground } from '@/modules/universe/utils/universeBackground';
 import { drawClouds } from '@/modules/universe/utils/universeClouds';
+import { drawNebulae } from '@/modules/universe/utils/universeNebula';
 import { drawComets, heavyStars } from '@/modules/universe/utils/universeComets';
 import { isFile } from '@/modules/universe/utils/universeGraph';
 import {
@@ -60,9 +61,8 @@ import type { UniversePulses } from '@/modules/universe/utils/universePulses';
  * every frame and never cached, because it is the panel's live state.
  *
  * THE PALETTE ARRIVES, IT IS NOT READ. Asking the document for a custom property forces a style
- * recalculation and no frame may pay for one; the owner reads the tokens once per palette (see
- * `universeTokens`) and hands the same object in, which is also what makes a theme flip a repaint
- * rather than a per-node lookup. No colour is spelled out in this file either: every stroke and
+ * recalculation and no frame may pay for one; the owner reads the tokens once (see
+ * `universeTokens`) and hands the same object in to every frame. No colour is spelled out in this file either: every stroke and
  * every fill is the token the design system named, and a missing one resolves through `tokenOf`.
  *
  * WHAT THE FRAME SAYS. A star's brightness is how recently git saw it change, and the instant is
@@ -150,6 +150,8 @@ export function drawStars(
   const frame = makeFrame(ctx, graph, camera, view, tokens, tweaks, now, NO_FLARES);
   worldTransform(ctx, view);
 
+  // First, so it is under everything: the haze is the space the galaxy hangs in, not a light in it.
+  drawNebulae(frame, tweaks.nebula);
   if (tweaks.edges !== 'none') drawEdges(frame);
   if (tweaks.trails > 0) drawTrails(frame);
   drawStardust(frame);
@@ -301,6 +303,9 @@ function drawLabels(frame: Frame, mode: UniverseTweaks['labels']): void {
   // Whether the focus's neighbours are named at all: a small neighbourhood is a story, a hub's is a wall.
   // Counted as distinct partners: a pair joined by two lanes is one neighbour, not two.
   const nameLit = focus !== null && new Set(graph.nodes[focus]?.adj ?? []).size <= LIT_LABELS_MAX;
+  // WHO is named is the focus's own answer (`ft`, written by the layout: 1 for the neighbourhood, the
+  // dim for everyone else); how STRONGLY is the eased `f`. Asking the eased value who is near named
+  // every star in the sky for the first frames of a hover, while the rest were still fading down.
   const core = tokenOf(tokens, '--ink');
   const body = tokenOf(tokens, '--ink');
   const dim = tokenOf(tokens, '--ink-mid');
@@ -310,7 +315,7 @@ function drawLabels(frame: Frame, mode: UniverseTweaks['labels']): void {
   const integrations: { node: UniverseGraphNode; alpha: number }[] = [];
   for (const node of graph.bodies) {
     if (!frame.visible(node)) continue;
-    const lit = nameLit && node.f > 0.85;
+    const lit = nameLit && node.ft === 1;
     const near = focus === node.id;
     if (node.kind === 'core') {
       // The sun is named whenever it is on screen: at the fitted view it is the one word that
@@ -364,7 +369,7 @@ function drawLabels(frame: Frame, mode: UniverseTweaks['labels']): void {
   if (mode !== 'all' && z <= FILE_LABEL_ZOOM && focus === null) return;
   for (const node of graph.act) {
     if (!isFile(node) || !frame.visible(node)) continue;
-    const lit = nameLit && node.f > 0.85;
+    const lit = nameLit && node.ft === 1;
     const near = focus === node.id;
     if (mode === 'all' || z > FILE_LABEL_ZOOM || near || lit) {
       // A file's own name earns its strength with the zoom that brought it close enough to read.

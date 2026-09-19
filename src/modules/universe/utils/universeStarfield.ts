@@ -9,9 +9,8 @@
  *
  * WHAT A FIELD ENTRY CARRIES, AND WHAT IT DOES NOT. A star knows where it is, how big and how bright
  * it is, how fast it twinkles, and which SLOT of the sky's palette it is drawn in — a `tint`, never a
- * colour. The palette is read from the document by the caller, so a field that has never seen a
- * colour is a field that cannot go stale when the theme flips; `universeSky` resolves the tints into
- * colours when it paints.
+ * colour. The palette is the caller's to read, so the field never holds a colour of its own;
+ * `universeSky` resolves the tints into colours when it paints.
  */
 
 /** One field star: its parallax layer `l`, its place in the viewport (`x` and `y`, `0..1`), its

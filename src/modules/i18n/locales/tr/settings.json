@@ -329,6 +329,22 @@
       "description": "plan runner; builder, düzeltme turu ve Athena'yı Claude Opus yerine DeepSeek'in deepseek-flash'inde çalıştırır. Prometheus, izciler ve yeniden planlayıcı Claude'da kalır. Sonraki aşamada geçerli olur.",
       "unreadable": "Anahtar sunucudan okunamadı, bu yüzden konumu bilinmiyor — kapalı olmakla aynı şey değil. Bu sayfa odağı her geri aldığında yeniden denenir."
     },
+    "jev": {
+      "master": {
+        "label": "Jev anlamsal yargısı",
+        "description": "Betikler ve oturumlar TypeSafe'in Jev'inden evet/hayır, tek seçim ya da büyük bir çıktıyı okumadan önce süzmesini isteyebilir. Kapalı: bu makineden hiçbir şey çıkmaz.",
+        "armsPrompts": "Bunu açmak, prompt metnini de Jev'e göndermeye başlar: aşağıdaki prompt opt-in'i açık olarak kayıtlı. Bu kapalıyken Jev'e hiçbir şey gönderilmez."
+      },
+      "prompts": {
+        "label": "Kancalar prompt metnimi Jev'e gönderebilsin",
+        "description": "artifact yönlendirme kancası, 'artifact' kelimesini içeren bir prompt'un metnini göndererek yönlendirme notunu ekleyip eklemeyeceğine karar verebilir. Kapalı: kanca yalnızca kelimeyi eşler.",
+        "gatedOn": "Yukarıdaki ana anahtar tarafından tutuluyor — ancak bu opt-in açık olarak kayıtlı, dolayısıyla Jev'i açmak prompt metnini hemen gönderir. Kapalı: kanca yalnızca kelimeyi eşler.",
+        "gatedOff": "Yukarıdaki ana anahtar tarafından tutuluyor: bunu değiştirmek için önce Jev'i açın. Kapalı: kanca yalnızca kelimeyi eşler."
+      },
+      "unreadable": "Anahtarlar sunucudan okunamadı, bu yüzden konumları bilinmiyor — kapalı olmakla aynı şey değil. Bu sayfa odağı her geri aldığında yeniden denenir.",
+      "stats": "Jev defteri: {{calls}} çağrı · {{tokens}} Jev token harcandı · {{linesIn}} satır süzüldü → {{linesKept}} tutuldu",
+      "statsEmpty": "Jev defteri: henüz çağrı kaydedilmedi."
+    },
     "login": {
       "title": "Giriş Yap",
       "reAuthenticate": "Yeniden Kimlik Doğrula",

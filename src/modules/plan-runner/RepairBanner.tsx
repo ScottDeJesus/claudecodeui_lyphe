@@ -13,6 +13,10 @@ import type { RunnerRepair } from '@/shared/types';
  * `progress.json.repair`:
  *
  *   · REPAIRING — a spinner, the phase, which step the session is on, and how long it has run.
+ *     Three sessions answer a ⛔, in order, and the strip names whichever is working: the REPLAN
+ *     (`by: 'replan'` — first re-running the phase's checks, then Odysseus rewriting the phase),
+ *     the fix-it UNBLOCK outing, and the HEAL behind a failed outing. The first step of the first
+ *     two can take minutes, and it used to leave the card reading `shiplog` with nothing said.
  *     Only while its process is alive: the run's own for an unblock outing, the heal drain's for a
  *     heal (`repair.live` — the run is halted while a heal works). A pending repair outlives its
  *     process (a park keeps it for the resume, a crash strands it), and a spinner over one nobody
@@ -42,7 +46,7 @@ export function RepairBanner({ repair, runLive }: { repair: RunnerRepair; runLiv
           <div className="flex min-w-0 items-center gap-2">
             <Spinner size={14} />
             <span className="min-w-0 text-sm">
-              <strong>{t('runner.repair.repairing', { phase: repair.phase_id })}</strong>
+              <strong>{t(repair.by === 'replan' ? 'runner.repair.replanning' : 'runner.repair.repairing', { phase: repair.phase_id })}</strong>
               <span className="text-muted-foreground">
                 {` · ${t(`runner.repair.step.${repair.step}`, { defaultValue: repair.step })}${attempt}${elapsed ? ` · ${elapsed}` : ''}`}
               </span>
@@ -58,7 +62,7 @@ export function RepairBanner({ repair, runLive }: { repair: RunnerRepair; runLiv
       <div data-runner-repair="paused">
         <Banner tone="neutral">
           <span className="min-w-0 text-sm">
-            <strong>{t(repair.by === 'heal' ? 'runner.repair.pausedHeal' : 'runner.repair.paused', { phase: repair.phase_id })}</strong>
+            <strong>{t(repair.by === 'heal' ? 'runner.repair.pausedHeal' : repair.by === 'replan' ? 'runner.repair.pausedReplan' : 'runner.repair.paused', { phase: repair.phase_id })}</strong>
             <span className="text-muted-foreground">{attempt}</span>
           </span>
         </Banner>

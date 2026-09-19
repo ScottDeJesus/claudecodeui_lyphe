@@ -250,6 +250,39 @@ neither is a route into the other: this lane still reads run files and shells ou
 route knows nothing about runs. Where the key lives and who reads it is declared once, in
 `.env.example`.
 
+## The Jev switches — two more flags this server reads and writes
+
+Beside the DeepSeek row, **Settings → Agents → Claude** carries two more rows for TypeSafe's
+Jev, the house semantic-judgment primitive (`~/.claude/hooks/jev_client.py`): `JevContent.tsx`,
+mounted directly under `RunnerModelContent`, drawn from `useJevSwitches.ts` — its own
+module-level reader/writer, not the DeepSeek hook's, because these two rows exist once and the
+DeepSeek switch's shared clock exists only because it is drawn in two places (here and the
+composer chip). `server/modules/settings/jev-switches.ts` reads and writes the same two files the
+Python side reads through `plan_runner.state.reads_on`: `~/.claude/state/jev.flag`, the MASTER
+(off, and nothing leaves the box), and `~/.claude/state/jev_prompts.flag`, the second opt-in a
+hook needs before it may send the operator's own prompt text — `route_artifact_word.py` is the
+one caller today. `GET`/`PUT /api/settings/jev` answer `{master, prompts, promptsLive}`, the last
+one derived server-side once rather than by each reader (`promptsLive = master && prompts`); `PUT`
+validates every named field before writing any of them, so a malformed pair (`{"prompts":"on"}`)
+writes nothing, and a partial-write failure restores the field already written rather than leaving
+the pair split. `GET /api/settings/jev/stats` answers the same ledger totals `scripts/jev stats`
+prints, read from `~/.claude/state/jev_ledger.jsonl` — calls, tokens spent, and lines filtered in
+vs kept — as a one-line summary under the two rows.
+
+**The gating rule the panel enforces is the one `jev_client.switch_on` enforces:** the prompts row
+is disabled (never hidden — its stored value still shows) while the master is off, so an operator
+can arm the prompt opt-in ahead of time without it taking effect until the master also reads on,
+and turning the master off never silently discards a stored prompts-on. Both files are written
+the same way `deepseek_flash.flag` is — a scratch file, realpath'd destination, atomic rename —
+through the shared `readFlagFile`/`writeFlagFile` this module reuses rather than re-implementing.
+
+**The CLI and the screen are two doors onto the same two files, not two switches.**
+`~/.claude/scripts/jev switch on|off|status [--scope prompts]` and the panel both read and write
+`jev.flag`/`jev_prompts.flag` directly — flipping one is visible from the other on the next read,
+with no daemon or lock between them. `jev switch status` prints both files' live state and whether
+the prompts scope is actually LIVE (master and prompts both on) or merely stored, the same
+`promptsLive` distinction the panel draws.
+
 ## How a run is classified
 
 In order, mirroring `runner_statusline.py`'s `read_run` and `segment`, plus one rule of the reaper's:

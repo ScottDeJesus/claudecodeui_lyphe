@@ -1,6 +1,7 @@
 import express from 'express';
 import type { NextFunction, Request, RequestHandler, Response } from 'express';
 
+import { createRouteHandler } from '@/modules/file-tree/file-tree-route-handler.js';
 import type {
   FileTreeListingServices,
   FileTreeLogger,
@@ -119,26 +120,6 @@ function normalizeUploadedFiles(request: UploadedRequest): FileTreeUploadedFile[
     : [];
 }
 
-function createRouteHandler(
-  operation: (request: Request, response: Response) => void | Promise<void>,
-  logger: FileTreeLogger,
-): RequestHandler {
-  return async (request, response) => {
-    try {
-      await operation(request, response);
-    } catch (error) {
-      if (error instanceof AppError) {
-        response.status(error.statusCode).json({ error: error.message });
-        return;
-      }
-
-      const message = error instanceof Error ? error.message : String(error);
-      logger.error('File Tree API error', error);
-      response.status(500).json({ error: message });
-    }
-  };
-}
-
 /**
  * Builds the File Tree HTTP router for the server composition root and route tests.
  * Paths are relative to the module's `/api/file-tree` mount point so the
@@ -179,24 +160,6 @@ export function createFileTreeRouter(
         response.status(500).json({ error: 'Error reading file' });
       }
     });
-  }, logger));
-
-  router.put('/projects/:projectId/file', createRouteHandler(async (request, response) => {
-    const body = readBody(request);
-    const filePath = readRequiredString(body.filePath, 'filePath', 'Invalid file path');
-    if (body.content === undefined) {
-      throw new AppError('Content is required', {
-        code: 'FILE_CONTENT_REQUIRED',
-        statusCode: 400,
-      });
-    }
-    if (typeof body.content !== 'string') {
-      throw new AppError('Content must be a string', {
-        code: 'INVALID_FILE_CONTENT',
-        statusCode: 400,
-      });
-    }
-    response.json(await services.saveTextFile(readProjectId(request), filePath, body.content));
   }, logger));
 
   router.get('/projects/:projectId/files', createRouteHandler(async (request, response) => {

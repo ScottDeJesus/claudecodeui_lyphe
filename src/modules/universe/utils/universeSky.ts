@@ -16,9 +16,8 @@ export type { SkyStar } from '@/modules/universe/utils/universeStarfield';
  * palette and at no other time: `refresh` is the only thing that repaints, and it says what its key
  * is.
  *
- * THE KEY INCLUDES THE PALETTE, where the export keyed size and device pixel ratio alone. That was
- * right while the colours were its own literals; here a theme flip changes what the sky looks like
- * without changing a single dimension, so the palette is part of the key and a theme switch repaints.
+ * THE KEY INCLUDES THE PALETTE, where the export keyed size and device pixel ratio alone: the tiles
+ * are painted from tokens, so what they were painted with is part of what they are.
  *
  * THE FIELD IS NOT THIS FILE'S. Where the stars are and how the band runs is generated once, from a
  * seed, in `universeStarfield` — the one place in this build where a pseudo-random number is drawn,
@@ -29,8 +28,7 @@ export type { SkyStar } from '@/modules/universe/utils/universeStarfield';
  * the export spelled alpha into its own hex literals (`col + 'aa'`), a gradient here fades to
  * `transparent` instead — a token may be written in any notation, and canvas interpolates gradients
  * premultiplied, so the fade is the same one with no assumption about how a colour is spelled. The
- * upshot is the one worth having: a light theme gives a light sky with dark stars, a dark theme the
- * reverse, out of the same code.
+ * tokens are always the DARK ones (`readUniverseTokens`): the sky has no light form.
  */
 
 /**

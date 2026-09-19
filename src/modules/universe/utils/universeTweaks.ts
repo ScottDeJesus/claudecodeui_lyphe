@@ -54,6 +54,8 @@ export type UniverseTweaks = {
    *  any zoom without waiting on the relaxation. */
   distance: number;
   milkyWay: boolean;
+  /** How strongly each galaxy's nebula is painted, `0` (none) to `1`. */
+  nebula: number;
   twinkle: number;
   perspective: number;
   /** Pulses are drawn at all. */
@@ -89,7 +91,7 @@ export const DEFAULT_TWEAKS: Readonly<UniverseTweaks> = Object.freeze({
   orbit: 0.05, inclination: 0.7, precession: 0.5, parallax: 0.6, drift: false,
   pulseSpeed: 1.2, trails: 0,
   labels: 'hubs', edges: 'import',
-  gravity: 1.3, distance: 1, milkyWay: true, twinkle: 0.6, perspective: 0.8, flow: true, renderer: 'webgl',
+  gravity: 1.3, distance: 1, milkyWay: true, nebula: 0.7, twinkle: 0.6, perspective: 0.8, flow: true, renderer: 'webgl',
   doppler: 0, wobble: 0, lensing: 0, transits: false, depthOfField: 0,
   recencyBrightDays: 7, recencyDimDays: 30,
   files: 'code',
@@ -109,7 +111,7 @@ export const TWEAK_RANGES = Object.freeze({
   trails: { min: 0, max: 40 },
   labels: { options: ['hubs', 'all', 'none'] },
   edges: { options: ['all', 'tree', 'import', 'cochange', 'none'] },
-  gravity: { min: 0.3, max: 3 }, distance: { min: 0.3, max: 1.5 }, milkyWay: { boolean: true }, twinkle: { min: 0, max: 1 },
+  gravity: { min: 0.3, max: 3 }, distance: { min: 0.3, max: 1.5 }, milkyWay: { boolean: true }, nebula: { min: 0, max: 1 }, twinkle: { min: 0, max: 1 },
   perspective: { min: 0, max: 1 }, flow: { boolean: true },
   renderer: { options: ['webgl', 'canvas'] },
   doppler: { min: 0, max: 1 }, wobble: { min: 0, max: 1 }, lensing: { min: 0, max: 1 },

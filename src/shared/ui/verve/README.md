@@ -86,10 +86,13 @@ This note says how the Verve design language is wired into this repo.
 
 ## The library those tokens paint
 
-Twenty-three components carry Verve paint today — Phase 2's twelve, then Phase 3's six new and
+Twenty-four components carry Verve paint today — Phase 2's twelve, then Phase 3's six new and
 three restyled, then DockableFab and SplitPane for the application switcher's kit scaffold,
 admitted on the barrel's *mechanism* test rather than its two-module rule (`index.ts`'s own
-header). What they share is the contract every later one joins:
+header), then `ConfirmDialog` for the files editor's and file manager's unsaved-changes guards —
+admitted on the ordinary two-module rule (the file-editor and file-manager modules both render it)
+and painting nothing of its own: it is `Dialog` and `Button` underneath, both already painted.
+What they share is the contract every later one joins:
 
 1. **A component is a flat file in `src/shared/ui/`.** `verve/` holds stylesheets and nothing
    else: no component, no module, no `verve/components/` to grow into.

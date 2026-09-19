@@ -157,9 +157,11 @@ than a number for anything translucent.
 
 `.verify/` is git-ignored on purpose: the screenshots are large binaries that churn on every
 run, and the scripts describe one operator's machine. Nothing in the shipped application
-imports from it. Playwright is not a dependency of this repo either — `console.mjs` imports
-it by absolute path from another checkout's `node_modules/playwright/index.js` (1.58.2,
-Chromium build 1208 already cached), so `npm install` here pulls no browser stack.
+imports from it. Playwright IS a dependency of this repo — `package.json` lists `playwright`
+`^1.58.2`, under `optionalDependencies` because the app itself needs no browser stack — and
+`console.mjs` is the one file that ignores that, importing another checkout's copy by absolute
+path (`/opt/shadow-connector/node_modules/playwright/index.js`, 1.58.2, Chromium build 1208
+already cached). The standalone files probes below import this repo's own copy.
 
 Screenshots land in `.verify/shots/` as `<phase>-<screen>[-<width>]-<light|dark>.png`;
 `0-git-390-dark.png` is the git panel at 390px wide in dark mode. The mode suffix
@@ -1585,6 +1587,34 @@ between them; the line ends in a full stop and is not bold, so no lead-in pass g
 R1 exclusion's new `[data-shape="list"]` clause must still not reach. `phase-33.mjs`'s gallery corpus
 gained the paragraph whose colon titles the list below it, the block that puts the `list` kind into
 its census (its entry above).
+
+**Three probes stand outside the suite and share nothing with it.**
+`python3 .verify/probe-files-api.py` (`API OK`) drives the files API over HTTP with `urllib` alone —
+the windows and their clamps, the bytes a patch leaves untouched either side of the edited lines, a
+CRLF file and one whose last line carries no terminator, the refusals it can stage — a stale
+revision, a binary file, a non-UTF-8 line, a line past 256 KiB, an edit past the end of the file, a
+newline inside a replacement line, and both directions out of the project — an in-project symlink
+writing its target and staying a link, and the equality of the `preview` and `edit-window` line
+models; its contracts are [files-api.md](files-api.md).
+`node .verify/probe-files-editor.mjs` (`EDITOR OK`) opens a 200,000-line file in the real editor,
+scrolls far enough to force loads and evictions, edits two lines far apart, saves with Mod-s and
+reads exactly those two edits back off disk, then walks the conflict banner and the unchanged file
+behind it, the open-while-dirty question, a tab switch that keeps the unsaved session and a discard
+that writes nothing. `node .verify/probe-files-previews.mjs` (`PREVIEWS OK`) opens a PDF, a Word
+file, a sheet, a WAV and a rendered Markdown and CSV file — and holds the negative that matters for
+the bundle: no preview library is fetched until a file of its kind opens.
+
+Neither browser probe imports anything from `.verify/lib/` — not `openConsole`, not the colour
+helpers, and above all not `runner-fixture.mjs`, which writes fake runs into the real runner state —
+and each imports Playwright by absolute path from this repo's own
+`node_modules/playwright/index.js`. Their fixtures are written under `.verify/cfep-scratch/` (the API
+probe's one out-of-project symlink target lives in `/tmp`, where a target outside the project has to
+be), and their screenshots are `.verify/shots/cfep-editor-390-light.png` and
+`.verify/shots/cfep-preview-pdf-390-light.png`. Both browser probes seed `localStorage` before the
+page loads — `auth-token` for the session, and `activeTab: 'files'` — and that second seed is what
+makes their 390px pass land on the Files tab: the strip is `overflow-x-auto`, so at phone width the
+tab a pass needs is not guaranteed to be on screen to click, and the app is standing on it from the
+first render instead.
 
 ## Standing colour baselines
 

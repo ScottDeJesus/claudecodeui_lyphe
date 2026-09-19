@@ -84,7 +84,12 @@ export function UniversePanel() {
   const hasMap = map !== null && map.nodes.length > 0;
 
   return (
-    <div className="relative h-full w-full overflow-hidden bg-background" data-universe-panel>
+    <div className="relative h-full w-full overflow-hidden" data-universe-panel>
+      {/* THE SKY IS DARK WHATEVER THE APP WEARS — there is no white space. Everything that sits ON
+          the sky lives in this wrapper and reads the dark tokens: the canvas, the counts, the
+          controls, the selection. The live activity feed is its sibling below, outside it, because
+          it is a panel of the app and follows the app's theme. */}
+      <div className="dark absolute inset-0 bg-background text-foreground">
       <UniverseCanvas
         map={map}
         tweaksRef={tweaksRef}
@@ -139,6 +144,8 @@ export function UniversePanel() {
           <UniverseSelectionPanel map={map} selectedNode={selectedNode} countsFor={countsFor} onSelectNode={onSelectNode} />
         </div>
       )}
+
+      </div>
 
       {hasMap && (
         <div

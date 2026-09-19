@@ -28,8 +28,17 @@ type DeepSeekFlashSwitch = {
  */
 async function readSwitch(): Promise<boolean | null> {
   try {
-    const body = (await (await api.settings.deepseekFlash()).json()) as DeepSeekFlashResponse;
-    return Boolean(body.enabled);
+    const response = await api.settings.deepseekFlash();
+    const body = (await response.json()) as DeepSeekFlashResponse;
+    // An error ANSWER is not a position. The API's own envelope for a restart, a proxy's 502 or an
+    // expired token's 401 is `{success:false,error:{…}}`, which `.json()` parses happily — and
+    // `Boolean(undefined)` is `false`, a switch drawn OFF for a switch that is on, with nothing
+    // thrown so the unknown state is never reached. A body without a real boolean is therefore
+    // "could not ask", exactly what a thrown call returns: the position is retracted and the Retry
+    // press is the way back. Same rule as the Jev hook's `positionOf`, which refuses any body that
+    // is not the three-boolean contract.
+    if (!response.ok || typeof body.enabled !== 'boolean') return null;
+    return body.enabled;
   } catch (error) {
     console.error('Error loading the DeepSeek runner switch:', error);
     return null;
@@ -39,8 +48,14 @@ async function readSwitch(): Promise<boolean | null> {
 /** The write, returning the position the server read back off the file, or `null` if it failed. */
 async function writeSwitch(next: boolean): Promise<boolean | null> {
   try {
-    const body = (await (await api.settings.saveDeepseekFlash(next)).json()) as DeepSeekFlashResponse;
-    return Boolean(body.enabled);
+    const response = await api.settings.saveDeepseekFlash(next);
+    const body = (await response.json()) as DeepSeekFlashResponse;
+    // A refused write is not a position either, and this is the direction that PERSISTS the invented
+    // side: read as `false`, a 500 on the PUT would publish OFF and the chip's next press would send
+    // `{"enabled":true}` back as though the row had read the file. Null here is what reaches
+    // `forgetPosition` and the unknown state both surfaces already render.
+    if (!response.ok || typeof body.enabled !== 'boolean') return null;
+    return body.enabled;
   } catch (error) {
     console.error('Error saving the DeepSeek runner switch:', error);
     return null;
@@ -54,7 +69,7 @@ async function writeSwitch(next: boolean): Promise<boolean | null> {
  * truth and this carries nothing but the last answer from it. Readers in a SECOND tab are out of its
  * reach; the focus re-read below is what closes that gap.
  */
-const readers = new Set<(position: boolean | null) => void>();
+const readers = new Set<(position: boolean | null, forget?: boolean) => void>();
 
 /**
  * The last position the server gave back — the newest thing anyone here knows.
@@ -124,6 +139,26 @@ function announce(enabled: boolean) {
   // re-asking a question nobody is waiting on any more.
   waiting = false;
   deliver(enabled);
+}
+
+/**
+ * Tell every surface the position is UNKNOWN, and mean it — the position each one is holding was
+ * never read off the file.
+ *
+ * The one case that produces it: a write whose answer never arrived, whose stand-in read never
+ * arrived either. What is on screen then is the OPTIMISTIC value the press drew before the write was
+ * issued, and `deliver(null)` is not enough to retract it — that means "could not ask", which every
+ * reader answers by keeping the last position it knew (correct for a failed read over an established
+ * position, a lie here). So it is dropped rather than kept: the file may hold either side, and a row
+ * drawing one of them is the "switch drawn off for a switch that is on" failure. Unread, not off —
+ * the reader is told, and the retry press is the way back.
+ */
+function forgetPosition() {
+  epoch += 1;
+  waiting = false;
+  // Nobody here knows anything any more, so a surface mounting now must ask rather than draw this.
+  known = null;
+  for (const reader of readers) reader(null, true);
 }
 
 /**
@@ -200,10 +235,12 @@ async function write(next: boolean): Promise<void> {
   // Re-READ on failure, never `!next`. Inverting is a guess about a file this process does not own:
   // the switch is host-wide, so a failed write can perfectly well land on a file another operator
   // just set to `next` anyway, and the control would then contradict disk until it remounted. Asking
-  // is the only way to know, and a failed re-read publishes nothing rather than inventing a worse
-  // position — every surface keeps the last one it knew.
+  // is the only way to know — and when that question goes unanswered too, the positions on screen
+  // are RETRACTED rather than kept (`forgetPosition`): there is nothing left here that was ever read
+  // off the file, and the one thing these controls must never do is draw a side they invented.
   const truth = settled !== null ? settled : await readSwitch();
   if (truth !== null) announce(truth);
+  else forgetPosition();
 
   writing = false;
 }
@@ -234,8 +271,16 @@ export function useDeepSeekFlashSwitch(): DeepSeekFlashSwitch {
   // this run's cleanup must not be able to silence the run that replaces it.
   useEffect(() => {
     let live = true;
-    const reader = (position: boolean | null) => {
+    const reader = (position: boolean | null, forget = false) => {
       if (!live) return;
+      if (forget) {
+        // Not "keep the last position and admit it is unread": the last position here was drawn by
+        // this very press and never confirmed against the file. Dropped, so the surface shows the
+        // unknown state instead of the side it guessed.
+        setPosition(null);
+        setUnreadable(true);
+        return;
+      }
       if (position === null) {
         setUnreadable(true);
         return;
@@ -248,13 +293,21 @@ export function useDeepSeekFlashSwitch(): DeepSeekFlashSwitch {
     if (known !== null) reader(known);
     void ask();
 
-    // Coming back to the tab is the one moment the position can have moved under a surface that is
+    // Coming back to the page is the one moment the position can have moved under a surface that is
     // already mounted and would otherwise never ask again — the operator flips it from their phone
     // and the desktop window, which has been open the whole time, must not go on showing the old
     // side. Skipped while a write is in flight: that write's own answer is already on its way, and a
     // read racing it could land first and be corrected by nothing.
     const onFocus = () => { if (!writing) void ask(); };
+    // `focus` alone is not this moment on a phone: iOS Safari fires no reliable window blur/focus on
+    // an app switch, which is the very case the re-read exists for. `visibilitychange` is the event
+    // that fires there, so both are listened for.
+    const onVisibilityChange = () => {
+      if (document.visibilityState !== 'visible') return;
+      onFocus();
+    };
     window.addEventListener('focus', onFocus);
+    document.addEventListener('visibilitychange', onVisibilityChange);
 
     return () => {
       live = false;
@@ -263,6 +316,7 @@ export function useDeepSeekFlashSwitch(): DeepSeekFlashSwitch {
       // server, and `ask` still owes its answer to every reader still on screen.
       readers.delete(reader);
       window.removeEventListener('focus', onFocus);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
     };
   }, []);
 

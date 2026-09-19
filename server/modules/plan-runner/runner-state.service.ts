@@ -167,7 +167,8 @@ function readRepair(raw: unknown): RunnerRepair | null {
   if (raw === null || typeof raw !== 'object') return null;
   const state = readString(field(raw, 'state')) as RunnerRepair['state'];
   if (!REPAIR_STATES.includes(state)) return null;
-  const by = readString(field(raw, 'by')) === 'heal' ? 'heal' : 'unblock';
+  const named = readString(field(raw, 'by'));
+  const by: RunnerRepair['by'] = named === 'heal' || named === 'replan' ? named : 'unblock';
   const pid = readNumberOrNull(field(raw, 'pid'));
   return {
     phase_id: readString(field(raw, 'phase_id')),
@@ -176,7 +177,7 @@ function readRepair(raw: unknown): RunnerRepair | null {
     live: by === 'heal' && state === 'repairing' && pid !== null && pid > 0 && pidAlive(pid),
     // A cleared unblock always re-walked its phase, and blocks written before `resumed` existed say
     // nothing; an unknown is carried as `null`, never inverted into a claim.
-    resumed: by === 'unblock' ? state === 'fixed'
+    resumed: by !== 'heal' ? state === 'fixed'
       : typeof field(raw, 'resumed') === 'boolean' ? (field(raw, 'resumed') as boolean) : null,
     step: readString(field(raw, 'step')),
     k: readNumber(field(raw, 'k'), 0),

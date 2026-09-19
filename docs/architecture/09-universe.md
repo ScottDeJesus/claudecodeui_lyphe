@@ -183,8 +183,12 @@ export's own ramp from orange through warm white to blue keyed on its size with 
 (`baseColorOf`, `universeTokens.ts`) — never its kind. A folder is its repo's pastel mixed halfway to warm white,
 a repo warm white, the sun cream with a cool glow, and every glow below the sun is the repo's pastel (one of
 the export's seven, by the repo's ordinal, `node.cluster`); an endpoint and an integration folder keep a
-token each; on a light canvas every literal is pulled toward the ink (`onSky`), since the export was drawn for a
-dark sky. Restored at the operator's word, 2026-09-17. An **edit is a flare** decaying
+token each. Restored at the operator's word, 2026-09-17. **The sky is dark whatever the app's theme is** —
+there is no white space, so there is no light sky. `UniversePanel` wraps the canvas and everything that sits ON
+the sky (the counts, the controls, the selection) in a `.dark` element, and `readUniverseTokens(scope)` reads
+the palette once off the canvas inside it, where every token resolves to its dark value; it is held for the
+life of the page and nothing watches for a theme. The live activity feed is that wrapper's SIBLING, outside
+it, so it alone follows the app's theme. An **edit is a flare** decaying
 linearly to exactly zero in 2400 ms — not the export's asymptotic glow (`utils/universePulses.ts:7-28`) — and an
 **execution is a pulse** routed on the real graph: from the star it resolved to, to that star's endpoint when
 the graph carries an endpoint edge, and otherwise to its parent body, so an execution is one leg and never a
@@ -259,6 +263,24 @@ key removed rather than filled (`hooks/useUniverseTweaks.ts:11-27,39-63`, `utils
 Those decorative passes were never deleted: each defaults to zero, and a zero or `false` skips its pass WHOLE,
 so the default frame pays for none of them (`utils/universeTweaks.ts:15-17,70-77`,
 `utils/universeLayout.ts:14-19`, `utils/universeRenderer.ts:53-57,130-131,166,171`).
+
+**Each galaxy sits in a nebula of its own colour** (`utils/universeNebula.ts`), the first thing the star layer
+draws inside the world transform, so it is under every edge, glow and star. The haze is the repo's own SHAPE,
+not a disc: every repo, the sun, and every folder under them down to depth 3 — never an endpoint — lays one
+soft, lobed puff over the room it holds
+(`reach`, centred on the room's live centre carried onto the body's drawn position), so colour thickens where
+folders crowd and thins where the repo does. The hue is the repo's palette slot, inherited down the tree —
+`NEBULA_PALETTE` in `utils/universeTokens.ts`, the seven repo pastels slot for slot with the chroma put back,
+because a pastel at a few percent of alpha is grey. The sun wears the slot after the last repo's, by design:
+it is a repo like any other. Seven slots cycle, so an eighth repo shares a hue with the first. Two rules carry it. It is NEVER additive: every puff is
+`source-over` at a low alpha, so overlapping haze converges on the hue and cannot sum to white — the flat
+additive wash the clouds once tried turned the fitted view 70% white, and the nebula's measured share of
+near-white pixels is the SAME with it on as with it off. And the parallax is two depths, not a second
+camera: each body is stamped twice, a wide faint puff on a far sheet whose points are pulled toward the
+view's centre (`FAR_DEPTH`) and a tighter one in the galaxy's own plane, so the two part as the camera pans.
+Nothing is baked per galaxy — the bodies orbit, and a haze painted once would drift off its stars — only the
+puff sprites are cached, by colour and variant. `nebula` is the tweak (0–1, default 0.7); zero skips the pass
+whole.
 
 ## What a frame costs
 

@@ -11,6 +11,8 @@ import {
 } from '@/modules/notifications/index.js';
 
 import { readDeepseekFlashSwitch, writeDeepseekFlashSwitch } from './deepseek-flash-switch.js';
+import { readJevLedgerStats } from './jev-ledger.js';
+import { readJevSwitches, writeJevMasterSwitch, writeJevPromptsSwitch } from './jev-switches.js';
 import { createSettingsRouter } from './settings.routes.js';
 import { createSettingsService } from './settings.service.js';
 
@@ -47,6 +49,12 @@ const settingsService = createSettingsService({
   deepseekFlash: {
     read: () => readDeepseekFlashSwitch(),
     write: (enabled) => writeDeepseekFlashSwitch(enabled),
+  },
+  jev: {
+    read: () => readJevSwitches(),
+    writeMaster: (enabled) => writeJevMasterSwitch(enabled),
+    writePrompts: (enabled) => writeJevPromptsSwitch(enabled),
+    readStats: () => readJevLedgerStats(),
   },
   getVapidPublicKey: getPublicKey,
 });

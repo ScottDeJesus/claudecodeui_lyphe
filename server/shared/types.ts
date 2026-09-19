@@ -1,3 +1,5 @@
+import type { BigIntStats } from 'node:fs';
+import type { FileHandle } from 'node:fs/promises';
 import type { IncomingMessage } from 'node:http';
 import type { Readable } from 'node:stream';
 
@@ -325,7 +327,7 @@ export type RunnerPosition = { rank: number; total: number; phase_id: string; ti
  * the run ends. It is the only record of a phase the runner halted on a crash or a budget: that phase's row never turns `blocked`.
  */
 /** The fix-it session on a blocked phase, from `progress.json.repair`: the one IN FLIGHT (`repairing`, `step` the sub-stage it is on; `paused` while the run waits out a rate limit), else the last one finished (`fixed` — the phase walks again — or `failed`). `by` says whose session it is: `unblock` is the run's own outing, walked by the run's process; `heal` is the heal drain's, which works while the run itself is halted. `live` is whether the process doing a `heal` repair is alive right now (always `false` for an `unblock`, whose liveness is the run's). `resumed` is whether a finished repair put the phase back on the walk: a cleared unblock always did, a heal only when it re-armed the phase's spec — a heal can cure the cause and leave the phase standing; `null` when the heal never measured it. `since` and `ended_at` are epoch SECONDS; `k` is the number of the outing this repair belongs to, and `limit` its per-phase ceiling (0 = none carried, as for a heal). */
-export type RunnerRepair = { phase_id: string; state: 'repairing' | 'paused' | 'fixed' | 'failed'; by: 'unblock' | 'heal'; live: boolean; resumed: boolean | null; step: string; k: number; limit: number; since: number | null; ended_at: number | null; reason: string };
+export type RunnerRepair = { phase_id: string; state: 'repairing' | 'paused' | 'fixed' | 'failed'; by: 'replan' | 'unblock' | 'heal'; live: boolean; resumed: boolean | null; step: string; k: number; limit: number; since: number | null; ended_at: number | null; reason: string };
 export type RunnerRunSnapshot = { run_id: string; plan_path: string; plan_title: string; /** A test's run, never the operator's: its plan sits in a scratch root (the runner's own fixtures under the temp dir) or its id is a probe's `fixture-` run. Hidden from every runs list unless a probe opts in, and never pushed as a notification. */ test_run: boolean; state: RunnerRunState; status: string; started_at: number; heartbeat_at: number; stopped_at: number | null; launched_by_session: string | null; outcome: string | null; ended_at: number | null; blocked_causes: Record<string, string>; pid: number | null; position: RunnerPosition | null; repair: RunnerRepair | null; phases: RunnerPhaseRow[]; spawns: number; max_spawns: number; cost_usd: number; plan_runs: number; plan_spawns: number; plan_cost_usd: number; plan_planning_usd: number; plan_review_usd: number; plan_scouts_usd: number; plan_total_usd: number; tokens: number; plan_tokens: number; line: string; timeline: RunnerTimelineEntry[] };
 /** The whole picture, pushed on change over `/ws`. `runs` is ordered by `started_at` ascending, oldest first, the order the terminal bar uses. `at` is epoch MILLISECONDS (`Date.now()`), unlike every field inside a snapshot. */
 export type RunnerStateEvent = { kind: 'runner_state'; runs: RunnerRunSnapshot[]; at: number };
@@ -1482,6 +1484,65 @@ export type FilePreview =
   | { kind: 'image'; mime: string; bytes: number | null; mtime: string | null }
   | { kind: 'none'; bytes: number | null; mtime: string | null };
 
+//----------------- FILE EDITING ------------
+/** One window of a text file read for editing: whole lines, never clipped. */
+export type FileEditWindow = {
+  path: string;              // project-relative, as asked
+  rev: string;               // opaque revision token (I3) of the file the lines were read from
+  startLine: number;         // 1-based number of lines[0]; echoes the clamped `start`
+  lines: string[];           // each line without its terminator and without one trailing '\r'
+  eof: boolean;              // true when this read reached the file's last line
+  totalLines: number | null; // the file's line count when known (eof reached, or known to the line index for this rev), else null
+  eol: '\n' | '\r\n';        // the file's FIRST line terminator; '\n' when the file has none
+};
+
+/** One contiguous line-range replacement against revision `baseRev`. */
+export type FileLinePatch = {
+  path: string;
+  baseRev: string;
+  startLine: number;   // 1-based first ORIGINAL line replaced; totalLines + 1 appends
+  deleteCount: number; // original lines removed from startLine, >= 0
+  lines: string[];     // replacement lines; none contains '\n' or '\r'
+};
+
+/** What a successful patch left on disk. */
+export type FilePatchResult = { path: string; rev: string; totalLines: number };
+
+/**
+ * Raw lines the line index read: bytes of each line without its '\n' (a trailing '\r' is kept; the
+ * service strips it). Server-only, because the index, the patch and the edit service all speak it.
+ */
+export type FileLineRead = {
+  lines: Buffer[];
+  startLine: number;
+  eof: boolean;
+  totalLines: number | null;
+  tooLongLine: number | null; // the first line in the window over maxLineBytes; reading stopped there
+  eol: '\n' | '\r\n' | null;  // the file's first terminator when the index knows it for this rev, else the first this read crossed; null when the file has none
+};
+
+/** The whole-file facts a patch needs, from one full scan per revision. */
+export type FileLineShape = { size: number; totalLines: number; endsWithNewline: boolean; eol: '\n' | '\r\n' };
+
+/**
+ * THE line model of the edit path (`file-line-index.ts`).
+ *
+ * One model, shared by every reader and writer of a file's lines, so a line the editor sees is the
+ * line the preview shows and the line a patch replaces. It works in BYTES: `0x0A` is the only
+ * separator it knows, and it never decodes text or holds a line it was not asked for.
+ */
+export type FileLineIndex = {
+  readWindow(realPath: string, rev: string, start: number, maxLines: number, maxBytes: number, maxLineBytes: number): Promise<FileLineRead>;
+  lineOffset(realPath: string, rev: string, line: number): Promise<number | null>; // byte offset where `line` starts; totalLines + 1 → size; beyond → null
+  fileShape(realPath: string, rev: string): Promise<FileLineShape>;
+};
+
+/** The edit service `file-tree.module.ts` builds and `file-tree-edit.routes.ts` calls. */
+export type FileTreeEditService = {
+  readEditWindow(projectId: string, filePath: string, start: number, lines: number): Promise<FileEditWindow>;
+  patchTextFile(projectId: string, patch: FileLinePatch): Promise<FilePatchResult>;
+};
+
 /**
  * One file as it was actually stored by an upload.
  *
@@ -1557,6 +1618,10 @@ export type FileTreeFileSystem = {
   copyFile(sourcePath: string, destinationPath: string, exclusive?: boolean): Promise<void>;
   /** `end` is inclusive, as in `fs.createReadStream`: `{ end: size - 1 }` reads exactly `size` bytes. */
   createReadStream(filePath: string, range?: { start?: number; end?: number }): Readable;
+  /** `stat` with bigint fields, so the revision token carries nanosecond mtime. */
+  statExact(candidatePath: string): Promise<BigIntStats>;
+  /** Creates the file with flag 'wx' and `mode`; fails with EEXIST instead of opening an existing one. */
+  openExclusive(filePath: string, mode: number): Promise<FileHandle>;
 };
 
 /**
@@ -1635,11 +1700,6 @@ export type FileTreeServices = {
   createWorkspaceFolder(folderPath: string): Promise<{ success: true; path: string }>;
   readTextFile(projectId: string, filePath: string): Promise<{ content: string; path: string }>;
   openFile(projectId: string, filePath: string): Promise<{ contentType: string; size: number; stream: Readable }>;
-  saveTextFile(projectId: string, filePath: string, content: string): Promise<{
-    success: true;
-    path: string;
-    message: string;
-  }>;
   listProjectFiles(
     projectId: string,
     options?: { respectGitignore: boolean },

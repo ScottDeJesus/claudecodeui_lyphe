@@ -331,6 +331,22 @@
       "description": "Le plan runner envoie son builder, sa passe de correction et Athena sur deepseek-flash de DeepSeek au lieu de Claude Opus. Prometheus, les scouts et le replanner restent sur Claude. Prend effet à la phase suivante.",
       "unreadable": "L'interrupteur n'a pas pu être lu depuis le serveur : sa position est inconnue — ce n'est pas la même chose qu'éteint. Une nouvelle tentative a lieu chaque fois que cette page reprend le focus."
     },
+    "jev": {
+      "master": {
+        "label": "Jugement sémantique de Jev",
+        "description": "Les scripts et les sessions peuvent demander à Jev de TypeSafe un oui/non, un choix, ou de filtrer une sortie volumineuse avant de la lire. Désactivé : rien ne quitte cette machine.",
+        "armsPrompts": "Activer ceci envoie aussi le texte du prompt à Jev : l’opt-in de prompt ci-dessous est mémorisé activé. Rien n’est envoyé à Jev tant que ceci est désactivé."
+      },
+      "prompts": {
+        "label": "Autoriser les hooks à envoyer mon prompt à Jev",
+        "description": "Le hook de routage des artifacts peut envoyer le texte d’un prompt contenant le mot « artifact » pour décider s’il ajoute sa note de routage. Désactivé : le hook se contente de comparer le mot.",
+        "gatedOn": "Retenu par l’interrupteur maître ci-dessus — mais cette option est mémorisée activée : activer Jev enverra donc immédiatement le texte du prompt. Désactivé : le hook se contente de comparer le mot.",
+        "gatedOff": "Retenu par l’interrupteur maître ci-dessus : activez Jev pour modifier ceci. Désactivé : le hook se contente de comparer le mot."
+      },
+      "unreadable": "Les interrupteurs n’ont pas pu être lus depuis le serveur : leur position est inconnue — ce n’est pas la même chose que désactivé. Une nouvelle tentative a lieu chaque fois que cette page reprend le focus.",
+      "stats": "Journal Jev : {{calls}} appels · {{tokens}} jetons Jev dépensés · {{linesIn}} lignes filtrées → {{linesKept}} conservées",
+      "statsEmpty": "Journal Jev : aucun appel enregistré pour l’instant."
+    },
     "login": {
       "title": "Connexion",
       "reAuthenticate": "Se ré-authentifier",

@@ -58,6 +58,7 @@ const WORDS: Readonly<Record<TweakKey, TweakWords>> = {
   gravity: { group: 'Look', label: 'Gravity', helper: 'How tightly repos and directories pull their stars in.', step: 0.1 },
   distance: { group: 'Look', label: 'Distance', helper: 'How far everything sits from Claude, the centre.', step: 0.05 },
   milkyWay: { group: 'Look', label: 'Milky Way', helper: 'Paint a faint band of dust behind the sky.' },
+  nebula: { group: 'Look', label: 'Nebulae', helper: 'Fill each galaxy with a haze of its own colour. Zero turns it off.', step: 0.05 },
   files: { group: 'Look', label: 'Files', helper: 'Which files are stars: code alone, or every tracked file.' },
   twinkle: { group: 'Look', label: 'Twinkle', helper: 'How much the stars flicker.', step: 0.05 },
   perspective: { group: 'Look', label: 'Perspective', helper: 'How much depth the sky has. Zero flattens it.', step: 0.05 },

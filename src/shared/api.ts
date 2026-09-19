@@ -3,7 +3,7 @@ import {
   getStoredAuthToken,
   storeAuthToken,
 } from '@/shared/authToken';
-import type { NtfySettingsInput, SubagentTranscriptResult } from '@/shared/types';
+import type { FileLinePatch, NtfySettingsInput, SubagentTranscriptResult } from '@/shared/types';
 import { IS_PLATFORM } from '@/shared/utils';
 import { readVoiceConfig, voiceConfigHeaders } from '@/shared/voiceConfig';
 
@@ -371,8 +371,6 @@ export const api = {
   // mobile) would otherwise be aborted mid-body and read as a broken file.
   readFileBlob: (projectId: string, filePath: string, options: ApiRequestOptions = {}) =>
     get(fileContentPath(projectId, filePath), { timeoutMs: NO_REQUEST_TIMEOUT, ...options }),
-  saveFile: (projectId: string, filePath: string, content: string) =>
-    put(`/api/file-tree/projects/${projectId}/file`, { filePath, content }),
   getFiles: (projectId: string, options: ApiRequestOptions = {}) =>
     get(`/api/file-tree/projects/${projectId}/files${query({ respectGitignore: true })}`, options),
 
@@ -391,6 +389,14 @@ export const api = {
     start = 1,
     options: ApiRequestOptions = {},
   ) => get(`/api/file-tree/projects/${projectId}/preview${query({ path, lines, start })}`, options),
+  // One window of whole lines read for editing, at `start` (1-based, clamped to at least 1).
+  // `lines` is clamped by the server to 1-400.
+  editWindow: (projectId: string, path: string, start: number, lines: number) =>
+    get(`/api/file-tree/projects/${projectId}/edit-window${query({ path, start, lines })}`),
+  // Replaces one contiguous range of original lines. `baseRev` is the revision the range was
+  // read from; a moved file is refused with a 409 rather than overwritten.
+  patchFile: (projectId: string, body: FileLinePatch) =>
+    patch(`/api/file-tree/projects/${projectId}/edit`, body),
 
   // File operations
   createFile: (
@@ -584,6 +590,13 @@ export const api = {
     // is the same answer for anyone signed in and both calls return the state read back off disk.
     deepseekFlash: () => get('/api/settings/deepseek-flash'),
     saveDeepseekFlash: (enabled: boolean) => put('/api/settings/deepseek-flash', { enabled }),
+
+    // The house Jev switches, same shape of answer for the same reason: two flag files on this
+    // host, not per-user preferences. `saveJev` sends only the switches named, so a PUT that moves
+    // one never moves the other, and both calls answer with the state read back off disk.
+    jev: () => get('/api/settings/jev'),
+    saveJev: (patch: { master?: boolean; prompts?: boolean }) => put('/api/settings/jev', patch),
+    jevStats: () => get('/api/settings/jev/stats'),
 
     push: {
       vapidPublicKey: () => get('/api/settings/push/vapid-public-key'),

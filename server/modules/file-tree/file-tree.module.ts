@@ -7,6 +7,8 @@ import mime from 'mime-types';
 import multer from 'multer';
 
 import { projectsDb } from '@/modules/database/index.js';
+import { createFileTreeEditRouter } from '@/modules/file-tree/file-tree-edit.routes.js';
+import { createFileTreeEditService } from '@/modules/file-tree/file-tree-edit.service.js';
 import { createFileTreeListingService } from '@/modules/file-tree/file-tree-listing.service.js';
 import { createFileTreeListingRouter, createFileTreeRouter } from '@/modules/file-tree/file-tree.routes.js';
 import { createFileTreeService } from '@/modules/file-tree/file-tree.service.js';
@@ -60,6 +62,30 @@ const fileTreeFileSystem: FileTreeFileSystem = {
     exclusive ? fs.constants.COPYFILE_EXCL : 0,
   ),
   createReadStream: (filePath, range) => fs.createReadStream(filePath, range),
+  // Bigint fields, because the revision token has to carry a nanosecond mtime: a same-size edit
+  // inside one millisecond is otherwise indistinguishable from no edit at all.
+  statExact: (candidatePath) => fsPromises.stat(candidatePath, { bigint: true }),
+  // 'wx', so a temp file that somehow already exists is an EEXIST rather than someone else's file
+  // overwritten by this save.
+  //
+  // `open` filters the mode through the process umask, so the `chmod` is what makes the mode the
+  // one asked for: without it, saving a 0o664 file under a 0o002 umask would answer a 0o644 one and
+  // quietly take the file away from everyone the group bits were sharing it with. The handle is
+  // closed before the failure leaves, because the caller's cleanup unlinks a file, not a descriptor.
+  openExclusive: async (filePath, mode) => {
+    const handle = await fsPromises.open(filePath, 'wx', mode);
+    try {
+      await handle.chmod(mode);
+    } catch (error) {
+      try {
+        await handle.close();
+      } catch {
+        // The chmod failure is the news; a handle that will not close is not.
+      }
+      throw error;
+    }
+    return handle;
+  },
 };
 
 /**
@@ -122,6 +148,18 @@ const fileTreeListingServices = createFileTreeListingService({
   fileSystem: fileTreeFileSystem,
 });
 
+/**
+ * Windowed editing, composed beside the browsing service.
+ *
+ * It receives the same filesystem adapter and the same project gateway as browsing, and builds
+ * its own `FileLineIndex` inside `createFileTreeEditService` — the line model belongs to the
+ * service that reads and writes lines, not to the composition root.
+ */
+const fileTreeEditServices = createFileTreeEditService({
+  fileSystem: fileTreeFileSystem,
+  projects: fileTreeProjects,
+});
+
 const fileUploadMiddleware = multer({
   storage: multer.diskStorage({
     destination: os.tmpdir(),
@@ -158,3 +196,5 @@ fileTreeRoutes.use(createFileTreeRouter(
 ));
 
 fileTreeRoutes.use(createFileTreeListingRouter(fileTreeListingServices, fileTreeLogger));
+
+fileTreeRoutes.use(createFileTreeEditRouter(fileTreeEditServices));

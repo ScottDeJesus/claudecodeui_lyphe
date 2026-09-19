@@ -3,6 +3,7 @@ import { McpServers } from '@/modules/mcp';
 import { ProviderSkills } from '@/modules/skills';
 import AccountContent from '@/modules/settings/tabs/agents-settings/sections/content/AccountContent';
 import EditModeContent from '@/modules/settings/tabs/agents-settings/sections/content/EditModeContent';
+import JevContent from '@/modules/settings/tabs/agents-settings/sections/content/JevContent';
 import PermissionsContent from '@/modules/settings/tabs/agents-settings/sections/content/PermissionsContent';
 import RunnerModelContent from '@/modules/settings/tabs/agents-settings/sections/content/RunnerModelContent';
 
@@ -51,8 +52,11 @@ export default function AgentCategoryContentSection({
           whether the runner's hands spend it at all — so it reads as a consequence of the card
           above rather than a setting of its own. */}
       {selectedCategory === 'account' && selectedAgent === 'claude' && (
-        <div className="mt-6">
+        <div className="mt-6 space-y-6">
           <RunnerModelContent />
+          {/* Under the model switch, not beside it: this is the narrower question of what may leave
+              the machine to answer one, and it reaches hooks rather than the runner's hands. */}
+          <JevContent />
         </div>
       )}
 

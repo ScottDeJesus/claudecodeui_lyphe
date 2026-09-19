@@ -57,7 +57,7 @@
 - **Responsive Design** - Works seamlessly across desktop, tablet, and mobile so you can also use Agents from mobile 
 - **Interactive Chat Interface** - Built-in chat interface for seamless communication with the Agents
 - **Integrated Shell Terminal** - Direct access to the Agents CLI through built-in shell functionality
-- **File Explorer** - Interactive file tree with a read-only preview of text, images and downloads — ask an Agent to change a file
+- **File Explorer** - Interactive file tree with an editor for text files, previews for PDFs, Word documents, spreadsheets, CSV/TSV, Markdown, images, audio and video, and downloads for everything else ([file-manager.md](file-manager.md))
 - **Git Explorer** - Read your branch, what is waiting to be pushed, and every pending change with its diff — committing and pushing are the Agent's: one button starts the conversation and runs your own `/git`
 - **Kanban Board** - Backlog, to do, in progress and done, with questions, checklists, issues, tags and build leases, live over the websocket — plus a one-way import from an existing Descent install ([kanban.md](kanban.md))
 - **Application Switcher** - Your other applications — framed inside the workspace from a draggable button, one or two at a time, off a registry file you edit by hand ([applications.md](applications.md))
@@ -258,7 +258,10 @@ CloudCLI UI - (https://cloudcli.ai).
 - **[React](https://react.dev/)** - User interface library
 - **[Vite](https://vitejs.dev/)** - Fast build tool and dev server
 - **[Tailwind CSS](https://tailwindcss.com/)** - Utility-first CSS framework
-- **[CodeMirror](https://codemirror.net/)** - Markdown editor behind the PRD editor
+- **[CodeMirror](https://codemirror.net/)** - Code and Markdown editor behind the PRD editor and the Files tab's file editor
+- **[PDF.js](https://mozilla.github.io/pdf.js/)** - PDF preview in the Files tab
+- **[docx-preview](https://github.com/VolodymyrBaydalka/docxjs)** - Word document preview in the Files tab
+- **[SheetJS](https://sheetjs.com/)** - Spreadsheet and CSV/TSV preview in the Files tab
 - **[TaskMaster AI](https://github.com/eyaltoledano/claude-task-master)** *(Optional)* - AI-powered project management and task planning
 
 

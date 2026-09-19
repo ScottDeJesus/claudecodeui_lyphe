@@ -356,6 +356,22 @@
       "description": "plan runner 将构建者、修复轮与 Athena 派发到 DeepSeek 的 deepseek-flash，而不是 Claude Opus。Prometheus、侦察者与重规划者仍留在 Claude。下一阶段生效。",
       "unreadable": "无法从服务器读取该开关，因此其位置未知——这与关闭不同。每当此页面重新获得焦点时都会重试。"
     },
+    "jev": {
+      "master": {
+        "label": "Jev 语义判断",
+        "description": "脚本与会话可以请 TypeSafe 的 Jev 回答是/否、二选一，或在读取前过滤大量输出。关闭：任何内容都不会离开本机。",
+        "armsPrompts": "打开此项还会开始将提示文本发送给 Jev：下方的提示 opt-in 保存为开启。此项关闭期间，不会向 Jev 发送任何内容。"
+      },
+      "prompts": {
+        "label": "允许钩子将我的提示文本发送给 Jev",
+        "description": "artifact 路由钩子可以发送包含“artifact”一词的提示文本，以决定是否添加其路由说明。关闭：钩子仅匹配该词。",
+        "gatedOn": "被上方的总开关拦住——但该 opt-in 保存为开启，因此一旦打开 Jev 就会立即发送提示文本。关闭：钩子仅匹配该词。",
+        "gatedOff": "被上方的总开关拦住：请先打开 Jev 再更改此项。关闭：钩子仅匹配该词。"
+      },
+      "unreadable": "无法从服务器读取这些开关，因此其位置未知——这与关闭不同。每当此页面重新获得焦点时都会重试。",
+      "stats": "Jev 账本：{{calls}} 次调用 · 消耗 {{tokens}} 个 Jev token · 过滤 {{linesIn}} 行 → 保留 {{linesKept}} 行",
+      "statsEmpty": "Jev 账本：尚无调用记录。"
+    },
     "login": {
       "title": "登录",
       "reAuthenticate": "重新认证",

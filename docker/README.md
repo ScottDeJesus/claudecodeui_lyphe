@@ -74,7 +74,7 @@ cloudcli sandbox logs my-project     # View server logs
 ## What you get
 
 - **Chat** — Markdown rendering, code blocks, message history
-- **Files** — File tree with a read-only preview for text, images and downloads
+- **Files** — File tree with an editor for text files, previews for PDFs, Word, spreadsheets, CSV/TSV, Markdown, images, audio and video, and downloads for the rest
 - **Git** — Diff viewer, staging, branch switching, commits
 - **Shell** — Built-in terminal emulator
 - **MCP** — Configure Model Context Protocol servers visually

@@ -142,6 +142,13 @@ const DOF_TWEAKS = { depthOfField: 0.6, trails: 8 };
 const TWEAKS_KEY = 'universe.tweaks.v1';
 /** The Universe tab's accessible name, exactly as `universe-ui-probe.mjs` finds it. */
 const TAB_LABEL = 'Universe';
+/** The sidebar's first project row, clicked — the app opens no workspace until one is. */
+const SELECT_FIRST_PROJECT = `(() => {
+  const row = document.querySelector('div[class*="20.5rem"] .pb-safe-area-inset-bottom > div > div.group > button');
+  if (row === null) return false;
+  row.click();
+  return true;
+})()`;
 /** The workspace strip exists only once a project is open — the app's own "we are somewhere" signal. */
 const TABS_PRESENT = 'document.querySelectorAll(\'[role="tab"]\').length > 0';
 /** The canvas has taken its box — a canvas in an unmounted or hidden pane is 0 by 0. */
@@ -487,6 +494,11 @@ async function openSky(cdp, sessionId) {
   stage = 'the app painting anything at all';
   if (!await waitFor(cdp, sessionId, 'document.body.innerText.trim().length > 0')) {
     return { error: 'the app painted nothing at all after the token was written and the page reloaded' };
+  }
+  stage = 'a project being selected';
+  // THE STRIP EXISTS ONLY ONCE A PROJECT IS OPEN, and the app no longer opens one on its own.
+  if (!await waitFor(cdp, sessionId, SELECT_FIRST_PROJECT, 15_000)) {
+    return { error: 'no project row appeared in the sidebar, so no workspace could be opened' };
   }
   stage = 'the workspace tab strip';
   if (!await waitFor(cdp, sessionId, TABS_PRESENT, 10_000)) {

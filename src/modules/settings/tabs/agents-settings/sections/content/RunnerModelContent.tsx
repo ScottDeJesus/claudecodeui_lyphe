@@ -23,19 +23,26 @@ export default function RunnerModelContent() {
 
   const label = t('agents.runnerModel.label', { defaultValue: 'Use DeepSeek Flash for build souls' });
   // A switch drawn off for a switch that is on is the one thing this row must never do, and it
-  // cannot draw a third state the way the composer's chip can. So when the read has failed the
-  // row says so in words, in the place the reader is already looking — the only surface they
-  // come to when they want to be sure.
-  const unknown = enabled === null && unreadable;
+  // cannot draw a third state the way the composer's chip can. So when there is no position the row
+  // says so in words, in the place the reader is already looking — the only surface they come to
+  // when they want to be sure.
+  //
+  // `enabled === null` is the chip's own rule and covers BOTH windows: the read still on the wire,
+  // and the read that failed. The first is not brief — the app's request timeout is 30 s and the
+  // hook asks again after it — so drawing it as OFF is the same lie for up to a minute. Only the
+  // sentence differs, and the chip already carries the same pair.
+  const unknown = enabled === null;
 
   return (
     <div className="rounded-xl border border-border bg-card">
       <SettingsRow
         label={label}
         description={unknown
-          ? t('agents.runnerModel.unreadable', {
-              defaultValue: 'The switch could not be read from the server, so its position is unknown — this is not the same as off. It is retried whenever this page regains focus.',
-            })
+          ? unreadable
+            ? t('agents.runnerModel.unreadable', {
+                defaultValue: 'The switch could not be read from the server, so its position is unknown — this is not the same as off. It is retried whenever this page regains focus.',
+              })
+            : t('status.loading', { ns: 'common', defaultValue: 'Loading...' })
           : t('agents.runnerModel.description', {
               defaultValue: 'Dispatch the plan runner’s builder, its fix-pass and Athena on DeepSeek’s deepseek-flash instead of Claude Opus. Prometheus, the scouts and the replanner stay on Claude. Takes effect on the next phase.',
             })}
@@ -46,7 +53,7 @@ export default function RunnerModelContent() {
           // be honoured — ask again. Without it a persistent read failure left the row dead until
           // the reader closed Settings and reopened it, which is a way out only if they guess it.
           <Button variant="outline" size="sm" onClick={() => void refresh()}>
-            {t('retry', { ns: 'common' })}
+            {t('buttons.retry', { ns: 'common', defaultValue: 'Try again' })}
           </Button>
         ) : (
           <SettingsToggle

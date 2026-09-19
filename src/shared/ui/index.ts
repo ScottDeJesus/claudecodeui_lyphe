@@ -89,3 +89,4 @@ export { Tabs } from '@/shared/ui/Tabs';
 export { Toast } from '@/shared/ui/Toast';
 export { ToastStack } from '@/shared/ui/ToastStack';
 export { Tooltip } from '@/shared/ui/Tooltip';
+export { ConfirmDialog } from '@/shared/ui/ConfirmDialog';

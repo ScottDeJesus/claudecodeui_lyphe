@@ -55,7 +55,7 @@
 - **响应式设计** - 在桌面、平板和移动设备上无缝运行，让您随时随地使用 Agents
 - **交互聊天界面** - 内置聊天 UI，轻松与 Agents 交流
 - **集成 Shell 终端** - 通过内置 shell 功能直接访问 Agents CLI
-- **文件浏览器** - 交互式文件树，支持文本、图片与下载的只读预览；修改交给 Agents
+- **文件浏览器** - 交互式文件树，文本文件可用内置编辑器修改，并支持 PDF、Word、表格、CSV/TSV、Markdown、图片、音频和视频的预览，其余文件提供下载 ([file-manager.md](file-manager.md))
 - **Git 浏览器** - 查看当前分支、尚未推送的提交，以及每个待处理更改及其 diff；提交与推送交给 Agents：一个按钮即可开启对话并运行你自己的 `/git`
 - **会话管理** - 恢复对话、管理多个会话并跟踪历史记录
 - **插件系统** - 通过自定义选项卡、后端服务与集成扩展 CloudCLI。 [开始构建 →](https://github.com/cloudcli-ai/cloudcli-plugin-starter)
@@ -237,7 +237,10 @@ GNU Affero 通用公共许可证 v3.0 或更高版本 (AGPL-3.0-or-later) - 详�
 - **[React](https://react.dev/)** - 用户界面库
 - **[Vite](https://vitejs.dev/)** - 快速构建工具与开发服务器
 - **[Tailwind CSS](https://tailwindcss.com/)** - 实用先行 CSS 框架
-- **[CodeMirror](https://codemirror.net/)** - PRD 编辑器背后的 Markdown 编辑器
+- **[CodeMirror](https://codemirror.net/)** - PRD 编辑器与文件标签页文件编辑器背后的代码 / Markdown 编辑器
+- **[PDF.js](https://mozilla.github.io/pdf.js/)** - 文件标签页的 PDF 预览
+- **[docx-preview](https://github.com/VolodymyrBaydalka/docxjs)** - 文件标签页的 Word 文档预览
+- **[SheetJS](https://sheetjs.com/)** - 文件标签页的表格与 CSV/TSV 预览
 - **[TaskMaster AI](https://github.com/eyaltoledano/claude-task-master)** *(可选)* - AI 驱动的项目管理与任务规划
 
 ### 赞助商

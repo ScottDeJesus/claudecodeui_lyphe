@@ -2,6 +2,7 @@ import path from 'node:path';
 
 import ignore from 'ignore';
 
+import { createFileTreeError, mapFileSystemError, readErrorCode } from '@/modules/file-tree/file-tree-errors.js';
 import type {
   FileTreeDirectoryEntry,
   FileTreeNode,
@@ -50,16 +51,6 @@ function includeEntryByHardExclusions(entryPath: string, isDirectory: boolean): 
 function includeEntryByFallbackDirectoryNames(entryPath: string, isDirectory: boolean): boolean {
   return includeEntryByHardExclusions(entryPath, isDirectory)
     && (!isDirectory || !IGNORED_DIRECTORY_NAMES.has(path.basename(entryPath)));
-}
-
-function createFileTreeError(message: string, statusCode: number, code: string): AppError {
-  return new AppError(message, { statusCode, code });
-}
-
-function readErrorCode(error: unknown): string | null {
-  return typeof error === 'object' && error !== null && 'code' in error
-    ? String(error.code)
-    : null;
 }
 
 function readErrorMessage(error: unknown): string {
@@ -127,19 +118,6 @@ function createConcurrencyLimiter(maximumConcurrency: number) {
   }
 
   return { acquire, release };
-}
-
-function mapFileSystemError(
-  error: unknown,
-  messages: Partial<Record<string, { message: string; statusCode: number }>>,
-): never {
-  const errorCode = readErrorCode(error);
-  const mappedError = errorCode ? messages[errorCode] : undefined;
-  if (mappedError) {
-    throw createFileTreeError(mappedError.message, mappedError.statusCode, errorCode ?? 'FILE_TREE_ERROR');
-  }
-
-  throw error;
 }
 
 function createGitignoreEntryFilter(
@@ -450,21 +428,6 @@ export function createFileTreeService(dependencies: FileTreeServiceDependencies)
         // ends short of `Content-Length` either way.
         stream: fileSystem.createReadStream(resolvedPath, { start: 0, end: Math.max(0, size - 1) }),
       };
-    },
-
-    async saveTextFile(projectId, filePath, content) {
-      const projectRoot = await resolveProjectRoot(projectId);
-      const resolvedPath = resolvePathInsideProject(projectRoot, filePath);
-      try {
-        await fileSystem.writeTextFile(resolvedPath, content);
-      } catch (error) {
-        mapFileSystemError(error, {
-          ENOENT: { message: 'File or directory not found', statusCode: 404 },
-          EACCES: { message: 'Permission denied', statusCode: 403 },
-        });
-      }
-
-      return { success: true, path: resolvedPath, message: 'File saved successfully' };
     },
 
     async listProjectFiles(projectId, options) {

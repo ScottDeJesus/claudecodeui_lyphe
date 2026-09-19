@@ -329,6 +329,22 @@
       "description": "plan runner 將建構者、修復輪與 Athena 派送到 DeepSeek 的 deepseek-flash，而非 Claude Opus。Prometheus、偵察者與重新規劃者仍留在 Claude。下一階段生效。",
       "unreadable": "無法從伺服器讀取此開關，因此其位置未知——這與關閉不同。每當此頁面重新取得焦點時都會重試。"
     },
+    "jev": {
+      "master": {
+        "label": "Jev 語意判斷",
+        "description": "指令碼與工作階段可以請 TypeSafe 的 Jev 回答是/否、二選一，或在讀取前過濾大量輸出。關閉：任何內容都不會離開本機。",
+        "armsPrompts": "開啟此項也會開始將提示文字傳送給 Jev：下方的提示 opt-in 儲存為開啟。此項關閉期間，不會向 Jev 傳送任何內容。"
+      },
+      "prompts": {
+        "label": "允許鉤子將我的提示文字傳送給 Jev",
+        "description": "artifact 路由鉤子可以傳送包含「artifact」一詞的提示文字，以決定是否加入其路由說明。關閉：鉤子僅比對該詞。",
+        "gatedOn": "被上方的總開關擋住——但此 opt-in 儲存為開啟，因此一旦開啟 Jev 就會立即傳送提示文字。關閉：鉤子僅比對該詞。",
+        "gatedOff": "被上方的總開關擋住：請先開啟 Jev 再變更此項。關閉：鉤子僅比對該詞。"
+      },
+      "unreadable": "無法從伺服器讀取這些開關，因此其位置未知——這與關閉不同。每當此頁面重新取得焦點時都會重試。",
+      "stats": "Jev 帳本：{{calls}} 次呼叫 · 消耗 {{tokens}} 個 Jev token · 過濾 {{linesIn}} 行 → 保留 {{linesKept}} 行",
+      "statsEmpty": "Jev 帳本：尚無呼叫紀錄。"
+    },
     "login": {
       "title": "登入",
       "reAuthenticate": "重新驗證",

@@ -328,6 +328,22 @@
       "description": "Il plan runner manda il suo builder, il suo passaggio di correzione e Athena su deepseek-flash di DeepSeek invece che su Claude Opus. Prometheus, gli scout e il replanner restano su Claude. Ha effetto dalla fase successiva.",
       "unreadable": "Non è stato possibile leggere l'interruttore dal server, quindi la sua posizione è sconosciuta — non è la stessa cosa di spento. Viene ritentato ogni volta che questa pagina torna in primo piano."
     },
+    "jev": {
+      "master": {
+        "label": "Giudizio semantico di Jev",
+        "description": "Gli script e le sessioni possono chiedere a Jev di TypeSafe un sì/no, una scelta, o di filtrare un output lungo prima di leggerlo. Spento: nulla lascia questa macchina.",
+        "armsPrompts": "Attivare questo inizia anche a inviare il testo del prompt a Jev: l’opt-in del prompt qui sotto è memorizzato acceso. Finché questo è spento non viene inviato nulla a Jev."
+      },
+      "prompts": {
+        "label": "Consenti agli hook di inviare il mio prompt a Jev",
+        "description": "L’hook di instradamento degli artifacts può inviare il testo di un prompt che contiene la parola «artifact» per decidere se aggiungere la sua nota di instradamento. Spento: l’hook confronta solo la parola.",
+        "gatedOn": "Trattenuto dall’interruttore principale qui sopra — ma questa opzione è memorizzata accesa, quindi accendere Jev invia subito il testo del prompt. Spento: l’hook confronta solo la parola.",
+        "gatedOff": "Trattenuto dall’interruttore principale qui sopra: accendi Jev per cambiarlo. Spento: l’hook confronta solo la parola."
+      },
+      "unreadable": "Non è stato possibile leggere gli interruttori dal server, quindi la loro posizione è sconosciuta — non è la stessa cosa di spento. Vengono ritentati ogni volta che questa pagina torna in primo piano.",
+      "stats": "Registro Jev: {{calls}} chiamate · {{tokens}} token Jev spesi · {{linesIn}} righe filtrate → {{linesKept}} mantenute",
+      "statsEmpty": "Registro Jev: nessuna chiamata registrata finora."
+    },
     "login": {
       "title": "Accedi",
       "reAuthenticate": "Ri-autenticati",

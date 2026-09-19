@@ -1,9 +1,11 @@
 # The file manager
 
-The Files tab: the project tree, the directory in view, and one file read-only beside it.
-`src/modules/file-manager/` is `DirectoryListing`, `FileBreadcrumb` and `PreviewPane` under the
-one `FileManager` its barrel exports, with `useFileManagerState` holding where it is. The server
-half — the routes, the refusal table, the no-overwrite rule — is [files-api.md](files-api.md).
+The Files tab: the project tree, the directory in view, and one file beside it — its lines, a
+document preview, or the editor. `src/modules/file-manager/` is `DirectoryListing`,
+`FileBreadcrumb` and `PreviewPane` under the one `FileManager` its barrel exports, with
+`useFileManagerState` holding where it is and `useEditGuard` settling what an open does to an
+unsaved session. The server half — the routes, the refusal table, the no-overwrite rule — is
+[files-api.md](files-api.md).
 
 ## The rules that bite
 
@@ -48,11 +50,19 @@ half — the routes, the refusal table, the no-overwrite rule — is [files-api.
    in `src/shared/utils.ts` under FORMATTING — `just now`, `4m ago`, `3h ago`, `yesterday`,
    `2 days ago`, then a plain locale date past thirty.
 
-5. **The preview is read-only and has exactly three arms**, because `FilePreview` has three: text
-   with line numbers under a footer saying where editing happens, an image the browser measures,
-   and a binary offered as a download. Bytes come through `api.readFileBlob` in both the image and
-   download paths — the route wants the auth header, so an `<img src>` pointed at it would 401; the
-   browser gets an object URL, revoked as soon as it has taken its own reference.
+5. **The pane's body is decided in one place, and it has three.** `choosePreviewBody`
+   (`src/modules/file-manager/utils/previewBody.ts`) answers with the body, whether Edit is offered
+   and which view toggle is drawn; `PreviewPane` renders that answer and `PreviewHeader` draws its
+   Edit button and its toggle from the same one, so a control and the thing under it cannot come
+   apart. In the order the rules bite: the file open in the editor IS the body; nothing selected, or
+   nothing read yet, is the arms and nothing else; an extension the document registry knows is drawn
+   as that document BEFORE the server's own arm is consulted, so a PDF the sniffer would not call
+   text still previews as a PDF; a Markdown or CSV file inside its cap gets the toggle and its rendered
+   view; everything else is the arms, with Edit offered for text alone. The arms are three because
+   `FilePreview` has three — text with its line numbers, an image the browser measures, a binary
+   offered as a download. Bytes come through `api.readFileBlob` in both the image and download
+   paths — the route wants the auth header, so an `<img src>` pointed at it would 401; the browser
+   gets an object URL, revoked as soon as it has taken its own reference.
 
 6. **A line reference lands ON its line, and says so when that line is gone.** The window is 200
    lines opening 40 above the target, the row carries `data-target-line`, and the footer names the
@@ -76,10 +86,45 @@ half — the routes, the refusal table, the no-overwrite rule — is [files-api.
    warning naming the shortfall. A dropped *folder* is counted and refused rather than sent, since
    `dataTransfer` reports it as a zero-byte file and uploading that writes a lie to disk.
 
-8. **What is missing is deliberate.** No editor: a file opened from anywhere in the workspace lands
-   in this pane, and all three of its arms are read-only. No New folder, no Rename — the tree
-   beside this pane already carries both. A folder's size is `—` and never `N files`, because no
-   child count is on the wire and counting one is a read per row.
+8. **What is missing is deliberate.** No New folder, no Rename — the tree beside this pane already
+   carries both. A folder's size is `—` and never `N files`, because no child count is on the wire
+   and counting one is a read per row.
+
+9. **One file is open for editing at a time, a window of lines at a time.** The header's Edit puts
+   `FileEditor` in the pane for the selected text file. It reads a viewport plus two screens of
+   buffer each way (`openWindowRequest`), and `nextWindowActions` — pure, in
+   `src/modules/file-editor/utils/windowPolicy.ts`, reading nothing but numbers off the view —
+   decides the prepends, appends and evictions. Lines more than two buffer screens behind or ahead
+   of the view are dropped once they are clean, and the touched lines are never evicted at all, so a
+   200,000-line file is a few hundred lines in memory and never the file. The gutter numbers the
+   FILE's lines, not the document's. A save is the touched line range alone, addressed by the
+   revision the window was read from ([files-api.md](files-api.md) §"The rules that bite", rules 9
+   and 10); Mod-s and the toolbar's Save both send it, and a second press joins the write already in
+   flight rather than repeating it. A write from anywhere else — or a window answered from a
+   different revision while the document is dirty — stops the fetching and draws the conflict
+   banner, whose whole offer is `Copy my changes` and `Reload from disk`. There is no overwrite,
+   deliberately: a line range is true only of the revision it was read from, so writing those line
+   numbers onto another revision would land the edits in the wrong place, and the only honest
+   answers are to copy the text out or to take the file on disk. A line too long to edit stops that
+   direction and the banner names it. The session is held in a store outside the component
+   (`utils/editSessionStore.ts`), so leaving the Files tab and coming back restores the same text,
+   cursor and scroll offset with no refetch — and a session left dirty in another project is kept
+   rather than dropped, because this tab cannot even show it and replacing it would lose edits off a
+   screen the reader cannot return to here. `useEditGuard.ts` asks before anything takes the
+   session's place: `Save and open` / `Discard and open` / `Keep editing` when another file is opened
+   over a dirty one, `Discard and edit` / `Keep editing` when another project's dirty session stands
+   in the way of Edit, and `Discard` / `Keep editing` on Close. A dirty session also attaches the
+   browser's own `beforeunload` guard, and detaches it the moment it is clean, so a clean session
+   never draws the "leave site?" prompt.
+
+10. **The document previews are their own capability, and this page does not restate their
+    contract.** `src/modules/document-preview/` draws a PDF, a Word file, a sheet, a media clip and
+    a rendered Markdown or CSV file; its own module doc comment,
+    [src/modules/document-preview/index.ts](../src/modules/document-preview/index.ts), is the whole
+    of that contract — the props, the loader, the cap checked before the load, the registry rows,
+    the one chunk per library — and is where to read it. What the file manager does is ask that
+    module's registry (`documentKindFor`, `textRenderingFor`, `documentCapFor`) what a file is, and
+    render what `choosePreviewBody` answered (rule 5).
 
 ## Proving it
 
@@ -88,4 +133,11 @@ turn — the chat card it opens comes from a conversation already on disk. Rule 
 separately by `node .verify/probe-shapes-lineopen.mjs`, which drives the app's own registered
 `openFileReference` op. The chat's links and file chips reaching that op with their line (rule 2)
 are proven by `node .verify/probe-shapes-inline.mjs`, which ends on the Files tab at the target
-row. See [verification.md](verification.md).
+row. The editor (rule 9) is proven headlessly by `node .verify/probe-files-editor.mjs` (`EDITOR
+OK`) — it opens a 200,000-line file, scrolls far enough to force loads and evictions, edits two
+lines far apart, saves with Mod-s and reads the two edits back off disk, then walks the conflict
+banner, the open-while-dirty dialog, a tab switch that keeps the unsaved session and a discard that
+writes nothing. The document previews and the pane's routing (rules 5 and 10) are proven by
+`node .verify/probe-files-previews.mjs` (`PREVIEWS OK`), which also holds the negative that matters
+for the bundle: no preview library is fetched until a file of its kind opens. See
+[verification.md](verification.md).

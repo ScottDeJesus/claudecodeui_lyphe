@@ -1,3 +1,4 @@
+import type { EditorState } from '@codemirror/state';
 import type { TFunction } from 'i18next';
 import type { ReactNode } from 'react';
 import type { NavigateFunction } from 'react-router-dom';
@@ -289,6 +290,20 @@ export type ToastRecord = ToastRequest & {
 
 /** Progress state of a single queue row, driving the indicator the Queue primitive renders. */
 export type QueueItemStatus = 'completed' | 'in_progress' | 'pending';
+
+/**
+ * One answer a `ConfirmDialog` offers, drawn as a library `Button` in the order given.
+ *
+ * `variant` is the Button's own paint — `destructive` only for the answer that throws work away,
+ * `outline` for the one that backs out. `busy` disables the button while the work it started is
+ * in flight, so a second press cannot start it twice.
+ */
+export type ConfirmDialogAction = {
+  label: string;
+  variant: 'default' | 'destructive' | 'outline' | 'ghost';
+  onSelect: () => void;
+  busy?: boolean;
+};
 
 // ---------------------------
 
@@ -916,6 +931,135 @@ export type FilePreview =
   | { kind: 'image'; mime: string; bytes: number | null; mtime: string | null }
   | { kind: 'none'; bytes: number | null; mtime: string | null };
 
+//----------------- FILE EDITING ------------
+
+/** One window of a text file read for editing: whole lines, never clipped. */
+export type FileEditWindow = {
+  /** Project-relative path, echoed as asked. */
+  path: string;
+  /** Opaque revision token of the file the lines were read from. */
+  rev: string;
+  /** 1-based number of `lines[0]`; echoes the clamped `start`. */
+  startLine: number;
+  /** Each line without its terminator and without one trailing `\r`. */
+  lines: string[];
+  /** True when this read reached the file's last line. */
+  eof: boolean;
+  /** The file's line count when known, else null. */
+  totalLines: number | null;
+  /** The file's FIRST line terminator; `'\n'` when the file has none. */
+  eol: '\n' | '\r\n';
+};
+
+/** One contiguous line-range replacement against revision `baseRev`. */
+export type FileLinePatch = {
+  /** Project-relative path of the file to patch. */
+  path: string;
+  /** Revision the replacement is written against; a moved file is refused. */
+  baseRev: string;
+  /** 1-based first ORIGINAL line replaced; `totalLines + 1` appends. */
+  startLine: number;
+  /** Original lines removed from `startLine`, `>= 0`. */
+  deleteCount: number;
+  /** Replacement lines; none contains `\n` or `\r`. */
+  lines: string[];
+};
+
+/** What a successful patch left on disk. */
+export type FilePatchResult = {
+  /** Project-relative path that was written. */
+  path: string;
+  /** The file's revision after the write. */
+  rev: string;
+  /** The file's line count after the write. */
+  totalLines: number;
+};
+
+/** Where the editor's document sits in the file at revision `rev` (held in CodeMirror state). */
+export type EditWindowMeta = {
+  /** Original line number of the document's first line. */
+  lo: number;
+  /** ORIGINAL lines (at rev) the document represents, edits inside the touched span included. */
+  origCount: number;
+  /** The document reaches the file's last line. */
+  eof: boolean;
+  /** The revision the document's original lines were read from. */
+  rev: string;
+  /** The file's line terminator, used when writing edits back. */
+  eol: '\n' | '\r\n';
+  /** The ORIGINAL file's line count at rev, when known. */
+  totalLines: number | null;
+};
+
+/** What the file editor shows about itself; FileEditor renders it and the probes read it off data-* attributes. */
+export type FileEditorStatus = {
+  /** Where the editor is in its lifecycle. */
+  phase: 'loading' | 'ready' | 'saving' | 'conflict' | 'error';
+  /** True while the document holds edits the file does not. */
+  dirty: boolean;
+  /** Current-file numbering of the document's first line. */
+  firstLine: number;
+  /** Current-file numbering of the document's last line. */
+  lastLine: number;
+  /** Current-file total: original total plus the document's line delta, when known. */
+  totalLines: number | null;
+  /** The sentence the conflict/error banner shows. */
+  message: string | null;
+  /** The line where fetching stopped because it is too long, else null. */
+  longLineStop: number | null;
+};
+
+/** The one edit session the app holds, as the file manager sees it. */
+export type EditSessionStatus = {
+  /** Project the session's file belongs to. */
+  projectId: string;
+  /** Project-relative path of the file being edited. */
+  path: string;
+  /** The file line the session was opened at. */
+  anchorLine: number;
+  /** True while the session holds unsaved edits. */
+  dirty: boolean;
+};
+
+/** The stored session: status plus the live CodeMirror state, kept across unmounts. */
+export type EditSessionRecord = EditSessionStatus & {
+  /** The live editor state, or null before the view has been built. */
+  state: EditorState | null;
+  /** The host element's scroll offset at the last unmount. */
+  scrollTop: number;
+};
+
+/** What the pure window policy reads (windowPolicy.ts) and the hook fills in from the view. */
+export type WindowPolicyInput = {
+  /** Original line number of the document's first line. */
+  lo: number;
+  /** ORIGINAL lines the document represents. */
+  origCount: number;
+  /** The document's current line count. */
+  docLines: number;
+  /** Whether the document reaches the file's last line. */
+  eof: boolean;
+  /** First document line in the viewport. */
+  top: number;
+  /** Last document line in the viewport. */
+  bottom: number;
+  /** Document lines a viewport holds (V). */
+  viewportLines: number;
+  /** Document line number where the touched span starts, or null when clean. */
+  touchedFirst: number | null;
+  /** Document line number where the touched span ends, or null when clean. */
+  touchedLast: number | null;
+  /** A request already in flight in that direction. */
+  pending: { up: boolean; down: boolean };
+};
+
+/** One thing the hook must do to its window. */
+export type WindowAction =
+  | { kind: 'prepend'; start: number; lines: number }
+  | { kind: 'append'; start: number; lines: number }
+  | { kind: 'evictTop'; count: number }
+  | { kind: 'evictBottom'; count: number };
+
 /**
  * One file as an upload actually stored it.
  *
@@ -930,6 +1074,53 @@ export type UploadedFileRecord = {
   size: number;
   mimeType: string;
   renamedFrom?: string;
+};
+
+// ---------------------------
+
+//----------------- DOCUMENT PREVIEW ------------
+
+/** A binary document the Files tab previews in place of its read-only arms. */
+export type DocumentPreviewKind = 'pdf' | 'word' | 'sheet' | 'audio' | 'video';
+
+/** A text file with a second, rendered view beside its lines. */
+export type TextRenderingKind = 'markdown' | 'delimited';
+
+/** What every kind view receives from DocumentPreview. */
+export type DocumentViewProps = {
+  /** The kind the registry matched, so one view can serve two (sheet + delimited, audio + video). */
+  kind: DocumentPreviewKind | TextRenderingKind;
+  /** The file's own name, for titles and alt text. */
+  name: string;
+  /** The file's bytes, already loaded by DocumentPreview. */
+  blob: Blob;
+};
+
+/** Which of a rendered text file's two views is showing. */
+export type PreviewView = 'rendered' | 'source';
+
+/** The header's view toggle for a rendered text file. */
+export type PreviewToggle = {
+  /** The label of the rendered view: Markdown reads `Rendered`, CSV/TSV reads `Table`. */
+  renderedLabel: 'Rendered' | 'Table';
+  /** The label of the line view: Markdown reads `Source`, CSV/TSV reads `Text`. */
+  sourceLabel: 'Source' | 'Text';
+};
+
+/** What the preview pane's body shows. */
+export type PreviewBody =
+  | { kind: 'editor' }
+  | { kind: 'document'; document: DocumentPreviewKind | TextRenderingKind }
+  | { kind: 'arms' };
+
+/** choosePreviewBody's answer, read by both PreviewHeader and PreviewPane. */
+export type PreviewChoice = {
+  /** The body the pane renders. */
+  body: PreviewBody;
+  /** Whether the header offers the Edit button. */
+  canEdit: boolean;
+  /** The header's view toggle, or null when the file has one view. */
+  toggle: PreviewToggle | null;
 };
 
 // ---------------------------
@@ -2064,7 +2255,7 @@ export type RunnerTimelineEntry = { at: string; phase_id: string; stage: string;
 export type RunnerPosition = { rank: number; total: number; phase_id: string; title: string; remain: number; pipeline: string; stage: string; stage_detail: string; stage_since: number };
 /** One run as the lane reads it off disk. `position` is `null` while the runner has not composed one yet, which a live run does show in its first seconds. `blocked_causes` is the receipt's phase id → cause map, `{}` until the run ends — the only record of a phase halted on a crash or a budget, whose row never turns `blocked`. `launched_by_session` is the APP session id of the chat whose turn launched the run — the server resolves it before the snapshot is sent, so it is safe to compare against the open chat; `null` when the run names none. */
 /** The fix-it session on a blocked phase, from `progress.json.repair`: the one IN FLIGHT (`repairing`, `step` the sub-stage it is on; `paused` while the run waits out a rate limit), else the last one finished (`fixed` — the phase walks again — or `failed`). `by` says whose session it is: `unblock` is the run's own outing, walked by the run's process; `heal` is the heal drain's, which works while the run itself is halted. `live` is whether the process doing a `heal` repair is alive right now (always `false` for an `unblock`, whose liveness is the run's). `resumed` is whether a finished repair put the phase back on the walk: a cleared unblock always did, a heal only when it re-armed the phase's spec — a heal can cure the cause and leave the phase standing; `null` when the heal never measured it. `since` and `ended_at` are epoch SECONDS; `k` is the number of the outing this repair belongs to, and `limit` its per-phase ceiling (0 = none carried, as for a heal). */
-export type RunnerRepair = { phase_id: string; state: 'repairing' | 'paused' | 'fixed' | 'failed'; by: 'unblock' | 'heal'; live: boolean; resumed: boolean | null; step: string; k: number; limit: number; since: number | null; ended_at: number | null; reason: string };
+export type RunnerRepair = { phase_id: string; state: 'repairing' | 'paused' | 'fixed' | 'failed'; by: 'replan' | 'unblock' | 'heal'; live: boolean; resumed: boolean | null; step: string; k: number; limit: number; since: number | null; ended_at: number | null; reason: string };
 export type RunnerRunSnapshot = { run_id: string; plan_path: string; plan_title: string; /** A test's run, never the operator's: its plan sits in a scratch root (the runner's own fixtures under the temp dir) or its id is a probe's `fixture-` run. Hidden from every runs list unless a probe opts in, and never pushed as a notification. */ test_run: boolean; state: RunnerRunState; status: string; started_at: number; heartbeat_at: number; stopped_at: number | null; launched_by_session: string | null; outcome: string | null; ended_at: number | null; blocked_causes: Record<string, string>; pid: number | null; position: RunnerPosition | null; repair: RunnerRepair | null; phases: RunnerPhaseRow[]; spawns: number; max_spawns: number; cost_usd: number; plan_runs: number; plan_spawns: number; plan_cost_usd: number; plan_planning_usd: number; plan_review_usd: number; plan_scouts_usd: number; plan_total_usd: number; tokens: number; plan_tokens: number; line: string; timeline: RunnerTimelineEntry[] };
 /** The whole picture, pushed on change over `/ws`. `runs` is ordered by `started_at` ascending. `at` is epoch MILLISECONDS, unlike every field inside a snapshot. */
 export type RunnerStateEvent = { kind: 'runner_state'; runs: RunnerRunSnapshot[]; at: number };
@@ -2276,3 +2467,12 @@ export type ChatEmbedSource = { sessionId: string; targets: EmbedUrlRef[] };
 
 /** What the widget's transcript view is open on: an `Agent`-tool row addressed by the tool call that spawned it (`id` is that call's `tool_id`), a launcher soul addressed by its launch id, or a board's Metis addressed by the session id the board minted. Its third consumer is the kanban module's `KanbanMetisPanel.tsx`, which opens a fleet row into the same view rather than a copy of it. */
 export type SubagentTranscriptTarget = { kind: 'agent' | 'soul' | 'metis'; id: string };
+
+//----------------- JEV SEMANTIC JUDGMENT: switches and ledger ------------
+/** The two house Jev switches as one answer, mirrored from the server's `JevSwitches`. `promptsLive` is the pair's actual effect (`master && prompts`), not a third file: the prompt opt-in counts only while the master is on, and that rule is derived server-side so the panel cannot hold a second opinion about it. */
+export type JevSwitchState = { master: boolean; prompts: boolean; promptsLive: boolean };
+
+/** The Jev ledger totaled, mirrored from the server's `JevLedgerStats`: `present` is false only while no call has ever been recorded, and `linesIn`/`linesKept` are the filter's own totals (`filter_kept` lines), which are kept out of `calls` exactly as `scripts/jev stats` keeps them. */
+export type JevLedgerStats = { present: boolean; calls: number; tokens: number; linesIn: number; linesKept: number };
+
+// ---------------------------

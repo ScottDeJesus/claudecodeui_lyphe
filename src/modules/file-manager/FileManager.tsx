@@ -3,13 +3,15 @@ import type { ChangeEvent } from 'react';
 
 import { api } from '@/shared/api';
 import { FileTree, useFileTreeUpload } from '@/modules/file-tree';
-import { Button } from '@/shared/ui';
+import { Button, ConfirmDialog } from '@/shared/ui';
 import { useToast } from '@/shared/context/ToastContext';
-import { downloadBlobAsFile, formatBytes } from '@/shared/utils';
+import { cn, downloadBlobAsFile, formatBytes } from '@/shared/utils';
 import type { Project, UploadedFileRecord } from '@/shared/types';
+import { getEditSessionStatus, useEditSessionStatus } from '@/modules/file-editor';
 import { DirectoryListing } from '@/modules/file-manager/DirectoryListing';
 import { FileBreadcrumb } from '@/modules/file-manager/FileBreadcrumb';
 import { PreviewPane } from '@/modules/file-manager/PreviewPane';
+import { useEditGuard } from '@/modules/file-manager/hooks/useEditGuard';
 import { useFileManagerState } from '@/modules/file-manager/hooks/useFileManagerState';
 
 /** What the file manager needs; rendered by the project-workspace module as the Files tab. */
@@ -109,6 +111,41 @@ export function FileManager({ selectedProject, openRequest, onRequestHandled, on
   // rather than reached for through `parentElement`: the pane then moves one node it was GIVEN,
   // which is the whole difference between this and `scrollIntoView`.
   const paneScrollRef = useRef<HTMLDivElement>(null);
+  // Every way into a file — the tree, the rows below, an open request from chat, git or the
+  // palette — arrives here first, because a file may only take the place of another file once the
+  // open session's unsaved text has been saved, dropped, or deliberately kept.
+  const openFile = useCallback((path: string, line?: number) => {
+    const directory = directoryOf(path);
+    // Walk the listing to the file's folder first, so the row that opens is the row in view.
+    // Skipped for a file already here: re-entering the directory the reader is standing in is a
+    // re-read of the folder for nothing.
+    if (directory !== currentDir) {
+      enter(directory);
+    }
+    select(path, line);
+  }, [currentDir, enter, select]);
+  const {
+    guardedSelect,
+    requestEdit,
+    openGuardOpen,
+    editGuardOpen,
+    dirtyName,
+    editName,
+    canSaveFirst,
+    savingFirst,
+    handleSaveAndOpen,
+    handleDiscardAndOpen,
+    handleDiscardAndEdit,
+    handleKeepEditing,
+  } = useEditGuard(projectId, openFile);
+  // The one edit session, when it is this project's file: PreviewPane shows the editor for its
+  // path, and nothing of another project's belongs in this tab. `editing` is the LAYOUT flag the
+  // panes read — true only while that session's file is the SELECTED one, because the editor takes
+  // the screen for its own file and for no other, and a hidden tree with no editor on screen would
+  // be a blank tab.
+  const session = useEditSessionStatus();
+  const editingSession = session !== null && session.projectId === projectId ? session : null;
+  const editing = editingSession?.path === selectedPath;
 
   const reportUploadFailure = useCallback((message: string, type: 'success' | 'error') => {
     // The hook's own success line counts files; the record-driven toast below names them, so only
@@ -218,10 +255,37 @@ export function FileManager({ selectedProject, openRequest, onRequestHandled, on
     if (!openRequest) {
       return;
     }
-    enter(directoryOf(openRequest.path));
-    select(openRequest.path, openRequest.line);
+    guardedSelect(openRequest.path, openRequest.line);
     onRequestHandled();
-  }, [enter, onRequestHandled, openRequest, select]);
+  }, [guardedSelect, onRequestHandled, openRequest]);
+
+  // The reader may have left a file open in the editor, and its pane unmounts with this tab along
+  // with the view that showed it — so a returning reader lands back on that file rather than on an
+  // empty pane. Once per project, and never under an open request: that request names its own file
+  // and is consumed by the effect above, and restoring over it would drag the reader off the file
+  // they just asked for. The ref rather than a dependency list is what makes it once: navigating
+  // the tree must not re-run it, and there is no state here to read that says "already restored".
+  const restoredProjectRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (restoredProjectRef.current === projectId) {
+      return;
+    }
+    restoredProjectRef.current = projectId;
+    if (openRequest) {
+      return;
+    }
+    const live = getEditSessionStatus();
+    if (live !== null && live.projectId === projectId) {
+      openFile(live.path);
+    }
+  }, [openFile, openRequest, projectId]);
+
+  // The editor closed on saved, discarded or clean, and only the first of those moved the file —
+  // but the listing and the read-only preview are both reads of that file, so both are re-read
+  // rather than trusted to still be right.
+  const handleEditorClosed = useCallback(() => {
+    refresh();
+  }, [refresh]);
 
   const selectedName = selectedPath && directoryOf(selectedPath) === currentDir
     ? selectedPath.split('/').pop() ?? null
@@ -237,7 +301,7 @@ export function FileManager({ selectedProject, openRequest, onRequestHandled, on
           by this section's `overflow-hidden`, so the Permissions head is truncated at 320 as it is
           at every width — the tree has no horizontal scroll to reach it with. Narrowing this pane
           again means re-measuring the controls, not the grid. */}
-      <section aria-label="Project files" className="flex h-[210px] flex-none flex-col overflow-hidden rounded-xl border border-border bg-card md:h-auto md:w-[320px]">
+      <section aria-label="Project files" className={cn('flex h-[210px] flex-none flex-col overflow-hidden rounded-xl border border-border bg-card md:h-auto md:w-[320px]', editing && 'max-md:hidden')}>
         <FileTree selectedProject={selectedProject} onFileOpen={onFileOpen} />
       </section>
 
@@ -273,8 +337,16 @@ export function FileManager({ selectedProject, openRequest, onRequestHandled, on
             inherited that, and `scrollTop` was stuck at 0. THIS div scrolled instead, which is why
             revealing a line took the directory listing with it. Capping one pane alone unbalances
             the row (a capped preview beside a listing still growing to 2,796px scrolls out of view),
-            so the cap must be symmetric — and a child selector stays symmetric for a third pane. */}
-        <div ref={paneScrollRef} className="flex min-h-0 flex-1 flex-wrap content-start overflow-y-auto overflow-x-hidden [&>section]:max-h-full">
+            so the cap must be symmetric — and a child selector stays symmetric for a third pane.
+            While a file is open in the editor a phone gives it the whole tab: the listing (the first
+            pane) steps aside below `md`, as the tree does, and the preview takes the full height. */}
+        <div
+          ref={paneScrollRef}
+          className={cn(
+            'flex min-h-0 flex-1 flex-wrap content-start overflow-y-auto overflow-x-hidden [&>section]:max-h-full',
+            editing && 'max-md:[&>section:first-child]:hidden [&>section:last-child]:h-full',
+          )}
+        >
           <DirectoryListing
             entries={listing?.entries ?? []}
             hasParent={currentDir !== ''}
@@ -283,7 +355,7 @@ export function FileManager({ selectedProject, openRequest, onRequestHandled, on
             error={error}
             upload={uploadProgress}
             onOpenDirectory={(name) => enter(currentDir ? `${currentDir}/${name}` : name)}
-            onOpenFile={(name) => select(currentDir ? `${currentDir}/${name}` : name)}
+            onOpenFile={(name) => guardedSelect(currentDir ? `${currentDir}/${name}` : name)}
             onUp={up}
             onDropFiles={handleDropFiles}
           />
@@ -298,9 +370,34 @@ export function FileManager({ selectedProject, openRequest, onRequestHandled, on
             missedLine={missedLine}
             error={previewError}
             onDownload={() => { void handleDownload(); }}
+            editing={editingSession}
+            onRequestEdit={requestEdit}
+            onEditorClosed={handleEditorClosed}
           />
         </div>
       </div>
+
+      <ConfirmDialog
+        open={openGuardOpen}
+        title="Unsaved changes"
+        message={`${dirtyName} has unsaved changes.`}
+        actions={[
+          ...(canSaveFirst ? [{ label: 'Save and open', variant: 'default' as const, onSelect: handleSaveAndOpen, busy: savingFirst }] : []),
+          { label: 'Discard and open', variant: 'destructive', onSelect: handleDiscardAndOpen },
+          { label: 'Keep editing', variant: 'outline', onSelect: handleKeepEditing },
+        ]}
+        onDismiss={handleKeepEditing}
+      />
+      <ConfirmDialog
+        open={editGuardOpen}
+        title="Unsaved changes"
+        message={`${dirtyName} has unsaved changes in another project. Discard them and edit ${editName}?`}
+        actions={[
+          { label: 'Keep editing', variant: 'outline', onSelect: handleKeepEditing },
+          { label: 'Discard and edit', variant: 'destructive', onSelect: handleDiscardAndEdit },
+        ]}
+        onDismiss={handleKeepEditing}
+      />
     </div>
   );
 }

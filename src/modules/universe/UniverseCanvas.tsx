@@ -25,7 +25,6 @@ import type { Cloud } from '@/modules/universe/utils/universeClouds';
 import type { UniverseLayers } from '@/modules/universe/utils/universeLayers';
 import type { UniverseRepaint } from '@/modules/universe/utils/universeRepaint';
 import type { StarsGL } from '@/modules/universe/utils/universeStarsGL';
-import type { UniverseTokens } from '@/modules/universe/utils/universeTokens';
 import type { UniverseTweaks } from '@/modules/universe/utils/universeTweaks';
 import type { Viewport } from '@/modules/universe/utils/universeView';
 import type { UniverseTweaksHandle } from '@/modules/universe/hooks/useUniverseTweaks';
@@ -258,7 +257,6 @@ export function UniverseCanvas(props: UniverseCanvasProps) {
     // `universeClouds` owns the bake, because a tile needs a canvas and the model is built in Node.
     let clouds: Map<number, Cloud> | null = null;
     let cloudGraph: UniverseGraph | null = null;
-    let cloudTokens: UniverseTokens | null = null;
     let cloudBright = Number.NaN;
     let cloudDim = Number.NaN;
     let cloudFiles: string | null = null;
@@ -285,12 +283,13 @@ export function UniverseCanvas(props: UniverseCanvasProps) {
     const repaint = createRepaint();
     repaintRef.current = repaint;
 
-    // THE OBJECTS THE LAST FRAME ACTUALLY DREW WITH — the whole of the dirty test for a tweak and for
-    // a palette. Identity, never a field: the panel hands a fresh tweaks object on every slider event
-    // and `universeTokens` a fresh palette on every theme flip, and either one leaves a picture on the
-    // star layer that the object which made it no longer describes.
+    // THE OBJECT THE LAST FRAME ACTUALLY DREW WITH — the whole of the dirty test for a tweak.
+    // Identity, never a field: the panel hands a fresh tweaks object on every slider event, and that
+    // leaves a picture on the star layer that the object which made it no longer describes.
     let drawnTweaks: UniverseTweaks | null = null;
-    let drawnTokens: UniverseTokens | null = null;
+    // The palette: the dark one, read once off this canvas — which sits inside the panel's `.dark`
+    // wrapper — and the same object for every frame of the canvas's life.
+    const tokens = readUniverseTokens(canvas);
     // The pivot the last frame drew with. `undefined` is "no frame yet", which is not the same as
     // "no pivot": a sky with nothing selected and no hand over a star draws `null`.
     let drawnPivot: number | null | undefined;
@@ -370,20 +369,15 @@ export function UniverseCanvas(props: UniverseCanvasProps) {
 
       stepLayout(graph, now, tweaks, view);
       perf.afterStep();
-      // The palette is a cached read — `universeTokens` asks the document again only when the theme
-      // class moves — so a theme flip reaches the next frame and a frame pays no style pass for one.
-      const tokens = readUniverseTokens();
       if (
         clouds === null ||
         graph !== cloudGraph ||
-        tokens !== cloudTokens ||
         tweaks.recencyBrightDays !== cloudBright ||
         tweaks.recencyDimDays !== cloudDim ||
         tweaks.files !== cloudFiles ||
         tweaks.distance !== cloudDistance
       ) {
         cloudGraph = graph;
-        cloudTokens = tokens;
         cloudBright = tweaks.recencyBrightDays;
         cloudDim = tweaks.recencyDimDays;
         cloudFiles = tweaks.files;
@@ -400,11 +394,6 @@ export function UniverseCanvas(props: UniverseCanvasProps) {
         // layer reads exactly one of them — `milkyWay`, which is all `drawBackground` is handed off
         // the object — so marking the stars alone would leave a Milky-Way toggle waiting out
         // `skyEvery` on the sky's own cadence, a second behind a switch one canvas showed at once.
-        repaint.markDirty('sky');
-        repaint.markDirty('stars');
-      }
-      if (tokens !== drawnTokens) {
-        drawnTokens = tokens;
         repaint.markDirty('sky');
         repaint.markDirty('stars');
       }

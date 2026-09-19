@@ -11,8 +11,7 @@ import type { UniverseCamera } from '@/modules/universe/utils/universeView';
  * a palette, so the `UniverseSky` is made once by the component that owns the canvas and handed
  * here; the `refresh` below is what decides whether anything has to be repainted, and it is a no-op
  * unless the size, the device pixel ratio or the palette has moved. Nothing here reads the document
- * either: the palette arrives as an argument, so a theme flip reaches the tiles through the caller's
- * own token read, and the one tuning this pass answers to arrives as the flag the caller's own gate
+ * either: the palette arrives as an argument, from the caller's own token read, and the one tuning this pass answers to arrives as the flag the caller's own gate
  * resolved. The glow sprite cache the star layer borrows is that same object, which is why a sky
  * nobody can reach from here is the whole point of owning it above.
  *
