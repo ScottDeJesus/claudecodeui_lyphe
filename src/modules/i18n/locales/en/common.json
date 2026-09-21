@@ -51,7 +51,6 @@
       "newBoard": "New board",
       "rename": "Rename",
       "archive": "Archive",
-      "importDescent": "Import from Descent",
       "newTitle": "New board",
       "renameTitle": "Rename board",
       "archiveTitle": "Archive this board?",
@@ -216,37 +215,6 @@
       "deepseekFlashOff": "DeepSeek Flash off",
       "cardArchived": "Card archived",
       "laneCleared": "The lane's cards were archived"
-    },
-    "import": {
-      "title": "Import from Descent",
-      "pathLabel": "Descent database",
-      "pathHelper": "Read only. Nothing in Descent is written, and a second import updates what it already brought across instead of adding it twice.",
-      "run": "Import",
-      "running": "Reading Descent…",
-      "again": "Import again",
-      "cancel": "Cancel",
-      "close": "Close",
-      "summary": "{{inserted}} added, {{updated}} updated",
-      "done": "Imported from Descent",
-      "counts": "{{inserted}} added, {{updated}} updated",
-      "failed": "The import did not run",
-      "table": {
-        "row": "What",
-        "source": "In Descent",
-        "imported": "On this board"
-      },
-      "rows": {
-        "boards": "Boards",
-        "cards": "Cards",
-        "tags": "Tags",
-        "questions": "Questions",
-        "issues": "Issues",
-        "decisions": "Decisions",
-        "checklist": "Checklist steps",
-        "attachments": "Attachments",
-        "events": "Events",
-        "settings": "Settings"
-      }
     }
   },
   "status": {
@@ -322,9 +290,14 @@
     "more": "+{{count}} more in Runner",
     "stop": "Stop",
     "resume": "Resume",
+    "start": "Start",
+    "queuedUntil": "DeepSeek peak until {{time}}",
+    "queuedWindowClosed": "peak window closed at {{time}} — ready to start",
+    "queuedManual": "queued — not started",
     "state": {
       "live": "LIVE",
       "paused": "PAUSED",
+      "queued": "QUEUED",
       "stale": "STALE"
     },
     "phase": {

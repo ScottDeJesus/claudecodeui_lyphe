@@ -51,8 +51,7 @@ export function boardFlagPath(boardId: string): string {
  * by a server that had simply forgotten it. The same sixteen characters are computed here, in the
  * guard, and by any later process that sees this session id at all.
  *
- * The shape (sixteen lowercase hex) is Descent's (`descent/mcp_server.py:298`); what is dropped is
- * its randomness.
+ * Sixteen lowercase hex is the shape; what it drops is any randomness.
  */
 export function deriveLeaseOwner(sessionId: string): string {
   return crypto.createHash('sha256').update(sessionId).digest('hex').slice(0, 16);
@@ -184,7 +183,7 @@ const KANBAN_PM_MCP_VERB = 'kanban-pm-mcp';
 /**
  * The one MCP server this child can see, as the single JSON string `--mcp-config` takes.
  *
- * `--strict-mcp-config` rides beside it and is what makes this the ONLY one: no `descent-pm`, no
+ * `--strict-mcp-config` rides beside it and is what makes this the ONLY one: no
  * user-scope server, nothing the CLI would otherwise load from the operator's own configuration.
  * The four variables are the whole of what the stdio program reads, and its own environment is
  * where it reads them from — hence the `env` block rather than this process's environment.

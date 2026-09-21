@@ -26,11 +26,11 @@ is not a directory is skipped. Four files per run are this lane's:
 | File | What it is |
 |---|---|
 | `progress.json` | The whole picture: position, phases, spend, and the composed ◆ line. REPLACED whole through `atomic_write` (`hooks/plan_runner/state_lock.py:72-90`, a per-write `mkstemp` scratch plus `os.replace`), called at `progress.py:151`, so a read caught mid-write is a decode error on the old bytes or a clean read of the new ones — never half a record. |
-| `run.json` | The run's own state. This lane reads two fields: `stopped_at`, and `launched_by_session` — the Claude transcript uuid whose turn launched the run, which `plan-runner.module.ts` resolves to the app session id (`sessionsDb.resolveAppSessionId`) before any snapshot leaves the server; the chat gutter's Runner widget pins on it. |
+| `run.json` | The run's own state. This lane reads four fields: `stopped_at`; `status` and `queued_until` — the runner's own words for a run CREATED PARKED (`start --queue`, or a fresh launch inside DeepSeek's peak hours with the switch on) rather than stopped mid-walk, which is what separates the `queued` state from `paused` below, `queued_until` riding the snapshot raw as the epoch it waits for, or `null` when nothing named one; and `launched_by_session` — the Claude transcript uuid whose turn launched the run, which `plan-runner.module.ts` resolves to the app session id (`sessionsDb.resolveAppSessionId`) before any snapshot leaves the server; the chat gutter's Runner widget pins on it. |
 | `receipt.json` | Its PRESENCE is the whole signal: the run is over. A resume renames it, so a continued run returns. |
 | `runner.log` | One appended line per stage change, in the ◆ shape with a local ISO timestamp in front. |
 
-A fifth file lives OUTSIDE the run directory and belongs to the PLAN, not the run: `~/.claude/state/plan_costs/<slug>.json`, the hooks tree's plan-cost ledger (`hooks/plan_runner/costs.py`; `plan-runner cost <plan>` prints it). It books what no receipt ever carried — the planner (Odysseus), the reviewer (Eupalinos) and every scout wave — and `readPlanLedger` folds those three kinds into the snapshot as `plan_planning_usd`, `plan_review_usd`, `plan_scouts_usd`; `plan_total_usd` is their sum plus the build spend the receipts already tallied over every run of the plan; `plan_tokens` is the same fold in tokens (the ledger's `tokens` per entry plus `run.json`'s `tokens` over every run), printed on the card as `⛁ 94.9M tok`, Descent's unit and shape. The card leads with that total the moment anything outside the run was spent (operator, 2026-09-12: "I'd like to see totals"). Absent ledger, unreadable ledger, a `build` row in it: all read as zero here, never as an error.
+A fifth file lives OUTSIDE the run directory and belongs to the PLAN, not the run: `~/.claude/state/plan_costs/<slug>.json`, the hooks tree's plan-cost ledger (`hooks/plan_runner/costs.py`; `plan-runner cost <plan>` prints it). It books what no receipt ever carried — the planner (Odysseus), the reviewer (Eupalinos) and every scout wave — and `readPlanLedger` folds those three kinds into the snapshot as `plan_planning_usd`, `plan_review_usd`, `plan_scouts_usd`; `plan_total_usd` is their sum plus the build spend the receipts already tallied over every run of the plan; `plan_tokens` is the same fold in tokens (the ledger's `tokens` per entry plus `run.json`'s `tokens` over every run), printed on the card as `⛁ 94.9M tok`. The card leads with that total the moment anything outside the run was spent (operator, 2026-09-12: "I'd like to see totals"). Absent ledger, unreadable ledger, a `build` row in it: all read as zero here, never as an error.
 
 A run directory holds more than those four, and the rest are ignored on purpose rather than missed.
 `progress.txt` is the same ◆ line plus one row per phase, rendered for a human reading it in a
@@ -321,20 +321,27 @@ In order, mirroring `runner_statusline.py`'s `read_run` and `segment`, plus one 
    (`hooks/plan_runner/cmd/observe.py:210-212`) and what `resume` refuses with exit 4, so carrying
    them would flood the tab with runs nothing can continue. Existence is the whole test; the plan's
    CONTENT is never read.
-4. `run.json.stopped_at` is non-null → **`paused`**.
-5. `now − beat ≥ 900` (`STALE_AFTER_S`, the statusline's own number at
+4. `run.json.stopped_at` is non-null AND `run.json.status` is `"queued"` → **`queued`**. The runner
+   writes this shape itself — `start --queue`, or a fresh launch landing inside DeepSeek's peak hours
+   with the switch on (`hooks/plan_runner/cmd/queueing.py`) — never the operator's `stop`, and it is
+   classified BEFORE `paused` because the two carry different words on the card (Start, never Resume)
+   for a run that has never walked. `run.json.queued_until` rides the snapshot as the epoch it waits
+   for, or `null` when nothing named one.
+5. `run.json.stopped_at` is non-null → **`paused`**.
+6. `now − beat ≥ 900` (`STALE_AFTER_S`, the statusline's own number at
    `runner_statusline.py:25`) → **`stale`**. Which `beat` — see below.
-6. Otherwise → **`live`**.
+7. Otherwise → **`live`**.
 
-**Paused wins over stale**, and rule 4 is the ONE deliberate difference from the statusline. Its
-`read_run` returns `None` for a parked run, because the bar is for what is moving; this lane carries
-it so the tab can list it and offer Resume. A run parked for a day has a lapsed heartbeat by
-definition, and reading that as stale would offer the operator a recovery for a state they chose. Do
-not "fix" the lane to match the bar.
+**Paused wins over stale, and queued wins over paused.** Rule 5 is the ONE deliberate difference from
+the statusline, and rule 4 is a second, narrower one layered on top of it. `read_run` returns `None`
+for a parked run, because the bar is for what is moving; this lane carries it so the tab can list it
+and offer Resume — or, for a queued run, Start. A run parked for a day, or queued through the night,
+has a lapsed heartbeat by definition, and reading either as stale would offer the operator a recovery
+for a state the clock or their own `stop` chose. Do not "fix" the lane to match the bar.
 
 ### The liveness beat
 
-Rule 5 is **not** aged against `progress.json.heartbeat_at`, and this is the second deliberate
+Rule 6 is **not** aged against `progress.json.heartbeat_at`, and this is the second deliberate
 divergence from the terminal bar. That field is set to "now" at `hooks/plan_runner/progress.py:185`,
 inside `_assemble`, which is reached only through `write` (`:139`, whose contract at `:141` is
 "Called after every stage change") and written at `:151` — so it advances on a stage change and at no
@@ -517,7 +524,10 @@ that way, and every caller removes it in a `finally`.
 
 `createFixtureRun()` → `{runId, dir, planPath}`, a five-phase run at phase 2 of 5, stage `builder`,
 with three `runner.log` lines. Then `touchStage(run, stage, detail)` moves it and appends a line,
-`pauseRun` / `unpauseRun` set and clear `run.json.stopped_at`, `staleRun` ages the heartbeat past
+`pauseRun` / `unpauseRun` set and clear `run.json.stopped_at`, `queueRun(run, untilEpoch = null)` parks
+it the same way plus the runner's own `status: 'queued'` and `queued_until` — the shape `start --queue`
+or DeepSeek's peak hours creates, told apart from a plain pause by those two fields alone — and
+`unpauseRun` clears its marks too, the way a real Start does, `staleRun` ages the heartbeat past
 the 900 s cut, `endRun(run, status = 'complete', endedAt = now)` writes a receipt shaped like the
 runner's own — an old `endedAt` proves the 24-hour window — `reopenRun` renames it aside the way a
 resume does, and `removeRun` takes the directory and the fixture plan away. `run.json` carries the runner's FULL record rather than the five fields this lane reads,
@@ -604,12 +614,15 @@ transcript fails that gate whatever it is named.
 **Which run comes first.** `useRunnerRuns` reads the bus through `useLiveTopic(RUNNER_ALL_TOPIC)` —
 never the socket or the API, since `RunnerFeed` is still the only thing in the client that names the
 frame — and answers `{ runs, count, pinned, others }`. `pinned` is the newest LIVE run, else the
-newest STALE one, else none; a PAUSED run is never it. A parked run is not in motion — the operator
-stopped it — and raising it to the front every time they open the app would be the app arguing with
-a decision they made; it stays in `runs`, counts toward `others`, and the tab lists it with a
-Resume. A stale run DOES come first, because a lapsed heartbeat is exactly the thing worth a glance.
-The tab's own order follows from the same rule: live, then stale, then paused, newest first inside
-each.
+newest STALE one, else none; a PAUSED or QUEUED run is never it — both are parks the app would be
+arguing with by raising them to the front, whether the operator pressed `stop` or the run parked
+itself on DeepSeek's clock. A parked run is not in motion, and raising it to the front every time the
+operator opens the app would be the app arguing with a decision that was made for it; it stays in
+`runs`, counts toward `others`, and the tab lists it with Resume — or, for a queued run, Start. A
+stale run DOES come first, because a lapsed heartbeat is exactly the thing worth a glance. The tab's
+own order follows `STATE_ORDER` (`runState.ts`): live, then stale, then queued, then paused, then
+ended, newest first inside each — queued outranks paused because its Start is the card's whole point,
+where a paused run can wait.
 
 **What it composes.** `RunCard` pulls the library together and declares nothing of its own:
 `Card` / `CardHeader` / `CardTitle` / `CardContent` / `CardFooter` for the shell, `Badge` for the
@@ -627,7 +640,7 @@ program this app does not control, so none of it is ever handed to a raw-HTML si
 markdown.
 
 **Colour, and the word beside it.** `runState.ts` holds the whole map, and it is pure: `live` →
-`positive`, `paused` → `neutral`, `stale` → `warn`; `shipped` → `positive`, `running` → `info`,
+`positive`, `paused` and `queued` → `neutral`, `stale` → `warn`; `shipped` → `positive`, `running` → `info`,
 `blocked` → `warn`, `deferred` and `pending` → `neutral`. Nothing is `danger` — red is destructive
 or denied, and a blocked phase is neither. Tone travels as `Badge tone=` and reaches the paint
 through the token blocks, so no file under `src/modules/plan-runner/` spells a colour. Every state
@@ -681,7 +694,12 @@ one key block, and a hardcoded spelling would be a second one that drifts and ca
 response, because a 409 carries the runner's verdict in its body. The footer offers exactly one
 button, chosen by state rather than by disabling the other: only a LIVE run can be stopped, since
 `plan-runner stop` looks for a lock naming the run and a stale run's daemon is gone, so offering
-Stop there would be inviting a refusal. A parked or dead run offers Resume. An ENDED run offers
+Stop there would be inviting a refusal. A parked or dead run offers Resume, over the same `resume`
+call — EXCEPT a QUEUED run, whose button reads Start instead
+(`queued ? t('runner.start') : t('runner.resume')` in `RunCard.tsx`) though it fires the identical
+`resume` request underneath: `resume` un-parks a run the operator stopped exactly as it un-parks one
+DeepSeek's clock parked, and the word on the button is the only difference — the operator never types
+`plan-runner resume` for either. An ENDED run offers
 Dismiss — always — and Resume whenever a phase is still blocked or pending, read off the PHASES and
 never off the receipt's word: the runner's `complete` means something shipped, not that nothing is
 left (`runUnfinished`; 14 of 21 `complete` receipts on this host carried blocked phases). Its badge

@@ -14,9 +14,9 @@ import { createAccountsRoutes } from './accounts.routes.js';
  *
  * ⚠ NO DEPENDENCIES ARE THREADED, and that is the shape rather than an omission. The account store
  * reads its root from the environment at CALL time (so a probe gets the scratch root it set), and the
- * usage meter takes nothing but the live credentials file. The Descent proxy needed a composition
- * root because it had a base URL, a timeout and an injected `fetch`; this module has none of the
- * three, so the root has nothing left to bind and the routes are constructed as they are.
+ * usage meter takes nothing but the live credentials file. There is no base URL, no timeout and no
+ * injected `fetch` here to bind, so a composition root would have nothing to hold and the routes are
+ * constructed as they are.
  */
 export function createAccountsModule(): Router {
   return createAccountsRoutes();

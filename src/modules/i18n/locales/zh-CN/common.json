@@ -47,7 +47,6 @@
       "newBoard": "新建看板",
       "rename": "重命名",
       "archive": "归档",
-      "importDescent": "从 Descent 导入",
       "newTitle": "新建看板",
       "renameTitle": "重命名看板",
       "archiveTitle": "归档此看板？",
@@ -88,11 +87,6 @@
       "autonomyOff": "自主模式已关闭",
       "cardArchived": "卡片已归档",
       "laneCleared": "该列的卡片已归档"
-    },
-    "import": {
-      "done": "已从 Descent 导入",
-      "counts": "新增 {{inserted}} 项，更新 {{updated}} 项",
-      "failed": "导入未执行"
     }
   },
   "status": {

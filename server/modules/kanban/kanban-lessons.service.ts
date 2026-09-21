@@ -31,8 +31,8 @@ import { writeKanban } from './kanban-write.service.js';
  * contract the MCP catalog and the routes both name; `kanbanLessonsService` below is the same five
  * in the one-object shape the route package's dependency bag takes.
  *
- * Ported from `~/.claude/descent/store_lessons.py`, whose `_project_lesson_full` /
- * `_project_lesson_lean` are the two projections the repository already carries.
+ * The verbs do no reshaping of their own: the repository carries a full lesson row and a lean index
+ * row, and each verb takes one of the two as it stands.
  */
 
 /** What a caller hands `stageLesson`: the note, its provenance, and nothing about its id. */
@@ -56,14 +56,14 @@ export type KanbanLessonInput = {
  */
 export const KANBAN_LESSON_STATUSES = ['staged', 'approved', 'rejected'] as const;
 
-/** The index read's own default, as `store_lessons.py:288` spells it. */
+/** The index read's own default. */
 const LESSON_INDEX_LIMIT = 100;
 
 /**
- * The approved index's ceiling: `store_actionable.py:170-171`'s top-50, unscored.
+ * The approved index's ceiling: the top fifty, unscored.
  *
- * Recency is the WHOLE order — there is no lesson scoring anywhere in Descent and none is invented
- * here, so this is a slice of the newest approved lessons and never a relevance ranking.
+ * Recency is the WHOLE order — no lesson scoring exists here and none is invented, so this is a
+ * slice of the newest approved lessons and never a relevance ranking.
  */
 const APPROVED_INDEX_LIMIT = 50;
 
@@ -92,7 +92,7 @@ export function lessonNotFound(lessonId: string): AppError {
  * `kanban_lessons.card_id` carries a foreign key with `ON DELETE SET NULL`, but that only fires on
  * a LATER delete of the card: inserting a lesson against an id that does not exist right now trips
  * the constraint at INSERT time and would surface as SQLite's own sentence rendered as a 500.
- * Descent validates up front for exactly this reason (`store_lessons.py:189-192`) and so does this.
+ * Validating up front is what keeps that a 404 instead, and so does this.
  */
 function requireLessonCard(cardId: string): KanbanCardRow {
   const card = kanbanCardsDb.getCardRow(cardId);
@@ -111,8 +111,8 @@ function requireLessonCard(cardId: string): KanbanCardRow {
  * Every run of non-`[a-z0-9]` characters collapses to a single hyphen and the ends are stripped, so
  * no `/`, `..`, NUL or other path metacharacter survives from a caller's `name` into a filename: a
  * lesson can never name a file outside the draft directory. Bounded to sixty characters so a
- * pathological name cannot mint an absurd filename. `store_lessons.py:120-130`'s `_kebab`, which
- * returns `''` for an all-punctuation name so the caller can fall back to the id.
+ * pathological name cannot mint an absurd filename. An all-punctuation name returns `''`,
+ * so the caller can fall back to the id.
  */
 function kebab(name: string): string {
   return name
@@ -147,10 +147,10 @@ function skillDraftPath(lessonId: string, name: string): string {
  * inserted. For a `skill_draft`, the body reaches disk in the seam's `afterEvent` step — once the
  * audit row is in and still inside the transaction — so a failed append leaves no `.SKILL.md` behind
  * it, a failed write rolls the row and its event back, and a lesson never points at a draft that
- * failed to land. That is `store_lessons.py:216-224`'s ordering exactly.
+ * failed to land. That ordering is the contract, not an accident of the code's order.
  *
- * The event names its subject: `lesson_id` is the key the source's own spine already uses
- * (`store_lessons.py:216-217`), and for a lesson with no card it is the ONLY identifier there is.
+ * The event names its subject: `lesson_id` is the key the spine already uses,
+ * and for a lesson with no card it is the ONLY identifier there is.
  * It is resolved from the mutation rather than written by hand, because the id does not exist until
  * the transaction has minted it.
  */
@@ -268,7 +268,7 @@ export function reviewLesson(
  * The APPROVED lessons a future session scans — the newest fifty, lean, unscored.
  *
  * Staged lessons are inert and never appear here: the corpus a session reads is exactly what a
- * person approved. `store_actionable.py:170-171`'s index, which is where the orient read takes it.
+ * person approved. It is deliberately lean — this read is on the orient path, so it must stay cheap.
  */
 export function approvedIndex(limit: number = APPROVED_INDEX_LIMIT): KanbanLessonLean[] {
   return listLessons({ status: 'approved', limit });

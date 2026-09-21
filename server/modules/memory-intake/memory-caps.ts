@@ -10,11 +10,10 @@
  * THE SEMANTICS ARE PORTED; THE PROSE IS OURS. The numbers and the no-regression ratchet come from
  * `~/.claude/hooks/enforce_memory_limits.py:237-338`, the predicate that guards a session's own
  * MEMORY.md edits, with the same lockstep `~/.claude/settings.json` passes it (`MEMORY_MAX_LINES=200`
- * and a `MEMORY_MAX_LINE_CHARS` default of 250). Descent reached that hook by path and called it;
- * this server cannot — the hook is Python, and a subprocess in the write path would be a second
+ * and a `MEMORY_MAX_LINE_CHARS` default of 250). This server calls nothing there — the hook is
+ * Python, and a subprocess in the write path would be a second
  * failure mode between a person's click and their file. So the measurement is ported, and the two
- * implementations move together: change a number in one and change the other in the same diff,
- * exactly as `store_memory_caps.py:53-59` says of itself.
+ * implementations move together: change a number in one and change the other in the same diff.
  *
  * What is NOT ported is that hook's wording. It speaks about one file (a project's MEMORY.md) in one
  * voice ("Relax via MEMORY_MAX_LINE_CHARS", "move prose to a topic file"), and every one of those

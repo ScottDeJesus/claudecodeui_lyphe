@@ -19,7 +19,8 @@ export function AppPane({ src, title }: AppPaneProps) {
     // (WidgetFrame.tsx, DocSpaceFrame.tsx). A sandbox without `allow-same-origin` cuts the framed
     // app's SameSite=Lax session cookie, which is the whole premise of the EIS framing grant in
     // R-EISBE-7 — and these are the operator's own applications on his own host, not untrusted
-    // embeds. The geolocation grant below fixes the hub's defect: Descent's weather tile asks for it.
+    // embeds. The geolocation grant below is what the hub's weather tile needs: without `allow` a
+    // frame is refused it.
     <iframe
       src={src}
       title={title}

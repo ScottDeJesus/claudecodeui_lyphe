@@ -84,7 +84,7 @@ type CachedRead = {
 
 const readCache = new Map<string, CachedRead>();
 
-/** A non-empty string, or `null` — the descent convention (`descent.transport.ts:44-46`). */
+/** A non-empty string, or `null`. */
 export function readStringOrNull(value: unknown): string | null {
   return typeof value === 'string' && value.length > 0 ? value : null;
 }
@@ -153,7 +153,7 @@ export function readPlanLedger(planPath: string): PlanLedger {
     const cost = Number((row as Record<string, unknown>).cost_usd);
     if (kind !== 'planning' && kind !== 'review' && kind !== 'scouts') continue;
     if (Number.isFinite(cost) && cost > 0) out[kind] += cost;
-    // Every token billed on the outing (in + out + cache read + cache write) — Descent's "⛁ tok" unit.
+    // Every token billed on the outing (in + out + cache read + cache write) — the "⛁ tok" unit.
     const tokens = Number((row as Record<string, unknown>).tokens);
     if (Number.isFinite(tokens) && tokens > 0) out.tokens += tokens;
   }

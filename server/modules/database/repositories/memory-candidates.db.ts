@@ -13,15 +13,12 @@ import type { MemoryCandidateFull, MemoryCandidateLean } from '@/shared/types.js
  * THE ID IS MINTED HERE, and its counter is the table's own ids: `mc-<n>`, one past the highest
  * `mc-<n>` already stored, computed INSIDE the insert statement so two concurrent stages cannot
  * read the same number. It never touches `kanban_id_seq` — that sequence is the board's, and a lane
- * the board cannot see has no business spending its numbers. An imported Descent row is given a
- * minted id like any other row and keeps Descent's own id in `descent_id`: the two counters are the
- * same shape (`mc-1` there, `mc-1` here) and different sequences, which is exactly why the source
- * id must never be the primary key — the first locally staged proposal would collide with one.
+ * the board cannot see has no business spending its numbers.
  *
- * Consumers: `memory.service.ts` (every verb of the lane) and, through it, `memory.routes.ts` and
- * the Descent import. Reach it through `@/modules/database/index.js`. Every statement runs on the
- * caller's connection and opens no transaction of its own, so a write issued inside the approve
- * transaction rolls back with the row it was writing.
+ * Consumers: `memory.service.ts` (every verb of the lane) and, through it, `memory.routes.ts`. Reach
+ * it through `@/modules/database/index.js`. Every statement runs on the caller's connection and
+ * opens no transaction of its own, so a write issued inside the approve transaction rolls back with
+ * the row it was writing.
  */
 
 /** One `memory_candidates` row. */
@@ -39,36 +36,6 @@ type MemoryCandidateRow = {
   asserted_path: string | null;
   refusal: string | null;
   created_at: string;
-  reviewed_at: string | null;
-};
-
-/**
- * One `ov_memory_candidates` row as Descent's own database spells it — the import's input.
- *
- * It lives here, beside the local row type and the upsert that consumes it, because the two are the
- * same table in two spellings and a reader checking one against the other should not have to cross
- * a module. The fields are Descent's: snake_case column names, `target` a plain string rather than
- * the lane's `MemoryTarget` union (Descent's vocabulary has grown a value — `user` is in the live
- * table today — and this lane imports what an install holds rather than what today's door accepts).
- *
- * The timestamps are Descent's spelling on arrival (`2026-06-24T03:09:28.168342+00:00`); the lane's
- * `importDescentCandidates` normalises them before they are handed to the upsert, the same way the
- * board's importer normalises every other source stamp.
- */
-export type DescentMemoryRow = {
-  id: string;
-  name: string;
-  body: string;
-  target: string;
-  project: string | null;
-  index_line: string | null;
-  rationale: string | null;
-  status: string;
-  source: string;
-  session_id: string | null;
-  asserted_path: string | null;
-  refusal: string | null;
-  created_at: string | null;
   reviewed_at: string | null;
 };
 
@@ -122,21 +89,6 @@ function toCandidateLean(row: MemoryCandidateRow): MemoryCandidateLean {
 }
 
 /**
- * The local id already standing for one imported Descent candidate, or null when it is new here.
- *
- * It is the whole of what makes an import an update rather than a second copy, and the sibling of
- * `kanbanImportDb.findIdByDescentId` — spelled out here because this lane's table is not one the
- * board's importer can name.
- */
-function findImportedId(descentId: string): string | null {
-  const row = getConnection()
-    .prepare('SELECT id FROM memory_candidates WHERE descent_id = ?')
-    .get(descentId) as { id: string } | undefined;
-
-  return row?.id ?? null;
-}
-
-/**
  * The candidate queue and the one-way review that empties it.
  *
  * Nothing here writes a board row, records a board event or appends to `kanban_id_seq`: this lane's
@@ -144,11 +96,8 @@ function findImportedId(descentId: string): string | null {
  */
 export const memoryCandidatesDb = {
   /**
-   * Stages one candidate at whatever status the caller names and returns it as stored.
-   *
-   * `status` is the caller's because the two callers differ: a fresh proposal lands `pending`, while
-   * the Descent import inserts rows at the status they were already reviewed to. `descentId` is the
-   * `ov_memory_candidates` row this one came from, or null for a locally staged proposal.
+   * Stages one candidate at the status the caller names — `pending` for a fresh proposal — and
+   * returns it as stored.
    */
   insertCandidate(input: {
     name: string;
@@ -160,17 +109,16 @@ export const memoryCandidatesDb = {
     status: string;
     source: string;
     sessionId: string | null;
-    descentId: string | null;
   }): MemoryCandidateFull {
     const row = getConnection()
       .prepare(
         `INSERT INTO memory_candidates
            (id, name, body, target, project, index_line, rationale, status, source, session_id,
-            created_at, descent_id)
+            created_at)
          VALUES (
            'mc-' || (SELECT COALESCE(MAX(CAST(substr(id, 4) AS INTEGER)), 0) + 1
                        FROM memory_candidates WHERE id LIKE 'mc-%'),
-           ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+           ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
          )
          RETURNING ${CANDIDATE_COLUMNS}`
       )
@@ -184,8 +132,7 @@ export const memoryCandidatesDb = {
         input.status,
         input.source,
         input.sessionId,
-        new Date().toISOString(),
-        input.descentId
+        new Date().toISOString()
       ) as MemoryCandidateRow | undefined;
 
     if (!row) throw new Error(`Could not insert memory candidate "${input.name}".`);
@@ -193,65 +140,9 @@ export const memoryCandidatesDb = {
   },
 
   /**
-   * Inserts one imported Descent candidate, or refreshes the row already standing for it.
-   *
-   * The conflict target is `descent_id`, which is what makes the import idempotent: a second run
-   * finds the row by its source id, reuses the local id that row already holds and UPDATES it. The
-   * id is minted by the same counter `insertCandidate` uses when the source row is new here, and
-   * the two never both fire — an insert either conflicts on `descent_id` (an existing row) or takes
-   * a number one past every id in the table (which nothing can hold) — so no re-import can fail on
-   * the primary key before the conflict clause is ever consulted.
-   *
-   * Descent's `status` and `target` are written VERBATIM, and a re-import therefore outranks a
-   * review performed here: this is the unguarded rule every imported child table follows, and the
-   * source is the whole truth about a row that carries a `descent_id`.
-   */
-  upsertCandidate(row: DescentMemoryRow): number {
-    const existing = findImportedId(row.id);
-
-    const changes = getConnection()
-      .prepare(
-        `INSERT INTO memory_candidates
-           (id, name, body, target, project, index_line, rationale, status, source, session_id,
-            asserted_path, refusal, created_at, reviewed_at, descent_id)
-         VALUES (
-           COALESCE(?, 'mc-' || (SELECT COALESCE(MAX(CAST(substr(id, 4) AS INTEGER)), 0) + 1
-                                   FROM memory_candidates WHERE id LIKE 'mc-%')),
-           ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
-         )
-         ON CONFLICT(descent_id) DO UPDATE SET
-           name = excluded.name, body = excluded.body, target = excluded.target,
-           project = excluded.project, index_line = excluded.index_line,
-           rationale = excluded.rationale, status = excluded.status, source = excluded.source,
-           session_id = excluded.session_id, asserted_path = excluded.asserted_path,
-           refusal = excluded.refusal, created_at = excluded.created_at,
-           reviewed_at = excluded.reviewed_at`
-      )
-      .run(
-        existing,
-        row.name,
-        row.body,
-        row.target,
-        row.project,
-        row.index_line,
-        row.rationale,
-        row.status,
-        row.source,
-        row.session_id,
-        row.asserted_path,
-        row.refusal,
-        row.created_at,
-        row.reviewed_at,
-        row.id
-      ).changes;
-
-    return changes;
-  },
-
-  /**
    * The candidate queue, newest first — LEAN, so no body crosses the wire for a list.
    *
-   * `status` is optional and is Descent's own word (`pending` for the review queue, `approved` for
+   * `status` is optional and is the lane's own word (`pending` for the review queue, `approved` for
    * the filed list). The sort is `created_at DESC, id DESC`, so two candidates staged in the same
    * second still come back in a stable order.
    */

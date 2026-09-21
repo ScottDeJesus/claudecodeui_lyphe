@@ -66,7 +66,7 @@ const USAGE_COLUMNS = `session_id, board_id, card_id, tokens_in, tokens_out, cac
   cache_create, byte_offset, updated_at`;
 
 /**
- * `tags` is a JSON ARRAY OF STRINGS, exactly as Descent stores it — never a comma-joined string,
+ * `tags` is a JSON ARRAY OF STRINGS — never a comma-joined string,
  * which cannot tell a tag containing a comma from two tags.
  *
  * A value that will not parse reads as the empty array rather than throwing: a column this
@@ -187,7 +187,7 @@ export const kanbanLearningDb = {
   /**
    * The lesson index, newest first — LEAN, so no body crosses the wire for a list.
    *
-   * `status` is optional and is Descent's own word (`staged`, `approved`, `rejected`): the review
+   * `status` is optional and is one of `staged`, `approved`, `rejected`: the review
    * queue asks for `staged`, the actionable read for `approved`, and the unfiltered read passes
    * nothing. The sort is `created_at DESC, id DESC` — the id breaks ties between two lessons staged
    * in the same second, so the order is stable rather than whatever SQLite finds first.

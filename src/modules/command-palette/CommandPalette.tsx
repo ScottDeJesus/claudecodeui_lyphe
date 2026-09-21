@@ -75,7 +75,7 @@ const NAV_TABS: Array<{ id: AppTab; label: string; keywords: string }> = [
   { id: 'kanban', label: 'Go to Kanban', keywords: 'kanban board lanes cards backlog' },
   { id: 'universe', label: 'Go to Universe', keywords: 'universe galaxy stars repos map graph' },
   { id: 'tasks', label: 'Go to Tasks', keywords: 'tasks taskmaster' },
-  { id: 'memory', label: 'Go to Memory', keywords: 'memory intake pending descent' },
+  { id: 'memory', label: 'Go to Memory', keywords: 'memory intake pending' },
   { id: 'runner', label: 'Go to Runner', keywords: 'runner plan run live phases' },
 ];
 

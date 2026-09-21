@@ -4,7 +4,6 @@ import { useTranslation } from 'react-i18next';
 
 import { KanbanBoardDialog, type KanbanBoardDialogMode } from '@/modules/kanban/KanbanBoardDialog';
 import { KanbanBoardHeader } from '@/modules/kanban/KanbanBoardHeader';
-import { KanbanImportDialog } from '@/modules/kanban/KanbanImportDialog';
 import { KanbanMetisPanel } from '@/modules/kanban/KanbanMetisPanel';
 import { KanbanRail } from '@/modules/kanban/KanbanRail';
 import { KanbanCardDrawer } from '@/modules/kanban/card-drawer/KanbanCardDrawer';
@@ -78,7 +77,6 @@ export function KanbanPanel({ projectId }: KanbanPanelProps) {
   const [sorts, setSorts] = useState<Record<string, KanbanViewSort>>({});
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const [dialog, setDialog] = useState<KanbanBoardDialogMode>(null);
-  const [importing, setImporting] = useState(false);
 
   const drag = useKanbanDrag({
     specs: lanes,
@@ -196,10 +194,6 @@ export function KanbanPanel({ projectId }: KanbanPanelProps) {
         onNewBoard={() => setDialog('new')}
         onRenameBoard={() => setDialog('rename')}
         onArchiveBoard={() => setDialog('archive')}
-        // The one row that reaches outside this app opens a surface rather than acting: it names
-        // another application's database, and a press with no path in front of it is a press the
-        // reader cannot check before making.
-        onImportDescent={() => setImporting(true)}
       />
 
       {body()}
@@ -226,21 +220,11 @@ export function KanbanPanel({ projectId }: KanbanPanelProps) {
         onClose={() => board.openCard(null)}
       />
 
-      <KanbanImportDialog
-        open={importing}
-        // Closing re-reads the board: an import can add a board, rewrite the one on screen and
-        // select another, and nothing short of reading it again is true about what is now there.
-        onClose={() => {
-          setImporting(false);
-          void refresh();
-        }}
-      />
-
-      {/* THE FLEET, IN THE BOARD'S OWN COLUMN, under the rail. A sibling of the drawer and the import
-          dialog rather than a child of either: it is a strip in the board's flow, and it must be
-          readable while a card is open beside it. Mounted ONLY while a board is selected — a fleet
-          belongs to a board, and with none there is nothing to ask about. It reads the fleet itself
-          and reports into nothing here. */}
+      {/* THE FLEET, IN THE BOARD'S OWN COLUMN, under the rail. A sibling of the drawer rather than a
+          child of it: it is a strip in the board's flow, and it must be readable while a card is
+          open beside it. Mounted ONLY while a board is selected — a fleet belongs to a board, and
+          with none there is nothing to ask about. It reads the fleet itself and reports into
+          nothing here. */}
       {currentBoardId !== null && <KanbanMetisPanel boardId={currentBoardId} boardName={currentName} />}
 
       {/* The board's single live region. Every move announces here, and nowhere else.

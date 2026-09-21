@@ -47,7 +47,6 @@
       "newBoard": "Nuova bacheca",
       "rename": "Rinomina",
       "archive": "Archivia",
-      "importDescent": "Importa da Descent",
       "newTitle": "Nuova bacheca",
       "renameTitle": "Rinomina bacheca",
       "archiveTitle": "Archiviare questa bacheca?",
@@ -90,11 +89,6 @@
       "autonomyOff": "Autonomia disattivata",
       "cardArchived": "Scheda archiviata",
       "laneCleared": "Le schede della colonna sono state archiviate"
-    },
-    "import": {
-      "done": "Importato da Descent",
-      "counts": "{{inserted}} aggiunte, {{updated}} aggiornate",
-      "failed": "L'importazione non è partita"
     }
   },
   "status": {

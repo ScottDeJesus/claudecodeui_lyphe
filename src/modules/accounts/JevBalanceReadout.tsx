@@ -1,3 +1,4 @@
+import { JevLogo } from '@/shared/ui/JevLogo';
 import { cn } from '@/shared/utils';
 import type { JevBalance } from '@/modules/accounts/hooks/useJevBalance';
 
@@ -31,7 +32,10 @@ export function JevBalanceReadout({ balance, variant = 'stacked' }: JevBalanceRe
   if (variant === 'inline') {
     return (
       <span className="flex min-w-0 items-baseline gap-1.5 text-xs" title={sentence} aria-label={sentence}>
-        <span className="flex-none text-ink-faint">Jev</span>
+        <span className="flex flex-none items-center gap-1 self-center text-ink-faint">
+          <JevLogo className="h-3 w-3" />
+          Jev
+        </span>
         <span className={cn('truncate tabular-nums', figure ? 'text-muted-foreground' : 'text-ink-faint')}>
           {figure ?? NO_FIGURE}
         </span>
@@ -42,7 +46,10 @@ export function JevBalanceReadout({ balance, variant = 'stacked' }: JevBalanceRe
   return (
     <div className="flex flex-col gap-1.5">
       <div className="flex items-baseline gap-2">
-        <span className="text-[13px] font-medium text-foreground">Jev balance</span>
+        <span className="flex items-center gap-1.5 self-center text-[13px] font-medium text-foreground">
+          <JevLogo className="h-4 w-4" />
+          Jev balance
+        </span>
         <span className={cn('ml-auto text-[12.5px] tabular-nums', figure ? 'text-muted-foreground' : 'text-ink-faint')}>
           {figure ?? NO_FIGURE}
         </span>

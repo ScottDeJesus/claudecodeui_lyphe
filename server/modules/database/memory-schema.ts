@@ -19,13 +19,13 @@
  * empty, so it builds the new shape) and fails only on a real database that already has the old one,
  * as a runtime error in a later phase.
  *
- * There is NO CHECK on `status` or `target`: Descent's candidate statuses grew a value twice, and a
+ * There is NO CHECK on `status` or `target`: the candidate statuses have grown a value twice, and a
  * CHECK a source value violates fails the whole import transaction rather than one row. The doors
  * (`validateMemoryArgs`, and the target list in `memory.service.ts`) validate instead.
  *
- * `descent_id` is `NULL UNIQUE` on purpose, like every imported table's: SQLite permits many NULLs
- * under one UNIQUE constraint, so a locally staged candidate sits beside an imported one while the
- * importer's `ON CONFLICT(descent_id)` still keys cleanly on the rows that carry one.
+ * The PROVENANCE COLUMN is `NULL UNIQUE` on purpose, like every imported table's: SQLite permits many
+ * NULLs under one UNIQUE constraint, so a locally staged candidate sits beside an imported one while
+ * an upsert's `ON CONFLICT` still keys cleanly on the rows that carry one.
  */
 export const MEMORY_SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS memory_candidates (
@@ -43,7 +43,7 @@ CREATE TABLE IF NOT EXISTS memory_candidates (
     refusal TEXT NULL,
     created_at TEXT NOT NULL,
     reviewed_at TEXT NULL,
-    descent_id TEXT NULL UNIQUE
+    legacy_id TEXT NULL UNIQUE
 );
 
 -- Both reads are "one status, newest first": the review queue and the filed list.

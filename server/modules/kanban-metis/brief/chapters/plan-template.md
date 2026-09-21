@@ -81,12 +81,8 @@ Rules for the template:
   RESUME, Metis reconstructs the in-flight footprint by re-reading THIS line from the
   plan (chapter **recovery.md** §"Resume on reconnect / rate-limit").
 - **Declare FILES, not symbols — the `PATH::SYMBOL` narrowing does not reach this board.**
-  Descent let a Footprint entry narrow from a whole file to a single symbol with a `::`
-  suffix (`config/features.py::flag_a`, `backend/routes/orders.py::get_order_detail`),
-  so that two builds on the SAME file under DISTINCT symbols stopped colliding. That is a
-  property of Descent's footprint guard, which keys on Descent's own `set_status` tool name
-  and **does not fire for a `kanban-pm` session** (chapter **parallelism.md**) — so on this
-  board a `::SYMBOL` buys nothing at all: nothing reads the footprint, so a symbol unlocks no
+  On this board a `::SYMBOL` buys nothing at all: nothing reads the footprint, so a symbol
+  unlocks no
   parallelism and hides no collision either way. **Write plain file/dir paths**
   (`core/foo/, api/foo.py, installation_guides/foo.sql`). The broad FILE claim is the safe
   over-claim — it states more of what you touch, and the ledger you and a sibling session both

@@ -4,7 +4,6 @@ import { kanbanAttachmentsService } from './kanban-attachments.service.js';
 import { kanbanBoardsService } from './kanban-boards.service.js';
 import { kanbanCardsService } from './kanban-cards.service.js';
 import { kanbanChecklistService } from './kanban-checklist.service.js';
-import { kanbanImportService } from './kanban-import.service.js';
 import { kanbanLeasesService } from './kanban-leases.service.js';
 import { kanbanLessonsService } from './kanban-lessons.service.js';
 import { kanbanQuestionsService } from './kanban-questions.service.js';
@@ -52,7 +51,6 @@ export function createKanbanModule(dependencies: KanbanModuleDependencies): Rout
     checklist: kanbanChecklistService,
     attachments: kanbanAttachmentsService,
     leases: kanbanLeasesService,
-    importer: kanbanImportService,
     lessons: kanbanLessonsService,
     planCost: dependencies.planCost,
     memoryPending: dependencies.memoryPending,

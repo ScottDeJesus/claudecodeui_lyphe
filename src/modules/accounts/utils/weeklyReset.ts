@@ -3,8 +3,7 @@
  *
  * The meter reads ONLY the live account — the other slots hold credential snapshots whose
  * access tokens expired days ago, and refreshing one would mutate the very auth state the
- * switcher exists to hold still (`~/.claude/descent/server_api_usage.py`, "ONLY THE LIVE
- * ACCOUNT CAN BE METERED"). So there is no reading to fetch for a docked account, and the
+ * switcher exists to hold still. So there is no reading to fetch for a docked account, and the
  * schedule is the operator's own, given directly in `VITE_ACCOUNT_WEEKLY_RESETS`:
  * comma-separated `<slot slug>=<Weekday>@<HH:MM>` entries (`work=Friday@14:00,home=Tuesday@00:00`).
  * An account with no entry draws no reset line.

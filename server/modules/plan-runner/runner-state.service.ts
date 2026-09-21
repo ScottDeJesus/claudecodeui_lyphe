@@ -223,6 +223,12 @@ export function parseTimeline(lines: string[]): RunnerTimelineEntry[] {
  * run parked for a day has a lapsed heartbeat by definition, and reading that as "stale" would
  * offer the operator a recovery for a state they chose.
  *
+ * A QUEUED run is that same park, written by the runner's own `start` rather than by an
+ * operator's `stop`: it is classified BEFORE `paused` (after `ended`), because the two carry
+ * different words on the card — Start is offered for one and Resume for the other — and a run
+ * that has never walked must not be reported as one that was stopped mid-walk. Its
+ * `queued_until` rides the snapshot so the card can name the window it waits for.
+ *
  * `endedKeepS` is how long a receipted run is still carried, as `ended` with its outcome, before it
  * is omitted — the operator dismisses it from the tab before then, or the window does.
  *
@@ -267,12 +273,19 @@ export function classifyRun(
   const heartbeatAt = ending !== null ? writtenBeat : (lockBeatFor?.(planPath, runId) ?? writtenBeat);
 
   const stoppedAt = readNumberOrNull(field(files.run, 'stopped_at'));
+  // The one field that separates a QUEUED run from a STOPPED one, and it is `run.json`'s: the
+  // runner writes `status: "queued"` when it creates the run parked (`start --queue`, or DeepSeek's
+  // peak hours with the switch on) and clears it at Start. `progress.json` carries the word too,
+  // but that is the runner's rendering of the run and this is the classification — read the record.
+  const runStatus = readString(field(files.run, 'status'));
+  const queuedUntil = readNumberOrNull(field(files.run, 'queued_until'));
   // Kept RAW: `run.json` carries a Claude transcript uuid, and translating it to an app session id
   // is the composition root's one job (`plan-runner.module.ts`). A disk reader that resolved ids
   // would need the database, and this lane is proven against a fixture directory with none.
   const launchedBySession = readStringOrNull(field(files.run, 'launched_by_session'));
   const state: RunnerRunState =
     ending !== null ? 'ended'
+    : stoppedAt !== null && runStatus === 'queued' ? 'queued'
     : stoppedAt !== null ? 'paused'
     : now - heartbeatAt >= staleAfterS ? 'stale'
     : 'live';
@@ -290,6 +303,9 @@ export function classifyRun(
     started_at: readNumber(field(progress, 'started_at'), writtenBeat),
     heartbeat_at: heartbeatAt,
     stopped_at: stoppedAt,
+    // Carried raw, like `stopped_at`: the client renders it in the reader's own zone, and `null`
+    // is a real answer — a queued run that named no window to wait for.
+    queued_until: queuedUntil,
     launched_by_session: launchedBySession,
     outcome: ending?.outcome ?? null,
     ended_at: ending?.at ?? null,

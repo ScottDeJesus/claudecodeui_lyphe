@@ -6,16 +6,15 @@ import { requireBoard } from './kanban-cards.guards.js';
 /**
  * The board header's six counts, in ONE round trip.
  *
- * `store_actionable.py:307-345` is the shape this is ported from: five scalar sub-SELECTs in one
- * statement, so the strip of registers costs one query rather than six, and every one of them
- * excludes archived cards. What a card IS, per register:
+ * FIVE SCALAR SUB-SELECTS IN ONE STATEMENT, so the strip of registers costs one query rather than
+ * six, and every one of them excludes archived cards. What a card IS, per register:
  *
  * - `building` — cards in the Building lane (`status = 'active'`), which is where a build lease
  *   puts them and where they stay until the builder moves them on.
  * - `awaitingAnswer` — cards with at least one question nobody has answered: the operator's turn,
  *   and the panel's own `needsAnswer`.
- * - `awaitingApprove` — the SAFE approve subset (`store_actionable.py`'s "GOTCHAS #48" mirror):
- *   not yet approved, no open question, sitting in a claimable/staging lane
+ * - `awaitingApprove` — the SAFE approve subset: not yet approved, no open question, sitting in a
+ *   claimable/staging lane
  *   (`todo`/`questions`/`not_ready`), and content-complete — a non-blank plan, body or description,
  *   because an intake card carries its intent in `description` with `body` empty.
  * - `claimable` — the same predicate `kanbanBoardsDb.countClaimable` grants a claim by, read
@@ -37,9 +36,9 @@ import { requireBoard } from './kanban-cards.guards.js';
  * sibling registers answer with, not a zero — "no such board" and "a board with nothing on it" are
  * different answers and this service does not blur them.
  *
- * A FAULT IS NOT CAUGHT, and that is a ruling rather than an omission. The program this is ported
- * from degrades to zeros (`store_actionable.py:333`, "must NEVER 500 or hang on a board-count
- * hiccup") because it feeds a terminal status bar. This feeds an authenticated board header whose
+ * A FAULT IS NOT CAUGHT, and that is a ruling rather than an omission. Degrading to zeros is the
+ * opposite ruling, and it belongs to a terminal status bar, which must never 500 or hang on a
+ * board-count hiccup. This feeds an authenticated board header whose
  * siblings — `lanes`, `claimable`, every card read on the same panel — fail loudly through the
  * global handler, and zeros here would not be calm but WRONG: `src/shared/kanban-types.ts` states
  * the strip's rule in the client's own words, "Zero is a count; an unknown reading is not — the

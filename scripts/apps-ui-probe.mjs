@@ -238,8 +238,8 @@ const DOCK_NODE = `(() => {
 
 const DIALOG = `document.querySelector('[role="dialog"]')`;
 const SEPARATOR = `document.querySelector('[role="separator"]')`;
-/** A pane, told apart from every other frame in the app by the attribute this feature fixes: the hub's
- *  frames carried no `allow` at all, so Descent's weather tile was refused the geolocation it asks for. */
+/** A pane, told apart from every other frame in the app by the attribute this feature fixes: a frame
+ *  mounted without `allow` cannot be granted geolocation, and the weather tile asks for it. */
 const PANES = `document.querySelectorAll('iframe[allow*="geolocation"]')`;
 
 /** The app's own "we are somewhere": the sidebar has painted and the wordmark is on screen. */

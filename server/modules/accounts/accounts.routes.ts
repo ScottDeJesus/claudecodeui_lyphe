@@ -15,14 +15,14 @@ import { readUsage } from './usage.service.js';
 
 /**
  * The account switcher's four routes, mounted at `/api` by `accounts.module.ts`. They answer the SAME
- * camelCase bodies the deleted Descent proxy produced, so no component changes: the panel's branches
- * on `reachable`, on `unreadable` and on a window's `percent` are untouched by this phase, and the
- * whole module moved server-side without the client noticing.
+ * camelCase bodies the panel is built on, so no component changes: its branches on `reachable`, on
+ * `unreadable` and on a window's `percent` hold as they are, and the route layer is free to move
+ * without the client noticing.
  *
  * THE `{ reachable }` ENVELOPE IS KEPT because the client is built on it. On a READ it is `true`
- * with the picture, or `false` with a one-word reason — never a 5xx, and never a 503. An outage used
- * to be a remote that stopped answering; there is no remote now, so a read that cannot be computed
- * still answers 200 and says so, and the panel draws its calm unknown rather than an error wall.
+ * with the picture, or `false` with a one-word reason — never a 5xx, and never a 503. A read that
+ * cannot be computed still answers 200 and says so, and the panel draws its calm unknown rather
+ * than an error wall.
  *
  * ⚠ A READ NEVER FAILS. That is the whole contract: this is the poll that rides the status chip, and
  * a store that cannot be read is a FACT this module reports rather than a fault it raises. The one
@@ -30,10 +30,10 @@ import { readUsage } from './usage.service.js';
  * is a claim about today's store, and the panel must not go down if that claim stops holding.
  *
  * `stateSummary()` answering `null` is the one account state with no picture in it: nothing captured
- * and no readable live login. That is Descent's OWN unreadable envelope (`slots: []`, every label
- * `null`, `unreadable: true`) and not the `{ reachable: false }` branch — the panel says "answered,
- * but it could not read its saved accounts" for the first and hides the meters behind "not reachable"
- * for the second. Only the first is true here: this module always answers.
+ * and no readable live login. That is the unreadable envelope (`slots: []`, every label `null`,
+ * `unreadable: true`) and not the `{ reachable: false }` branch — the panel says "answered, but it
+ * could not read its saved accounts" for the first and hides the meters behind "not reachable" for
+ * the second. Only the first is true here: this module always answers.
  *
  * A WRITE'S VERDICT IS ITS OWN BODY. The client reads a refusal out of `error` as a STRING — the
  * store's plain English, which is the most useful thing an operator can be told — so a refusal
@@ -45,7 +45,7 @@ import { readUsage } from './usage.service.js';
 /**
  * What a read answers when it could not be computed at all, in the words the client already has.
  *
- * ⚠ It reuses the proxy's own word rather than inventing one: `unreachableReasonInWords` maps
+ * ⚠ It reuses the word the client already maps rather than inventing one: `unreachableReasonInWords` maps
  * `timeout` and `bad-response` to their sentences and everything else to the plain "not reachable",
  * so a fourth word would be flattened anyway. This shape exists for a fault nobody has seen, and the
  * reader is owed calm English, not a new vocabulary in a corner they cannot reach.
@@ -55,8 +55,8 @@ function notComputed(): { reachable: false; reason: string } {
 }
 
 /**
- * The picture when the store has nothing to show — Descent's own unreadable envelope, field for
- * field. `liveSessions: 0` rides along because it is not a fact about the store either way.
+ * The picture when the store has nothing to show — the unreadable envelope, field for field.
+ * `liveSessions: 0` rides along because it is not a fact about the store either way.
  */
 function unreadablePicture(): ClaudeAccounts {
   return {
@@ -75,10 +75,9 @@ function unreadablePicture(): ClaudeAccounts {
 /**
  * How many Claude sessions are running on this box, for the switch confirm's soft gate.
  *
- * ⚠ THIS SERVER HAS NO SESSION REGISTRY IT CAN COUNT. Descent counted its own process-manager rows;
- * CloudCLI keeps chat sessions in a database and spawned CLIs in a keepalive host, and neither is a
- * number this lane may reach for — an app row can be idle for hours, so a non-zero here would claim
- * an account is in use while it is not.
+ * ⚠ THIS SERVER HAS NO SESSION REGISTRY IT CAN COUNT. CloudCLI keeps chat sessions in a database and
+ * spawned CLIs in a keepalive host, and neither is a number this lane may reach for — an app row can
+ * be idle for hours, so a non-zero here would claim an account is in use while it is not.
  *
  * So the route states the soft fact, `0`, which the panel words as "none proven running" — an
  * understatement that never blocks a switch, and never a gate. `drift` is the real check on whether

@@ -7,8 +7,8 @@
 
 ## Learning — two substrates, and only one of them is yours to write
 
-Metis learned from two stores on Descent. **Both are here, and they work differently on
-purpose: you STAGE one and you only READ the other.**
+**Two stores stand behind this chapter, and they work differently on purpose: you STAGE one and
+you only READ the other.**
 
 - **Lessons — you stage them at RETRO, the operator reviews them.**
   `stage_lesson(name, summary, body?, trigger, tags?, feature_id?, kind?)` files a durable

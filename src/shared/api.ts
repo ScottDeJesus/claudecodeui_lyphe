@@ -802,7 +802,6 @@ export const api = {
       del(`/api/kanban/cards/${encodeURIComponent(cardId)}/attachments/${encodeURIComponent(attachmentId)}`),
 
     events: (query: string) => get(`/api/kanban/events${query}`),
-    importDescent: (body: { dbPath?: string }) => post('/api/kanban/import/descent', body),
   },
 
   // The board's Metis fleet (docs/kanban.md): who this board has out working for it, the four verbs

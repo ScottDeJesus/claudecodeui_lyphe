@@ -87,9 +87,8 @@ export type KanbanBoardUpdatePatch = {
 /**
  * Boards, their one settings row, and the per-status card totals.
  *
- * Consumers: `kanban-boards.service.ts` (every board verb), `kanban-write.service.ts` (a board is
- * named and its lanes read to build a frame), and `kanban-import.service.ts`. Reach it through
- * `@/modules/database/index.js`.
+ * Consumers: `kanban-boards.service.ts` (every board verb) and `kanban-write.service.ts` (a board
+ * is named and its lanes read to build a frame). Reach it through `@/modules/database/index.js`.
  *
  * Every method calls `getConnection()` itself, like every other repository here: the handle is a
  * singleton, so a call made while a transaction is open joins that transaction rather than

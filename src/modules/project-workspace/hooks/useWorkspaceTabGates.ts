@@ -11,7 +11,7 @@ export type WorkspaceTabGates = {
   shouldShowShellTab: boolean;
   /** True while the Memory tab belongs on the bar — the sticky rule below decides it. */
   shouldShowMemoryTab: boolean;
-  /** How many memories are waiting. Zero whenever Descent could not be read, so the pill and the gate agree. */
+  /** How many memories are waiting. Zero whenever the lane could not be read, so the pill and the gate agree. */
   memoryPendingCount: number;
   /** True while the Runner tab belongs on the bar — the same sticky rule the Memory tab takes. */
   shouldShowRunnerTab: boolean;

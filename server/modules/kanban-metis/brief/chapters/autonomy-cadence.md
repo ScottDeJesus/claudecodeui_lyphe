@@ -48,10 +48,8 @@ moving a card. Three hard rules make that real:
   pass (below); the operator reads PROGRESS off the board's lanes + checklists, not a chat
   transcript.
 
-  **There is no keep-flowing nudge on this board, and that is not a gap.** The autonomy
-  hook that used to nudge a session to keep going reads Descent's store and judges it
-  against Descent's board, so it **stands down** for a board session — and nothing replaces
-  it, deliberately. **The driver IS the keep-flowing mechanism here:** its tick re-reads
+  **There is no keep-flowing nudge on this board, and that is not a gap. The driver IS the
+  keep-flowing mechanism here:** its tick re-reads
   every board and spawns a fresh Metis while that board still has claimable work and the
   dial has room, so the loop is continued by something outside the session rather than by
   a hook arguing with its end.

@@ -22,7 +22,10 @@ import type { KanbanLessonInput, KanbanLessonsService } from '../kanban-lessons.
 /** The dependencies this route package needs. `kanban.routes.ts` hands them over. */
 export type LearningRouteDependencies = { lessons: KanbanLessonsService };
 
-/** The index read's default and ceiling, exactly as `mcp_tools_lessons.py`'s schema states them. */
+/**
+ * The index read's default and ceiling: 100 back unless a caller asks for more, 500 at the most —
+ * the same bounds `kanban-pm-tools-lessons.ts` declares for the tool door, so the two cannot drift.
+ */
 const LESSON_LIMIT_DEFAULT = 100;
 const LESSON_LIMIT_MAX = 500;
 
@@ -50,9 +53,9 @@ function handle<P extends Record<string, string>>(
  *
  * A repeated parameter arrives as an array in Express and only the first plain string counts. A
  * BLANK value is no filter either: `GET /api/kanban/lessons?status=&limit=` is how this plan's own
- * route table spells the unfiltered call, and the ported source reads an empty filter as none
- * (`server_api_lessons.py:39`, `body.get("status") or None`). Refusing `''` would answer a 400 to
- * the very spelling the plan writes down, for a filter the caller did not specify.
+ * route table spells the unfiltered call, and an empty filter is no filter. Refusing `''` would
+ * answer a 400 to the very spelling the plan writes down, for a filter the caller did not
+ * specify.
  */
 function filterValue(value: unknown): string | undefined {
   const raw = typeof value === 'string' ? value : Array.isArray(value) ? value[0] : undefined;
@@ -77,9 +80,8 @@ function parseStatus(value: unknown): string | undefined | null {
 /**
  * `?limit=` inside `[1, 500]`, or `undefined` for a value that is absent, unusable or outside it.
  *
- * Refused rather than clamped, matching `mcp_tools_lessons.py:184-186`: a silently clamped limit
- * hides the caller's bug, and the "full dedupe sweep" its schema documents only works if 500 means
- * 500.
+ * Refused rather than clamped: a silently clamped limit hides the caller's bug, and a full sweep
+ * of the index only works if 500 means 500.
  */
 function parseLimit(value: unknown): number | undefined | null {
   const raw = filterValue(value);

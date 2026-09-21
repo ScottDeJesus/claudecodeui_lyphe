@@ -9,9 +9,9 @@ import { DEFAULT_METIS_STATE_ROOT } from './metis-registry.service.js';
  * The relaunch ledger and the rate-limit hold: the two questions the driver asks before it puts a
  * child on a board, and the bounds that keep it from asking forever.
  *
- * `~/.claude/descent/pm_relaunch_ledger.py:159-191` is the ledger ported here — SAME rule, this
- * repository's constants: launches that keep THROWING are retried ever-less-often and then not at
- * all, so a board whose work cannot start stops consuming a conversation every fifteen seconds. The
+ * THE LEDGER'S RULE, in this repository's constants: launches that keep THROWING are retried
+ * ever-less-often and then not at all, so a board whose work cannot start stops consuming a
+ * conversation every fifteen seconds. The
  * count is on DISK because an in-memory one is zeroed by a restart, and the restarted server would
  * revive the very poison board the ceiling exists to retire.
  *
@@ -28,16 +28,16 @@ import { DEFAULT_METIS_STATE_ROOT } from './metis-registry.service.js';
  */
 
 /**
- * How many failed launches of one board the ledger allows before it stops retrying that board:
- * `pm_relaunch_ledger.py:51`'s `MAX_ATTEMPTS` — a count of LAUNCHES THAT THREW, never of launches
+ * How many failed launches of one board the ledger allows before it stops retrying that board —
+ * a count of LAUNCHES THAT THREW, never of launches
  * that ran. Three is deliberate: the first backoff is ten minutes, so three attempts span half an
  * hour of a board genuinely failing to start.
  */
 export const RELAUNCH_MAX_ATTEMPTS = 3;
 
 /**
- * The first backoff after attempt #1, in milliseconds: `pm_relaunch_ledger.py:54-55`'s
- * `BACKOFF_BASE` (600 s). Attempt N waits `BASE * 2 ** (N - 1)`, capped at
+ * The first backoff after attempt #1, in milliseconds: ten minutes. Attempt N waits
+ * `BASE * 2 ** (N - 1)`, capped at
  * {@link RELAUNCH_BACKOFF_CAP_MS} — the units are MILLISECONDS because every timestamp in this
  * module is, and a ledger mixing seconds with the clock the driver passes would catch no type.
  */
@@ -47,8 +47,8 @@ export const RELAUNCH_BACKOFF_BASE_MS = 600_000;
 export const RELAUNCH_BACKOFF_CAP_MS = 3_600_000;
 
 /**
- * How old a ledger row may be before it is FORGIVEN: `pm_relaunch_ledger.py:71`'s `_LEDGER_TTL_SECS`
- * (7 days) — "a long-quiet card is eventually forgiven". Without it a board at the ceiling has no way
+ * How old a ledger row may be before it is FORGIVEN: seven days — "a long-quiet card is eventually
+ * forgiven". Without it a board at the ceiling has no way
  * back but a person launching it by hand. A row recorded a week ago says nothing about the board
  * TODAY; `lastAt` is the freshness stamp, and a dropped row re-earns its attempts from zero.
  */
@@ -56,14 +56,13 @@ export const RELAUNCH_LEDGER_TTL_MS = 604_800_000;
 
 /**
  * The hold armed when `reset_at` HAS passed: the short grace on the raw event, so a cap that lifts
- * and is immediately re-fired does not get a child launched into it. `pm_relaunch.py:70`'s
- * `RATE_LIMIT_QUIET` (120 s).
+ * and is immediately re-fired does not get a child launched into it. Two minutes.
  */
 export const RATE_LIMIT_GRACE_MS = 120_000;
 
 /**
  * The hold armed when the signal carries NO `reset_at`: the long window, because a cap advertising no
- * reset cannot be told from a multi-hour one. `pm_relaunch.py:67`'s `RATE_LIMIT_LOG_QUIET` (1800 s) —
+ * reset cannot be told from a multi-hour one. Half an hour —
  * the producer writes `reset_at` only when the payload named one, and the common fire carries the
  * event and nothing else.
  */
@@ -74,7 +73,7 @@ export const RATE_LIMIT_RESET_BUFFER_MS = 30_000;
 
 /**
  * The furthest future a `reset_at` may name before it is read as CORRUPT rather than as a hold:
- * `pm_relaunch.py:78`'s `RESET_AT_MAX_HORIZON` (8 days). Claude's caps are hourly windows, so a
+ * eight days. Claude's caps are hourly windows, so a
  * timestamp a week out is a bad parse or a bad clock, and honouring it would silence every board on
  * the install. Past the horizon the signal is demoted to the blind hold — held, but not that long.
  */
@@ -150,7 +149,7 @@ function readLedger(): RelaunchLedger {
     const attempts = row.attempts;
     const lastAt = row.lastAt;
     if (!Number.isFinite(attempts) || !Number.isFinite(lastAt)) continue;
-    // Long quiet: forgiven, exactly as `pm_relaunch_ledger.py:99-105` drops a stale row on load.
+    // Long quiet: forgiven, so a row older than the ledger's own TTL never reaches the count.
     if (Date.now() - (lastAt as number) > RELAUNCH_LEDGER_TTL_MS) continue;
     ledger[boardId] = {
       attempts: Math.max(0, Math.trunc(attempts as number)),
@@ -161,8 +160,8 @@ function readLedger(): RelaunchLedger {
 }
 
 /**
- * The ledger written back atomically: same-directory temp file, then rename, `pm_relaunch_ledger.py:
- * 117-140`'s save. The atomicity is the point — a reader (or the next boot) can never catch a
+ * The ledger written back atomically: same-directory temp file, then rename — the
+ * atomicity is the point — a reader (or the next boot) can never catch a
  * half-written file, the one failure that would turn a killed server into one whose ledger has to be
  * discarded. A write fault is said once and dropped: the count is then correct only for this
  * process's life, which beats taking the tick down.
@@ -268,7 +267,7 @@ function readSignal(): RateLimitSignal | null {
 /**
  * When the API rate-limit hold lifts, in epoch MILLISECONDS, or `null` when there is no hold.
  *
- * `pm_relaunch.py:194-228`'s `rate_limit_signal`, in the one form its callers need: the driver does
+ * The hold's one form, which is all its callers need: the driver does
  * not care WHY spawning is held, only until when. A future `reset_at` (plus a small buffer) is
  * exact; a `reset_at` that has already passed falls back to the short grace on the event; a signal
  * with no `reset_at` at all — the common fire — holds for the long blind window, because a cap that

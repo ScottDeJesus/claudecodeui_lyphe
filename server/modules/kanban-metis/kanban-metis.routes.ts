@@ -63,18 +63,6 @@ function handle<P extends Record<string, string>>(
 }
 
 /**
- * The importer, refused before the router can see it.
- *
- * `POST /api/kanban-pm/import/descent` reads a FOREIGN database — the Descent SQLite file — and
- * rewrites the board from it, four hundred cards in one transaction. No autonomous session has any
- * business calling it: a Metis who decided to "sync" would not be building a card, she would be
- * replacing every card on the board with an older picture of it, and the only reason the operator
- * can do it at all is that he knows which database he is pointing at. His own authenticated mount
- * (`/api/kanban`) still carries the verb; this door does not.
- */
-const IMPORT_PATH = /\/import(\/|$)/i;
-
-/**
  * The lesson REVIEW, refused on the same terms — and this is the fence that actually matters.
  *
  * The lesson lifecycle has two ends with opposite actors: a Metis STAGES a note about what she
@@ -91,7 +79,7 @@ const REVIEW_PATH = /\/lessons\/[^/]+\/(approve|reject)(\/|$)/i;
 
 /**
  * The DESTRUCTION of an operator's uploaded bytes, refused on the same terms — and METHOD-SCOPED,
- * unlike the two above.
+ * unlike the one above.
  *
  * An attachment's bytes are the OPERATOR's: a screenshot he pasted into a card, a PDF he handed a
  * build. A Metis who ADDS one is recording what her build produced, and one who READS one is looking
@@ -100,7 +88,7 @@ const REVIEW_PATH = /\/lessons\/[^/]+\/(approve|reject)(\/|$)/i;
  * a `rm`. So the refusal is on `DELETE` alone, and only on this door: the operator's own
  * `/api/kanban` carries all three verbs.
  *
- * The path test is the same shape as the two above, so `…/cards/<id>/attachments/<id>` in any case
+ * The path test is the same shape as the one above, so `…/cards/<id>/attachments/<id>` in any case
  * is refused — spelled with `%2F` or not, because `matchesPath` decodes before it tests.
  *
  * ONE TRAILING SLASH IS TOLERATED, the way `REVIEW_PATH` above tolerates it, and that tolerance is
@@ -123,10 +111,9 @@ const OPERATOR_BYTES = /\/cards\/[^/]+\/attachments\/[^/]+\/?$/i;
  *
  * CASE-INSENSITIVE AND PERCENT-DECODED, because the router behind this guard is both. Express
  * matches routes without regard to case unless `case sensitive routing` is set, so a guard that
- * spelled the path in lowercase only would be a lock on one handle of a door standing open:
- * MEASURED 2026-09-16, `POST /api/kanban-pm/import/descent` was refused 403 while
- * `POST /api/kanban-pm/Import/descent` reached `import.routes.ts:46` and ran. A `%2F` is a `/` to
- * everything downstream of here too, so the test is made on the decoded path.
+ * spelled a path in lowercase only would be a lock on one handle of a door standing open — every
+ * pattern here carries the `i` flag for that reason. A `%2F` is a `/` to everything downstream of
+ * here too, so the test is made on the decoded path.
  */
 function matchesPath(path: RegExp, rawPath: string): boolean {
   let decoded = rawPath;
@@ -189,11 +176,6 @@ export function kanbanMetisSecretGuard(
   response: Response,
   next: NextFunction,
 ): void {
-  if (matchesPath(IMPORT_PATH, request.path)) {
-    refuse(response, 403, 'The descent importer is not reachable from the kanban-pm door.');
-    return;
-  }
-
   // The review fence, ahead of the credential check: a review is a person's act, so WHOSE
   // credential arrived is not the question — no Metis reviews a lesson, this one included.
   if (matchesPath(REVIEW_PATH, request.path)) {

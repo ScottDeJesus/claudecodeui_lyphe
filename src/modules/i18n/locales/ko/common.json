@@ -47,7 +47,6 @@
       "newBoard": "새 보드",
       "rename": "이름 바꾸기",
       "archive": "보관",
-      "importDescent": "Descent에서 가져오기",
       "newTitle": "새 보드",
       "renameTitle": "보드 이름 바꾸기",
       "archiveTitle": "이 보드를 보관할까요?",
@@ -88,11 +87,6 @@
       "autonomyOff": "자율 모드를 껐습니다",
       "cardArchived": "카드를 보관했습니다",
       "laneCleared": "레인의 카드를 보관했습니다"
-    },
-    "import": {
-      "done": "Descent에서 가져왔습니다",
-      "counts": "{{inserted}}개 추가, {{updated}}개 갱신",
-      "failed": "가져오기를 실행하지 못했습니다"
     }
   },
   "status": {

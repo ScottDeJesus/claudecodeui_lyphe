@@ -17,8 +17,7 @@ import type { KanbanPmClient } from './kanban-pm-client.js';
  */
 
 /**
- * The corpus kinds one search covers — Descent's `store_search.KINDS`, the four the ported brief
- * already asks for.
+ * The corpus kinds one search covers — the four the brief already asks for.
  *
  * `lesson` was DECLARED here and not searchable while this board had no corpus to search. The
  * corpus is on the board now (a lesson tool stages into it, `learning.routes.ts` serves it), so the
@@ -36,8 +35,8 @@ export const SEARCH_QUERY_MAX = 500;
  *
  * The first is the board's own transport ceiling (`server/modules/kanban/routes/board.routes.ts`,
  * `EVENT_LIMIT_MAX`), duplicated here because this program may not import from `server/modules/`.
- * The second is Descent's `store.get_decisions` default — the port keeps the number so a brief
- * written against Descent is answered at the same width.
+ * The second is the decision recall's own width — one number, so every caller is answered at the
+ * same depth.
  */
 export const EVENT_READ_LIMIT = 200;
 export const SELECTION_LIMIT = 50;
@@ -98,11 +97,10 @@ function snippetAround(text: string, query: string): string | null {
 /**
  * The lesson hits, and how much of the corpus produced them.
  *
- * Descent indexed lessons into its full-text table alongside the cards, so a search over there
- * matched a lesson's NAME and its BODY, rejected rows included ("they're history"). This board's
- * index route is lean by design — it ships no bodies — so the body is read one row at a time, the
- * way every other read in this program reaches a body. The order is the index's own (newest first),
- * and `read`/`more` carry the depth rather than leaving a caller to assume it.
+ * A lesson's NAME and its BODY both match a search, rejected rows included ("they're history"). This
+ * board's index route is lean by design — it ships no bodies — so the body is read one row at a
+ * time, the way every other read in this program reaches a body. The order is the index's own
+ * (newest first), and `read`/`more` carry the depth rather than leaving a caller to assume it.
  *
  * TWO BOUNDS, both deliberate. `budget` is the caller's own hit limit: no search can return more
  * than that many hits, so no search needs to open more than that many bodies. And each row's read
@@ -254,14 +252,15 @@ export type LearnedSelectionsResult = {
  * The operator's past design-question answers, most recent first, filtered by tag overlap and/or a
  * substring of the question.
  *
- * The tag basis is the subtle part. Descent stamps a decision with the feature's tags AT ANSWER
- * TIME; this board's own answer path writes the column empty (`kanban-questions.service.ts`'s
- * `insertDecision` passes `tags: []`), and the MCP cannot fill it in because the answer route takes
- * no tags. A filter that read only the decision's own tags would therefore report every answer made
- * through this server — including the ones Metis itself just recorded — as absent, and would match
- * only rows imported from Descent. So a decision matches when EITHER its own snapshot or the tags
- * its card carries today intersect the wanted set: the snapshot is the historical truth where it
- * exists, and the card's current tags are the same signal for every answer this board wrote itself.
+ * The tag basis is the subtle part. A decision is stamped with its tags AT ANSWER TIME only where a
+ * snapshot was written for it; this board's own answer path writes the column empty
+ * (`kanban-questions.service.ts`'s `insertDecision` passes `tags: []`), and the MCP cannot fill it
+ * in because the answer route takes no tags. A filter that read only the decision's own tags would
+ * therefore report every answer made through this server — including the ones Metis itself just
+ * recorded — as absent, and would match only the rows whose snapshot carries tags. So a decision
+ * matches when EITHER its own snapshot or the tags its card carries today intersect the wanted set:
+ * the snapshot is the historical truth where it exists, and the card's current tags are the same
+ * signal for every answer this board wrote itself.
  */
 export async function getLearnedSelections(
   client: KanbanPmClient,

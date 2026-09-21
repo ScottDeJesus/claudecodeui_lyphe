@@ -53,10 +53,10 @@ function handle<P extends Record<string, string>>(
 /**
  * Multer, in MEMORY — the service owns where a byte lands, so the transport never opens a file.
  *
- * The two limits are the door's, and they are ordered the way `server_api.py:360-399` orders its
- * gate: the type is refused before the body is read at all (`fileFilter` runs on the part's
- * headers), and the size is cut off BY multer as the bytes arrive, so an eight-hundred-megabyte
- * upload is closed at eight megabytes rather than buffered in full and then refused.
+ * The two limits are the door's, and their order is the gate's own: the type is refused before the
+ * body is read at all (`fileFilter` runs on the part's headers), and the size is cut off BY multer
+ * as the bytes arrive, so an eight-hundred-megabyte upload is closed at eight megabytes rather
+ * than buffered in full and then refused.
  *
  * `files: 1` is the single-file counterpart of the cap: this route takes one attachment, and a
  * second part is a caller's mistake rather than something to store.
@@ -85,7 +85,7 @@ const upload = multer({
 });
 
 /**
- * The upload. `201` with the stored row, exactly as `server_api.py:h_add_attachment` answers.
+ * The upload. `201` with the stored row.
  *
  * Every refusal arrives here as a CALLBACK error rather than a thrown one, so each is translated
  * back into the status it means: an over-cap body is the 413 the route table declares, the

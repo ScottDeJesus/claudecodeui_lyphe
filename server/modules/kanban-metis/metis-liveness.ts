@@ -13,14 +13,16 @@ import { KANBAN_LEASE_STALE_SECONDS } from '@/shared/kanban-types.js';
  * here. A predicate that reached for either would be untestable by construction and would put the
  * only I/O in the module that is supposed to have none.
  *
- * Ported from `~/.claude/descent/pm_capacity.py`'s `_reapable` (`:226-303`) and
- * `pm_capacity_stall.py`'s `stalled` (`:258-318`), with the dials kept at their Python values.
+ * The rule is arithmetic over those four facts, read against three dials: a minimum quiet age
+ * before a session may be reaped at all, a quiet window past which it reads as having finished its
+ * turn, and a longer silence past which it is wedged. The dials are what make a live process
+ * readable, so they are named here rather than inlined at the comparison.
  */
 
 /**
  * Minimum age before a session is reap-eligible at all.
  *
- * `pm_capacity.py:121`'s `QUIESCE_MIN_AGE_SECS`. A just-launched Metis is mid-orient — reading the
+ * A just-launched Metis is mid-orient — reading the
  * brief, calling `list_actionable`, claiming her first card — and a reaper that could reach her
  * during that window would retire healthy sessions in a loop. Five minutes is past any plausible
  * orient and is the window in which she must have stamped a lease.
@@ -30,8 +32,8 @@ export const QUIESCE_MIN_AGE_MS = 300_000;
 /**
  * How long `child.log` must have been still before the session reads as having finished its turn.
  *
- * `pm_capacity.py:118`'s `QUIESCE_QUIET_SECS`. The child writes its `--output-format stream-json`
- * stream to that file continuously while a turn is running, so silence there means the turn ended —
+ * The child writes its `--output-format stream-json` stream to that file continuously while a
+ * turn is running, so silence there means the turn ended —
  * and three minutes is long enough that a Metis thinking between tool calls is not mistaken for one
  * who has stopped.
  */
@@ -40,9 +42,9 @@ export const QUIESCE_QUIET_MS = 180_000;
 /**
  * How long a session may be BOTH silent and unleased before it is judged wedged.
  *
- * `pm_capacity_stall.py`'s `STALL_SECS` (default 2700 s). This is the longer, stronger window: a
- * session quiet for this long is not pausing, it is stuck — and the branch exists so a Metis whose
- * turn has wedged cannot hold a concurrency slot for the life of the server.
+ * This is the longer, stronger window: a session quiet for this long is not pausing, it is
+ * stuck — and the branch exists so a Metis whose turn has wedged cannot hold a concurrency slot
+ * for the life of the server.
  */
 export const STALL_MS = 2_700_000;
 

@@ -62,7 +62,7 @@ off it when nothing is.
 `memory` is a valid persisted tab (`VALID_TABS`), so a reload restores it — and the sticky clause
 holds it there through the first paint, before the first poll has answered.
 
-**In the palette.** `Go to Memory` (keywords `memory intake pending descent`) is offered exactly
+**In the palette.** `Go to Memory` (keywords `memory intake pending`) is offered exactly
 when the tab is on the bar, since the palette reads the same hook. It carries no count.
 
 ## The reading, and when it is taken
@@ -218,38 +218,31 @@ looking pressable and turn a refused press into a press that vanished.
 ## The fence
 
 Approving a candidate writes into files every future session in a project reads. That is why the
-whole intake lane is HTTP-only and carries no agent seam — no MCP verb, not even a staging one
-(Descent GOTCHAS #253). This tab does not widen it. The routes sit behind `authenticateToken` like
-every other app route, a soul proposes and only a signed-in person files, and Descent's own routes
-at `:7878` were already reachable unauthenticated by any process on this host. What CloudCLI adds is
-one bearer-authenticated HTTP path and a pair of buttons; nothing here is callable by an agent.
+whole intake lane is HTTP-only and carries no agent seam — no MCP verb, not even a staging one.
+This tab does not widen it. The routes sit behind `authenticateToken` like every other app route,
+and a soul proposes while only a signed-in person files. What this lane adds is one
+bearer-authenticated HTTP path and a pair of buttons; nothing here is callable by an agent.
 
 ## The native module
 
 A second implementation of the same four contracts lives inside this server itself, at
 `server/modules/memory-intake/` — `memory.service.ts` (the candidate lifecycle: stage, list, get,
-approve, reject, and `importDescentCandidates`, over its own `memory_candidates` table, which is not
-a board table and carries no `board_id`), `memory-assert.ts` (the disk half: every write path is DERIVED from a candidate's
+approve, reject, over its own `memory_candidates` table, which is not a board table and carries no
+`board_id`), `memory-assert.ts` (the disk half: every write path is DERIVED from a candidate's
 `target`, `project` and `name` against the same five-entry allowlist named in the table under §"One
-row" above — a row never carries a path of its own — and a `memory` candidate writes its topic note before its
-`MEMORY.md` router line, so a mid-write fault leaves an orphan note rather than a dangling index
-pointer), and `memory-caps.ts` (the size budgets, ported number-for-number from
+row" above — a row never carries a path of its own — and a `memory` candidate writes its topic note
+before its `MEMORY.md` router line, so a mid-write fault leaves an orphan note rather than a
+dangling index pointer), and `memory-caps.ts` (the size budgets, ported number-for-number from
 `~/.claude/hooks/enforce_memory_limits.py` — the predicate that guards a session's own MEMORY.md
 edits — so the two move together rather than drift apart). `index.ts` barrels the three for
 `memory-intake.module.ts`, which the server entrypoint mounts at `/api/memory` behind
 `authenticateToken` — and nowhere else: it is not on the board's router, so neither of that router's
 two mounts ([kanban.md](kanban.md) §"The routes", §"The kanban-pm MCP surface") can reach it.
 
-**`importDescentCandidates` is this lane's own door for the board's Descent import**, called from
-`kanban-import-satellites.ts` rather than reached over HTTP: an old install's `ov_memory_candidates`
-rows land here VERBATIM — Descent's own `status` and `target` words, not filtered through
-`validateMemoryArgs`, because those rows are what a person already lived with rather than a fresh
-proposal, and `target` has grown a value (`user`) this lane's own staging door would refuse today.
-Idempotent by `descent_id`: a second import of one install finds the row a previous import already
-minted a local id for and updates it rather than inserting a second copy. The board's importer keeps
-no tally of its own for this table — only the count this verb reports back — because
-`memory_candidates` carries no `board_id` and is not a board satellite
-([kanban.md](kanban.md) §"Importing from Descent").
+**The provenance column is `legacy_id`, and it is `NULL UNIQUE`.** A row that carries one carries a
+provenance id minted elsewhere, so that id can appear at most once in this table and a row staged
+here is never in conflict with it. `memory_candidates` carries no `board_id` and is not a board
+satellite ([kanban.md](kanban.md) §"The tables").
 
 The four routes are `GET /`, `GET /:candidateId`, `POST /:candidateId/approve` and
 `POST /:candidateId/reject` — the four contracts this page describes, and

@@ -94,7 +94,7 @@ export type KanbanLaneCount = { status: KanbanStatus; total: number };
  */
 export type KanbanLeaseState = 'none' | 'held' | 'stale';
 
-/** Descent's DEFAULT_STALE_SECS (descent/store_lease.py:27). The ONE home for this number.
+/** How long a build lease may go unrefreshed before it reads stale. The ONE home for this number.
  *  Consumers: the summary mapper in kanban-cards.db.ts, and kanban-leases.service.ts. */
 export const KANBAN_LEASE_STALE_SECONDS = 40;
 
@@ -104,8 +104,9 @@ export const KANBAN_LEASE_STALE_SECONDS = 40;
  *  places is a lane whose header and body disagree about how much of it is loaded. */
 export const KANBAN_LANE_LIMIT_DEFAULT = 50;
 
-/** The hard ceiling on a lane page. Without it one request can ask for a whole imported board,
- *  and the Descent import measures 449 cards. Consumers: the same three as the default. */
+/** The hard ceiling on a lane page. Without it one request can ask for a whole board's lane in one
+ *  page, which is a lot of card rows for a header strip to have asked for. Consumers: the same
+ *  three as the default. */
 export const KANBAN_LANE_LIMIT_MAX = 200;
 
 /** The rung a lane's order climbs by. A new card sits one rung past the last, a move to the top
@@ -176,7 +177,10 @@ export type KanbanWriteContext = { actor?: string };
  * frame kinds a panel can subscribe to.
  *
  * Consumers: `kanban-write.service.ts` (the seam's `spec.kind`), `kanban-events.db.ts` (the row's
- * `kind`), the Descent importer, and `src/shared/kanban-types.ts`.
+ * `kind`), and `src/shared/kanban-types.ts`.
+ *
+ * The row's own `kind` is read back as a plain `string` (`KanbanEventRow`), never narrowed to this
+ * union on the way out: rows written under a kind this union has since dropped still read.
  */
 export type KanbanEventKind =
   | 'board.created'
@@ -208,8 +212,7 @@ export type KanbanEventKind =
   | 'lease.plan_released'
   | 'lesson.staged'
   | 'lesson.reviewed'
-  | 'metis.nudged'
-  | 'import.descent';
+  | 'metis.nudged';
 
 /**
  * One card as a lane renders it: the row, its tags, its four rolled-up counts, and the lease
@@ -391,83 +394,13 @@ export type KanbanEventRow = {
 export type KanbanLeaseResult = { granted: boolean; card: KanbanCardSummary };
 
 /**
- * One side of an import's reckonable totals — the source or what this board now holds.
- *
- * `lessons` and `memory` are an install's satellites rather than a board's spine: the lessons land
- * in `kanban_lessons` like every other table here, while the candidates belong to the memory lane
- * and are counted by its own verb. A source old enough to predate either holds zero of them, which
- * is why neither appears on the importer's required-shape list.
- *
- * Consumers: `kanban-import.service.ts` (it builds both sides), the import route,
- * and `src/shared/kanban-types.ts`.
- */
-export type KanbanImportCounts = {
-  boards: number;
-  cards: number;
-  tags: number;
-  questions: number;
-  issues: number;
-  decisions: number;
-  checklist: number;
-  attachments: number;
-  events: number;
-  lessons: number;
-  memory: number;
-  settings: number;
-};
-
-/**
- * One attachment's bytes, as the copy that follows an import needs them.
- *
- * The paths are DERIVED and already contained: `sourcePath` is Descent's own layout under its
- * install's attachment root, `targetPath` came out of `resolveUnderRoot` against this board's root.
- * A pair travels rather than being re-derived at the moment of the copy because the translation it
- * depends on — which card each source feature landed under — exists only inside the import's own
- * transaction, and the copy runs after that transaction has committed.
- */
-export type KanbanAttachmentCopy = {
-  cardId: string;
-  attachmentId: string;
-  sourcePath: string;
-  targetPath: string;
-};
-
-/**
- * What one Descent import did: the source's counts, this board's counts after it, how many rows
- * were new against how many were refreshed, and the id translation.
- *
- * `boardIdMap` maps a Descent board id to the Athena id it landed under, which is what lets the
- * operator recognise a board they know. `currentBoardId` is the imported `current_board` setting,
- * already translated, or null when the source named no board.
- *
- * `attachmentCopies` is an OBLIGATION, not a report: the attachment ROWS are committed and the files
- * they point at are not, because the bytes are nine megabytes of I/O that must not run under the
- * write seam's lock. The caller that answers the operator places them first —
- * `placeAttachmentBytes()` in `kanban-import-satellites.ts`, one line, idempotent, never fatal —
- * so the answer means "imported, bytes on disk" rather than "imported, maybe". A caller that drops
- * them leaves rows whose files are not there, and this board's standing rule is that a row without
- * its file reads as nothing.
- *
- * Consumers: `kanban-import.service.ts`, the import route, and `src/shared/kanban-types.ts`.
- */
-export type KanbanImportResult = {
-  source: KanbanImportCounts;
-  imported: KanbanImportCounts;
-  inserted: number;
-  updated: number;
-  boardIdMap: Record<string, string>;
-  currentBoardId: string | null;
-  attachmentCopies: KanbanAttachmentCopy[];
-};
-
-/**
  * One lesson: what a build learned, staged for a person's review before any later session reads it
  * back.
  *
  * The lifecycle is one-way and its two ends have OPPOSITE actors: a build (or the spill sweep)
  * stages, a person reviews, and only an approved lesson reaches a session again. `status` is
- * Descent's own word — today `staged`, `approved` or `rejected` — carried as a plain string and not
- * a union, because that vocabulary grew a value twice. `draftPath` is set ONLY for a
+ * carried as a plain string and not a union — today `staged`, `approved` or `rejected` — because
+ * that vocabulary grew a value twice. `draftPath` is set ONLY for a
  * `kind='skill_draft'` lesson, whose body also landed as a `SKILL.md` file to promote. `cardId` is
  * provenance and nullable on purpose: a lesson OUTLIVES the card it was learned on.
  *

@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { JEV_SCOPES, useJevSwitches } from '@/shared/hooks/useJevSwitches';
 import type { JevScopeName } from '@/shared/hooks/useJevSwitches';
 import { Button } from '@/shared/ui';
+import { JevLogo } from '@/shared/ui/JevLogo';
 import SettingsCard from '@/modules/settings/SettingsCard';
 import SettingsRow from '@/modules/settings/SettingsRow';
 import SettingsToggle from '@/modules/settings/SettingsToggle';
@@ -164,7 +165,7 @@ export default function JevContent() {
 
   return (
     <SettingsCard divided>
-      <SettingsRow label={masterLabel} description={masterDescription}>
+      <SettingsRow label={masterLabel} icon={<JevLogo className="h-4 w-4" />} description={masterDescription}>
         {unknown ? (
           // The press a control with no position can honour: ask again. Without it a persistent read
           // failure left every row dead until Settings was closed and reopened.

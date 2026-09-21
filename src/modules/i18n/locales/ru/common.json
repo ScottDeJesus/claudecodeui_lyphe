@@ -47,7 +47,6 @@
       "newBoard": "Новая доска",
       "rename": "Переименовать",
       "archive": "В архив",
-      "importDescent": "Импортировать из Descent",
       "newTitle": "Новая доска",
       "renameTitle": "Переименовать доску",
       "archiveTitle": "Отправить доску в архив?",
@@ -91,11 +90,6 @@
       "autonomyOff": "Автономность выключена",
       "cardArchived": "Карточка отправлена в архив",
       "laneCleared": "Карточки колонки отправлены в архив"
-    },
-    "import": {
-      "done": "Импортировано из Descent",
-      "counts": "{{inserted}} добавлено, {{updated}} обновлено",
-      "failed": "Импорт не выполнился"
     }
   },
   "status": {

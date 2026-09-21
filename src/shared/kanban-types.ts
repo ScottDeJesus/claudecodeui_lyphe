@@ -230,36 +230,6 @@ export type KanbanEventRow = {
  */
 export type KanbanLeaseResult = { granted: boolean; card: KanbanCardSummary };
 
-/** One side of an import's reckonable totals — the Descent source, or what this board holds now. */
-export type KanbanImportCounts = {
-  boards: number;
-  cards: number;
-  tags: number;
-  questions: number;
-  issues: number;
-  decisions: number;
-  checklist: number;
-  attachments: number;
-  events: number;
-  settings: number;
-};
-
-/**
- * What one Descent import did, as the import dialog reports it: the source's counts, this board's
- * counts after it, new rows against refreshed ones, and the id translation.
- *
- * `currentBoardId` is the imported `current_board` setting, already translated, or null when the
- * source named no board.
- */
-export type KanbanImportResult = {
-  source: KanbanImportCounts;
-  imported: KanbanImportCounts;
-  inserted: number;
-  updated: number;
-  boardIdMap: Record<string, string>;
-  currentBoardId: string | null;
-};
-
 /**
  * Every event kind the seam may record, mirrored from `server/shared/kanban-types.ts` where it is
  * declared beside the frame's own shapes.
@@ -298,16 +268,15 @@ export type KanbanEventKind =
   | 'lease.plan_released'
   | 'lesson.staged'
   | 'lesson.reviewed'
-  | 'metis.nudged'
-  | 'import.descent';
+  | 'metis.nudged';
 
 /**
  * One lesson: what a build learned, staged for a person's review before any later session reads it
  * back.
  *
  * The lifecycle is one-way and its two ends have OPPOSITE actors: a build stages, a person reviews,
- * and only an approved lesson reaches a session again. `status` is Descent's own word — today
- * `staged`, `approved` or `rejected` — a plain string, because that vocabulary grew a value twice.
+ * and only an approved lesson reaches a session again. `status` is carried as a plain string and
+ * not a union — today `staged`, `approved` or `rejected` — because that vocabulary grew a value twice.
  * `draftPath` is set ONLY for a `kind='skill_draft'` lesson, whose body also landed as a `SKILL.md`
  * file to promote, and `cardId` is nullable because a lesson outlives the card it was learned on.
  */

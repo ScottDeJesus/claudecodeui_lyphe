@@ -5,9 +5,8 @@ import path from 'node:path';
 import { expandHome } from '@/shared/utils.js';
 
 /**
- * Archive FINISHED plans out of the plans corpus into its `archive/` subdirectory — the port of
- * `~/.claude/descent/archive_plans.py` (`:124-200`, the clobber refusal at `:248-251`), called by
- * the plan-runner module on the cadence `plans_archive_watcher.py` used for it.
+ * Archive FINISHED plans out of the plans corpus into its `archive/` subdirectory, called by the
+ * plan-runner module on its own cadence.
  *
  * The plans corpus grows unbounded — every `/plan` session and every runner plan lands in it, and
  * nothing prunes it — so the finished ones are moved aside. This is the WHOLE of the selection
@@ -26,7 +25,7 @@ import { expandHome } from '@/shared/utils.js';
  * the plan's text. That reader changes whenever the plan format changes, and a TypeScript copy of
  * it would answer differently from the thing that walks the file. When the child cannot be
  * reached at all, this sweep moves NOTHING: an unanswerable clause 2 keeps every plan, which is the
- * port's own fail-safe.
+ * fail-safe this sweep is built on.
  *
  * CLAUSE 3 ARRIVES AS A PARAMETER, and this file never learns where it came from. A card's plan or
  * build lease is the sole mid-build guard on a plan already cold by clause 1 — a build can hold a
@@ -48,7 +47,7 @@ const DEFAULT_PLANS_DIR = '~/.claude/plans';
 /** The directory holding the runner's own phase reader. The one home for clause 2's rule. */
 const CLASSIFIER_DIR = '~/.claude/hooks';
 
-/** How old a plan must be before the sweep may touch it, in hours (`archive_plans.COLD_HOURS`). */
+/** How old a plan must be before the sweep may touch it, in hours. */
 const COLD_HOURS = 48;
 
 /** The same window in milliseconds, derived so the two spellings cannot drift. */

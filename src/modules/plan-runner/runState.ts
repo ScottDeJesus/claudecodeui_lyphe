@@ -10,10 +10,10 @@ import type { RunnerPhaseState, RunnerRunSnapshot, RunnerRunState, Tone } from '
  * because a clock is the only thing here that changes without the data changing.
  */
 
-/** How a run's state reaches the eye. Never `danger`: a stale or parked run is a warning, not a denial. An ended run's badge is its OUTCOME's — see {@link runOutcomeTone}. */
+/** How a run's state reaches the eye. Never `danger`: a stale or parked run is a warning, not a denial. An ended run's badge is its OUTCOME's — see {@link runOutcomeTone}. A QUEUED run is `neutral` with PAUSED and ENDED: it is parked on purpose, nothing is wrong, and amber would read as a hand wanted. */
 export function runStateTone(state: RunnerRunState): Tone {
   if (state === 'live') return 'positive';
-  if (state === 'paused' || state === 'ended') return 'neutral';
+  if (state === 'paused' || state === 'queued' || state === 'ended') return 'neutral';
   return 'warn';
 }
 
@@ -141,15 +141,18 @@ export function phaseProgress(run: RunnerRunSnapshot): { shipped: number; total:
  *
  * LIVE first because something is happening to it right now. STALE second because a lapsed
  * heartbeat is the one state that may want a hand — it is the reason a person opens this tab
- * unprompted. PAUSED last because a parked run is parked on purpose: the operator stopped it, and
- * a list that raised their own decision above a run in trouble would be the app arguing with them.
- * ENDED last of all — nothing more will happen to it; it is there to be read and dismissed — and
- * within ENDED the most recent ending first, since that is the one the operator came to see.
+ * unprompted. QUEUED third, above PAUSED: both are parks the operator chose, but a queued run has
+ * not started at all and its Start is the card's whole point, while a paused run was stopped
+ * mid-walk and can wait. PAUSED fourth because a parked run is parked on purpose: the operator
+ * stopped it, and a list that raised their own decision above a run in trouble would be the app
+ * arguing with them. ENDED last of all — nothing more will happen to it; it is there to be read
+ * and dismissed — and within ENDED the most recent ending first, since that is the one the
+ * operator came to see.
  *
- * Reversible in one place, by design (the plan's own reversible default): change these three
- * numbers and the order changes, with nothing else to find.
+ * Reversible in one place, by design (the plan's own reversible default): change these numbers and
+ * the order changes, with nothing else to find.
  */
-export const STATE_ORDER: Record<RunnerRunState, number> = { live: 0, stale: 1, paused: 2, ended: 3 };
+export const STATE_ORDER: Record<RunnerRunState, number> = { live: 0, stale: 1, queued: 2, paused: 3, ended: 4 };
 
 /** State first, then newest first inside each state — by its ending for an ended run, its start otherwise. */
 export function byUrgencyThenNewest(a: RunnerRunSnapshot, b: RunnerRunSnapshot): number {

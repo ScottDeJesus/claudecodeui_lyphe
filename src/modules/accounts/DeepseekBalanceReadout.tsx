@@ -1,3 +1,4 @@
+import { LLMProviderLogo } from '@/shared/ui/LLMProviderLogo';
 import { cn } from '@/shared/utils';
 import type { DeepseekBalance } from '@/shared/types';
 
@@ -170,7 +171,10 @@ export function DeepseekBalanceReadout({ balance, variant = 'stacked' }: Deepsee
         title={sentence}
         aria-label={sentence}
       >
-        <span className="flex-none text-ink-faint">DeepSeek</span>
+        <span className="flex flex-none items-center gap-1 self-center text-ink-faint">
+          <LLMProviderLogo provider="deepseek" className="h-3 w-3" />
+          DeepSeek
+        </span>
         <span className={cn('truncate tabular-nums', known ? 'text-muted-foreground' : 'text-ink-faint')}>
           {figure ?? NO_FIGURE}
         </span>
@@ -181,7 +185,10 @@ export function DeepseekBalanceReadout({ balance, variant = 'stacked' }: Deepsee
   return (
     <div className="flex flex-col gap-1.5">
       <div className="flex items-baseline gap-2">
-        <span className="text-[13px] font-medium text-foreground">DeepSeek balance</span>
+        <span className="flex items-center gap-1.5 self-center text-[13px] font-medium text-foreground">
+          <LLMProviderLogo provider="deepseek" className="h-4 w-4" />
+          DeepSeek balance
+        </span>
         <span className={cn('ml-auto text-[12.5px] tabular-nums', known ? 'text-muted-foreground' : 'text-ink-faint')}>
           {figure ?? NO_FIGURE}
         </span>

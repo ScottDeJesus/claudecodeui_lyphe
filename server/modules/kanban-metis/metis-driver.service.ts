@@ -34,12 +34,11 @@ import type { MetisSpawner } from './metis-spawn.service.js';
  * The driver: one interval, and inside each tick exactly one order — reap first, then spawn. Never
  * the other way round, never a third thing.
  *
- * `pm_capacity.py:640-667`'s `tick_once`, ported in-process. The order is the whole of the design:
- * a session that has died or gone quiet is retired BEFORE the spawn decision reads the live count,
- * so the count the spawner acts on is this tick's post-reap snapshot. Reverse the two and a board
- * overshoots its concurrency dial every time a session is dying — the tick would spawn a
- * replacement for a slot the reaper is about to free, and the board would run two Metises for one
- * dial.
+ * The order is the whole of the design: a session that has died or gone quiet is retired BEFORE
+ * the spawn decision reads the live count, so the count the spawner acts on is this tick's
+ * post-reap snapshot. Reverse the two and a board overshoots its concurrency dial every time a
+ * session is dying — the tick would spawn a replacement for a slot the reaper is about to free,
+ * and the board would run two Metises for one dial.
  *
  * Every decision this loop makes is READABLE. `reading()` is the same arithmetic the tick uses,
  * asked of one board, so the `GET /api/kanban-metis/boards/:boardId/driver` route can answer why a
@@ -53,10 +52,8 @@ import type { MetisSpawner } from './metis-spawn.service.js';
 /**
  * How often the tick runs.
  *
- * `pm_capacity.py:111`'s `TICK_SECS` is 45 s, slept in 5 s slices because that watcher is a shell
- * loop that must notice an operator's nudge. This one is an in-process timer with nothing to poll
- * for, so it can afford to be three times as responsive — 15 s is the longest wait a launch can
- * take before a panel click feels answered.
+ * An in-process timer with nothing to poll for, so it can afford to be responsive: 15 s is the
+ * longest wait a launch can take before a panel click feels answered.
  */
 export const TICK_MS = 15_000;
 
@@ -74,7 +71,7 @@ export const LAUNCH_GUARD_WARN_MS = 60_000;
 /**
  * How long a board must wait after a spawn before the driver will spawn for it again.
  *
- * `pm_capacity.py:479-488`'s churn cooldown, and it is PER BOARD, never global: a global one lets
+ * The churn cooldown, and it is PER BOARD, never global: a global one lets
  * one busy board's spawn starve every other board on the install. The window is what keeps a board
  * whose work cannot actually be claimed — a stale lease, a card that leaves its lane mid-launch —
  * from being respawned on every tick forever.
@@ -193,7 +190,7 @@ type BoardLeaseOwners = { kind: 'known'; owners: Set<string> } | { kind: 'unprov
 /**
  * Every lease owner on one board right now, read across the board's WHOLE card ladder.
  *
- * Both lease kinds count, for the same reason `pm_capacity_stall.py:258-318` re-reads both: a Metis
+ * Both lease kinds count, for one reason: a Metis
  * waiting on a long build and a Metis authoring a plan are both silent while working, and the
  * silence is indistinguishable from having stopped.
  *

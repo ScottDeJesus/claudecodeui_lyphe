@@ -10,8 +10,8 @@ import type { ClaudeUsageWindow } from '@/shared/types.js';
  *
  * ⚠ THE DEPENDENCY RUNS ONE WAY AND MUST STAY THAT WAY. That one-way edge is the whole reason the
  * split exists: it is what lets the payload's shape change without a reviewer — or an editor — going
- * anywhere near the token. Ported from `~/.claude/descent/usage_windows.py`, which had the same seam
- * for the same reason, and which the deleted proxy was the only caller of.
+ * anywhere near the token. This file is the only place that shape is read, and `usage.service.ts`
+ * is the only caller of it.
  *
  * `GET /api/oauth/usage` is not a published API. It grew several window names between two
  * measurements on the same day (`seven_day_sonnet`, `seven_day_cowork` and four more arrived as

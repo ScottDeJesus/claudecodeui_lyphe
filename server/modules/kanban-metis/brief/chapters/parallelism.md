@@ -129,11 +129,8 @@ they will touch:
   disjoint regions of your footprint first, Reading the other build's plan before touching a
   shared file.
   **Nothing on this board refuses the claim, checks the footprint, or warns you about a
-  collision.** Descent ran a footprint guard (G3) on its own `set_status` tool name that
-  blocked or advised on an overlapping active-claim, with a `METIS_FOOTPRINT_MODE` dial and a
-  post-claim whisper naming the collider; a board session's tool is
-  `mcp__kanban-pm__set_status`, so **none of it fires here.** There is no mode to read, no
-  hard lock to trip under any setting, no whisper, and no symbol-`::` unlock — a
+  collision.** There is no mode to read, no hard lock to trip under any setting, no whisper, and
+  no symbol-`::` unlock — a
   kanban-aware footprint guard is a named follow-up, not a thing you can rely on today. So
   the preference is a **discipline you keep**, never a gate you wait on: a collision is never
   a reason to build nothing this pass, and an empty or uncertain footprint will not be

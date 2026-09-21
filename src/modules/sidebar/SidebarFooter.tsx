@@ -85,7 +85,7 @@ export default function SidebarFooter({
       <div className="nav-divider" />
 
       {/* The signed-in account, above Settings in both layouts — ONE instance carrying its own
-          responsive sizing, not one per block: two mounts would mean two Descent pollers, and
+          responsive sizing, not one per block: two mounts would mean two usage pollers, and
           D7 caps how often that read may happen. */}
       <div className="px-3 py-2 md:px-2 md:py-1.5">
         <AccountFooterRow />

@@ -8,7 +8,7 @@ import { vitalsCounts } from '../kanban-vitals.service.js';
  * What one audit-log read may ask for.
  *
  * The clamp is here, in the transport, and not in the service: without it a single request can
- * ask for a board's whole history, and an imported Descent board's log is twelve thousand rows.
+ * ask for a board's whole history, and an imported board's log is twelve thousand rows.
  */
 const EVENT_LIMIT_DEFAULT = 50;
 const EVENT_LIMIT_MAX = 200;

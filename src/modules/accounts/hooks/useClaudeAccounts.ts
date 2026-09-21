@@ -43,7 +43,7 @@ async function readBody(response: Response): Promise<unknown> {
  * so there is exactly one poller in the app at a time.
  *
  * A switch is deliberately unguarded by a dialog: the soft gate is the fact on the row
- * ("in use now · 8 sessions running"), not a modal (Descent GOTCHAS #174). What IS guarded
+ * ("in use now · 8 sessions running"), not a modal. What IS guarded
  * is a SECOND write while one is in flight, since a whole-box swap is not re-entrant.
  */
 export function useClaudeAccounts() {
@@ -121,7 +121,7 @@ export function useClaudeAccounts() {
         tone: 'positive',
         title: `Switched to ${label}`,
         // The honest sentence, not the comfortable one: the swap is whole-box and running
-        // sessions keep the tokens they already hold in memory (Descent GOTCHAS #174).
+        // sessions keep the tokens they already hold in memory.
         message: `Running conversations finish on the account they started with. New messages use ${label}.`,
       });
       await refresh();

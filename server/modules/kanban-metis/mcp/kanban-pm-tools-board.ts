@@ -26,7 +26,7 @@ import {
  * plus the three lesson tools, whose descriptors and handlers live in
  * `kanban-pm-tools-lessons.ts` and are spliced in at the bottom of this table.
  *
- * Names are `descent-pm`'s, for the reason `kanban-pm-tools-cards.ts` states. The rows these reads
+ * Names are fixed, for the reason `kanban-pm-tools-cards.ts` states. The rows these reads
  * answer with are projected in `kanban-pm-projections.ts`.
  *
  * Consumers: `kanban-pm-mcp.ts`, which assembles this table with the other two and starts the
@@ -185,7 +185,7 @@ export function createBoardTools(client: KanbanPmClient): ToolTable {
           return errorResult(`limit must be a whole number between 1 and ${SEARCH_LIMIT_MAX}`);
         }
 
-        // The default is the whole corpus, as Descent's was: every kind a search covers.
+        // The default is the whole corpus: every kind a search covers.
         const requestedKinds = (args.kinds as string[] | undefined) ?? [...SEARCH_KINDS];
         const unknownKind = requestedKinds.find(
           (kind) => !(SEARCH_KINDS as readonly string[]).includes(kind)

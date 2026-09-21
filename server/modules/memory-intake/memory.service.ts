@@ -2,7 +2,6 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 import { getConnection, memoryCandidatesDb, sessionsDb } from '@/modules/database/index.js';
-import type { DescentMemoryRow } from '@/modules/database/index.js';
 import type { MemoryCandidateFull, MemoryCandidateLean } from '@/shared/types.js';
 import { AppError } from '@/shared/utils.js';
 
@@ -45,7 +44,7 @@ export type MemoryTarget = (typeof MEMORY_TARGETS)[number];
 /** The longest a candidate's name may be — a title, and the source of a filename besides. */
 const MAX_NAME_CHARS = 80;
 
-/** The index read's own ceiling, as `store_memory.py:312` spells it. */
+/** The index read's own ceiling: the most candidates one listing returns. */
 const MEMORY_LIST_LIMIT = 100;
 
 /**
@@ -68,10 +67,10 @@ export type MemoryCandidateInput = {
 /**
  * One of two spellings of the same field, whichever the caller used.
  *
- * A spill file on disk carries Descent's snake_case (`index_line`, `session_id`); a TypeScript caller
- * carries the names the row and the wire use. Both are accepted for the two multi-word fields and no
- * others, so neither caller's spelling is silently DROPPED by the whitelist below — a door that
- * discarded a field it was handed would be worse than one that refused it.
+ * A spill file on disk carries the snake_case spellings (`index_line`, `session_id`); a TypeScript
+ * caller carries the names the row and the wire use. Both are accepted for the two multi-word fields
+ * and no others, so neither caller's spelling is silently DROPPED by the whitelist below — a door
+ * that discarded a field it was handed would be worse than one that refused it.
  */
 function field(data: Record<string, unknown>, camel: string, snake: string): unknown {
   return data[camel] ?? data[snake];
@@ -202,7 +201,7 @@ export function validateMemoryArgs(input: unknown): MemoryCandidateInput {
 /**
  * A row's `sessionId` as the app session id the client can compare against the chat it has open.
  *
- * Descent's provenance column is UNVERIFIED, and the resolver is the only translation of it — three
+ * The provenance column is UNVERIFIED, and the resolver is the only translation of it — three
  * lookups that end with the id unchanged when nothing knows it. Display only: nothing in this module
  * gates on it. It drives `isMine`/`mineFirst` in the panel, so dropping it would silently un-sort the
  * operator's own proposals among everyone's.
@@ -221,8 +220,7 @@ function resolveSession(candidate: MemoryCandidateFull): MemoryCandidateFull {
  * Stage one proposed memory at status `pending`, and return it as stored.
  *
  * `source` is the INGEST PATH's own identity and never the file's claim, so it is a parameter the
- * caller passes rather than a field the door would hand back. `descentId` is null: a locally staged
- * proposal came from this board, not from an imported Descent row.
+ * caller passes rather than a field the door would hand back.
  *
  * No event row, no frame, no bell — this lane is not a board lane. Its own `created_at` is its
  * record.
@@ -239,7 +237,6 @@ export function stageMemoryCandidate(input: MemoryCandidateInput, source = 'spil
       status: 'pending',
       source,
       sessionId: input.sessionId,
-      descentId: null,
     })
   );
 }
@@ -344,72 +341,6 @@ export function approveMemoryCandidate(candidateId: string): MemoryCandidateFull
 /** Discard one PENDING candidate. Nothing is written to any target, and a refusal cannot occur. */
 export function rejectMemoryCandidate(candidateId: string): MemoryCandidateFull | null {
   return review(candidateId, false);
-}
-
-/**
- * The stamp a source row with none of its own is given: the epoch, never "now".
- *
- * A fresh timestamp would be newer than every local edit on the next run, and it would differ on
- * every run, so two imports of one source could not agree. The epoch says what is actually true:
- * nothing is known about when this row was made.
- */
-const SOURCE_EPOCH = new Date(0).toISOString();
-
-/**
- * Descent's spelling of an instant, in this lane's one spelling.
- *
- * Descent writes its own: `2026-06-24T03:09:28.168342+00:00` — microsecond precision and a numeric
- * offset, not the millisecond `Z` form. This lane stores the one spelling `new
- * Date().toISOString()` produces, because its queue sorts on `created_at` as TEXT and two spellings
- * of one instant compare WRONG as text. The board's importer states the same rule in its own pass
- * helpers, and the two are separate homes on purpose: this lane imports no board module, and the
- * rule is four lines of `Date.parse` in each.
- *
- * A value that will not parse is kept EXACTLY as it is rather than dropped or zeroed: nothing is
- * known about it, and a stamp a reader can still show beats a null.
- */
-function normaliseStamp(value: string | null): string | null {
-  if (value === null) return null;
-  const parsed = new Date(value);
-  return Number.isNaN(parsed.getTime()) ? value : parsed.toISOString();
-}
-
-/** The same where the column demands a value: an absent stamp is the epoch. */
-function stamp(value: string | null): string {
-  return normaliseStamp(value) ?? SOURCE_EPOCH;
-}
-
-/**
- * The Descent import's door into this lane: an old install's proposals, written as they stand.
- *
- * THIS IS THE ONE VERB HERE THAT DOES NOT PASS THROUGH `validateMemoryArgs`, and the reason is a
- * sentence rather than a shortcut: the door validates a NEW proposal, while these rows are what a
- * person already lived with — Descent's own vocabulary, at the status that install last left them
- * in. Its `target` list has grown a value this lane's door refuses (`user` is in the live table
- * today), so routing 53 rows through the door would fail a whole board import over three rows that
- * are not wrong, merely older. `status` travels the same way and for the same reason.
- *
- * Idempotent by `descent_id`: the repository's upsert reuses the local id a previous import gave
- * the row and UPDATES it, so a second import adds nothing. The count returned is rows WRITTEN,
- * which the board's importer records beside its own tables'.
- *
- * `sessionId` is NOT resolved here: resolution is a read-path translation of Descent's unverified
- * provenance, and every read of this table goes through it already.
- */
-export function importDescentCandidates(rows: DescentMemoryRow[]): number {
-  let written = 0;
-
-  for (const row of rows) {
-    const changes = memoryCandidatesDb.upsertCandidate({
-      ...row,
-      created_at: stamp(row.created_at),
-      reviewed_at: normaliseStamp(row.reviewed_at),
-    });
-
-    written += changes > 0 ? 1 : 0;
-  }
-
-  return written;
 }
 
 /** The lane's verbs as one bag, which is what the route package takes. */

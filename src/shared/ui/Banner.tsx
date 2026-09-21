@@ -14,7 +14,7 @@ type BannerProps = {
  * A full-width line the app uses to say something about the surface it sits on.
  *
  * Used by the chat module (Phase 6) for the tool-permission prompt and by the accounts module
- * (Phase 13) for the drift notice, whose "Save it" is the `action`, and for a write Descent
+ * (Phase 13) for the drift notice, whose "Save it" is the `action`, and for a write the store
  * refused — every caller needs a toned strip carrying a sentence and at most one or two buttons,
  * and none should spell a second one.
  *

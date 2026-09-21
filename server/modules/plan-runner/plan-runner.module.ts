@@ -60,14 +60,14 @@ const ANNOUNCED_THROUGH_KEY = 'plan_runner_announced_through';
 /**
  * How long the plans-archive sweep waits after construction before its first pass, in milliseconds.
  *
- * The plan-archive watcher's settle window (`plans_archive_watcher.py:67`, ~2 min), for its own
- * reason: a boot still warming must not race the first sweep, and this server restarts far more
- * often than once a day — so the pass AFTER THE SETTLE is what reliably runs, and a daily timer
- * measured from boot would be reset by the next restart before it ever fired.
+ * A settle window of ~2 min, for its own reason: a boot still warming must not race the first
+ * sweep, and this server restarts far more often than once a day — so the pass AFTER THE SETTLE is
+ * what reliably runs, and a daily timer measured from boot would be reset by the next restart
+ * before it ever fired.
  */
 const ARCHIVE_SETTLE_MS = 120_000;
 
-/** How often the sweep runs once that first pass has happened (`plans_archive_watcher.py:70`, 24 h). */
+/** How often the sweep runs once that first pass has happened (24 h). */
 const ARCHIVE_INTERVAL_MS = 86_400_000;
 
 /**

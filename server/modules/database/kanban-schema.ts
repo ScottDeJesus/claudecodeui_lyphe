@@ -15,12 +15,12 @@
  * created empty, so it builds the new shape) and fails only on a real
  * database that already has the old one, as a runtime error in a later phase.
  *
- * `descent_id` is `NULL UNIQUE` on purpose, and nullable on every table:
- * SQLite permits many NULLs under one UNIQUE constraint, so locally created
- * rows (no Descent ancestor) sit beside imported ones while the importer's
- * `ON CONFLICT(descent_id)` still keys cleanly on the rows that carry one.
- * A UNIQUE constraint already builds the index for it, so no separate index
- * on `descent_id` is declared below.
+ * The PROVENANCE COLUMN is `NULL UNIQUE` on purpose, and nullable on every
+ * table: SQLite permits many NULLs under one UNIQUE constraint, so locally
+ * created rows (no imported ancestor) sit beside imported ones while an
+ * upsert's `ON CONFLICT` still keys cleanly on the rows that carry one. A
+ * UNIQUE constraint already builds the index for it, so no separate index on
+ * it is declared below.
  */
 export const KANBAN_SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS kanban_boards (
@@ -34,7 +34,7 @@ CREATE TABLE IF NOT EXISTS kanban_boards (
     archived INTEGER NOT NULL DEFAULT 0,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL,
-    descent_id TEXT NULL UNIQUE
+    legacy_id TEXT NULL UNIQUE
 );
 
 CREATE TABLE IF NOT EXISTS kanban_cards (
@@ -63,7 +63,7 @@ CREATE TABLE IF NOT EXISTS kanban_cards (
     plan_owner TEXT NULL,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL,
-    descent_id TEXT NULL UNIQUE
+    legacy_id TEXT NULL UNIQUE
 );
 
 CREATE TABLE IF NOT EXISTS kanban_card_tags (
@@ -85,7 +85,7 @@ CREATE TABLE IF NOT EXISTS kanban_questions (
     sort_order INTEGER NOT NULL DEFAULT 0,
     created_at TEXT NOT NULL,
     answered_at TEXT NULL,
-    descent_id TEXT NULL UNIQUE
+    legacy_id TEXT NULL UNIQUE
 );
 
 CREATE TABLE IF NOT EXISTS kanban_issues (
@@ -96,7 +96,7 @@ CREATE TABLE IF NOT EXISTS kanban_issues (
     filed_at TEXT NOT NULL,
     resolved_at TEXT NULL,
     resolved_by TEXT NULL,
-    descent_id TEXT NULL UNIQUE
+    legacy_id TEXT NULL UNIQUE
 );
 
 CREATE TABLE IF NOT EXISTS kanban_decisions (
@@ -107,7 +107,7 @@ CREATE TABLE IF NOT EXISTS kanban_decisions (
     choice TEXT NOT NULL DEFAULT '[]',
     tags TEXT NOT NULL DEFAULT '[]',
     created_at TEXT NOT NULL,
-    descent_id TEXT NULL UNIQUE
+    legacy_id TEXT NULL UNIQUE
 );
 
 CREATE TABLE IF NOT EXISTS kanban_checklist_items (
@@ -119,7 +119,7 @@ CREATE TABLE IF NOT EXISTS kanban_checklist_items (
     note TEXT NOT NULL DEFAULT '',
     created_at TEXT NOT NULL,
     done_at TEXT NULL,
-    descent_id TEXT NULL UNIQUE
+    legacy_id TEXT NULL UNIQUE
 );
 
 CREATE TABLE IF NOT EXISTS kanban_attachments (
@@ -129,7 +129,7 @@ CREATE TABLE IF NOT EXISTS kanban_attachments (
     mime TEXT NOT NULL DEFAULT '',
     size INTEGER NOT NULL DEFAULT 0,
     created_at TEXT NOT NULL,
-    descent_id TEXT NULL UNIQUE
+    legacy_id TEXT NULL UNIQUE
 );
 
 CREATE TABLE IF NOT EXISTS kanban_events (
@@ -140,7 +140,7 @@ CREATE TABLE IF NOT EXISTS kanban_events (
     card_id TEXT NULL,
     actor TEXT NOT NULL DEFAULT 'operator',
     payload TEXT NOT NULL DEFAULT '{}',
-    descent_id TEXT NULL UNIQUE
+    legacy_id TEXT NULL UNIQUE
 );
 
 CREATE TABLE IF NOT EXISTS kanban_settings (
@@ -156,10 +156,10 @@ CREATE TABLE IF NOT EXISTS kanban_id_seq (
 
 -- The lesson store: what a build learned, staged for a person's review before any later session
 -- reads it back. card_id is ON DELETE SET NULL, never CASCADE — a lesson OUTLIVES the card it was
--- learned on, and the pointer to a deleted card simply goes NULL. descent_id carries the ov_lessons
--- row this one came from, like every other imported table here.
--- There is NO CHECK on status, kind or trigger: Descent's lesson vocabulary grew a value twice, and
--- a CHECK would fail the whole import transaction on a value it forbids. The doors validate instead.
+-- learned on, and the pointer to a deleted card simply goes NULL. The provenance column carries the
+-- id of the row this one was imported from, like every other imported table here.
+-- There is NO CHECK on status, kind or trigger: the lesson vocabulary has grown a value twice, and
+-- a CHECK would fail a whole import transaction on a value it forbids. The doors validate instead.
 CREATE TABLE IF NOT EXISTS kanban_lessons (
     id TEXT PRIMARY KEY NOT NULL,
     card_id TEXT NULL REFERENCES kanban_cards(id) ON DELETE SET NULL,
@@ -174,7 +174,7 @@ CREATE TABLE IF NOT EXISTS kanban_lessons (
     draft_path TEXT NULL,
     created_at TEXT NOT NULL,
     reviewed_at TEXT NULL,
-    descent_id TEXT NULL UNIQUE
+    legacy_id TEXT NULL UNIQUE
 );
 
 -- What one Metis session has spent, read from its transcript: the per-session ledger behind the

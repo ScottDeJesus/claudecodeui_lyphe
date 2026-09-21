@@ -4,8 +4,8 @@ import type { DeepseekBalance } from '@/shared/types.js';
  * The vendor's own balance endpoint, absolute because it is not on this host and never will be.
  *
  * Deliberately a DEFAULT rather than the only source: the module passes the URL in as a
- * dependency, the way the Descent proxy passes its `baseUrl`, so a test can point this service at
- * a local port and prove all five unknown paths without touching the real account.
+ * dependency, so a test can point this service at a local port and prove all five unknown paths
+ * without touching the real account.
  */
 export const DEEPSEEK_BALANCE_URL = 'https://api.deepseek.com/user/balance';
 

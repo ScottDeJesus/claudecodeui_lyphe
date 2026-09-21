@@ -20,8 +20,8 @@ import { expandHome } from '@/shared/utils.js';
  *      identity, never one a caller assumed, and `install` calls it BEFORE copying the target slot
  *      over the live files. So the login being replaced is saved before anything is overwritten, and
  *      a live pair clobbered by a still-running session self-heals into the right slot next switch.
- *      The order IS the rule: install's refusal happens before a single byte moves. Honest residual
- *      (inherited from `account_store.py`): that self-heal files the CLOBBERED pair over the slot's
+ *      The order IS the rule: install's refusal happens before a single byte moves. Honest residual:
+ *      that self-heal files the CLOBBERED pair over the slot's
  *      good one, and `drift` cannot see it, because the identities match. Recovery is a fresh
  *      `/login` — no cure fits inside rule 3, since the store cannot tell whose tokens it holds.
  *   2. DRIFT IS A FULL-EMAIL COMPARE — the live identity against the ACTIVE SLOT's stored identity,

@@ -6,7 +6,7 @@ export { credentialsDb } from '@/modules/database/repositories/credentials.js';
 export { githubTokensDb } from '@/modules/database/repositories/github-tokens.js';
 // The Kanban board's repositories: used by the kanban module — its board verbs mint through
 // `kanbanIdsDb`, its cards are summarised through `kanbanCardsDb`, its audit log is appended
-// through `kanbanEventsDb` by the one write seam — and by the Descent importer.
+// through `kanbanEventsDb` by the one write seam.
 // The card's approval, written by the approve gate: one statement, so an approval and the
 // promotion a `not_ready` card takes with it cannot land apart.
 export { kanbanApprovalsDb } from '@/modules/database/repositories/kanban-approvals.db.js';
@@ -24,12 +24,6 @@ export type { KanbanCardRow } from '@/modules/database/repositories/kanban-cards
 export { kanbanChecklistDb } from '@/modules/database/repositories/kanban-checklist.db.js';
 export { kanbanEventsDb } from '@/modules/database/repositories/kanban-events.db.js';
 export { kanbanIdsDb } from '@/modules/database/repositories/kanban-ids.db.js';
-// The Descent importer's upserts, keyed on `descent_id`: the board and its cards, the six tables
-// that hang off a card, and the lookup that decides whether a source row is an insert or a
-// refresh. The table union is the allowlist for the one statement that names a table rather than a
-// bound parameter.
-export { kanbanImportDb } from '@/modules/database/repositories/kanban-import.db.js';
-export type { KanbanImportTable } from '@/modules/database/repositories/kanban-import.db.js';
 // The lesson store and the per-session usage ledger: what a build learned, staged for a person's
 // review, and what each Metis session spent as its transcript grew. Neither is a card's child, so
 // neither is reached through a card's read.
@@ -41,11 +35,8 @@ export { kanbanLeasesDb } from '@/modules/database/repositories/kanban-leases.db
 // answer writes both in one mutate callback.
 export { kanbanQuestionsDb } from '@/modules/database/repositories/kanban-questions.db.js';
 // The memory-intake lane's own table: proposals to write a memory into one of five destinations,
-// each waiting on a person's approval. It is not a board table and no board reads it. The row type
-// below is Descent's spelling of that table — the shape the importer reads out of an old install
-// and hands to the lane, which is why the board's transport names it too.
+// each waiting on a person's approval. It is not a board table and no board reads it.
 export { memoryCandidatesDb } from '@/modules/database/repositories/memory-candidates.db.js';
-export type { DescentMemoryRow } from '@/modules/database/repositories/memory-candidates.db.js';
 export { notificationChannelEndpointsDb } from '@/modules/database/repositories/notification-channel-endpoints.js';
 export { notificationPreferencesDb } from '@/modules/database/repositories/notification-preferences.js';
 // providerModelsDb: used by Providers to persist user-managed custom model rows.

@@ -16,7 +16,7 @@ import { writeKanban } from './kanban-write.service.js';
  *
  * It lives in `kanban_settings` and NOT on the client, because boards are GLOBAL: switching
  * projects must not switch boards, and a board survives a reload, a second tab and a restart.
- * `current_board` is the one settings row this project imports from a Descent database.
+ * `current_board` is the one settings row an imported database seeds; nothing else writes it.
  */
 const CURRENT_BOARD_KEY = 'current_board';
 
@@ -199,7 +199,7 @@ export const kanbanBoardsService = {
   /**
    * The operator's "go now": one audit row on the board, and nothing else.
    *
-   * `store_nudge.py`'s nudge collapses a daemon's sleep, and this is the same act against a driver
+   * A nudge collapses a driver's sleep, and that is the whole act against a driver
    * that ticks on an interval: the caller records that a human asked, and wakes the loop itself
    * (`kanban-metis.routes.ts` schedules the tick on the next macrotask). The write is here rather
    * than in that route because every write on this board goes through the seam, which is what makes

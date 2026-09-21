@@ -5,7 +5,6 @@ import type { KanbanAttachmentsService } from '../kanban-attachments.service.js'
 import type { KanbanBoardsService } from '../kanban-boards.service.js';
 import type { KanbanCardsService } from '../kanban-cards.service.js';
 import type { KanbanChecklistService } from '../kanban-checklist.service.js';
-import type { KanbanImportService } from '../kanban-import.service.js';
 import type { KanbanLeasesService } from '../kanban-leases.service.js';
 import type { KanbanLessonsService } from '../kanban-lessons.service.js';
 import type { KanbanQuestionsService } from '../kanban-questions.service.js';
@@ -16,15 +15,14 @@ import type { KanbanMemoryPendingReader } from './board.routes.js';
 import * as cardRoutes from './card.routes.js';
 import type { KanbanPlanCostReader } from './card.routes.js';
 import * as detailRoutes from './detail.routes.js';
-import * as importRoutes from './import.routes.js';
 import { createLearningRoutes } from './learning.routes.js';
 
 /**
  * What the route package is built from.
  *
- * One object rather than one argument per factory: the import sibling adds its field here as it
- * lands, and no existing factory's call site has to change — each factory declares only the fields
- * it uses (`CardRouteDependencies`, `DetailRouteDependencies`) and takes them off this object.
+ * One object rather than one argument per factory: every service lands here as its phase does, and
+ * no existing factory's call site has to change — each factory declares only the fields it uses
+ * (`CardRouteDependencies`, `DetailRouteDependencies`) and takes them off this object.
  */
 export type KanbanServices = {
   boards: KanbanBoardsService;
@@ -33,7 +31,6 @@ export type KanbanServices = {
   checklist: KanbanChecklistService;
   attachments: KanbanAttachmentsService;
   leases: KanbanLeasesService;
-  importer: KanbanImportService;
   lessons: KanbanLessonsService;
   // The two READINGS the board cannot take for itself, handed in by the composition root rather
   // than imported: a card's plan cost lives in the plan-runner's ledgers and the estate's pending
@@ -64,7 +61,6 @@ export function createKanbanRouter(services: KanbanServices): Router {
   // The card's ATTACHMENT BYTES: the one mount in this package that takes a multipart body and
   // streams a file. Its paths are its own, so its position here decides nothing.
   router.use(createAttachmentRoutes(services));
-  router.use(importRoutes.createImportRoutes(services));
   router.use(createLearningRoutes(services));
 
   return router;

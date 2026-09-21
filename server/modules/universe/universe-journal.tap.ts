@@ -25,9 +25,9 @@ import { matchPath } from './universe-route-match.js';
 export type JournalMessage = { method?: string; path?: string; logger?: string };
 
 /**
- * An access line in either of the two shapes this estate writes: uvicorn's
- * `INFO: 127.0.0.1:57360 - "POST /api/… HTTP/1.1" 200 OK` and descent's
- * `[descent] 127.0.0.1 "GET /api/memory?status=pending HTTP/1.1" 200 -`.
+ * An access line in either of the two shapes a Python service on this estate writes: uvicorn's
+ * `INFO: 127.0.0.1:57360 - "POST /api/… HTTP/1.1" 200 OK` and a logger-tagged
+ * `[api] 127.0.0.1 "GET /api/memory?status=pending HTTP/1.1" 200 -`.
  *
  * One pattern for both because the quoted request is what they share: whatever precedes the quote
  * is the logger's business and differs between frameworks, and whatever follows it is a status.

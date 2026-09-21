@@ -1,7 +1,7 @@
 import { useTranslation } from 'react-i18next';
 
 import { useDeepSeekFlashSwitch } from '@/shared/hooks/useDeepSeekFlashSwitch';
-import { Button } from '@/shared/ui';
+import { Button, LLMProviderLogo } from '@/shared/ui';
 import SettingsRow from '@/modules/settings/SettingsRow';
 import SettingsToggle from '@/modules/settings/SettingsToggle';
 
@@ -36,6 +36,7 @@ export default function RunnerModelContent() {
   return (
     <div className="rounded-xl border border-border bg-card">
       <SettingsRow
+        icon={<LLMProviderLogo provider="deepseek" className="h-4 w-4" />}
         label={label}
         description={unknown
           ? unreadable

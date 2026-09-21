@@ -15,9 +15,9 @@ import {
 /**
  * The nine card tools: the feature's own lifecycle, over the board's card routes.
  *
- * The names are `descent-pm`'s to the letter, because the brief a Metis child is handed and the
- * hook matchers around her were written against them — a ported brief asking for `create_feature`
- * must not find a tool called `create_feature_card`. What changes is only the server word
+ * The names are FIXED, because the brief a Metis child is handed and the hook matchers around her
+ * are written against them — a brief asking for `create_feature` must not find a tool called
+ * `create_feature_card`. The only word that changes is the server prefix
  * (`mcp__kanban-pm__create_feature`).
  *
  * Consumers: `kanban-pm-mcp.ts`, which assembles this table with the other two and starts the

@@ -17,6 +17,7 @@ import {
 } from '@/modules/database/schema.js';
 import { KANBAN_SCHEMA_SQL } from '@/modules/database/kanban-schema.js';
 import { MEMORY_SCHEMA_SQL } from '@/modules/database/memory-schema.js';
+import { migrateProvenanceColumnToLegacyId } from '@/modules/database/migrations-legacy-id.js';
 
 const SQLITE_UUID_SQL = `
 lower(hex(randomblob(4))) || '-' ||
@@ -610,6 +611,7 @@ export const runMigrations = (db: Database) => {
     // KANBAN_SCHEMA_SQL above. It sits here, after the projects rebuild, for the same reason the
     // board's script does: nothing in this lane references `projects`.
     db.exec(MEMORY_SCHEMA_SQL);
+    migrateProvenanceColumnToLegacyId(db);
 
     db.exec('CREATE INDEX IF NOT EXISTS idx_session_ids_lookup ON sessions(session_id)');
     db.exec('CREATE INDEX IF NOT EXISTS idx_sessions_provider_session_id ON sessions(provider_session_id)');

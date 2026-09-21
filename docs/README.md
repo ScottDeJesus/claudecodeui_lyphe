@@ -59,7 +59,7 @@
 - **Integrated Shell Terminal** - Direct access to the Agents CLI through built-in shell functionality
 - **File Explorer** - Interactive file tree with an editor for text files, previews for PDFs, Word documents, spreadsheets, CSV/TSV, Markdown, images, audio and video, and downloads for everything else ([file-manager.md](file-manager.md))
 - **Git Explorer** - Read your branch, what is waiting to be pushed, and every pending change with its diff — committing and pushing are the Agent's: one button starts the conversation and runs your own `/git`
-- **Kanban Board** - Backlog, to do, in progress and done, with questions, checklists, issues, tags and build leases, live over the websocket — plus a one-way import from an existing Descent install ([kanban.md](kanban.md))
+- **Kanban Board** - Backlog, to do, in progress and done, with questions, checklists, issues, tags and build leases, live over the websocket ([kanban.md](kanban.md))
 - **Application Switcher** - Your other applications — framed inside the workspace from a draggable button, one or two at a time, off a registry file you edit by hand ([applications.md](applications.md))
 - **Browser Use** - Open browser sessions for web research, testing, and agent-driven browser tasks
 - **Session Management** - Resume conversations, manage multiple sessions, and track history

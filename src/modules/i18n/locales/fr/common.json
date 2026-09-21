@@ -47,7 +47,6 @@
       "newBoard": "Nouveau tableau",
       "rename": "Renommer",
       "archive": "Archiver",
-      "importDescent": "Importer depuis Descent",
       "newTitle": "Nouveau tableau",
       "renameTitle": "Renommer le tableau",
       "archiveTitle": "Archiver ce tableau ?",
@@ -90,11 +89,6 @@
       "autonomyOff": "Autonomie désactivée",
       "cardArchived": "Carte archivée",
       "laneCleared": "Les cartes de la colonne ont été archivées"
-    },
-    "import": {
-      "done": "Importé depuis Descent",
-      "counts": "{{inserted}} ajoutées, {{updated}} mises à jour",
-      "failed": "L'import n'a pas abouti"
     }
   },
   "status": {

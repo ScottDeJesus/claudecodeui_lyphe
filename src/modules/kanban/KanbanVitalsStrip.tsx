@@ -9,7 +9,7 @@ import { cn } from '@/shared/utils';
 /**
  * The board's six counts, in the header, where the reader is already looking.
  *
- * SIX REGISTERS, ONE FIXED ORDER — Descent's own, left to right, with the claimable count last:
+ * SIX REGISTERS, ONE FIXED ORDER, left to right, with the claimable count last:
  * a register that moved with its value would have to be re-found on every glance. Each is a glyph
  * and a number and nothing else; the words ride in a tooltip (hover, or a long-press on a phone)
  * and in the accessible name, because six labels would cost the board's name its width.

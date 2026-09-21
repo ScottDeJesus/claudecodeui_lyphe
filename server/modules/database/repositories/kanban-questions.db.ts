@@ -49,8 +49,8 @@ const QUESTION_COLUMNS = `id, card_id, text, multi, options, selected, other_on,
 const DECISION_COLUMNS = `id, card_id, question_id, question, choice, tags, created_at`;
 
 /**
- * The JSON columns are ARRAYS OF STRINGS and they are stored as JSON, exactly as Descent stores
- * them — never as a comma-joined string, which cannot tell an option containing a comma from two
+ * The JSON columns are ARRAYS OF STRINGS and they are stored as JSON — never as a comma-joined
+ * string, which cannot tell an option containing a comma from two
  * options and turns `[]` into one empty option.
  *
  * A value that will not parse reads as the empty array rather than as an exception: a column this

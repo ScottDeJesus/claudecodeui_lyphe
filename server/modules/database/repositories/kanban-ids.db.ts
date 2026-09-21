@@ -18,8 +18,8 @@ export const kanbanIdsDb = {
    *
    * The prefix is the id's only semantic, and this list is its vocabulary rather than a constraint
    * — the mint takes whatever it is handed: `b` boards, `c` cards, `q` questions, `i` issues, `d`
-   * decisions, `k` checklist items, `a` attachments, `ls` lessons. A Descent row's own id is never
-   * reused as a primary key — it is kept in `descent_id`.
+   * decisions, `k` checklist items, `a` attachments, `ls` lessons. A minted id is never the id an
+   * imported row arrived with — that one is kept in the provenance column.
    */
   mintId(prefix: string): string {
     const db = getConnection();

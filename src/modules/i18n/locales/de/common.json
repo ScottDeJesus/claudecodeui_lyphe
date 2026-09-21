@@ -47,7 +47,6 @@
       "newBoard": "Neues Board",
       "rename": "Umbenennen",
       "archive": "Archivieren",
-      "importDescent": "Aus Descent importieren",
       "newTitle": "Neues Board",
       "renameTitle": "Board umbenennen",
       "archiveTitle": "Dieses Board archivieren?",
@@ -89,11 +88,6 @@
       "autonomyOff": "Autonomie aus",
       "cardArchived": "Karte archiviert",
       "laneCleared": "Die Karten der Spalte wurden archiviert"
-    },
-    "import": {
-      "done": "Aus Descent importiert",
-      "counts": "{{inserted}} hinzugefügt, {{updated}} aktualisiert",
-      "failed": "Der Import ist nicht gelaufen"
     }
   },
   "status": {

@@ -509,8 +509,8 @@ export const sessionsDb = {
   /**
    * One id of ANY spelling → the app session id it belongs to.
    *
-   * The plan runner writes the Claude transcript uuid into `run.json` and
-   * Descent records whatever id its staging was handed; both are provider-side
+   * The plan runner writes the Claude transcript uuid into `run.json`, and a
+   * staging path records whatever id it was handed; both are provider-side
    * names for a conversation whose app row is keyed differently. The browser
    * never learns a provider id, so the translation has to happen server-side,
    * and this is the one method that does it.

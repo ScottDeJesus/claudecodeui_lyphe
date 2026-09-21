@@ -236,7 +236,8 @@ app.use('/api/memory', authenticateToken, createMemoryIntakeModule());
 // The SAME board router behind a second door, for the `kanban-pm` MCP child and nothing else —
 // no verb is duplicated here, and there is deliberately NO `authenticateToken`: a Metis is not a
 // user and holds no user token. `kanbanMetisSecretGuard` is that door's own credential check, on a
-// secret derived from the session id, and it refuses the descent importer outright.
+// secret derived from the session id, and it refuses the lesson review and the byte-deleting verbs
+// outright.
 app.use('/api/kanban-pm', kanbanMetisSecretGuard, createKanbanModule(kanbanReadings));
 
 // The applications this host serves, and the registry file the switcher's drawer reads (protected).
@@ -246,8 +247,8 @@ app.use('/api/apps', authenticateToken, createAppsModule());
 // Installed CLI version + what the live runs are on (protected)
 app.use('/api/cli-version', authenticateToken, createCliVersionModule());
 
-// The money left on this host's DeepSeek account (protected) — a different account from the
-// Claude slots Descent holds, read from the vendor directly with the key in this host's .env.
+// The money left on this host's DeepSeek account (protected) — an account of its own, read from
+// the vendor directly with the key in this host's .env.
 app.use('/api/deepseek', authenticateToken, createDeepseekModule());
 
 // The plan runner's live runs, and the relay for its own stop/resume (protected).

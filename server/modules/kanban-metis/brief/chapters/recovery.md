@@ -47,9 +47,7 @@ Do this at the TOP of every orient (orient step 2), BEFORE claiming any new feat
      - **`is_mine == true AND is_stale` is YOUR OWN orphan.** This is the case the
        derived owner exists for: the child died or was reaped, the lease aged out, and
        the SAME session id coming back — a re-adopted session, a driver re-launch with
-       the same uuid — reads its own card as `is_mine` and resumes it cleanly. (Descent
-       could not do this: it minted a per-process token, so a restarted session could not
-       recognise its own build.)
+       the same uuid — reads its own card as `is_mine` and resumes it cleanly.
      - **This board has no PARK contract.** There is no `parked` flag on a card here and
        no operator-stop sentinel: a card the operator has deliberately held back is
        expressed by the operator's own hands (a tag, an issue, a card they moved), and the
@@ -133,8 +131,8 @@ as step a of the BUILD ladder does for a fresh build.
   session** (`is_mine == false AND not is_stale`). The lease is advisory-with-
   staleness, not a hard mutex: stealing a fresh foreign lease double-builds an
   overlapping reconnect. Only orphans (`build_owner is null OR is_stale`) resume.
-- **The owner is DERIVED from the session id, never minted.** That is the one property
-  this board changed from Descent on purpose. A minted token lives only in the process
+- **The owner is DERIVED from the session id, never minted.** A minted token lives only in
+  the process
   that minted it, so a resumed or re-adopted session would come back unable to refresh
   the leases it already holds and would be reaped by its own staleness rule. A derived
   owner is the same sixteen hex characters every time that session id is seen, by any
@@ -194,13 +192,12 @@ planning ENDS, and a claim that outlived its planning would pin the card to an o
 walked away. The heartbeat re-stamps a plan lease through the same claim verb, every 10s,
 for the same reason the build lease is re-stamped there and not in the driver.
 
-**`/execute` stale-marker recovery (in play for a Metis build too).** Because a Metis
-build runs `Skill(execute)` INLINE, the `/execute` machinery is in play — including
-its pipeline marker (`~/.claude/state/pipeline_active_<session>.txt`). A Metis build's
-OWN per-phase resume substrate is still the card's CHECKLIST (above), but if a crashed
-inline `/execute` leaves a stale pipeline marker that wedges the next turn, the hook
-SELF-HEALS it — the Stop hook auto-clears a marker that is PROVABLY dead (no soul dispatched
-AND no block within `DESCENT_PIPELINE_HEAL_MINS`, default 6h; a live run is never healed).
-The manual `rm ~/.claude/state/pipeline_active_<session_id>.txt` stays the fallback (the block
-message prints the exact filename). Everything else reconciles from the
-checklist + the card lanes + the lease.
+**`/execute` stale-marker recovery — no longer a thing.** A Metis
+build runs `Skill(execute)` INLINE, so the `/execute` machinery is in play — but not a
+pipeline marker: that session-keyed marker family is retired and nothing in the house
+writes it, so there is no stale one to heal and no manual `rm` fallback to reach for.
+The hold that DOES survive a Metis build is the PENDING-plan one (`pending_execute_plan_<sid>.txt`),
+and its release is the run's own launch (the runner's `start` clears it for the session that
+started it); a stale one is reaped by the 48h sweep. A Metis build's
+OWN per-phase resume substrate is still the card's CHECKLIST (above). Everything else
+reconciles from the checklist + the card lanes + the lease.

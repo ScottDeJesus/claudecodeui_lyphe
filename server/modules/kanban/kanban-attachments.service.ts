@@ -19,8 +19,7 @@ import { writeKanban } from './kanban-write.service.js';
  * the extension of the VALIDATED mime — NEVER from the client's filename. A filename like
  * `../../etc/passwd` or `x.php` therefore cannot influence where bytes land or what they are named:
  * the only caller-controlled bit that reaches a path (the mime) is constrained to the closed allowlist
- * below before it touches a path component. The filename is display text and nothing else. This is
- * `~/.claude/descent/store_attachments.py`'s rule, and its `store_schema.py:79-93` derivation.
+ * below before it touches a path component. The filename is display text and nothing else.
  *
  * ON-DISK / ROW ORDERING. `addAttachment` writes the bytes BEFORE it inserts the row, so a failed
  * disk write never commits a row pointing at a file that is not there. The reverse — a file with no
@@ -36,7 +35,7 @@ import { writeKanban } from './kanban-write.service.js';
  */
 
 /**
- * The largest attachment this board accepts, in bytes — Descent's eight megabytes, checked by
+ * The largest attachment this board accepts, in bytes — eight megabytes, checked by
  * multer's `fileSize` limit so an oversized body is cut off as it arrives rather than buffered and
  * then refused. The service checks it again on the bytes it was handed, because a caller other than
  * the route (an import, a future MCP verb) must meet the same cap.
@@ -73,8 +72,8 @@ export function isAllowedAttachmentMime(mime: string): boolean {
  * The mime is a string the caller sends, and it is the one field that decides both the stored
  * extension and the `Content-Type` the download is labelled with. Nothing else verifies it: a
  * multipart part's headers are all a browser has to go on, so without this gate `image/png` is a
- * claim about bytes nobody looked at. `server_api.py:360-399` orders its door mime → decode → size
- * → sniff for exactly that reason, and `_sniff_image` is this table.
+ * claim about bytes nobody looked at. The door orders itself mime → decode → size
+ * → sniff for exactly that reason, and this table is what that last step reads.
  *
  * WebP is a CONTAINER, so a bare `RIFF` prefix proves nothing — a WAV carries it too — and its
  * form-type at offset 8 is what decides.
@@ -152,16 +151,16 @@ function findAttachment(cardId: string, attachmentId: string): KanbanAttachment 
  * refused rather than written to a name the next reader could not reconstruct — and the bytes are
  * SNIFFED against the claimed mime, because the multipart part's headers cannot be, which is what
  * makes the row's `mime` (and so the download's `Content-Type`) a fact rather than the caller's
- * claim. `server_api.py:360-399`'s order: mime, then the bytes decode to something, then the size,
+ * claim. The order is fixed: mime, then the bytes decode to something, then the size,
  * then the header.
  *
  * The bytes are written inside the seam's transaction (the minted id is what names the file, so the
  * id cannot precede it) and the row is inserted after them, in the same transaction: a disk failure
  * rolls the row back and leaves at most an orphan blob, never a card pointing at a file that is not
- * there. `store_attachments.py`'s `add_attachment` order exactly.
+ * there. That is the order the row insert and the blob write take, fixed.
  *
  * A blank filename is defaulted rather than refused: it is a display label, the client's browser
- * always sends one, and the store never uses it as a path component (`server_api.py:392`).
+ * always sends one, and the store never uses it as a path component.
  */
 export function addAttachment(
   cardId: string,
@@ -269,15 +268,15 @@ export function resolveAttachmentFile(
  * Removes one attachment: the row and its event in the seam, then the file.
  *
  * Answers `false` for an attachment that is not there, and appends no event for one — a stale id
- * must not tick the stream. The unlink is BEST-EFFORT and happens after the row is committed,
- * `store_attachments.py:delete_attachment`'s order: the row is the source of truth for every reader,
+ * must not tick the stream. The unlink is BEST-EFFORT and happens after the row is committed: the
+ * row is the source of truth for every reader,
  * so an un-removable file is never a reason to roll back a delete the operator asked for.
  *
- * THAT ORPHAN IS NOT RECLAIMED BY ANYTHING HERE. Descent's `purge_feature_attachments` was not
- * ported — this repository has no sweep over `<root>/<cardId>/` — so a failed unlink, a rolled-back
- * write, or a card deleted straight from the database leaves bytes under the root that only the
- * operator's own `rm` will take back. The delete's own success path is unaffected (the row and the
- * file both go), and the honest statement of the gap belongs beside the choice that leaves it.
+ * THAT ORPHAN IS NOT RECLAIMED BY ANYTHING HERE — this repository has no sweep over
+ * `<root>/<cardId>/` — so a failed unlink, a rolled-back write, or a card deleted straight from the
+ * database leaves bytes under the root that only the operator's own `rm` will take back. The
+ * delete's own success path is unaffected (the row and the file both go), and the honest statement
+ * of the gap belongs beside the choice that leaves it.
  *
  * The row's own delete is the one statement here with no repository verb: `kanban-checklist.db.ts`
  * carries the attachment INSERT and LIST but no delete, and this phase's manifest does not include

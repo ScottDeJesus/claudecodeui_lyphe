@@ -48,8 +48,12 @@ async function readBody(response: Response): Promise<VerbBody | null> {
  *
  * The toast is amber rather than red on both: a refused verb denied nothing and destroyed
  * nothing (design doctrine :145).
+ *
+ * `resumeWord` is the word ON THE BUTTON that pressed it, and the refusal answers in that word: a
+ * queued run's button says Start, and a refusal headed "Resume" names a verb the operator never
+ * saw. The runner's own sentence underneath is the same either way — it is `resume` that runs.
  */
-export function useRunnerVerbs(runId: string): {
+export function useRunnerVerbs(runId: string, resumeWord?: string): {
   stop(): Promise<void>;
   resume(): Promise<void>;
   busy: RunnerVerb | null;
@@ -93,7 +97,8 @@ export function useRunnerVerbs(runId: string): {
         // on stderr, but a verb that exits non-zero having said its piece on stdout is still
         // telling the reader something, and an empty toast tells them nothing at all.
         const said = firstLine(body?.stderr) || firstLine(body?.stdout) || t('messages.operationFailed');
-        toast({ tone: 'warn', title: t(verb === 'stop' ? 'runner.stop' : 'runner.resume'), message: said });
+        const title = verb === 'stop' ? t('runner.stop') : (resumeWord ?? t('runner.resume'));
+        toast({ tone: 'warn', title, message: said });
       } catch (error) {
         // The request never completed — the API is down, or the deadline passed. That is the
         // network's word, not the runner's, and it is said as such.
@@ -103,7 +108,7 @@ export function useRunnerVerbs(runId: string): {
         if (mountedRef.current) setBusy(null);
       }
     },
-    [runId, t, toast],
+    [runId, resumeWord, t, toast],
   );
 
   const stop = useCallback(() => send('stop'), [send]);

@@ -13,8 +13,8 @@ import { isRecord, markRolled, parseWindows } from './usage-windows.js';
  *
  * The SHAPE half — what the payload means, and what a missing window is — is `usage-windows.ts`,
  * which this file imports and which holds no credential and opens no socket. That edge runs one way
- * on purpose, and it is why the split exists. Ported from `~/.claude/descent/server_api_usage.py`,
- * which the deleted proxy served from.
+ * on purpose, and it is why the split exists: this half owns the token, so nothing that only reads
+ * a payload may reach one.
  *
  * THE TOKEN SEAM — one deliberate divergence from the account store's rule, and the five bounds that
  * keep it checkable. `account-store.service.ts` never parses a token: it copies credential BYTES file

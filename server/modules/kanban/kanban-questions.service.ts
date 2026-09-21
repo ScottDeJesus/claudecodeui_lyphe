@@ -60,7 +60,7 @@ function requireQuestion(questionId: string): KanbanQuestion {
 }
 
 /**
- * THE APPROVE GATE, exactly as Descent defines it (descent/README.md:428).
+ * THE APPROVE GATE.
  *
  * A card may be approved when nobody is still waiting on an answer AND the card says something
  * about what would be built — a plan, a body, or at least a description. Either half alone is a

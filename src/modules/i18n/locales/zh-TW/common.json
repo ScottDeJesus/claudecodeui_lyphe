@@ -47,7 +47,6 @@
       "newBoard": "新增看板",
       "rename": "重新命名",
       "archive": "封存",
-      "importDescent": "從 Descent 匯入",
       "newTitle": "新增看板",
       "renameTitle": "重新命名看板",
       "archiveTitle": "封存此看板？",
@@ -88,11 +87,6 @@
       "autonomyOff": "自主模式已關閉",
       "cardArchived": "卡片已封存",
       "laneCleared": "該欄的卡片已封存"
-    },
-    "import": {
-      "done": "已從 Descent 匯入",
-      "counts": "新增 {{inserted}} 項，更新 {{updated}} 項",
-      "failed": "匯入未執行"
     }
   },
   "status": {

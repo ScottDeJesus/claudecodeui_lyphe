@@ -9,8 +9,8 @@ import { getConnection } from '@/modules/database/connection.js';
  * absorbs, and removing one that is not there is a delete of nothing. Neither write needs to look
  * first, so neither can lose a race by looking.
  *
- * Consumers: `kanban-cards.service.ts` (the tag verbs and the lane page's batch read) and the
- * Descent importer. Reach it through `@/modules/database/index.js`.
+ * Consumers: `kanban-cards.service.ts` (the tag verbs and the lane page's batch read).
+ * Reach it through `@/modules/database/index.js`.
  */
 export const kanbanCardTagsDb = {
   /**

@@ -103,8 +103,10 @@ export default function ComposerDeepSeekSwitch({ yieldsToVoice }: Props) {
       <LLMProviderLogo provider="deepseek" className="h-4 w-4 shrink-0" />
       {/* The rate's second channel: green and amber are one grey to a red-green colour-blind
           reader, so peak also wears the warn tone's own glyph. Off-peak wears none — the mark to
-          notice is the expensive one. */}
-      {!unknown && peak && <span aria-hidden="true" className="text-[10px] leading-none">▲</span>}
+          notice is the expensive one. NOT ON A PHONE (operator, 2026-09-20): below `sm` the chip is
+          the mark alone, and the glyph beside it read as damage rather than as a price. The same
+          breakpoint the "Flash" label uses, so the narrow chip is one mark and nothing else. */}
+      {!unknown && peak && <span aria-hidden="true" className="hidden text-[10px] leading-none sm:inline">▲</span>}
       <span className="hidden sm:inline">
         {t('input.deepseekFlashShort', { defaultValue: 'Flash' })}
       </span>

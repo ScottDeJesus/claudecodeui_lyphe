@@ -93,7 +93,7 @@ export const kanbanEventsDb = {
    * The newest rows first, optionally narrowed to one board and one card.
    *
    * Newest first is what makes the limit mean something: the board's newest write is what a panel
-   * repaints from, and an imported Descent board's log runs to twelve thousand rows, so a read
+   * repaints from, and an imported board's log runs to twelve thousand rows, so a read
    * that started at the oldest would spend its budget on history nobody asked to see.
    */
   listEvents(options: { boardId?: string; cardId?: string; limit?: number }): KanbanEventRow[] {

@@ -16,16 +16,15 @@ const SWITCH_REASSURANCE =
 /**
  * What the date on a row means, said once so no row has to imply it.
  *
- * The account store calls `expiresAt` "a freshness clock, not a secret" — the rule it kept from
- * `account_store.py:148`, where the switcher said it aloud — and renders no warning from it
- * anywhere. It is the provider's expiry inside the COPY the store holds, read from that slot's own
- * file — so the date is the age of the copy and nothing more. On the live store, two of three sit
- * in the past.
+ * The account store calls `expiresAt` "a freshness clock, not a secret" and renders no warning from
+ * it anywhere. It is the provider's expiry inside the COPY the store holds, read from that slot's
+ * own file — so the date is the age of the copy and nothing more. On the live store, two of three
+ * sit in the past.
  *
  * It says what the date IS and draws no contrast, deliberately. Every clause that sorted the rows
  * into "the one in use" and "the rest" turned out false: nothing refreshes a copy on a clock, so
  * the active slot's stamp passes like any other; and a switch writes the OUTGOING slot fresh
- * first (`account_store.py:316-331`), so a just-docked copy carries a future date for hours.
+ * first, so a just-docked copy carries a future date for hours.
  * `savedCopyFreshness` below has a future-tense branch for exactly that row. A sentence that
  * merely names the field cannot be contradicted by any row beneath it.
  *

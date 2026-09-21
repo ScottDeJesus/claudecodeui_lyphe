@@ -19,7 +19,7 @@ import type { KanbanLessonInput } from './kanban-lessons.service.js';
  * genuinely different, so a shared sweeper would be a third thing that has to know both.
  *
  * THE PRODUCER CONTRACT IS `<name>.json.tmp`, THEN RENAME TO `<name>.json` — the contract
- * `memory_ingest.py:38` states and `learn.md` §4 keeps. The scan is `endsWith('.json')`, so a `.tmp`
+ * `learn.md` §4 keeps. The scan is `endsWith('.json')`, so a `.tmp`
  * is invisible to it and the rename publishes the lesson whole or not at all. The scan cannot
  * ENFORCE that — it sees only the name a producer declared complete — so a producer writing the
  * final name in place has forfeited the protection, and a half-written document is refused.
@@ -27,7 +27,7 @@ import type { KanbanLessonInput } from './kanban-lessons.service.js';
  * STAGE, THEN UNLINK — AT-LEAST-ONCE, DELIBERATELY. The opposite order (unlink first) would LOSE a
  * lesson entirely if the staging then failed. This order can re-stage a duplicate if the process
  * dies in the window between the two, which is visible on the review queue and one click to reject.
- * A duplicate is cheap; a silent loss is not. `lessons_ingest.py:30-34` makes the same trade.
+ * A duplicate is cheap; a silent loss is not, so the trade is made that way on purpose.
  *
  * QUARANTINE WHAT RE-READING WOULD REPEAT; DEFER EVERYTHING ELSE. A malformed file, a door refusal,
  * a `cardId` naming no card: facts about these bytes, so the file moves to `failed/` — a SUBDIR the
@@ -36,10 +36,9 @@ import type { KanbanLessonInput } from './kanban-lessons.service.js';
  * next pass. That arm covers a peer's write lock (`SQLITE_BUSY`/`SQLITE_LOCKED`) and, load-bearingly,
  * "no such table" — what this sweep sees when its first pass runs while `server/index.ts` is still
  * building the routers, a moment before `initializeDatabase()`, the sole caller of `runMigrations`,
- * creates the schema. The polarity is the source's (`lessons_ingest.py:145-154`: quarantine a
- * `ValueError`, defer a `sqlite3.OperationalError`) and deliberate — we never discard a lesson we
- * could still stage; a store fault nothing will fix costs one log line per pass, which a person can
- * see and act on. Ported from `~/.claude/descent/lessons_ingest.py`.
+ * creates the schema. The polarity is deliberate — quarantine a bad VALUE, defer a store FAULT —
+ * and it is the whole point: we never discard a lesson we could still stage, and a store fault
+ * nothing will fix costs one log line per pass, which a person can see and act on.
  */
 
 /** The sweep's cadence. Latency only — staging is idempotent at the operator's review. */
@@ -54,8 +53,7 @@ const SUMMARY_MAX_CHARS = 60;
  *
  * ONE SWEEP PER PROCESS, not one per module construction. The board's router is built twice — once
  * for `/api/kanban` and once for the `/api/kanban-pm` mount a Metis can reach — so a per-construction
- * interval would scan one directory with two timers and stage the same file twice. The stray-daemon
- * guard `lessons_ingest.py:209-222` keeps the same invariant for the same reason.
+ * interval would scan one directory with two timers and stage the same file twice.
  */
 let sweepTimer: ReturnType<typeof setInterval> | null = null;
 
@@ -87,8 +85,8 @@ function describe(error: unknown): string {
 /**
  * The store's verdict on the CONTENT — the one class of store failure re-reading these bytes would
  * produce again, so the only one worth quarantining: the `AppError` `stageLesson` throws before its
- * transaction opens, for a `cardId` that names no card (the source's `ValueError` arm,
- * `lessons_ingest.py:145-147`). A `SqliteError` is the opposite — it says something about the STORE
+ * transaction opens, for a `cardId` that names no card). A `SqliteError` is the opposite — it says
+ * something about the STORE
  * — and a two-code test for BUSY or LOCKED (what this file shipped first) classified "no such table"
  * as permanent and destroyed lessons during the boot race above. Do not narrow it again.
  */
@@ -120,8 +118,8 @@ function text(value: unknown, field: string): string {
  * `undefined` and surfacing as sqlite's own sentence rendered a 500 — the file path is the one place
  * no transport pre-check runs. What is checked here is exactly what the row requires: `name`,
  * `summary` and `trigger` are non-empty strings, `name` and `summary` carry the lesson contract's
- * two length bounds (`learn.md` §2 — `mcp_tools_lessons.py:127-134` enforces the same pair at the
- * MCP door, and a bound promised to the writer is one this door has to keep), and the four optional
+ * two length bounds (`learn.md` §2 — the MCP door enforces the same pair, and a bound promised to
+ * the writer is one this door has to keep), and the four optional
  * fields carry the shapes the repository can store.
  *
  * The `trigger` VOCABULARY is deliberately NOT re-declared here. It has one home — the `kanban-pm`

@@ -47,7 +47,6 @@
       "newBoard": "Nuevo tablero",
       "rename": "Renombrar",
       "archive": "Archivar",
-      "importDescent": "Importar desde Descent",
       "newTitle": "Nuevo tablero",
       "renameTitle": "Renombrar tablero",
       "archiveTitle": "¿Archivar este tablero?",
@@ -90,11 +89,6 @@
       "autonomyOff": "Autonomía desactivada",
       "cardArchived": "Tarjeta archivada",
       "laneCleared": "Se han archivado las tarjetas de la columna"
-    },
-    "import": {
-      "done": "Importado desde Descent",
-      "counts": "{{inserted}} añadidas, {{updated}} actualizadas",
-      "failed": "La importación no se ejecutó"
     }
   },
   "status": {

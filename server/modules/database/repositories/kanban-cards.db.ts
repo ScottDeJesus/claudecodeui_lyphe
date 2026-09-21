@@ -60,8 +60,8 @@ export type KanbanCardUpdatePatch = {
 /**
  * Cards, their tags, their rolled-up counts, and the lane page a status set reads as.
  *
- * Consumers: `kanban-cards.service.ts` (every card verb), `kanban-write.service.ts` (the write
- * seam reads the affected card's FRESH summary to build its frame), and `kanban-import.service.ts`.
+ * Consumers: `kanban-cards.service.ts` (every card verb) and `kanban-write.service.ts` (the write
+ * seam reads the affected card's FRESH summary to build its frame).
  * Reach it through `@/modules/database/index.js`.
  *
  * `getConnection()` is called per query, like every repository here, so a call made while the
@@ -129,8 +129,9 @@ export const kanbanCardsDb = {
    * statuses compose one is panel policy this server never learns — so binding the card's own
    * status would drop a fresh To Do card into the middle of a lane that also shows `questions`.
    * One gap past the board's highest `sort_order` is below every card on the board, and so the
-   * bottom of every lane that could hold it. `descent_id` stays unset: this card has no Descent
-   * ancestor, and that column is nullable-UNIQUE exactly so many rows may say so at once.
+   * bottom of every lane that could hold it. The provenance column stays unset: this card was
+   * created here and has no imported ancestor, and that column is nullable-UNIQUE exactly so many
+   * rows may say so at once.
    */
   insertCard(input: {
     id: string;

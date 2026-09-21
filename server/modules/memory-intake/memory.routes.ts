@@ -34,7 +34,7 @@ import { memoryNotFound, type MemoryIntakeService } from './memory.service.js';
  */
 
 /**
- * What a candidate's id may look like — the same fence the Descent proxy wrote, kept verbatim so the
+ * What a candidate's id may look like — kept as it was so the
  * ids a session has already seen keep working. Narrower than "any path segment" on purpose.
  */
 const MEMORY_ID = /^[A-Za-z0-9_-]{1,64}$/;

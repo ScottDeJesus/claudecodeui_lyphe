@@ -47,7 +47,6 @@
       "newBoard": "Yeni pano",
       "rename": "Yeniden adlandır",
       "archive": "Arşivle",
-      "importDescent": "Descent'ten içe aktar",
       "newTitle": "Yeni pano",
       "renameTitle": "Panoyu yeniden adlandır",
       "archiveTitle": "Bu pano arşivlensin mi?",
@@ -89,11 +88,6 @@
       "autonomyOff": "Otonomi kapalı",
       "cardArchived": "Kart arşivlendi",
       "laneCleared": "Sütundaki kartlar arşivlendi"
-    },
-    "import": {
-      "done": "Descent'ten içe aktarıldı",
-      "counts": "{{inserted}} eklendi, {{updated}} güncellendi",
-      "failed": "İçe aktarma çalışmadı"
     }
   },
   "status": {

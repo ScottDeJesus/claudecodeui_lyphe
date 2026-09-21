@@ -43,13 +43,11 @@ import type { MemoryCandidateInput } from './memory.service.js';
  * building the routers, a moment before `initializeDatabase()`, the sole caller of `runMigrations`,
  * creates the schema). The door is where a fact about the bytes is decided; a store failure is a
  * fact about the store, and it changes. A narrowing to `SQLITE_BUSY`/`SQLITE_LOCKED` alone shipped
- * here first and destroyed proposals during that boot race; the polarity is the source's
- * (`memory_ingest.py:212-226` — a door `ValueError` quarantined, an `OperationalError` deferred) and
+ * here first and destroyed proposals during that boot race; the polarity — a door `ValueError`
+ * quarantined, an `OperationalError` deferred — is load-bearing and
  * must not be narrowed again. The price is that a store fault nothing
  * will fix leaves one line per pass with the file still queued — visible and actionable — instead of
  * losing a proposal one second before it could have been staged.
- *
- * Ported from `~/.claude/descent/memory_ingest.py`.
  */
 
 /** The sweep's cadence. Latency only — staging is idempotent at the operator's review. */
@@ -60,7 +58,6 @@ const SPILL_INTERVAL_MS = 15_000;
  *
  * ONE SWEEP PER PROCESS, not one per module construction: a second construction — a second mount, a
  * reload seam — would otherwise race the first over one directory and stage the same proposal twice.
- * `memory_ingest.py:307-314` keeps the same invariant for the same reason.
  */
 let sweepTimer: ReturnType<typeof setInterval> | null = null;
 

@@ -118,11 +118,11 @@ export function MemoryCandidateRow({ candidate, refusal, busy, onReview }: Memor
   const targetWords = t(`memory.target.${candidate.target}`, { defaultValue: candidate.target });
   const TargetIcon = TARGET_ICONS[candidate.target] ?? StickyNoteIcon;
 
-  // A card reviewed elsewhere reads WHOLE: the by-id read has no status filter
-  // (store_memory.py:343-349), so a full read can land carrying `approved` or `rejected` rather
-  // than a null. That is the same news as no-such-id — this memory is no longer waiting — so it
-  // gets the same words in place of the body. The buttons stay: a press answers 422 in the
-  // server's own text through the refusal path, and the next refresh drops the row.
+  // A card reviewed elsewhere reads WHOLE: the by-id read has no status filter, so a full read can
+  // land carrying `approved` or `rejected` rather than a null. That is the same news as
+  // no-such-id — this memory is no longer waiting — so it gets the same words in place of the
+  // body. The buttons stay: a press answers 422 in the server's own text through the refusal path,
+  // and the next refresh drops the row.
   const noLongerPending = full === null || (full !== undefined && full.status !== 'pending');
 
   return (

@@ -17,7 +17,7 @@ import { getLiveMetisRegistry } from './metis-registry.service.js';
  * The token watcher: every thirty seconds, what each live Metis session has burned, read off the
  * transcript files the CLI writes — never guessed at, and never smeared onto the wrong card.
  *
- * `~/.claude/descent/pm_telemetry.py` ported in-process. It records the same two ways: the durable
+ * It records two ways: the durable
  * per-session ledger (`kanban_session_usage`) and the per-card `build_tokens_*` counters the
  * board's cost chip renders, attributed to the card the session holds a FRESH build lease on. A
  * session between cards — orienting, or holding a lease that went stale — records at the session
@@ -228,7 +228,7 @@ function tallyFile(filePath: string, tally: FileTally): void {
 /**
  * What one transcript holds from `fromOffset` on, deduped on `message.id`.
  *
- * The one-shot reading, and the whole contract of the port: `tokensIn|Out|cacheRead|cacheCreate`
+ * The one-shot reading: `tokensIn|Out|cacheRead|cacheCreate`
  * are what the consumed lines hold, `seen` names the messages they carried, and `offset` is where
  * to resume — always past a complete line, never into a partial one. A file that is not there
  * reads as all zeros at the offset asked for.
@@ -362,7 +362,7 @@ function liveLeaseHolders(
       cursor,
     });
     for (const card of result.cards) {
-      // Both halves of Descent's predicate: the lane the claim path moves the card into, and the
+      // Both halves of the predicate: the lane the claim path moves the card into, and the
       // lease freshness the server already computed for the summary. They are stamped together, so
       // a card holding a live lease is an `active` card, and a card failing either test is simply
       // not one this tick may attribute to.

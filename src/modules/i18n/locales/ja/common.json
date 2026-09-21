@@ -47,7 +47,6 @@
       "newBoard": "新しいボード",
       "rename": "名前を変更",
       "archive": "アーカイブ",
-      "importDescent": "Descent からインポート",
       "newTitle": "新しいボード",
       "renameTitle": "ボードの名前を変更",
       "archiveTitle": "このボードをアーカイブしますか？",
@@ -88,11 +87,6 @@
       "autonomyOff": "自律モードをオフにしました",
       "cardArchived": "カードをアーカイブしました",
       "laneCleared": "レーンのカードをアーカイブしました"
-    },
-    "import": {
-      "done": "Descent からインポートしました",
-      "counts": "{{inserted}} 件追加、{{updated}} 件更新",
-      "failed": "インポートを実行できませんでした"
     }
   },
   "status": {

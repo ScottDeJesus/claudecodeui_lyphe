@@ -22,8 +22,7 @@ import { MEMORY_TARGETS } from './memory.service.js';
  * keys), a `project` slug for the project-scoped targets, and a readable `name`. It NEVER names a
  * path. Every real path is composed here from the allowlist, the home directory, a project slug
  * re-checked against `PROJECT_SLUG_RE` and a kebab-slugged name, so no column of a row — and
- * therefore no session that dropped a spill file, and no row Phase 6's import copies in from
- * Descent's own table — can aim a write outside the sanctioned homes:
+ * therefore no session that dropped a spill file — can aim a write outside the sanctioned homes:
  *
  *   * `memory`       → `~/.claude/projects/<project>/memory/<kebab>.md` (a NEW topic note), and THEN
  *                      one `- …` router line appended to that project's `memory/MEMORY.md`
@@ -154,8 +153,8 @@ export function projectMemoryDir(project: string): string {
  * The order is load-bearing for `memory`: the topic note first, its router line second.
  *
  * A target that is not one of the five REFUSES rather than falling through to the last branch.
- * Descent's own DDL comment names a fourth `target` value (`user`) that its enforced allowlist never
- * had, and a row carrying one can reach here from an import — falling through would append that row's
+ * A column describes itself in prose and an enforced allowlist is narrower than that prose, so a row
+ * can arrive here carrying a value outside it — falling through would append that row's
  * body to the global CLAUDE.md, which is the highest-blast file this lane can touch. An unknown
  * target has no derivable home, and saying so is the only honest answer.
  */
@@ -176,8 +175,8 @@ function stepsFor(
   if (PROJECT_TARGETS.includes(target)) {
     // The SECURITY belt behind the door, and the one no import can walk around.
     //
-    // The door checks this slug, but a candidate can reach here without ever passing it: Phase 6's
-    // import inserts rows wholesale from Descent's own table, and a hand-edited row is one `INSERT`
+    // The door checks this slug, but a candidate can reach here without ever passing it: an
+    // import inserts rows wholesale, and a hand-edited row is one `INSERT`
     // away in any case. So the slug is re-checked at the only place in the module that composes a
     // path. `String(project)` would happily turn a `null` into a directory named "null" and a
     // `../../etc` into a climb out of `projects/` — the exact escape this file's header says no

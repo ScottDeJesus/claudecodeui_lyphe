@@ -7,7 +7,7 @@ import { ActionMenu, type ActionMenuItem, LLMProviderLogo, Select, Switch, Toolt
 
 /**
  * The board's one row of chrome: which board you are looking at, how it stands in six counts,
- * whether it is running itself, and the four things you can do to the board as a whole.
+ * whether it is running itself, and the three things you can do to the board as a whole.
  *
  * IT INVENTS NO SHELL. `h-12`, a bottom border and no background of its own — it sits inside the
  * workspace tab and inherits the chrome the tab already draws. A second page-level header here
@@ -63,7 +63,6 @@ type KanbanBoardHeaderProps = {
   onNewBoard: () => void;
   onRenameBoard: () => void;
   onArchiveBoard: () => void;
-  onImportDescent: () => void;
 };
 
 /** Rendered by KanbanPanel, above the lane rail. Nothing else mounts it. */
@@ -78,7 +77,6 @@ export function KanbanBoardHeader({
   onNewBoard,
   onRenameBoard,
   onArchiveBoard,
-  onImportDescent,
 }: KanbanBoardHeaderProps) {
   const { t } = useTranslation();
 
@@ -90,14 +88,6 @@ export function KanbanBoardHeader({
     // Archiving hides a board and deletes nothing, which is why it is not marked as danger.
     { key: 'rename-board', label: t('kanban.board.rename'), disabled: !hasBoard, onSelect: onRenameBoard },
     { key: 'archive-board', label: t('kanban.board.archive'), disabled: !hasBoard, onSelect: onArchiveBoard },
-    {
-      // The one row that opens a dialog rather than doing something, and the only one that
-      // reaches outside this app — so it sits alone under the divider.
-      key: 'import-descent',
-      label: t('kanban.board.importDescent'),
-      showDividerBefore: true,
-      onSelect: onImportDescent,
-    },
   ];
 
   return (

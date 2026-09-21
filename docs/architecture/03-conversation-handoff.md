@@ -134,8 +134,7 @@ and returns the input unchanged rather than `null` when no row carries it at all
 callers outside the sessions service that hold a provider-spelled id and must show it beside an app
 session without ever letting a provider id itself reach the browser: the plan-runner lane's
 `launched_by_session` ([plan-runner.md](../plan-runner.md) §files) and the memory lane's `sessionId`
-([memory-intake.md](../memory-intake.md) §"Where the shapes live") — the column's own name is
-inherited from Descent's schema, but the lane it resolves for is CloudCLI's own now.
+([memory-intake.md](../memory-intake.md) §"Where the shapes live").
 
 ### What `session_created` used to do
 

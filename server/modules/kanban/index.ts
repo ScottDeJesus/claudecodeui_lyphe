@@ -4,7 +4,7 @@
 // archive, restore, tags, questions and their answers, issues, checklist, attachments, approval
 // and the two leases, and the lessons: the staged corpus, its by-id read and the two reviews.
 export { createKanbanModule } from './kanban.module.js';
-// The eight verb surfaces, exported so an in-process caller names a service once instead of
+// The seven verb surfaces, exported so an in-process caller names a service once instead of
 // reaching into its file. Their own consumers today are the routes, which import the files. Each
 // service lands here as its phase does, so the barrel never drifts a phase behind the module.
 // The MCP program is NOT an in-process caller: it is a leaf that reaches the board over HTTP
@@ -21,7 +21,6 @@ export { kanbanCardsService } from './kanban-cards.service.js';
 // than read out of these rows by a module the board cannot see.
 export { plansHeldByLease } from './kanban-cards.service.js';
 export { kanbanChecklistService } from './kanban-checklist.service.js';
-export { kanbanImportService } from './kanban-import.service.js';
 export { kanbanLeasesService } from './kanban-leases.service.js';
 // The lesson store's five verbs: the board's own read surface for what a build learned, and the
 // one the `kanban-pm` MCP program reaches over HTTP in Phase 7. Its review verbs are delivered on

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * The `kanban-pm` stdio MCP server: Descent's twenty-five PM tools, served over the board's own
+ * The `kanban-pm` stdio MCP server: the board's twenty-five PM tools, served over its own
  * HTTP verbs.
  *
  * This is a PROGRAM, not a service. It is spawned as a stdio child of the CLI, one per Metis

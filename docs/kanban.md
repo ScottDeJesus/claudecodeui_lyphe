@@ -1,6 +1,6 @@
 # The Kanban board
 
-Forty-two routes under `/api/kanban`, behind `authenticateToken` on the MOUNT
+Forty-one routes under `/api/kanban`, behind `authenticateToken` on the MOUNT
 (`server/index.ts:226` — no route file imports the guard), wired in `kanban.module.ts`, plus one
 websocket frame — `kind: 'kanban_event'` — sent to every open `/ws` socket on every write and
 never on a read.
@@ -19,16 +19,14 @@ a SET of them, composed on the client (§"The panel"). A card carries a title, a
 description, an optional plan and body, tags, questions and the decisions they produced, issues, a
 checklist, attachments, approval, and two leases with their token ledgers.
 
-**It is Descent's model, ported.** The schemas are Descent's `ov_*` tables under a `kanban_`
-prefix, with the same columns and the same five statuses, because the importer (§"Importing from
-Descent") has to be a mapping rather than a translation. What came across with them is Descent's
-daemon, one module over: **the driver in `server/modules/kanban-metis/` DOES schedule, build and
-resume — THIS module does none of the three** (§"The driver"). The autonomy switch stays a UI gate
-and a governor column the driver reads; the leases stay rows an external process takes and
-refreshes, and the only thing here that reads one for a decision is `claimableCount`, which the
-driver asks before it spawns (§"The services"). This module owns the data model and the verbs; the
-driver owns every decision taken over them, and reads them through this module's barrel rather than
-through a second copy of anything.
+**The model is this module's, under a `kanban_` prefix, and the machine that works it is not.** A
+card carries the five statuses and the columns above; the daemon sits one module over: **the driver
+in `server/modules/kanban-metis/` DOES schedule, build and resume — THIS module does none of the
+three** (§"The driver"). The autonomy switch stays a UI gate and a governor column the driver
+reads; the leases stay rows an external process takes and refreshes, and the only thing here that
+reads one for a decision is `claimableCount`, which the driver asks before it spawns (§"The
+services"). This module owns the data model and the verbs; the driver owns every decision taken over
+them, and reads them through this module's barrel rather than through a second copy of anything.
 
 ## The tables
 
@@ -38,13 +36,16 @@ Thirteen tables and ten indexes, all declared in ONE idempotent script,
 `projects(project_id)`. There is no version counter: every statement is `IF NOT EXISTS`, and that
 is what makes a re-run at every boot safe. The consequence is the trap, stated in that file's own
 header — once a database has these tables, editing a column here changes nothing on it, and a
-later change needs an explicit `ALTER TABLE` in `migrations.ts` beside the `sessions` columns.
+later change needs an explicit `ALTER TABLE` in `migrations.ts` beside the `sessions` columns — or,
+once that file is already past the house's soft size cap, in its own sibling module with one
+import line and one call line left in `migrations.ts` (`migrations-legacy-id.ts`, the provenance
+column's rename to `legacy_id`, is that pattern's first instance).
 
 | Table | What it holds |
 |---|---|
-| `kanban_boards` | A board: its name, the project it is ABOUT (`project_id` — never a lane filter, but no longer inert either: it resolves to the ONE `--add-dir` this board's Metis is given, and a board with a null `project_id` gives her none, so she works only inside her own session directory — §"A board's Metis, launched"), `autonomy` (the driver's governor — §"The driver"), `deepseek_flash` (the board's own switch — §"The two switches"), `concurrency` (the board's own Metis dial — §"The driver"), `sort_order`, `archived`, `descent_id`. |
-| `kanban_cards` | The card, every column of Descent's `ov_features` including the ones its own `_migrate` adds: title, `status` with a five-value CHECK, `priority` with a three-value CHECK, description, `closing_remarks`, `plan`, `body`, approval, `archived`, `sort_order`, the four token counters (`build_tokens_in`, `_out`, `_cache_read`, `_cache_create` — accumulated by the token watcher, §"The token watcher"), both leases (`build_lease_at`/`build_owner`, `plan_lease_at`/`plan_owner`), and the timestamps. |
-| `kanban_card_tags` | The card/tag join. Descent's `ov_tags` IS a join table, so there is no tag entity here either: `(card_id, tag)` is the primary key and a tag exists only as a name attached to a card. |
+| `kanban_boards` | A board: its name, the project it is ABOUT (`project_id` — never a lane filter, but no longer inert either: it resolves to the ONE `--add-dir` this board's Metis is given, and a board with a null `project_id` gives her none, so she works only inside her own session directory — §"A board's Metis, launched"), `autonomy` (the driver's governor — §"The driver"), `deepseek_flash` (the board's own switch — §"The two switches"), `concurrency` (the board's own Metis dial — §"The driver"), `sort_order`, `archived`, `legacy_id`. |
+| `kanban_cards` | The card: title, `status` with a five-value CHECK, `priority` with a three-value CHECK, description, `closing_remarks`, `plan`, `body`, approval, `archived`, `sort_order`, the four token counters (`build_tokens_in`, `_out`, `_cache_read`, `_cache_create` — accumulated by the token watcher, §"The token watcher"), both leases (`build_lease_at`/`build_owner`, `plan_lease_at`/`plan_owner`), and the timestamps. |
+| `kanban_card_tags` | The card/tag join. There is no tag entity: `(card_id, tag)` is the primary key and a tag exists only as a name attached to a card. |
 | `kanban_questions` | A card's questions: `text`, `multi`, `options` and `selected` as JSON text arrays, the free-text `other`, and `answered`. |
 | `kanban_issues` | Issues filed against a card, with `filed_at`, `resolved`, and who resolved it. |
 | `kanban_decisions` | The record of an answer — what was asked, what was chosen, its tags. `card_id` and `question_id` are both nullable and both may name rows that are gone; a decision outlives what it decided. |
@@ -53,7 +54,7 @@ later change needs an explicit `ALTER TABLE` in `migrations.ts` beside the `sess
 | `kanban_events` | The audit log: `ts`, `kind`, `board_id`, `card_id`, `actor`, `payload` as a JSON object. It is the table the write seam writes (§"The one write seam"), and one request reads it (`GET /events`). |
 | `kanban_settings` | `key` / `value`. Exactly one key is live: `current_board`, the selected board — the reason boards are global (§"The panel"). |
 | `kanban_id_seq` | `prefix` / `next`. The id minting arithmetic and nothing else. |
-| `kanban_lessons` | The lesson STORE: what a build learned, staged for a person's review — `name`, `summary`, `body`, `trigger`, `kind` (`note` or `skill_draft`), `tags`, `status`, `source`, an optional `draft_path`. `card_id` is `ON DELETE SET NULL`, never CASCADE — a lesson OUTLIVES the card it was learned on. No CHECK on `status`, `kind` or `trigger`: Descent's lesson vocabulary grew a value twice, so the doors validate instead of a constraint. |
+| `kanban_lessons` | The lesson STORE: what a build learned, staged for a person's review — `name`, `summary`, `body`, `trigger`, `kind` (`note` or `skill_draft`), `tags`, `status`, `source`, an optional `draft_path`. `card_id` is `ON DELETE SET NULL`, never CASCADE — a lesson OUTLIVES the card it was learned on. No CHECK on `status`, `kind` or `trigger`: the lesson vocabulary has grown a value before now, so the doors validate instead of a constraint. |
 | `kanban_session_usage` | What one Metis session has spent, read from its transcript: the per-session ledger behind the card's rolled-up token chips. `session_id` is the primary key — one row per session, upserted as the transcript grows — and the four counters are the session's running TOTALS, never a delta: the watcher subtracts the row it stored last tick from what it counted now (§"The token watcher"). `byte_offset` records where the MAIN transcript's read cursor stood at that write; the watcher resumes from its own in-memory cursors and never reads the column back. `board_id` and `card_id` are provenance and may be NULL — `card_id` is the last card this session's spend was attributed to, and a tick that finds none leaves it alone. |
 
 The ten indexes are all named `ix_kanban_*` so one query can count them:
@@ -64,12 +65,11 @@ instead. `events_board` is `(board_id, id)`, which is what makes the audit-log r
 `kanban_session_usage` carries no index of its own: every read of it is by its own primary key,
 `session_id`.
 
-**There is deliberately no index on `descent_id`.** The column is `NULL UNIQUE` on every table that
+**There is deliberately no index on `legacy_id`.** The column is `NULL UNIQUE` on every table that
 has one, and a UNIQUE constraint already builds its own index — a second one would be dead weight
 on every insert. That nullability is load-bearing rather than incidental: SQLite permits MANY NULL
-rows under one UNIQUE constraint, which is exactly what lets a card created here (no Descent
-ancestor, `descent_id` null) sit in the same table as an imported one while the importer's
-`ON CONFLICT(descent_id)` still keys cleanly on the rows that carry one.
+rows under one UNIQUE constraint, which is exactly what lets a locally created row (`legacy_id`
+null) sit in the same table as one carrying a provenance id.
 
 `PRAGMA foreign_keys = ON` is set in the schema's own init script, so every `REFERENCES` above is
 enforced — including the `ON DELETE CASCADE` from a card to its questions, issues, checklist items,
@@ -82,12 +82,11 @@ names is deleted, and the same clause that unlabels a board when its project goe
   prefix inside the caller's transaction — an UPSERT, not a read-then-write, so two creates racing
   on one prefix cannot mint the same id — and returns `` `${prefix}-${next}` ``. The prefixes are
   `b` boards, `c` cards, `q` questions, `i` issues, `d` decisions, `k` checklist items and
-  `a` attachments. Descent's own ids are never reused as primary keys; they live in `descent_id`
+  `a` attachments. A provenance id is never reused as a primary key; it lives in `legacy_id`
   and nowhere else.
-- **Timestamps are ISO-8601 UTC seconds**, `new Date().toISOString()`, in every `*_at` column. On
-  import, Descent's own spelling — microsecond precision with a numeric offset — is normalised to
-  this one before it lands, because the guards and the orderings below are TEXT comparisons and two
-  spellings of one instant compare wrong.
+- **Timestamps are ISO-8601 UTC seconds**, `new Date().toISOString()`, in every `*_at` column, and
+  one spelling is the only one there is: the guards and the orderings below are TEXT comparisons,
+  and two spellings of one instant would compare wrong.
 - **`sort_order` is REAL and moves by midpoint.** A move takes `afterId` (the card that will sit
   directly above) and `beforeId` (directly below), either of which may be null: both null → `1000`
   (`KANBAN_SORT_ORDER_GAP`); one null → that end of the lane's bounds, ±1000; both present →
@@ -107,9 +106,9 @@ names is deleted, and the same clause that unlabels a board when its project goe
   stores them. The panel sums the rows its lane policy composes (§"The panel"). The server
   never learns that a board has lanes.
 - **A lease is claimable when it is unclaimed, already the caller's, or STALE** — stale meaning the
-  stamp is null, unparseable, or older than `KANBAN_LEASE_STALE_SECONDS` (**40**, Descent's own
-  `DEFAULT_STALE_SECS`, written once in `server/shared/kanban-types.ts` and imported by every
-  TypeScript consumer — the lease verbs, the card summaries, `claimableCount`, and the plan-runner
+  stamp is null, unparseable, or older than `KANBAN_LEASE_STALE_SECONDS` (**40**, written once in
+  `server/shared/kanban-types.ts` and imported by every TypeScript consumer — the lease verbs, the
+  card summaries, `claimableCount`, and the plan-runner
   module's plans-archive sweep, which reads it through `plansHeldByLease` rather than a second
   staleness rule of its own (§"The services")). One reader outside this codebase MIRRORS the value
   rather than importing it: `~/.claude/hooks/concurrency_arbiter/presence_resolve.py`'s
@@ -148,8 +147,7 @@ write that then rolls back. One place to be right. The order is fixed:
 
 A verb that needs two writes to be atomic does both inside ONE `mutate` callback — never two
 `writeKanban` calls. That is what makes `approveCard` promote a `not_ready` card to `todo` AND
-approve it as one event, and what makes an import of twelve thousand events one write
-(§"Importing from Descent").
+approve it as one event.
 
 Two things the seam needs from the caller rather than the verb: `actor`, which defaults to
 `'operator'` and rides straight into the event row — no route reads an identity off the request,
@@ -167,11 +165,11 @@ The event kinds are exactly: `board.created`, `board.updated`, `board.selected`,
 `card.unapproved`, `tag.added`, `tag.removed`, `question.added`, `question.answered`, `issue.filed`,
 `issue.resolved`, `checklist.added`, `checklist.updated`, `checklist.removed`, `attachment.added`,
 `attachment.removed`, `lease.build_claimed`, `lease.build_refreshed`, `lease.build_released`, `lease.plan_claimed`,
-`lease.plan_released`, `import.descent`, `lesson.staged`, `lesson.reviewed`, `metis.nudged`.
+`lease.plan_released`, `lesson.staged`, `lesson.reviewed`, `metis.nudged`.
 
 ## The services
 
-Eight service files, cut by cohesion rather than one file growing to twenty-nine verbs. Every write
+Seven service files, cut by cohesion rather than one file growing to twenty-nine verbs. Every write
 verb takes an optional trailing `context?: KanbanWriteContext` (`{ actor?: string }`); the routes
 pass nothing. The lease verbs take an explicit `owner` instead — a lease owner is a different
 concept from an event actor, and both ride on the summary.
@@ -231,9 +229,8 @@ four columns of the shape `build_tokens_in = build_tokens_in + ?`. Never a SET �
 can work one card over its life, and a SET to a session's own totals would erase the earlier one's
 spend — and never a read-then-write, which drops an increment whenever a tick races a claim, a move
 or another session's tick. It is an ordinary `card.updated` write and costs what any write costs:
-one audit row whose payload is `{ tokens: delta }` and one `kanban_event` frame. (Descent's
-telemetry wrote no event; this board has no second way to write a card — §"The one write seam".) It
-does NOT stamp `updated_at`, because that column orders the Done lane and a token count is not a
+one audit row whose payload is `{ tokens: delta }` and one `kanban_event` frame. It does NOT stamp
+`updated_at`, because that column orders the Done lane and a token count is not a
 card moving. A card deleted between the watcher's read and this write answers the same 404 every
 card verb does, and the seam rolls the audit row back with it.
 
@@ -245,11 +242,11 @@ answerQuestion(questionId, input: { selected, other? }, context?) -> KanbanQuest
 approveCard(cardId, context?) / unapproveCard(cardId, context?) -> KanbanCardSummary
 ```
 
-**The approve gate** is Descent's, and both its refusals are 409s rather than 400s: the request was
-well formed, the card is not ready. A card is approvable when it has ZERO unanswered questions
+**The approve gate** refuses with 409s rather than 400s, because the request was well formed and
+the card is not ready. A card is approvable when it has ZERO unanswered questions
 (`KANBAN_CARD_QUESTIONS_OPEN`) and at least one of `plan`, `body`, `description` is non-empty
-(`KANBAN_CARD_NEEDS_PLAN`). A `not_ready` card that passes is promoted to `todo` AND
-approved in one `mutate`, one event. Un-approving clears approval and nothing else — a card approved
+(`KANBAN_CARD_NEEDS_PLAN`). A `not_ready` card that passes is promoted to `todo` AND approved in
+one `mutate`, one event. Un-approving clears approval and nothing else — a card approved
 out of the backlog stays in To Do, because un-approving is not un-promoting.
 
 `kanban-checklist.service.ts` — checklist items and issues
@@ -264,8 +261,8 @@ removeChecklistItem(itemId, context?) -> void
 
 The two surfaces are one file because they are one drawer section's worth of state: an issue and a
 checklist item are both small rows hanging off a card with no lifecycle beyond theirs. Attachments
-used to be the file's third surface; they moved out to their own service (below) because a verb
-that has to place a file on disk beside its row is a different subject from a list of text rows.
+are their own service (below), because a verb that has to place a file on disk beside its row is a
+different subject from a list of text rows.
 
 `kanban-attachments.service.ts` — a card's attachment BYTES, and the row that indexes them
 
@@ -276,17 +273,17 @@ resolveAttachmentFile(cardId, attachmentId) -> { path, mime, filename } | null
 removeAttachment(cardId, attachmentId, context?) -> boolean
 ```
 
-The on-disk layout is Descent's own (`store_schema.py:79-93`, ported): `<root>/<cardId>/<attachmentId>.<ext>`,
-the extension taken from a CLOSED mime allowlist (`png`, `jpg`, `gif`, `webp`, `pdf` — no SVG, unlike
+The on-disk layout is `<root>/<cardId>/<attachmentId>.<ext>`, the extension taken from a CLOSED mime
+allowlist (`png`, `jpg`, `gif`, `webp`, `pdf` — no SVG, unlike
 the chat-assets route, because this route streams bytes back into the app's own origin) and never
 from the client's filename, so nothing the caller names can choose where a byte lands. `addAttachment`
-gates in the order `server_api.py:360-399` does — mime, then non-empty, then the size cap
+gates in this order — mime, then non-empty, then the size cap
 (`ATTACHMENT_MAX_BYTES`, 8 MiB), then a magic-byte sniff against the claimed mime — and writes the
 bytes to disk BEFORE it inserts the row, so a failed write never commits a row pointing at nothing.
 `removeAttachment` deletes the row and its event inside `writeKanban`'s own transaction first, then
 best-effort unlinks the file; an orphan blob left by a failed unlink is not reclaimed by anything in
-this repository (Descent's `purge_feature_attachments` was not ported). `resolveAttachmentFile` and
-the on-disk path both resolve through `resolveUnderRoot` (`server/shared/utils.ts`), the same
+this repository. `resolveAttachmentFile` and the on-disk path both resolve through
+`resolveUnderRoot` (`server/shared/utils.ts`), the same
 separator-and-resolve containment predicate the global chat-assets folder uses
 (`server/modules/assets/services/image-assets.service.ts`) — moved there as a pure extraction so the
 one check has one home instead of two copies that could drift apart.
@@ -302,19 +299,16 @@ Five verbs over two compare-and-set statements that live in `kanban-leases.db.ts
 `writeKanban` call whose `mutate` returns `{ granted }`, and the payload carries the owner. A
 refused claim records nothing.
 
-`kanban-import.service.ts` — `importFromDescent(input: { dbPath? }, context?)`, §"Importing from
-Descent".
-
 `kanban-lessons.service.ts` — `stageLesson`, `listLessons`, `getLesson`, `reviewLesson`,
 `approvedIndex`, §"The lessons lane".
 
 ## The routes
 
 `server/modules/kanban/routes/` is a PACKAGE, not one file: `board.routes.ts` (9 routes),
-`card.routes.ts` (10), `detail.routes.ts` (14), `import.routes.ts` (1), `learning.routes.ts` (5,
+`card.routes.ts` (10), `detail.routes.ts` (14), `learning.routes.ts` (5,
 §"The lessons lane") and `attachment.routes.ts` (3, below), each exporting a
 `create<X>Routes(services): Router` factory; and `kanban.routes.ts`, the FACTORY that builds one
-`express.Router()` and `use`s the six onto it. The package is INTERNAL — nothing outside
+`express.Router()` and `use`s the five onto it. The package is INTERNAL — nothing outside
 `kanban.module.ts` imports it, and the module's barrel exports the services and the module
 constructor, never a route.
 
@@ -363,7 +357,6 @@ POST   /api/kanban/cards/:cardId/approve                               -> { card
 POST   /api/kanban/cards/:cardId/unapprove                             -> { card }
 POST   /api/kanban/cards/:cardId/build-lease/{claim,refresh,release}   { owner } -> { granted, card }
 POST   /api/kanban/cards/:cardId/plan-lease/{claim,release}            { owner } -> { granted, card }
-POST   /api/kanban/import/descent               { dbPath? }            -> KanbanImportResult
 GET    /api/kanban/lessons?status=&limit=                              -> { lessons }
 POST   /api/kanban/lessons     { name, summary, trigger, body?, tags?, cardId?, kind? } -> { lesson }
 GET    /api/kanban/lessons/:lessonId                                   -> { lesson }
@@ -379,7 +372,7 @@ member would answer a request for two statuses with one lane. `status=todo` and
 parses `cursor` as an opaque string.
 
 `GET /events` clamps `limit` the same way, default 50, max 200. Without the clamp one request can
-ask for the board's whole audit log, which on an imported Descent board is twelve thousand rows.
+ask for the board's whole audit log, which on a long-lived board is twelve thousand rows.
 
 `GET /lessons` narrows to one of `KANBAN_LESSON_STATUSES` and clamps `limit` to `[1, 500]`, refusing
 rather than clamping a value outside it — the two reviews are refused on the `kanban-pm` mount, not
@@ -419,9 +412,8 @@ broadcast: `JSON.stringify` once for the whole set rather than once per socket, 
 mid-send is caught PER CLIENT — a dead socket must not cost every client after it their frame.
 There is no per-user or per-project filtering, here or anywhere else in this server's broadcasts.
 
-**Exactly one frame per write.** One card edit is one frame; one card moved is one frame; an
-import — four hundred cards, twelve thousand events, one `mutate` and one event row — is ONE frame
-carrying `card: null` and the board's fresh lane counts, not 449. The frame is read after the
+**Exactly one frame per write.** One card edit is one frame; one card moved is one frame; a lesson
+staged with no card behind it is ONE frame carrying `card: null`. The frame is read after the
 commit, so it carries what landed rather than what was intended, and it is built outside the
 transaction so a client is never told about a write that then rolls back.
 
@@ -436,8 +428,8 @@ tab is active.
 
 `src/modules/kanban/` composes the tab's pane, its header — which mounts `KanbanVitalsStrip`, the
 board's six counts, its design carried in its own docstring, wired through `useBoardVitals` off a
-publish/subscribe store the lane feed keeps rather than a prop the header would have to carry — its
-import dialog, the card drawer under
+publish/subscribe store the lane feed keeps rather than a prop the header would have to carry — the
+card drawer under
 `card-drawer/`, six hooks — `useKanbanMetis` is the newest, reading the board's own Metis fleet —
 and four module-private utilities under `utils/`. The barrel exports
 `KanbanPanel` and nothing else — a second export is how a policy that must be decided in one place
@@ -523,7 +515,7 @@ statement, every one of them excluding archived cards:
   where they stay until the builder moves them on.
 - `awaitingAnswer` — cards with at least one question nobody has answered: the operator's turn, and
   the panel's own `needsAnswer`.
-- `awaitingApprove` — the SAFE approve subset (Descent's "GOTCHAS #48" mirror): not yet approved, no
+- `awaitingApprove` — the SAFE approve subset: not yet approved, no
   open question, sitting in a claimable/staging lane (`todo`/`questions`/`not_ready`), and
   content-complete — a non-blank plan, body or description, because an intake card carries its intent
   in `description` with `body` empty.
@@ -561,105 +553,11 @@ instead, in the shape `<title> moved to <lane>, position <n> of <total>`. Only t
 the lane the card left and the lane it landed in, and a toast leaves — and a thing that leaves
 cannot announce.
 
-## Importing from Descent
-
-`POST /api/kanban/import/descent` — `importFromDescent(input: { dbPath? })`, the board's one door
-onto a foreign database. It reaches its source through TWO files and never opens a database itself:
-
-**`kanban-import.transport.ts` is the foreign read, and nothing else.** It opens the `descent.db` at
-`input.dbPath` (default `~/.claude/descent/descent.db`) through `better-sqlite3` with
-`{ readonly: true, fileMustExist: true }`, so the worst a bug here can do to a live Descent install
-is fail to open it. It checks the file's SHAPE — the nine `ov_*` tables and the columns each read
-names, plus the columns of two OPTIONAL satellite tables, `ov_lessons` and `ov_memory_candidates`,
-checked only when the table is there — before a single row is read, so the wrong file and the
-older-Descent file are both a 404 naming what is missing rather than a driver error four tables
-deep. The two satellites' ABSENCE is never what the 404 is about: a Descent old enough to predate
-either is still a board worth importing, since they are an INSTALL's satellites rather than a
-board's spine. A file holding no boards is refused rather than imported, because every card is a
-board's child. It reads each table one pass into typed row arrays, resolves
-`descentAttachmentsRoot` from the directory of the database it actually opened — Descent keeps its
-bytes beside its database — closes the handle in a `finally`, and writes NOTHING, maps nothing and
-has never heard of a `kanban_` table. The source file is never written.
-
-**`kanban-import.service.ts`** calls the transport, maps the rows and hands the whole mapping to the
-write seam as ONE `mutate` callback under the `import.descent` kind — which is why an import is one
-event and one frame, and why a failure anywhere in the mapping rolls the whole import back: there is
-no such thing as a half-imported board. Mapping, table by table: `ov_boards`→`kanban_boards`,
-`ov_features`→`kanban_cards`, `ov_tags`→`kanban_card_tags`, `ov_questions`→`kanban_questions`,
-`ov_issues`→`kanban_issues`, `ov_decisions`→`kanban_decisions`,
-`ov_checklist_items`→`kanban_checklist_items`, `ov_attachments`→`kanban_attachments`,
-`ov_events`→`kanban_events`, `ov_lessons`→`kanban_lessons`. Ordering inside the transaction follows
-that list — parents before children — and an `ov_events` row whose `feature_id` no longer resolves
-is imported with `card_id` null rather than dropped, because Descent's log carries no foreign key
-there. A lesson's `feature_id` is translated the same way and for the same reason: a lesson
-OUTLIVES the card it was learned on (§"The lessons lane"), so one naming a card this board never
-imported still lands, with a null card rather than being dropped.
-
-**Descent's memory proposals are NOT a board table.** `ov_memory_candidates` rows go straight to the
-memory-intake lane's own `importDescentCandidates` ([memory-intake.md](memory-intake.md) §"The native
-module") rather than through a `kanban_` table — no board, no card, no lane, no frame — and this
-mapping keeps only the count it reads back. `KanbanImportCounts` (`server/shared/kanban-types.ts`)
-therefore carries `lessons` and `memory` beside the nine board tables: `lessons` is one more row
-landed in `kanban_lessons` exactly like every table above it, and `memory` is that count read back
-from the lane that owns the table. Nothing is refused for a `target` this lane's own staging door
-would reject — an import hands over what an operator already lived with, not a fresh proposal.
-
-**The imported attachments' BYTES are copied once the transaction has committed, never inside it.**
-The mapping only PLANS the copy — a source path under the imported install's own attachment root
-and a target path under this board's, both derived from ids rather than from anything the source
-file sent — because a write seam holding its lock across an install's worth of file I/O would stall
-every other writer on the board. `KanbanImportResult.attachmentCopies` carries that plan out as an
-obligation; the route (`import.routes.ts`) discharges it with `placeAttachmentBytes`
-(`kanban-import-satellites.ts`) between the write and the answer, so "imported" means the corpus is
-on disk and not merely promised. It is never fatal: a source file the old install no longer has is a
-line in the server log, not a failed import.
-
-**Idempotency is `descent_id`.** Every imported row carries Descent's primary key in that column,
-and every table's insert is `INSERT INTO … ON CONFLICT(descent_id) DO UPDATE SET …` naming every
-non-key column — so a second run UPDATES and inserts nothing new, a row that is already here keeps
-its local id, and every link that pointed at it still does. A locally created row has no
-`descent_id` and can never collide. `kanban_card_tags` is the exception with no exception to make:
-its key is the pair `(card_id, tag)` itself, so its insert is `INSERT OR IGNORE`.
-
-**A re-import never overwrites a card you edited here.** For `kanban_cards` and `kanban_boards` the
-upsert's `DO UPDATE` carries a guard clause:
-
-```sql
-INSERT INTO kanban_cards (…) VALUES (…)
-ON CONFLICT(descent_id) DO UPDATE SET …
-WHERE excluded.updated_at >= kanban_cards.updated_at
-```
-
-and the same shape, on `kanban_boards.updated_at`, for boards. A card edited in Athena after its
-last Descent change therefore survives a second import untouched; one Descent changed more recently
-is refreshed. A `DO UPDATE` whose `WHERE` is false is not an error and not a conflict — SQLite
-simply skips the row — so the import completes and the counts still reconcile: a card the guard
-held is counted as neither an insert nor a refresh. The CHILD tables stay full upserts with no
-guard, deliberately: they carry no local editing surface here, and a partially guarded child would
-leave a card's questions half from each side. The lessons landing beside them are no exception, even
-though a lesson CAN be reviewed here: the source is still the whole truth about a row that carries a
-`descent_id`, so a re-import refreshes `status` and `reviewed_at` together and a review performed
-here does not outrank the install it was imported from. Memory candidates follow the identical rule
-for the identical reason ([memory-intake.md](memory-intake.md) §"The native module").
-
-**One setting is imported, and eighteen are not.** `ov_settings` holds the key `current_board`,
-which is translated through the board id map and written to `kanban_settings`; the rest are
-Descent daemon state — `mcp_active_pid`, `notif_ingest_keepalive`, `pm_capacity_governor`,
-`schema_version`, `theme` and their siblings — and are skipped. One `import.descent` event is
-recorded with the counts as its payload.
-
-The result is what the dialog shows: source counts against imported counts per table, `inserted`
-and `updated`, the board id map, and the current board. `attachmentCopies` never reaches it — the
-route destructures the obligation off the result, discharges it with `placeAttachmentBytes`, and
-answers with the rest, so the shape on the wire says what landed rather than a foreign install's own
-on-disk paths.
-
 ## The lessons lane
 
 A lesson is a note worth carrying into a future session — staged by whoever learned it, reviewed by
-a person, and read again only once approved. `kanban-lessons.service.ts` is the ported form of
-Descent's `store_lessons.py` / `store_actionable.py`; its own docstring carries the design in full,
-and this is the map onto the routes and the fence around it.
+a person, and read again only once approved. `kanban-lessons.service.ts`'s own docstring carries the
+design in full; this is the map onto the routes and the fence around it.
 
 **Five verbs, `ls-` ids.** `stageLesson` inserts a row at `status: 'staged'` (event `lesson.staged`)
 after validating any `cardId` it names against a real card; `listLessons` and `getLesson` are the
@@ -687,8 +585,8 @@ and does not know which door served a given request.
 a PERSON's act — a build stages, it never promotes its own note — so the refusal lives one layer
 out, in `kanban-metis.routes.ts`'s `kanbanMetisSecretGuard`: a request whose decoded path matches
 `REVIEW_PATH` (`/lessons/<id>/(approve|reject)`) is refused `403` before the router ever sees it,
-the same way that guard already refused the importer (§"The kanban-pm MCP surface" §"The second
-door, and the child's credential"). Staging and reading are ungated on that mount — filing a lesson
+ahead of the credential check, the way the guard's other refusals are (§"The kanban-pm MCP surface"
+§"The second door, and the child's credential"). Staging and reading are ungated on that mount — filing a lesson
 and reading the corpus are exactly what a build is for.
 
 **Reviewed from the Memory tab, not from the board.** The two review routes' one caller in this app
@@ -706,10 +604,9 @@ the wiring from a Metis's own tool call to the store and HTTP doors this lane bu
 `server/modules/kanban-metis/` is the machine that drives the verbs above: it launches one Metis
 per board, keeps a registry of them, reaps what has died, and feeds the panel. It reaches the board
 only through `server/modules/kanban/index.ts`'s barrel (`kanbanBoardsService`, `kanbanCardsService`)
-— never a route, a repository or an internal service. It is Descent's daemon ported in-process:
-`metis-driver.service.ts` is `~/.claude/descent/pm_capacity.py`'s `tick_once` and `metis-liveness.ts`
-is that daemon's `_reapable` / `stalled` pair, kept as pure arithmetic over four facts the caller
-gathers — the session's age, `child.log`'s mtime, whether the child is still alive, and whether its
+— never a route, a repository or an internal service. `metis-driver.service.ts` runs the tick, and
+`metis-liveness.ts` holds the `_reapable` / `stalled` pair — kept as pure arithmetic over four facts
+the caller gathers — the session's age, `child.log`'s mtime, whether the child is still alive, and whether its
 owner still holds a fresh lease. The decision that ends in a SIGTERM is readable without a running
 server, which is the point of that split.
 
@@ -780,8 +677,8 @@ authorization (the registry has to hold it) and the read itself belongs to `prov
 `readClaudeTranscriptBySessionId` falls back to `scanProjectsRoot` when the sessions table holds no
 row, and for a board session that fallback is not an edge case but the ONLY path (§"Seclusion").
 
-**The nudge** is Descent's "Nudge Metis" against a loop rather than a sleeping daemon: it records a
-`metis.nudged` event on the board (through `kanbanBoardsService`, so it lands in the audit log and
+**The nudge** plays "Nudge Metis" against a loop: it records a `metis.nudged` event on the board
+(through `kanbanBoardsService`, so it lands in the audit log and
 on the wire like every other act) and schedules `driver.tick()` on the NEXT MACROTASK, then answers
 `{ nudged: true, at }` immediately — a reap plus a spawn can take seconds, and the caller pressed a
 button. The **relaunch ledger** lives at `<KANBAN_METIS_STATE_ROOT>/relaunch-ledger.json`, one row
@@ -802,9 +699,9 @@ into `src/shared/types.ts`.
 
 ## The token watcher
 
-`metis-telemetry.service.ts` is `~/.claude/descent/pm_telemetry.py` ported in-process: the module's
-second interval, started once beside the driver's — `startTelemetryWatcher()`, called at
-construction in `kanban-metis.module.ts` after the registry and the driver exist. It ticks at once,
+`metis-telemetry.service.ts` runs the module's second interval, started once beside the driver's —
+`startTelemetryWatcher()`, called at construction in `kanban-metis.module.ts` after the registry and
+the driver exist. It ticks at once,
 so a build already in flight at boot starts accruing on the first pass, and then every
 `TELEMETRY_TICK_MS` (30 000). The interval is unreferenced, like the driver's, and a second call is
 a no-op rather than a second watcher over the same tallies. It has no route and no frame of its own;
@@ -892,7 +789,7 @@ claude -p --output-format stream-json --verbose --permission-mode bypassPermissi
 
   `--session-id` mints a conversation and `--resume` continues one; a child handed both is a child
   arguing with itself, so exactly one is present on any spawn. `--strict-mcp-config` is what makes
-  `kanban-pm` the ONLY MCP she can see: no `descent-pm`, no user-scope servers. `--add-dir` is
+  `kanban-pm` the ONLY MCP she can see: no user-scope servers. `--add-dir` is
   DERIVED from the board rather than enumerated — `project_id` through
   `projectsDb.getProjectPathById` becomes ONE directory, and a board whose `project_id` is null gets
   NO `--add-dir` at all, so she works only inside her own cwd.
@@ -921,13 +818,12 @@ when nothing is claimable.
 ## The kanban-pm MCP surface
 
 A Metis works her board through `kanban-pm`: the server name is `kanban-pm`, the client-facing
-prefix is `mcp__kanban-pm__<tool>`, and the twenty-five tool names are IDENTICAL to `descent-pm`'s,
-deliberately — the brief's prose and the hook matchers port by changing the server word alone.
+prefix is `mcp__kanban-pm__<tool>`, and the twenty-five tool names are fixed — the brief's prose and
+the hook matchers name them literally.
 
 **It is a LEAF.** `kanban-pm-mcp.ts` is a `#!/usr/bin/env node` stdio program, with its tools under
 `server/modules/kanban-metis/mcp/`, and it hand-rolls newline-delimited JSON-RPC 2.0 over
-stdin/stdout — **no new dependency**, the way Descent's own `mcp_server.py` is built. Everything
-under `mcp/` imports only from `mcp/`, from `node:` builtins and from `server/shared/`: never the
+stdin/stdout — **no new dependency**. Everything under `mcp/` imports only from `mcp/`, from `node:` builtins and from `server/shared/`: never the
 module's own barrel, never `@/modules/*`, never a service. It runs as a separate PROCESS with no
 server in it, so an import reaching back into the module would drag a database handle, a router and
 a websocket fan-out into a stdio child that must start in milliseconds. `cli.service.ts` starts it
@@ -1006,8 +902,7 @@ and answers from them regardless.
 
 **The lease heartbeat lives in the MCP process**, not in the driver, because the lease verbs are
 compare-and-set on the owner and a refresh from a process that is not acting as that owner defeats
-the CAS. A `setInterval` at **10 000 ms** (Descent's own `HEARTBEAT_SECS`) refreshes the build and
-plan leases it holds. The in-memory list of claimed ids is an OPTIMISATION only: the owner is
+the CAS. A `setInterval` at **10 000 ms** refreshes the build and plan leases it holds. The in-memory list of claimed ids is an OPTIMISATION only: the owner is
 derivable, so a process that lost that list can still re-read `list_active_builds` and refresh what
 is its own.
 
@@ -1025,10 +920,7 @@ bearer claims and accepts it only while the registry holds that session id in st
 Nothing is kept in memory between restarts — a map in memory is a map that empties on restart, and
 every live Metis's next tool call would then 401 against a server that had simply forgotten her,
 mid-build, with no way back but to kill her. Revocation is the registry's `running` set: a session
-that leaves it stops being accepted on its next call, and nothing has to be erased. The guard also
-denies the importer at the door: any path matching `/import/` is refused `403` before the router
-sees it, because `POST /api/kanban/import/descent` reads a foreign database and can rewrite four
-hundred cards in one transaction, and no autonomous session has business calling it. **The same
+that leaves it stops being accepted on its next call, and nothing has to be erased. **The same
 guard refuses a lesson review** — any path matching `/lessons/<id>/(approve|reject)` — ahead of the
 credential check, because reviewing is a person's act and whose credential arrived is not the
 question (§"The lessons lane"). **And the same guard refuses one method, not a path** — a `DELETE`
@@ -1048,8 +940,7 @@ from the source tree whether the server runs under `tsx` or from `dist-server`. 
 concatenated under their own headings into ONE string and handed over as a single
 `--append-system-prompt`; its path and sha256 are recorded in `spec.json`, and a resume re-reads the
 brief from disk, so a resumed Metis runs the board as it stands now rather than as it stood when she
-was first launched. `~/.claude/descent/pm-chapters/` is the retired Descent board's and
-is not touched by any of this — the board has its own brief, its own chapters and its own home.
+was first launched. The board has its own brief, its own chapters and its own home.
 
 **The brief is the same for every board; what is true of ONE project is not in it.** A database
 connection, the vendor systems a build must not write to, who receives a notification, which repos
@@ -1084,8 +975,8 @@ table records the same refusal from the read side:
 
 **The hooks seam.** One module, `~/.claude/hooks/kanban_metis.py`, holds the predicate and never
 raises: `SESSION_ROOT`, `board_id(payload_or_cwd)` (the leaf under that root, else `None`) and
-`is_board_session(payload_or_cwd)`. Three consumers, one early return each, and the same predicate
-is stated from the hooks' own side in `~/.claude/hooks/README.md` §"Metis-session scoping":
+`is_board_session(payload_or_cwd)`. One consumer, one early return, and the same predicate is
+stated from the hooks' own side in `~/.claude/hooks/README.md` §"Metis-session scoping":
 
 - `metis_session.maybe_stamp` gains a FOURTH create trigger: any event whose payload `cwd` is a
   board session stamps the Metis-presence marker, without a typed `/pm` — the board-issued identity
@@ -1093,35 +984,13 @@ is stated from the hooks' own side in `~/.claude/hooks/README.md` §"Metis-sessi
   deliberately falls THROUGH rather than claiming the event: a `return True` there would
   short-circuit the guard ladder for every event of a board session and silence exactly the guards
   that are meant to apply to her.
-- `enforce_metis_contract._guard_stop` (G4) **stands down** — it reads Descent's sqlite store, and
-  scanning it would compare her work against a board that never held it.
-- The G4b autonomy branch **stands down** for the same reason: judging her turn against Descent's
-  queue could block (or fail to block) her over work that is not hers. The Stop WARN pair (P5/P6)
-  stands down with them, since both read the same store.
 
-Every stand-down keys on the payload's CWD and never on the presence marker: on her first event no
-marker exists yet, and the stand-down must already hold.
-
-**What still applies to a board Metis.** G1, G2, G5 and G10 carry no Descent coupling and do
-exactly what they do for an operator's session: **G1** lints the same `pm-*.plan.md` plans `/execute`
-would mis-handle, **G2** blocks a git write while a build marker is live, **G5** sends a decision to
-`post_design_questions` instead of a terminal prompt nobody is watching, and **G10** blocks
-destructive SQL from an unattended session. **What stays Descent-only until sunset, and why each
-needs no change:**
-
-- **G3** (footprint on `set_status active`) — it fires on a literal `mcp__descent-pm__*` verb; her
-  tools are `mcp__kanban-pm__*`, so it never reaches her, and the board's own claim CAS is the
-  equivalent guard.
-- **G4** (Stop, board-consistency) — reads Descent's store, and the code stands it down explicitly
-  rather than letting it judge the wrong board.
-- **G4b** (Stop, keep-flowing) — same store, same wrong question; a verdict read from Descent's
-  cards could block her turn over a queue that is not hers.
-- **G6** (honesty on `set_status done`) — reads a Descent card's checklist; her `done` claims travel
-  through `mcp__kanban-pm__set_status`.
-- **G7**, **G8** and **G9** (freshness, follow-up cards, questions on a follow-up card) — all three
-  trigger on literal `mcp__descent-pm__*` tool names, so none of them ever fires on her.
-- **P5/P6** (the Stop WARN pair) — both read Descent's store and stand down with G4; neither can
-  block, so standing them down can never trap a turn.
+**What applies to a board Metis.** G1, G2, G5 and G10 are not board-coupled and do exactly what
+they do for an operator's session: **G1** lints the same `pm-*.plan.md` plans `/execute`
+would mis-handle, **G2** blocks a git write while a build marker is live — though the plan-path
+cleanup retired that marker's only producer, so it is OFF for every session today, board Metis
+included (`hooks/GOTCHAS.md` #29) — **G5** sends a decision to `post_design_questions` instead of a
+terminal prompt nobody is watching, and **G10** blocks destructive SQL from an unattended session.
 
 ## The pilot panel
 

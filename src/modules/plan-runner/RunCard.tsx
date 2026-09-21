@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next';
 
 import { useElapsed } from '@/shared/hooks/useElapsed';
+import { useRateChangeTick } from '@/shared/hooks/useRateChangeTick';
 import { useRunnerVerbs } from '@/modules/plan-runner/hooks/useRunnerVerbs';
 import { PhaseRow } from '@/modules/plan-runner/PhaseRow';
 import { PipelineStrip } from '@/modules/plan-runner/PipelineStrip';
@@ -37,6 +38,18 @@ function planFileName(planPath: string): string {
 }
 
 /**
+ * Where a QUEUED run is waiting until, in the reader's own clock: `10:00 AM`.
+ *
+ * The runner stores the epoch and prints its own UTC rendering for `/execute`'s line; here the
+ * reader is a person looking at their own watch, and a window stated in UTC on a card in a
+ * different zone is a time they have to convert. Nothing is invented when the runner named no
+ * window: that case is the caller's other string.
+ */
+function queuedClock(epochSeconds: number): string {
+  return new Date(epochSeconds * 1000).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+}
+
+/**
  * One plan-runner run, whole: what it is, how far it has got, where it is standing, and the one
  * verb that applies to it.
  *
@@ -54,11 +67,13 @@ function planFileName(planPath: string): string {
  * some disabled. Only a LIVE run can be stopped: `plan-runner stop` looks for a lock naming the run
  * and refuses without one, so a stale run — whose daemon is gone — has literally nothing to stop,
  * and offering the button would be inviting a refusal. A parked or dead run offers Resume, the verb
- * that actually continues it. An ENDED run offers Dismiss — the operator asked to see a run finish
- * and clear it themselves (2026-09-09) — and Resume too whenever a phase is still blocked or
- * pending, read off the PHASES and never off the receipt's word: the runner's `complete` means
- * something shipped, not that nothing is left (`runUnfinished`). Dismiss is rendered only
- * when the caller passes `onDismiss`: the card does not know the lane, and the panel does.
+ * that actually continues it. A QUEUED run offers Start, which is that same `resume` (`start` is
+ * what created it parked; the runner's resume is the walk). An ENDED run offers Dismiss — the
+ * operator asked to see a run finish and clear it themselves (2026-09-09) — and Resume too whenever
+ * a phase is still blocked or pending, read off the PHASES and never off the receipt's word: the
+ * runner's `complete` means something shipped, not that nothing is left (`runUnfinished`). Dismiss
+ * is rendered only when the caller passes `onDismiss`: the card does not know the lane, and the
+ * panel does.
  *
  * A FIX-IT SESSION IS SAID ABOVE EVERYTHING ELSE. When the runner sends an unblock at a blocked
  * phase, `RepairBanner` leads the card — repairing, then finished — so a blocked run that is being
@@ -68,15 +83,20 @@ function planFileName(planPath: string): string {
  * ending, in the outcome's tone, with how long ago it ended in place of how long it has run. The
  * strip lights no active stage — nothing is in flight — and keeps every stage the run walked.
  *
+ * A QUEUED CARD SHOWS WHERE IT IS WAITING: the runner parked it before it ever walked (`start
+ * --queue`, or DeepSeek's peak hours with the switch on), so the badge is QUEUED, the header's
+ * clock is the time the window ends rather than an age, the strip lights nothing, and the footer's
+ * one verb is Start.
+ *
  * `data-runner-card`, `data-run-id` and `data-run-state` are the browser harness's handles, and
  * they are on the ROOT so a probe can scope every reading to one run — the operator's own runs are
  * on screen at the same time and must never be acted on. `phase-25.mjs` asserts their ABSENCE from
  * the chat view; the Runner tab's probe is what reads them on a card.
  */
-/** Byte-for-byte Descent's `dom.humanizeTokens` (`descent/ui/dom.js`): "94.9M", "1M", "12.5k". */
+/** Byte-for-byte `hooks/plan_runner/costs.py`'s `humanize`: "94.9M", "1M", "12.5k". */
 function humanizeTokens(n: number): string {
   if (n < 1000) return String(n);
-  if (n < 999_950) return `${(n / 1e3).toFixed(1).replace(/\.0$/, '')}k`;   // dom.js's cut
+  if (n < 999_950) return `${(n / 1e3).toFixed(1).replace(/\.0$/, '')}k`;   // the same cut
   return `${(n / 1e6).toFixed(1).replace(/\.0$/, '')}M`;
 }
 
@@ -90,13 +110,34 @@ export function RunCard({
   onDismiss?: () => void;
 }) {
   const { t } = useTranslation();
-  const { stop, resume, busy } = useRunnerVerbs(run.run_id);
   const ended = run.state === 'ended';
+  // A QUEUED run is nothing moving and nothing elapsed: it has an epoch it waits FOR, and the one
+  // clock on this card would otherwise count up from a start that never happened.
+  const queued = run.state === 'queued';
+  // The resume verb's WORD travels into the hook: pressing Start and being answered under the
+  // header "Resume" is the runner's own rule in this app's other name for it.
+  const { stop, resume, busy } = useRunnerVerbs(run.run_id,
+    queued ? t('runner.start') : t('runner.resume'));
   // One clock either way: since the run started while it moves, since it ended once it has.
-  // One clock either way; an ended run's age is re-read once a minute, a moving run's every second.
-  const runElapsed = useElapsed(ended ? run.ended_at : run.started_at, ended ? 60_000 : 1_000);
+  // A queued run's card holds no elapsed clock at all (`sinceEpochSeconds` `null` buys none), which
+  // is why it passes null rather than an interval it would never read.
+  const runElapsed = useElapsed(queued ? null : ended ? run.ended_at : run.started_at,
+    ended ? 60_000 : 1_000);
+  // The window the park waits for is the RUNNER's epoch, and it must close on the card without a
+  // reload: the DeepSeek boundary clock (one timer, armed at the next boundary rather than ticking)
+  // is that re-render, and it is the same rule the epoch was computed from.
+  const peaked = useRateChangeTick();
+  const windowClosed = queued && run.queued_until !== null && run.queued_until * 1000 <= peaked;
   const outcomeWord = ended ? runOutcomeWord(run) : '';
   const unfinished = ended && runUnfinished(run);
+  let queuedNote = '';
+  if (queued) {
+    // PAST the window the note changes TENSE: the run is no longer waiting for anything, and the
+    // present tense would be the one false thing on this card at the moment Start is decided.
+    if (run.queued_until === null) queuedNote = t('runner.queuedManual');
+    else if (windowClosed) queuedNote = t('runner.queuedWindowClosed', { time: queuedClock(run.queued_until) });
+    else queuedNote = t('runner.queuedUntil', { time: queuedClock(run.queued_until) });
+  }
 
   const progress = phaseProgress(run);
   const anyBlocked = run.phases.some((phase) => phase.state === 'blocked');
@@ -107,7 +148,8 @@ export function RunCard({
   // The PLAN's whole bill leads once anything outside this run was spent on it — the planner,
   // the review, a scout wave, an earlier run (operator, 2026-09-12: "I'd like to see totals").
   const outside = run.plan_planning_usd + run.plan_review_usd + run.plan_scouts_usd;
-  // Tokens in Descent's unit and shape ("⛁ 94.9M tok"): every token billed on the plan, all kinds.
+  // Tokens in the same unit and shape `hooks/plan_runner/costs.py` prints ("⛁ 94.9M tok"): every
+  // token billed on the plan, all kinds.
   const tokens = run.plan_tokens > 0 ? ` · ${t('runner.tokens', { n: humanizeTokens(run.plan_tokens) })}` : '';
   const spend = (run.plan_runs > 1 || outside > 0
     ? `${t('runner.planTotal', { total: run.plan_total_usd.toFixed(2) })} · ${t('runner.planSplit', {
@@ -147,7 +189,11 @@ export function RunCard({
           ) : (
             <Badge tone={runStateTone(run.state)}>{t(`runner.state.${run.state}`)}</Badge>
           )}
-          {runElapsed && (
+          {queued ? (
+            // WHERE a moving run shows how long it has been going, a queued run shows WHEN it was
+            // waiting for: nothing is elapsing, and the reason it is standing still is the window.
+            <span className="flex-none font-mono text-xs text-muted-foreground">{queuedNote}</span>
+          ) : runElapsed && (
             <span className="flex-none font-mono text-xs text-muted-foreground">
               {ended ? t('runner.ended', { elapsed: runElapsed }) : runElapsed}
             </span>
@@ -167,8 +213,10 @@ export function RunCard({
 
         <PipelineStrip
           stages={pipelineForRun(run)}
-          active={ended ? '' : (run.position?.stage ?? '')}
-          detail={ended ? '' : (run.position?.stage_detail ?? '')}
+          // An ended run and a QUEUED one both have nothing in flight: no stage lights, and no
+          // clock ticks — the strip shows what the run walked and nothing more.
+          active={ended || queued ? '' : (run.position?.stage ?? '')}
+          detail={ended || queued ? '' : (run.position?.stage_detail ?? '')}
           seen={seenStages(run)}
         />
 
@@ -191,9 +239,10 @@ export function RunCard({
                 // Filtered here rather than inside the row: the log is one list for the whole run,
                 // and every row scanning all 200 entries would be five passes for one answer.
                 timeline={run.timeline.filter((entry) => entry.phase_id === phase.id)}
-                // An ended run has no phase in flight, whatever `position` still says: no row ticks.
-                isCurrent={!ended && phase.id === currentPhaseId}
-                stageSince={ended ? null : (run.position?.stage_since ?? null)}
+                // An ended or QUEUED run has no phase in flight, whatever `position` still says: no
+                // row ticks. A queued run's position points at the phase it WOULD start with.
+                isCurrent={!ended && !queued && phase.id === currentPhaseId}
+                stageSince={ended || queued ? null : (run.position?.stage_since ?? null)}
               />
             ))}
           </CollapsibleContent>
@@ -214,6 +263,12 @@ export function RunCard({
               </Button>
             )}
           </>
+        ) : queued ? (
+          // Start IS `resume`: the runner's `resume` re-opens the ledger and walks the run at its
+          // stage, and a queued run has no stage yet — it begins where a fresh run does.
+          <Button size="sm" disabled={busy !== null} onClick={() => void resume()} data-runner-start>
+            {t('runner.start')}
+          </Button>
         ) : run.state === 'live' ? (
           <Button variant="secondary" size="sm" disabled={busy !== null} onClick={() => void stop()}>
             {t('runner.stop')}

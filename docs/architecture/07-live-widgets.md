@@ -401,7 +401,7 @@ showing the same block in ArchPulse's own studio — the round trip, rather than
 It is the one probe in this repo that needs `archpulse.service` up; the gates it reads, the
 title-prefixed fixture it creates and deletes, and what an ArchPulse restart mid-run looks like are
 in [verification.md](../verification.md) §"The browser harness" and §"What bites people". The other
-half of this contract — the embed route, the two block types that behave differently there, the
+half of this contract — the embed route, the block types that behave differently there, the
 `resize` height being the body's border box rather than the document's `scrollHeight` — is
 `~/.claude/ArchPulse/README.md` §"Embedding one block", which points back here for this half.
 
@@ -524,9 +524,8 @@ Tailscale host, or `VITE_DOCSPACE_EMBED_ORIGIN` when set) — then every address
 deduplicated on the URL with the chat's entry winning (it carries the model's title), then a last
 entry, `Type an address…`, that swaps the row to a field. A typed value is validated by building the
 fence body it is equivalent to and handing it to the same classifier; a value with no scheme is
-retried once as `http://`, because someone typing `myhost:8005` means a host. Descent is deliberately
-not offered: the descent-sunset plan ends with `:7878` dark. The row is ONE row with two modes
-because two rows of chrome took 92px of a 242px card, measured, in a 300px column.
+retried once as `http://`, because someone typing `myhost:8005` means a host. The row is ONE row
+with two modes because two rows of chrome took 92px of a 242px card, measured, in a 300px column.
 
 **A flush card takes the column's spare height.** `GutterWidgetFrame` grew two props for this:
 `flush`, which gives a body that is itself a frame the card's whole inside (no padding, no scroll

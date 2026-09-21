@@ -55,9 +55,6 @@ const CUSTOM_OPTION = '\u0000custom';
  * and the derived default gives the page's OWN hostname, which is the whole reason a reader on
  * Tailscale gets a reachable address and not a loopback one. A hard-coded address here
  * would be a second answer to "where is ArchPulse", wrong the first time either changes.
- *
- * Descent (`:7878`) is deliberately absent: the descent-sunset plan ends with that port dark, and an
- * entry that offers a service being retired is a dead link with a friendly name.
  */
 function housePresets(): EmbedUrlRef[] {
   if (typeof window === 'undefined') return [];

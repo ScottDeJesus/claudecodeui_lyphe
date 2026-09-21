@@ -1,13 +1,10 @@
 /**
  * How a model's `choice` becomes the answer the board stores.
  *
- * Ported from Descent's `mcp_tools.py::_split_choice` and the arity rule in
- * `_h_answer_design_question`, because this is a step the port dropped and its absence was visible
- * on the panel: a value that matched no option was posted as a SELECTION, so a free-form answer
- * arrived in the drawer with nothing to show for it and the decision's own `other` column stayed
- * empty. Descent's rule is the one that makes a free-form answer survive the round trip — a value
- * exactly matching one of the question's options is a selection, EVERY OTHER value is freeform, and
- * the freeform half is what the board's `other` column is for.
+ * The rule is a lost-value guard. A value exactly matching one of the question's options is a
+ * SELECTION, EVERY OTHER value is FREEFORM, and the freeform half is what the board's `other`
+ * column is for — without the split, a free-form answer arrives in the drawer with nothing to show
+ * for it and the decision's own `other` column stays empty.
  *
  * The two lists are separate from the module that writes them so the rule reads as the rule it is:
  * a lost-value audit of one function, with no board, no HTTP and no card in it.
@@ -51,9 +48,9 @@ function asText(value: unknown): string {
  * "Yes", and silently trimming it would record a selection the model did not make. Order is kept
  * inside each bucket and a repeated value is kept once, so a lossless answer stays readable.
  *
- * A choice with no non-blank member is refused rather than written. Descent refuses it because an
- * empty `other` is a junk decision in the learning substrate; on this board it is worse than junk —
- * the answer route marks the question answered, and the approve gate counts only unanswered
+ * A choice with no non-blank member is refused rather than written. An
+ * empty `other` is a junk decision in the learning substrate, and on this board it is worse than
+ * junk — the answer route marks the question answered, and the approve gate counts only unanswered
  * questions, so a blank answer silently opens the gate on a question nobody answered.
  */
 export function resolveChoice(
@@ -94,7 +91,7 @@ export function resolveChoice(
  * The body the board's answer route takes: the selections, and the freeform half joined.
  *
  * Joined with "; " because the column is one string and a separator is the only way several
- * free-form parts survive in it — the same join Descent writes. The freeform half is sent even when
+ * free-form parts survive in it. The freeform half is sent even when
  * it is empty, so the answer overwrites a previous free-form text rather than leaving it standing
  * under a new selection.
  */

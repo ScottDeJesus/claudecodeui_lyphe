@@ -18,7 +18,7 @@ import {
  * The nine detail tools: a card's questions and their answers, its issues, its checklist and its
  * approval — over the board's question, checklist and card routes.
  *
- * Names are `descent-pm`'s, for the reason `kanban-pm-tools-cards.ts` states.
+ * Names are fixed, for the reason `kanban-pm-tools-cards.ts` states.
  *
  * Consumers: `kanban-pm-mcp.ts`, which assembles this table with the other two and starts the
  * transport over it.

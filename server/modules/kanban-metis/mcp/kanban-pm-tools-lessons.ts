@@ -18,7 +18,7 @@ import {
  * there is deliberately no approve tool). A staged lesson is invisible to future sessions until the
  * operator approves it, and then it is the approved index `list_actionable` carries.
  *
- * The schemas are `mcp_tools_lessons.py:45-95`'s: the trigger and kind enums are the four and two
+ * The schemas are fixed: the trigger and kind enums are the four and two
  * values the corpus accepts, and `limit` is REFUSED rather than clamped outside 1..500, because a
  * silently clamped limit hides the caller's bug.
  *
@@ -36,19 +36,21 @@ const LESSON_TRIGGERS = [
 ];
 const LESSON_KINDS = ['note', 'skill_draft'];
 
-/** The index's bounds, `mcp_tools_lessons.py`'s schema: `limit` 1..500, default 100. */
+/**
+ * The index's bounds: `limit` 1..500, default 100 — the same bounds `learning.routes.ts` declares
+ * for the HTTP door, so the two cannot drift.
+ */
 const LESSON_LIMIT_DEFAULT = 100;
 const LESSON_LIMIT_MAX = 500;
 
-/** Descent's door rules: a name past 80 and a summary past 60 are REFUSED, never truncated. */
+/** The door rules: a name past 80 and a summary past 60 are REFUSED, never truncated. */
 const LESSON_NAME_MAX = 80;
 const LESSON_SUMMARY_MAX = 60;
 
 /**
  * How much of the approved corpus the orient read carries.
  *
- * `store_actionable.py:170-171`'s approved index: an unscored recency slice, because there is no
- * lesson scoring anywhere in Descent and none is invented here.
+ * An unscored recency slice: there is no lesson scoring anywhere here and none is invented.
  */
 export const APPROVED_LESSON_LIMIT = 50;
 
@@ -207,9 +209,9 @@ export function createLessonTools(client: KanbanPmClient): ToolTable {
           trigger,
           body: typeof args.body === 'string' ? args.body : '',
           tags: (args.tags as string[] | undefined) ?? [],
-          // Descent's `feature_id` is this board's `cardId`: the tool keeps the argument name the
-          // ported brief was written against and translates it at the one boundary that can — the
-          // route names a card the way this board's schema does.
+          // The tool's `feature_id` argument is this board's `cardId`: the name is the one the
+          // brief was written against, translated at the one boundary that can — the route names a
+          // card the way this board's schema does.
           cardId: args.feature_id as string | undefined,
           kind,
         });
@@ -218,8 +220,8 @@ export function createLessonTools(client: KanbanPmClient): ToolTable {
       },
 
       list_lessons: async (args) => {
-        // Refused, never clamped — `mcp_tools_lessons.py:184-186`'s rule, and the "full dedupe
-        // sweep" its schema documents only means anything if 500 means 500.
+        // Refused, never clamped — 500 must mean 500, or the "full dedupe
+        // sweep" its schema documents means nothing.
         const limit = args.limit === undefined ? LESSON_LIMIT_DEFAULT : args.limit;
         if (
           typeof limit !== 'number' ||

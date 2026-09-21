@@ -26,9 +26,8 @@ import type { KanbanPmClient } from './kanban-pm-client.js';
  */
 
 /**
- * Ten seconds — `descent/mcp_server.py`'s `HEARTBEAT_SECS = 10`, and the cadence the board's own
- * forty-second staleness window is measured in misses of. Spelled without a separator because the
- * number IS the dial a reader greps for.
+ * Ten seconds — the cadence the board's own forty-second staleness window is measured in misses of.
+ * Spelled without a separator because the number IS the dial a reader greps for.
  */
 export const HEARTBEAT_INTERVAL_MS = 10000;
 
@@ -66,11 +65,11 @@ export function forgetPlanLease(cardId: string): void {
 /**
  * Give the plan lease up at one of its lifecycle doors, then stop re-stamping it.
  *
- * The doors are Descent's `store_mutators._release_plan_lease` callers — attaching the plan,
- * posting the questions, filing an issue — because those three are where planning ENDS, and a
- * claim that outlived its planning is a card pinned to an owner who has walked away. A failed
- * release is announced on stderr and never retried: the set is forgotten either way, so the lease
- * ages out by the board's own staleness window instead of being renewed forever.
+ * The three doors are attaching the plan, posting the questions and filing an issue — those three
+ * are where planning ENDS, and a claim that outlived its planning is a card pinned to an owner who
+ * has walked away. A failed release is announced on stderr and never retried: the set is forgotten
+ * either way, so the lease ages out by the board's own staleness window instead of being renewed
+ * forever.
  */
 export async function releasePlanLease(client: KanbanPmClient, cardId: string): Promise<void> {
   try {

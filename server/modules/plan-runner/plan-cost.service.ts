@@ -38,7 +38,7 @@ import { listRunDirs, readPlanLedger, readRunFiles } from './runner-state.transp
  *   lost ground. Its own `total_usd` is not read on its own — it is the sum of the four kinds these
  *   floors are taken of.
  *
- * The result is CACHED per plan for 20 seconds, `plan_costs.py`'s own TTL — opening a drawer must
+ * The result is CACHED per plan for 20 seconds — opening a drawer must
  * not walk two hundred run directories on every click, and a cost that is twenty seconds stale on
  * a surface that reports dollars is not a lie. The reading never throws: a plan with nothing
  * behind it answers `null`, which is what the route hands the drawer, so a card whose plan was
@@ -49,7 +49,7 @@ import { listRunDirs, readPlanLedger, readRunFiles } from './runner-state.transp
 /** Where the runner keeps its runs unless the operator moved it. The lane's composition root reads the same variable (`plan-runner.module.ts`). */
 const DEFAULT_STATE_DIR = '~/.claude/state/runner';
 
-/** How long one plan's reading is held. `plan_costs.TTL_S` and `costs.RUNS_INDEX_TTL_S` are the same 20 s. */
+/** How long one plan's reading is held. `costs.RUNS_INDEX_TTL_S` is the same 20 s. */
 const COST_TTL_MS = 20_000;
 
 /** Four places, like every priced figure the runner writes (`costs.py` rounds its own sums there). */

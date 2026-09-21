@@ -40,7 +40,6 @@ export { createKanbanMetisModule } from './kanban-metis.module.js';
 
 // kanbanMetisSecretGuard: used by the server entrypoint as the bare middleware on the second
 // board mount, `/api/kanban-pm` without `authenticateToken` — the door the `kanban-pm` MCP child
-// comes in through, on the derived per-session credential and with the descent importer refused
-// before the router can see it. It reads the process's registry itself (`setLiveMetisRegistry`,
+// comes in through, on the derived per-session credential. It reads the process's registry itself (`setLiveMetisRegistry`,
 // called by the composition root above), so it too needs nothing here.
 export { kanbanMetisSecretGuard } from './kanban-metis.routes.js';
