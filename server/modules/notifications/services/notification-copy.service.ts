@@ -197,6 +197,10 @@ const RUNNER_STOP_HEADLINES: Record<string, string> = {
   'all-blocked': 'Plan blocked',
   budget: 'Plan out of budget',
   'flag-off': 'Plan stopped: flag off',
+  // The runner's word for "the plan file could not be read" -- a park `resume` re-enters, and the
+  // one park nothing takes up on its own (`runner_watchdog._verdict` answers `done` over it), so the
+  // push is the operator's only notice and it has to name the fact rather than say "stopped".
+  unreadable: 'Plan unreadable',
 };
 
 /** `3 of 4 phases shipped`, or `No phases` for a plan that had none. */

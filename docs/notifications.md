@@ -90,7 +90,7 @@ The events raised today:
 | `login.expired` | `error` | The Claude runtime, when the credentials rather than the request are the problem |
 | `session.stuck` | `error` | The stall watchdog, when a run still in flight has emitted nothing for the stall threshold — no runtime raises it |
 | `runner.finished` | `stop` | The plan-runner lane, when a plan run ends with every phase shipped — see [plan-runner.md](plan-runner.md) §"Pushes on an ending" |
-| `runner.blocked` | `error` | The plan-runner lane, when a plan run ends with phases blocked or left: `all-blocked`, `budget`, `flag-off`, or a `complete` that left phases |
+| `runner.blocked` | `error` | The plan-runner lane, when a plan run ends with phases blocked or left: `all-blocked`, `budget`, `flag-off`, `unreadable`, or a `complete` that left phases |
 | `limit.reached` · `limit.reset` · `limit.warning` · `limit.overage` · `limit.out_of_credits` | `limit` | The Claude runtime, reading the SDK's `rate_limit_event` |
 | `push.enabled` | `info` | The settings service, when a browser saves a push subscription |
 

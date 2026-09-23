@@ -71,6 +71,14 @@ export type RunnerEndingsNotifier = {
   observe(runs: RunnerRunSnapshot[], now: number): void;
 };
 
+// An ending that is a PARK, not news: `rate-limited` is the one word something re-presses without a
+// hand (`runner_watchdog.py` `_park` resumes the same run when its window lifts), so nothing is
+// wrong with the plan and the lane's own card says it. `dry-run` never happened and `unknown` is a
+// receipt caught mid-write -- neither is an event. `unreadable` IS NOT HERE, and the distinction is
+// measured, not felt: nothing takes up a run that ENDED `unreadable` with no phase blocked and no
+// unblock owed -- `_verdict` answers `done` over one and pops its counters -- so the operator's own
+// `resume` is the only remedy there is, and the push is the only thing that tells him. It earns
+// `Plan unreadable` (`notification-copy.service.ts`), never a silent fall-through.
 const SILENT_OUTCOMES = new Set(['rate-limited', 'dry-run', 'unknown']);
 
 function isDue(run: RunnerRunSnapshot, mark: number): run is RunnerRunSnapshot & { ended_at: number } {

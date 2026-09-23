@@ -4878,7 +4878,7 @@ The events raised today:
 | `login.expired` | `error` | The Claude runtime, when the credentials rather than the request are the problem |
 | `session.stuck` | `error` | The stall watchdog, when a run still in flight has emitted nothing for the stall threshold — no runtime raises it |
 | `runner.finished` | `stop` | The plan-runner lane, when a plan run ends with every phase shipped — see [plan-runner.md](plan-runner.md) §"Pushes on an ending" |
-| `runner.blocked` | `error` | The plan-runner lane, when a plan run ends with phases blocked or left: `all-blocked`, `budget`, `flag-off`, or a `complete` that left phases |
+| `runner.blocked` | `error` | The plan-runner lane, when a plan run ends with phases blocked or left: `all-blocked`, `budget`, `flag-off`, `unreadable`, or a `complete` that left phases |
 | `limit.reached` · `limit.reset` · `limit.warning` · `limit.overage` · `limit.out_of_credits` | `limit` | The Claude runtime, reading the SDK's `rate_limit_event` |
 | `push.enabled` | `info` | The settings service, when a browser saves a push subscription |
 
@@ -5956,13 +5956,16 @@ tabs receive, and only when that picture changed.
 | The ending | Code | Kind — the switch it rides | ntfy |
 |---|---|---|---|
 | `complete`, no phase blocked or pending | `runner.finished` | `stop` — Run stopped | priority 3, ✅ |
-| `complete` with phases left, `all-blocked`, `budget`, `flag-off` | `runner.blocked` | `error` — Run failed | priority 4, ⚠️ |
+| `complete` with phases left, `all-blocked`, `budget`, `flag-off`, `unreadable` | `runner.blocked` | `error` — Run failed | priority 4, ⚠️ |
 | `rate-limited`, `dry-run`, a receipt caught mid-write (`unknown`) | none | — | — |
 | a fixture walk — the plan in a scratch folder — `~/.claude/state/test-projects/runner-fixtures/`, anywhere else under `~/.claude/state`, or the OS temp dir (`scripts/runner_fixtures/*.sh`) | none | — | — |
 
 "Phases left" is the card's own `runUnfinished` rule — a blocked or pending phase — read off the
 phases, never off the receipt's word. A rate-limited park says nothing because nothing is wrong with
-the plan: `runner_watchdog.py` resumes the same run when its window lifts. The title is the headline
+the plan: `runner_watchdog.py` resumes the same run when its window lifts. `unreadable` DOES push —
+nothing takes up a run that ended there (`_verdict` answers `done` over one: its `blocked` is empty
+and no phase owes an unblock), so the operator's own `resume` is the whole remedy and the push says
+`Plan unreadable`. The title is the headline
 and the plan's title (`Plan blocked · <plan title>`); the body counts shipped of total. A finish adds
 the run's walk time — `ended_at - started_at` — and the plan's spend over every run of it. `started_at`
 is the START press, never a queue wait: a run created PARKED is stamped by the press that lifts it out
@@ -6131,7 +6134,7 @@ launches the drain), read off
 `progress.json.repair` — repairing with its step and clock while its process lives (the run's for an
 unblock, the drain's pid for a heal), paused while it waits — a queued heal no drain is working names
 its gate off the item's `waiting_on` (`heal-running` → `runner.repair.waitsHeal`, `heals-off` →
-`waitsOff`, `cap-spent` → `waitsCap` with the cap; any other word is a child the drain could not
+`waitsOff`; any other word is a child the drain could not
 start, `waitsHeld` with the fault; no word → `pausedHeal`, "the next drain takes it up"; the words are
 `hooks/plan_runner/heal_live.py`'s and `heal_drain._held`'s, carried through `readRepair` unchanged) —
 then the ending: unblocked and running
