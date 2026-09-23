@@ -354,6 +354,11 @@ to its CSS overlay instead, same as any other host that withholds it
 `.verify/probe-docspace-canvas.mjs` reads `allow` off the rendered element alongside the three
 sandbox tokens, so a change that drops either reddens the same gate.
 
+**A canvas block opens in READ in this frame** — pan locked, its Read/Edit switch the way into
+Edit. The mode is the block's own default on every surface, so nothing here asks whether it is
+framed; the hooks that mode rides on are the README's (§"Embedding one block"), not this file's,
+and `.verify/probe-docspace-canvas.mjs` reads them from inside the frame.
+
 **A frame that never answers is a fault the reader cannot see**, so `DocSpaceFrame` arms a timer
 for `DOCSPACE_READY_TIMEOUT_MS` at mount and replaces the iframe with `WidgetErrorCard` naming the
 origin if no `ready` arrives. The timer is cleared two ways — by the `ready` the host accepts, and
@@ -457,7 +462,10 @@ question that needs the live page to answer it. `allow-popups` and `allow-top-na
 withheld: an embed may not spray windows over the operator's browser, and may not steer the tab it
 sits in away from the chat. The one grant made through `allow` is `fullscreen`, so an embedded
 video's own control keeps working — a different mechanism from the card's switch, which never
-touches the frame.
+touches the frame. The same grant reaches a whole ArchPulse page framed here: its canvas blocks
+open in **Read**, pan locked, and the `fullscreen` grant is what lets one of their Full Screen
+controls call the real API rather than fall back to the CSS overlay (§"The DocSpace kind";
+`~/.claude/ArchPulse/README.md` §"Embedding one block" for the block).
 
 **The height is DECLARED, not reported, and it has to be.** A page that never heard of this app
 will never post `resize`, so `useWidgetHost`'s protocol has nothing to say here and the frame would
