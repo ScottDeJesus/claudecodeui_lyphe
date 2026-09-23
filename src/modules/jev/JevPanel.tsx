@@ -15,7 +15,7 @@ import { Banner, Button, EmptyState, ScrollArea, Spinner, Tooltip } from '@/shar
 import { JevLogo } from '@/shared/ui/JevLogo';
 
 /**
- * The Jev tab: what asking costs, what it saves, who asks most, and the switches that govern it.
+ * The Jev view of the API tab: what asking costs, what it saves, who asks most, and the switches that govern it.
  *
  * ORDERED THE WAY THE OPERATOR ASKED. Balance and burn first, with what Jev saves BESIDE it on a wide
  * panel so "is it worth it" reads as one comparison; then the biggest consumers, the range picker on

@@ -79,7 +79,7 @@ const NAV_TABS: Array<{ id: AppTab; label: string; keywords: string }> = [
   { id: 'memory', label: 'Go to Memory', keywords: 'memory intake pending' },
   { id: 'runner', label: 'Go to Runner', keywords: 'runner plan run live phases' },
   { id: 'heal', label: 'Go to Heal', keywords: 'heal friction ledger reflex regression ignore' },
-  { id: 'jev', label: 'Go to Jev', keywords: 'jev spend balance burn tokens consumers cache typesafe' },
+  { id: 'api', label: 'Go to API', keywords: 'api jev deepseek spend balance burn tokens consumers usage outings typesafe' },
 ];
 
 /** Rendered by the project-workspace module to search projects, sessions, files, branches and commits and run their actions. */

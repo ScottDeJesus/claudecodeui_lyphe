@@ -27,7 +27,7 @@
     "memory": "Memory",
     "runner": "Runner",
     "heal": "Heal",
-    "jev": "Jev",
+    "api": "API",
     "kanban": "Kanban",
     "universe": "Universe",
     "schedules": "Schedules",
@@ -335,6 +335,165 @@
       "never": "never",
       "ago": "{{ago}} ago",
       "empty": "No caller is known yet"
+    }
+  },
+  "api": {
+    "subtabs": {
+      "jev": "Jev",
+      "deepseek": "DeepSeek"
+    },
+    "subtabsLabel": "API services"
+  },
+  "deepseekUsage": {
+    "title": "DeepSeek",
+    "refresh": "Refresh",
+    "reading": "Asking the DeepSeek usage reader…",
+    "sampleNotice": "Sample numbers — the live reader wires in next.",
+    "unreachable": {
+      "title": "The DeepSeek usage reader could not be asked",
+      "retry": "Try again"
+    },
+    "empty": {
+      "title": "No DeepSeek spend on this box yet",
+      "message": "The first outing answered by DeepSeek writes the ledger. The switches below are what route work there."
+    },
+    "sections": {
+      "burn": "Balance and burn",
+      "burnHint": "the vendor's balance, the ledger's spend",
+      "consumers": "Biggest consumers",
+      "consumersHint": "runs, chains, heals, waves and sessions",
+      "where": "Where it goes",
+      "whereHint": "by role, model, soul and token column",
+      "feed": "Newest outings",
+      "feedHint": "every range",
+      "switches": "Switches that route work to DeepSeek",
+      "switchesHint": "read-only",
+      "recon": "Ledger against balance",
+      "reconHint": "per hour"
+    },
+    "range": {
+      "label": "Range",
+      "today": "today",
+      "7d": "7 days",
+      "30d": "30 days",
+      "all": "all time"
+    },
+    "burn": {
+      "asOf": "{{currency}} · as of {{when}} ago",
+      "noReading": "no reading yet — the server records the balance every 3 minutes",
+      "unavailable": "the vendor says this account can no longer serve requests",
+      "available": "available",
+      "today": "today",
+      "week": "7 days",
+      "all": "all time",
+      "list": "list {{usd}}",
+      "outings": "{{n}} outings",
+      "measured": "balance fell {{today}} today · {{week}} in 7 days",
+      "measuredNone": "no balance drop measured yet",
+      "pricing": "Rows priced one by one — list rate in DeepSeek's peak windows ({{windows}} UTC, Mon–Fri), {{offPeak}} of it otherwise; holidays not modelled; the list figure is the basis the run receipts and the Heal cap count.",
+      "unpriced": "unpriced models, counted at $0: {{models}}"
+    },
+    "chart": {
+      "max": "max {{value}}",
+      "series": "$ per day, per-row priced",
+      "total": "14 days · {{value}} · {{outings}} outings",
+      "label": "DeepSeek spend by day, the last 14 days",
+      "barTitle": "{{date}} · {{outings}} outings · {{tokens}} tok · {{usd}} (list {{list}})"
+    },
+    "consumers": {
+      "ofSpend": "{{share}} of spend ({{range}})",
+      "rangeTotal": "of {{usd}} · list {{list}} · {{tokens}} tok · {{outings}} outings ({{range}})",
+      "noTop": "No priced DeepSeek outing in this range",
+      "empty": "No consumer in this range",
+      "kinds": "By kind",
+      "columns": {
+        "kind": "kind",
+        "name": "name",
+        "outings": "outings",
+        "input": "input",
+        "output": "output",
+        "cache_read": "cache read",
+        "cache_write": "cache write",
+        "usd": "$",
+        "share": "share"
+      }
+    },
+    "kind": {
+      "chain": "chain",
+      "heal": "heal",
+      "run": "run",
+      "wave": "wave",
+      "soul": "soul",
+      "session": "session"
+    },
+    "where": {
+      "roles": "Roles",
+      "models": "Models",
+      "souls": "Souls",
+      "columns": "Token columns",
+      "endpoint": "every outing goes to {{host}}",
+      "outings": "Outings in this range, by $",
+      "noOutings": "No outing in this range",
+      "unknownSoul": "(unknown)",
+      "columnNames": {
+        "input": "input",
+        "output": "output",
+        "cache_read": "cache read",
+        "cache_write": "cache write"
+      },
+      "cols": {
+        "soul": "soul",
+        "role": "role",
+        "model": "model",
+        "kind": "kind",
+        "name": "name",
+        "run": "run id",
+        "tokens": "tokens",
+        "usd": "$"
+      }
+    },
+    "feed": {
+      "caption": "newest first · the ledger keeps tokens and who spent them, never what was asked",
+      "empty": "No DeepSeek outing yet",
+      "cols": {
+        "when": "when",
+        "soul": "soul",
+        "role": "role",
+        "model": "model",
+        "consumer": "consumer",
+        "tokens": "tokens",
+        "usd": "$"
+      }
+    },
+    "switches": {
+      "chat": "DeepSeek chat switch",
+      "heal": "Heal model switch",
+      "swarm": "Swarm switch",
+      "on": "on",
+      "off": "off",
+      "unreadable": "unreadable",
+      "lanes": "up to {{n}} lanes",
+      "noCeiling": "no lane ceiling",
+      "caption": "Mirrors only. Settings changes the chat and swarm switches; Heal changes the heal model."
+    },
+    "recon": {
+      "ledger": "ledger priced",
+      "balance": "balance fell",
+      "gap": "gap",
+      "gapOver": "{{usd}} more — the balance fell by more than the ledger priced",
+      "gapUnder": "{{usd}} less — the balance fell by less than the ledger priced",
+      "gapNone": "none — the two agree",
+      "gapUnknown": "no covered hour yet",
+      "covered": "{{hours}} covered hours · {{readings}} readings",
+      "topups": "top-ups {{usd}}",
+      "unassigned": "{{usd}} fell between readings too far apart to place",
+      "noReadings": "No balance readings yet — the balance log started when the server began recording.",
+      "otherCurrency": "The balance is in {{currency}}, so it is not compared with the ledger's dollars.",
+      "caption": "Only covered hours are compared: an hour counts once two readings under 15 minutes apart land in it.",
+      "legendLedger": "ledger",
+      "legendBalance": "balance",
+      "hourTitle": "{{hour}} · ledger {{ledger}} · balance {{balance}}",
+      "label": "Ledger and balance by hour"
     }
   },
   "kanban": {

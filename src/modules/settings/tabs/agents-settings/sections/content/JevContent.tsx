@@ -33,7 +33,7 @@ type ScopeRow = {
  * The scope rows are drawn from `JEV_SCOPES` and the table below rather than written out one by one,
  * so a scope the server gains is one entry here and nothing else: every row's gating, its press and
  * the master's warning follow from the list. The read, the writes and the re-read all live in
- * `useJevSwitches`; the Jev readings themselves are the Jev tab's, not this panel's.
+ * `useJevSwitches`; the Jev readings themselves are the API tab's Jev view's, not this panel's.
  */
 export default function JevContent() {
   const { t } = useTranslation('settings');
@@ -106,10 +106,10 @@ export default function JevContent() {
         });
 
   // D11: Settings owns the switches and nothing else. The readings it used to draw here — the ledger
-  // total and the per-consumer net list — are the Jev tab's, whose "What Jev saves" section draws the
+  // total and the per-consumer net list — are the API tab's Jev view's, whose "What Jev saves" section draws the
   // same numbers from the one reader. One line of copy says where they went; no reading is left here.
   const netPointer = t('agents.jev.netPointer', {
-    defaultValue: 'Per-caller context kept out is on the Jev tab, next to Heal.',
+    defaultValue: 'Per-caller context kept out is on the API tab, under Jev.',
   });
 
   return (

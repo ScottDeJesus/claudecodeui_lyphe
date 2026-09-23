@@ -1,7 +1,7 @@
 import type { Tone } from '@/shared/types';
 
 /**
- * The formatters every part of the Jev tab shares, so a dollar reads the same in the balance, the
+ * The formatters every part of the Jev view shares, so a dollar reads the same in the balance, the
  * table and the feed. Each is a pure function of its number; `—` is the one word for "not known".
  */
 

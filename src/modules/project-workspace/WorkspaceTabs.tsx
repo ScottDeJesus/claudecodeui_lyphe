@@ -52,7 +52,8 @@ type BuiltInTab = {
 // brain for memory, an orbit for the sky, a pulse for the runner — the one view whose
 // subject is something moving on its own — a clock for what the box runs on a schedule, and a
 // heartbeat for the heal reflex, the view whose subject is the house mending itself, and coins
-// for Jev, the view whose subject is what the house spends on asking.
+// for the API tab, the view whose subject is what the house spends on third-party services —
+// Jev and DeepSeek.
 
 // Row one — views of THIS project: what each one shows changes with the project selected.
 const PROJECT_BASE_TABS: BuiltInTab[] = [
@@ -85,9 +86,10 @@ const RUNNER_TAB: BuiltInTab = { id: 'runner', labelKey: 'tabs.runner', icon: Ac
 
 const HEAL_TAB: BuiltInTab = { id: 'heal', labelKey: 'tabs.heal', icon: HeartPulse };
 
-// Ungated, like the board: Jev's spend is a fact about the box whatever project is open, and a
-// tab the operator opens to make a money decision must not hide on a quiet day.
-const JEV_TAB: BuiltInTab = { id: 'jev', labelKey: 'tabs.jev', icon: Coins };
+// Ungated, like the board: what the third-party services (Jev and DeepSeek) cost is a fact about
+// the box whatever project is open, and a tab the operator opens to make a money decision must not
+// hide on a quiet day.
+const API_TAB: BuiltInTab = { id: 'api', labelKey: 'tabs.api', icon: Coins };
 
 /**
  * Rendered by ProjectSidebarRegion, under the wordmark, to show the built-in workspace tabs plus
@@ -95,7 +97,7 @@ const JEV_TAB: BuiltInTab = { id: 'jev', labelKey: 'tabs.jev', icon: Coins };
  *
  * Row one is this project: Chat, Shell, Files, Git, Browser, Tasks — views whose content changes
  * with the project selected. Row two is the house: Kanban, Universe, Schedules, Memory, Runner,
- * Heal, Jev, then plugin tabs — surfaces that read the same whichever project is open, which is why
+ * Heal, API, then plugin tabs — surfaces that read the same whichever project is open, which is why
  * every count dot the strip carries lives there. One row held both kinds until it outgrew the
  * sidebar: measured at 328px (a 304px strip, 36px a glyph), nine tabs made 340px of content and
  * the ninth sat past the edge with no affordance at all, three more tabs still to come. Split by
@@ -141,7 +143,7 @@ export default function WorkspaceTabs({
     ...(shouldShowMemoryTab ? [MEMORY_TAB] : []),
     ...(shouldShowRunnerTab ? [RUNNER_TAB] : []),
     ...(shouldShowHealTab ? [HEAL_TAB] : []),
-    JEV_TAB,
+    API_TAB,
   ];
 
   // Three tabs carry a count, and each only while there is something to count: `undefined` is what

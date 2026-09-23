@@ -13,7 +13,7 @@ import { KanbanPanel } from '@/modules/kanban';
 import { MemoryIntakePanel } from '@/modules/memory-intake';
 import { RunnerPanel } from '@/modules/plan-runner';
 import { HealPanel } from '@/modules/heal';
-import { JevPanel } from '@/modules/jev';
+import { ApiPanel } from '@/modules/api-tab';
 import { TaskMasterPanel, useTaskMasterProjectSync } from '@/modules/task-master';
 import { UniversePanel } from '@/modules/universe';
 import { SchedulesPanel } from '@/modules/schedules';
@@ -430,9 +430,9 @@ function WorkspaceMain({
           )}
 
           {/* No gate, like the board below: the tab is always on the strip. */}
-          {activeTab === 'jev' && (
+          {activeTab === 'api' && (
             <div className="h-full overflow-hidden">
-              <JevPanel />
+              <ApiPanel />
             </div>
           )}
 

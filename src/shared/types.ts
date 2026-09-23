@@ -52,7 +52,7 @@ export type ProviderModelActions = {
 //----------------- PROJECTS AND SESSIONS ------------
 
 /** Identifies the workspace pane the user is looking at; plugin panes are namespaced by plugin id. */
-export type AppTab = 'chat' | 'files' | 'shell' | 'git' | 'tasks' | 'browser' | 'memory' | 'runner' | 'heal' | 'jev' | 'kanban' | 'universe' | 'schedules' | `plugin:${string}`;
+export type AppTab = 'chat' | 'files' | 'shell' | 'git' | 'tasks' | 'browser' | 'memory' | 'runner' | 'heal' | 'api' | 'kanban' | 'universe' | 'schedules' | `plugin:${string}`;
 
 /** A message queued to be sent to a session at a future time. */
 export type ScheduledMessage = {
@@ -2138,6 +2138,49 @@ export type CliVersionReport = { installed: string | null; reason: string | null
 export type DeepseekBalance =
   | { reachable: true; available: boolean; currency: string; total: string; checkedAt: number }
   | { reachable: false; reason: string };
+
+export type DeepseekRange = 'today' | '7d' | '30d' | 'all';
+export type DeepseekKind = 'chain' | 'heal' | 'run' | 'wave' | 'soul' | 'session';
+export type DeepseekColumns = { input: number; output: number; cache_read: number; cache_write: number };
+export type DeepseekDay = { day: string; outings: number; tokens: number; usd: number; usd_list: number };
+export type DeepseekShareRow = { key: string; outings: number; usd: number; share: number };
+export type DeepseekConsumer = DeepseekColumns & {
+  kind: DeepseekKind; name: string; outings: number; tokens: number; usd: number; usd_list: number; share: number; last_ts: number;
+};
+export type DeepseekOuting = DeepseekColumns & {
+  outing: string; session_id: string; segment: number; started_at: number; last_at: number;
+  parent_session: string | null; soul: string | null; role: string; model: string; kind: DeepseekKind; name: string; run_id: string | null;
+  tokens: number; usd: number; usd_list: number;
+};
+export type DeepseekReconHour = { hour_start: number; ledger_usd: number; balance_usd: number | null; topup_usd: number; readings: number };
+export type DeepseekUsageSummary = {
+  generated_at: number;
+  ledger: { path: string; present: boolean; messages: number; outings: number; first_ts: number | null; last_ts: number | null; synced_at: number | null; sync_s: number | null; unpriced_models: string[] };
+  pricing: { mode: 'per-row'; off_peak_factor: number; peak_utc: [number, number][]; weekdays_only: boolean; holidays_modelled: boolean; rates: Record<string, number[]> };
+  endpoint: string;
+  balance: { total: number; currency: string; available: boolean; checked_at: number } | null;
+  spend: {
+    today_usd: number; week_usd: number; all_usd: number; today_list_usd: number; week_list_usd: number; all_list_usd: number;
+    today_outings: number; week_outings: number; all_outings: number; today_balance_usd: number | null; week_balance_usd: number | null;
+  };
+  days: DeepseekDay[];
+  range: DeepseekRange;
+  range_since: number | null;
+  totals: DeepseekColumns & { outings: number; messages: number; tokens: number; usd: number; usd_list: number };
+  columns: Record<keyof DeepseekColumns, { tokens: number; usd: number }>;
+  kinds: DeepseekShareRow[];
+  roles: DeepseekShareRow[];
+  models: DeepseekShareRow[];
+  souls: DeepseekShareRow[];
+  consumers: DeepseekConsumer[];
+  top: { kind: DeepseekKind; name: string; usd: number; share: number } | null;
+  outings: DeepseekOuting[];
+  feed: DeepseekOuting[];
+  recon: {
+    currency: string | null; readings: number; covered_hours: number; ledger_usd: number; balance_usd: number | null;
+    gap_usd: number | null; topups_usd: number; unassigned_usd: number; hours: DeepseekReconHour[];
+  };
+};
 
 // ---------------------------
 

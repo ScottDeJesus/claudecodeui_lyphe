@@ -35,7 +35,7 @@ export type JevPanelRead = {
 type SettledReading = { range: JevRange; data: JevSummary | null; error: string | null };
 
 /**
- * The Jev tab's whole read: `api.jev.summary` on a timer, in the shape of `HealContext.tsx:91-129`.
+ * The Jev view's whole read: `api.jev.summary` on a timer, in the shape of `HealContext.tsx:91-129`.
  *
  * ONE question per window at a time and the newest answer wins, which is what the two tokens are
  * for: a poll issued before a press must not land after the press's own read and put the pre-press

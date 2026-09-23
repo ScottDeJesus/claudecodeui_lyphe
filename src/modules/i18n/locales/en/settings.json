@@ -415,7 +415,7 @@
         "gatedOff": "Held off by the master switch above: turn Jev on to change this."
       },
       "unreadable": "The switches could not be read from the server, so their position is unknown — this is not the same as off. They are retried whenever this page regains focus.",
-      "netPointer": "Per-caller context kept out is on the Jev tab, next to Heal."
+      "netPointer": "Per-caller context kept out is on the API tab, under Jev."
     }
   },
   "permissions": {
