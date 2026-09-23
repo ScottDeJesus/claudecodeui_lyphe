@@ -53,6 +53,8 @@
       "by": "Fired by {{reason}} · built by {{builder}}",
       "closed": "{{count}} rows closed",
       "costTitle": "DeepSeek’s share of this heal — what the daily cap counts, never the chain’s whole bill",
+      "costTitleOld": "Booked before 2026-09-23, when a heal booked its chain’s WHOLE bill: the Claude stages in this number were your subscription, not DeepSeek — though the daily cap counts them as DeepSeek all the same",
+      "costTitleUnbooked": "Nothing booked yet — a heal books its cost when it ends",
       "empty": {
         "message": "A cycle fires them — nightly on the schedule, or Run a cycle now.",
         "title": "No heal has run yet"
@@ -87,7 +89,7 @@
       "ignoredOne": "ignored",
       "live": "{{count}} live",
       "noTranscript": "no transcript",
-      "regression": "⚠ regression · {{klass}} came back {{ago}}",
+      "regression": "⚠ regression · {{signature}} came back {{ago}}",
       "soul": "soul",
       "title": "Friction by kind",
       "toggle": "Show the rows of {{kind}}",
@@ -118,9 +120,12 @@
       "noHeal": "none yet",
       "noHealTitle": "No heal has run",
       "spend": "DeepSeek today",
+      "spendMixed": "Heal spend today",
+      "spendNoteMixed": "Not DeepSeek’s dollars alone: the rows booked before 2026-09-23 booked their chain’s whole bill, Claude stages included, and the daily cap counts them all the same.",
       "spendTitle": "DeepSeek heal spend today against the daily cap",
+      "spendTitleClaude": "DeepSeek heal spend today. These heals run on Claude — your subscription — so the daily cap counts none of it and closes nothing.",
       "spendTitleReserved": "DeepSeek heal spend today: {{spent}} landed, {{reserved}} reserved for the heals still walking. The daily cap weighs both.",
-      "spendTitleClaude": "DeepSeek heal spend today. These heals run on Claude — your subscription — so the daily cap counts none of it and closes nothing."
+      "spendTitleUnknown": "DeepSeek heal spend today against the daily cap. The worker named no reserved figure, so the heals still walking are not in this number."
     },
     "queue": {
       "empty": "The runner’s queue is empty.",
@@ -167,7 +172,7 @@
       "pillOffTitle": "No cycle opens on its own; Run a cycle now opens one",
       "pressed": "Pressed",
       "refusedEntry": "ignore refused",
-      "spentTitle": "DeepSeek dollars this cycle spent",
+      "spentTitle": "DeepSeek dollars this cycle spent — a heal that landed before 2026-09-23 booked its chain’s whole bill, Claude stages included, so a cycle spanning that date counts more than DeepSeek billed",
       "startCaption": "Chiron ranks the live friction, then heals walk his list",
       "title": "Cycles",
       "toggle": "Show the worklist of the {{door}} cycle started {{ago}}",

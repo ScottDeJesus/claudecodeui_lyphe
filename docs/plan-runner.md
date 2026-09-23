@@ -351,9 +351,10 @@ clause with the Python rather than to be lenient in one direction: a reader that
 writer that emitted it, would leave the operator pressing a switch the worker does not see move.
 
 **THE DAILY CAP IS A DEEPSEEK FIGURE, and so is the peak park.** The worker sums the day's heals whose
-row says they ran on DeepSeek — Claude is the operator's own subscription, so it carries no cap, no
-dollar figure and no warning anywhere — and neither park is weighed against a heal whose model is
-Claude. That is the whole reason the model switch exists: leftover Claude usage at the end of a week
+row says they ran on DeepSeek — each booked at its chain's DeepSeek stages alone — plus a reserve for
+the ones still walking (`spend_today` landed + `spend_reserved`: running heals × the mean of the last
+five landed). Claude is the operator's own subscription, so it carries no cap, no dollar figure and no
+warning anywhere, and neither park is weighed against a heal whose model is Claude. That is the whole reason the model switch exists: leftover Claude usage at the end of a week
 can be spent on heals that would otherwise be parked behind a cap, without moving a single session's
 builds, because `heal_model.flag` is the HEAL's own choice and never the chat's.
 

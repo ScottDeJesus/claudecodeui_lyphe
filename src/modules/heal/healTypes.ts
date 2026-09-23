@@ -84,13 +84,70 @@ export type HealCard = {
   athena: AthenaCounts | null;
   /** Rows this heal claimed and closed. */
   closed: number;
-  /** The failure shapes this heal cured — what `read.regressions()` compares a returning row against. */
+  /**
+   * The failure shapes this heal cured — what `read.regressions()` compares a returning row against.
+   * A HEAD of the claim, never all of it: the worker sends `SIGNATURES_SHOWN` (12) and the count in
+   * `shapes_claimed`, because one heal of a long-running kind can cure hundreds of shapes and this
+   * payload rides every sixty seconds. The whole list is on the heal row and in its brief.
+   */
   signatures_claimed: string[];
+  /** How many shapes the heal claimed in total — `signatures_claimed.length` or more. */
+  shapes_claimed: number;
   /** Rows filed after this heal landed that carry its id — the after-landing spike mark. */
   spikes: number;
+  /**
+   * Dollars this heal booked — WHOSE dollars depends on when it ended: a heal that landed before the
+   * 2026-09-23 recipe change booked its chain's WHOLE bill, Claude stages included; one that landed
+   * after books its DeepSeek share alone, which is what `spend_today` and the daily cap count. Read
+   * `bookedBy` rather than the date, so no reader re-derives which of the two this is.
+   */
   cost_usd: number;
   chain_id: string | null;
 };
+
+/**
+ * The instant the cost recipe changed. A heal's `cost_usd` has meant two different things: before this
+ * the ledger booked a chain's WHOLE bill, Claude stages included (the six rows of 2026-09-23 sum
+ * $7.259154, of which $3.109996 is Claude — the operator's subscription, counted as if it were
+ * DeepSeek); from it, a heal books its DeepSeek share alone. The payload carries no mark of which
+ * recipe booked a row — no column of the ledger records it and the worker sends none — so the boundary
+ * is carried here as the fact it is.
+ *
+ * ITS VALUE IS THE BUILD'S OWN CHAIN START (`chain-heal-deepseek-dollars-20260923-123256-c6ec`,
+ * 2026-09-23 12:32:56 local). No row can hide in the gap above it: the day's last heal landed 12:02:48
+ * and the $7.26 those six booked was already past the $5.00 cap, so the reflex launched nothing
+ * between — every booking from here on is the new recipe, which from the next local midnight is every
+ * card this tab can draw.
+ */
+const DEEPSEEK_SHARE_SINCE = 1790191976;
+
+/** Which recipe booked a heal's `cost_usd` — the two readings a reader must be told apart, and nothing yet booked. */
+export type HealBookedBy = 'deepseek-share' | 'chain-total' | 'unbooked';
+
+/**
+ * Whose figure a heal's `cost_usd` is. A heal books when it ENDS (`ended_at`), so the boundary is read
+ * there and never off this screen's own clock: a walking row has booked nothing, an ended row before
+ * the change carries its chain's whole bill, and later rows DeepSeek's share.
+ */
+export function bookedBy(heal: Pick<HealCard, 'ended_at'>): HealBookedBy {
+  if (heal.ended_at === null) return 'unbooked';
+  return heal.ended_at >= DEEPSEEK_SHARE_SINCE ? 'deepseek-share' : 'chain-total';
+}
+
+/**
+ * Whether the day's figure is mixed — a card booked by the OLD recipe and ended inside the day's own
+ * window (`sinceMidnight`, the cut `spend_today` is summed from) must be read for what it is. A card
+ * older than the window is not in the figure and has nothing to say about it: this is what keeps the
+ * answer from outliving the day, since the tab's card list is longer than its day.
+ */
+export function hasPreChangeRows(
+  heals: readonly Pick<HealCard, 'ended_at'>[],
+  sinceMidnight: number,
+): boolean {
+  return heals.some(
+    (heal) => heal.ended_at !== null && heal.ended_at >= sinceMidnight && bookedBy(heal) === 'chain-total',
+  );
+}
 
 /** The runner heal queue's own items — the second door, read here and never written. */
 export type HealQueueItem = {
@@ -150,7 +207,12 @@ export type HealCycle = {
   gathered: number;
   ignored: number;
   healed: number;
-  /** DeepSeek dollars only. A cycle on Claude spends a subscription, and reads zero. */
+  /**
+   * DeepSeek dollars only. A cycle on Claude spends a subscription, and reads zero. A heal booked
+   * before the 2026-09-23 recipe change counts its chain's whole bill here (see `bookedBy`), so a cycle
+   * that spans that date — the night of the change, and no other — reads high by the Claude stages its
+   * heals rode.
+   */
   spent: number;
   /** Chiron's launch id, `fallback: <why>`, `none — nothing to judge`, or null before he is launched. */
   judge: string | null;

@@ -11,11 +11,14 @@ import {
   statusWord,
   usd,
 } from '@/modules/heal/healState';
+import { bookedBy } from '@/modules/heal/healTypes';
 import type { HealCard, HealQueueItem } from '@/modules/heal/healTypes';
 import { Badge, Button, Card, CardContent, CardFooter, CardHeader, CardTitle, Chip, EmptyState } from '@/shared/ui';
 
 /** How many claimed shapes a card NAMES before the rest are counted. A card is a summary and one heal
- *  can cure thirty shapes at once; the full list is in the heal's own brief, one press away. */
+ *  can cure hundreds of shapes at once; the full list is in the heal's own brief, one press away. The
+ *  COUNT comes from `heal.shapes_claimed` (the heal's total) and never from the array's length — the
+ *  worker ships only the first `SIGNATURES_SHOWN` (12) shapes, so the array is a head, not the set. */
 const SHAPE_CHIPS = 3;
 
 /**
@@ -111,6 +114,23 @@ function athenaLine(counts: HealCard['athena'], t: ReturnType<typeof useTranslat
     : `Athena · ${parts.join(' · ')}`;
 }
 
+/**
+ * Whose figure the number beside the row is — one clause per recipe, because one clause for both would
+ * be false of half the cards this tab can draw. `bookedBy` reads the change off the row's own ending;
+ * a walking heal has booked nothing, and one that landed before 2026-09-23 12:32 carries the Claude
+ * stages its chain rode, which were never DeepSeek dollars even though the daily cap counts them.
+ */
+function costTitle(heal: HealCard, t: ReturnType<typeof useTranslation>['t']): string {
+  const booked = bookedBy(heal);
+  if (booked === 'unbooked') {
+    return t('heal.cards.costTitleUnbooked', { defaultValue: 'Nothing booked yet — a heal books its cost when it ends' });
+  }
+  if (booked === 'chain-total') {
+    return t('heal.cards.costTitleOld', { defaultValue: 'Booked before 2026-09-23, when a heal booked its chain’s WHOLE bill: the Claude stages in this number were your subscription, not DeepSeek — though the daily cap counts them as DeepSeek all the same' });
+  }
+  return t('heal.cards.costTitle', { defaultValue: 'DeepSeek’s share of this heal — what the daily cap counts, never the chain’s whole bill' });
+}
+
 function HealCardView({ heal, onOpenChain }: { heal: HealCard; onOpenChain: (heal: HealCard) => void }) {
   const { t } = useTranslation();
   const chainId = heal.chain_id;
@@ -145,14 +165,16 @@ function HealCardView({ heal, onOpenChain }: { heal: HealCard; onOpenChain: (hea
           ) : (
             <Badge as="span" tone="positive">{t('heal.cards.quiet', { defaultValue: 'quiet after landing' })}</Badge>
           ))}
-          {/* The row's `cost_usd` is the DeepSeek share of what the chain spent — the same figure the
-              daily cap counts, and not the chain's own total (a stage that rode Claude is the
-              operator's subscription). The title says which of the two this is. */}
-          <span className="ml-auto font-mono text-muted-foreground" title={t('heal.cards.costTitle', { defaultValue: 'DeepSeek’s share of this heal — what the daily cap counts, never the chain’s whole bill' })}>{usd(heal.cost_usd)}</span>
+          {/* The row's `cost_usd` is today the DeepSeek share of what the chain spent — the same figure
+              the daily cap counts, and not the chain's own total (a stage that rode Claude is the
+              operator's subscription). WHICH OF THOSE THIS NUMBER IS DEPENDS ON WHEN THE HEAL ENDED,
+              and the title says whose it is — the rows already on screen were booked before the recipe
+              changed and carry their chains' whole bills. */}
+          <span className="ml-auto font-mono text-muted-foreground" title={costTitle(heal, t)}>{usd(heal.cost_usd)}</span>
         </div>
         <div className="flex min-w-0 flex-wrap items-center gap-1.5 text-xs">
           <span className="text-muted-foreground">{t('heal.cards.shapes', { defaultValue: 'Shapes claimed:' })}</span>
-          {heal.signatures_claimed.length === 0 ? (
+          {heal.shapes_claimed === 0 ? (
             <span className="text-muted-foreground">{t('heal.cards.noShapes', { defaultValue: 'none yet' })}</span>
           ) : (
             <>
@@ -161,10 +183,13 @@ function HealCardView({ heal, onOpenChain }: { heal: HealCard; onOpenChain: (hea
                   <span className="block truncate font-mono">{signature}</span>
                 </Chip>
               ))}
-              {heal.signatures_claimed.length > SHAPE_CHIPS && (
+              {/* The COUNT is the heal's own total (`shapes_claimed`), not the length of the head the
+                  payload carries: the worker ships `SIGNATURES_SHOWN` shapes, so a card whose claim is
+                  larger would otherwise say "+9 more" when the heal cured five hundred. */}
+              {heal.shapes_claimed > SHAPE_CHIPS && (
                 <span className="text-muted-foreground"
                       title={heal.signatures_claimed.slice(SHAPE_CHIPS).join('\n')}>
-                  {t('heal.cards.moreShapes', { defaultValue: '+{{count}} more', count: heal.signatures_claimed.length - SHAPE_CHIPS })}
+                  {t('heal.cards.moreShapes', { defaultValue: '+{{count}} more', count: heal.shapes_claimed - SHAPE_CHIPS })}
                 </span>
               )}
             </>

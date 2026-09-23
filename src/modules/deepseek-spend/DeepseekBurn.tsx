@@ -19,8 +19,10 @@ function windows(peak: [number, number][]): string {
  * The balance here is the VENDOR'S OWN reading — unlike Jev's estimate — so it carries no `≈`, only
  * the age of the reading. No reading yet is `—` and a sentence, never `$0.00`. The spend figures lead
  * with the per-row dollars — what the outings really cost, priced per window, the same figure a run
- * receipt and the Heal cap carry since `costs.result_cost` sends a child here too (2026-09-23) — and
- * the peak-list figure sits small beside each as the rate those dollars were halved from.
+ * receipt and a heal booked since 2026-09-23 carry, `costs.result_cost` sending a child here too — and
+ * the peak-list figure sits small beside each as the rate those dollars were halved from. A heal booked
+ * BEFORE that date is the one exception, and it is not this panel's: it carries its chain's whole bill,
+ * the Claude stages it rode included, which no vendor ledger ever billed.
  * The balance-measured drop sits under them when a pair of readings has measured one.
  */
 export function DeepseekBurn({ balance, spend, days, pricing, ledger }: DeepseekBurnProps) {
