@@ -346,6 +346,14 @@ granted, and the absence of `allow-modals` is why the embed answers a delete wit
 confirm strip rather than a browser dialog, which a frame without that token answers `false` in
 silence.
 
+**The frame also carries `allow="fullscreen"`, a Permissions-Policy grant and not a fourth
+SANDBOX token.** A canvas block's own Full Screen control calls the browser's Fullscreen API from
+inside this document; without the grant the call is refused and `useElementFullscreen` falls back
+to its CSS overlay instead, same as any other host that withholds it
+(`~/.claude/ArchPulse/README.md` §"Embedding one block"). Gate 1 of
+`.verify/probe-docspace-canvas.mjs` reads `allow` off the rendered element alongside the three
+sandbox tokens, so a change that drops either reddens the same gate.
+
 **A frame that never answers is a fault the reader cannot see**, so `DocSpaceFrame` arms a timer
 for `DOCSPACE_READY_TIMEOUT_MS` at mount and replaces the iframe with `WidgetErrorCard` naming the
 origin if no `ready` arrives. The timer is cleared two ways — by the `ready` the host accepts, and
@@ -715,6 +723,7 @@ listeners in the bus for every later publish to walk.
 | `publish`'s equal-value skip | It must remain a COMPLETE no-op. Replace the retained entry on an equal reading and `useLiveTopic` re-renders forever, because its snapshot is compared by reference |
 | The feed's retirement or its seed guard | Gate 9 drives the REST seed into a fresh bus and gate 10 ends a run and requires it to leave `runner:*`. Both live in `RunnerFeed.tsx`, never in `live-bus/` |
 | `DOCSPACE_SANDBOX` | It still carries EXACTLY `allow-scripts allow-same-origin allow-forms` and the frame still has no inline document. Gate 1 of `.verify/phase-28.mjs` compares the attribute with `===`, never `includes`, so a quietly added `allow-popups` or `allow-top-navigation` reddens it |
+| `DocSpaceFrame`'s `allow` attribute | It still reads `fullscreen` — a canvas block's own Full Screen control needs it to reach the real Fullscreen API rather than its CSS-overlay fallback. Gate 1 of `.verify/probe-docspace-canvas.mjs` checks it alongside `DOCSPACE_SANDBOX` on the same rendered iframe |
 | `isForeignOrigin` | It still compares ORIGINS (not hostnames — the two services differ only by port here), still treats an unparseable URL as not-foreign, and is still consulted BEFORE the iframe renders. It is the only thing standing between a same-origin `VITE_DOCSPACE_EMBED_ORIGIN` and `localStorage['auth-token']`; gate 2 of the probe asserts the rendered frame's origin is not the page's |
 | The `src` memo in `DocSpaceFrame` | It is keyed on the ids ALONE and the theme is still read from a ref latched at mount. Adding anything theme-shaped to that key turns every flip into a reload that discards the reader's unsaved edit — gate 8 of `phase-28.mjs` flips the theme and requires `src` to come back byte-identical, with the flip itself asserted so the gate cannot pass by not happening. Gate 3 of `phase-29.mjs` flips it again on a frame holding a REAL block, where a reload is a fault the reader would see and not only an attribute that changed |
 | `EMBED_SANDBOX` or the embed's URL validation | The sandbox is still EXACTLY `allow-scripts allow-same-origin allow-forms` (no `allow-popups`, no `allow-top-navigation`), the scheme is still checked by PARSING rather than by a prefix, and `isForeignOrigin` still runs before the iframe renders. The same-origin refusal is what keeps `allow-same-origin` away from `localStorage['auth-token']` |
