@@ -179,6 +179,8 @@ export function DocSpaceFrame({
         sandbox={DOCSPACE_SANDBOX}
         title="DocSpace block"
         referrerPolicy="no-referrer"
+        // A canvas block's own Full Screen needs this: without the permission it fills this frame.
+        allow="fullscreen"
         // The host's revoke rule: the first load is the block, and any later one means the frame
         // navigated away from it, after which nothing is posted in. Wired as a prop rather than
         // from an effect so React attaches it during commit, before the document can finish
