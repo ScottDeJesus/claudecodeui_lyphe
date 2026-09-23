@@ -369,10 +369,11 @@ emits ASCII and a plain decimal alone.
 
 **What `off` stops is the LAUNCH, and only the launch — for BOTH doors.** Every ending still indexes
 the friction it saw, so nothing is lost while the switch is off, but the typed `/heal` door and the
-watchdog's tick are gated by it exactly alike: the master sits ABOVE the QUIET GATE
-(`plan_runner.quiet.busy` — nothing may be walking a run, a chain, an arc, a queue or a rate limit)
-and the daily cap in the ladder, so it gates every launch attempt before either of those is even
-consulted.
+watchdog's tick are gated by it exactly alike: the master sits ABOVE the daily cap
+in the ladder, so it gates every launch attempt before the cap is even consulted. NO WALK BARS A
+LAUNCH — a heal starts beside any plan or chain alike (operator, 2026-09-23: "Heals shouldn't have
+to wait for because a plan is in progress"); the cap and the one-drain-per-box lock are spend and
+one-worker guards, not walk guards.
 
 **One client surface for the master, two for the model.** Settings → Agents → Claude carries the
 master as a third row in `RunnerModelContent.tsx` beneath the swarm one, wearing the heal panel's own
@@ -396,9 +397,9 @@ Heal tab's own Start/Stop (`HealStartStopButton.tsx`) is the CYCLE's door, never
 cycle reads "Run a cycle now" (`POST /api/heal/cycle`, disabled while the master is off, captioned where
 the master lives) and opens one — Chiron ranks the live friction, heals walk his list; an open cycle
 reads "End cycle" (`POST /api/heal/cycle/stop`, pressable regardless of the master) and closes it,
-running heals finishing on their own. Both doors ask the same quiet gate the watchdog's tick asks, so a
-press fires at once while the box is quiet and, refused, answers with the worker's own sentence (e.g.
-"busy — run … is walking …") under the button. Which word the button shows is `cycle_open` off the
+running heals finishing on their own. Both doors ask the same gate the watchdog's tick asks, so a
+press fires at once and, refused, answers with the worker's own sentence (e.g.
+"heal switch off") under the button. Which word the button shows is `cycle_open` off the
 summary, never an optimistic flip — every press ends in a re-read.
 
 ## The Jev switches — the flags this server reads and writes

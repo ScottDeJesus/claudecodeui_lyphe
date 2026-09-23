@@ -26,8 +26,8 @@ type CycleAnswer = { cycle: string | null; started: boolean; stage: string | nul
  * press — landed, refused or failed — ends in `refresh()`, so the button moves only once the worker
  * has been read saying so.
  *
- * A REFUSED PRESS ANSWERS WHERE THE FINGER IS. The worker refuses a press in one sentence ("busy — run
- * X is walking plan.md", "a cycle is already open") and that sentence stands under the button at
+ * A REFUSED PRESS ANSWERS WHERE THE FINGER IS. The worker refuses a press in one sentence ("heal
+ * switch off", "a cycle is already open") and that sentence stands under the button at
  * every width — not in the cell's caption, which is hidden under 48rem, so a phone would press and
  * see nothing move. It wraps inside the cell rather than widening it: a sentence must never push the
  * toolbar past a 390px edge.

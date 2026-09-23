@@ -73,8 +73,8 @@ export type HealResult<T> =
 /**
  * What a cycle door answers, carried WHOLE: the worker's own object (`{"cycle", "started", "stage",
  * "why"}`), which is the cycle's verdict on the press — including its REFUSAL, which is an answer and
- * not a fault. `started` false carries the worker's sentence in `why` ("busy — run … is walking …",
- * "heal switch off", "a cycle is already open (healing) — Stop ends it"); true carries the id and stage
+ * not a fault. `started` false carries the worker's sentence in `why` ("heal switch off",
+ * "a cycle is already open (healing) — Stop ends it"); true carries the id and stage
  * the press opened. Nothing here narrows the object: the panel renders `why`, and a second shape
  * written down in this lane would be a second place it is defined.
  */
@@ -187,7 +187,7 @@ export function createHealService({ bin }: HealServiceDependencies): HealService
      * The cycle door, asked and ANSWERED. A cycle press is a question ("may one open now?"), and the
      * worker's own object IS the answer, refusal included: `execFile` holds the response until the
      * worker prints it, and the bound is that worker's own for this door. Spawning it detached would give the press nowhere to
-     * put its reason, and the panel would read "busy — run … is walking …" as a wall instead.
+     * put its reason, and the panel would read "heal switch off" as a wall instead.
      */
     cycle: () => ask(bin, ['--cycle', 'now'], CYCLE_TIMEOUT_MS),
 

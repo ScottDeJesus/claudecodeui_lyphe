@@ -152,8 +152,8 @@ export function HealControls({ switches, ignore }: { switches: HealSwitches; ign
       <ControlRow
         label={t('heal.schedule.label', { defaultValue: 'Nightly maintenance cycle' })}
         description={schedule.on
-          ? t('heal.schedule.on', { defaultValue: 'Every day at {{slot}} a cycle opens on its own: Chiron ranks what hurt over the last two weeks, and heals walk his list one after another. It waits for a quiet box — nothing opens beside a walking run. Takes effect at the next slot.', slot: hourWord(schedule.hour) })
-          : t('heal.schedule.off', { defaultValue: 'Off: only Run a cycle now opens one. On, a cycle opens every day at the hour beside it, once the box is quiet.' })}
+          ? t('heal.schedule.on', { defaultValue: 'Every day at {{slot}} a cycle opens on its own: Chiron ranks what hurt over the last two weeks, and heals walk his list one after another. It runs beside whatever else is walking. Takes effect at the next slot.', slot: hourWord(schedule.hour) })
+          : t('heal.schedule.off', { defaultValue: 'Off: only Run a cycle now opens one. On, a cycle opens every day at the hour beside it, unless one is still open.' })}
         data-heal-schedule
       >
         <div className="flex items-center gap-3">

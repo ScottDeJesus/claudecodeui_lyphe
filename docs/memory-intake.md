@@ -188,7 +188,11 @@ the cap guard, otherwise the copy the server recorded on the row (which is what 
 
 ## The two verbs
 
-**file it** writes the memory to disk. **discard** writes nothing. Both are on every row, both are
+**file it** writes the memory to disk. **discard** writes nothing. A `memory` or `topic` note does not
+stay there: within a minute the house's docstore inbox (`~/.claude/docstore/ingest/inbox.py`, run by
+a minute cron and by a PostToolUse hook; `docstore get MAN-92`) takes it in as one store row, deletes
+the file and re-exports the project's `MEMORY.md` from the rows. This lane's write is the whole of
+its part and never waits on that. Both verbs are on every row, both are
 disabled while any write is in flight, and each raises one toast:
 
 | The write answered | The toast |

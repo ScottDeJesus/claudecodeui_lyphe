@@ -15,8 +15,8 @@ import { cn } from '@/shared/utils';
  * ONE CARD PER CYCLE, THE OPEN ONE STANDING OPEN. A closed cycle is one line — door, stage, when, its
  * four tallies — so ten of them read as a ledger and not a wall, and it opens to its worklist. The
  * open cycle is already open, because the thing in motion is the thing being watched, and its waiting
- * reason (a busy box, a park, the master off) is a banner and not a footnote: it is the one answer to
- * "why is nothing happening".
+ * reason (a park — the cap or DeepSeek's peak — or the master off) is a banner and not a footnote: it
+ * is the one answer to "why is nothing happening". A walk elsewhere never parks a cycle.
  *
  * THE WORKLIST IS CHIRON'S ORDER AND THE WORKER'S RANK. Nothing here re-sorts: the payload's order is
  * the order drawn, and `item.label` is printed as the worker wrote it. Colour is the tier — red for a

@@ -125,7 +125,7 @@ export function createHealRouter(
 
   /**
    * The cycle's two doors. Both RELAY the worker's own object with 200 — a refusal is an ANSWER, not
-   * an error: `{"started": false, "why": "busy — run … is walking …"}` is exactly what the panel has
+   * an error: `{"started": false, "why": "heal switch off"}` is exactly what the panel has
    * to show, and a 4xx here would put the fleet's own sentence where the tab prints "something went
    * wrong". A fault (the worker not on this host, or not speaking its JSON contract) still answers
    * 503/502 through `emit`, because that is not the worker refusing — it is nothing having answered.

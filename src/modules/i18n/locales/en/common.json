@@ -176,8 +176,8 @@
       "hourLabel": "Hour the nightly cycle opens, UTC",
       "hourUp": "One hour later",
       "label": "Nightly maintenance cycle",
-      "off": "Off: only Run a cycle now opens one. On, a cycle opens every day at the hour beside it, once the box is quiet.",
-      "on": "Every day at {{slot}} a cycle opens on its own: Chiron ranks what hurt over the last two weeks, and heals walk his list one after another. It waits for a quiet box — nothing opens beside a walking run. Takes effect at the next slot."
+      "off": "Off: only Run a cycle now opens one. On, a cycle opens every day at the hour beside it, unless one is still open.",
+      "on": "Every day at {{slot}} a cycle opens on its own: Chiron ranks what hurt over the last two weeks, and heals walk his list one after another. It runs beside whatever else is walking. Takes effect at the next slot."
     }
   },
   "jev": {

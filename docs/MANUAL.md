@@ -4633,7 +4633,11 @@ governs: /home/lyphe/.claude/hooks/enforce_memory_limits.py
 ## MAN-605 — The two verbs
 section: memory-intake/005 The two verbs
 
-**file it** writes the memory to disk. **discard** writes nothing. Both are on every row, both are
+**file it** writes the memory to disk. **discard** writes nothing. A `memory` or `topic` note does not
+stay there: within a minute the house's docstore inbox (`~/.claude/docstore/ingest/inbox.py`, run by
+a minute cron and by a PostToolUse hook; `docstore get MAN-92`) takes it in as one store row, deletes
+the file and re-exports the project's `MEMORY.md` from the rows. This lane's write is the whole of
+its part and never waits on that. Both verbs are on every row, both are
 disabled while any write is in flight, and each raises one toast:
 
 | The write answered | The toast |
@@ -4660,6 +4664,8 @@ press that waits still happens, on the card it was aimed at.
 Every row's buttons go quiet during one write, not only the row being written. `busyId` holds one id
 because the design writes one at a time, so painting only that row would leave the other five
 looking pressable and turn a refused press into a press that vanished.
+
+governs: /home/lyphe/.claude/docstore/ingest/inbox.py
 
 ## MAN-606 — The fence
 section: memory-intake/006 The fence
@@ -5638,10 +5644,11 @@ emits ASCII and a plain decimal alone.
 
 **What `off` stops is the LAUNCH, and only the launch — for BOTH doors.** Every ending still indexes
 the friction it saw, so nothing is lost while the switch is off, but the typed `/heal` door and the
-watchdog's tick are gated by it exactly alike: the master sits ABOVE the QUIET GATE
-(`plan_runner.quiet.busy` — nothing may be walking a run, a chain, an arc, a queue or a rate limit)
-and the daily cap in the ladder, so it gates every launch attempt before either of those is even
-consulted.
+watchdog's tick are gated by it exactly alike: the master sits ABOVE the daily cap
+in the ladder, so it gates every launch attempt before the cap is even consulted. NO WALK BARS A
+LAUNCH — a heal starts beside any plan or chain alike (operator, 2026-09-23: "Heals shouldn't have
+to wait for because a plan is in progress"); the cap and the one-drain-per-box lock are spend and
+one-worker guards, not walk guards.
 
 **One client surface for the master, two for the model.** Settings → Agents → Claude carries the
 master as a third row in `RunnerModelContent.tsx` beneath the swarm one, wearing the heal panel's own
@@ -5665,9 +5672,9 @@ Heal tab's own Start/Stop (`HealStartStopButton.tsx`) is the CYCLE's door, never
 cycle reads "Run a cycle now" (`POST /api/heal/cycle`, disabled while the master is off, captioned where
 the master lives) and opens one — Chiron ranks the live friction, heals walk his list; an open cycle
 reads "End cycle" (`POST /api/heal/cycle/stop`, pressable regardless of the master) and closes it,
-running heals finishing on their own. Both doors ask the same quiet gate the watchdog's tick asks, so a
-press fires at once while the box is quiet and, refused, answers with the worker's own sentence (e.g.
-"busy — run … is walking …") under the button. Which word the button shows is `cycle_open` off the
+running heals finishing on their own. Both doors ask the same gate the watchdog's tick asks, so a
+press fires at once and, refused, answers with the worker's own sentence (e.g.
+"heal switch off") under the button. Which word the button shows is `cycle_open` off the
 summary, never an optimistic flip — every press ends in a re-read.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/settings/heal-switch.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/heal/HealModelSwitch.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useHealMasterSwitch.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useHealModelSwitch.ts

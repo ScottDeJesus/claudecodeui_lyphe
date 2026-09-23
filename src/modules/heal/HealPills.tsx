@@ -26,7 +26,8 @@ const CYCLE_TONE: Record<HealCycleState['word'], Tone> = { open: 'info', waiting
  * FIVE NUMBERS AND NOTHING ELSE ABOVE THE FOLD. A reader who opens this tab on a phone sees these
  * before anything scrolls, and each answers one question in a tone that says whether to act:
  * amber friction is work waiting, red spend is a cap that has closed the door, an amber cycle is
- * one waiting on a busy box. Each pill is a press that carries the reader to its section.
+ * one parked (the cap, DeepSeek's peak) or held by the master. Each pill is a press that carries the
+ * reader to its section.
  *
  * THE CYCLE PILL RENDERS THE WORKER'S SENTENCE. `cycle_state.text` is Python's decision — which of
  * an open cycle, a refused schedule, the next slot or "off" wins — and this pill prints it, colours
