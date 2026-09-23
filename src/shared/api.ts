@@ -776,10 +776,11 @@ export const api = {
     cycleStop: () => post('/api/heal/cycle/stop', {}),
   },
 
-  // The Jev tab: one reader answer per window, and the one thing the tab can CHANGE — the replay
-  // cache. Both go through the server's door, which runs `scripts/jev`; nothing in the browser reads
-  // the ledger, the account file or the cache for itself. The window and the feed length ride the
-  // query string, where the route holds each to a token shape before it can reach an argument.
+  // The API tab's Jev view: one reader answer per window, and the one thing the view can CHANGE —
+  // the replay cache. Both go through the server's door, which runs `scripts/jev`; nothing in the
+  // browser reads the ledger, the account file or the cache for itself. The window and the feed
+  // length ride the query string, where the route holds each to a token shape before it can reach
+  // an argument.
   jev: {
     summary: (range: JevRange, feed: number) => get(`/api/jev/summary?range=${range}&feed=${feed}`),
     clearCache: () => post('/api/jev/cache/clear', {}),

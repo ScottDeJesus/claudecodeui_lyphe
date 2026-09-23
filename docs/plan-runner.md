@@ -408,7 +408,7 @@ the house semantic-judgment primitive (`~/.claude/hooks/jev_client.py`): `JevCon
 directly under `RunnerModelContent`, drawn from `useJevSwitches.ts`, whose state is the one module
 in `src/shared/hooks/jevSwitchesStore.ts` — the reader, the writer, the in-flight write guard and
 the focus/visibility re-read all live there, because these rows are drawn in TWO places: this
-Settings page and the Jev tab. A flip on either reaches the other the moment the server confirms
+Settings page and the API tab's Jev view. A flip on either reaches the other the moment the server confirms
 it (the overlay means no focus event fires when Settings closes over the tab behind it).
 `server/modules/settings/jev-switches.ts` reads and writes the same files the Python side reads
 through `plan_runner.state.reads_on`: `~/.claude/state/jev.flag`, the MASTER (off, and nothing
@@ -438,9 +438,9 @@ would do it, when ANY stored opt-in is on below it. Every file is written the sa
 shared `readFlagFile`/`writeFlagFile` this module reuses rather than re-implementing.
 
 **Settings draws no Jev reading; one line of copy points at the tab.** The rows above and that line
-are the whole card: `JevContent.tsx` says the per-caller context Jev kept out is on the Jev tab, next
-to Heal, and draws nothing else off the ledger (D11). Every Jev number the app shows — the tab, and
-the footer balance beside the DeepSeek one — comes from ONE reader, the Python package
+are the whole card: `JevContent.tsx` says the per-caller context Jev kept out is on the API tab,
+under Jev, and draws nothing else off the ledger (D11). Every Jev number the app shows — the API
+tab's Jev view, and the footer balance beside the DeepSeek one — comes from ONE reader, the Python package
 `hooks/jev_stats/`, whose `summarize()` is the single home of each figure `jev stats` prints and of
 the payload `/api/jev/summary` serves, so the command and the screen cannot drift. It opens
 `~/.claude/state/jev_ledger.jsonl` read-only and consumes it only through its last complete line, so
