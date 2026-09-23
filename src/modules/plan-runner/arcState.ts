@@ -67,9 +67,10 @@ export function reorderAllowed(arc: ArcSnapshot, from: number, to: number): bool
 }
 
 /**
- * How a card's state reaches the eye. Never `danger`: a stalled card is a card asking for a hand,
- * not a denial. `unminted`, `queued` and `paused` are all `neutral` — nothing is wrong with a card
- * the runner has not got to yet, and amber would read as though something had gone amiss.
+ * How a card's state reaches the eye. Never `danger`: a stalled card is a card the runner is
+ * already pressing again the moment a cure lands (`repress_key`, `arc_walk`), not a denial and not
+ * a hand's to fix. `unminted`, `queued` and `paused` are all `neutral` — nothing is wrong with a
+ * card the runner has not got to yet, and amber would read as though something had gone amiss.
  */
 export function cardTone(state: ArcCardState): Tone {
   if (state === 'complete') return 'positive';

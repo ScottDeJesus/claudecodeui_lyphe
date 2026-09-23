@@ -672,23 +672,27 @@ like that.
 
 ## The `/shell` socket
 
-`handleShellConnection` (`shell-websocket.service.ts:296`) carries PTY sessions and has its
-own, entirely separate, `type`-keyed protocol: `init` (`:314`), `input` (`:561`) and
-`resize` (`:568`). No `kind`, no `seq`, no run registry.
+`handleShellConnection` (`shell-websocket.service.ts`) carries PTY sessions and has its
+own, entirely separate, `type`-keyed protocol: `init`, `input` and `resize`. No `kind`, no
+`seq`, no run registry.
 
 The parts worth knowing:
 
-- **PTYs outlive their socket too.** `ptySessionsMap` (`:34`) holds them, and a disconnect
-  starts a 30 minute `PTY_SESSION_TIMEOUT` (`:35`) before the process is killed
-  (`:587-617`). A reconnect within that window reattaches.
-- **Output is buffered per session, capped at 5000 chunks** (`:432-447`), and replayed to a
-  returning client (`:361-377`) so a reconnect shows recent terminal output instead of a
-  blank screen.
-- **A stale close cannot detach a live PTY** (`:599-601`) — mobile networks deliver an old
-  socket's `close` after its replacement has already attached. Covered by *a stale socket
-  close cannot detach the socket that replaced it*.
+- **PTYs outlive their socket too.** `ptySessionsMap` holds them, and a disconnect in the
+  socket's `close` handler starts a 30 minute `PTY_SESSION_TIMEOUT` before the process is
+  killed. A reconnect within that window reattaches.
+- **A plain-shell command owns its own slot.** The key is
+  `<projectPath>_<sessionId|default>` plus, for a plain-shell `initialCommand`,
+  `_cmd_<first 16 hex chars of SHA-256(initialCommand)>`. The digest covers the whole string, so
+  two commands never share a slot and a reattach lands only on a PTY running the same command.
+- **Output is buffered per session, capped at 5000 chunks** (`session.buffer` in `onData`), and
+  replayed to a returning client (the `existingSession` branch of `init`) so a reconnect shows
+  recent terminal output instead of a blank screen.
+- **A stale close cannot detach a live PTY** (the `session.ws !== ws` guard in `close`) — mobile
+  networks deliver an old socket's `close` after its replacement has already attached. Covered
+  by *a stale socket close cannot detach the socket that replaced it*.
 - **Provider auth URLs are detected in the output stream** and forwarded as
-  `type: 'auth_url'`, deduplicated per connection (`:459-475`).
+  `type: 'auth_url'`, deduplicated per connection (`announcedAuthUrls`).
 
 The client is `useShellConnection.ts:127` via `getShellWebSocketUrl`
 (`src/modules/shell/utils/socket.ts:39-53`), which builds the URL the same way the chat one

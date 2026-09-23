@@ -293,14 +293,20 @@ const COPY_BY_CODE = new Map<string, CodeCopy>([
     const left = readNumber(meta.left) ?? 0;
     const phase = readText(meta.blockedPhase);
     const cause = readText(meta.blockCause);
+    const doors = readText(meta.doorsSpent);
     const counts = [
       runnerShippedText(meta),
       blocked > 0 ? `${blocked} blocked` : null,
       left > 0 ? `${left} left` : null,
     ].filter((part): part is string => part !== null).join(' · ');
+    const said = phase && cause ? `${counts}\nPhase ${phase}: ${cause}` : counts;
     return {
       headline: lookup(RUNNER_STOP_HEADLINES, meta.outcome) ?? 'Plan stopped',
-      body: phase && cause ? `${counts}\nPhase ${phase}: ${cause}` : counts,
+      // WHAT THE RUN ALREADY TRIED, when it tried the ladder — the receipt's own `doors_spent`
+      // (`closing.doors_spent`): the phase, the cause, and the replan/unblocks/in-run cure it spent
+      // on that block. A bare ⛔ reads as "re-author the spec"; a phase the cure could not clear is
+      // waiting on a heal item that is already filed, and the operator is owed that difference.
+      body: doors ? `${said}\n${doors}` : said,
     };
   }],
   ['push.enabled', () => ({ headline: 'Push notifications enabled', body: 'Push notifications are now enabled!' })],

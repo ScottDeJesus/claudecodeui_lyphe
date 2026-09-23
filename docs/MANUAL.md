@@ -1,6 +1,6 @@
 <!-- docstore export; edit rows with docstore write, never this file -->
 
-## MAN-681 — docs
+## MAN-1359 — docs
 
 One document per user-facing piece of the fork: the account, application and CLI-version switchers, chat contracts, the file, git, kanban, schedules, notifications and API panels, memory intake, hosting, the launcher-souls and plan-runner lanes, and the verification harness.
 
@@ -1969,6 +1969,102 @@ section: deepseek-balance/007 Proving it
    it, since nothing here touches the unit's own key.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts
+
+## MAN-1361 — The Claude Design authorization row
+section: design-login/000
+
+**Settings → Agents → Claude → Account** draws a second row directly under the sign-in row. Its
+`Authenticate` button opens the embedded terminal on Claude Design's own claude.ai grant, which
+DesignSync requires (`design/README.md`).
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/design/README.md
+
+## MAN-1362 — The two rows
+section: design-login/001 The two rows
+
+| | sign-in row | design row |
+| --- | --- | --- |
+| Modal title | `Claude CLI Login` | `Claude Design Login` |
+| Command | `claude --dangerously-skip-permissions /login` | `claude --dangerously-skip-permissions /design-login` |
+| `loginFlow` | `'account'` | `'design'` |
+| Grants | the CLI's own credential | `user:design:read` + `user:design:write` on claude.ai/design projects |
+| After the terminal exits | `handleLoginComplete` re-reads auth status, raises the save banner | nothing |
+
+`/design-login` is the slash command DesignSync tells the user to run in the interactive TUI.
+`claude design-login --json` is the VS Code extension's machine interface and answers in JSON lines;
+it is not used here.
+
+## MAN-1363 — Where each part lives
+section: design-login/002 Where each part lives
+
+| File | Owns |
+| --- | --- |
+| `src/modules/settings/tabs/agents-settings/sections/content/AccountContent.tsx` | The row: drawn only when `agent === 'claude' && onDesignLogin`. No other gate — an `api_key` account sees it |
+| `src/modules/settings/tabs/agents-settings/AgentsSettingsTab.tsx` | `onDesignLogin` set on `agentContextById.claude` only |
+| `src/shared/types.ts` | `AgentContext.onDesignLogin?` |
+| `src/modules/settings/hooks/useSettingsController.ts` | `loginFlow`, `openDesignLogin`, `openLoginForProvider` (sets `'account'`), `closeLoginModal`, the early return in `handleLoginComplete` |
+| `src/modules/settings/Settings.tsx` | The modal's `customCommand` and `title`, read off `loginFlow`; `key={`${loginProvider \|\| 'claude'}:${loginFlow}`}` |
+| `src/modules/provider-auth/ProviderLoginModal.tsx` | Optional `title`: `titleOverride ?? getProviderTitle(provider)` |
+| `src/modules/i18n/locales/en/settings.json` | `agents.designLogin.{title,description,button}` — `en` only, the other locales fall back |
+
+`AccountFooterRow` and `Onboarding` mount the modal without `title` or `customCommand`; their
+titles and commands are unchanged.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/settings.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/provider-auth/ProviderLoginModal.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/hooks/useSettingsController.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/Settings.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/agents-settings/AgentsSettingsTab.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/agents-settings/sections/content/AccountContent.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts
+
+## MAN-1364 — Rules
+section: design-login/003 Rules
+
+1. `loginFlow` is held state, never derived from `loginProvider`: both flows run on `claude`. A
+   third flow adds a value to `LoginFlow`, not a provider id.
+2. `closeLoginModal` is the only path that closes the modal and the only place the flow resets.
+3. `handleLoginComplete` ends the design flow silently. A design grant changes no credential this
+   pane reports; a re-check would relabel a healthy account.
+4. The modal's `key` carries the flow, so a change of flow remounts the terminal instead of handing a
+   new command to a pty already running the old one.
+5. The description says read AND write: the CLI's own panel and the minted URL both carry both scopes.
+6. The pty slot is keyed by a digest of the whole command
+   ([architecture/01-websocket-transport.md](architecture/01-websocket-transport.md) §"The `/shell`
+   socket"), so each row reattaches only to a pty running its own command.
+7. A parked design pty lives `PTY_SESSION_TIMEOUT` (30 min). Another `Authenticate` press reattaches
+   to the pending authorization; it does not mint a second.
+
+## MAN-1365 — Proving it
+section: design-login/004 Proving it
+
+```
+node scripts/design-login-probe.mjs <app-url>
+```
+
+| Fact | Value |
+| --- | --- |
+| Token | minted by `scripts/universe-token.mjs`; the only argument is the app URL |
+| Output | one `KEY=value` per reading, then `PROBE OK` (exit 0) or `PROBE FAILED` (exit 1); causes on stderr; missing argument exits 2 |
+| Screenshots | `$DESIGN_LOGIN_PROBE_SHOTS`, default `/tmp/design-login-probe/` |
+| Browser | playwright's `chrome-headless-shell`; `CHROME_HEADLESS_SHELL` overrides the path |
+| Sign-in | never completed; the operator finishes the grant |
+| Theme | flipped by the `dark` class on `<html>`, never the real toggle (it persists to `auth.db`) |
+| Leaves behind | one parked pty per flow for `PTY_SESSION_TIMEOUT`; the next press of that row reattaches |
+| Measured | 2026-09-23: `PROBE OK` on `:5183`, CLI v2.1.280, `CONSOLE_ERRORS=0` |
+
+What it asserts, in order:
+
+1. The design row sits directly under the sign-in row; title, description and button copy render.
+2. The design modal titles `Claude Design Login`, mounts `.xterm`, and its terminal draws the
+   `Design login` panel and an OAuth URL whose scope is `user:design:read+user:design:write`.
+3. No `CLAUDECODE` session refusal, no non-interactive refusal, no unknown-command answer.
+4. The sign-in modal titles `Claude CLI Login` and draws its own `Select login method` menu, never
+   the design panel; the design modal never draws the sign-in menu.
+
+A reading is believed only when it meets all three:
+
+- It comes from `/shell` frames that arrive after `window.__shellMark`, set immediately before the
+  press. xterm renders to canvas, so terminal text is never in the DOM.
+- `[Reconnected to existing session]` is absent from those frames.
+- `ps -eo args=` shows exactly one more process whose argv equals that flow's command, and no change
+  for the other flow's. This is the only reading taken outside the browser.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/scripts/design-login-probe.mjs, /home/lyphe/.claude/claudecodeui_lyphe/scripts/universe-token.mjs
 
 ## MAN-523 — The launcher-souls lane
 section: dispatch-souls/000
@@ -6019,9 +6115,15 @@ run and phase states, `Meter` for shipped-of-total with spawns and spend beneath
 `Shimmer` for the stage strip (`PipelineStrip`), `Collapsible` + `CollapsibleTrigger` +
 `CollapsibleContent` twice — once around the phase list, once inside each `PhaseRow` around its
 timeline — `Banner` + `Spinner` for the repair strip (`RepairBanner`: the unblock outing on a
-blocked phase, or the heal the drain works while the run is halted (`by`), read off
+blocked phase, or the heal the drain works beside the walk (`by`; the ending that filed the item
+launches the drain), read off
 `progress.json.repair` — repairing with its step and clock while its process lives (the run's for an
-unblock, the drain's pid for a heal), paused while it waits, then the ending: unblocked and running
+unblock, the drain's pid for a heal), paused while it waits — a queued heal no drain is working names
+its gate off the item's `waiting_on` (`heal-running` → `runner.repair.waitsHeal`, `heals-off` →
+`waitsOff`, `cap-spent` → `waitsCap` with the cap; any other word is a child the drain could not
+start, `waitsHeld` with the fault; no word → `pausedHeal`, "the next drain takes it up"; the words are
+`hooks/plan_runner/heal_live.py`'s and `heal_drain._held`'s, carried through `readRepair` unchanged) —
+then the ending: unblocked and running
 again, cured with the phase still standing (`resumed` false), or still blocked with the reason)
 — and `Button` for the one verb. Every string reaches the DOM as a text node: a plan
 title, a phase title, a stage word and the runner's own stderr are all free text written by a
@@ -6275,14 +6377,20 @@ never the page.
 **The face.** `ArcCard.tsx` (`data-arc-card="<position>"`, `data-arc-card-state`) draws the card's
 number, title, state badge, charter and phases: the number is a `Chip` (`runner.arcCard`,
 `Card {{n}}`), the title sits in `[data-arc-card-title]`, the badge is toned by `cardTone`, and the
-charter is clamped to two lines. Under the charter, `ArcPhaseList.tsx` draws one compact row per phase
+charter is clamped to two lines. BESIDE THE BADGE a card with a shipped or ⛔ phase AND a phase still
+unshipped draws its count over the very rows beneath it — `10 of 18 · 8 blocked`
+(`data-arc-card-phases`, `runner.arcPhaseCount` · `runner.arcBlockedPhases`; the `blocked` half only
+while a ⛔ stands). No count line for a card nothing has happened to (`queued`, `unminted`), a card
+whose every phase shipped, or a card with no phases. Under the charter,
+`ArcPhaseList.tsx` draws one compact row per phase
 (`data-arc-phase="<id>"`, `data-arc-phase-state`): the run card's own mark (`PHASE_GLYPH` — ✅ shipped,
-`·` still to come), the phase id and its title, with the state's word for a screen reader. The list
-comes from the RECORD: the runner writes each card's `phases` (`[{id, title, shipped}]`) into
+⛔ blocked, `·` still to come), the phase id and its title, with the state's word for a screen reader. The list
+comes from the RECORD: the runner writes each card's `phases` (`[{id, title, shipped, blocked}]`) into
 `arc.json` on every sync (`hooks/plan_runner/arc_phases.py` — the list and verdicts from
 `plan_census.phase_census`, the titles from `plan_v2.phase_headings` or, for a phase with no H2
-heading, the census mention's own line; a hand-written ship stamp is cut off a title), and `readCard` copies it
-through, so a plan that lands, or a phase that ships, reaches the deck within one watchdog tick. A
+heading, the census mention's own line; a hand-written ship stamp is cut off a title; `blocked` is
+set for a phase the ship log's LATEST entry for it holds ⛔), and `readCard` copies it
+through, so a plan that lands, or a phase that ships or blocks, reaches the deck within one watchdog tick. A
 `walking`/`paused` card with its run on the lane draws its LIVE run's phases instead, which carry the
 real state, so the card that has a run never shows two answers — until that run has composed any
 phases, when the record's list stands in. A plan not written yet (`[]`) draws
@@ -6314,12 +6422,33 @@ position). `cardDraggable(arc, card)` is true only for a
 `queued` or `unminted` card past `arc.last_started`. `reorderAllowed(arc, from, to)` asks that same
 line of BOTH ends of a move, plus the deck's bounds and `from !== to` — what keeps the deck from
 offering a drop the runner's own `arcs.reorder` would only refuse (§"The drag" below).
-`cardTone(state)` maps a card's state to a `Badge` tone and is never `danger`: a `stalled` card asks
-for a hand, it is not a fault. `arcProgress(arc)` counts complete CARDS against the total — not
+`cardTone(state)` maps a card's state to a `Badge` tone and is never `danger`: a `stalled` card is
+one the runner is already pressing again the moment a cure lands, not a fault. `arcProgress(arc)`
+counts complete CARDS against the total — not
 `useArcs()`'s `count`, which is unfinished ARCS across the whole deck. `current` and `last_started`
 are always read off the snapshot, never recomputed from the card states — the runner's own
 decisions, and a card walked out of order (`--now`) would disagree with a client that tried to
 guess them.
+
+**The stalled card.** A run never parks on a ⛔ (runner ruling 2026-09-11), so a receipt reads
+`complete` while phases stand blocked. `arcs.card_state` calls a card `complete` only when
+`arc_stalled.landed(receipt)` — `status == "complete"` with empty `blocked` and `skipped_unchanged`;
+any other card whose newest run has a receipt is `stalled`. The runner writes `run_status` on the entry (the receipt's word
+plus what it left: `complete — 8 blocked`); the server copies it and the face draws the count
+(§"The face").
+
+`stalled` is not a resting state: the arc's tick presses the card again once a cure lands, once per
+cure (the card's `repress_key` in `arc.json`), and the arc never advances past an unfinished card
+(runner ruling 2026-09-23: "plans must be completed, no waiting on heals"). The key is read over the
+phases the card still OWES — the plan's unshipped ones, not the receipt's books alone, since a run
+can end non-`complete` with empty books (`halted`, `rate-limited`). A cure is:
+
+- an owed phase's `spec_sha` moved
+- an owed phase's ⚒ outcome word moved
+- a heal item for the card's plan closed `healed`
+- a plan the runner names no phase in: its bytes changed
+
+The deck draws; the runner presses.
 
 **The run strip.** `ArcCard`'s live card, while `walking` or `paused`, joins the lane by `run_id` —
 never by plan path, since a plan can have been walked more than once — and, when found, draws the
@@ -6348,8 +6477,8 @@ either.
 **The copy** lives under `runner.*` in `src/modules/i18n/locales/en/common.json`: `arcs`, `arcCards`,
 `arcCard`, `arcWalking`, `arcStalled`, `arcComplete`, `arcNotStarted`, `arcQueued`, `arcPaused`,
 `arcDragHint`, `arcViewing`, `arcPrevious`, `arcNextCard`, `arcStrip`, `arcNoPhases`,
-`arcMorePhases`, `arcFewerPhases` — English only, the runner card's own fallback rule
-(§"The runner card" above).
+`arcPhaseCount`, `arcBlockedPhases`, `arcMorePhases`, `arcFewerPhases` — English only, the runner
+card's own fallback rule (§"The runner card" above).
 
 **The API.** `api.planRunner.arcs()` (`GET /api/plan-runner/arcs`) and
 `api.planRunner.arcReorder(arc, from, to)` (`POST /api/plan-runner/arcs/:arc/reorder`) are read from
@@ -6402,11 +6531,13 @@ running the probe.
 
 The arc deck's own three probes, each printing exactly one final line:
 
-- `node .verify/probe-arc-deck.mjs` → `ARC DECK PASS walks=4 reorder=ok shots=4` — the strip at a
+- `node .verify/probe-arc-deck.mjs` → `ARC DECK PASS walks=4 gutter=2 reorder=ok shots=6` — the strip at a
   desktop and a phone viewport, light and dark: position order, layers, the live card scrolled into
-  view, one right-arrow step, each card's phase rows (one list folded past eight), one height, no
-  vertical scroll in the strip (a wheel over it moves the page), and a drag of card 4 onto card 3
-  written into the arc file by the runner. Its four shots land in `.verify/artifacts/`.
+  view, one right-arrow step, each card's phase rows (one list folded past eight; card 2's ten shipped
+  and eight ⛔), the stalled card's `stalled` badge beside `10 of 18 · 8 blocked` and the landed card's
+  missing count line, one height, no vertical scroll in the strip (a wheel over it moves the page),
+  the same deck in the chat gutter's Runner widget in both themes, and a drag of card 4 onto card 3
+  written into the arc file by the runner. Its six shots land in `.verify/artifacts/`.
 - `node .verify/probe-arc-fill.mjs` → `ARC FILL PASS deck=fixture-arc reorder=ok shots=2` — a drop
   reordering a fixture deck through the runner.
 - `bash ~/.claude/scripts/runner_fixtures/arc_proof.sh` → `ARC PROOF PASS cards=2/2

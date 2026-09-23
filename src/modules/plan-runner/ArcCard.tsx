@@ -104,10 +104,13 @@ export function dragScopePosition(types: readonly string[], arcName: string): nu
  * that cannot move never promises that it can.
  *
  * THE PHASES ARE THE PLAN'S. A card with no run draws the phase list the runner wrote into its
- * record (`arc.json:cards[].phases`, `shipped` from the runner's own census); a `walking`/`paused`
- * card draws its LIVE run's phases instead, which carry the real state, so the card that has a run
- * never shows two answers (the record stands in until the run has composed any). A plan not
- * written yet draws "Plan not written yet".
+ * record (`arc.json:cards[].phases`, `shipped` and `blocked` from the runner's own readers); a
+ * `walking`/`paused` card draws its LIVE run's phases instead, which carry the real state, so the
+ * card that has a run never shows two answers (the record stands in until the run has composed
+ * any). A plan not written yet draws "Plan not written yet". Beside the badge, a card with a phase
+ * behind it and phases still ahead draws `10 of 18 · 8 blocked` — the count over the very rows
+ * beneath it, so a `stalled` card says HOW MUCH held it rather than leaving the reader to count the
+ * ⛔s, and a card nothing has happened to yet says nothing at all.
  *
  * Every card fills its strip slot's height (`h-full`): the deck stretches its row to the tallest
  * card, so the strip does not jump as it scrolls.
@@ -134,10 +137,26 @@ export function ArcCard({ arc, card, layer }: ArcCardProps) {
   const inert = live !== null && (live.state === 'ended' || live.state === 'queued');
   const phase = live?.phases.find((row) => row.id === (live.position?.phase_id ?? null)) ?? null;
   // A run whose progress has not composed its phases yet carries `[]`: the record's list stands in
-  // until it does, so a freshly walking card never reads "Plan not written yet".
+  // until it does, so a freshly walking card never reads "Plan not written yet". A record phase the
+  // ship log's LAST ⛔ stands over (`blocked`, `arc_phases.py`) takes the run's own blocked state,
+  // so the card draws it with `PHASE_GLYPH`'s ⛔ beside the runs it belongs to.
   const phaseList = live && live.phases.length > 0
     ? live.phases
-    : card.phases.map((entry) => ({ id: entry.id, title: entry.title, state: entry.shipped ? ('shipped' as const) : ('pending' as const) }));
+    : card.phases.map((entry) => ({
+        id: entry.id,
+        title: entry.title,
+        state: entry.shipped ? ('shipped' as const) : entry.blocked ? ('blocked' as const) : ('pending' as const),
+      }));
+
+  // THE COUNT RIDES THE SAME ROWS the list draws above it, so the two can never disagree: a card
+  // whose run ended with a ⛔ reads `10 of 18 · 8 blocked` under its `stalled` badge, which is how a
+  // `complete` receipt that left eight phases standing is told apart from one that landed them all.
+  // Nothing for a card with nothing behind it — a `queued` or `unminted` card's `0 of 18` says
+  // nothing its badge does not — and nothing for one whose every phase shipped (the badge already
+  // says complete). A count needs a phase walked, or a ⛔ to explain.
+  const shipped = phaseList.filter((row) => row.state === 'shipped').length;
+  const blocked = phaseList.filter((row) => row.state === 'blocked').length;
+  const counts = (shipped > 0 || blocked > 0) && shipped < phaseList.length ? { shipped, blocked } : null;
 
   /**
    * The drag carries the card's position as the card type's value, the `<arc>:<position>` copy the
@@ -169,7 +188,19 @@ export function ArcCard({ arc, card, layer }: ArcCardProps) {
     >
       <div className="flex min-w-0 items-center gap-2">
         <Chip size="sm">{t('runner.arcCard', { n: card.position })}</Chip>
-        <Badge tone={cardTone(card.state)} className="ml-auto shrink-0">
+        {/* The counts ride the badge's own row, in the reader's language, as two strings the
+            separator sits between — `data-arc-card-phases` is the browser harness's handle. */}
+        {counts && (
+          <p data-arc-card-phases className="ml-auto min-w-0 shrink-0 truncate text-xs text-muted-foreground">
+            {t('runner.arcPhaseCount', { done: counts.shipped, total: phaseList.length })}
+            {counts.blocked > 0 && <> · {t('runner.arcBlockedPhases', { n: counts.blocked })}</>}
+          </p>
+        )}
+        <Badge
+          data-arc-card-badge
+          tone={cardTone(card.state)}
+          className={cn('shrink-0', counts === null && 'ml-auto')}
+        >
           {t(STATE_KEY[card.state])}
         </Badge>
       </div>

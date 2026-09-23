@@ -46,6 +46,14 @@ type NotificationPreferencesResponse = {
 
 type ActiveLoginProvider = AgentProvider | '';
 
+/**
+ * Which authorization the embedded terminal is running. `account` is the provider's own CLI login and
+ * is what the modal has always done; `design` is Claude Design's separate claude.ai grant, which runs
+ * in the same terminal but is not a sign-in for this account at all — the two must not be confused
+ * when the terminal exits, because only one of them leaves a credential the app reads afterwards.
+ */
+type LoginFlow = 'account' | 'design';
+
 // Every tab the sidebar can land on. A tab missing from here is silently rewritten to
 // "agents" when a caller deep-links to it, which is how Voice became unreachable by name.
 const KNOWN_MAIN_TABS: SettingsMainTab[] = ['agents', 'appearance', 'git', 'tasks', 'notifications', 'api', 'voice', 'plugins', 'browser', 'about'];
@@ -138,8 +146,11 @@ export function useSettingsController({ isOpen, initialTab }: UseSettingsControl
   // it did — the answer must be merged under it, not written over it.
   const editedNotificationLeavesRef = useRef<NotificationPreferenceLeaves>(noNotificationPreferenceLeaves());
 
+  // The modal is open and which of the two authorizations it was opened for. Held rather than derived
+  // from the provider, because the design flow runs on the same provider the account flow does.
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [loginProvider, setLoginProvider] = useState<ActiveLoginProvider>('');
+  const [loginFlow, setLoginFlow] = useState<LoginFlow>('account');
   const {
     providerAuthStatus,
     checkProviderAuthStatus,
@@ -252,12 +263,45 @@ export function useSettingsController({ isOpen, initialTab }: UseSettingsControl
   }, []);
 
   const openLoginForProvider = useCallback((provider: AgentProvider) => {
+    // Named explicitly rather than left as whatever the last flow set: opening an account login after
+    // a design one has to put the modal back on the account command.
+    setLoginFlow('account');
     setLoginProvider(provider);
     setShowLoginModal(true);
   }, []);
 
+  /**
+   * Opens the same embedded terminal on Claude Design's own authorization (`/design-login`), which the
+   * DesignSync tool asks the user to run interactively. Claude is pinned because the command is Claude's
+   * slash command, not a provider-independent one.
+   */
+  const openDesignLogin = useCallback(() => {
+    setLoginFlow('design');
+    setLoginProvider('claude');
+    setShowLoginModal(true);
+  }, []);
+
+  /**
+   * The only way the modal closes. Resetting the flow here, and not on the next open, is what keeps the
+   * modal from being remounted on the account command while the design one is still selected — the
+   * command is read off the flow at render time.
+   */
+  const closeLoginModal = useCallback(() => {
+    setShowLoginModal(false);
+    setLoginFlow('account');
+  }, []);
+
   const handleLoginComplete = useCallback((exitCode: number) => {
     if (!loginProvider) {
+      return;
+    }
+
+    // A design authorization authenticates nothing this screen reports on: it is a second, separate
+    // claude.ai grant for design-system projects, and the account's own credential is exactly where it
+    // was. Re-reading the auth status would re-answer a question that did not change, and the one save
+    // banner below would announce a sign-in that never happened — so this flow ends silently, which is
+    // also why it is decided here rather than by leaving the callback off the modal.
+    if (loginFlow === 'design') {
       return;
     }
 
@@ -270,7 +314,7 @@ export function useSettingsController({ isOpen, initialTab }: UseSettingsControl
 
       setSaveStatus(authStatus.authenticated ? 'success' : 'error');
     })();
-  }, [checkProviderAuthStatus, loginProvider]);
+  }, [checkProviderAuthStatus, loginFlow, loginProvider]);
 
   const saveSettings = useCallback(async () => {
     const stores = toAutosavedStores({
@@ -477,9 +521,11 @@ export function useSettingsController({ isOpen, initialTab }: UseSettingsControl
     setCodexPermissionMode,
     providerAuthStatus,
     openLoginForProvider,
+    openDesignLogin,
+    closeLoginModal,
     showLoginModal,
-    setShowLoginModal,
     loginProvider,
+    loginFlow,
     handleLoginComplete,
   };
 }

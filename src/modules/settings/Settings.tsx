@@ -59,9 +59,11 @@ function Settings({ isOpen, onClose, projects = [], initialTab = 'agents' }: Set
     setCodexPermissionMode,
     providerAuthStatus,
     openLoginForProvider,
+    openDesignLogin,
+    closeLoginModal,
     showLoginModal,
-    setShowLoginModal,
     loginProvider,
+    loginFlow,
     handleLoginComplete,
   } = useSettingsController({
     isOpen,
@@ -189,6 +191,7 @@ function Settings({ isOpen, onClose, projects = [], initialTab = 'agents' }: Set
                 <AgentsSettingsTab
                   providerAuthStatus={providerAuthStatus}
                   onProviderLogin={openLoginForProvider}
+                  onProviderDesignLogin={openDesignLogin}
                   claudePermissions={claudePermissions}
                   onClaudePermissionsChange={setClaudePermissions}
                   cursorPermissions={cursorPermissions}
@@ -235,13 +238,21 @@ function Settings({ isOpen, onClose, projects = [], initialTab = 'agents' }: Set
         </div>
       </div>
 
+      {/* The flow is part of the key so a change of authorization remounts the terminal rather than
+          handing the new command to a pty already running the old one. The two commands are the
+          CLI's own interactive login, mirrored for design authorization: `design-login` is the
+          slash command the DesignSync tool tells the user to run in the interactive TUI — the
+          `claude design-login --json` subcommand beside it is the VS Code extension's machine
+          interface and would answer in JSON lines instead of asking anyone to sign in. */}
       <ProviderLoginModal
-        key={loginProvider || 'claude'}
+        key={`${loginProvider || 'claude'}:${loginFlow}`}
         isOpen={showLoginModal}
-        onClose={() => setShowLoginModal(false)}
+        onClose={closeLoginModal}
         provider={loginProvider || 'claude'}
         onComplete={handleLoginComplete}
         isAuthenticated={isAuthenticated}
+        customCommand={loginFlow === 'design' ? 'claude --dangerously-skip-permissions /design-login' : undefined}
+        title={loginFlow === 'design' ? 'Claude Design Login' : undefined}
       />
 
     </div>

@@ -825,9 +825,15 @@ run and phase states, `Meter` for shipped-of-total with spawns and spend beneath
 `Shimmer` for the stage strip (`PipelineStrip`), `Collapsible` + `CollapsibleTrigger` +
 `CollapsibleContent` twice — once around the phase list, once inside each `PhaseRow` around its
 timeline — `Banner` + `Spinner` for the repair strip (`RepairBanner`: the unblock outing on a
-blocked phase, or the heal the drain works while the run is halted (`by`), read off
+blocked phase, or the heal the drain works beside the walk (`by`; the ending that filed the item
+launches the drain), read off
 `progress.json.repair` — repairing with its step and clock while its process lives (the run's for an
-unblock, the drain's pid for a heal), paused while it waits, then the ending: unblocked and running
+unblock, the drain's pid for a heal), paused while it waits — a queued heal no drain is working names
+its gate off the item's `waiting_on` (`heal-running` → `runner.repair.waitsHeal`, `heals-off` →
+`waitsOff`, `cap-spent` → `waitsCap` with the cap; any other word is a child the drain could not
+start, `waitsHeld` with the fault; no word → `pausedHeal`, "the next drain takes it up"; the words are
+`hooks/plan_runner/heal_live.py`'s and `heal_drain._held`'s, carried through `readRepair` unchanged) —
+then the ending: unblocked and running
 again, cured with the phase still standing (`resumed` false), or still blocked with the reason)
 — and `Button` for the one verb. Every string reaches the DOM as a text node: a plan
 title, a phase title, a stage word and the runner's own stderr are all free text written by a
@@ -1077,14 +1083,20 @@ never the page.
 **The face.** `ArcCard.tsx` (`data-arc-card="<position>"`, `data-arc-card-state`) draws the card's
 number, title, state badge, charter and phases: the number is a `Chip` (`runner.arcCard`,
 `Card {{n}}`), the title sits in `[data-arc-card-title]`, the badge is toned by `cardTone`, and the
-charter is clamped to two lines. Under the charter, `ArcPhaseList.tsx` draws one compact row per phase
+charter is clamped to two lines. BESIDE THE BADGE a card with a shipped or ⛔ phase AND a phase still
+unshipped draws its count over the very rows beneath it — `10 of 18 · 8 blocked`
+(`data-arc-card-phases`, `runner.arcPhaseCount` · `runner.arcBlockedPhases`; the `blocked` half only
+while a ⛔ stands). No count line for a card nothing has happened to (`queued`, `unminted`), a card
+whose every phase shipped, or a card with no phases. Under the charter,
+`ArcPhaseList.tsx` draws one compact row per phase
 (`data-arc-phase="<id>"`, `data-arc-phase-state`): the run card's own mark (`PHASE_GLYPH` — ✅ shipped,
-`·` still to come), the phase id and its title, with the state's word for a screen reader. The list
-comes from the RECORD: the runner writes each card's `phases` (`[{id, title, shipped}]`) into
+⛔ blocked, `·` still to come), the phase id and its title, with the state's word for a screen reader. The list
+comes from the RECORD: the runner writes each card's `phases` (`[{id, title, shipped, blocked}]`) into
 `arc.json` on every sync (`hooks/plan_runner/arc_phases.py` — the list and verdicts from
 `plan_census.phase_census`, the titles from `plan_v2.phase_headings` or, for a phase with no H2
-heading, the census mention's own line; a hand-written ship stamp is cut off a title), and `readCard` copies it
-through, so a plan that lands, or a phase that ships, reaches the deck within one watchdog tick. A
+heading, the census mention's own line; a hand-written ship stamp is cut off a title; `blocked` is
+set for a phase the ship log's LATEST entry for it holds ⛔), and `readCard` copies it
+through, so a plan that lands, or a phase that ships or blocks, reaches the deck within one watchdog tick. A
 `walking`/`paused` card with its run on the lane draws its LIVE run's phases instead, which carry the
 real state, so the card that has a run never shows two answers — until that run has composed any
 phases, when the record's list stands in. A plan not written yet (`[]`) draws
@@ -1116,12 +1128,33 @@ position). `cardDraggable(arc, card)` is true only for a
 `queued` or `unminted` card past `arc.last_started`. `reorderAllowed(arc, from, to)` asks that same
 line of BOTH ends of a move, plus the deck's bounds and `from !== to` — what keeps the deck from
 offering a drop the runner's own `arcs.reorder` would only refuse (§"The drag" below).
-`cardTone(state)` maps a card's state to a `Badge` tone and is never `danger`: a `stalled` card asks
-for a hand, it is not a fault. `arcProgress(arc)` counts complete CARDS against the total — not
+`cardTone(state)` maps a card's state to a `Badge` tone and is never `danger`: a `stalled` card is
+one the runner is already pressing again the moment a cure lands, not a fault. `arcProgress(arc)`
+counts complete CARDS against the total — not
 `useArcs()`'s `count`, which is unfinished ARCS across the whole deck. `current` and `last_started`
 are always read off the snapshot, never recomputed from the card states — the runner's own
 decisions, and a card walked out of order (`--now`) would disagree with a client that tried to
 guess them.
+
+**The stalled card.** A run never parks on a ⛔ (runner ruling 2026-09-11), so a receipt reads
+`complete` while phases stand blocked. `arcs.card_state` calls a card `complete` only when
+`arc_stalled.landed(receipt)` — `status == "complete"` with empty `blocked` and `skipped_unchanged`;
+any other card whose newest run has a receipt is `stalled`. The runner writes `run_status` on the entry (the receipt's word
+plus what it left: `complete — 8 blocked`); the server copies it and the face draws the count
+(§"The face").
+
+`stalled` is not a resting state: the arc's tick presses the card again once a cure lands, once per
+cure (the card's `repress_key` in `arc.json`), and the arc never advances past an unfinished card
+(runner ruling 2026-09-23: "plans must be completed, no waiting on heals"). The key is read over the
+phases the card still OWES — the plan's unshipped ones, not the receipt's books alone, since a run
+can end non-`complete` with empty books (`halted`, `rate-limited`). A cure is:
+
+- an owed phase's `spec_sha` moved
+- an owed phase's ⚒ outcome word moved
+- a heal item for the card's plan closed `healed`
+- a plan the runner names no phase in: its bytes changed
+
+The deck draws; the runner presses.
 
 **The run strip.** `ArcCard`'s live card, while `walking` or `paused`, joins the lane by `run_id` —
 never by plan path, since a plan can have been walked more than once — and, when found, draws the
@@ -1150,8 +1183,8 @@ either.
 **The copy** lives under `runner.*` in `src/modules/i18n/locales/en/common.json`: `arcs`, `arcCards`,
 `arcCard`, `arcWalking`, `arcStalled`, `arcComplete`, `arcNotStarted`, `arcQueued`, `arcPaused`,
 `arcDragHint`, `arcViewing`, `arcPrevious`, `arcNextCard`, `arcStrip`, `arcNoPhases`,
-`arcMorePhases`, `arcFewerPhases` — English only, the runner card's own fallback rule
-(§"The runner card" above).
+`arcPhaseCount`, `arcBlockedPhases`, `arcMorePhases`, `arcFewerPhases` — English only, the runner
+card's own fallback rule (§"The runner card" above).
 
 **The API.** `api.planRunner.arcs()` (`GET /api/plan-runner/arcs`) and
 `api.planRunner.arcReorder(arc, from, to)` (`POST /api/plan-runner/arcs/:arc/reorder`) are read from
@@ -1201,11 +1234,13 @@ running the probe.
 
 The arc deck's own three probes, each printing exactly one final line:
 
-- `node .verify/probe-arc-deck.mjs` → `ARC DECK PASS walks=4 reorder=ok shots=4` — the strip at a
+- `node .verify/probe-arc-deck.mjs` → `ARC DECK PASS walks=4 gutter=2 reorder=ok shots=6` — the strip at a
   desktop and a phone viewport, light and dark: position order, layers, the live card scrolled into
-  view, one right-arrow step, each card's phase rows (one list folded past eight), one height, no
-  vertical scroll in the strip (a wheel over it moves the page), and a drag of card 4 onto card 3
-  written into the arc file by the runner. Its four shots land in `.verify/artifacts/`.
+  view, one right-arrow step, each card's phase rows (one list folded past eight; card 2's ten shipped
+  and eight ⛔), the stalled card's `stalled` badge beside `10 of 18 · 8 blocked` and the landed card's
+  missing count line, one height, no vertical scroll in the strip (a wheel over it moves the page),
+  the same deck in the chat gutter's Runner widget in both themes, and a drag of card 4 onto card 3
+  written into the arc file by the runner. Its six shots land in `.verify/artifacts/`.
 - `node .verify/probe-arc-fill.mjs` → `ARC FILL PASS deck=fixture-arc reorder=ok shots=2` — a drop
   reordering a fixture deck through the runner.
 - `bash ~/.claude/scripts/runner_fixtures/arc_proof.sh` → `ARC PROOF PASS cards=2/2

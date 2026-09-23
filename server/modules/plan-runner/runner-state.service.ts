@@ -205,15 +205,25 @@ function pidAlive(pid: number): boolean {
  * The fix-it session on a blocked phase, or `null` when the run never sent one. An unknown state
  * word is `null` too: a card must never say "repairing" over something it cannot read.
  *
- * A `heal` repair is worked by the heal drain while the run itself is halted, so the run's own
- * liveness says nothing about it: `live` is read off the drain's pid, which the stamp carries.
+ * A `heal` repair is worked by the heal drain, which the walk's own ending launches beside the walk
+ * (`heal_live`), so the run's own liveness says nothing about it: `live` is read off the drain's pid,
+ * which the stamp carries. When that drain is NOT alive, `waiting_on` names the gate holding the
+ * item -- another heal is out, heals are off, the day's cap is spent -- so the card says why. A word
+ * that is not one of those three gates is a child the drain could not start, named by its fault
+ * (`heal_drain._held`).
+ *
+ * A `cure` repair is the walk's OWN work: `cure.at_block` launches the Asclepius chain that cures
+ * the block's CLASS and HOLDS the phase's lane on it until the chain ends, so the run's liveness is
+ * the repair's, exactly as it is for an unblock outing -- and, for the same reason, there is no pid
+ * of its own to read.
  */
 function readRepair(raw: unknown): RunnerRepair | null {
   if (raw === null || typeof raw !== 'object') return null;
   const state = readString(field(raw, 'state')) as RunnerRepair['state'];
   if (!REPAIR_STATES.includes(state)) return null;
   const named = readString(field(raw, 'by'));
-  const by: RunnerRepair['by'] = named === 'heal' || named === 'replan' ? named : 'unblock';
+  const by: RunnerRepair['by'] = named === 'heal' || named === 'replan' || named === 'cure'
+    ? named : 'unblock';
   const pid = readNumberOrNull(field(raw, 'pid'));
   return {
     phase_id: readString(field(raw, 'phase_id')),
@@ -230,6 +240,12 @@ function readRepair(raw: unknown): RunnerRepair | null {
     since: readNumberOrNull(field(raw, 'since')),
     ended_at: readNumberOrNull(field(raw, 'ended_at')),
     reason: readString(field(raw, 'reason')),
+    // The runner's own word, carried through UNCHANGED: the card renders `heal_live`'s three gate
+    // words, and any other word — a child the drain could not start writes the fault's own
+    // (`heal_drain._held`) — through the paused strip's `waitsHeld`. A word this card does not know
+    // reads as the generic sentence rather than as a claim.
+    waiting_on: readString(field(raw, 'waiting_on')),
+    cap: readNumberOrNull(field(raw, 'cap')),
   };
 }
 
@@ -374,6 +390,10 @@ export function classifyRun(
     outcome: ending?.outcome ?? null,
     ended_at: ending?.at ?? null,
     blocked_causes: ending !== null ? readBlockedCauses(files.receipt) : {},
+    // The receipt's own sentence over a ⛔ the run walked out on (`closing.doors_spent`, the runner's
+    // `closing.py`): the phase, its cause, and the doors it spent — `''` on a receipt that carries
+    // none. Read RAW, like every other field here: the ending's notification is where it is said.
+    doors_spent: ending !== null ? readString(field(files.receipt, 'doors_spent')) : '',
     pid: readNumberOrNull(field(progress, 'pid')),
     position: readPosition(field(progress, 'position')),
     // The lane table, read with the same defences as every other block here: absent or malformed

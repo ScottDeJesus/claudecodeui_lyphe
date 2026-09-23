@@ -822,13 +822,19 @@
         "heal-fix": "applying the review's fixes",
         "close": "merging the plan repair",
         "measuring": "re-running the phase's checks for fresh evidence",
-        "replanning": "Odysseus is rewriting the phase"
+        "replanning": "Odysseus is rewriting the phase",
+        "curing": "an Asclepius chain is curing the cause's class"
       },
       "paused": "Repair of Phase {{phase}} paused — it resumes with the run",
-      "pausedHeal": "Heal of Phase {{phase}} is waiting for the heal drain",
+      "pausedHeal": "Heal of Phase {{phase}} is queued — the next drain takes it up",
+      "waitsHeal": "Heal of Phase {{phase}} waits: another heal is running",
+      "waitsOff": "Heal of Phase {{phase}} waits: heals are off",
+      "waitsCap": "Heal of Phase {{phase}} waits: today's heal cap ({{cap}}) is spent — raise it in the Heal tab",
       "ended": "finished {{elapsed}} ago",
       "replanning": "Replanning Phase {{phase}}",
-      "pausedReplan": "Replan of Phase {{phase}} paused — it resumes with the run"
+      "curing": "Repairing Phase {{phase}} — by cure",
+      "pausedReplan": "Replan of Phase {{phase}} paused — it resumes with the run",
+      "waitsHeld": "Heal of Phase {{phase}} waits: a child could not be started — {{why}}"
     },
     "arcs": "Arcs",
     "arcCards": "{{done}} of {{total}} done",
@@ -845,6 +851,8 @@
     "arcNextCard": "Next card",
     "arcStrip": "Cards of {{title}}",
     "arcNoPhases": "Plan not written yet",
+    "arcPhaseCount": "{{done}} of {{total}}",
+    "arcBlockedPhases": "{{n}} blocked",
     "arcMorePhases": "+{{n}} more",
     "arcFewerPhases": "Show fewer",
     "model": {

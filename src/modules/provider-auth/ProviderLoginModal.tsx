@@ -28,6 +28,8 @@ type ProviderLoginModalProps = {
   onComplete?: (exitCode: number) => void;
   customCommand?: string;
   isAuthenticated?: boolean;
+  /** Overrides the title derived from the provider, for a caller running something other than that provider's own login. Absent everywhere else, which is what keeps those titles byte-for-byte what they were. */
+  title?: string;
 };
 
 const getProviderCommand = ({
@@ -72,7 +74,7 @@ const getProviderTitle = (provider: LLMProvider) => {
   return 'Claude CLI Login';
 };
 
-/** Used by the onboarding and settings modules to run a provider's CLI login command in an embedded shell. */
+/** Used by the onboarding, accounts and settings modules to run a command in an embedded shell — a provider's CLI login, and, through `customCommand` and `title`, the settings dialog's Claude Design authorization. */
 export default function ProviderLoginModal({
   isOpen,
   onClose,
@@ -80,13 +82,14 @@ export default function ProviderLoginModal({
   onComplete,
   customCommand,
   isAuthenticated = false,
+  title: titleOverride,
 }: ProviderLoginModalProps) {
   if (!isOpen) {
     return null;
   }
 
   const command = getProviderCommand({ provider, customCommand, isAuthenticated });
-  const title = getProviderTitle(provider);
+  const title = titleOverride ?? getProviderTitle(provider);
 
   const handleComplete = (exitCode: number) => {
     onComplete?.(exitCode);

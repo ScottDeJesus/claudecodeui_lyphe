@@ -68,7 +68,7 @@ function readPhases(value: unknown): ArcCardPhase[] {
   if (!Array.isArray(value)) return [];
   return value
     .filter((raw) => typeof field(raw, 'id') === 'string')
-    .map((raw) => ({ id: readString(field(raw, 'id')), title: readString(field(raw, 'title')), shipped: field(raw, 'shipped') === true }));
+    .map((raw) => ({ id: readString(field(raw, 'id')), title: readString(field(raw, 'title')), shipped: field(raw, 'shipped') === true, blocked: field(raw, 'blocked') === true }));
 }
 
 /**

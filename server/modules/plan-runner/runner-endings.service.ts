@@ -33,6 +33,14 @@ export type RunnerEndingMeta = {
   blockedPhase: string | null;
   blockCause: string | null;
   /**
+   * The receipt's own sentence over a phase the run walked out on (`closing.doors_spent`): the phase,
+   * its cause, and the replan/unblocks/in-run cure the run spent on that block — `''` when it carries
+   * no such ⛔. It rides the meta because the push must say what the walk already tried: a bare
+   * "Phase 4: verify" reads as "re-author the spec", while a deferred phase is waiting on the heal
+   * item the ending just filed.
+   */
+  doorsSpent: string;
+  /**
    * The run's WALK: `ended_at - started_at`. `started_at` is the Start press, never a queue wait — a
    * run created PARKED is stamped by the press that lifts it out of the queue, while a run merely
    * STOPPED and resumed keeps its original start, so a pause counts and a park does not.
@@ -104,6 +112,7 @@ function endingOf(run: RunnerRunSnapshot & { ended_at: number }): RunnerEnding {
       left: Math.max(0, run.phases.length - shipped - count('deferred') - blocked.length),
       blockedPhase: blocked[0]?.id || null,
       blockCause: blocked[0]?.cause || null,
+      doorsSpent: run.doors_spent,
       durationMs: Math.max(0, (run.ended_at - run.started_at) * 1000),
       costUsd: run.plan_cost_usd,
     },

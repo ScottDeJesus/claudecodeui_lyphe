@@ -1,4 +1,4 @@
-import { LogIn } from 'lucide-react';
+import { LogIn, Palette } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 import { Badge, Button, LLMProviderLogo } from '@/shared/ui';
@@ -8,6 +8,8 @@ type AccountContentProps = {
   agent: AgentProvider;
   authStatus: ProviderAuthStatus;
   onLogin: () => void;
+  /** Claude only, and optional: hands the design authorization to whoever owns the login modal. A provider that never sets it draws no such row. */
+  onDesignLogin?: () => void;
 };
 
 type AgentDisplayConfig = {
@@ -30,7 +32,7 @@ const agentConfig: Record<AgentProvider, AgentDisplayConfig> = {
 };
 
 /** Rendered by AgentCategoryContentSection for the "account" category to show sign-in state for one provider. */
-export default function AccountContent({ agent, authStatus, onLogin }: AccountContentProps) {
+export default function AccountContent({ agent, authStatus, onLogin, onDesignLogin }: AccountContentProps) {
   const { t } = useTranslation('settings');
   const config = agentConfig[agent];
 
@@ -103,6 +105,31 @@ export default function AccountContent({ agent, authStatus, onLogin }: AccountCo
                 >
                   <LogIn className="mr-2 h-4 w-4" />
                   {authStatus.authenticated ? t('agents.login.reLoginButton') : t('agents.login.button')}
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {/* Under the sign-in row, drawn only for Claude. Claude Design is a SECOND claude.ai
+              grant — it authorizes reading design-system projects and changes nothing about the
+              account above it — so it reads as a narrower question asked after that one rather
+              than as another way to sign the same account in. The button never takes the tonal
+              fill the login button does when it is the thing standing between the reader and a
+              working agent: nothing here is unconfigured, so nothing here is the next step. */}
+          {agent === 'claude' && onDesignLogin && (
+            <div className="border-t border-border/50 pt-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="font-medium text-foreground">
+                    {t('agents.designLogin.title')}
+                  </div>
+                  <div className="text-sm text-muted-foreground">
+                    {t('agents.designLogin.description')}
+                  </div>
+                </div>
+                <Button onClick={onDesignLogin} variant="outline" size="sm">
+                  <Palette className="mr-2 h-4 w-4" />
+                  {t('agents.designLogin.button')}
                 </Button>
               </div>
             </div>

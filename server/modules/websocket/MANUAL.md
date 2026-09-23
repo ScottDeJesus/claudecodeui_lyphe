@@ -187,7 +187,8 @@ The shell handler manages persistent PTY sessions keyed by:
 
 `<projectPath>_<sessionIdOrDefault>[_cmd_<hash>]`
 
-This enables reconnect behavior and isolates command-specific plain-shell sessions.
+`<hash>` is the first 16 hex characters of SHA-256 over the whole `initialCommand`; the suffix is present only for a plain-shell command.
+Two different commands never share a key, so a reconnect only reattaches to a PTY running the same command.
 
 ## MAN-720 — Shell Lifecycle
 section: README/010 `/shell` Terminal Flow/011 Shell Lifecycle

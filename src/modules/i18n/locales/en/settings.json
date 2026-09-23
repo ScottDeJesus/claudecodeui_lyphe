@@ -384,6 +384,11 @@
       "button": "Login",
       "reLoginButton": "Re-login"
     },
+    "designLogin": {
+      "title": "Authenticate for designs",
+      "description": "Authorize Claude Design so sessions on this machine can read and write your design-system projects",
+      "button": "Authenticate"
+    },
     "error": "Error: {{error}}",
     "runnerModel": {
       "label": "Use DeepSeek Flash for build souls",
