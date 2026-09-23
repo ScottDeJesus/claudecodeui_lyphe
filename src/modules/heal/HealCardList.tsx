@@ -6,8 +6,6 @@ import {
   agoWord,
   athenaTone,
   byMotionThenNewest,
-  classTone,
-  classWord,
   fileName,
   statusTone,
   statusWord,
@@ -15,6 +13,10 @@ import {
 } from '@/modules/heal/healState';
 import type { HealCard, HealQueueItem } from '@/modules/heal/healTypes';
 import { Badge, Button, Card, CardContent, CardFooter, CardHeader, CardTitle, Chip, EmptyState } from '@/shared/ui';
+
+/** How many claimed shapes a card NAMES before the rest are counted. A card is a summary and one heal
+ *  can cure thirty shapes at once; the full list is in the heal's own brief, one press away. */
+const SHAPE_CHIPS = 3;
 
 /**
  * Every heal the reflex has run, each as a whole card in the run card's shape, and beneath them the
@@ -143,15 +145,30 @@ function HealCardView({ heal, onOpenChain }: { heal: HealCard; onOpenChain: (hea
           ) : (
             <Badge as="span" tone="positive">{t('heal.cards.quiet', { defaultValue: 'quiet after landing' })}</Badge>
           ))}
-          <span className="ml-auto font-mono text-muted-foreground" title={t('heal.cards.costTitle', { defaultValue: 'What the chain cost' })}>{usd(heal.cost_usd)}</span>
+          {/* The row's `cost_usd` is the DeepSeek share of what the chain spent — the same figure the
+              daily cap counts, and not the chain's own total (a stage that rode Claude is the
+              operator's subscription). The title says which of the two this is. */}
+          <span className="ml-auto font-mono text-muted-foreground" title={t('heal.cards.costTitle', { defaultValue: 'DeepSeek’s share of this heal — what the daily cap counts, never the chain’s whole bill' })}>{usd(heal.cost_usd)}</span>
         </div>
         <div className="flex min-w-0 flex-wrap items-center gap-1.5 text-xs">
-          <span className="text-muted-foreground">{t('heal.cards.classes', { defaultValue: 'Cause classes claimed:' })}</span>
-          {heal.classes_claimed.length === 0 ? (
-            <span className="text-muted-foreground">{t('heal.cards.noClasses', { defaultValue: 'none yet' })}</span>
-          ) : heal.classes_claimed.map((klass) => (
-            <Chip key={klass} size="sm" tone={classTone(klass)}>{classWord(klass)}</Chip>
-          ))}
+          <span className="text-muted-foreground">{t('heal.cards.shapes', { defaultValue: 'Shapes claimed:' })}</span>
+          {heal.signatures_claimed.length === 0 ? (
+            <span className="text-muted-foreground">{t('heal.cards.noShapes', { defaultValue: 'none yet' })}</span>
+          ) : (
+            <>
+              {heal.signatures_claimed.slice(0, SHAPE_CHIPS).map((signature) => (
+                <Chip key={signature} size="sm" tone="neutral" title={signature} className="max-w-[18rem]">
+                  <span className="block truncate font-mono">{signature}</span>
+                </Chip>
+              ))}
+              {heal.signatures_claimed.length > SHAPE_CHIPS && (
+                <span className="text-muted-foreground"
+                      title={heal.signatures_claimed.slice(SHAPE_CHIPS).join('\n')}>
+                  {t('heal.cards.moreShapes', { defaultValue: '+{{count}} more', count: heal.signatures_claimed.length - SHAPE_CHIPS })}
+                </span>
+              )}
+            </>
+          )}
         </div>
       </CardContent>
 

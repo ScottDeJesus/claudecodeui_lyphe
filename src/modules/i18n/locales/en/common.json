@@ -51,17 +51,18 @@
       "athenaClean": "Athena · clean",
       "athenaPending": "Athena · not yet",
       "by": "Fired by {{reason}} · built by {{builder}}",
-      "classes": "Cause classes claimed:",
       "closed": "{{count}} rows closed",
-      "costTitle": "What the chain cost",
+      "costTitle": "DeepSeek’s share of this heal — what the daily cap counts, never the chain’s whole bill",
       "empty": {
         "message": "A cycle fires them — nightly on the schedule, or Run a cycle now.",
         "title": "No heal has run yet"
       },
       "ended": "ended {{ago}}",
-      "noClasses": "none yet",
+      "moreShapes": "+{{count}} more",
+      "noShapes": "none yet",
       "openBrief": "Open brief",
       "quiet": "quiet after landing",
+      "shapes": "Shapes claimed:",
       "spike": "↑ {{count}} filed after landing",
       "title": "Heals"
     },
@@ -116,8 +117,9 @@
       "noCapOnClaude": "no cap on Claude",
       "noHeal": "none yet",
       "noHealTitle": "No heal has run",
-      "spend": "Today",
-      "spendTitle": "Heal spend today against the daily cap",
+      "spend": "DeepSeek today",
+      "spendTitle": "DeepSeek heal spend today against the daily cap",
+      "spendTitleReserved": "DeepSeek heal spend today: {{spent}} landed, {{reserved}} reserved for the heals still walking. The daily cap weighs both.",
       "spendTitleClaude": "DeepSeek heal spend today. These heals run on Claude — your subscription — so the daily cap counts none of it and closes nothing."
     },
     "queue": {

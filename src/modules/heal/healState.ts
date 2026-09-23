@@ -4,10 +4,10 @@ import type { Tone } from '@/shared/types';
 /**
  * How the ledger's facts reach the eye — the same job `plan-runner/runState.ts` does for a run.
  *
- * Colour is language here, not decoration: red is a cause recurring or a review that blocks,
- * amber is a heal that needs a hand or a cap being approached, green is a heal that landed and
- * stayed quiet, grey is what is waiting on purpose or ignored by design. Nothing below spells a
- * colour; tone travels as `tone=` and reaches the paint through the token blocks.
+ * Colour is language here, not decoration: red is a shape a heal claimed coming back, or a review
+ * that blocks, amber is a heal that needs a hand or a cap being approached, green is a heal that
+ * landed and stayed quiet, grey is what is waiting on purpose or ignored by design. Nothing below
+ * spells a colour; tone travels as `tone=` and reaches the paint through the token blocks.
  */
 
 /** The class's own word, for a chip. The door's word (`kind`) is printed as-is and never mapped. */
@@ -74,8 +74,8 @@ export function trendMark(trend: HealKindRow['trend']): { glyph: string; word: s
 }
 
 /**
- * Triage order: a regression first (a cause came BACK), then the most live rows, then the all-ignored
- * kinds last — they are by-design refusals and read grey for a reason.
+ * Triage order: a regression first (a SHAPE a heal claimed came BACK), then the most live rows, then
+ * the all-ignored kinds last — they are by-design refusals and read grey for a reason.
  */
 export function byUrgency(a: HealKindRow, b: HealKindRow): number {
   const ra = a.regression ? 1 : 0;

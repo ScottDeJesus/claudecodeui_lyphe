@@ -20,8 +20,9 @@ const CYCLE_TONE: Record<HealCycleState['word'], Tone> = { open: 'info', waiting
 
 /**
  * The tab's vitals, in the operator's own order: friction since the last heal, what is ignored,
- * the last heal, today's spend against its cap, and — fifth — the cycle: open, waiting, next at an
- * hour, or the schedule off.
+ * the last heal, today's DEEPSEEK spend against its cap — the landed dollars, and what the heals
+ * still walking have reserved — and — fifth — the cycle: open, waiting, next at an hour, or the
+ * schedule off.
  *
  * FIVE NUMBERS AND NOTHING ELSE ABOVE THE FOLD. A reader who opens this tab on a phone sees these
  * before anything scrolls, and each answers one question in a tone that says whether to act:
@@ -39,6 +40,7 @@ export function HealPills({ summary, activePill, onSelect }: HealPillsProps) {
   const ignored = summary.ignored;
   const lastHeal = summary.last_heal;
   const spend = summary.spend_today;
+  const reserved = summary.spend_reserved; // what the heals still WALKING have yet to book
   const cap = summary.switches.daily_cap; // null is NO CEILING, the switch file absent and the shipped state
   // THE CAP IS DEEPSEEK'S, so this pill is about DeepSeek's money in both readings — but while Claude
   // is the effective model the ceiling cannot close anything, and a red pill over a cap nothing is
@@ -46,8 +48,16 @@ export function HealPills({ summary, activePill, onSelect }: HealPillsProps) {
   // still a fact the operator paid, and the words beside it name the side the cap does not count.
   const onClaude = summary.switches.model === 'claude';
 
+  // WHAT THE DOOR ACTUALLY WEIGHS IS BOTH HALVES. A walking heal books its cost when it ENDS, so
+  // `spend_today` alone under-reads a day with launches open (`read.tallies` reserves for them) — the
+  // landed figure stays the number, the reserved one rides beside it whenever there is one, and the
+  // tone is read off their sum, which is the figure `parked()` compares with the cap. Under the Claude
+  // model nothing is reserved (a Claude heal books nothing this cap counts) and the reading is spend's.
+  const weighed = onClaude ? spend : spend + reserved;
+  const money = reserved > 0 && !onClaude ? `${usd(spend)} + ${usd(reserved)}` : usd(spend);
+
   // Red only once the cap has actually closed the door; amber from 80% so the closing is seen coming.
-  const spendTone: Tone = onClaude ? 'neutral' : cap === null ? 'neutral' : spend >= cap ? 'danger' : spend >= cap * 0.8 ? 'warn' : 'positive';
+  const spendTone: Tone = onClaude ? 'neutral' : cap === null ? 'neutral' : weighed >= cap ? 'danger' : weighed >= cap * 0.8 ? 'warn' : 'positive';
   const cycleState: HealCycleState = summary.cycle_state;
 
   const fifth: PillSpec = {
@@ -90,14 +100,16 @@ export function HealPills({ summary, activePill, onSelect }: HealPillsProps) {
     },
     {
       key: 'spend',
-      label: t('heal.pills.spend', { defaultValue: 'Today' }),
+      label: t('heal.pills.spend', { defaultValue: 'DeepSeek today' }),
       value: onClaude
         ? `${usd(spend)} · ${t('heal.pills.noCapOnClaude', { defaultValue: 'no cap on Claude' })}`
-        : cap === null ? `${usd(spend)} · ${t('heal.pills.noCap', { defaultValue: 'no cap' })}` : `${usd(spend)} / ${usd(cap)}`,
+        : cap === null ? `${money} · ${t('heal.pills.noCap', { defaultValue: 'no cap' })}` : `${money} / ${usd(cap)}`,
       tone: spendTone,
       title: onClaude
         ? t('heal.pills.spendTitleClaude', { defaultValue: 'DeepSeek heal spend today. These heals run on Claude — your subscription — so the daily cap counts none of it and closes nothing.' })
-        : t('heal.pills.spendTitle', { defaultValue: 'Heal spend today against the daily cap' }),
+        : reserved > 0
+          ? t('heal.pills.spendTitleReserved', { defaultValue: 'DeepSeek heal spend today: {{spent}} landed, {{reserved}} reserved for the heals still walking. The daily cap weighs both.', spent: usd(spend), reserved: usd(reserved) })
+          : t('heal.pills.spendTitle', { defaultValue: 'DeepSeek heal spend today against the daily cap' }),
     },
     fifth,
   ];

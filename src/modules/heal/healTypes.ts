@@ -5,9 +5,11 @@
  * a judgment: `rail-deny`, `script-nudge-blocked`, `tool-error`. A heal is scoped to a kind, the
  * triage counts a kind, the hold is taken on a kind.
  *
- * `klass` is THE CAUSE CLASS, null until judged — the heal doctrine's four. Only a klass feeds a
- * heal's `classes_claimed`, and only a klass can mark a regression: rails refuse BY DESIGN, so a
- * regression measured on the door's word would fire within the hour, forever.
+ * `klass` is THE CAUSE CLASS, null until judged — the heal doctrine's four. It is what a kind's chip
+ * and the tallies' class breakdown read, and it is NOT what a heal claims: a claim is the set of
+ * `signature` SHAPES a heal cured (`HealCard.signatures_claimed`), because a bucket is too coarse to
+ * be a cause — a busy kind's rows carry all four, so a claim of the buckets marked every classified
+ * row a regression (measured 2026-09-23: 109 rows). Only a shape can mark one.
  *
  * A CYCLE is the unit the operator asks about — "what did last night do?" — one nightly (or pressed)
  * pass in which Chiron ranks the live friction and heals walk his list. The tab renders the
@@ -41,10 +43,11 @@ export type HealItem = {
   ignored: boolean;
 };
 
-/** A landed heal claimed this class, and a live row of it is later than that heal's ending. */
+/** A landed heal cured this SHAPE, and a live row of that kind carries it again. */
 export type HealRegression = {
   heal_id: string;
-  klass: HealClass;
+  /** The normalized failure shape that came back — the worker's own claim, printed as it wrote it. */
+  signature: string;
   /** Epoch seconds of the row that marks it. */
   since: number;
 };
@@ -81,7 +84,8 @@ export type HealCard = {
   athena: AthenaCounts | null;
   /** Rows this heal claimed and closed. */
   closed: number;
-  classes_claimed: HealClass[];
+  /** The failure shapes this heal cured — what `read.regressions()` compares a returning row against. */
+  signatures_claimed: string[];
   /** Rows filed after this heal landed that carry its id — the after-landing spike mark. */
   spikes: number;
   cost_usd: number;
@@ -198,7 +202,14 @@ export type HealSummary = {
   live_since_last_heal: number;
   ignored: number;
   last_heal: { id: string; kind: HealKind; status: HealStatus; ended_at: number | null } | null;
+  /** DeepSeek dollars LANDED today — a heal books its cost when it ends, so this is what has closed. */
   spend_today: number;
+  /**
+   * DeepSeek dollars the heals still WALKING have yet to book: the ones in flight, priced at the mean
+   * of the last five landed heals (0 when none has landed). The daily cap weighs `spend_today` plus
+   * this — a cap read off the landed half alone lets the launches already open close past it.
+   */
+  spend_reserved: number;
   /** kind → heal id, for every kind a running heal holds. */
   held: Record<HealKind, string>;
   kinds: HealKindRow[];

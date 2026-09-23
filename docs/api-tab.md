@@ -96,11 +96,14 @@ The DeepSeek view is six sections in this order, each a `JevSection` and each ro
   (`costs.price`); `usd` is `usd_list` at peak and `usd_list * OFF_PEAK_FACTOR` off-peak.
 - Chinese public holidays are NOT modelled (`hooks/plan_runner/deepseek.py`): a holiday weekday prices
   as peak.
-- **Why it differs from a receipt.** The receipts (`hooks/plan_runner/costs.py`) price a DeepSeek child
-  at the PEAK list rate as a ceiling — the child's own wall-clock window is ignored, so one phase's
-  cost never depends on which side of 04:00 UTC it ran. That ceiling is exactly `usd_list`, and
-  `usd_list` is the basis a run receipt and the Heal cap count. `usd` is what the ledger really spent,
-  priced per window; the panel leads with `usd` and shows the list figure small beside it.
+- **A receipt prices a DeepSeek child HERE too, since 2026-09-23.** `costs.result_cost` sends a child
+  through `row_price` at the window it ran in (`vendor_price`, `hooks/plan_runner/costs.py`), so a run
+  receipt, a chain stage and a heal row carry this ledger's own figure for the same tokens — not the
+  peak list rate, and never the CLI's `modelUsage` row, which is cumulative session arithmetic rather
+  than the billed delta. Measured over the eighteen DeepSeek outings of 2026-09-23's six heal chains:
+  the old recipe read $4.149158 where the ledger bills $1.201426596. `usd_list` is what `usd` would
+  have been had every hour of the row been peak; the panel leads with `usd` and shows the list figure
+  small beside it, as the reference rate the window's own dollars were halved from.
 
 ## The reconciliation — and the two parts of its gap
 
