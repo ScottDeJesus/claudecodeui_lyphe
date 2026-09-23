@@ -1,5 +1,7 @@
 import type { DeepseekBalance } from '@/shared/types.js';
 
+import type { DeepseekUsageReading } from './deepseek-usage.service.js';
+
 /**
  * The vendor's own balance endpoint, absolute because it is not on this host and never will be.
  *
@@ -34,6 +36,15 @@ type DeepseekServiceDependencies = {
   fetchImpl: typeof fetch;
   timeoutMs: number;
   now: () => number;
+  /**
+   * Where a REACHABLE reading goes on its way out — the usage recorder, in the module's own wiring.
+   *
+   * An optional dependency rather than a direct call into the recorder, because this service's one
+   * job is answering the balance route and a reading is a fact about the account, not about who
+   * wants a copy of it. A caller that hands no `onReading` gets exactly the behaviour this service
+   * had before the recorder existed.
+   */
+  onReading?: (reading: DeepseekUsageReading) => void;
 };
 
 /** One entry of the vendor's `balance_infos`. Amounts arrive as decimal strings. */
@@ -140,13 +151,24 @@ export function createDeepseekService(dependencies: DeepseekServiceDependencies)
     const reading = readVendorBalance(payload);
     if (!reading) return { reachable: false, reason: 'bad-response' };
 
-    return {
-      reachable: true,
-      available: reading.available,
-      currency: reading.currency,
+    const report: DeepseekUsageReading = {
       total: reading.total,
+      currency: reading.currency,
+      available: reading.available,
       checkedAt: dependencies.now(),
     };
+
+    // The recorder is handed every reachable reading, and it is handed it HERE: once the reading
+    // exists, and before the route's answer leaves. Wrapped because a recorder that throws is a
+    // fact about the recorder — the answer below is already built and is handed back unchanged.
+    try {
+      dependencies.onReading?.(report);
+    } catch {
+      // Swallowed on purpose: the balance this person is reading must not depend on the ledger's
+      // health, and the recorder's own failures are already one `console.warn` deep.
+    }
+
+    return { reachable: true, ...report };
   }
 
   return { balance };
