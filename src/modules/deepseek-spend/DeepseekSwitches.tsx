@@ -1,5 +1,8 @@
 import { useTranslation } from 'react-i18next';
 
+import { useDeepSeekFlashSwitch } from '@/shared/hooks/useDeepSeekFlashSwitch';
+import { useHealModelSwitch } from '@/shared/hooks/useHealModelSwitch';
+import { useSwarmSwitch } from '@/shared/hooks/useSwarmSwitch';
 import type { Tone } from '@/shared/types';
 import { Badge } from '@/shared/ui';
 
@@ -15,6 +18,16 @@ const STATE_TONE: Record<Mirror['state'], Tone> = { on: 'positive', off: 'neutra
 const STATE_GLYPH: Record<Mirror['state'], string> = { on: '✓', off: '·', unreadable: '▲' };
 
 /**
+ * One hook reading as the row draws it. A switch with no answer is `unreadable`, never `off`: the
+ * hooks report "could not ask" as a `null` position or an `unreadable` flag, and neither is the same
+ * as a switch the server read as off.
+ */
+function mirrorOf(on: boolean | null, unreadable: boolean, detail: string | null = null): Mirror {
+  if (unreadable || on === null) return { state: 'unreadable', detail };
+  return { state: on ? 'on' : 'off', detail };
+}
+
+/**
  * Used by DeepseekUsagePanel as its fifth block: the three switches that route work to DeepSeek,
  * MIRRORED — each a word on a toned badge, never a toggle, because a toggle that looks disabled still
  * invites a press and this view changes nothing. The caption names where each one IS changed:
@@ -23,8 +36,21 @@ const STATE_GLYPH: Record<Mirror['state'], string> = { on: '✓', off: '·', unr
  */
 export function DeepseekSwitches() {
   const { t } = useTranslation();
-  // FILL: switchMirrors
-  const mirrors: Mirrors = { chat: { state: 'on', detail: null }, heal: { state: 'off', detail: 'claude' }, swarm: { state: 'on', detail: '4' } };
+  // The three switches' own readers, the ones Settings, the composer and Heal compose. Only the
+  // positions are taken: no setter and no save is in reach from this view, so no press here can flip
+  // anything. Each row is a statement of where the switch IS, not a control.
+  const chat = useDeepSeekFlashSwitch();
+  const heal = useHealModelSwitch();
+  const swarm = useSwarmSwitch();
+  const mirrors: Mirrors = {
+    chat: mirrorOf(chat.enabled, chat.unreadable),
+    // The heal switch's two sides are the words `deepseek` and `claude`, so the detail is the side
+    // itself and the row reads as "on · deepseek" rather than an unlabelled badge.
+    heal: mirrorOf(heal.position === null ? null : heal.position === 'deepseek', heal.unreadable, heal.position),
+    // `lanes` is a ceiling or none at all; the ceiling rides the row as digits, `null` leaves the
+    // row's own "no lane ceiling" line to say it.
+    swarm: mirrorOf(swarm.enabled, swarm.unreadable, swarm.lanes === null ? null : String(swarm.lanes)),
+  };
   const rows: { key: keyof Mirrors; detail: string | null }[] = [
     { key: 'chat', detail: null },
     { key: 'heal', detail: mirrors.heal.detail },

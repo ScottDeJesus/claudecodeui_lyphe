@@ -121,9 +121,7 @@ where declared. Read it there, not a copy here. The client mirrors it in `src/sh
    `state/deepseek_usage/ledger.sqlite`. A refusal there is swallowed and never turns this route's
    own answer into a 5xx, and the five UNKNOWN words above are never handed to it — only a reading
    that came back `reachable: true` is. The server also takes its OWN reading, on no browser's
-   behalf: a first one 15 s after `createDeepseekModule()` runs, then one every 180 s
-   (`DEEPSEEK_BALANCE_RECORD_MS`, `deepseek.module.ts`), both timers unref'd, so the ledger's series
-   holds even while no tab is open. `checkedAt` is epoch MILLISECONDS (`Date.now()`), unlike
+   behalf — see §"The balance log". `checkedAt` is epoch MILLISECONDS (`Date.now()`), unlike
    `ClaudeUsage.checkedAt`, which is seconds.
 
 ## The client's one reading
@@ -168,6 +166,46 @@ figure has nothing else to explain: the panel is where someone checks the money 
 stopped, and a frozen tab would otherwise hold a five-minute-old number that looks fresh.
 `DeepseekBalanceReadout` is deliberately not a `Meter` — a balance has no limit to be a share of —
 and it is the one component this feature added rather than composed from what was there.
+
+## The balance log
+
+The ledger has a second writer beside the footer's reading, and it belongs to the server.
+
+- The server takes its OWN reading, on no browser's behalf: a first `balance()` 15 s after
+  `createDeepseekModule()` runs, then one every 180 s (`DEEPSEEK_BALANCE_RECORD_MS`,
+  `server/modules/deepseek/deepseek.module.ts`), both timers unref'd — so the series holds even while
+  no tab is open. It is the same figure the footer reads, taken on the server's clock.
+- Every reachable reading — the timer's, the footer's, anyone's — is handed to the balance service's
+  `onReading` and on to `record` (`deepseek-usage.service.ts`), which shells to
+  `scripts/deepseek-usage balance-record`. The four values go over as `--flag=value` arguments and
+  nothing else; no argument carries the key, and the child starts with a copy of `userFacingEnv()`
+  with `DEEPSEEK_API_KEY` DELETED (`childEnv`), because the argv rule is worth nothing if the
+  environment hands the same secret over instead.
+- Rows land in `~/.claude/state/deepseek_usage/ledger.sqlite`, table `balance`
+  (`hooks/deepseek_usage/store.py`): `ts`, `total`, `currency`, `available`, one row per reading.
+  `balance-record` is that table's ONE validator and writer — a `total` outside
+  `^[0-9]+(\.[0-9]+)?$`, a `currency` outside `^[A-Z]{3}$`, or a `checked-at` that is not a positive
+  integer exits 2 with one line naming the ARGUMENT and writes nothing.
+- Exit 2 is logged by the service as one `console.warn('deepseek-usage record: invalid-reading')`; any
+  other failure is logged by fault class alone. A refused reading is dropped and never turns this
+  route's answer into a 5xx; the five UNKNOWN words are never handed to it at all — only a reading
+  that came back `reachable: true` is.
+
+## The usage door
+
+- `GET /api/deepseek/usage?range=&feed=`, mounted beside `GET /balance` in the same router
+  (`server/modules/deepseek/deepseek.routes.ts`), behind `authenticateToken`.
+- Validation happens in the route, before the reader is asked: `range` must match
+  `^(today|7d|30d|all)$` (default `today`) and `feed` must be an integer 0..500 (default `50`);
+  anything else is 400 `{ error }`, so a crafted query can never reach argv.
+- The reader is `scripts/deepseek-usage stats --json --range <range> --feed <feed>`, run through
+  `execFile` — an argument array, never a shell — with a 30 s ceiling. Fault mapping: `unreachable` →
+  503 (the reader never answered), `unreadable` → 502 (it answered, and not with the one JSON object
+  its contract promises). A fault's message is the child's own fault line, or the fixed string
+  `deepseek-usage failed`.
+- The API tab is its reader: `useDeepseekUsage` polls `api.deepseek.usage` and `DeepseekUsagePanel`
+  draws the payload — the whole usage surface is [api-tab.md](api-tab.md) §"Where each DeepSeek number
+  comes from".
 
 ## The rate beside the balance
 

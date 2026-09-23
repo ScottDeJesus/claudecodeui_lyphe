@@ -3,7 +3,7 @@ import {
   getStoredAuthToken,
   storeAuthToken,
 } from '@/shared/authToken';
-import type { FileLinePatch, JevRange, NtfySettingsInput, RunnerModelChoice, SubagentTranscriptResult } from '@/shared/types';
+import type { DeepseekRange, FileLinePatch, JevRange, NtfySettingsInput, RunnerModelChoice, SubagentTranscriptResult } from '@/shared/types';
 import { IS_PLATFORM } from '@/shared/utils';
 import { readVoiceConfig, voiceConfigHeaders } from '@/shared/voiceConfig';
 
@@ -988,6 +988,12 @@ export const api = {
   // same reason `accounts.usage` does — no reading is a reading in words, never an error wall.
   deepseek: {
     balance: () => get('/api/deepseek/balance'),
+
+    // What this host has spent on DeepSeek and who spent it, one window at a time
+    // (docs/deepseek-balance.md). The server answers by running the ledger reader as a command, so
+    // the whole payload is one object and the tab reads it whole — every figure it draws is already
+    // in the body, and no number is derived on this side. `feed` is the newest-first tail length.
+    usage: (range: DeepseekRange, feed: number) => get(`/api/deepseek/usage?range=${range}&feed=${feed}`),
   },
 };
 

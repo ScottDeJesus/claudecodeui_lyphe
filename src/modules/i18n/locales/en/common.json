@@ -348,7 +348,6 @@
     "title": "DeepSeek",
     "refresh": "Refresh",
     "reading": "Asking the DeepSeek usage reader…",
-    "sampleNotice": "Sample numbers — the live reader wires in next.",
     "unreachable": {
       "title": "The DeepSeek usage reader could not be asked",
       "retry": "Try again"

@@ -143,18 +143,31 @@ function faultMessage(stderr: string): string {
  */
 function ask(bin: string, argv: string[], timeoutMs: number): Promise<AskOutcome> {
   return new Promise((resolve) => {
-    execFile(
-      bin,
-      argv,
-      { encoding: 'utf8', timeout: timeoutMs, maxBuffer: OUTPUT_MAX_BYTES, env: childEnv(), cwd: os.homedir() },
-      (error, stdout, stderr) => {
-        if (error) {
-          resolve({ ok: false, code: typeof error.code === 'number' ? error.code : null, stderr });
-          return;
-        }
-        resolve({ ok: true, stdout, stderr });
-      },
-    );
+    // The spawn can throw SYNCHRONOUSLY — an argument carrying a NUL byte is `ERR_INVALID_ARG_VALUE`,
+    // raised before any child exists. That is the same fact as a child that never answered, and it
+    // has to resolve rather than reject: `record` runs as `void usage.record(...)`, so a rejection is
+    // an unhandled one, and this process is the server. `stderr` is empty because no child ever spoke,
+    // which is why this lands on the fixed message and never on Node's own error text.
+    //
+    // The value that reaches argv unchecked is a vendor's — `deepseek.service.ts` passes a reading's
+    // raw strings through so the recorder stays the ONE validator — so this is the spawn layer's own
+    // refusal to carry them, and it is a reading dropped, never a boot lost.
+    try {
+      execFile(
+        bin,
+        argv,
+        { encoding: 'utf8', timeout: timeoutMs, maxBuffer: OUTPUT_MAX_BYTES, env: childEnv(), cwd: os.homedir() },
+        (error, stdout, stderr) => {
+          if (error) {
+            resolve({ ok: false, code: typeof error.code === 'number' ? error.code : null, stderr });
+            return;
+          }
+          resolve({ ok: true, stdout, stderr });
+        },
+      );
+    } catch {
+      resolve({ ok: false, code: null, stderr: '' });
+    }
   });
 }
 

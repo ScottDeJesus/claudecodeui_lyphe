@@ -5,12 +5,12 @@ import { useTranslation } from 'react-i18next';
 import { DeepseekBurn } from '@/modules/deepseek-spend/DeepseekBurn';
 import { DeepseekConsumers } from '@/modules/deepseek-spend/DeepseekConsumers';
 import { DeepseekFeed } from '@/modules/deepseek-spend/DeepseekFeed';
-import { sampleUsage } from '@/modules/deepseek-spend/deepseekFixtures';
 import { DeepseekRecon } from '@/modules/deepseek-spend/DeepseekRecon';
 import { DeepseekSwitches } from '@/modules/deepseek-spend/DeepseekSwitches';
 import { DeepseekWhere } from '@/modules/deepseek-spend/DeepseekWhere';
+import { useDeepseekUsage } from '@/modules/deepseek-spend/useDeepseekUsage';
 import { JevSection } from '@/modules/jev';
-import type { DeepseekRange, DeepseekUsageSummary } from '@/shared/types';
+import type { DeepseekRange } from '@/shared/types';
 import { Banner, Button, DeepSeekLogo, EmptyState, ScrollArea, Spinner, Tooltip } from '@/shared/ui';
 
 /**
@@ -32,12 +32,9 @@ import { Banner, Button, DeepSeekLogo, EmptyState, ScrollArea, Spinner, Tooltip 
 export function DeepseekUsagePanel() {
   const { t } = useTranslation();
   const [range, setRange] = useState<DeepseekRange>('today');
-  // FILL: useDeepseekUsage
-  const { data, loading, error }: { data: DeepseekUsageSummary | null; loading: boolean; error: string | null } = { data: sampleUsage(range), loading: false, error: null };
-  // FILL: onRangeChange
+  const { data, loading, error, refresh } = useDeepseekUsage(range);
   const onRangeChange = (next: DeepseekRange) => setRange(next);
-  // FILL: onRefresh
-  const onRefresh = () => {};
+  const onRefresh = () => void refresh();
   const refreshLabel = t('deepseekUsage.refresh');
 
   return (
@@ -80,8 +77,6 @@ export function DeepseekUsagePanel() {
         </div>
       ) : (
         <ScrollArea className="min-h-0 flex-1">
-          {/* FILL: sampleNotice */}
-          <Banner tone="info">{t('deepseekUsage.sampleNotice')}</Banner>
           {error && <Banner tone="warn">{error}</Banner>}
           <div className="flex w-full min-w-0 flex-col gap-8 px-4 py-5 [@container(min-width:48rem)]:px-6" data-deepseek-body>
             {!data.ledger.present ? (
