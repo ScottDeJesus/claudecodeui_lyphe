@@ -88,8 +88,9 @@ function isDue(run: RunnerRunSnapshot, mark: number): run is RunnerRunSnapshot &
  * card's own `runUnfinished` rule (`src/modules/plan-runner/runState.ts`), because the runner's
  * `complete` means something shipped, not that nothing is left. Every other ending wants a hand.
  *
- * A phase counts as blocked when its row says so OR the receipt names it: a phase halted on a crash
- * or a budget is in the receipt's map with its row still `running` or `pending`.
+ * A phase counts as blocked when its row says so OR the receipt names it: a phase the walk left
+ * standing on a crash or on the run's budget is in the receipt's map with its row still `running` or
+ * `pending`.
  */
 function endingOf(run: RunnerRunSnapshot & { ended_at: number }): RunnerEnding {
   const count = (state: RunnerPhaseState): number => run.phases.filter((phase) => phase.state === state).length;

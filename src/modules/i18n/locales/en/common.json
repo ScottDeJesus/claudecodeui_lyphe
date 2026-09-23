@@ -799,10 +799,10 @@
     "ended": "ended {{elapsed}} ago",
     "outcome": {
       "complete": "COMPLETE",
-      "halted": "HALTED",
       "all-blocked": "ALL BLOCKED",
       "budget": "BUDGET",
       "flag-off": "FLAG OFF",
+      "rate-limited": "RATE LIMITED",
       "dry-run": "DRY RUN",
       "unknown": "ENDED",
       "incomplete": "INCOMPLETE"

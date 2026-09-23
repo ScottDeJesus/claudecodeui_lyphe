@@ -715,10 +715,10 @@ point of syncing it. Its fixtures each carry a plan of their own (`createFixture
 because an ended run is superseded by a newer run of the same plan and two fixtures on one plan
 would read as one plan re-walked. Sixteen gates on five fixtures plus a sixth that never appears: a live fixture on
 the lane; `endRun` keeping its card as ENDED with the outcome word `COMPLETE`, no Stop, Dismiss
-offered and the count still counting it; a second fixture ended `halted` reading in the warn tone
+offered and the count still counting it; a second fixture ended `budget` reading in the warn tone
 with Resume beside Dismiss; Dismiss on the first taking its card and dropping the count by one;
 a newer ended run of a fixture's plan superseding it, one ended card per plan; a fresh load with
-the dismissed card still gone and the halted one still there; a second dismissal keeping the first
+the dismissed card still gone and the budget one still there; a second dismissal keeping the first
 (the stored list is pruned against the WHOLE lane, never the visible list — pruning against the
 visible list dropped every earlier dismissal the moment a second was made, and the server still
 carried those runs, so they came straight back); a `complete` receipt written over blocked phases

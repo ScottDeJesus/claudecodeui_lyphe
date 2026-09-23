@@ -458,11 +458,14 @@ section: api-tab/005 Pricing — per window, computed at read
   (`costs.price`); `usd` is `usd_list` at peak and `usd_list * OFF_PEAK_FACTOR` off-peak.
 - Chinese public holidays are NOT modelled (`hooks/plan_runner/deepseek.py`): a holiday weekday prices
   as peak.
-- **Why it differs from a receipt.** The receipts (`hooks/plan_runner/costs.py`) price a DeepSeek child
-  at the PEAK list rate as a ceiling — the child's own wall-clock window is ignored, so one phase's
-  cost never depends on which side of 04:00 UTC it ran. That ceiling is exactly `usd_list`, and
-  `usd_list` is the basis a run receipt and the Heal cap count. `usd` is what the ledger really spent,
-  priced per window; the panel leads with `usd` and shows the list figure small beside it.
+- **A receipt prices a DeepSeek child HERE too, since 2026-09-23.** `costs.result_cost` sends a child
+  through `row_price` at the window it ran in (`vendor_price`, `hooks/plan_runner/costs.py`), so a run
+  receipt, a chain stage and a heal row carry this ledger's own figure for the same tokens — not the
+  peak list rate, and never the CLI's `modelUsage` row, which is cumulative session arithmetic rather
+  than the billed delta. Measured over the eighteen DeepSeek outings of 2026-09-23's six heal chains:
+  the old recipe read $4.149158 where the ledger bills $1.201426596. `usd_list` is what `usd` would
+  have been had every hour of the row been peak; the panel leads with `usd` and shows the list figure
+  small beside it, as the reference rate the window's own dollars were halved from.
 
 ## MAN-475 — The reconciliation — and the two parts of its gap
 section: api-tab/006 The reconciliation — and the two parts of its gap
@@ -4875,7 +4878,7 @@ The events raised today:
 | `login.expired` | `error` | The Claude runtime, when the credentials rather than the request are the problem |
 | `session.stuck` | `error` | The stall watchdog, when a run still in flight has emitted nothing for the stall threshold — no runtime raises it |
 | `runner.finished` | `stop` | The plan-runner lane, when a plan run ends with every phase shipped — see [plan-runner.md](plan-runner.md) §"Pushes on an ending" |
-| `runner.blocked` | `error` | The plan-runner lane, when a plan run ends with phases blocked or left: `all-blocked`, `halted`, `budget`, `flag-off`, or a `complete` that left phases |
+| `runner.blocked` | `error` | The plan-runner lane, when a plan run ends with phases blocked or left: `all-blocked`, `budget`, `flag-off`, or a `complete` that left phases |
 | `limit.reached` · `limit.reset` · `limit.warning` · `limit.overage` · `limit.out_of_credits` | `limit` | The Claude runtime, reading the SDK's `rate_limit_event` |
 | `push.enabled` | `info` | The settings service, when a browser saves a push subscription |
 
@@ -5626,9 +5629,10 @@ clause with the Python rather than to be lenient in one direction: a reader that
 writer that emitted it, would leave the operator pressing a switch the worker does not see move.
 
 **THE DAILY CAP IS A DEEPSEEK FIGURE, and so is the peak park.** The worker sums the day's heals whose
-row says they ran on DeepSeek — Claude is the operator's own subscription, so it carries no cap, no
-dollar figure and no warning anywhere — and neither park is weighed against a heal whose model is
-Claude. That is the whole reason the model switch exists: leftover Claude usage at the end of a week
+row says they ran on DeepSeek — each booked at its chain's DeepSeek stages alone — plus a reserve for
+the ones still walking (`spend_today` landed + `spend_reserved`: running heals × the mean of the last
+five landed). Claude is the operator's own subscription, so it carries no cap, no dollar figure and no
+warning anywhere, and neither park is weighed against a heal whose model is Claude. That is the whole reason the model switch exists: leftover Claude usage at the end of a week
 can be spent on heals that would otherwise be parked behind a cap, without moving a single session's
 builds, because `heal_model.flag` is the HEAL's own choice and never the chat's.
 
@@ -5952,7 +5956,7 @@ tabs receive, and only when that picture changed.
 | The ending | Code | Kind — the switch it rides | ntfy |
 |---|---|---|---|
 | `complete`, no phase blocked or pending | `runner.finished` | `stop` — Run stopped | priority 3, ✅ |
-| `complete` with phases left, `all-blocked`, `halted`, `budget`, `flag-off` | `runner.blocked` | `error` — Run failed | priority 4, ⚠️ |
+| `complete` with phases left, `all-blocked`, `budget`, `flag-off` | `runner.blocked` | `error` — Run failed | priority 4, ⚠️ |
 | `rate-limited`, `dry-run`, a receipt caught mid-write (`unknown`) | none | — | — |
 | a fixture walk — the plan in a scratch folder — `~/.claude/state/test-projects/runner-fixtures/`, anywhere else under `~/.claude/state`, or the OS temp dir (`scripts/runner_fixtures/*.sh`) | none | — | — |
 
@@ -5965,8 +5969,8 @@ is the START press, never a queue wait: a run created PARKED is stamped by the p
 of the queue (`launch._resume`), while a run merely STOPPED and resumed keeps its original start, so a
 pause counts and the hours it spent waiting for a window do not. Anything else adds how many phases are blocked and
 left, and names the first blocked phase with its cause. Blocked means the row says `blocked` OR the
-receipt's `blocked` map names the phase (`blocked_causes` on the snapshot): a phase the runner halted
-on a crash or a budget is in that map while its row still reads `running` or `pending`. A tap opens
+receipt's `blocked` map names the phase (`blocked_causes` on the snapshot): a phase the walk left standing
+on a crash or on the run's budget is in that map while its row still reads `running` or `pending`. A tap opens
 the app root: the push goes to every active user, so it names no chat.
 
 **A run belongs to no login, so every active user is told**, each through their own event switches
@@ -6166,8 +6170,9 @@ without a tab stop of its own a keyboard-only reader could not reach the stages 
 off-screen at 390px.
 
 `position.stage` is **not always one of the six**. `progress.py::_stage` falls back to the RUN's own
-status — `running`, `complete`, `all-blocked`, `budget`, `halted`, `dry-run` — whenever no phase
-holds a stage, which is every start-up and every gap between phases. That word is drawn after the
+status — `running`, `complete`, `blocked`, `all-blocked`, `budget`, `flag-off`, `rate-limited`,
+`dry-run`, `unreadable` — whenever no phase holds a stage, which is every start-up and every gap
+between phases. That word is drawn after the
 chain behind a `·` separator rather than dropped (which would blank the card's one "what is
 happening now" signal) or appended to the chain (which would claim it is a link in it).
 
@@ -6222,7 +6227,7 @@ Dismiss — always — and Resume whenever a phase is still blocked or pending, 
 never off the receipt's word: the runner's `complete` means something shipped, not that nothing is
 left (`runUnfinished`; 14 of 21 `complete` receipts on this host carried blocked phases). Its badge
 carries the outcome word (`COMPLETE` in the positive tone only when nothing is left; `INCOMPLETE`,
-`HALTED`, `ALL BLOCKED`, `BUDGET`, `FLAG OFF` in warn, never red) and how long ago it ended — re-read
+`ALL BLOCKED`, `BUDGET`, `FLAG OFF` in warn, never red) and how long ago it ended — re-read
 once a minute, not once a second — and its strip lights no active stage. Dismissal is
 `dismissRun` in `modules/plan-runner/dismissedRuns.ts`, and it is of one ENDING: `{run_id, ended_at}`
 joins `dismissedEndings` under the `planRunner` key of the server-synced user preferences — a MERGED
@@ -6448,7 +6453,7 @@ plus what it left: `complete — 8 blocked`); the server copies it and the face 
 cure (the card's `repress_key` in `arc.json`), and the arc never advances past an unfinished card
 (runner ruling 2026-09-23: "plans must be completed, no waiting on heals"). The key is read over the
 phases the card still OWES — the plan's unshipped ones, not the receipt's books alone, since a run
-can end non-`complete` with empty books (`halted`, `rate-limited`). A cure is:
+can end non-`complete` with empty books (`unreadable`, `flag-off`, `rate-limited`). A cure is:
 
 - an owed phase's `spec_sha` moved
 - an owed phase's ⚒ outcome word moved
@@ -6505,7 +6510,7 @@ malformed id refused at the route, an unknown id answered in the runner's words,
 run off the lane, and nothing left behind.
 
 `node .verify/phase-27.mjs` proves the ended card in Chromium: a receipted fixture stays listed as
-ENDED with its outcome word and its count, Stop gone and Dismiss offered; a `halted` ending in the
+ENDED with its outcome word and its count, Stop gone and Dismiss offered; a `budget` ending in the
 warn tone with Resume beside Dismiss; Dismiss taking the card and the count and HOLDING across a
 reload, because the dismissal rides the synced preferences; a receipt a day old not listed at all; a
 live fixture untouched by any of it. See [verification.md](verification.md).
@@ -7736,10 +7741,10 @@ point of syncing it. Its fixtures each carry a plan of their own (`createFixture
 because an ended run is superseded by a newer run of the same plan and two fixtures on one plan
 would read as one plan re-walked. Sixteen gates on five fixtures plus a sixth that never appears: a live fixture on
 the lane; `endRun` keeping its card as ENDED with the outcome word `COMPLETE`, no Stop, Dismiss
-offered and the count still counting it; a second fixture ended `halted` reading in the warn tone
+offered and the count still counting it; a second fixture ended `budget` reading in the warn tone
 with Resume beside Dismiss; Dismiss on the first taking its card and dropping the count by one;
 a newer ended run of a fixture's plan superseding it, one ended card per plan; a fresh load with
-the dismissed card still gone and the halted one still there; a second dismissal keeping the first
+the dismissed card still gone and the budget one still there; a second dismissal keeping the first
 (the stored list is pruned against the WHOLE lane, never the visible list — pruning against the
 visible list dropped every earlier dismissal the moment a second was made, and the server still
 carried those runs, so they came straight back); a `complete` receipt written over blocked phases

@@ -195,7 +195,6 @@ function permissionCopy(meta: Record<string, unknown>): { headline: string; body
 const RUNNER_STOP_HEADLINES: Record<string, string> = {
   complete: 'Plan incomplete',
   'all-blocked': 'Plan blocked',
-  halted: 'Plan halted',
   budget: 'Plan out of budget',
   'flag-off': 'Plan stopped: flag off',
 };

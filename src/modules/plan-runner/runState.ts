@@ -46,9 +46,9 @@ export function runOutcomeWord(run: RunnerRunSnapshot): string {
 
 /**
  * How an ended run's outcome reaches the eye. Positive only for a `complete` ending with nothing
- * left; every other ending (`halted`, `all-blocked`, `budget`, `flag-off`, or `complete` with
- * blocked phases) is a run that stopped short and wants a look — amber, never red (design
- * doctrine :145): nothing was denied.
+ * left; every other ending (`all-blocked`, `budget`, `flag-off`, `rate-limited`, `unreadable`, or
+ * `complete` with blocked phases) is a run that stopped short and wants a look — amber, never red
+ * (design doctrine :145): nothing was denied.
  */
 export function runOutcomeTone(run: RunnerRunSnapshot): Tone {
   return runOutcomeWord(run) === 'complete' ? 'positive' : 'warn';

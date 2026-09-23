@@ -663,7 +663,7 @@ tabs receive, and only when that picture changed.
 | The ending | Code | Kind — the switch it rides | ntfy |
 |---|---|---|---|
 | `complete`, no phase blocked or pending | `runner.finished` | `stop` — Run stopped | priority 3, ✅ |
-| `complete` with phases left, `all-blocked`, `halted`, `budget`, `flag-off` | `runner.blocked` | `error` — Run failed | priority 4, ⚠️ |
+| `complete` with phases left, `all-blocked`, `budget`, `flag-off` | `runner.blocked` | `error` — Run failed | priority 4, ⚠️ |
 | `rate-limited`, `dry-run`, a receipt caught mid-write (`unknown`) | none | — | — |
 | a fixture walk — the plan in a scratch folder — `~/.claude/state/test-projects/runner-fixtures/`, anywhere else under `~/.claude/state`, or the OS temp dir (`scripts/runner_fixtures/*.sh`) | none | — | — |
 
@@ -676,8 +676,8 @@ is the START press, never a queue wait: a run created PARKED is stamped by the p
 of the queue (`launch._resume`), while a run merely STOPPED and resumed keeps its original start, so a
 pause counts and the hours it spent waiting for a window do not. Anything else adds how many phases are blocked and
 left, and names the first blocked phase with its cause. Blocked means the row says `blocked` OR the
-receipt's `blocked` map names the phase (`blocked_causes` on the snapshot): a phase the runner halted
-on a crash or a budget is in that map while its row still reads `running` or `pending`. A tap opens
+receipt's `blocked` map names the phase (`blocked_causes` on the snapshot): a phase the walk left standing
+on a crash or on the run's budget is in that map while its row still reads `running` or `pending`. A tap opens
 the app root: the push goes to every active user, so it names no chat.
 
 **A run belongs to no login, so every active user is told**, each through their own event switches
@@ -871,8 +871,9 @@ without a tab stop of its own a keyboard-only reader could not reach the stages 
 off-screen at 390px.
 
 `position.stage` is **not always one of the six**. `progress.py::_stage` falls back to the RUN's own
-status — `running`, `complete`, `all-blocked`, `budget`, `halted`, `dry-run` — whenever no phase
-holds a stage, which is every start-up and every gap between phases. That word is drawn after the
+status — `running`, `complete`, `blocked`, `all-blocked`, `budget`, `flag-off`, `rate-limited`,
+`dry-run`, `unreadable` — whenever no phase holds a stage, which is every start-up and every gap
+between phases. That word is drawn after the
 chain behind a `·` separator rather than dropped (which would blank the card's one "what is
 happening now" signal) or appended to the chain (which would claim it is a link in it).
 
@@ -927,7 +928,7 @@ Dismiss — always — and Resume whenever a phase is still blocked or pending, 
 never off the receipt's word: the runner's `complete` means something shipped, not that nothing is
 left (`runUnfinished`; 14 of 21 `complete` receipts on this host carried blocked phases). Its badge
 carries the outcome word (`COMPLETE` in the positive tone only when nothing is left; `INCOMPLETE`,
-`HALTED`, `ALL BLOCKED`, `BUDGET`, `FLAG OFF` in warn, never red) and how long ago it ended — re-read
+`ALL BLOCKED`, `BUDGET`, `FLAG OFF` in warn, never red) and how long ago it ended — re-read
 once a minute, not once a second — and its strip lights no active stage. Dismissal is
 `dismissRun` in `modules/plan-runner/dismissedRuns.ts`, and it is of one ENDING: `{run_id, ended_at}`
 joins `dismissedEndings` under the `planRunner` key of the server-synced user preferences — a MERGED
@@ -1149,7 +1150,7 @@ plus what it left: `complete — 8 blocked`); the server copies it and the face 
 cure (the card's `repress_key` in `arc.json`), and the arc never advances past an unfinished card
 (runner ruling 2026-09-23: "plans must be completed, no waiting on heals"). The key is read over the
 phases the card still OWES — the plan's unshipped ones, not the receipt's books alone, since a run
-can end non-`complete` with empty books (`halted`, `rate-limited`). A cure is:
+can end non-`complete` with empty books (`unreadable`, `flag-off`, `rate-limited`). A cure is:
 
 - an owed phase's `spec_sha` moved
 - an owed phase's ⚒ outcome word moved
@@ -1203,7 +1204,7 @@ malformed id refused at the route, an unknown id answered in the runner's words,
 run off the lane, and nothing left behind.
 
 `node .verify/phase-27.mjs` proves the ended card in Chromium: a receipted fixture stays listed as
-ENDED with its outcome word and its count, Stop gone and Dismiss offered; a `halted` ending in the
+ENDED with its outcome word and its count, Stop gone and Dismiss offered; a `budget` ending in the
 warn tone with Resume beside Dismiss; Dismiss taking the card and the count and HOLDING across a
 reload, because the dismissal rides the synced preferences; a receipt a day old not listed at all; a
 live fixture untouched by any of it. See [verification.md](verification.md).

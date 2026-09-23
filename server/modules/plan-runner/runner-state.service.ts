@@ -79,7 +79,7 @@ function readEnding(receipt: unknown, fallbackAt: number): { outcome: string; at
 
 /**
  * The receipt's `blocked` map — phase id → cause — keeping string causes only. It is the one record of a
- * phase the runner halted on a crash or a budget, whose `progress.json` row never turns `blocked`.
+ * phase the walk left standing on a crash or on the run's budget, whose `progress.json` row never turns `blocked`.
  */
 function readBlockedCauses(receipt: unknown): Record<string, string> {
   const raw = field(receipt, 'blocked');
@@ -208,9 +208,8 @@ function pidAlive(pid: number): boolean {
  * A `heal` repair is worked by the heal drain, which the walk's own ending launches beside the walk
  * (`heal_live`), so the run's own liveness says nothing about it: `live` is read off the drain's pid,
  * which the stamp carries. When that drain is NOT alive, `waiting_on` names the gate holding the
- * item -- another heal is out, heals are off, the day's cap is spent -- so the card says why. A word
- * that is not one of those three gates is a child the drain could not start, named by its fault
- * (`heal_drain._held`).
+ * item -- another heal is out, heals are off -- so the card says why. A word that is not one of those
+ * two gates is a child the drain could not start, named by its fault (`heal_drain._held`).
  *
  * A `cure` repair is the walk's OWN work: `cure.at_block` launches the Asclepius chain that cures
  * the block's CLASS and HOLDS the phase's lane on it until the chain ends, so the run's liveness is
@@ -240,12 +239,11 @@ function readRepair(raw: unknown): RunnerRepair | null {
     since: readNumberOrNull(field(raw, 'since')),
     ended_at: readNumberOrNull(field(raw, 'ended_at')),
     reason: readString(field(raw, 'reason')),
-    // The runner's own word, carried through UNCHANGED: the card renders `heal_live`'s three gate
+    // The runner's own word, carried through UNCHANGED: the card renders `heal_live`'s two gate
     // words, and any other word — a child the drain could not start writes the fault's own
     // (`heal_drain._held`) — through the paused strip's `waitsHeld`. A word this card does not know
     // reads as the generic sentence rather than as a claim.
     waiting_on: readString(field(raw, 'waiting_on')),
-    cap: readNumberOrNull(field(raw, 'cap')),
   };
 }
 
