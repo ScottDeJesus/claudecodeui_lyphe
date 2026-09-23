@@ -94,5 +94,5 @@ export function createDeepseekModule(): Router {
 
   startBalanceRecording(() => deepseekService.balance());
 
-  return createDeepseekRouter(deepseekService);
+  return createDeepseekRouter(deepseekService, usage);
 }

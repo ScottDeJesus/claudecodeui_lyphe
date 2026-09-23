@@ -114,8 +114,16 @@ where declared. Read it there, not a copy here. The client mirrors it in `src/sh
    than the client's own request ceiling, so a hung vendor degrades to the calm unknown before the
    screen gives up on the whole request.
 
-8. **Nothing is persisted and nothing is cached.** No column, no migration, no file: a reading is
-   true for the request that carried it. `checkedAt` is epoch MILLISECONDS (`Date.now()`), unlike
+8. **Every REACHABLE reading is booked in a ledger; nothing on this route is cached.** No column
+   and no migration on this side: once a reading is built, and before the route answers, it is
+   handed to `record` (`server/modules/deepseek/deepseek-usage.service.ts`), which shells to
+   `scripts/deepseek-usage balance-record` — the ledger's own validator and ONE writer of
+   `state/deepseek_usage/ledger.sqlite`. A refusal there is swallowed and never turns this route's
+   own answer into a 5xx, and the five UNKNOWN words above are never handed to it — only a reading
+   that came back `reachable: true` is. The server also takes its OWN reading, on no browser's
+   behalf: a first one 15 s after `createDeepseekModule()` runs, then one every 180 s
+   (`DEEPSEEK_BALANCE_RECORD_MS`, `deepseek.module.ts`), both timers unref'd, so the ledger's series
+   holds even while no tab is open. `checkedAt` is epoch MILLISECONDS (`Date.now()`), unlike
    `ClaudeUsage.checkedAt`, which is seconds.
 
 ## The client's one reading
