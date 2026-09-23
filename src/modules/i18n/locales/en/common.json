@@ -836,7 +836,6 @@
       "pausedHeal": "Heal of Phase {{phase}} is queued — the next drain takes it up",
       "waitsHeal": "Heal of Phase {{phase}} waits: another heal is running",
       "waitsOff": "Heal of Phase {{phase}} waits: heals are off",
-      "waitsCap": "Heal of Phase {{phase}} waits: today's heal cap ({{cap}}) is spent — raise it in the Heal tab",
       "ended": "finished {{elapsed}} ago",
       "replanning": "Replanning Phase {{phase}}",
       "curing": "Repairing Phase {{phase}} — by cure",
