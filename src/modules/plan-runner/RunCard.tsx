@@ -1,3 +1,4 @@
+import { Network } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 import { useElapsed } from '@/shared/hooks/useElapsed';
@@ -6,15 +7,21 @@ import { useRunnerVerbs } from '@/modules/plan-runner/hooks/useRunnerVerbs';
 import { PhaseRow } from '@/modules/plan-runner/PhaseRow';
 import { PipelineStrip } from '@/modules/plan-runner/PipelineStrip';
 import { RepairBanner } from '@/modules/plan-runner/RepairBanner';
+import { RunModelControl } from '@/modules/plan-runner/RunModelControl';
+import { ScheduleControl } from '@/modules/plan-runner/ScheduleControl';
 import {
   PHASE_GLYPH,
   phaseProgress,
+  phaseStateTone,
   pipelineForRun,
+  runLanes,
   runOutcomeTone,
   runOutcomeWord,
   runStateTone,
   runUnfinished,
+  scheduleClock,
   seenStages,
+  waveCompanions,
 } from '@/modules/plan-runner/runState';
 import {
   Badge,
@@ -30,6 +37,7 @@ import {
   Meter,
 } from '@/shared/ui';
 import type { RunnerRunSnapshot } from '@/shared/types';
+import { effectiveModelWord } from '@/shared/utils';
 
 /** The last path segment of the plan the run walks — `cloudcli-docspace-embed.plan.md` — or the whole string when it has no slash. */
 function planFileName(planPath: string): string {
@@ -86,12 +94,22 @@ function queuedClock(epochSeconds: number): string {
  * A QUEUED CARD SHOWS WHERE IT IS WAITING: the runner parked it before it ever walked (`start
  * --queue`, or DeepSeek's peak hours with the switch on), so the badge is QUEUED, the header's
  * clock is the time the window ends rather than an age, the strip lights nothing, and the footer's
- * one verb is Start.
+ * one verb is Start — beside it `Start at …` (`ScheduleControl`), the same press made ahead of time,
+ * and once scheduled the note leads with `starts <time>` and the button reads Cancel.
+ *
+ * A SWARMED CARD SHOWS ITS LANES: with the switch on the run walks several phases at once, and the
+ * strip and the ◆ position can name only one of them, so EVERY live lane gets a row beneath the
+ * strip naming its phase and its stage — the one the strip already follows included, since a lane
+ * row is about the lane and not about what the strip picked. The block appears once the run carries
+ * a second lane and not before (one lane says nothing the strip does not), it leads with the swarm
+ * mark and the lane count so a swarming run is told apart at a glance, and it displaces nothing: the
+ * phase list below still holds every phase of the run exactly as it did.
  *
  * `data-runner-card`, `data-run-id` and `data-run-state` are the browser harness's handles, and
  * they are on the ROOT so a probe can scope every reading to one run — the operator's own runs are
  * on screen at the same time and must never be acted on. `phase-25.mjs` asserts their ABSENCE from
- * the chat view; the Runner tab's probe is what reads them on a card.
+ * the chat view; the Runner tab's probe is what reads them on a card. `data-runner-swarm` is the
+ * same kind of handle on the lanes block's own header, where the swarm mark and its count are.
  */
 /** Byte-for-byte `hooks/plan_runner/costs.py`'s `humanize`: "94.9M", "1M", "12.5k". */
 function humanizeTokens(n: number): string {
@@ -116,7 +134,7 @@ export function RunCard({
   const queued = run.state === 'queued';
   // The resume verb's WORD travels into the hook: pressing Start and being answered under the
   // header "Resume" is the runner's own rule in this app's other name for it.
-  const { stop, resume, busy } = useRunnerVerbs(run.run_id,
+  const { stop, resume, setModel, schedule, busy } = useRunnerVerbs(run.run_id,
     queued ? t('runner.start') : t('runner.resume'));
   // One clock either way: since the run started while it moves, since it ended once it has.
   // A queued run's card holds no elapsed clock at all (`sinceEpochSeconds` `null` buys none), which
@@ -130,16 +148,25 @@ export function RunCard({
   const windowClosed = queued && run.queued_until !== null && run.queued_until * 1000 <= peaked;
   const outcomeWord = ended ? runOutcomeWord(run) : '';
   const unfinished = ended && runUnfinished(run);
+  // The operator's scheduled Start (`?? null` for a frame from an older server): it LEADS the note, and the
+  // DeepSeek-peak sentence stays beside it when both apply; "not started" is dropped — a time says more.
+  const startAt = run.start_at ?? null;
   let queuedNote = '';
   if (queued) {
     // PAST the window the note changes TENSE: the run is no longer waiting for anything, and the
     // present tense would be the one false thing on this card at the moment Start is decided.
-    if (run.queued_until === null) queuedNote = t('runner.queuedManual');
-    else if (windowClosed) queuedNote = t('runner.queuedWindowClosed', { time: queuedClock(run.queued_until) });
-    else queuedNote = t('runner.queuedUntil', { time: queuedClock(run.queued_until) });
+    let peakNote = '';
+    if (run.queued_until === null) peakNote = startAt === null ? t('runner.queuedManual') : '';
+    else if (windowClosed) peakNote = t('runner.queuedWindowClosed', { time: queuedClock(run.queued_until) });
+    else peakNote = t('runner.queuedUntil', { time: queuedClock(run.queued_until) });
+    const starts = startAt === null ? '' : t('runner.schedule.starts', { time: scheduleClock(startAt) });
+    queuedNote = [starts, peakNote].filter(Boolean).join(' · ');
   }
 
   const progress = phaseProgress(run);
+  // No lane table on a serial run — which is every run until the switch is on; `runLanes` says `[]`.
+  const lanes = runLanes(run);
+  const alongside = waveCompanions(run);   // the plan's shared waves, whatever the switch reads
   const anyBlocked = run.phases.some((phase) => phase.state === 'blocked');
   const currentPhaseId = run.position?.phase_id ?? null;
   // The PLAN's spend leads once it has run more than once: a restart opens a new run at 0, and
@@ -220,6 +247,48 @@ export function RunCard({
           seen={seenStages(run)}
         />
 
+        {/* ONE ROW PER LANE, and only once a run walks MORE THAN ONE: with a single lane the strip
+            above already says the same thing. The row speaks the card's own vocabulary — the
+            running mark, the tone `phaseStateTone` gives a running phase, the runner's stage word.
+            Keyed by its LANE ID, never by index: an index key would slide every row under a
+            finished lane onto its neighbour's mark and stage.
+            THE SWARM MARK LEADS THE BLOCK — the same `Network` glyph the settings row beside the
+            switch wears — because the row of lanes alone reads as "this run has several phases"; the
+            mark and its count are what say the run is walking them TOGETHER, at a glance, which is
+            the one fact about a run this card could not show before. */}
+        {lanes.length > 1 && (
+          <div
+            className="flex min-w-0 flex-col gap-0.5"
+            role="group"
+            aria-label={t('runner.phases')}
+            data-runner-lanes
+          >
+            <div className="flex items-center gap-1.5 px-2 text-xs text-muted-foreground" data-runner-swarm>
+              <Network className="h-3.5 w-3.5 flex-none" aria-hidden="true" />
+              <span>{t('runner.lanesAtOnce', { count: lanes.length })}</span>
+            </div>
+            {lanes.map((lane) => (
+              <div
+                key={lane.lane}
+                className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 px-2 text-xs"
+                data-runner-lane={lane.lane}
+              >
+                <span className="flex-none font-mono text-xs" aria-hidden="true">{PHASE_GLYPH.running}</span>
+                <span className="flex-none font-mono text-xs text-muted-foreground">{lane.rank}</span>
+                {/* The runner may not have composed a title yet; the id is the name of record then. */}
+                <span className="min-w-0 flex-1 basis-40 break-words text-sm leading-snug">
+                  {lane.title || lane.phase_id}
+                </span>
+                {lane.stage && (
+                  <Badge tone={phaseStateTone('running')} className="min-w-0 break-words">
+                    {lane.stage_detail ? `${lane.stage} · ${lane.stage_detail}` : lane.stage}
+                  </Badge>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+
         <Collapsible defaultOpen={defaultOpen} className="min-w-0">
           {/* The blocked mark lives OUT here, beside the count, not only on the phase row inside.
               A caller may pass `defaultOpen={false}`, and a reader of a folded card would then meet
@@ -243,13 +312,14 @@ export function RunCard({
                 // row ticks. A queued run's position points at the phase it WOULD start with.
                 isCurrent={!ended && !queued && phase.id === currentPhaseId}
                 stageSince={ended || queued ? null : (run.position?.stage_since ?? null)}
+                alongside={alongside.get(phase.id)}
               />
             ))}
           </CollapsibleContent>
         </Collapsible>
       </CardContent>
 
-      <CardFooter className="gap-2 p-3 pt-0">
+      <CardFooter className="flex-wrap gap-2 p-3 pt-0">
         {ended ? (
           <>
             {unfinished && (
@@ -266,9 +336,14 @@ export function RunCard({
         ) : queued ? (
           // Start IS `resume`: the runner's `resume` re-opens the ledger and walks the run at its
           // stage, and a queued run has no stage yet — it begins where a fresh run does.
-          <Button size="sm" disabled={busy !== null} onClick={() => void resume()} data-runner-start>
-            {t('runner.start')}
-          </Button>
+          // Beside it, the same Start made ahead of time: the watchdog presses it at the scheduled moment.
+          <>
+            <Button size="sm" disabled={busy !== null} onClick={() => void resume()} data-runner-start>
+              {t('runner.start')}
+            </Button>
+            <ScheduleControl scope="run" startAt={startAt} busy={busy !== null}
+              onSchedule={(when) => void schedule(when)} />
+          </>
         ) : run.state === 'live' ? (
           <Button variant="secondary" size="sm" disabled={busy !== null} onClick={() => void stop()}>
             {t('runner.stop')}
@@ -277,6 +352,14 @@ export function RunCard({
           <Button size="sm" disabled={busy !== null} onClick={() => void resume()}>
             {t('runner.resume')}
           </Button>
+        )}
+        {/* The run's own DeepSeek / Claude word, on every run a press could still move: a finished
+            run has no next phase for the word to reach. A record with no word — or a frame from an older server — reads DeepSeek. */}
+        {(!ended || unfinished) && (
+          <div className="ml-auto">
+            <RunModelControl scope="run" value={effectiveModelWord(run.model)} busy={busy !== null}
+              onChoose={(choice) => void setModel(choice)} />
+          </div>
         )}
       </CardFooter>
     </Card>

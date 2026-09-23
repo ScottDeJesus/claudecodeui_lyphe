@@ -23,8 +23,9 @@ import { cn } from '@/shared/utils';
  * row. The header carries a wash of the muted surface — barely a tint, 1.05:1, and dropped outright
  * under forced colours — so what actually divides it from the body is the hairline under it.
  *
- * THE FRAME KNOWS NOTHING OF RUNS, MEMORIES OR PAGES. It is handed a title, a count, an icon and a
- * body, so a further widget costs the layout one entry and this file no change at all. `flush` is
+ * THE FRAME KNOWS NOTHING OF RUNS, MEMORIES OR PAGES. It is handed a title, a count, an icon, a body,
+ * and at most one node of the widget's own for its header — so a further widget costs the layout one
+ * entry and this file no change at all. `flush` is
  * the one thing a body may ask of its own chrome: a body that IS a frame reaching its own edges — the
  * Embed widget's — gets the card's whole inside, with no padding and no scroll area, because a live
  * iframe scrolls itself and a padded one would sit in a box two insets smaller than the card.
@@ -35,11 +36,19 @@ import { cn } from '@/shared/utils';
  * THE HEADER IS THE TOGGLE, and it is also the drag handle. A press and release anywhere on it opens
  * or closes the body — the chevron is the sign of what a press will do, not the only place to press
  * it — and a press that travels drags the widget instead. The header is a real `<button>`, so Enter
- * and Space reach it and a screen reader is told `aria-expanded`. The ONE exception is the fullscreen
- * switch beside it, which is a second control and therefore a second button: a button inside a button
- * is invalid markup, so the row is a flex container holding the toggle (which takes all the width it
- * can) and that switch. A widget given no `onToggleFullscreen` draws no switch, and the row is then
- * the toggle and nothing else, exactly as it was.
+ * and Space reach it and a screen reader is told `aria-expanded`.
+ *
+ * BESIDE IT STAND EVERY OTHER CONTROL, and never inside it. The frame's fullscreen switch and the
+ * widget's own `headerAction` are each a second control and therefore a second button: a button
+ * inside a button is invalid markup, and the press meant for one of them must not also fold the card
+ * or begin a drag. So the row is a flex container — the toggle takes all the width it can, then
+ * `headerAction`, then the switch — and both of the others are siblings of the toggle rather than
+ * children of it, which is what makes the click and the drag above belong to the toggle alone. The
+ * SLOT IS GENERIC: this file is handed a node and knows nothing about what it does, which is how a
+ * widget's own act comes to live in its chrome without this file learning about runs, memories or
+ * pages. The node supplies its OWN size and margin, as the switch does, because the frame hands it
+ * the edge of a 44px row and nothing more. A widget that asks for neither draws the toggle and
+ * nothing else, exactly as it was.
  *
  * FULLSCREEN IS A CLASS CHANGE ON THIS CARD, never a move. The body of a widget may be a live iframe
  * — the Embed widget's is — and React reparenting an iframe destroys and recreates the element, so a
@@ -74,6 +83,7 @@ export function GutterWidgetFrame({
   onDragEnd,
   fullscreen = false,
   onToggleFullscreen,
+  headerAction,
   flush = false,
   children,
 }: {
@@ -89,6 +99,12 @@ export function GutterWidgetFrame({
   fullscreen?: boolean;
   /** Absent for a widget that offers no fullscreen switch; present, it draws one beside the toggle. */
   onToggleFullscreen?: () => void;
+  /**
+   * A widget's own control for this row, between the toggle and the switch. The frame draws it and
+   * styles nothing of it: the node carries its own size, margin and label, and draws nothing at all
+   * by returning `null` when it has nothing to offer.
+   */
+  headerAction?: ReactNode;
   /** True for a body that is itself a frame reaching its own edges: no padding, no scroll area. */
   flush?: boolean;
   children: ReactNode;
@@ -194,14 +210,18 @@ export function GutterWidgetFrame({
         // open floor, `rounded-none` the card's radius. `z-[45]` is the transcript card's fullscreen
         // layer — over the workspace, UNDER the dialog layer, so a dialog opened from here comes up
         // in front (see `ShapeFrame`).
-        fullscreen && 'fixed inset-0 z-[45] m-0 h-full max-h-none min-h-0 rounded-none border-0',
+        // Stated here with the transcript card's for the same reason: in the home-screen app the
+        // fullscreen header row and its switch must clear the status bar above and the notch band
+        // at the side, and this layer is the screen (see `ShapeFrame`, and src/index.css).
+        fullscreen && 'pwa-notch-safe fixed inset-0 z-[45] m-0 h-full max-h-none min-h-0 rounded-none border-0',
       )}
       // The closing clamp is a height for a card in a column; a fullscreen card is the screen.
       style={closing === null || fullscreen ? undefined : { maxHeight: `${closing}px` }}
     >
-      {/* The ROW is the header; the toggle is the whole of it but for the fullscreen switch, which has
-          to be its own control and so cannot be inside that button. With no switch to draw, the
-          toggle takes the row entire and the markup is what it always was. */}
+      {/* The ROW is the header; the toggle is the whole of it but for the controls beside it — the
+          widget's own `headerAction` and the fullscreen switch — each of which has to be its own
+          control and so cannot be inside that button. With neither to draw, the toggle takes the row
+          entire and the markup is what it always was. */}
       <div
         className={cn(
           'flex h-11 w-full shrink-0 items-center bg-muted/40',
@@ -224,7 +244,7 @@ export function GutterWidgetFrame({
         >
           <Icon className="h-4 w-4 shrink-0 text-accent-ink forced-colors:text-[CanvasText]" aria-hidden="true" />
           <span className="min-w-0 flex-1 truncate text-sm font-medium text-foreground">{title}</span>
-          {count > 0 ? <Badge as="span" tone="info">{count}</Badge> : null}
+          {count > 0 ? <Badge as="span" tone="info" data-testid="gutter-widget-count">{count}</Badge> : null}
           {/* One glyph for both states, turned rather than swapped: it says which way the next press
               will go. It is a sign, not a second control — the press belongs to the header. */}
           <ChevronDownIcon
@@ -238,6 +258,7 @@ export function GutterWidgetFrame({
             )}
           />
         </button>
+        {headerAction}
         {onToggleFullscreen ? (
           <button
             type="button"

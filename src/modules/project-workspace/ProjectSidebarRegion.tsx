@@ -26,6 +26,8 @@ function ProjectSidebarRegion({
     memoryPendingCount,
     shouldShowRunnerTab,
     runnerCount,
+    shouldShowHealTab,
+    healCount,
   } = useWorkspaceTabGates(activeTab);
 
   // Choosing a tab on a phone means choosing a pane the drawer is covering, so the drawer gets
@@ -49,6 +51,8 @@ function ProjectSidebarRegion({
       memoryPendingCount={memoryPendingCount}
       shouldShowRunnerTab={shouldShowRunnerTab}
       runnerCount={runnerCount}
+      shouldShowHealTab={shouldShowHealTab}
+      healCount={healCount}
       onTabChange={handleTabChange}
     />
   ) : null;
@@ -73,8 +77,13 @@ function ProjectSidebarRegion({
   }
 
   return (
+    // The drawer is the mobile frame's second layer, so it takes the status-bar offset with the
+    // shell (`pwa-status-clear`, src/index.css) — its panel's title row and search field are the
+    // chrome that must clear the notch. The scrim below it deliberately does not: a scrim covers
+    // the whole screen, and keeping it full-bleed is what stops a strip of the app showing above
+    // the drawer.
     <div
-      className={`fixed inset-0 z-50 flex transition-all duration-150 ease-out ${
+      className={`pwa-status-clear fixed inset-0 z-50 flex transition-all duration-150 ease-out ${
         sidebarOpen ? 'visible opacity-100' : 'invisible opacity-0'
       }`}
     >

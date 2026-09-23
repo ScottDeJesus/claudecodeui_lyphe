@@ -3,11 +3,17 @@
  *
  * A button on the phone is a bare POST to `/api/ntfy/act?t=<token>`: the ntfy
  * app holds no CloudCLI login, so the token IS the credential. It names one
- * pending permission request, the user it belongs to and the one decision the
+ * pending permission prompt, the user it belongs to and the one decision the
  * button stands for — all under an HMAC-SHA256 signature, so a token minted for
  * "Deny" can never be replayed as "Approve". A token works once, and its
- * sibling buttons die with it: consuming any token of a request deletes that
- * request.
+ * sibling buttons die with it: consuming any token of a prompt deletes that
+ * prompt.
+ *
+ * A prompt, not an attempt at one: the key is the runtime's `promptKey` (the
+ * tool use id of the ask), which a successor process re-issues the same
+ * question under. The dev server hands over to a fresh process on every save,
+ * and a parked question is re-asked by each of them — so a token minted before
+ * a handover must still find its prompt on the other side of it.
  *
  * This file is the crypto and the bookkeeping only. It knows decision SHAPES
  * (`allow`, `deny`, `revise`, `opt:<n>`) and nothing about tools or what an
@@ -22,9 +28,9 @@ import { appConfigDb } from '@/modules/database/index.js';
 // Consumed by the ntfy action decisions (which mint each shape) and the act route (which logs its kind).
 export type NtfyActionDecision = 'allow' | 'deny' | 'revise' | `opt:${number}`;
 
-// Consumed by the ntfy action decisions and the act route: one permission request a phone may still answer.
+// Consumed by the ntfy action decisions and the act route: one permission prompt a phone may still answer.
 export type PendingAction = {
-  requestId: string;
+  promptKey: string;
   userId: string;
   sessionId: string | null;
   toolName: string;
@@ -35,7 +41,7 @@ export type PendingAction = {
 /**
  * A refused token, and whether it was a GUESS — a token whose shape or signature
  * proves this instance never minted it. A refusal that carried our own signature
- * (spent, expired, its request gone) is not a guess: its holder really did hold a
+ * (spent, expired, its prompt gone) is not a guess: its holder really did hold a
  * token of ours. The act route counts guesses only, so a stranger's noise can
  * never stand between the phone and its own button.
  */
@@ -50,7 +56,7 @@ const MAX_TOKEN_CHARS = 2048;
 /** Every shape `mintActionToken` will sign; a signed payload holding anything else is refused. */
 const DECISION_PATTERN = /^(allow|deny|revise|opt:(0|[1-9][0-9]{0,2}))$/;
 
-/** Requests a phone may still answer, by request id. */
+/** Prompts a phone may still answer, by prompt key. */
 const pendingActions = new Map<string, PendingAction>();
 
 /**
@@ -109,10 +115,10 @@ function decodePayload(payloadSegment: string): TokenPayload | null {
   }
 }
 
-/** Forgets requests and spent nonces whose time is up. Runs on every register and consume. */
+/** Forgets prompts and spent nonces whose time is up. Runs on every register and consume. */
 function pruneExpired(now: number): void {
-  for (const [requestId, action] of pendingActions) {
-    if (action.expiresAt <= now) pendingActions.delete(requestId);
+  for (const [promptKey, action] of pendingActions) {
+    if (action.expiresAt <= now) pendingActions.delete(promptKey);
   }
   for (const [nonce, expiresAt] of consumedNonces) {
     if (expiresAt <= now) consumedNonces.delete(nonce);
@@ -123,12 +129,12 @@ function refuse(status: 400 | 401 | 410, reason: string, forged: boolean): Consu
   return { ok: false, status, reason, forged };
 }
 
-// Consumed by the ntfy action decisions, which register a request before minting its buttons' tokens.
+// Consumed by the ntfy action decisions, which register a prompt before minting its buttons' tokens.
 export function registerPendingAction(action: Omit<PendingAction, 'expiresAt'> & { ttlMs: number }): void {
   const now = Date.now();
   pruneExpired(now);
-  pendingActions.set(action.requestId, {
-    requestId: action.requestId,
+  pendingActions.set(action.promptKey, {
+    promptKey: action.promptKey,
     userId: action.userId,
     sessionId: action.sessionId,
     toolName: action.toolName,
@@ -138,33 +144,31 @@ export function registerPendingAction(action: Omit<PendingAction, 'expiresAt'> &
 }
 
 /**
- * Retires a request no phone may answer any more, spending none of its tokens:
+ * Retires a prompt no phone may answer any more, spending none of its tokens:
  * every button of it answers 410 from this moment on.
  *
- * Consumed by whoever learns the request was settled elsewhere — the in-app
- * answer path. That is the ONE thing that closes the window in which a
- * question's four-hour button stays live in ntfy's message cache after the
- * browser already answered, and the call has to come from the Claude runtime,
- * which reaches this module only through `modules/notifications/index.ts`: the
- * re-export there is the one line this phase's manifest does not reach.
+ * Consumed by whoever learns the prompt was settled elsewhere — the Claude
+ * runtime, the moment its approval resolves, whichever door it came through.
+ * That is the ONE thing that closes the window in which a question's four-hour
+ * button stays live in ntfy's message cache after the browser already answered.
  */
-export function forgetPendingAction(requestId: string): void {
-  pendingActions.delete(requestId);
+export function forgetPendingAction(promptKey: string): void {
+  pendingActions.delete(promptKey);
 }
 
 /**
  * Mints the token for one button: `<base64url JSON payload>.<base64url HMAC of
  * that segment>`. Consumed by the ntfy action decisions. The token expires with
- * its request, so the request must be registered first; minting for an unknown
- * request, or for a decision this file would refuse, throws.
+ * its prompt, so the prompt must be registered first; minting for an unknown
+ * prompt, or for a decision this file would refuse, throws.
  */
-export function mintActionToken(requestId: string, userId: string | number, decision: NtfyActionDecision): string {
-  const action = pendingActions.get(requestId);
-  if (!action) throw new Error('mintActionToken: the request is not pending');
+export function mintActionToken(promptKey: string, userId: string | number, decision: NtfyActionDecision): string {
+  const action = pendingActions.get(promptKey);
+  if (!action) throw new Error('mintActionToken: the prompt is not pending');
   if (!DECISION_PATTERN.test(decision)) throw new Error('mintActionToken: unknown decision shape');
 
   const payload: TokenPayload = {
-    r: requestId,
+    r: promptKey,
     u: String(userId),
     d: decision,
     e: action.expiresAt,
@@ -179,8 +183,8 @@ export function mintActionToken(requestId: string, userId: string | number, deci
  *
  * Checked in this order, so nothing an unsigned payload says is ever read:
  * shape (400) → signature over the raw payload segment (401) → payload fields
- * (400) → expiry and decision shape (401) → spent nonce, unknown request or a
- * different user (410). On success the nonce is recorded and the request
+ * (400) → expiry and decision shape (401) → spent nonce, unknown prompt or a
+ * different user (410). On success the nonce is recorded and the prompt
  * deleted BEFORE the caller acts on it, so a throw downstream can never leave
  * a reusable token behind. Each refusal also reports whether it was `forged` —
  * refused at or before the signature — which is the only kind the route counts.

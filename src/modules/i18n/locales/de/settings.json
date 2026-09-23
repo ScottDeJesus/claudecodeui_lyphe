@@ -346,12 +346,7 @@
         "gatedOn": "Wird vom Master-Schalter oben zurückgehalten — die Opt-in ist aber gespeichert AN, das Einschalten von Jev sendet also sofort Befehlsausgabe.",
         "gatedOff": "Wird vom Master-Schalter oben zurückgehalten: Schalte zuerst Jev ein, um das zu ändern."
       },
-      "unreadable": "Die Schalter konnten nicht vom Server gelesen werden, ihre Stellung ist also unbekannt — das ist nicht dasselbe wie aus. Bei jedem Fokuswechsel werden sie erneut gelesen.",
-      "stats": "Jev-Ledger: {{calls}} Aufrufe · {{tokens}} Jev-Tokens verbraucht · {{linesIn}} Zeilen gefiltert → {{linesKept}} behalten",
-      "statsEmpty": "Jev-Ledger: noch keine Aufrufe aufgezeichnet.",
-      "net": "Jev-Netto: {{chars}} Zeichen ≈ {{tokens}} Sitzungs-Tokens (+ einbehalten, − hinzugefügt)",
-      "consumer": "{{caller}}: {{chars}} Zeichen",
-      "consumerMore": "… und {{more}} weitere — `jev stats` listet jeden Verbraucher."
+      "unreadable": "Die Schalter konnten nicht vom Server gelesen werden, ihre Stellung ist also unbekannt — das ist nicht dasselbe wie aus. Bei jedem Fokuswechsel werden sie erneut gelesen."
     },
     "login": {
       "title": "Anmelden",

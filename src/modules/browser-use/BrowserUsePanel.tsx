@@ -510,8 +510,12 @@ export default function BrowserUsePanel({ isVisible, onShowSettings }: BrowserUs
         </aside>
       </div>
 
+      {/* Fullscreen in the home-screen app: the status bar covers the top of the screen, and this
+          layer's only control — Close — is in the header row at its very top. `pwa-notch-safe`
+          pads the layer by the inset and the header, in flow, rides it; the floor keeps the
+          frame's own `p-6` gutter, which this class outranks on specificity (src/index.css). */}
       {isFullscreen && selectedSession && (
-        <div className="fixed inset-0 z-50 bg-black/90 p-6">
+        <div className="pwa-notch-safe fixed inset-0 z-50 bg-black/90 p-6 [--pwa-notch-safe-pad:1.5rem]">
           <div className="flex h-full flex-col rounded-md border border-white/10 bg-black">
             <div className="flex items-center justify-between border-b border-white/10 px-4 py-3 text-sm text-white/80">
               <div className="min-w-0 truncate">{selectedSession.title || selectedSession.url || 'Browser session'}</div>

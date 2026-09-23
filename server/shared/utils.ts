@@ -28,6 +28,7 @@ import type {
   ProviderCurrentActiveModel,
   ProviderModelsDefinition,
   ProviderSkillSource,
+  RunnerModelChoice,
   SubagentActivity,
   WorkspacePathValidationResult,
 } from '@/shared/types.js';
@@ -1450,4 +1451,57 @@ export function findApplicationRoot(startDirectory: string): string {
 export function expandHome(value: string): string {
   if (value === '~') return os.homedir();
   return value.startsWith('~/') ? path.join(os.homedir(), value.slice(2)) : value;
+}
+
+// ---------------------------
+//----------------- PLAN-RUNNER MODEL WORD UTILITIES ------------
+
+/**
+ * The only words `plan-runner model` and `plan-runner arc model` accept (`hooks/plan_runner/run_model.py`), in
+ * the order the controls draw them. The routes relay a member of THIS list, never the request's own string, so
+ * the argv word a verb is spawned with is always ours.
+ */
+const RUNNER_MODEL_CHOICES: readonly RunnerModelChoice[] = ['deepseek', 'claude', 'auto'];
+
+/**
+ * A model word as one of `RUNNER_MODEL_CHOICES`, or `null` for anything else — a missing field, another casing,
+ * a word with padding. Used by the run route (`POST /runs/:id/model`) and the arc route (`POST /arcs/:arc/model`)
+ * to refuse a body with a 400 before anything is spawned, and by `runner-state.service.ts` / `arc-state.service.ts`
+ * to carry a record's stored word into the snapshot (`null` for a record born before the runner wrote its default).
+ */
+export function readRunnerModelChoice(value: unknown): RunnerModelChoice | null {
+  return RUNNER_MODEL_CHOICES.find((choice) => choice === value) ?? null;
+}
+
+/** The 400 sentence both model routes answer with when `readRunnerModelChoice` finds no word. */
+export function runnerModelChoiceError(): string {
+  return `model must be one of ${RUNNER_MODEL_CHOICES.join(', ')}`;
+}
+
+
+// ---------------------------
+//----------------- PLAN-RUNNER SCHEDULE WORD UTILITIES ------------
+
+/**
+ * A strict ISO-8601 instant WITH its zone: `2026-09-23T10:00:00Z`, `2026-09-23T03:00-07:00`, seconds and a
+ * fraction optional. The zone is required because the runner refuses a naive time (it names no clock), and the
+ * shape is anchored end to end so nothing but a timestamp can ride through to argv.
+ */
+const ISO_INSTANT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d{1,6})?)?(?:Z|[+-]\d{2}:\d{2})$/;
+
+/**
+ * A request body's schedule word, or `null` for anything the runner's `schedule` verbs would not take:
+ * `offpeak`, `none`, or an `ISO_INSTANT` that `Date.parse` also accepts. The runner stays the final judge — a
+ * time already past is ITS refusal, carried back whole. Used by `POST /runs/:id/schedule` and `POST /arcs/:arc/schedule` to refuse a body with a 400 before
+ * anything is spawned, so the argv word is always one of these shapes and never free text.
+ */
+export function readRunnerScheduleWhen(value: unknown): string | null {
+  if (value === 'offpeak' || value === 'none') return value;
+  if (typeof value !== 'string' || !ISO_INSTANT.test(value)) return null;
+  return Number.isFinite(Date.parse(value)) ? value : null;
+}
+
+/** The 400 sentence both schedule routes answer with when `readRunnerScheduleWhen` finds no word. */
+export function runnerScheduleWhenError(): string {
+  return 'when must be offpeak, none, or an ISO-8601 timestamp with a zone';
 }

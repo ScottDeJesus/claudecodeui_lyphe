@@ -7,7 +7,7 @@ import { Minus, Plus } from 'lucide-react';
  *
  * The buttons carry their own accessible names because a glyph has none, and the value between
  * them is announced through `aria-live` so a reader who cannot see it still hears what the
- * press did. One consumer today: the Appearance tab's chat text size.
+ * press did.
  */
 type StepperProps = {
   /** Already formatted for reading — "16px", "1.5x". The stepper never formats. */

@@ -8,7 +8,20 @@ import {
   writeUserPreferences,
 } from '@/shared/userSettings';
 import { useProviderAuthStatus } from '@/modules/provider-auth';
-import type { AgentProvider, ClaudePermissionsState, CodexPermissionMode, CursorPermissionsState, NotificationPreferencesState, PermissionMode, ProjectSortOrder, SettingsMainTab } from '@/shared/types';
+import {
+  autosavedStoresSignature,
+  createDefaultNotificationPreferences,
+  foldNotificationLeaves,
+  hasNotificationPreferenceLeaves,
+  noNotificationPreferenceLeaves,
+  normalizeNotificationPreferences,
+  notificationPreferenceLeaves,
+  notificationPreferencesSignature,
+  overlayNotificationLeaves,
+  toAutosavedStores,
+} from '@/modules/settings/utils/autosavedSettings';
+import type { ClaudeSettingsStorage, CodexSettingsStorage, CursorSettingsStorage, NotificationPreferenceLeaves } from '@/modules/settings/utils/autosavedSettings';
+import type { AgentProvider, ClaudePermissionsState, CodexPermissionMode, CursorPermissionsState, NotificationPreferencesState, ProjectSortOrder, SettingsMainTab } from '@/shared/types';
 
 const DEFAULT_CURSOR_PERMISSIONS: CursorPermissionsState = {
   allowedCommands: [],
@@ -24,28 +37,6 @@ type ThemeContextValue = {
 type UseSettingsControllerArgs = {
   isOpen: boolean;
   initialTab: string;
-};
-
-// `permissionMode` is the edit mode, and it is the ONE store the chat composer
-// writes to as well (useChatProviderState). It is declared on all three so a save
-// from this dialog carries the composer's choice back out instead of dropping it.
-type ClaudeSettingsStorage = {
-  allowedTools?: string[];
-  disallowedTools?: string[];
-  skipPermissions?: boolean;
-  projectSortOrder?: ProjectSortOrder;
-  permissionMode?: PermissionMode;
-};
-
-type CursorSettingsStorage = {
-  allowedCommands?: string[];
-  disallowedCommands?: string[];
-  skipPermissions?: boolean;
-  permissionMode?: PermissionMode;
-};
-
-type CodexSettingsStorage = {
-  permissionMode?: CodexPermissionMode;
 };
 
 type NotificationPreferencesResponse = {
@@ -78,6 +69,33 @@ const toCodexPermissionMode = (value: unknown): CodexPermissionMode => {
 
 const toResponseJson = async <T>(response: Response): Promise<T> => response.json() as Promise<T>;
 
+/**
+ * The notification preferences the server holds, or `null` when the read produced no usable answer —
+ * a failed request, a timeout, a refusal. The two are told apart deliberately: a null answer is the
+ * absence of a truth, and every caller here treats it as one rather than as a set of defaults, because
+ * the defaults are the client's own invention and writing them back is how a user's stored switches
+ * are lost. The server always answers with a row (it creates one on first read), so null is never an
+ * empty-account case — only a read that failed.
+ */
+async function readServerNotificationPreferences(): Promise<NotificationPreferencesState | null> {
+  try {
+    const response = await api.settings.notificationPreferences();
+    if (!response.ok) {
+      return null;
+    }
+
+    const data = await toResponseJson<NotificationPreferencesResponse>(response);
+    if (!data.success || !data.preferences) {
+      return null;
+    }
+
+    return normalizeNotificationPreferences(data.preferences);
+  } catch (error) {
+    console.error('Error reading notification preferences:', error);
+    return null;
+  }
+}
+
 const createEmptyClaudePermissions = (): ClaudePermissionsState => ({
   allowedTools: [],
   disallowedTools: [],
@@ -87,44 +105,6 @@ const createEmptyClaudePermissions = (): ClaudePermissionsState => ({
 const createEmptyCursorPermissions = (): CursorPermissionsState => ({
   ...DEFAULT_CURSOR_PERMISSIONS,
 });
-
-const createDefaultNotificationPreferences = (): NotificationPreferencesState => ({
-  channels: {
-    inApp: true,
-    webPush: false,
-    desktop: false,
-    sound: true,
-  },
-  events: {
-    actionRequired: true,
-    stop: true,
-    error: true,
-    limits: true,
-    background: false,
-  },
-});
-
-const normalizeNotificationPreferences = (
-  preferences?: Partial<NotificationPreferencesState> | null,
-): NotificationPreferencesState => {
-  const defaults = createDefaultNotificationPreferences();
-
-  return {
-    channels: {
-      inApp: preferences?.channels?.inApp ?? defaults.channels.inApp,
-      webPush: preferences?.channels?.webPush ?? defaults.channels.webPush,
-      desktop: preferences?.channels?.desktop ?? defaults.channels.desktop,
-      sound: preferences?.channels?.sound ?? defaults.channels.sound,
-    },
-    events: {
-      actionRequired: preferences?.events?.actionRequired ?? defaults.events.actionRequired,
-      stop: preferences?.events?.stop ?? defaults.events.stop,
-      error: preferences?.events?.error ?? defaults.events.error,
-      limits: preferences?.events?.limits ?? defaults.events.limits,
-      background: preferences?.events?.background ?? defaults.events.background,
-    },
-  };
-};
 
 export function useSettingsController({ isOpen, initialTab }: UseSettingsControllerArgs) {
   const { isDarkMode, toggleDarkMode } = useTheme() as ThemeContextValue;
@@ -144,6 +124,20 @@ export function useSettingsController({ isOpen, initialTab }: UseSettingsControl
   ));
   const [codexPermissionMode, setCodexPermissionMode] = useState<CodexPermissionMode>('default');
 
+  // The signature of what the server last agreed with, one per section: rewritten by every load
+  // that read that section and by every save that landed. This is the one thing an auto-save is
+  // measured against, so a change batch produced by a load is not mistaken for a change the user
+  // made. `null` is not "the defaults" — it is "never read", and it makes its section unwritable
+  // until a read produces a truth to measure from.
+  const [syncedStoresSignature, setSyncedStoresSignature] = useState<string | null>(null);
+  const [syncedNotificationsSignature, setSyncedNotificationsSignature] = useState<string | null>(null);
+
+  // The notification switches the user has moved since the server last agreed with them, as their
+  // own values. Held in a ref because it is bookkeeping rather than something the dialog renders,
+  // and kept across loads because it is the only record that a tap happened before the answer to
+  // it did — the answer must be merged under it, not written over it.
+  const editedNotificationLeavesRef = useRef<NotificationPreferenceLeaves>(noNotificationPreferenceLeaves());
+
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [loginProvider, setLoginProvider] = useState<ActiveLoginProvider>('');
   const {
@@ -152,52 +146,109 @@ export function useSettingsController({ isOpen, initialTab }: UseSettingsControl
     refreshProviderAuthStatuses,
   } = useProviderAuthStatus();
 
+  /** Reads every autosaved section and adopts it as what the dialog shows. */
   const loadSettings = useCallback(async () => {
+    // What this load adopts, kept as it is set. Each section's baseline is declared from the values
+    // this read produced rather than read back out of state, because the setters below have not
+    // rendered by the time the read is over.
+    let claudePermissionsRead = createEmptyClaudePermissions();
+    let projectSortOrderRead: ProjectSortOrder = 'name';
+    let cursorPermissionsRead = createEmptyCursorPermissions();
+    let codexPermissionModeRead: CodexPermissionMode = 'default';
+
     try {
       const savedClaudeSettings = readUserPreference<ClaudeSettingsStorage>('claudePermissions', {});
-      setClaudePermissions({
+      claudePermissionsRead = {
         allowedTools: savedClaudeSettings.allowedTools || [],
         disallowedTools: savedClaudeSettings.disallowedTools || [],
         skipPermissions: Boolean(savedClaudeSettings.skipPermissions),
         permissionMode: savedClaudeSettings.permissionMode,
-      });
-      setProjectSortOrder(readUserPreference<ProjectSortOrder>('projectSortOrder', 'name') === 'date' ? 'date' : 'name');
+      };
+      setClaudePermissions(claudePermissionsRead);
+
+      projectSortOrderRead = readUserPreference<ProjectSortOrder>('projectSortOrder', 'name') === 'date' ? 'date' : 'name';
+      setProjectSortOrder(projectSortOrderRead);
 
       const savedCursorSettings = readUserPreference<CursorSettingsStorage>('cursorPermissions', {});
-      setCursorPermissions({
+      cursorPermissionsRead = {
         allowedCommands: savedCursorSettings.allowedCommands || [],
         disallowedCommands: savedCursorSettings.disallowedCommands || [],
         skipPermissions: Boolean(savedCursorSettings.skipPermissions),
         permissionMode: savedCursorSettings.permissionMode,
-      });
+      };
+      setCursorPermissions(cursorPermissionsRead);
 
       const savedCodexSettings = readUserPreference<CodexSettingsStorage>('codexPermissions', {});
-      setCodexPermissionMode(toCodexPermissionMode(savedCodexSettings.permissionMode));
-
-      try {
-        const notificationResponse = await api.settings.notificationPreferences();
-        if (notificationResponse.ok) {
-          const notificationData = await toResponseJson<NotificationPreferencesResponse>(notificationResponse);
-          if (notificationData.success && notificationData.preferences) {
-            setNotificationPreferences(normalizeNotificationPreferences(notificationData.preferences));
-          } else {
-            setNotificationPreferences(createDefaultNotificationPreferences());
-          }
-        } else {
-          setNotificationPreferences(createDefaultNotificationPreferences());
-        }
-      } catch {
-        setNotificationPreferences(createDefaultNotificationPreferences());
-      }
-
+      codexPermissionModeRead = toCodexPermissionMode(savedCodexSettings.permissionMode);
+      setCodexPermissionMode(codexPermissionModeRead);
     } catch (error) {
       console.error('Error loading settings:', error);
-      setClaudePermissions(createEmptyClaudePermissions());
-      setCursorPermissions(createEmptyCursorPermissions());
-      setNotificationPreferences(createDefaultNotificationPreferences());
-      setCodexPermissionMode('default');
-      setProjectSortOrder('name');
+      claudePermissionsRead = createEmptyClaudePermissions();
+      projectSortOrderRead = 'name';
+      cursorPermissionsRead = createEmptyCursorPermissions();
+      codexPermissionModeRead = 'default';
+      setClaudePermissions(claudePermissionsRead);
+      setProjectSortOrder(projectSortOrderRead);
+      setCursorPermissions(cursorPermissionsRead);
+      setCodexPermissionMode(codexPermissionModeRead);
     }
+
+    // The store half is in hand before this line, so its baseline is declared here, in the same
+    // commit as the values themselves. That is what lets a store edit made while the notification
+    // read below is still in flight be a difference from a truth rather than a difference from a
+    // placeholder — and it is why the flush that ships such an edit has something to compare with.
+    setSyncedStoresSignature(autosavedStoresSignature(toAutosavedStores({
+      claudePermissions: claudePermissionsRead,
+      projectSortOrder: projectSortOrderRead,
+      cursorPermissions: cursorPermissionsRead,
+      codexPermissions: { permissionMode: codexPermissionModeRead },
+    })));
+
+    const serverPreferences = await readServerNotificationPreferences();
+    if (serverPreferences === null) {
+      // No answer is not an answer. The stored preferences are unknown, so the dialog keeps showing
+      // what it held and its baseline stays null: nothing measured against a value nobody read may
+      // be written. The one exception is a switch the user moved themselves, which the save takes
+      // with it by reading the truth first — see `saveSettings`.
+      return;
+    }
+
+    // The user's own taps, if any, are laid OVER the server's answer rather than being overwritten
+    // by it, because the answer is older news than the tap. Every switch the user did not touch
+    // keeps the value the server holds, which is the whole difference between adopting an answer
+    // and answering with the placeholders that answer replaced.
+    const merged = overlayNotificationLeaves(serverPreferences, editedNotificationLeavesRef.current);
+    editedNotificationLeavesRef.current = notificationPreferenceLeaves(serverPreferences, merged);
+    setNotificationPreferences(merged);
+
+    // The baseline is the server's answer, not the merge: a tap that agrees with the server settles
+    // as no change at all, and one that does not is still an edit waiting to be written.
+    setSyncedNotificationsSignature(notificationPreferencesSignature(serverPreferences));
+  }, []);
+
+  /**
+   * The setter the notifications tab and the push handlers are given, which records what the user
+   * actually moved before handing the value on.
+   *
+   * The difference is taken against `previous` — React's own answer to "what was on screen when this
+   * control was moved" — because every caller builds its new value by spreading the state it was
+   * given. That is right for the screen and wrong for the wire: during hydration the state being
+   * spread is a placeholder, so recording the whole value would store every placeholder along with
+   * the one switch the user touched.
+   */
+  const updateNotificationPreferences = useCallback((value: NotificationPreferencesState) => {
+    setNotificationPreferences((previous) => {
+      // Recorded inside the updater because `previous` is the only one of the two that is not a
+      // guess, and folded rather than replaced because a second tap on the same switch means the
+      // later value, not a second entry. A re-run (React calls an updater twice in development)
+      // writes the same leaves twice, which is the same leaves.
+      editedNotificationLeavesRef.current = foldNotificationLeaves(
+        editedNotificationLeavesRef.current,
+        notificationPreferenceLeaves(previous, value),
+      );
+
+      return value;
+    });
   }, []);
 
   const openLoginForProvider = useCallback((provider: AgentProvider) => {
@@ -222,38 +273,83 @@ export function useSettingsController({ isOpen, initialTab }: UseSettingsControl
   }, [checkProviderAuthStatus, loginProvider]);
 
   const saveSettings = useCallback(async () => {
+    const stores = toAutosavedStores({
+      claudePermissions,
+      projectSortOrder,
+      cursorPermissions,
+      codexPermissions: { permissionMode: codexPermissionMode },
+    });
+    const storesSignature = autosavedStoresSignature(stores);
+    // A null baseline is "never read", so nothing here can be called a change — writing is what a
+    // section does once somebody has read it, or, for a switch the user moved themselves, once the
+    // read below has produced the truth to lay that switch over.
+    const storesChanged = syncedStoresSignature !== null && syncedStoresSignature !== storesSignature;
+
+    const leaves = editedNotificationLeavesRef.current;
+    const storedPreferences = overlayNotificationLeaves(notificationPreferences, leaves);
+    const notificationsChanged = syncedNotificationsSignature === null
+      ? hasNotificationPreferenceLeaves(leaves)
+      : syncedNotificationsSignature !== notificationPreferencesSignature(storedPreferences);
+
+    // The debounce cannot tell a tap from a load: opening the dialog fetches the notification
+    // preferences, and that answer arrives here as a state change like any other, half a second
+    // before this runs. Writing then put the payload the dialog had just read back on the wire and
+    // announced a save nobody made — on every open, of every session.
+    //
+    // So each section is judged against what the server last agreed with, and not against what the
+    // screen happens to hold: nothing has changed if the values are the ones just loaded, and
+    // anything else is a real edit that goes out exactly as before. What a section whose read failed
+    // never gets is a change it did not see the user make — that is the difference between an
+    // unknown value and a default one, and it is what keeps an unrelated edit from writing the
+    // notification preferences away.
+    if (!storesChanged && !notificationsChanged) {
+      return;
+    }
+
     setSaveStatus(null);
 
     try {
-      // One call so the whole dialog's state reaches the server as a single
-      // merge-patch rather than four racing requests.
-      // `permissionMode` is spread in only when it has a value: this dialog
-      // auto-saves the moment it opens, and writing the key as undefined would
-      // erase an edit mode the composer had just set.
-      writeUserPreferences({
-        claudePermissions: {
-          allowedTools: claudePermissions.allowedTools,
-          disallowedTools: claudePermissions.disallowedTools,
-          skipPermissions: claudePermissions.skipPermissions,
-          ...(claudePermissions.permissionMode ? { permissionMode: claudePermissions.permissionMode } : {}),
-        },
-        projectSortOrder,
-        cursorPermissions: {
-          allowedCommands: cursorPermissions.allowedCommands,
-          disallowedCommands: cursorPermissions.disallowedCommands,
-          skipPermissions: cursorPermissions.skipPermissions,
-          ...(cursorPermissions.permissionMode ? { permissionMode: cursorPermissions.permissionMode } : {}),
-        },
-        codexPermissions: {
-          permissionMode: codexPermissionMode,
-        },
-      });
+      if (storesChanged) {
+        // One call so the store half of the dialog reaches the server as a single
+        // merge-patch rather than four racing requests.
+        // `permissionMode` is spread in only when it has a value: writing the key
+        // as undefined would erase an edit mode the composer had just set.
+        writeUserPreferences({
+          claudePermissions: stores.claudePermissions,
+          projectSortOrder: stores.projectSortOrder,
+          cursorPermissions: stores.cursorPermissions,
+          codexPermissions: stores.codexPermissions,
+        });
+        setSyncedStoresSignature(storesSignature);
+      }
 
-      const notificationResponse = await api.settings.saveNotificationPreferences(
-        notificationPreferences,
-      );
-      if (!notificationResponse.ok) {
-        throw new Error('Failed to save notification preferences');
+      if (notificationsChanged) {
+        // With nothing read yet — a load whose read failed — the payload cannot be the one on
+        // screen: its untouched switches are placeholders, and writing those would reset every
+        // preference the user never saw. So the truth is read now and the user's own taps are laid
+        // over it, which is the same merge a successful load does, one step later. Paid for only
+        // in the case where the answer is genuinely missing.
+        let payload = storedPreferences;
+        if (syncedNotificationsSignature === null) {
+          const serverPreferences = await readServerNotificationPreferences();
+          if (serverPreferences === null) {
+            throw new Error('Notification preferences are unknown and could not be read');
+          }
+          payload = overlayNotificationLeaves(serverPreferences, leaves);
+        }
+
+        const notificationResponse = await api.settings.saveNotificationPreferences(payload);
+        if (!notificationResponse.ok) {
+          throw new Error('Failed to save notification preferences');
+        }
+
+        // What the server now holds is the merge, so the dialog shows it and both the leaves and the
+        // baseline move to it together — the next change is measured from the value that landed.
+        editedNotificationLeavesRef.current = noNotificationPreferenceLeaves();
+        if (syncedNotificationsSignature === null) {
+          setNotificationPreferences(payload);
+        }
+        setSyncedNotificationsSignature(notificationPreferencesSignature(payload));
       }
 
       setSaveStatus('success');
@@ -261,22 +357,21 @@ export function useSettingsController({ isOpen, initialTab }: UseSettingsControl
       console.error('Error saving settings:', error);
       setSaveStatus('error');
     }
-    // Field-by-field, not the whole state object — but then EVERY field this
-    // function writes has to be listed, or the auto-save effect keyed on
-    // `[saveSettings]` never re-runs for the one that was missed and the control
-    // that changed it is silently inert.
+    // Whole stores, not the fields inside them: the payload this writes is built by
+    // `toAutosavedStores`, so naming fields here would be a second, silently incomplete copy of
+    // that function's own list — and a field left off it is a control whose change never re-runs
+    // the effect keyed on `[saveSettings]`, which is to say a control that does nothing. The
+    // stores themselves are replaced wholesale and never mutated, so an edit is exactly an
+    // identity change here. The two baselines are listed for the same reason: a read that learns
+    // the truth must reach that effect, or the edit measured against it is never written.
   }, [
-    claudePermissions.allowedTools,
-    claudePermissions.disallowedTools,
-    claudePermissions.permissionMode,
-    claudePermissions.skipPermissions,
+    claudePermissions,
     codexPermissionMode,
-    cursorPermissions.allowedCommands,
-    cursorPermissions.disallowedCommands,
-    cursorPermissions.permissionMode,
-    cursorPermissions.skipPermissions,
+    cursorPermissions,
     notificationPreferences,
     projectSortOrder,
+    syncedNotificationsSignature,
+    syncedStoresSignature,
   ]);
 
   useEffect(() => {
@@ -295,7 +390,6 @@ export function useSettingsController({ isOpen, initialTab }: UseSettingsControl
 
   // Auto-save permissions and sort order with debounce
   const autoSaveTimerRef = useRef<number | null>(null);
-  const isInitialLoadRef = useRef(true);
 
   // Read by the unmount flush below, which must call the NEWEST saver rather than
   // the one that happened to be current when the dialog opened.
@@ -304,13 +398,13 @@ export function useSettingsController({ isOpen, initialTab }: UseSettingsControl
     saveSettingsRef.current = saveSettings;
   }, [saveSettings]);
 
+  // Armed on every change, a load's own answer included, and left to the save to decide what is
+  // real: an answer from the server changes nothing a signature can see, so the save it wakes
+  // returns without writing. Holding the timer back until the dialog was hydrated is what turned
+  // the flush below into a trap — the flush reads this ref to decide whether anything is pending,
+  // and a ref that was never armed says "nothing", so an edit made during a slow load died with
+  // the close that followed it.
   useEffect(() => {
-    // Skip auto-save on initial load (settings are being loaded from the store)
-    if (isInitialLoadRef.current) {
-      isInitialLoadRef.current = false;
-      return;
-    }
-
     if (autoSaveTimerRef.current !== null) {
       window.clearTimeout(autoSaveTimerRef.current);
     }
@@ -354,13 +448,6 @@ export function useSettingsController({ isOpen, initialTab }: UseSettingsControl
     return () => window.clearTimeout(timer);
   }, [saveStatus]);
 
-  // Reset initial load flag when settings dialog opens
-  useEffect(() => {
-    if (isOpen) {
-      isInitialLoadRef.current = true;
-    }
-  }, [isOpen]);
-
   useEffect(() => () => {
     if (closeTimerRef.current !== null) {
       window.clearTimeout(closeTimerRef.current);
@@ -385,7 +472,7 @@ export function useSettingsController({ isOpen, initialTab }: UseSettingsControl
     cursorPermissions,
     setCursorPermissions,
     notificationPreferences,
-    setNotificationPreferences,
+    setNotificationPreferences: updateNotificationPreferences,
     codexPermissionMode,
     setCodexPermissionMode,
     providerAuthStatus,

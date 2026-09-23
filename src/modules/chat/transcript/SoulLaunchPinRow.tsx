@@ -17,9 +17,9 @@ import { formatSubagentFinishTime } from '@/modules/chat/utils/subagentSummary';
  * It is a SECOND KIND OF ROW IN THE SAME STRIP, and it is drawn to be indistinguishable in shape
  * from the agent rows next to it — same centred mark, same two lines, the same place for the status
  * and the figures — because the reader is looking at one thing: what is working for them right
- * now. Its mark is the icon of the provider actually paying for it (the DeepSeek whale, or
- * Claude's when the switch is off or a refused key sent the soul back); an `Agent`-tool subagent
- * carries its own provider's logo the same way.
+ * now. Its mark is that of the provider actually paying for it (the DeepSeek whale, or Claude's
+ * mascot when the switch is off or a refused key sent the soul back); an `Agent`-tool subagent
+ * carries its own provider's mark the same way.
  *
  * WHAT IT SAYS AND WHY IT CAN SAY IT. A launcher soul is a detached child, so nothing streams into
  * this transcript: its status, its elapsed and its cost are read off its launch directory by the
@@ -81,7 +81,8 @@ export const SoulLaunchPinRow = memo(({ launch, onDismiss, onOpen, openLabel }: 
       // The mark sits beside BOTH lines, centred on the row's height; the lines stack to its right.
       className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1 text-xs text-muted-foreground"
     >
-      <LLMProviderLogo provider={launch.provider} className="h-4 w-4 flex-shrink-0" />
+      {/* The mascot for a soul that ran on Claude, as every other row in this strip wears it. */}
+      <LLMProviderLogo provider={launch.provider} claudeMark="mascot" className="h-4 w-4 flex-shrink-0" />
       <div className="flex min-w-0 flex-1 flex-col gap-0.5">
         <div className="flex items-center gap-1.5">
           <span className="flex-shrink-0 font-medium text-foreground">{soulName(launch.agent)}</span>

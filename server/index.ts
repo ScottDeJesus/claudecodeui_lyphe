@@ -49,6 +49,7 @@ import {
     initializeScheduledMessageDispatcher,
     scheduledMessagesRoutes,
 } from './modules/scheduled-messages/index.js';
+import { createSchedulesModule } from './modules/schedules/index.js';
 import browserUseRoutes from './modules/browser-use/browser-use.routes.js';
 import { assetsRoutes } from './modules/assets/index.js';
 import { createAccountsModule } from './modules/accounts/index.js';
@@ -58,6 +59,8 @@ import { createKanbanModule, plansHeldByLease } from './modules/kanban/index.js'
 import { createKanbanMetisModule, kanbanMetisSecretGuard } from './modules/kanban-metis/index.js';
 import { createMemoryIntakeModule, listMemoryCandidates } from './modules/memory-intake/index.js';
 import { createDispatchSoulsModule } from './modules/dispatch-souls/index.js';
+import { createHealModule } from './modules/heal/index.js';
+import { createJevModule } from './modules/jev/index.js';
 import { createPlanRunnerModule, planCostFor } from './modules/plan-runner/index.js';
 import { createUniverseModule } from './modules/universe/index.js';
 import { fileTreeRoutes } from './modules/file-tree/index.js';
@@ -262,7 +265,18 @@ app.use('/api/deepseek', authenticateToken, createDeepseekModule());
 const planRunner = createPlanRunnerModule({ heldPlanPaths: plansHeldByLease });
 app.use('/api/plan-runner', authenticateToken, planRunner.router);
 
-// The launcher souls a `/dispatch` started — the poll behind the `soul_launch_state` frame that
+// The heal reflex's ledger, the switches that steer it, and the door to a heal on demand
+// (protected — this is the operator's own friction record, and this app is reachable from a LAN).
+// Built inline, unlike the two above: the lane holds no timer and no socket, so there is nothing
+// for `listen` or a shutdown to start or stop.
+const heal = createHealModule();
+app.use('/api/heal', authenticateToken, heal.router);
+
+// Jev's spend, consumers and live feed — protected, the operator's usage record
+const jev = createJevModule();
+app.use('/api/jev', authenticateToken, jev.router);
+
+// The launcher souls a session started by hand — the poll behind the `soul_launch_state` frame that
 // pins each one in its own chat's rows (protected). Built out here for the same
 // reason `planRunner` is: its poll starts after `listen` and stops on shutdown.
 const dispatchSouls = createDispatchSoulsModule();
@@ -292,6 +306,11 @@ app.use('/api/browser-use', authenticateToken, browserUseRoutes);
 // Unified provider MCP routes (protected)
 app.use('/api/providers', authenticateToken, providerRoutes);
 app.use('/api/scheduled-messages', authenticateToken, scheduledMessagesRoutes);
+
+// The cron registry the Schedules tab shows (protected): the sync's own table, plus the asking
+// user's still-pending scheduled prompts read live. The guard rides THIS mount alone — never a
+// prefix over `/api`, which would gate the intentionally public mounts declared below it.
+app.use('/api/schedules', authenticateToken, createSchedulesModule());
 
 // Agent API Routes (uses API key authentication)
 app.use('/api/agent', agentRoutes);
@@ -437,7 +456,9 @@ async function soleServerDuties() {
     soleServerDutiesRan = true;
     try { // D-11: a browser that subscribes before this ran reads a live keepalive session as idle
         const keepalive = await readoptKeepaliveSessions({ runtime: providerRuntimeService, supervised });
-        console.log(`[keepalive] re-adopted ${keepalive.readopted} host(s), swept ${keepalive.swept}`);
+        // "swept" here is DEAD HOST FILES, not the version sweep: an idle host retired by the boot's
+        // version test logs its own `retiring idle host …` line and is not counted in this one.
+        console.log(`[keepalive] re-adopted ${keepalive.readopted} host(s), swept ${keepalive.swept} dead host file(s)`);
     } catch (error) { console.error('[keepalive] re-adopt failed (continuing):', getErrorMessage(error)); }
     // Sends anything that came due while the server was not running, then keeps polling.
     initializeScheduledMessageDispatcher(providerRuntimeService);

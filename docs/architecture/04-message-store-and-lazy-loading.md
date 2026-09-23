@@ -184,8 +184,10 @@ and only the last one appends. Stage one handles and returns on the control fram
 `loading_progress`) and on `protocol_error`, which appends a synthetic `error` row of its own.
 Stage two handles and returns on `stream_delta` and `stream_end`; `stream_delta` also appends
 the raw frame, but *only* for a session that is not the one being viewed, so switching to it
-later shows the partial reply. Stage three appends everything left except `complete`, `status`,
-`permission_request`, `permission_resolved` and `permission_cancelled`. Separately,
+later shows the partial reply. Stage three appends everything left that carries a numeric `seq` — the run's own stamp — except
+`complete`, `status`, `permission_request`, `permission_resolved` and `permission_cancelled`. A
+frame with no `seq` belongs to no run and is dropped here instead, which is what keeps a
+box-wide lane frame that reaches this far out of the transcript. Separately,
 `useChatSessionState` appends the optimistic user echo from `addMessage` and from the
 `pendingUserMessage` flush.
 

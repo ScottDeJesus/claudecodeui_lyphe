@@ -166,6 +166,7 @@
     "iconDefault": "デフォルト",
     "iconOption": "{{name}} アイコン",
     "unread": "完了、未読",
-    "dragHandle": "ドラッグして並べ替え"
+    "dragHandle": "ドラッグして並べ替え",
+    "subagentsRunning": "サブエージェント実行中"
   }
 }

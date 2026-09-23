@@ -32,6 +32,7 @@ import {
 import { resolveClaudeCodeExecutablePath } from '@/shared/claude-cli-path.js';
 import {
   createNotificationEvent,
+  forgetPendingAction,
   notifyBackgroundWorkCompleted,
   notifyRunFailed,
   notifyRunStopped,
@@ -50,6 +51,7 @@ import {
   resolveIdleCloseMs
 } from './chat-process.js';
 import { createSignalState, detectRuntimeSignals } from './claude-runtime-signals.js';
+import { installedCliVersionForLaunch } from './installed-cli-version.js';
 import { SURFACE_ENV, SURFACE_PROMPT_APPEND } from './surface-signal.js';
 
 const activeSessions = new Map();
@@ -73,9 +75,11 @@ const TOOL_APPROVAL_TIMEOUT_MS = parseInt(process.env.CLAUDE_TOOL_APPROVAL_TIMEO
 // Passed to the spawned CLI as CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS: how long, AFTER its stdin
 // has ended, the CLI waits for still-running background tasks before killing them and exiting.
 // On this path stdin ends only once nothing is running (the idle closer asks first — see
-// chat-process.ts), on an abort (whose interrupt has already taken the tasks down), or on a
-// retirement for a launch-bound setting. So this ceiling is the backstop for a task that
-// started in the gap between that check and the EOF, never the normal way a process ends.
+// chat-process.ts), on a Stop with nothing left to hear from, on a Stop whose interrupt went
+// unanswered, or on a retirement for a launch-bound setting. So this ceiling is the backstop for a
+// task that started in the gap between that check and the EOF, never the normal way a process
+// ends — and never on the Stop that keeps its process alive for the tasks it still has running
+// (abortClaudeSDKSession).
 const BG_WAIT_CEILING_MS = 30 * 60 * 1000;
 // How long after a `task_notification` a zero-turn result can still be the
 // CLI's own reconciliation of an orphaned background task (see queryClaudeSDK).
@@ -130,6 +134,31 @@ function createRequestId() {
     return crypto.randomUUID();
   }
   return crypto.randomBytes(16).toString('hex');
+}
+
+/**
+ * The identity of ONE ask — the same in the process that raised it and in the successor that
+ * re-issues it after a handover.
+ *
+ * The request id beside it is minted per ATTEMPT, and that is the whole bug: a re-adopted host
+ * replays the CLI's parked `can_use_tool` request, so the successor asks again on a fresh id, and
+ * everything keyed on that id — the notification's dedupe key, the phone's answer buttons — reads
+ * one question as two. The tool use id is the CLI's own name for the call and survives the replay
+ * untouched (measured 2026-09-22: 12 phone pushes for one question, one per dev-server handover).
+ *
+ * Falls back to the ask's own content when the SDK hands no tool use id over: an ask nothing
+ * stamped can only be told apart by what it asks.
+ */
+function promptKeyFor(toolUseId, sessionId, toolName, input) {
+  if (typeof toolUseId === 'string' && toolUseId) {
+    return `toolu:${toolUseId}`;
+  }
+  const digest = crypto
+    .createHash('sha256')
+    .update(JSON.stringify([sessionId ?? null, toolName, input ?? null]))
+    .digest('hex')
+    .slice(0, 32);
+  return `ask:${digest}`;
 }
 
 function waitForToolApproval(requestId, options = {}) {
@@ -188,14 +217,31 @@ function waitForToolApproval(requestId, options = {}) {
   });
 }
 
+/**
+ * The approval waiting on one PROMPT, whichever attempt raised it.
+ *
+ * A tap on the phone names the prompt, never this process's attempt at it: the push was minted by
+ * a predecessor, whose request id this process has never heard of — but whose question it is
+ * asking again right now under that same tool use id. Request ids and prompt keys cannot collide:
+ * one is a bare uuid, the other carries a `toolu:`/`ask:` prefix.
+ */
+function findByPromptKey(promptKey) {
+  for (const resolver of pendingToolApprovals.values()) {
+    if (resolver._promptKey === promptKey) {
+      return resolver;
+    }
+  }
+  return undefined;
+}
+
 function resolveToolApproval(requestId, decision) {
-  const resolver = pendingToolApprovals.get(requestId);
+  const resolver = pendingToolApprovals.get(requestId) ?? findByPromptKey(requestId);
   if (resolver) {
     resolver(decision);
     return;
   }
-  // A request this process never held: answered already, timed out, or issued by a predecessor
-  // that was handed over mid-prompt (the successor re-issues it under a new id).
+  // A request this process never held: answered already, timed out, or a prompt raised by a
+  // predecessor that is no longer pending anywhere (its successor never re-issued it).
   console.warn(`[permission] decision for unknown request ${requestId}: no pending approval in this process`);
 }
 
@@ -342,7 +388,16 @@ function addSession(sessionId, queryInstance, process = null) {
   );
   if (superseding) {
     if (existing.process) {
-      // Interrupt first over the open stdin, then EOF (see queryClaudeSDK).
+      // Interrupt first over the open stdin, then EOF (see queryClaudeSDK) — and that EOF is what
+      // ends any background work this process still has running, with its CLI. A process a Stop
+      // kept alive for exactly that work (abortClaudeSDKSession) is retired here the moment the
+      // next message changes a launch argument, and the loss is otherwise silent: the completion
+      // that was going to land in this chat simply never arrives.
+      if (existing.process.hasBackgroundWork === true) {
+        console.warn(
+          `[Claude SDK] Session ${sessionId} is respawning for a changed launch argument while background work is still running; the retirement that follows ends that work`
+        );
+      }
       void existing.process.retire();
     } else {
       supersededInstances.add(existing.instance);
@@ -765,7 +820,13 @@ async function resolveSdkOptions(options, context) {
 async function joinProcess(live, command, options, ws, context) {
   const { sessionId } = options;
   const resolved = await resolveSdkOptions(options, context);
-  const next = launchProfileOf(resolved.sdkOptions, resolved.mcpUnreadable);
+  // Asked ONLY when the running process has announced a version of its own: with nothing to
+  // compare it against, this would spend a probe (and on a cold cache a subprocess) on the send
+  // path for an answer nothing reads.
+  const installedCliVersion = typeof live.profile?.cliVersion === 'string'
+    ? await installedCliVersionForLaunch()
+    : null;
+  const next = launchProfileOf(resolved.sdkOptions, resolved.mcpUnreadable, false, installedCliVersion);
   const plan = planLiveChanges(live.profile, next, { resumeFromScratch: options.resumeFromScratch === true });
   if (plan.respawn) {
     console.log(`[Claude SDK] Replacing the process for session ${sessionId}: ${plan.respawn}`);
@@ -851,6 +912,11 @@ async function spawnProcess(command, options, initialWs, context) {
   // to tell that result from one a background follow-up turn produces in the same stream. A
   // re-adopted turn has no uuid on record and takes the next result, as it always did.
   let pendingTurn = null;
+  // Set when a Stop interrupts this process's turn but keeps the process for the background work
+  // still in flight (abortClaudeSDKSession). The aborted turn's client-facing events stay
+  // suppressed through its own `result`; this flag is what ends that suppression — see the result
+  // branch for why a leaked suppression breaks the next message to join this process.
+  let stoppedTurnPending = false;
   const openTurn = (uuid) => {
     pendingTurn?.settle();
     let settle;
@@ -923,7 +989,24 @@ async function spawnProcess(command, options, initialWs, context) {
   let closing = false;
   let profile = null;
 
-  const isBusy = () => pendingTurn !== null || turnInFlight || heldForBackgroundWork() || backgroundTasks.size > 0;
+  // The CLI's version, as THAT process's own init reported it — the one source, read twice: the
+  // run registry's stamp (what the report and the client's banner compare against the installed
+  // binary) and the live profile (what decides, at the next message, whether this process is
+  // older than the binary on disk). Never the installed binary's version: that is a different
+  // process's fact, and it arrives here only through a re-adoption's own record.
+  const noteReportedCliVersion = (version) => {
+    if (typeof ws.setCliVersion === 'function') ws.setCliVersion(version);
+    profile.cliVersion = version;
+  };
+
+  // Work this process started that outlives the turn that started it: a backgrounded subagent or
+  // Bash job, a watcher, a scheduled wake-up. Two witnesses, because one alone misses: `deferredTools`
+  // is this loop's own ledger of the calls that leave work behind, and `backgroundTasks` is the CLI's
+  // level signal for the same tasks (`task_started`/`task_notification` bookends — the set the CLI
+  // fills for a background Agent and a background Bash alike, measured 2026-09-22). Asked by the idle
+  // closer, and by a Stop deciding whether this process still has an answer coming.
+  const hasBackgroundWork = () => heldForBackgroundWork() || backgroundTasks.size > 0;
+  const isBusy = () => pendingTurn !== null || turnInFlight || hasBackgroundWork();
   const processAbort = new AbortController();
 
   // The handle later messages join through, registered under the session key.
@@ -950,10 +1033,27 @@ async function spawnProcess(command, options, initialWs, context) {
       idle?.cancel();
       queue?.end();
     },
-    // Interrupt FIRST, over the still-open stdin, so the CLI stops what it is doing —
-    // background tasks included, which the SDK's interrupt takes down when no per-task stop
-    // is declared — then EOF. Silent on the wire: the run that retired it owns every
-    // client-facing event from here.
+    /**
+     * True while work this process started is still running past the end of its turn. Asked by a
+     * Stop, to decide whether this process still has an answer coming (abortClaudeSDKSession).
+     */
+    get hasBackgroundWork() {
+      return hasBackgroundWork();
+    },
+    /**
+     * A Stop ended this process's turn but left the process running for the background work still
+     * in flight. The turn is already over for the client — the abort handler sent its `complete` —
+     * so it is over here too: settling it keeps `isBusy` honest, and the idle closer then ends the
+     * process once the background work does, exactly as after a normal turn.
+     */
+    stopTurn() {
+      stoppedTurnPending = true;
+      settleTurn();
+    },
+    // Interrupt FIRST, over the still-open stdin, so the CLI stops what it is doing, then EOF.
+    // The interrupt ends the TURN and nothing else — it is the EOF that winds the process down,
+    // and a background task still running at that EOF dies with the CLI. Silent on the wire: the
+    // run that retired it owns every client-facing event from here.
     async retire() {
       if (closing) return;
       closing = true;
@@ -1001,8 +1101,12 @@ async function spawnProcess(command, options, initialWs, context) {
         profile.disallowedTools = [...changes.tools.disallowed];
       }
       if (profile.unknown) {
-        // The first message after re-adoption IS the profile from here on.
-        Object.assign(profile, next, { unknown: false });
+        // The first message after re-adoption IS the profile from here on — every field but
+        // its CLI version: `next` carries the INSTALLED binary's version, and a process's own
+        // version is only ever the one its init announced. Adopting that one would mark an
+        // unread host current for as long as it lives.
+        const announced = profile.cliVersion;
+        Object.assign(profile, next, { unknown: false, cliVersion: announced });
         sdkOptions.allowedTools = [...next.allowedTools];
         sdkOptions.disallowedTools = [...next.disallowedTools];
       }
@@ -1060,10 +1164,18 @@ async function spawnProcess(command, options, initialWs, context) {
       // close the transport and kill the CLI (SIGTERM, then SIGKILL) — through the host when there is one.
       sdkOptions.abortController = processAbort;
       // A re-adopted process answers to the profile its host recorded at spawn; only a host
-      // from before that field leaves it unknown.
+      // from before that field leaves it unknown. Its CLI version is the one that process
+      // announced at init, read out of the host's own record of it — never the installed
+      // binary's, which is a different process and may be a newer build.
+      const reportedCliVersion = reattach ? (reattach.cliVersion ?? null) : null;
       profile = reattach
-        ? (reattach.profile ? { ...reattach.profile, unknown: false } : launchProfileOf(sdkOptions, resolved.mcpUnreadable, true))
+        ? (reattach.profile
+            ? { ...reattach.profile, unknown: false, cliVersion: reportedCliVersion }
+            : launchProfileOf(sdkOptions, resolved.mcpUnreadable, true, reportedCliVersion))
         : launchProfileOf(sdkOptions, resolved.mcpUnreadable);
+      // Known the moment the run is adopted, so the report (and the banner beside the
+      // transcript) never reads a live host as "not heard yet" until its next turn.
+      if (reportedCliVersion && typeof ws.setCliVersion === 'function') ws.setCliVersion(reportedCliVersion);
       keepalive = armKeepaliveSpawn(sdkOptions, {
         appSessionId: sessionId ?? null,
         userId: ws?.userId ?? null,
@@ -1083,19 +1195,24 @@ async function spawnProcess(command, options, initialWs, context) {
       // Asking a human, in one place: the `permission_request` frame, the push that carries it to
       // a phone, the wait, the `permission_resolved` that retracts it. Two callers — `canUseTool`,
       // and the PreToolUse hook for the modes that never reach it.
-      const promptForToolDecision = async (toolName, input, { signal, requiresInteraction }) => {
+      const promptForToolDecision = async (toolName, input, { signal, requiresInteraction, toolUseId = null }) => {
         const requestId = createRequestId();
+        // The ask's own name, shared with every successor that re-issues it. The push is keyed on
+        // THIS, the in-app frame on the request id: a re-issue must put the question back on the
+        // chat's wire while never buzzing the phone a second time for it.
+        const promptKey = promptKeyFor(toolUseId, sessionId || capturedSessionId, toolName, input);
         ws.send(createNormalizedMessage({ kind: 'permission_request', requestId, toolName, input, sessionId: capturedSessionId || sessionId || null, provider: 'claude' }));
         emitNotification(createNotificationEvent({
           provider: 'claude',
           sessionId: sessionId || capturedSessionId || null,
           kind: 'action_required',
           code: 'permission.required',
-          // The request id and the raw input are what a push needs to be answerable from the phone.
-          meta: { toolName, sessionName: sessionSummary, requestId, toolInput: input },
+          // The request id and the raw input are what a push needs to be answerable from the phone;
+          // the prompt key is what tells a successor this question has already been pushed.
+          meta: { toolName, sessionName: sessionSummary, requestId, promptKey, toolInput: input },
           severity: 'warning',
           requiresUserAction: true,
-          dedupeKey: `claude:permission:${sessionId || capturedSessionId || 'none'}:${requestId}`
+          dedupeKey: `claude:permission:${sessionId || capturedSessionId || 'none'}:${promptKey}`
         }));
 
         const decision = await waitForToolApproval(requestId, {
@@ -1107,12 +1224,17 @@ async function spawnProcess(command, options, initialWs, context) {
             _sessionId: sessionId || capturedSessionId || null,
             _toolName: toolName,
             _input: input,
+            _promptKey: promptKey,
             _receivedAt: new Date(),
           },
           onCancel: (reason) => {
             ws.send(createNormalizedMessage({ kind: 'permission_cancelled', requestId, reason, sessionId: capturedSessionId || sessionId || null, provider: 'claude' }));
           }
         });
+        // This ask is settled here, whichever door it came through — the app's panel or a tap on
+        // the phone. A phone button of the same prompt must stop answering 200 for a question that
+        // is over, and this is the only moment the runtime knows it is.
+        forgetPendingAction(promptKey);
         if (!decision) {
           return { behavior: 'deny', message: 'Permission request timed out' };
         }
@@ -1151,15 +1273,25 @@ async function spawnProcess(command, options, initialWs, context) {
           // answering in both would put one question on the wire twice.
           matcher: 'AskUserQuestion|ExitPlanMode',
           timeout: 86_400,
-          hooks: [async (input, _toolUseId, hookOptions) => {
+          hooks: [async (input, toolUseId, hookOptions) => {
             if (!HOOK_MODES.has(sdkOptions.permissionMode)) return {};
-            const result = await promptForToolDecision(input.tool_name, input.tool_input, { signal: hookOptions?.signal, requiresInteraction: true });
+            const result = await promptForToolDecision(input.tool_name, input.tool_input, { signal: hookOptions?.signal, requiresInteraction: true, toolUseId });
             return { hookSpecificOutput: { hookEventName: 'PreToolUse', permissionDecision: result.behavior, permissionDecisionReason: result.message, updatedInput: result.behavior === 'allow' ? result.updatedInput : undefined } };
           }]
         }],
         Notification: [{
           matcher: '',
           hooks: [async (input) => {
+            // The DOMINANT producer of `permission_prompt` is the CLI announcing the very prompt
+            // `promptForToolDecision` has already raised: it arms a six-second timer on a pending
+            // tool ask and notifies under this type when that fires, so emitting it here would
+            // ask the human twice, the second time without the question or the answer buttons.
+            // The type has a second, broader producer inside the CLI — a dialog announced under
+            // no type of its own defaults to this one — which reaches no human by any other door
+            // today; a dialog family that ever does needs this guard re-read, not this comment.
+            // Every other type — `idle_prompt`, `auth_success`, `elicitation_dialog` — is the
+            // CLI's alone, and no runtime event covers it.
+            if (input?.notification_type === 'permission_prompt') return {};
             const message = typeof input?.message === 'string' ? input.message : 'Claude requires your attention.';
             // Notifications are app-facing, so they carry the app session id.
             emitNotification(createNotificationEvent({
@@ -1200,7 +1332,11 @@ async function spawnProcess(command, options, initialWs, context) {
           }
         }
 
-        return promptForToolDecision(toolName, input, { signal: toolContext?.signal, requiresInteraction });
+        return promptForToolDecision(toolName, input, {
+          signal: toolContext?.signal,
+          requiresInteraction,
+          toolUseId: toolContext?.toolUseID
+        });
       };
 
       queue = createPromptQueue(promptMessages);
@@ -1245,7 +1381,7 @@ async function spawnProcess(command, options, initialWs, context) {
       console.log('Starting async generator loop for session:', capturedSessionId || 'NEW');
       for await (const message of queryInstance) {
         // Unguarded on purpose: only the SDK's init message carries this field, and it arrives after the hook events that claim the session-id capture below — and on every turn, resumed ones included.
-        if (typeof ws.setCliVersion === 'function' && typeof message.claude_code_version === 'string') ws.setCliVersion(message.claude_code_version);
+        if (typeof message.claude_code_version === 'string') noteReportedCliVersion(message.claude_code_version);
         // Capture session ID from first message
         if (message.session_id && !capturedSessionId) {
 
@@ -1445,6 +1581,16 @@ async function spawnProcess(command, options, initialWs, context) {
           // keeps its hands off the process until it has.
           for (const id of launchedThisTurn) deferredTools.add(id);
           launchedThisTurn.clear();
+          // The turn a Stop ended has now reported. The process a Stop kept alive for its
+          // background work is ordinary again from here: the NEXT message to join it is a run of
+          // its own, and its terminal `complete` must reach the client. Leaving the mark set was a
+          // run that ended on the registry's failure fallback instead. Only ever set for a process
+          // a Stop kept (see `stopTurn`), and the aborted turn's own result is necessarily this
+          // one — the CLI answers an interrupt by ending that turn, and the process is serial.
+          if (stoppedTurnPending && abortPending) {
+            stoppedTurnPending = false;
+            abortedInstances.delete(queryInstance);
+          }
           keepalive?.note(turnBits(pendingTurn === null));
         }
       }
@@ -1534,7 +1680,31 @@ async function spawnProcess(command, options, initialWs, context) {
 }
 
 /**
- * Aborts an active SDK session
+ * Aborts an active SDK session — the Stop button, and every other caller that cancels a run.
+ *
+ * STOP ENDS THE REPLY, NOT THE WORK THE REPLY STARTED. The SDK's interrupt ends the TURN: it does
+ * not touch the CLI's background tasks, and the process stays up (measured with the SDK directly,
+ * 2026-09-22: a turn started a background Bash job and a background subagent, `interrupt()` was
+ * called mid-reply, the turn's result arrived and the markers those jobs wrote appeared a minute
+ * later, on a process whose stdin had never been closed). What killed them was this function's own
+ * wind-down: `close()` ends stdin, the CLI exits, and the tasks die or are orphaned before the
+ * `task_notification` that would wake the agent. So the wind-down is now a decision:
+ *
+ * - Background work still in flight → leave the process exactly as it is, idle, registered as this
+ *   session's live process. Its task notifications still arrive and wake the agent, landing in the
+ *   chat as they would after a normal turn, and the operator's next message joins that same
+ *   process. The idle closer ends it once nothing is running, as always. "In flight" is read on
+ *   both sides of the interrupt, because the interrupt's own task reports can erase the evidence
+ *   (the read carries the measurement). One follow-up does end that work early: a message that
+ *   changes a launch argument (model, cwd, allowed tools, the CLI's own version) respawns, and a
+ *   respawn retires this process wholesale — `addSession` logs the line when it happens.
+ * - Nothing in flight → end stdin, as before: the next message spawns a fresh process.
+ * - The interrupt went unanswered (or failed) → kill, as before. A wedged CLI must still stop, and
+ *   this is the only path a Stop is allowed to take background work down with it.
+ *
+ * The client sees no difference either way: the run completes as `aborted` in the caller
+ * (`chat-websocket.service.ts`'s `handleChatAbort`), which is what stops the spinner.
+ *
  * @param {string} sessionId - Session identifier
  * @returns {boolean} True if session was aborted, false if not found
  */
@@ -1552,8 +1722,18 @@ async function abortClaudeSDKSession(sessionId) {
   // complete (the abort handler sends the aborted one).
   abortedInstances.add(session.instance);
 
-  // Over the still-open stdin, so it arrives. It also takes the CLI's background tasks
-  // down (no per-task stop is declared), so nothing is left worth keeping the process for.
+  // Read BEFORE the interrupt, because the interrupt itself can wipe the evidence: a background
+  // task the interrupted turn owns is reported ended the moment the CLI acts on the interrupt
+  // (`task_notification`, measured 2026-09-22 — a subagent's own background job was reported
+  // `stopped` in the same breath as the interrupt), and that report releases the hold this asks
+  // about. A report is not proof the work ended either: the same notification has arrived while
+  // the job went on to write its marker 100 s later. So the question is asked on both sides of the
+  // interrupt and answered by EITHER: work outstanding when Stop was pressed, or work outstanding
+  // once the CLI has answered. The cost of being wrong that way is one process idling until the
+  // idle closer's window; the cost of the other is the work.
+  const backgroundWorkAtPress = session.process?.hasBackgroundWork === true;
+
+  // Over the still-open stdin, so it arrives. It ends the turn and nothing else.
   //
   // Bounded: the interrupt is a control request the CLI must answer, and a wedged CLI never does.
   // Awaited without a limit, Stop hung for good on such a process — every click logged here and
@@ -1570,8 +1750,17 @@ async function abortClaudeSDKSession(sessionId) {
   // A late rejection from the abandoned interrupt is expected once the process is killed.
   interrupting.catch(() => {});
 
+  // Asked only of a process that DID answer: an unanswered interrupt winds down on the kill path,
+  // background work or not.
+  const backgroundWork = answered
+    && (backgroundWorkAtPress || session.process?.hasBackgroundWork === true);
+
   try {
-    if (answered) {
+    if (backgroundWork) {
+      // The turn is over for the client; the work it started is not over for this process.
+      session.process.stopTurn();
+      console.log(`[Claude SDK] Session ${sessionId} stopped, process kept: background work is still running and its result still belongs in this chat`);
+    } else if (answered) {
       // End stdin; the next message spawns a fresh process.
       session.process?.close();
     } else {
@@ -1581,9 +1770,14 @@ async function abortClaudeSDKSession(sessionId) {
   } catch (error) {
     console.error(`[Claude SDK] Winding down the process for session ${sessionId} failed: ${error?.message || error}`);
   } finally {
-    // The session leaves the map whatever happened above, so the caller always completes the run.
-    session.status = 'aborted';
-    removeSession(sessionId);
+    // A kept process STAYS the session's live process, which is the whole point of keeping it: the
+    // next message joins it rather than spawning a second CLI beside it. It stays `active` for the
+    // same reason — that status is what `addSession` reads to decide an entry has been superseded
+    // and must be wound down, and a kept process is not superseded by anything.
+    if (!backgroundWork) {
+      session.status = 'aborted';
+      removeSession(sessionId);
+    }
   }
   return true;
 }
@@ -1610,12 +1804,39 @@ function getPendingApprovalsForSession(sessionId) {
   return pending;
 }
 
+/**
+ * Every session with a tool approval waiting right now, whether or not it still has a run.
+ *
+ * The same question as `getPendingApprovalsForSession`, asked the other way round, and the run
+ * registry cannot answer it: a prompt OUTLIVES the run that raised it. A backgrounded agent's
+ * completion wakes the CLI for a continuation turn the server registers no run for, and a
+ * re-adopted host re-issues the prompt it was parked on — in both states the approval sits here
+ * while the session is long gone from `chatRunRegistry`. Read by `sessionsService
+ * .listAwaitingInputSessionIds` for the sidebar's yellow dot, through the provider registry.
+ *
+ * `_sessionId` is the app session id for everything the chat gateway dispatches, and the
+ * provider-native id only for legacy/direct callers that never supplied one — an id no sidebar row
+ * is keyed by, which leaves the mark absent exactly as it was before.
+ *
+ * @returns {string[]} Deduped app session ids, sorted
+ */
+function listPendingSessionIds() {
+  const sessionIds = new Set();
+  for (const resolver of pendingToolApprovals.values()) {
+    if (resolver._sessionId) {
+      sessionIds.add(resolver._sessionId);
+    }
+  }
+  return [...sessionIds].sort();
+}
+
 export const claudeRuntime = {
   run: queryClaudeSDK,
   abort: abortClaudeSDKSession,
   permissions: {
     resolve: resolveToolApproval,
     listPending: getPendingApprovalsForSession,
+    listPendingSessions: listPendingSessionIds,
   },
 };
 
@@ -1625,6 +1846,7 @@ export {
   abortClaudeSDKSession,
   resolveToolApproval,
   getPendingApprovalsForSession,
+  listPendingSessionIds,
   extractTokenBudget,
   extractCumulativeTokenBudget
 };

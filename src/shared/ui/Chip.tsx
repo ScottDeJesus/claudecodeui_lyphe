@@ -22,8 +22,9 @@ type ChipProps = {
   title?: string;
   /**
    * The name, for a chip whose visible content is a MARK rather than a word — the composer's
-   * DeepSeek chip, whose whale is the whole chip on a phone. The mark carries its own
-   * `aria-label` of "DeepSeek", which is a name for the picture and not for the control.
+   * DeepSeek chip, whose mark is the whole chip on a phone. The mark carries its own
+   * `aria-label` ("DeepSeek" on, "Claude" off), which is a name for the picture and not for the
+   * control.
    */
   ariaLabel?: string;
   /**

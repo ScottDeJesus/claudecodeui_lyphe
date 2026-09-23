@@ -35,11 +35,15 @@
     --nav-float-ring: color-mix(in srgb, var(--border) 50%, transparent);
     --nav-divider-color: color-mix(in srgb, var(--border) 50%, transparent);
 
-    /* Safe area CSS variables */
-    --safe-area-inset-top: env(safe-area-inset-top);
-    --safe-area-inset-right: env(safe-area-inset-right);
-    --safe-area-inset-bottom: env(safe-area-inset-bottom);
-    --safe-area-inset-left: env(safe-area-inset-left);
+    /* Safe area CSS variables. The `0px` fallback matters: without it the declaration is
+       invalid wherever `env()` is unsupported, the custom property stays UNDEFINED, and any
+       `var(--safe-area-inset-left)` lands in a rule's value as guaranteed-invalid — which for
+       `left`/`right` on a `position:fixed` box computes to `auto` and drops the box back to its
+       static position, sized to content, instead of covering the screen. */
+    --safe-area-inset-top: env(safe-area-inset-top, 0px);
+    --safe-area-inset-right: env(safe-area-inset-right, 0px);
+    --safe-area-inset-bottom: env(safe-area-inset-bottom, 0px);
+    --safe-area-inset-left: env(safe-area-inset-left, 0px);
 
     /* Mobile navigation dimensions - Single source of truth */
     /* Floating nav: ~52px bar + 8px bottom margin + 12px px-3 top spacing */
@@ -53,7 +57,14 @@
     --header-total-padding: calc(var(--header-safe-area-top) + var(--header-base-padding));
   }
   
-  /* Fallback for older iOS versions */
+  /* iOS 11.0-11.1 only: `env()` is unknown there and `constant()` is the name that resolves, so
+     this block is load-bearing on those devices (the base `:root` rule above declares nothing
+     where `env()` cannot be parsed) and stays. The `0px` fallback of that rule does NOT belong
+     here: it guards `env()`, which takes a fallback argument, while `constant()` takes none — and
+     the `@supports` guard is itself the proof that the function resolves wherever this block
+     applies, because an engine that cannot parse the value fails the guard and never reaches these
+     declarations. Measured: the guard is false in current Chromium and WebKit, so on both the four
+     tokens come from the `env()` lines alone. */
   @supports (padding-top: constant(safe-area-inset-top)) {
     :root {
       --safe-area-inset-top: constant(safe-area-inset-top);
@@ -133,12 +144,56 @@
     overflow: hidden;
   }
 
-  /* Adjust fixed inset positioning in PWA mode */
-  body.pwa-mode .fixed.inset-0 {
+  /* Clear the iOS status bar in PWA mode — for the APP FRAME ONLY, the two layers that carry
+     persistent chrome: the workspace shell and the mobile drawer it holds. `#root`'s own
+     padding cannot do this, because a `position:fixed` child's containing block is the
+     viewport, not `#root`; hence a `top` on the frame itself, which is what these two do.
+     `pwa-status-clear` is opt-IN, and that is the whole point: this used to read
+     `body.pwa-mode .fixed.inset-0`, which caught every full-screen fixed layer in the app —
+     every dialog's scrim, every lightbox, the Settings sheet — and pushed its box off the
+     screen edge. An overlay that stops 47px short on the left and 55px short at the top leaves
+     the app visible in the strips, which on a phone reads as the panel sliding under something
+     else. Measured on the Settings sheet in a standalone PWA: box [47,55,750,335] on an 844x390
+     screen instead of [0,0,844,390]. Overlays keep `inset-0` and pad their CONTENT instead —
+     see `pwa-notch-safe`. */
+  body.pwa-mode .pwa-status-clear {
     top: var(--header-total-padding);
     left: var(--safe-area-inset-left);
     right: var(--safe-area-inset-right);
-    bottom: 0;
+  }
+
+  /* A full-bleed sheet in PWA mode: the box is the whole screen (`inset-0`, so the scrim reaches
+     every edge) and the CONTENT takes the inset as padding, keeping the title row and the close
+     button out from under the status bar and the landscape notch. Padding, not `top`: a box
+     offset would leave the sheet's own background short of the edge — the strip this whole rule
+     pair exists to remove.
+
+     IT MOVES ONLY WHAT IS IN FLOW. An `absolute` child of the layer is placed against the
+     containing block's padding EDGE, which padding does not move: measured, an ImageLightbox close
+     button stayed at y=16 while its layer's padding went 0 -> 47px. A control that is absolutely
+     positioned must carry the inset in its own offsets — today that is one control, the lightbox's
+     `top-[calc(1rem+var(--safe-area-inset-top))] right-[…]` (chat/transcript/ChatMessageImages.tsx).
+
+     Inset-driven, and deliberately NOT scoped by width. Where the inset is 0 the padding is 0, so
+     desktop and portrait pay nothing; where it is not, the content has to clear the sensor housing
+     wherever that housing is — including a phone held sideways (844x390), where `md:` matches and
+     these sheets are centred cards. Scoping this to `max-width: 767px` on the premise that no notch
+     sits over a card at `md` and up left the landscape card's own content in the band: all ten
+     nav-rail buttons 19px in from the left edge and the `h2` 11px in, against a 47px inset.
+
+     A FLOOR, NOT A REPLACEMENT. This selector outranks a padding utility on specificity, so on a
+     sheet that carries its own padding it used to flatten that padding to the inset — and where
+     the inset is 0, which is every desktop-width install, the sheet lost its gutter outright
+     (measured: `p-6` plus this class, PWA landscape, computed `padding: 0 47px 24px 47px`). Hence
+     `max()` against `--pwa-notch-safe-pad`, the padding the sheet already wants: a layer declares
+     it inline — `class="… pwa-notch-safe [--pwa-notch-safe-pad:1.5rem]"`. Absent, it is 0px and
+     the padding is the inset alone, which is what every box that carries no padding of its own
+     wants: the three full-bleed layers (ImageLightbox, `ShapeFrame`, `GutterWidgetFrame`) and the
+     two dialog panels (Settings, ProviderLoginModal). */
+  body.pwa-mode .pwa-notch-safe {
+    padding-top: max(var(--safe-area-inset-top), var(--pwa-notch-safe-pad, 0px));
+    padding-left: max(var(--safe-area-inset-left), var(--pwa-notch-safe-pad, 0px));
+    padding-right: max(var(--safe-area-inset-right), var(--pwa-notch-safe-pad, 0px));
   }
   
   /* Global transition defaults */

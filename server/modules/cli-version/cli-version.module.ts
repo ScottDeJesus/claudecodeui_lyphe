@@ -1,34 +1,25 @@
-import { execFile } from 'node:child_process';
-import { promisify } from 'node:util';
-
 import type { Router } from 'express';
 
 import { chatRunRegistry } from '@/modules/websocket/index.js';
-import { resolveSpawnedClaudeBinaryPath } from '@/shared/claude-cli-path.js';
 
 import { createCliVersionRouter } from './cli-version.routes.js';
-import { createCliVersionService } from './cli-version.service.js';
-
-const execFileAsync = promisify(execFile);
+import { createCliVersionService, readInstalledCliVersion } from './cli-version.service.js';
 
 /**
  * Builds the authenticated CLI-version router for the server entrypoint.
  *
- * The composition root is the only place that reads the environment, spawns
- * anything, or reaches into the run registry; the service takes all of it as
- * dependencies, which is what lets the failure path and the cache be proven
- * without a server and without a real CLI.
+ * Two dependencies, and both are joins this file is the place for: the run registry, which is
+ * the only home of a live run's version, and the server's ONE cached reading of the installed
+ * binary — the same instance the chat runtime asks at send time, so the version this route
+ * reports and the version that decides whether a process is replaced are never two answers.
  *
- * The binary comes from `claude-cli-path.ts`, which is the module that answers
- * "which file does a run spawn" for the SDK as well — asked once, answered the
- * same way for both, so a version can never be reported about a binary nothing
- * runs.
+ * The binary itself is resolved by that reading, through `claude-cli-path.ts` — the module that
+ * answers "which file does a run spawn" for the SDK too, asked once and answered the same way for
+ * both, so a version can never be reported about a binary nothing runs.
  */
 export function createCliVersionModule(): Router {
   const cliVersionService = createCliVersionService({
-    resolveBinaryPath: () => resolveSpawnedClaudeBinaryPath(),
-    execFile: (file, args, options) => execFileAsync(file, [...args], options),
-    now: () => Date.now(),
+    readInstalled: readInstalledCliVersion,
     // The registry is the ONLY home of a run's version: it is read live here
     // and never copied anywhere that outlives the run.
     listRunningRuns: () => chatRunRegistry.listRunningRuns(),

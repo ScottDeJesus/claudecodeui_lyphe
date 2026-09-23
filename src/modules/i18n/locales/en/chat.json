@@ -135,6 +135,7 @@
     "plainModeTooltip": "Send every message with /plain: short, skimmable replies",
     "deepseekFlash": "DeepSeek Flash",
     "deepseekFlashShort": "Flash",
+    "deepseekFlashOffShort": "Claude",
     "deepseekFlashPeak": "Peak hours right now: DeepSeek is full price until {{time}}.",
     "deepseekFlashOffPeak": "Off-peak right now: DeepSeek is half price until {{time}}.",
     "deepseekFlashTooltip": "While this is on, the plan runner's build souls — the builder, its fix-pass and Athena — run on DeepSeek Flash. Prometheus and the scouts stay on Claude.",

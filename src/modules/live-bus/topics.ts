@@ -22,7 +22,11 @@ export const LIVE_TOPIC_ALLOWLIST: readonly RegExp[] = [
   // One run by id. The class and the ceiling are the server route's own
   // (`^[A-Za-z0-9._-]{1,120}$`), so a topic the bus admits is an id the route would too.
   /^runner:[A-Za-z0-9._-]{1,120}$/,
-  // The launcher souls a `/dispatch` started, as one array. No per-launch topic yet: the only
+  // Every arc the runner is walking, as one array — the deck's whole picture. The plan-runner's
+  // second lane, and a single-array topic for the same reason `souls:*` is: the deck is one
+  // gallery, and a topic nothing subscribes to is a topic with no way to tell it has gone stale.
+  /^arc:\*$/,
+  // The launcher souls a session started by hand, as one array. No per-launch topic yet: the only
   // reader is the pin above the composer, which wants the whole picture, and a topic nothing
   // subscribes to is a topic with no way to tell it has gone stale.
   /^souls:\*$/,
@@ -44,6 +48,8 @@ export function isAllowedTopic(topic: unknown): topic is string {
 
 /** The topic carrying every run the lane can see. One spelling, so a producer and a reader cannot drift. */
 export const RUNNER_ALL_TOPIC = 'runner:*';
+/** The topic carrying every arc the runner is walking — the deck's one array. One spelling, so the deck's feed and its reader cannot drift. */
+export const ARC_ALL_TOPIC = 'arc:*';
 
 /** The topic carrying every launcher soul the lane can see, running and recently ended alike. */
 export const SOULS_ALL_TOPIC = 'souls:*';

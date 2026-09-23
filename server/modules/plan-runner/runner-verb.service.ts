@@ -6,14 +6,15 @@ import type { RunnerVerb, RunnerVerbResult } from '@/shared/types.js';
 import { userFacingEnv } from '@/shared/child-env.js';
 
 /**
- * Relaying the runner's own two verbs, `stop` and `resume`.
+ * Relaying the runner's own four verbs, `stop`, `resume`, `model` (a run's DeepSeek / Claude word) and
+ * `schedule` (a queued run's Start at a time).
  *
  * This server never manipulates a run itself: it does not take the run's lock, does not signal
  * its process and never rewrites one of its state files. It runs the runner's own command and
  * carries back what the runner said. That is the whole design — the runner already knows what a
  * pause means, what a resume may refuse, and which of the two a given run can even accept.
  *
- * The argv array is the security boundary. No shell parses any of this: the binary and its two
+ * The argv array is the security boundary. No shell parses any of this: the binary and its
  * arguments are handed to the kernel as separate strings, so a run id carrying a space, a
  * semicolon or a quote is one argument the runner rejects rather than a second command. The id
  * is ALSO validated at the route before it reaches here (`plan-runner.routes.ts`), because two
@@ -31,7 +32,7 @@ import { userFacingEnv } from '@/shared/child-env.js';
 const execFileAsync = promisify(execFile);
 
 /**
- * How much the runner may say. Both verbs print a line or two, so this is roughly a thousand
+ * How much the runner may say. Every verb prints a line or two, so this is roughly a thousand
  * times the real output; it is stated rather than left to the default so the number is visible
  * beside the classification that has to reason about overflowing it.
  */
@@ -77,7 +78,8 @@ function readExitCode(value: unknown): number | null {
 }
 
 /**
- * Runs one verb against one run id.
+ * Runs one verb against one run id. `verbArgs` follow the id — `model`'s word or `schedule`'s time, each
+ * already checked by the route against the shapes the runner accepts; `stop` and `resume` take none.
  *
  * `cwd` is the home directory rather than this repository: the runner resolves its own state
  * root from `$HOME`, and a verb must never be interpreted against whatever working tree the
@@ -87,13 +89,14 @@ export async function runRunnerVerb(
   verb: RunnerVerb,
   runId: string,
   dependencies: RunnerVerbDependencies,
+  verbArgs: readonly string[] = [],
 ): Promise<RunnerVerbResult> {
   const searchPath = dependencies.claudeBinDir
     ? `${dependencies.claudeBinDir}:${process.env.PATH ?? ''}`
     : process.env.PATH;
 
   try {
-    const result = await execFileAsync(dependencies.bin, [verb, runId], {
+    const result = await execFileAsync(dependencies.bin, [verb, runId, ...verbArgs], {
       timeout: dependencies.timeoutMs,
       maxBuffer: VERB_MAX_BUFFER,
       env: { ...userFacingEnv(), PATH: searchPath },

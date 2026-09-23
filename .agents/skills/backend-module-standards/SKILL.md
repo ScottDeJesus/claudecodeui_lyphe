@@ -1,6 +1,6 @@
 ---
 name: backend-module-standards
-description: Enforce this repository's TypeScript backend module architecture standards. Use whenever creating, modifying, refactoring, or reviewing backend code under `server/`, including routes, services, modules, repositories, shared backend code, and backend tests. Do not apply these rules to frontend code or non-backend scaffolding.
+description: Enforce this repository's TypeScript backend module architecture standards. Use whenever creating, modifying, refactoring, or reviewing backend code under `server/`, including routes, services, modules, repositories, and shared backend code. Do not apply these rules to frontend code or non-backend scaffolding.
 ---
 
 # Backend Module Standards
@@ -9,7 +9,7 @@ Apply these rules after the repository's basic scaffolding is in place. Limit th
 
 ## Inspect before editing
 
-1. Identify the owning feature module and its existing barrel, services, routes, and tests.
+1. Identify the owning feature module and its existing barrel, services, and routes.
 2. Search for existing shared types, interfaces, and utilities before adding any definition.
 3. Search for every consumer before changing a module's public exports.
 
@@ -49,11 +49,6 @@ Apply these rules after the repository's basic scaffolding is in place. Limit th
 - Keep business logic, persistence, filesystem work, subprocess execution, and orchestration out of routes.
 - Allow a service to call other services. Access another module's services through that module's public barrel contract.
 
-## Test within the module
-
-- Put feature tests in `server/modules/<feature>/tests/`.
-- Add or update unit tests for changed service behavior and route parsing.
-
 ## Verify the result
 
 Before finishing:
@@ -61,4 +56,4 @@ Before finishing:
 1. Confirm all cross-module imports use `index.ts` barrels and all public exports are necessary and documented.
 2. Confirm shared definitions follow the one-use versus multiple-use placement rule and grouping-comment format.
 3. Confirm routes only parse, call services, and format responses.
-4. Run the narrow relevant tests, then `npm run build`, `npm run typecheck`, and `npm run lint` when the task scope and environment permit.
+4. Run `npm run build`, `npm run typecheck`, and `npm run lint` when the task scope and environment permit. This house writes no unit tests; verification is running the real server.

@@ -123,9 +123,12 @@
   box-shadow: var(--shadow-rest);
 }
 /* The side-nav count pill in the Verve design file, verbatim: a routine count in the grey
- * register, read off the same two tone tokens `.vv-badge` reads (controls.css:72-85). */
-.vv-tabs__count {
-  margin-left: 6px;
+ * register, read off the same two tone tokens `.vv-badge` reads (controls.css:72-85). One rule
+ * body under two names: a Menu row's count (`.vv-menu__count`) is the same pill, because the
+ * Tabs overflow lists collapsed tabs there and a tab must not change its count's face by moving
+ * behind More. */
+.vv-tabs__count,
+.vv-menu__count {
   padding: 1px 7px;
   display: inline-block;
   border-radius: var(--radius-pill);
@@ -135,6 +138,10 @@
   font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
+.vv-tabs__count { margin-left: 6px; }
+/* `auto` takes the row's free space before `justify-between` can, so the count sits at the
+ * row's end beside any tick rather than stranded in its middle. */
+.vv-menu__count { margin-left: auto; align-self: center; }
 
 /* An icon-only tab is a square target, not a word: the padding goes even so the glyph sits in
  * the middle of it, and the box is wide enough (16px glyph + 2x11px) to stay a comfortable
@@ -208,9 +215,13 @@
  * 264px sidebar left a third of the rule bare, which reads as a row that failed to fill
  * rather than as a row of five. `1 1 auto` grows them from their own widths, so equal
  * icon tabs stay equal and a plugin's word tab keeps the room its label needs; once the
- * whole set no longer fits, growth stops and the strip scrolls as before. */
+ * whole set no longer fits, growth stops — an overflow row then collapses its trailing tabs
+ * behind More (below), and a strip inside its caller's scroller scrolls. */
 .vv-tabs--underline .vv-tabs__tab { flex: 1 1 auto; }
-.vv-tabs--underline .vv-tabs__tab {
+/* The More trigger takes the underline tab's box whole, so it is a tab's height and a glyph
+ * tab's width, and the row reads as one run of stops rather than a row with a button on it. */
+.vv-tabs--underline .vv-tabs__tab,
+.vv-tabs-row .vv-tabs__more {
   padding: 7px 10px;
   border-radius: 0;
   border-bottom: 2px solid transparent;
@@ -249,6 +260,42 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+/* Overflow (`overflowLabel`, Tabs.tsx): the tablist and its More trigger share ONE row, and the
+ * row is exactly as wide as its container — the room the plan measures is the room the caller
+ * gave, never the tabs' own width. The gap is the underline strip's own 2px, so the trigger sits
+ * one tab-gap after the last tab and the plan's arithmetic (one gap per stop) stays true. */
+.vv-tabs-row {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+  gap: 2px;
+  width: 100%;
+}
+.vv-tabs-row > .vv-tabs--underline { flex: 1 1 auto; min-width: 0; }
+/* Menu's own shell, flattened to the tab it wraps: flex so the face stretches to the row's
+ * height, square so its focus ring is the same shape as a tab's. */
+.vv-tabs-row > .vv-menu,
+.vv-tabs-row .vv-menu__trigger { display: flex; }
+.vv-tabs-row .vv-menu__trigger { border-radius: 0; }
+/* Open is a state: the trigger takes full ink while its panel is up, the way a chosen tab does. */
+.vv-tabs-row .vv-menu__trigger[aria-expanded='true'] .vv-tabs__more { color: var(--ink); }
+/* The ghost the plan is measured off: every tab once at its natural width, plus the trigger.
+ * Invisible and out of the flow, and clipped to a zero-height box the row's own width — so a
+ * wide ghost never becomes scrollable overflow for whatever scroller the row sits in. Every tab
+ * is measured at the chosen weight: a word tab is widest selected, and a plan made at the
+ * lighter weight would clip the tab the moment it was chosen. */
+.vv-tabs-row > .vv-tabs__ghost {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: flex;
+  width: 100%;
+  height: 0;
+  overflow: hidden;
+  visibility: hidden;
+  pointer-events: none;
+}
+.vv-tabs__ghost .vv-tabs__tab { flex: none; font-weight: 700; }
 
 /* ---------------------------------------------------------------- EmptyState */
 /* Dashed, because a solid card says "here is a thing" and the point is that there is not one. */

@@ -160,9 +160,15 @@ export const SubagentPanel = memo(({
         {/* Defensive: a normalized message always carries its provider. The robot stands in only when
           * none is known, because `LLMProviderLogo` would otherwise dress it in Claude's mark. */}
         {markProvider ? (
-          <LLMProviderLogo provider={markProvider} className="h-3.5 w-3.5 flex-shrink-0" />
+          /* An agent working in this conversation, so it wears the coding tool's own figure for
+           * Claude (`claudeMark="mascot"`) as the transcript's assistant turns do; the row is
+           * `h-3.5`, and the mark's own floor widens it to the 16 device pixels its cells need. */
+          <LLMProviderLogo provider={markProvider} claudeMark="mascot" className="h-3.5 w-3.5 flex-shrink-0" />
         ) : (
-          <Bot aria-hidden className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />
+          /* The mascot's floor claims 16px of width for this column (`min-w-4`), so the robot takes
+           * the same 16px — its square viewBox letterboxing the glyph at its own 14px inside them —
+           * and a transcript holding both kinds of row keeps one text column. */
+          <Bot aria-hidden className="h-3.5 w-4 flex-shrink-0 text-muted-foreground" />
         )}
         <span className={TOOL_ROW_LABEL}>{label || 'Agent'}</span>
         {description && (

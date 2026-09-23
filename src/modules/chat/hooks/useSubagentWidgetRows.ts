@@ -24,11 +24,14 @@ const NO_SOUL_LAUNCH_IDS: string[] = [];
  * the shared empties above yield no rows rather than the last chat's.
  *
  * Called by the chat-gutters module (`ChatGutterLayout.tsx`, whose Subagents widget body draws the
- * rows) and by `subagents/SubagentWidgetBody.tsx` beneath it.
+ * rows), by `subagents/SubagentWidgetBody.tsx` beneath it, and by
+ * `subagents/SubagentWidgetClearCompleted.tsx` in that widget's header — whose act needs the same
+ * rows' finished half and no other reading of them. Nothing here fetches: the source and the
+ * dismissals are two stores already held, so a further reader costs a subscription and a filter.
  */
 export function useSubagentWidgetRows(
   sessionId: string | null,
-): { rows: PinnedSubagentRow[]; dismiss: (id: string) => void } {
+): { rows: PinnedSubagentRow[]; dismiss: (id: string) => void; dismissMany: (ids: string[]) => void } {
   const source = useSubagentSource(sessionId);
   return usePinnedSubagentRows(
     source?.agentMessages ?? NO_AGENT_MESSAGES,

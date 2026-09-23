@@ -91,9 +91,9 @@ export function createProviderRuntimeService(
       return Boolean(await dependencies.resolveProvider(providerName).runtime.abort(sessionId));
     },
 
-    resolveToolApproval(requestId: string, decision: ProviderPermissionDecision): void {
+    resolveToolApproval(approvalKey: string, decision: ProviderPermissionDecision): void {
       for (const provider of dependencies.listProviders()) {
-        provider.runtime.permissions?.resolve(requestId, decision);
+        provider.runtime.permissions?.resolve(approvalKey, decision);
       }
     },
 

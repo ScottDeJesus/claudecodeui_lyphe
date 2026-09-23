@@ -39,21 +39,21 @@ card in front of you.
 that launches a build WORKFLOW running N feature pipelines at once under the slider"* — is
 **RETIRED**. Workflows were a workaround for a constraint that this model resolves
 differently. The constraint was real: **a subagent CANNOT invoke a Skill** (`Skill(execute)`
-/ `Skill(dispatch)` are main-loop-only and run *inline*, dispatching their souls as
+is main-loop-only and runs *inline*, dispatching its souls as
 `Agent()` calls from the main loop). The OLD cure routed around it with a workflow engine so
 one main-loop could fan out N pipelines. The NEW cure is simpler: **parallelism comes from
 MULTIPLE main-loops (sessions), each doing inline `/execute` on its OWN one feature** — not
 one main-loop fanning out workflows. A Metis session IS a main loop, so `Skill(execute)`
 runs natively in it; there is nothing to route around. (And the old failure that the
 workflow was guarding against — a soul-LESS solo agent doing a fake build — is NOT what
-happens here: `Skill(execute)`→dispatch dispatches the REAL souls with real independent
+happens here: `Skill(execute)` dispatches the REAL souls with real independent
 Athena and real-data verify, exactly as everywhere else. The forbidden anti-pattern is a
 single agent doing build + self-review + self-verify; an inline `/execute` is the OPPOSITE
 of that — it is the full multi-soul pipeline.)
 
 **How a session builds its ONE claimed feature.** Run `Skill(execute)` on the feature's
-`pm-<slug>.plan.md`. `/execute` walks the plan and delegates EVERY UNSHIPPED phase to
-`Skill(dispatch)`, which runs the multi-stage pipeline that mirrors `/execute`+dispatch,
+`pm-<slug>.plan.md`. `/execute` hands the plan to the detached `plan-runner`, which walks it and
+puts EVERY UNSHIPPED phase through the same multi-stage pipeline every other build uses,
 iterating each unshipped phase:
 
 1. **Build** — a Heph-quality builder agent implements the phase.
@@ -82,7 +82,7 @@ skip one** (the thing that failed before).
 
 > (HOW each inline-build stage loads its soul — the COMPLETE `SKILL.md` VERBATIM,
 > never a paraphrase — is **ABSOLUTE RULE #12** in core. It rides this inline
-> pipeline for free, exactly as `Skill(dispatch)` already does.)
+> pipeline for free, exactly as the runner's own stages already do.)
 
 **One in-flight build per session; concurrency is more sessions the driver ran.** A solo
 session builds

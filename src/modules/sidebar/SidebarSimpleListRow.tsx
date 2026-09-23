@@ -14,8 +14,17 @@ type SidebarSimpleListRowProps = {
   row: RecentConversationListItem;
   isSelected: boolean;
   isRunning: boolean;
-  /** A question in this run waits on the user: drawn as a yellow dot in place of the spinner. */
+  /**
+   * A question or permission prompt for this chat waits on the user: drawn as a yellow dot in place
+   * of the spinner, and on its own when the chat has no run left to spin — a question outlives the
+   * turn that asked it.
+   */
   isAwaitingInput: boolean;
+  /**
+   * A subagent from this chat is still running — often after the chat's own turn has ended. Drawn
+   * as a purple dot BESIDE whichever mark above applies, never instead of one.
+   */
+  isSubagentRunning: boolean;
   isRemoveFailed: boolean;
   onSelect: () => void;
   onArchive: () => void;
@@ -37,6 +46,7 @@ export default function SidebarSimpleListRow({
   isSelected,
   isRunning,
   isAwaitingInput,
+  isSubagentRunning,
   isRemoveFailed,
   onSelect,
   onArchive,
@@ -137,7 +147,7 @@ export default function SidebarSimpleListRow({
         </a>
       )}
 
-      {isRunning && isAwaitingInput && !isEditing && (
+      {isAwaitingInput && !isEditing && (
         <Tooltip content={t('simpleList.awaitingInput')} position="top">
           <span
             data-testid="simple-chat-awaiting-input"
@@ -162,7 +172,21 @@ export default function SidebarSimpleListRow({
         </Tooltip>
       )}
 
-      {row.unread && !isSelected && !isRunning && !isEditing && (
+      {isSubagentRunning && !isEditing && (
+        <Tooltip content={t('simpleList.subagentsRunning')} position="top">
+          <span
+            data-testid="simple-chat-subagents-running"
+            role="status"
+            aria-label={t('simpleList.subagentsRunning')}
+            className="flex h-5 w-5 flex-shrink-0 items-center justify-center"
+          >
+            {/* The pinned strip's own running mark, in its own ink. */}
+            <span aria-hidden="true" className="h-2 w-2 animate-pulse rounded-full bg-purple-500 dark:bg-purple-400" />
+          </span>
+        </Tooltip>
+      )}
+
+      {row.unread && !isSelected && !isRunning && !isAwaitingInput && !isEditing && (
         <span
           data-testid="simple-chat-unread"
           role="img"

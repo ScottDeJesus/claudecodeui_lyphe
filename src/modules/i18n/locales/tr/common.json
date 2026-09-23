@@ -349,6 +349,7 @@
     "subagents": {
       "title": "Alt ajanlar",
       "empty": "Bu sohbette alt ajan yok",
+      "clearCompleted": "Tamamlananları temizle",
       "back": "Alt ajanlara dön",
       "loading": "Transkript yükleniyor…",
       "notFound": "Diskte henüz transkript yok",

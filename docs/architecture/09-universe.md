@@ -246,10 +246,10 @@ itself (`UniversePanel.tsx:39-43,97-128`).
 
 **The chat reducer returns early on these frames**
 (`src/modules/chat/hooks/useChatRealtimeHandlers.ts:181-195`). Four kinds — `runner_state`, `soul_launch_state`,
-`universe_map` and `universe_activity` — carry no `sessionId`, and `default` falls into the NormalizedMessage
-path, where such a frame inherits the viewed session's id, is appended to the open transcript and evicts real
-messages from the realtime buffer as it goes. For this pair the second kind is the dangerous one: it arrives up
-to ten times a second for as long as anything in the estate is busy.
+`universe_map` and `universe_activity` — carry no `sessionId`. The early return is a naming, not the fence: what
+actually keeps a frame out of the open transcript is that the append below admits a row only when it carries a
+run's numeric `seq` (`:253`), and no box-wide lane frame ever does. For this pair the second kind is still worth
+naming: it arrives up to ten times a second for as long as anything in the estate is busy.
 
 **The Tweaks dialog** (`UniverseTweaksPanel.tsx:9-27`) is the ONE control surface — a gear beside Recenter,
 opening a dialog with exactly one control per tunable, so no tunable has a second control anywhere to drift. A
@@ -427,5 +427,5 @@ T=$(node scripts/universe-token.mjs); node scripts/universe-fps-probe.mjs http:/
 | `ADMITTED_TOOLS` | `Read` and `Bash` are still out, and a new tool is added in that one array rather than in the resolver |
 | `reconcile`, the coalescer, `TWEAK_RANGES` | The comparison is still against the held map's heads; a quiet estate still sends nothing and the cap still counts the rows it drops; every key of `UniverseTweaks` is still in the range table, and a zero still skips its pass whole |
 | The GPU glow/disc gate in `universeStarsGL.ts`, or `CORE_IRIS_RADII`/`CORE_IRIS_ALPHA`/`KIND_DIM`/`discAlphaOf` | The gate still reads the same expression `drawGlow` uses (`node.r * GLOW_MULT[kind] * z` against `GLOW_MIN_PX`), and those four stay exported from `universeStarsGL.ts` and read — not copied — by `drawLeftovers` in `universeRenderer.ts`, so a star too wide for a GPU point draws at the same numbers as one that fit |
-| `useChatRealtimeHandlers`'s early return | The four kinds still RETURN and do not break — a `break` falls into the NormalizedMessage path and injects stray rows into the open transcript |
+| `useChatRealtimeHandlers`'s early return | The four kinds still RETURN and do not break — a `break` would run the switch's per-kind UI side effects meant for provider frames, though the `seq` stamp gate (`:253`) would still keep the row itself out of the transcript |
 

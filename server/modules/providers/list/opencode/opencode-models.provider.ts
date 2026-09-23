@@ -253,6 +253,7 @@ export const OPENCODE_PREDEFINED_MODELS: ProviderModelsDefinition = {
         values: [{ value: 'low' }, { value: 'high' }],
       },
     },
+    { value: 'anthropic/claude-opus-5-5', label: 'Claude Opus 5.5', description: 'Anthropic' },
     { value: 'anthropic/claude-opus-5', label: 'Claude Opus 5', description: 'Anthropic' },
     { value: 'anthropic/claude-opus-5-fast', label: 'Claude Opus 5 Fast', description: 'Anthropic' },
     { value: 'anthropic/claude-fable-5', label: 'Claude Fable 5', description: 'Anthropic' },

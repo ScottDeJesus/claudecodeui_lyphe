@@ -1,7 +1,7 @@
 import { clsx, type ClassValue } from 'clsx';
 import { extendTailwindMerge } from 'tailwind-merge';
 
-import type { Project, ProjectSession } from '@/shared/types';
+import type { Project, ProjectSession, RunnerModelChoice } from '@/shared/types';
 
 //----------------- DEPLOYMENT MODE ------------
 
@@ -351,4 +351,18 @@ export function formatBytes(bytes: number | null | undefined): string {
 
   const rounded = value >= 100 ? value.toFixed(0) : value.toFixed(1).replace(/\.0$/, '');
   return `${rounded} ${BYTE_UNITS[unit]}`;
+}
+
+// ---------------------------
+
+//----------------- PLAN-RUNNER MODEL WORD ------------
+
+/**
+ * The model word a run's or an arc's control shows as pressed: the stored word, or `deepseek` for a record with
+ * none (`null` / absent — born before the runner wrote its default), because that is how the runner itself reads
+ * it (`run_model.clean`). Used by `RunCard` and `ArcDeck` to hand `RunModelControl` its value, so `Chat switch` is
+ * pressed only when the record says `auto`.
+ */
+export function effectiveModelWord(stored: RunnerModelChoice | null | undefined): RunnerModelChoice {
+  return stored ?? 'deepseek';
 }

@@ -27,9 +27,10 @@ button press and re-render all four.
 
 ## Where the tab is, and when
 
-The tab sits on the workspace strip in the sidebar, after every other built-in tab except the
-Runner tab ([plan-runner.md](plan-runner.md) §"The Runner tab") and before any plugin tab, and it
-carries the pending count. The strip's built-in tabs are icon-only, so that count never reaches
+The tab sits on the workspace's house row in the sidebar — the second of its two rows, the one for
+surfaces that read the same whichever project is open — after the board, the sky and the schedules,
+before the Runner and Heal tabs ([plan-runner.md](plan-runner.md) §"The Runner tab") and any plugin
+tab, and it carries the pending count. The strip's built-in tabs are icon-only, so that count never reaches
 Verve's `.vv-tabs__count` pill — `Tabs` draws that for word tabs only. The glyph wears a bare accent
 dot instead, and the number is spelled out in the tab's `title` (`Memory (2)`), which is what
 anything reading this strip's count reads. Both are absent below 1: a queue that has just been

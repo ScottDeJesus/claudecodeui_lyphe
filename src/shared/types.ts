@@ -52,7 +52,7 @@ export type ProviderModelActions = {
 //----------------- PROJECTS AND SESSIONS ------------
 
 /** Identifies the workspace pane the user is looking at; plugin panes are namespaced by plugin id. */
-export type AppTab = 'chat' | 'files' | 'shell' | 'git' | 'tasks' | 'browser' | 'memory' | 'runner' | 'kanban' | 'universe' | `plugin:${string}`;
+export type AppTab = 'chat' | 'files' | 'shell' | 'git' | 'tasks' | 'browser' | 'memory' | 'runner' | 'heal' | 'jev' | 'kanban' | 'universe' | 'schedules' | `plugin:${string}`;
 
 /** A message queued to be sent to a session at a future time. */
 export type ScheduledMessage = {
@@ -2247,8 +2247,8 @@ export type LiveBus = {
 export type RunnerRunState = 'live' | 'paused' | 'queued' | 'stale' | 'ended';
 /** One phase's outcome as the runner spells it, from `progress.json.phases[].state`. */
 export type RunnerPhaseState = 'shipped' | 'running' | 'blocked' | 'deferred' | 'pending';
-/** One row of `progress.json.phases[]`. `note` is the runner's own short word and is free text — it reaches the DOM as a text node, never as markup. */
-export type RunnerPhaseRow = { rank: number; id: string; title: string; state: RunnerPhaseState; note: string };
+/** One row of `progress.json.phases[]`. `note` is the runner's own short word and is free text — it reaches the DOM as a text node, never as markup. `wave` is the phase's 1-based wave in the plan's whole map (what `plan-runner swarm <plan>` prints), `null` when no wave can place it; absent on a frame from a server older than the field. */
+export type RunnerPhaseRow = { rank: number; id: string; title: string; state: RunnerPhaseState; note: string; wave?: number | null };
 /** One `runner.log` stage change. `at` is the runner's LOCAL ISO timestamp to the second, kept as the string it wrote. `detail` is `''` when the stage word stood alone. */
 export type RunnerTimelineEntry = { at: string; phase_id: string; stage: string; detail: string };
 /** Where the run stands, from `progress.json.position`. `stage_since` is epoch SECONDS, like every timestamp inside a snapshot. */
@@ -2256,16 +2256,46 @@ export type RunnerPosition = { rank: number; total: number; phase_id: string; ti
 /** One run as the lane reads it off disk. `position` is `null` while the runner has not composed one yet, which a live run does show in its first seconds. `blocked_causes` is the receipt's phase id → cause map, `{}` until the run ends — the only record of a phase halted on a crash or a budget, whose row never turns `blocked`. `launched_by_session` is the APP session id of the chat whose turn launched the run — the server resolves it before the snapshot is sent, so it is safe to compare against the open chat; `null` when the run names none. */
 /** The fix-it session on a blocked phase, from `progress.json.repair`: the one IN FLIGHT (`repairing`, `step` the sub-stage it is on; `paused` while the run waits out a rate limit), else the last one finished (`fixed` — the phase walks again — or `failed`). `by` says whose session it is: `unblock` is the run's own outing, walked by the run's process; `heal` is the heal drain's, which works while the run itself is halted. `live` is whether the process doing a `heal` repair is alive right now (always `false` for an `unblock`, whose liveness is the run's). `resumed` is whether a finished repair put the phase back on the walk: a cleared unblock always did, a heal only when it re-armed the phase's spec — a heal can cure the cause and leave the phase standing; `null` when the heal never measured it. `since` and `ended_at` are epoch SECONDS; `k` is the number of the outing this repair belongs to, and `limit` its per-phase ceiling (0 = none carried, as for a heal). */
 export type RunnerRepair = { phase_id: string; state: 'repairing' | 'paused' | 'fixed' | 'failed'; by: 'replan' | 'unblock' | 'heal'; live: boolean; resumed: boolean | null; step: string; k: number; limit: number; since: number | null; ended_at: number | null; reason: string };
-export type RunnerRunSnapshot = { run_id: string; plan_path: string; plan_title: string; /** A test's run, never the operator's: its plan sits in a scratch root (the runner's own fixtures under the temp dir) or its id is a probe's `fixture-` run. Hidden from every runs list unless a probe opts in, and never pushed as a notification. */ test_run: boolean; state: RunnerRunState; status: string; started_at: number; heartbeat_at: number; stopped_at: number | null; /** `run.json`'s `queued_until`, `null` on every run that was not created parked and on a queued one given no window to wait for (a bare `--queue` outside DeepSeek's peak hours). Epoch SECONDS, like every timestamp here. */ queued_until: number | null; launched_by_session: string | null; outcome: string | null; ended_at: number | null; blocked_causes: Record<string, string>; pid: number | null; position: RunnerPosition | null; repair: RunnerRepair | null; phases: RunnerPhaseRow[]; spawns: number; max_spawns: number; cost_usd: number; plan_runs: number; plan_spawns: number; plan_cost_usd: number; plan_planning_usd: number; plan_review_usd: number; plan_scouts_usd: number; plan_total_usd: number; tokens: number; plan_tokens: number; line: string; timeline: RunnerTimelineEntry[] };
+export type RunnerRunSnapshot = { run_id: string; plan_path: string; plan_title: string; /** A test's run, never the operator's: its plan sits in a scratch root (the runner's own fixtures under the temp dir) or its id is a probe's `fixture-` run. Hidden from every runs list unless a probe opts in, and never pushed as a notification. */ test_run: boolean; state: RunnerRunState; status: string; started_at: number; heartbeat_at: number; stopped_at: number | null; /** `run.json`'s `queued_until`, `null` on every run that was not created parked and on a queued one given no window to wait for (a bare `--queue` outside DeepSeek's peak hours). Epoch SECONDS, like every timestamp here. */ queued_until: number | null; /** `run.json`'s `start_at`: the operator's SCHEDULED Start on a queued run (`plan-runner schedule`), pressed by the watchdog's tick when it comes; `null` when none was asked for (the key absent too). Epoch SECONDS. */ start_at: number | null; /** The run's own model word off `run.json:model`; `null` only on a record born before the runner wrote its default, which reads `deepseek` (`effectiveModelWord`). */ model: RunnerModelChoice | null; launched_by_session: string | null; outcome: string | null; ended_at: number | null; blocked_causes: Record<string, string>; pid: number | null; position: RunnerPosition | null; repair: RunnerRepair | null; phases: RunnerPhaseRow[]; spawns: number; max_spawns: number; cost_usd: number; plan_runs: number; plan_spawns: number; plan_cost_usd: number; plan_planning_usd: number; plan_review_usd: number; plan_scouts_usd: number; plan_total_usd: number; tokens: number; plan_tokens: number; line: string; timeline: RunnerTimelineEntry[] };
 /** The whole picture, pushed on change over `/ws`. `runs` is ordered by `started_at` ascending. `at` is epoch MILLISECONDS, unlike every field inside a snapshot. */
 export type RunnerStateEvent = { kind: 'runner_state'; runs: RunnerRunSnapshot[]; at: number };
-/** The two verbs the server may relay. Starting a run is `/execute`'s act, never a button's. */
-export type RunnerVerb = 'stop' | 'resume';
+/** A run's or an arc's OWN model word, as `run.json:model` and `arc.json:model` record it (`hooks/plan_runner/run_model.py`) and as the model control sends it through `POST /runs/:id/model` and `POST /arcs/:arc/model`: `deepseek` (the runner's default, written at birth), `claude`, or `auto` — follow the chat's DeepSeek switch. The server checks a request against exactly these three before anything is spawned, so the argv word is always ours. */
+export type RunnerModelChoice = 'deepseek' | 'claude' | 'auto';
+/** The verbs this server may relay: `stop`, `resume`, `model` (the run's own DeepSeek / Claude word; restarts nothing) and `schedule` (a QUEUED run's Start at a time — `offpeak`, an ISO timestamp, or `none` to clear). Starting a run from a plan is `/execute`'s act, never a button's; a queued run's Start, now or scheduled, is the operator's. */
+export type RunnerVerb = 'stop' | 'resume' | 'model' | 'schedule';
+/** `GET /runs/offpeak`: the runner's next DeepSeek off-peak moment in epoch SECONDS (`plan-runner offpeak`, derived from `deepseek.PEAK_UTC`), or `null` when the runner could not answer. The card's `Start at …` button shows it in the reader's clock and never computes it. */
+export type RunnerOffpeak = { at: number | null };
 /** What one relayed verb did. A refusal is a RESULT, not an error: `stderr` carries the runner's own line whole so the reader sees the verdict rather than our paraphrase. */
 export type RunnerVerbResult = { ok: boolean; verb: RunnerVerb; run_id: string; exit: number | null; stdout: string; stderr: string; reason?: 'timeout' | 'spawn-failed' };
+
+//----------------- ARC DECK: a stack of plans walked one card after another ------------
+// An arc is a stack: one orchestrating plan listing ordered cards, each card a plan of its own, walked one
+// after another. The runner keeps one record per arc under `~/.claude/state/arcs/<name>/` — `arc.json` (the
+// whole picture, written whole through `os.replace`), `receipt.json` (present ⇒ the arc is over) and
+// `resume_brief.md` — and this client only READS them; the one thing it can ask for, a reorder, is a verb the
+// server relays, never a state file the app writes. The deck never computes the order: `current` and
+// `last_started` are the runner's own decisions, copied out of `arc.json`. Every timestamp is epoch SECONDS,
+// because that is what the runner's Python writes (`time.time()`). Mirrored field-for-field in
+// `server/shared/types.ts`.
+
+/** One card's walk, as the runner spells it in `arc.json:cards[].state` (`hooks/plan_runner/arcs.py:CARD_STATES`). `unminted` is a card whose run the runner has not created yet — each card is created at its own turn — and `stalled` is one whose latest run carries a receipt that is not `complete`. */
+export type ArcCardState = 'unminted' | 'queued' | 'walking' | 'paused' | 'complete' | 'stalled';
+/** One phase of an arc card's plan, as `arc.json:cards[].phases[]` writes it (`hooks/plan_runner/arc_phases.py`): the phase's `id` and heading `title` in plan order, and `shipped` — the runner's own census verdict, true only for a phase whose ship-log line has landed. A plan not yet on disk has no phases, and its card carries `[]`. */
+export type ArcCardPhase = { id: string; title: string; shipped: boolean };
+/** One card of an arc, as `arc.json:cards[]` writes it. `plan_path` is the card's own `plan` field: an ABSOLUTE path, since the runner resolves the bare basename against the arc file's directory. `charter` is free text and reaches the DOM as a text node, never as markup. `cost_usd` and `spawns` are the card's run's books, `0` before it has any. `phases` is the card's plan's phase list, re-read by the runner on every sync (the watchdog's two-minute tick), so a plan that lands or a phase that ships reaches the deck within one tick. */
+export type ArcCardSnapshot = { position: number; plan_path: string; title: string; charter: string; run_id: string | null; state: ArcCardState; run_status: string | null; ended_at: number | null; cost_usd: number; spawns: number; phases: ArcCardPhase[] };
+/** One arc, as `<arcs dir>/<name>/arc.json` records it. `current` is the position of the first non-complete card — the card the walk acts on next, `null` once every card is complete — and `last_started` is the highest position that has started; BOTH are the runner's own decisions, copied here and never recomputed, because they are what tells the deck which card is live and which may still be dragged. `test_arc` is whether the arc lives in a hidden root (`isHiddenProjectPath(arc_path)`), the same rule a run's `test_run` follows, so a `/tmp` fixture never reaches the operator's deck. `has_receipt` is the arc's own `receipt.json` on disk — the arc has finished. `now` is the runner's recorded word that this arc walks through DeepSeek's peak hours. */
+export type ArcSnapshot = { arc: string; arc_path: string; title: string; test_arc: boolean; status: 'not-started' | 'walking' | 'stalled' | 'complete'; started_at: number | null; ended_at: number | null; synced_at: number; has_receipt: boolean; now: boolean; /** `arc.json`'s `start_at`: the operator's SCHEDULED `arc start` (`plan-runner arc schedule`), pressed by the watchdog's tick; `null` when none was asked for, and always once the arc has started. Epoch SECONDS. */ start_at: number | null; /** The arc's ONE model word off `arc.json:model`, handed to every card it mints; `null` only on a record synced before the runner wrote its default, which reads `deepseek` (`effectiveModelWord`). */ model: RunnerModelChoice | null; current: number | null; last_started: number; cards: ArcCardSnapshot[] };
+/** Where a card sits in its deck's walk — CLIENT-ONLY, derived by `deckLayers` off the snapshot's own `current`: `done` is complete and behind the walk, `top` is the live card, `beneath` is a card still to come. It is each card's `data-arc-layer` value, which the browser harness reads. */
+export type ArcCardLayer = 'top' | 'beneath' | 'done';
+/** The whole deck, pushed on change over `/ws`. `at` is epoch MILLISECONDS (`Date.now()`), unlike every field inside a snapshot. */
+export type ArcStateEvent = { kind: 'arc_state'; arcs: ArcSnapshot[]; at: number };
+/** What one relayed arc verb did — the shape `RunnerVerbResult` gives a run's verbs, with the arc's name where the run id was, since `plan-runner arc reorder|model|start|schedule <name> …` names an arc rather than a run. `reason` is present only when the runner never got to answer: it timed out, or its binary could not be spawned. */
+export type ArcVerbResult = { ok: boolean; arc: string; exit: number | null; stdout: string; stderr: string; reason?: 'timeout' | 'spawn-failed' };
+// ---------------------------
 /** How a launcher soul is going while it is out, and how it ended once its receipt landed. `stopped` is a cap, not a fault; the pinned agents keep the same two words apart for the same reason. */
 export type SoulLaunchState = 'running' | 'completed' | 'failed' | 'stopped';
-/** One launcher soul — a `/dispatch` hand started through `plan-runner soul` — as its pin draws it. `provider` is the one the pin PAINTS: `result.json`'s word once it landed, `spec.json`'s pin before then. `cost_usd`, `tokens` and `duration_s` are `null` until the receipt lands. */
+/** One launcher soul — a soul a session started by hand through `plan-runner soul` — as its pin draws it. `provider` is the one the pin PAINTS: `result.json`'s word once it landed, `spec.json`'s pin before then. `cost_usd`, `tokens` and `duration_s` are `null` until the receipt lands. */
 export type SoulLaunchSnapshot = { launch_id: string; role: string; agent: string; brief: string; provider: 'deepseek' | 'claude'; blocked: boolean; state: SoulLaunchState; status: string; cause: string; started_at: number; ended_at: number | null; duration_s: number | null; cost_usd: number | null; tokens: number | null };
 /** The whole picture, pushed on change over `/ws`. `launches` is ordered by `started_at` ascending. `at` is epoch MILLISECONDS, unlike every field inside a snapshot. */
 export type SoulLaunchStateEvent = { kind: 'soul_launch_state'; launches: SoulLaunchSnapshot[]; at: number };
@@ -2468,7 +2498,7 @@ export type ChatEmbedSource = { sessionId: string; targets: EmbedUrlRef[] };
 /** What the widget's transcript view is open on: an `Agent`-tool row addressed by the tool call that spawned it (`id` is that call's `tool_id`), a launcher soul addressed by its launch id, or a board's Metis addressed by the session id the board minted. Its third consumer is the kanban module's `KanbanMetisPanel.tsx`, which opens a fleet row into the same view rather than a copy of it. */
 export type SubagentTranscriptTarget = { kind: 'agent' | 'soul' | 'metis'; id: string };
 
-//----------------- JEV SEMANTIC JUDGMENT: switches and ledger ------------
+//----------------- JEV SEMANTIC JUDGMENT: switches and the reader ------------
 /** The house Jev switches as one answer, mirrored from the server's `JevSwitches`: the master, each scope's STORED value, and each scope's LIVE one. A live field is the pair's actual effect (`master && stored`), not a file of its own — a narrower opt-in counts only while the master is on, and that rule is derived server-side so the panel cannot hold a second opinion about it. A scope added on the server arrives here as two more fields, which is why `JevContent.tsx` draws its rows from a table rather than field by field. */
 export type JevSwitchState = {
   master: boolean;
@@ -2478,20 +2508,110 @@ export type JevSwitchState = {
   toolOutputLive: boolean;
 };
 
-/** One Jev consumer's net effect on what sessions read, in characters — positive for text kept OUT of a session's context, negative for text ADDED to it. `caller` is the name it passes to Jev, and the pair is one row of the per-consumer list `/jev/stats` answers with. */
-export type JevConsumerNet = { caller: string; chars: number };
+/** The Jev reader's whole answer (`jev stats --json`), key for key: the tab draws it and nothing else. `balance` is an ESTIMATE — TypeSafe has no balance API — and `null` when the account file cannot be read; every `usd` is `null` for the same reason. `net` is all-time whatever `range` asked. */
+export type JevRange = 'today' | '7d' | '30d' | 'all';
+export type JevVerbTally = { calls: number; tokens: number; usd: number | null };
+export type JevConsumer = {
+  caller: string; calls: number; tokens: number; usd: number | null; share: number;
+  avg_latency_s: number | null; unavailable: number; cache_hits: number; refusals: number;
+  verbs: Record<string, JevVerbTally>; asks: string | null; source: string | null; mapped: boolean;
+};
+export type JevDay = { day: string; calls: number; tokens: number; usd: number | null };
+export type JevFeedRow = {
+  ts: number; caller: string; verb: string; ok: boolean | null; tokens: number | null;
+  latency_s: number | null; answer: number | string | null; items: number | null;
+};
+export type JevReferenceRow = {
+  caller: string; asks: string | null; source: string | null; mapped: boolean; calls_all: number; last_ts: number | null;
+};
+export type JevSummary = {
+  generated_at: number;
+  ledger: { present: boolean; rows: number; bad_rows: number; bytes: number; first_ts: number | null; last_ts: number | null };
+  switches: { master: boolean; prompts: boolean; tool_output: boolean };
+  price: { usd_per_mtok: number | null; credit_usd: number | null; unledgered_tokens: number };
+  balance: { credit_usd: number; spent_usd: number; left_usd: number; estimate: true } | null;
+  spend: { today_usd: number | null; week_usd: number | null; all_usd: number | null; today_calls: number; week_calls: number; all_calls: number };
+  days: JevDay[];
+  range: JevRange;
+  range_since: number | null;
+  totals: { calls: number; tokens: number; usd: number | null; unavailable: number; cache_hits: number; cached_tokens: number; refusals: number; p50_s: number | null; p95_s: number | null };
+  consumers: JevConsumer[];
+  top: { caller: string; usd: number | null; share: number; asks: string | null } | null;
+  net: { lines_in: number; lines_kept: number; chars_saved: number; net_chars: number; by_caller: { caller: string; chars: number }[] };
+  feed: JevFeedRow[];
+  reference: JevReferenceRow[];
+  cache: { path: string; keys: number | null; draws: number | null; bytes: number | null; file_bytes: number | null; error: string | null };
+  budget: { counters: { key: string; used: number; mtime: number }[] };
+  no_send: { paths: string[]; source: 'file' | 'missing' };
+};
 
-/** The Jev ledger totaled, mirrored from the server's `JevLedgerStats`: `present` is false only while no call has ever been recorded, and `linesIn`/`linesKept` are the filter's own totals (`filter_kept` lines), which are kept out of `calls` — as are `saved` lines, which are reports about a call rather than one — exactly as `scripts/jev stats` keeps them. `netChars` and `byCaller` are that command's `NET context` line: every `saved` line's `chars_saved`, totaled and split by consumer, largest first. */
-export type JevLedgerStats = {
-  present: boolean;
-  calls: number;
-  tokens: number;
-  linesIn: number;
-  linesKept: number;
-  netChars: number;
-  byCaller: JevConsumerNet[];
-  /** What is left of the credit the operator seeded, by this host's own metering; `null` until `~/.claude/state/jev_account.json` exists. TypeSafe has no balance route, so this is an estimate and is drawn as one. */
-  balance: { creditUsd: number; spentUsd: number; leftUsd: number } | null;
+// ---------------------------
+//----------------- CRON REGISTRY: the tracked record of every scheduled job ------------
+//
+// The CLIENT MIRROR of the CRON REGISTRY group in server/shared/types.ts, field for field and
+// doc-comment for doc-comment, for the Schedules tab. The registry is WRITTEN server-side — by
+// the sync, and by the module's CLI door — and read here; nothing in this file mints a shape the
+// server does not answer, so a field renamed on the server is a type error here rather than an
+// `undefined` on screen.
+
+/** Which of the two things a tracked row is: `cron` is a line the box's crontab runs, `scheduled-prompt` is a message the app will send at a time the operator chose. The kind decides which half of `CronJobState` the row may carry — the two never trade values. Mirrors the server's `CronJobKind` in server/shared/types.ts. */
+export type CronJobKind = 'cron' | 'scheduled-prompt';
+/** Whose job it is — always `user`: the registry tracks the operator's own crontab and scheduled prompts, and the OS's system cron is not read (operator ruling 2026-09-21: nothing the packages ship belongs on the screen). It stays a field because every stored row and every id carries it. Mirrors the server's `CronJobOrigin` in server/shared/types.ts. */
+export type CronJobOrigin = 'user';
+/** Every state a tracked job can be in. The four cron values and the three scheduled-prompt values share one union because a row of either kind is read through the same shape — but a row is only ever one kind's set, never a mix. Mirrors the server's `CronJobState` in server/shared/types.ts. */
+export type CronJobState =
+  | 'ok' | 'failed' | 'missing' | 'unknown'   // a cron row is only ever one of these four
+  | 'pending' | 'sent' | 'cancelled';         // a scheduled-prompt row adds these three
+/** How far a tracked row has moved from what the box actually holds: `none` when the sync's read agrees with the record, `adopted` when the row was just discovered, `missing` when the line is gone from the box, `changed` when the schedule or the command moved underneath it. Only the CLI door clears drift. Mirrors the server's `CronJobDrift` in server/shared/types.ts. */
+export type CronJobDrift = 'none' | 'adopted' | 'missing' | 'changed';
+/** One tracked job, exactly as the registry holds it: one crontab line or one scheduled prompt, with everything the screen shows and the sync writes. Every field is declared here — this file reads what the server wrote and invents nothing. Mirrors the server's `CronJob` in server/shared/types.ts. */
+export type CronJob = {
+  id: string;                 // stable: `${kind}:${origin}:${sha1(command).slice(0,12)}`
+  kind: CronJobKind;
+  name: string;               // the operator's plain name; derived from the command on adoption
+  purpose: string | null;     // why it exists — null until someone says
+  tags: string[];             // short lowercase words for what it is for at a glance ('cleanup'); [] when none
+  owner: string;              // 'lyphe' for a crontab line; the asking user's id for a prompt
+  origin: CronJobOrigin;      // always 'user' — see CronJobOrigin
+  expression: string;         // the raw cron expression, verbatim
+  scheduleText: string;       // plain words, e.g. 'every hour at :47'
+  command: string;            // the command line as the box holds it
+  logPath: string | null;     // absolute path from a `>>` redirection, else null
+  state: CronJobState;
+  drift: CronJobDrift;
+  driftDetail: string | null; // what differs, in one clause; null when drift is 'none'
+  lastRunAt: string | null;   // ISO-8601 with offset, written by the sync
+  lastResult: string | null;  // 'invoked' when only the journal saw it; null when nothing did
+  nextRunAt: string | null;   // a scheduled-prompt row's own `scheduled_for`; null for a cron row
+  note: string | null;        // anything the record must carry that no other field holds
+  source: string;             // 'crontab -l' | '/etc/cron.d/<f>' | '/etc/crontab' | 'scheduled_messages'
+  trackedAt: string;          // ISO-8601 — when this row entered the registry
+  updatedAt: string;          // ISO-8601 — when the sync last touched it
+};
+/** What one sync run did, told as counts rather than as a diff: what the box showed, what the registry gained, what it had to mark gone, and how long the read took. `ok: false` still carries a report — a sync that failed still ran, and the error text is the reason, never an exception thrown at the caller. Mirrors the server's `CronSyncReport` in server/shared/types.ts. */
+export type CronSyncReport = {
+  ranAt: string;
+  ok: boolean;
+  error: string | null;
+  seen: number;      // cron lines read off the box this run
+  adopted: number;   // rows the registry gained
+  missing: number;   // rows now marked missing
+  changed: number;   // rows whose schedule or command moved
+  ms: number;
+};
+
+// THE STATE MAPPING, named here so the screen has to invent nothing. A `cron` row's state is
+// 'ok' when the sync saw its line on the box, 'missing' when it did not, 'failed' when a reader
+// could not answer for it, 'unknown' before any sync. A `scheduled-prompt` row carries
+// `ScheduledMessageStatus` ONE-TO-ONE — 'pending' -> 'pending', 'sent' -> 'sent', 'failed' ->
+// 'failed', 'cancelled' -> 'cancelled'. Nothing is collapsed: 'pending' is the operator's own
+// question and must survive the trip.
+
+/** The whole registry as one read: every tracked job, and the last sync that touched them — the answer `GET /api/schedules` gives. `lastSync: null` means no sync has ever been recorded, which is not the same as a sync that found nothing. Mirrors the server's `CronRegistrySnapshot` in server/shared/types.ts. */
+export type CronRegistrySnapshot = {
+  readAt: string;
+  jobs: CronJob[];
+  lastSync: CronSyncReport | null;
 };
 
 // ---------------------------

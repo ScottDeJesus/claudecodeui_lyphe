@@ -23,6 +23,7 @@ function ProjectCommandPalette() {
     shouldShowBrowserTab,
     shouldShowMemoryTab,
     shouldShowRunnerTab,
+    shouldShowHealTab,
   } = useWorkspaceTabGates(activeTab);
 
   // The commit and branch rows lead to the git tab on this project's repository, so they are
@@ -49,14 +50,15 @@ function ProjectCommandPalette() {
   // Plugin tabs remain the one exclusion — they are discovered at runtime and the palette has no
   // rows for them at all. Memoised because a fresh array on every render would defeat the memo().
   const visibleTabs = useMemo<AppTab[]>(() => {
-    const tabs: AppTab[] = ['chat', 'files', 'git', 'kanban', 'universe'];
+    const tabs: AppTab[] = ['chat', 'files', 'git', 'kanban', 'universe', 'schedules', 'jev'];
     if (shouldShowShellTab) tabs.push('shell');
     if (shouldShowTasksTab) tabs.push('tasks');
     if (shouldShowBrowserTab) tabs.push('browser');
     if (shouldShowMemoryTab) tabs.push('memory');
     if (shouldShowRunnerTab) tabs.push('runner');
+    if (shouldShowHealTab) tabs.push('heal');
     return tabs;
-  }, [shouldShowBrowserTab, shouldShowMemoryTab, shouldShowRunnerTab, shouldShowShellTab, shouldShowTasksTab]);
+  }, [shouldShowBrowserTab, shouldShowHealTab, shouldShowMemoryTab, shouldShowRunnerTab, shouldShowShellTab, shouldShowTasksTab]);
 
   return (
     <CommandPalette

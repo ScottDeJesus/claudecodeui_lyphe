@@ -390,6 +390,12 @@
       "description": "Dispatch the plan runner’s builder, its fix-pass and Athena on DeepSeek’s deepseek-flash instead of Claude Opus. Prometheus, the scouts and the replanner stay on Claude. Takes effect on the next phase.",
       "unreadable": "The switch could not be read from the server, so its position is unknown — this is not the same as off. It is retried whenever this page regains focus."
     },
+    "runnerHealModel": {
+      "label": "Model for heal souls",
+      "descriptionClaude": "Pinned to Claude — your subscription, so these heals are capped by nothing and count against no daily cap. It steers the heal reflex’s souls only: the chat composer’s Flash switch is a different file and never moves with it. Press the chip to send them back to DeepSeek Flash.",
+      "descriptionDeepseek": "Pinned to DeepSeek Flash. These heals count against the daily cap on the Heal tab, and park until midnight once it is reached. It steers the heal reflex’s souls only: the chat composer’s Flash switch is a different file and never moves with it. Press the chip to send them to Claude instead.",
+      "descriptionUnknown": "Which model this heal’s souls run on could not be read — the reflex’s summary is not in hand. Press Try again to ask for it."
+    },
     "jev": {
       "master": {
         "label": "Jev semantic judgment",
@@ -409,11 +415,7 @@
         "gatedOff": "Held off by the master switch above: turn Jev on to change this."
       },
       "unreadable": "The switches could not be read from the server, so their position is unknown — this is not the same as off. They are retried whenever this page regains focus.",
-      "stats": "Jev ledger: {{calls}} calls · {{tokens}} Jev tokens spent · {{linesIn}} lines filtered → {{linesKept}} kept",
-      "statsEmpty": "Jev ledger: no calls recorded yet.",
-      "net": "Jev net: {{chars}} chars ≈ {{tokens}} session tokens (+ kept out, − added)",
-      "consumer": "{{caller}}: {{chars}} chars",
-      "consumerMore": "… and {{more}} more — `jev stats` lists every consumer."
+      "netPointer": "Per-caller context kept out is on the Jev tab, next to Heal."
     }
   },
   "permissions": {

@@ -347,12 +347,7 @@
         "gatedOn": "被上方的總開關擋住——但此 opt-in 儲存為開啟，因此一旦開啟 Jev 就會立即傳送命令輸出。",
         "gatedOff": "被上方的總開關擋住：請先開啟 Jev 再變更此項。"
       },
-      "unreadable": "無法從伺服器讀取這些開關，因此其位置未知——這與關閉不同。每當此頁面重新取得焦點時都會重試。",
-      "stats": "Jev 帳本：{{calls}} 次呼叫 · 消耗 {{tokens}} 個 Jev token · 過濾 {{linesIn}} 行 → 保留 {{linesKept}} 行",
-      "statsEmpty": "Jev 帳本：尚無呼叫紀錄。",
-      "net": "Jev 淨額：{{chars}} 字元 ≈ 工作階段 {{tokens}} token（+ 省下，− 新增）",
-      "consumer": "{{caller}}：{{chars}} 字元",
-      "consumerMore": "… 另有 {{more}} 個 — 完整清單見 `jev stats`。"
+      "unreadable": "無法從伺服器讀取這些開關，因此其位置未知——這與關閉不同。每當此頁面重新取得焦點時都會重試。"
     },
     "login": {
       "title": "登入",

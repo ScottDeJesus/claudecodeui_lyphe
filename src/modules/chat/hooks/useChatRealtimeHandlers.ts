@@ -180,15 +180,14 @@ export function useChatRealtimeHandlers({
         case 'loading_progress':
           return;
 
-        // A box-wide frame owned by the live bus, never a chat row. It must RETURN and not break:
-        // `default` falls into the NormalizedMessage path below, where a frame carrying no
-        // sessionId of its own inherits the viewed session's and is appended to the open
-        // transcript, evicting real messages from the realtime buffer as it goes.
+        // A box-wide frame owned by the live bus, never a chat row: each RETURNs rather than
+        // breaking, to say so and to stay off the provider path below.
         //
-        // `universe_map` and `universe_activity` are here because they carry no sessionId at all:
-        // the first is one frame per HEAD move, but the second is the estate's activity coalesced
-        // and sent up to ten times a second for as long as anything in the estate is busy, so the
-        // fall-through would fill the open transcript with stray rows on a working host.
+        // This list is a NAMING, not the fence. What keeps a box-wide frame out of the transcript
+        // is the run stamp the append below checks, so a lane that lands tomorrow needs no edit
+        // here — it carries no run stamp and never becomes a row. `universe_activity` is the case
+        // that shows why the list alone was never enough: it is the estate's activity coalesced
+        // and sent up to ten times a second for as long as anything in the estate is busy.
         case 'runner_state':
         case 'soul_launch_state':
         case 'universe_map':
@@ -239,8 +238,22 @@ export function useChatRealtimeHandlers({
       }
 
       // --- All other messages: route to store ---
+      // A row joins the transcript only if the RUN WROTE IT. `ChatSessionWriter` hands every
+      // provider frame to `ChatRunRegistry.decorateAndRecordEvent`, which stamps the run's
+      // monotonic `seq` before the frame goes on the wire; a box-wide lane frame — `arc_state`,
+      // `kanban_metis_state`, `kanban_event`, `universe_*` — belongs to no run and carries none.
+      //
+      // Asking the stamp rather than the kind is the point, and the kind list above is why: a lane
+      // reaches production before anyone remembers to add it there, and the frame that slips
+      // through inherits the viewed session's id, is appended as a `NormalizedMessage` with no
+      // `id`, and makes the store's merge read `id.startsWith` off `undefined`. That throw happens
+      // inside the websocket listener, where the gateway's per-listener catch swallows it — so the
+      // frame is lost, every frame after it is lost, and the open chat never moves again until a
+      // reload rebuilds the store.
+      const writtenByRun = typeof msg.seq === 'number';
       const shouldPersist =
-        msg.kind !== 'complete'
+        writtenByRun
+        && msg.kind !== 'complete'
         && msg.kind !== 'status'
         && msg.kind !== 'permission_request'
         && msg.kind !== 'permission_resolved'

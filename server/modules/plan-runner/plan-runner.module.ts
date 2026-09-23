@@ -5,15 +5,17 @@ import type { Router } from 'express';
 import { appConfigDb, sessionsDb, userDb } from '@/modules/database/index.js';
 import { createNotificationEvent, notifyUserIfEnabled } from '@/modules/notifications/index.js';
 import { WS_OPEN_STATE, connectedClients } from '@/modules/websocket/index.js';
-import type { RunnerRunSnapshot, RunnerStateEvent, RunnerVerb } from '@/shared/types.js';
+import type { ArcStateEvent, RunnerRunSnapshot, RunnerStateEvent, RunnerVerb } from '@/shared/types.js';
 import { resolveClaudeCodeExecutablePath } from '@/shared/claude-cli-path.js';
 import { expandHome } from '@/shared/utils.js';
 
+import { createArcLane } from './arc-lane.js';
 import { createPlanRunnerRouter } from './plan-runner.routes.js';
 import { sweepPlanArchive } from './plan-archive.service.js';
 import { createRunnerEndingsNotifier } from './runner-endings.service.js';
 import type { RunnerEnding } from './runner-endings.service.js';
 import { snapshotRuns } from './runner-state.service.js';
+import { createOffpeakClock } from './runner-offpeak.service.js';
 import { runRunnerVerb } from './runner-verb.service.js';
 import { createRunnerWatcher } from './runner-watcher.service.js';
 
@@ -136,7 +138,7 @@ function resolveLaunchingSessions(runs: RunnerRunSnapshot[]): RunnerRunSnapshot[
 }
 
 /**
- * Builds the plan-runner lane for the server entrypoint: the poll, the frame, the two verbs, and
+ * Builds the plan-runner lane for the server entrypoint: the poll, the frame, the three run verbs, and
  * the notification each ending earns.
  *
  * The composition root is the only place here that reads the environment, names a path, spawns
@@ -161,7 +163,8 @@ export function createPlanRunnerModule({ heldPlanPaths }: PlanRunnerDependencies
   /** The daily sweep's interval, created once from the settle callback and cleared by `stop()`. */
   let archiveTimer: NodeJS.Timeout | null = null;
 
-  const broadcast = (frame: RunnerStateEvent): void => {
+  /** Every frame this module's sockets carry — the run list's and the arc deck's. ONE door, because both go to the same clients. */
+  const broadcast = (frame: RunnerStateEvent | ArcStateEvent): void => {
     const message = JSON.stringify(frame);
     connectedClients.forEach((client) => {
       if (client.readyState === WS_OPEN_STATE) client.send(message);
@@ -247,11 +250,39 @@ export function createPlanRunnerModule({ heldPlanPaths }: PlanRunnerDependencies
     logError: logErrorOnce,
   });
 
+  /**
+   * The arc deck's lane, built BESIDE the run lane on the same cadence and the same clock: `ENDED_KEEP_S` is
+   * the window a finished run is given, so the two lanes never disagree about how long a completed thing is
+   * shown, and the snapshot is handed epoch SECONDS exactly as the run list is.
+   *
+   * Its root is DERIVED from the run root rather than spelled, because the runner keeps the two together
+   * (`hooks/plan_runner/arcs.py:ARCS_DIR` is `PLAN_RUNNER_STATE_DIR`'s sibling): a moved run root must move
+   * the deck with it. Two roots cannot be allowed to name different trees — the runner resolves a drag in the
+   * tree IT writes, so the deck would draw one tree and silently rewrite an arc in the other, and the next
+   * frame would redraw from the root that did not change.
+   */
+  const arcLane = createArcLane({
+    // An explicit override for a probe, never a second root.
+    arcsDir: expandHome(process.env.PLAN_RUNNER_ARCS_DIR || path.join(path.dirname(stateDir), 'arcs')),
+    bin,
+    claudeBinDir,
+    broadcast,
+    pollMs: POLL_MS,
+    timeoutMs: VERB_TIMEOUT_MS,
+    endedKeepS: ENDED_KEEP_S,
+    logError: logErrorOnce,
+  });
+
   const router = createPlanRunnerRouter({
     current: () => watcher.current(),
-    runVerb: (verb: RunnerVerb, runId: string) =>
-      runRunnerVerb(verb, runId, { bin, timeoutMs: VERB_TIMEOUT_MS, claudeBinDir }),
+    runVerb: (verb: RunnerVerb, runId: string, verbArgs?: readonly string[]) =>
+      runRunnerVerb(verb, runId, { bin, timeoutMs: VERB_TIMEOUT_MS, claudeBinDir }, verbArgs),
+    offpeak: createOffpeakClock({ bin, timeoutMs: VERB_TIMEOUT_MS }),
   });
+
+  // The deck's routes ride this module's router, under the mount `server/index.ts` already makes for the
+  // lane — no second mount, and no edit to the entrypoint.
+  router.use(arcLane.router);
 
   /**
    * ONE pass of the plans-archive sweep. Never throws.
@@ -287,9 +318,13 @@ export function createPlanRunnerModule({ heldPlanPaths }: PlanRunnerDependencies
 
   return {
     router,
-    start: () => watcher.start(),
+    start: () => {
+      watcher.start();
+      arcLane.start();
+    },
     stop: () => {
       watcher.stop();
+      arcLane.stop();
       clearTimeout(settleTimer);
       if (archiveTimer !== null) clearInterval(archiveTimer);
     },

@@ -59,7 +59,7 @@ type RecentSessionsPage = {
  * status fields plus the project the session belongs to, so the list never
  * depends on which sessions a client has paged in.
  */
-type RunningSessionListItem = {
+export type RunningSessionListItem = {
   sessionId: string;
   provider: LLMProvider;
   startedAt: number;
@@ -202,6 +202,29 @@ export const sessionsService = {
         ),
       };
     });
+  },
+
+  /**
+   * The conversations with a question or permission prompt waiting on the user right now.
+   *
+   * Beside `listRunningSessions`, and deliberately not folded into it, for the reason the subagent
+   * list is: a prompt outlives the run that raised it. A backgrounded agent's completion wakes the
+   * CLI for a continuation turn no run is registered for, and a re-adopted host re-issues the prompt
+   * it was parked on — in both states the question is pending on screen while the run registry has
+   * already forgotten the session. A mark read off the runs alone cannot appear in either.
+   *
+   * Reads the providers directly: `providerRuntimeService` imports this service.
+   */
+  listAwaitingInputSessionIds(): string[] {
+    const sessionIds = new Set<string>();
+
+    for (const provider of providerRegistry.listProviders()) {
+      for (const sessionId of provider.runtime.permissions?.listPendingSessions() ?? []) {
+        sessionIds.add(sessionId);
+      }
+    }
+
+    return [...sessionIds].sort();
   },
 
   /**

@@ -124,7 +124,12 @@ export default function TaskDetailModal({
     <div className={cn('fixed inset-0 z-[100] flex items-center justify-center md:p-4', className)}>
       <div className="vv-dialog__backdrop absolute inset-0" onClick={onClose} aria-hidden />
 
-      <div className="vv-dialog__panel relative flex h-full w-full flex-col max-md:rounded-none md:h-[90vh] md:max-w-4xl">
+      {/* `pwa-notch-safe` rides the PANEL, not the layer above it: below `md` this panel is
+          `h-full w-full`, so it IS the screen, and its header row — where Close sits, at its very
+          top — is the chrome that must clear the status bar. The layer stays full-bleed for its
+          backdrop, a sibling `absolute inset-0` that layer padding would leave short of the edge.
+          No `--pwa-notch-safe-pad`: the panel carries no padding utility to compose with. */}
+      <div className="pwa-notch-safe vv-dialog__panel relative flex h-full w-full flex-col max-md:rounded-none md:h-[90vh] md:max-w-4xl">
         <div className="flex items-start justify-between gap-3 border-b border-border p-4 md:p-6">
           <div className="min-w-0 flex-1">
             <div className="mb-2 flex items-center gap-2">

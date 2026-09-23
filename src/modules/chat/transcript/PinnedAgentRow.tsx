@@ -22,7 +22,7 @@ type PinnedAgentRowProps = {
   id: string;
   latest: string;
   summary: SubagentSummary;
-  /** The provider it ran on: its logo is the row's mark. The robot stands in only when none is known. */
+  /** The provider it ran on: its mark is the row's, Claude's being the mascot the chat draws. The robot stands in only when none is known. */
   provider?: SubagentMarkProvider;
   onDismiss: (id: string) => void;
   /** Opens this row's transcript — in place in the gutter's widget, in a dialog from the strip. */
@@ -64,7 +64,9 @@ function PinnedAgentRow({ id, latest, summary, provider, onDismiss, onOpen, open
         * `LLMProviderLogo` defaults to Claude, so passing an unknown provider straight in would
         * dress it in Claude's mark instead of the neutral robot. */}
       {provider ? (
-        <LLMProviderLogo provider={provider} className="h-4 w-4 flex-shrink-0" />
+        // The mascot for Claude, as the chat's own assistant turns wear it: this row is the same
+        // agent at work, drawn again while it runs.
+        <LLMProviderLogo provider={provider} claudeMark="mascot" className="h-4 w-4 flex-shrink-0" />
       ) : (
         <Bot className={`h-4 w-4 flex-shrink-0 ${running ? 'text-purple-500 dark:text-purple-400' : 'text-muted-foreground/70'}`} />
       )}

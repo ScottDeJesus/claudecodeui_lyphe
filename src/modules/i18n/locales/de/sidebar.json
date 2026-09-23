@@ -173,6 +173,7 @@
     "iconDefault": "Standard",
     "iconOption": "Symbol {{name}}",
     "unread": "Fertig, noch nicht gelesen",
-    "dragHandle": "Zum Umsortieren ziehen"
+    "dragHandle": "Zum Umsortieren ziehen",
+    "subagentsRunning": "Subagenten laufen"
   }
 }

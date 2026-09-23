@@ -45,6 +45,13 @@ type RecentSessionsPage = {
 const SESSION_ROW_COLUMNS =
   'session_id, provider, provider_session_id, project_path, jsonl_path, custom_name, model, effort, forked_from_session_id, simple_list_at, simple_list_rank, icon, last_completed_at, last_read_at, isArchived, created_at, updated_at';
 
+/**
+ * The same list, addressed to the `sessions` table, for the queries that join `projects` — both
+ * tables carry a `project_path`, so an unqualified one is ambiguous there. Derived rather than
+ * written out, so the two can never drift apart.
+ */
+const SESSIONS_ROW_COLUMNS = SESSION_ROW_COLUMNS.split(', ').map((column) => `sessions.${column}`).join(', ');
+
 const SQLITE_UTC_TIMESTAMP_REGEX = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/;
 
 function normalizeTimestamp(value?: string): string | null {
@@ -666,6 +673,37 @@ export const sessionsDb = {
       sessions: normalizeSessionRows(rows),
       total: Number(countRow?.count ?? 0),
     };
+  },
+
+  /**
+   * The visible conversations touched at or after `sinceIso`, newest first — the candidate set a
+   * whole-estate question asks ("which sessions could this be about?") rather than a feed anyone
+   * reads. Archived chats and archived projects are left out for the same reason the sidebar
+   * leaves them out: a row nobody can see needs no answer about.
+   *
+   * `datetime(...)` on both sides of the comparison, deliberately: a row's timestamp is stored as
+   * an ISO string by the app and as a bare SQLite `CURRENT_TIMESTAMP` by the database's own writes,
+   * and comparing the two as text works only until the date part ties. The threshold is the
+   * caller's, because the window it means belongs to the question, not to the table.
+   */
+  getSessionsActiveSince(sinceIso: string, limit: number): SessionRow[] {
+    const db = getConnection();
+    const visiblePath = visibleProjectPathSql('sessions.project_path');
+    const rows = db
+      .prepare(
+        `SELECT ${SESSIONS_ROW_COLUMNS}
+         FROM sessions
+         LEFT JOIN projects ON projects.project_path = sessions.project_path
+         WHERE sessions.isArchived = 0
+           AND (projects.isArchived IS NULL OR projects.isArchived = 0)
+           AND ${visiblePath.clause}
+           AND datetime(COALESCE(sessions.updated_at, sessions.created_at)) >= datetime(?)
+         ORDER BY datetime(COALESCE(sessions.updated_at, sessions.created_at)) DESC, sessions.session_id DESC
+         LIMIT ?`
+      )
+      .all(...visiblePath.params, sinceIso, limit) as SessionRow[];
+
+    return normalizeSessionRows(rows);
   },
 
   /**

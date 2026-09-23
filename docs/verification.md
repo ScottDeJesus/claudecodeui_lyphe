@@ -454,8 +454,8 @@ queue. When the board's own pending queue is empty, the UI half runs on a synthe
 list injected the same way, since a probe that quietly passed on an empty queue would be measuring
 an absence; a `[NOTE]` says which of the two it read. The 390 px pass MEASURES the one new thing on
 the mobile strip rather than photographing it — choosing a tab closes the drawer, so the tab's
-bounding box is read while the drawer is still up, a tab pushed off the sideways-scrolling strip by
-its own count being indistinguishable in the picture. Unlike its HTTP-only sibling this one is **not**
+bounding box is read while the drawer is still up, a tab pushed out of its row by its own count
+being indistinguishable in the picture. Unlike its HTTP-only sibling this one is **not**
 safe to run while the operator is in the app, for a reason that has nothing to do with memory: it
 opens two `openConsole` sessions and each ends in `ensureTheme`, so it leaves the dev account on
 whichever mode ran last — every browser probe's cost here, see *Hosted instance* below. What is true
@@ -890,6 +890,31 @@ keeps the largest of the server's reading, its live fold and the finish total, a
 only where the figure can no longer move. The theme gate compares the same rows' colours across a
 light and a dark session and requires them to have moved, since every rendered element has some
 colour. It sends no prompt and writes nothing but its own browser's dismissal key.
+
+**`probe-workspace-tab-rows.mjs` proves the workspace tabs are two rows that each fit.** At 1440
+and 390, dark and light, it reads both tablists under the wordmark — `This project`, then `The
+house` — prints each row's tabs in order (the selected one bracketed, a count dot marked `•`), and
+holds every tab's box inside its row's rect, the row inside the sidebar, and `scrollWidth` at
+`clientWidth` for the tablist and its row alike. At the account's own gates it also requires that
+no More trigger is drawn, that the house row sits below the project row, that exactly one tab and
+one indicator exist across the two, and that no count dot is on the project row. At 390 it opens
+the drawer first, since that is where the rows are. Four screenshots, `workspace-tab-rows-*`; zero
+console errors once signed in. It selects nothing beyond what `openConsole` selects, and leaves the
+dev account on whichever theme ran last.
+
+**`probe-tabs-overflow.mjs` proves the kit's `Tabs` overflow alone.** It mounts `Tabs`
+(`underline`, `overflowLabel`) over the running page — the module instance read out of
+`WorkspaceTabs.tsx`'s served source — with fourteen icon tabs, one of the last three carrying a
+count, inside a 304 px box: the workspace row's measured width. It asserts that the trailing tabs
+collapsed behind ONE trigger that is a tab's height and wears the collapsed count's dot; that End
+lands on the trigger without opening it, and ArrowLeft from there selects the last visible tab;
+that the menu lists exactly the collapsed tabs in strip order, the counted one with its number,
+announced apart from its name; that choosing a collapsed tab makes it selected AND puts it in the
+row's last slot under the indicator, the slot's former tab collapsing instead and the trigger
+dropping its dot; that widening the box to 700 px — a DOM resize, so the ResizeObserver is what
+answers — removes the trigger with all fourteen tabs in order; and that narrowing again keeps the
+selected tab in the row. Dark then light, four screenshots (`tabs-overflow-*`), and the fixture
+unmounted in a `finally`.
 
 **`probe-shapes-lineopen.mjs` proves a line number survives all the way to a row a reader can
 actually see.** It drives the preview route with `fetch` first — a mid-file window, and `start=0`,
@@ -1612,9 +1637,9 @@ probe's one out-of-project symlink target lives in `/tmp`, where a target outsid
 be), and their screenshots are `.verify/shots/cfep-editor-390-light.png` and
 `.verify/shots/cfep-preview-pdf-390-light.png`. Both browser probes seed `localStorage` before the
 page loads — `auth-token` for the session, and `activeTab: 'files'` — and that second seed is what
-makes their 390px pass land on the Files tab: the strip is `overflow-x-auto`, so at phone width the
-tab a pass needs is not guaranteed to be on screen to click, and the app is standing on it from the
-first render instead.
+makes their 390px pass land on the Files tab: at phone width the workspace tabs live in the closed
+sidebar drawer, so the app is standing on the tab from the first render instead of the pass opening
+the drawer to click it.
 
 ## Standing colour baselines
 
@@ -1813,8 +1838,10 @@ question body, the session its tap opens, priority 4, and its two answer buttons
 `Blue` button's url with a **bare `fetch`, no headers at all**, which is the only honest proof
 that the signed token needs no CloudCLI session. Then it waits for `permission_resolved` and the
 turn's `complete`, counts the `permission_request` frames for that session (two would mean the
-hook and `canUseTool` both asked), and reads the model's last words for the answer the phone
-sent. It passes on exactly:
+hook and `canUseTool` both asked) and the pushes opening it (a second, titled "Claude needs you",
+is the CLI's own `Notification` hook announcing the same prompt — see
+[architecture/02-realtime-stream.md](architecture/02-realtime-stream.md) §"Permission requests"),
+and reads the model's last words for the answer the phone sent. It passes on exactly:
 
 ```
 PROBE OK bypass: frames=1 push=question actions=2 answered=Blue reply=Blue | default: frames=1 push=question actions=2 answered=Blue reply=Blue
@@ -1822,8 +1849,12 @@ PROBE OK bypass: frames=1 push=question actions=2 answered=Blue reply=Blue | def
 
 Anything else prints `PROBE FAILED <mode> <step>`, the detail, and every frame kind the socket
 saw, and exits 1. It sends `skipPermissions: false` explicitly, so a stored "skip permissions"
-cannot quietly turn the `default` run into a second bypass run. It deletes the session rows it
-created, and the project row on the same terms as the run-failed probe.
+cannot quietly turn the `default` run into a second bypass run. It deletes the session row it mints,
+and the project row on the same terms as the run-failed probe — not the row the chat itself ends up
+in, which the sync watcher keys by the CLI's own uuid once the turn starts, nor the dev account's
+ntfy endpoint row the probe's `configureNtfy` writes; both are what the per-run-project-path
+follow-up closes, and a reader who takes "leaves nothing behind" from this paragraph is reading a
+cleanup that does not happen.
 
 One stall probe — a run that goes quiet — also under plain `node`:
 
@@ -2030,6 +2061,7 @@ Eight things to know before running one:
 | **Nothing in `all.mjs` measures the DeepSeek balance** | It is the one surface here with no `phase-<n>.mjs`: `phase-13.mjs` predates it and asserts nothing about it, so the figure could vanish from the row and the panel with the standing gate still green — and the shots `13-footer` and `13-popover` would carry the change without a gate reading it. The procedure that does prove it, and the vendor-body table that seeds the missing script, are [deepseek-balance.md](deepseek-balance.md) §"Proving it". |
 | **Nothing in `all.mjs` measures the soul pin either** | The second such surface: the launcher-soul row among the chat's pinned rows was proven once by hand, in headless Chromium against the live client and a REAL `plan-runner soul` launch, and no phase holds it. A probe cannot fake it cheaply, which is why — the row is a JOIN, so it needs BOTH a transcript carrying a `SOUL LAUNCHED` receipt inside a `Bash` **result** whose command segment opens with `plan-runner soul`, AND a matching directory under `~/.claude/state/dispatch-souls/`. `DISPATCH_SOULS_STATE_DIR` looks like the way out and is not: the server reads it once at composition, so pointing it at a fixture tree means restarting the API. Writing a fixture launch dir under the REAL root is the workable path, with phase-23/26's discipline — one clearly-prefixed name, removed in a `finally`, and the launcher's own 14-day sweep behind it. The row carries `data-testid="pinned-soul-row"` with `data-status`, `data-provider` and `data-launch-id`; the hand procedure is [dispatch-souls.md](dispatch-souls.md) §"Proving it". |
 | **Nothing in `all.mjs` measures the DeepSeek Flash switch either** | Two client surfaces read and write it — the Settings row (`RunnerModelContent.tsx`) and the composer's own chip (`ComposerDeepSeekSwitch.tsx`) — sharing one coordinator, `useDeepSeekFlashSwitch`, and no `phase-<n>.mjs` drives either. Proven by hand instead, in headless Chromium against the running dev server signed in as the operator's own account, at viewport widths from 320px to 430px: both surfaces' filled/outlined/unknown positions, the composer chip standing down where its row has no room (with and without the voice button present), and a flip made on one surface reaching the other while both are mounted. Its contract is at [plan-runner.md](plan-runner.md) §"The DeepSeek switch". |
+| **Nor the swarm switch beside it** | One client surface, `RunnerModelContent.tsx`'s second row beneath the DeepSeek one, reads and writes it through its own coordinator, `useSwarmSwitch` — no `phase-<n>.mjs` drives it. Proven by hand instead, against the running dev server signed in as the operator's own account, by two probes. [`probe-swarm-ceiling.mjs`](../.verify/probe-swarm-ceiling.mjs) PRESSES the ceiling control — `−` from `Unlimited` to the first count, `+` up with no upper bound, the row's own `Unlimited` action back to no ceiling, and the same presses with the switch OFF — with every `/api/settings/swarm` request intercepted and answered inside the probe, so the PUT goes nowhere near the operator's flag file and the assertion is on the BODY the page sent (that body's own bytes are read back through the real writer and the real `swarm.read()` separately, which is what the probe's printout names). [`probe-swarm-mark.mjs`](../.verify/probe-swarm-mark.mjs) is the reading probe and covers the mark alone: the swarm mark on both surfaces it appears on (the settings row, and a swarmed run's card beside its lane strip), the two `<svg>` contents compared byte for byte so a second glyph is a FAIL, and the mark's contrast against its own card measured to the 3:1 non-text floor in both themes. Its contract is at [plan-runner.md](plan-runner.md) §"The swarm switch". |
 
 ## Hosted instance
 

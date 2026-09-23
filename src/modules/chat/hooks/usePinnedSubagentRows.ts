@@ -10,7 +10,7 @@ import {
   type SubagentMarkProvider,
   type SubagentSummary,
 } from '@/modules/chat/utils/subagentSummary';
-import { dismissPin, useDismissedPins } from '@/modules/chat/utils/pinnedDismissals';
+import { dismissPin, dismissPins, useDismissedPins } from '@/modules/chat/utils/pinnedDismissals';
 
 /**
  * The rows a conversation pins: the agents and launcher souls working for it right now, and the
@@ -121,7 +121,7 @@ function expiryOf(entry: PinnedSubagentRow): number | null {
 export function usePinnedSubagentRows(
   messages: ChatMessage[],
   soulLaunchIds: string[],
-): { rows: PinnedSubagentRow[]; dismiss: (id: string) => void } {
+): { rows: PinnedSubagentRow[]; dismiss: (id: string) => void; dismissMany: (ids: string[]) => void } {
   const dismissed = useDismissedPins();
 
   const launchesById = useSoulLaunches();
@@ -232,6 +232,11 @@ export function usePinnedSubagentRows(
   const dismiss = useCallback((id: string) => {
     dismissPin(dismissKeyByIdRef.current.get(id) ?? id);
   }, []);
+  // Many rows, one act — the same id-to-key translation, applied once to the whole list so the
+  // store writes and publishes a single time. See `dismissPins`.
+  const dismissMany = useCallback((ids: string[]) => {
+    dismissPins(ids.map((id) => dismissKeyByIdRef.current.get(id) ?? id));
+  }, []);
 
-  return { rows, dismiss };
+  return { rows, dismiss, dismissMany };
 }

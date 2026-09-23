@@ -70,6 +70,13 @@ export type LiveHost = {
   heldForBackgroundWork: boolean;
   deferredTools: string[];
   profile: Record<string, unknown> | null;
+  /**
+   * The CLI version this host's own process announced at init, read out of ITS journal — null when
+   * the journal holds no such line. The runtime's launch profile carries it, so a process adopted
+   * after a restart knows what it runs and is retired at its next message when the binary on disk
+   * is newer (see `lastReportedCliVersion`).
+   */
+  cliVersion: string | null;
 };
 
 export type TmuxResult = { ok: boolean; stdout: string; error: string | null };
@@ -168,30 +175,30 @@ export function listLiveHosts(): LiveHost[] {
       deferredTools: Array.isArray(meta.deferredTools)
         ? meta.deferredTools.filter((id): id is string => typeof id === 'string')
         : [],
-      profile: meta.profile && typeof meta.profile === 'object' ? meta.profile : null
+      profile: meta.profile && typeof meta.profile === 'object' ? meta.profile : null,
+      // Out of the journal, not the meta: what the CLI said about itself, at the one moment it said
+      // it. A host spawned before this field existed answers just the same.
+      cliVersion: lastReportedCliVersion(hostId)
     });
   }
   return live;
 }
 
-/** How far back, per read, the journal is scanned for its newest turn end. */
+/** How far back, per read, the journal is scanned for what a boot wants out of its tail. */
 const JOURNAL_SCAN_CHUNK_BYTES = 256 * 1024;
 
 /**
- * When the host's CLI last ended a turn — the `at` of the newest `result` line in its journal — or
- * null when it never has. Read backwards in chunks, so a multi-megabyte journal costs one chunk in
- * the usual case, where the newest line is that result.
+ * Walks the journal's lines NEWEST first and stops at the first one `visit` claims.
  *
- * Re-adoption asks it to tell a turn whose end the previous server already recorded from one that
- * ended without a recorded completion (a follow-up turn a background task pushed): only the second
- * is news for the unread dot.
+ * Backwards in chunks, so a multi-megabyte journal costs one chunk when the line wanted is at the
+ * tail. Whether an answer is worth a deeper read is the caller's business, never this walk's.
  */
-export function lastTurnFinishedAt(hostId: string): number | null {
+function journalLineNewestFirst(hostId: string, visit: (raw: string) => boolean): boolean {
   let fd: number;
   try {
     fd = fs.openSync(hostJournalPath(hostId), 'r');
   } catch {
-    return null;
+    return false;
   }
   try {
     let position = fs.fstatSync(fd).size;
@@ -205,13 +212,67 @@ export function lastTurnFinishedAt(hostId: string): number | null {
       // The first piece may be the tail of a line that starts in the previous chunk.
       carry = position > 0 ? (lines.shift() ?? '') : '';
       for (let i = lines.length - 1; i >= 0; i -= 1) {
-        const at = readResultAt(lines[i]);
-        if (at !== null) return at;
+        if (visit(lines[i])) return true;
       }
     }
-    return readResultAt(carry);
+    return visit(carry);
   } finally {
     fs.closeSync(fd);
+  }
+}
+
+/**
+ * When the host's CLI last ended a turn — the `at` of the newest `result` line in its journal — or
+ * null when it never has.
+ *
+ * Re-adoption asks it to tell a turn whose end the previous server already recorded from one that
+ * ended without a recorded completion (a follow-up turn a background task pushed): only the second
+ * is news for the unread dot.
+ */
+export function lastTurnFinishedAt(hostId: string): number | null {
+  let found: number | null = null;
+  journalLineNewestFirst(hostId, (raw) => {
+    found = readResultAt(raw);
+    return found !== null;
+  });
+  return found;
+}
+
+/**
+ * The Claude CLI version the host's CLI announced at its own init — the newest such line in its
+ * journal — or null when the journal holds none.
+ *
+ * The journal IS the run's own record of what its process said, written by the host as that line
+ * passed through it, so a server that adopts this host later reads the version from the process it
+ * is adopting rather than from the installed binary: those are two different processes, and the
+ * second can be a newer build. That is the whole comparison — a live host on an older version is
+ * retired at its next message (chat-process.ts, `planLiveChanges`).
+ *
+ * A version is a property of the PROCESS, not of a turn, so the newest such line answers for the
+ * whole host — including a host that has run no turn since it was spawned, if its own start ever
+ * printed one. Null is "not heard", which is never a reason to replace anything.
+ */
+export function lastReportedCliVersion(hostId: string): string | null {
+  let version: string | null = null;
+  journalLineNewestFirst(hostId, (raw) => {
+    version = readInitVersion(raw);
+    return version !== null;
+  });
+  return version;
+}
+
+/** The `claude_code_version` of one journal entry when it is CLI output carrying an init, else null. */
+function readInitVersion(raw: string): string | null {
+  // Cheapest test first: almost every line is an assistant delta, and neither `JSON.parse` may run
+  // for it.
+  if (!raw.includes('claude_code_version')) return null;
+  try {
+    const entry = JSON.parse(raw) as { t?: unknown; line?: unknown };
+    if (entry.t !== 'out' || typeof entry.line !== 'string') return null;
+    const output = JSON.parse(entry.line) as { claude_code_version?: unknown };
+    return typeof output.claude_code_version === 'string' ? output.claude_code_version : null;
+  } catch {
+    return null;
   }
 }
 

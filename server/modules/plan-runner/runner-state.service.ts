@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 
 import type {
+  RunnerLaneRow,
   RunnerPhaseRow,
   RunnerPhaseState,
   RunnerPosition,
@@ -10,6 +11,7 @@ import type {
   RunnerTimelineEntry,
 } from '@/shared/types.js';
 import { isHiddenProjectPath } from '@/shared/hidden-project-paths.js';
+import { readRunnerModelChoice } from '@/shared/utils.js';
 
 import {
   listRunDirs,
@@ -34,6 +36,8 @@ import {
 /** One `runner.log` line: a local ISO stamp, the ◆ line, and the stage word with its optional detail. */
 const TIMELINE_LINE =
   /^(\S+) ◆ (\d+) of (\d+) · Phase ([\w.]+) — .*? · stage: (\S+)(?: (.*))?$/;
+/** The suffix `progress.py` adds while more than one lane is live — ids today, a bare count in older logs. */
+const LANES_TAIL = / · lanes: [\w., ]+$/;
 
 /** How long an ENDED run stays on the lane after its receipt, when a caller names no window. The composition root names one (`plan-runner.module.ts`); this default only keeps a bare call honest. */
 const DEFAULT_ENDED_KEEP_S = 24 * 60 * 60;
@@ -106,7 +110,48 @@ function readPhaseRow(raw: unknown, index: number): RunnerPhaseRow {
     title: readString(field(raw, 'title')),
     state: PHASE_STATES.includes(state) ? state : 'pending',
     note: readString(field(raw, 'note')),
+    // Absent is `null`, the boundary rule `lanes` follows: a file from before the field, or a
+    // phase the plan's wave map could not place.
+    wave: readNumberOrNull(field(raw, 'wave')),
   };
+}
+
+/**
+ * One `progress.json` lane row, or `null` for a record nothing can be drawn from.
+ *
+ * `lane` and `phase_id` are the row's identity — the lane id IS the phase id, a phase running on
+ * exactly one lane — so a row missing either is DROPPED: a lane with no id has no key to render
+ * under and a lane with no phase has no name to show. Everything else falls back the way the
+ * neighbouring readers do, so one field the runner grew later costs that field and not the row.
+ */
+function readLaneRow(raw: unknown): RunnerLaneRow | null {
+  if (raw === null || typeof raw !== 'object') return null;
+  const lane = readStringOrNull(field(raw, 'lane'));
+  const phaseId = readStringOrNull(field(raw, 'phase_id'));
+  if (lane === null || phaseId === null) return null;
+  return {
+    lane,
+    phase_id: phaseId,
+    rank: readNumber(field(raw, 'rank'), 0),
+    title: readString(field(raw, 'title')),
+    stage: readString(field(raw, 'stage')),
+    stage_detail: readString(field(raw, 'stage_detail')),
+    stage_since: readNumber(field(raw, 'stage_since'), 0),
+  };
+}
+
+/**
+ * The run's live lanes, lowest rank first — what the runner wrote, or `[]`.
+ *
+ * An absent key is not a defect: a `progress.json` written before lanes shipped has none, while
+ * today's writer always spells the table out — `[]` on a serial run, one row per live lane. A
+ * `lanes` that is not an array is `[]` too rather than a throw, the same direction `phases` reads
+ * in and the one that keeps the card drawn: a malformed lane table may cost the lane rows, never
+ * the run.
+ */
+function readLanes(raw: unknown): RunnerLaneRow[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.map(readLaneRow).filter((row): row is RunnerLaneRow => row !== null);
 }
 
 /**
@@ -195,6 +240,14 @@ function readRepair(raw: unknown): RunnerRepair | null {
  * last line can be half-written when we read it, and a partial line parsed leniently would put
  * a phantom stage on the wall. The timestamp is kept as the runner's own local ISO string — it
  * carries no zone, so re-parsing it into an epoch would invent an offset.
+ *
+ * An event that repeats the one KEPT BEFORE IT — same second, same phase, same stage, same detail
+ * — collapses into it. A second is the runner's own resolution, and a sibling lane's stage change
+ * used to re-print the current phase's line, so a phase read `08:16:35 builder` four times over one
+ * unchanged stage (heal-reflex run, 2026-09-22). The writer no longer appends those, and this keeps
+ * every log ALREADY on disk clean without a rewrite. CONSECUTIVE rows only: a stage re-entered
+ * after another in the same second is a real event, and an identical stage at a LATER second is
+ * kept for the same reason — a builder re-spawned after a retry.
  */
 export function parseTimeline(lines: string[]): RunnerTimelineEntry[] {
   const entries: RunnerTimelineEntry[] = [];
@@ -202,8 +255,15 @@ export function parseTimeline(lines: string[]): RunnerTimelineEntry[] {
   // length. A run hours long has thousands of lines and only the last 200 can survive; matching
   // the earlier ones every time the file changes buys a result that is thrown away.
   for (let index = lines.length - 1; index >= 0 && entries.length < TIMELINE_LIMIT; index -= 1) {
-    const match = TIMELINE_LINE.exec(lines[index]);
-    if (match) entries.push({ at: match[1], phase_id: match[4], stage: match[5], detail: match[6] ?? '' });
+    // The ◆ line's ` · lanes: 5, 6` tail names the run's lanes, not this stage's detail: cut first.
+    const match = TIMELINE_LINE.exec(lines[index].replace(LANES_TAIL, ''));
+    if (!match) continue;
+    const entry = { at: match[1], phase_id: match[4], stage: match[5], detail: match[6] ?? '' };
+    // Newest-first: the entry pushed LAST is this one's predecessor in the log.
+    const previous = entries[entries.length - 1];
+    if (previous && previous.at === entry.at && previous.phase_id === entry.phase_id
+      && previous.stage === entry.stage && previous.detail === entry.detail) continue;
+    entries.push(entry);
   }
   return entries.reverse();
 }
@@ -306,12 +366,20 @@ export function classifyRun(
     // Carried raw, like `stopped_at`: the client renders it in the reader's own zone, and `null`
     // is a real answer — a queued run that named no window to wait for.
     queued_until: queuedUntil,
+    // The operator's scheduled Start (`plan-runner schedule`), raw like `queued_until`; absent reads `null`.
+    start_at: readNumberOrNull(field(files.run, 'start_at')),
+    // The run's own model word as the runner stored it (`run_model.py`); a record with no word reads `null`.
+    model: readRunnerModelChoice(field(files.run, 'model')),
     launched_by_session: launchedBySession,
     outcome: ending?.outcome ?? null,
     ended_at: ending?.at ?? null,
     blocked_causes: ending !== null ? readBlockedCauses(files.receipt) : {},
     pid: readNumberOrNull(field(progress, 'pid')),
     position: readPosition(field(progress, 'position')),
+    // The lane table, read with the same defences as every other block here: absent or malformed
+    // is no lanes, never a dropped snapshot. This lane only READS `progress.json` — how the file
+    // is found and parsed is the transport's, and nothing here asks for another read.
+    lanes: readLanes(field(progress, 'lanes')),
     repair: readRepair(field(progress, 'repair')),
     phases: Array.isArray(phases) ? phases.map(readPhaseRow) : [],
     spawns: readNumber(field(progress, 'spawns'), 0),

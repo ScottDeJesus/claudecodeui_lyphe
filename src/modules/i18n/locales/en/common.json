@@ -26,8 +26,316 @@
     "browser": "Browser",
     "memory": "Memory",
     "runner": "Runner",
+    "heal": "Heal",
+    "jev": "Jev",
     "kanban": "Kanban",
-    "universe": "Universe"
+    "universe": "Universe",
+    "schedules": "Schedules",
+    "project": "This project",
+    "house": "The house",
+    "more": "More views"
+  },
+  "heal": {
+    "actions": {
+      "label": "Heal actions",
+      "modelClaude": "Heals run on Claude — your subscription, no cap",
+      "modelDeepseek": "Heals run on DeepSeek Flash, under the daily cap"
+    },
+    "cap": {
+      "description": "The most a day of DeepSeek heals may spend before a cycle waits until midnight instead; blank is no ceiling. It counts DeepSeek dollars only — heals on Claude, your subscription, are never counted here and never held by it.",
+      "field": "USD per day",
+      "label": "Daily cap",
+      "none": "no ceiling"
+    },
+    "cards": {
+      "athenaClean": "Athena · clean",
+      "athenaPending": "Athena · not yet",
+      "by": "Fired by {{reason}} · built by {{builder}}",
+      "classes": "Cause classes claimed:",
+      "closed": "{{count}} rows closed",
+      "costTitle": "What the chain cost",
+      "empty": {
+        "message": "A cycle fires them — nightly on the schedule, or Run a cycle now.",
+        "title": "No heal has run yet"
+      },
+      "ended": "ended {{ago}}",
+      "noClasses": "none yet",
+      "openBrief": "Open brief",
+      "quiet": "quiet after landing",
+      "spike": "↑ {{count}} filed after landing",
+      "title": "Heals"
+    },
+    "ignore": {
+      "add": "Add ignore",
+      "description": "A row here is never counted as pain. Adding one is retroactive: every existing row it matches is ignored too, and the count is shown.",
+      "label": "Ignored by design",
+      "pattern": "Pattern (regex)",
+      "reason": "Reason",
+      "reasonHint": "why this is by design",
+      "swept": "Added · ignored {{count}} existing rows",
+      "tool": "Tool"
+    },
+    "kinds": {
+      "classTitle": "Cause class",
+      "empty": {
+        "message": "Every door is filing quietly. The next row filed lights this list.",
+        "title": "No friction since the last heal"
+      },
+      "hint": "the door’s own word — what a heal is scoped to",
+      "ignored": "{{count}} ignored",
+      "ignoredOne": "ignored",
+      "live": "{{count}} live",
+      "noTranscript": "no transcript",
+      "regression": "⚠ regression · {{klass}} came back {{ago}}",
+      "soul": "soul",
+      "title": "Friction by kind",
+      "toggle": "Show the rows of {{kind}}",
+      "noneFiled": "No rows are filed under this kind right now.",
+      "readFailed": "This kind could not be read",
+      "reading": "Reading this kind’s rows…"
+    },
+    "model": {
+      "label": "Model for heal souls",
+      "offPeak": "Off-peak right now: DeepSeek is half price until {{time}}.",
+      "peak": "Peak hours right now: DeepSeek is full price until {{time}}.",
+      "reading": "Reading the heal’s model switch…",
+      "short": "Flash",
+      "shortClaude": "Claude",
+      "tooltip": "This heal’s souls run on DeepSeek Flash, and its spend counts against the daily cap in Heal settings. It steers the heal reflex’s souls only — the chat composer’s Flash switch is a different file and never moves with it. Press to send the next heal to Claude instead.",
+      "tooltipClaude": "This heal’s souls run on Claude — your subscription, so it is capped by nothing and counts against no cap. It steers the heal reflex’s souls only — the chat composer’s Flash switch is a different file and never moves with it. Press to send the next heal to DeepSeek Flash instead.",
+      "unreadable": "The heal’s model switch could not be read — press to try again."
+    },
+    "pills": {
+      "friction": "Friction",
+      "frictionTitle": "Live rows since the last heal",
+      "ignored": "Ignored",
+      "ignoredTitle": "Rows an ignore row swept — refusals by design, never pain",
+      "label": "Heal vitals",
+      "lastHeal": "Last heal",
+      "noCap": "no cap",
+      "noCapOnClaude": "no cap on Claude",
+      "noHeal": "none yet",
+      "noHealTitle": "No heal has run",
+      "spend": "Today",
+      "spendTitle": "Heal spend today against the daily cap",
+      "spendTitleClaude": "DeepSeek heal spend today. These heals run on Claude — your subscription — so the daily cap counts none of it and closes nothing."
+    },
+    "queue": {
+      "empty": "The runner’s queue is empty.",
+      "next": "next: {{next}}",
+      "noNext": "no next step named",
+      "phase": "phase {{phase}}",
+      "readOnly": "read-only",
+      "title": "Runner heal queue — the second door"
+    },
+    "reading": "Reading the friction ledger…",
+    "settings": {
+      "close": "Close heal settings",
+      "open": "Heal settings",
+      "title": "Heal settings"
+    },
+    "startStop": {
+      "start": "Run a cycle now",
+      "startHint": "Open a cycle now: Chiron ranks the live friction, then heals walk his list one after another.",
+      "stop": "End cycle",
+      "stopHint": "End the open cycle: heals already running finish on their own, and nothing new starts."
+    },
+    "title": "Heal",
+    "unreachable": {
+      "retry": "Try again",
+      "title": "The friction ledger could not be read"
+    },
+    "cycles": {
+      "chironFallback": "Chiron · fallback — {{why}}",
+      "chironJudging": "Chiron · judging",
+      "chironNone": "Chiron · nothing to judge",
+      "chironPending": "Chiron · not launched yet",
+      "chironRanked": "Chiron · ranked {{count}}",
+      "empty": "No cycles yet",
+      "ended": "ended {{ago}}",
+      "gathered": "{{count}} gathered",
+      "healed": "{{count}} healed",
+      "hint": "nightly or pressed — Chiron ranks, heals walk his list",
+      "ignored": "{{count}} ignored",
+      "ignoredEntry": "ignored · {{count}} swept",
+      "masterOff": "Heals are off — Settings → Agents",
+      "nightly": "Nightly",
+      "openCaption": "A cycle is open — End cycle lets running heals finish and starts nothing new",
+      "pill": "Cycle",
+      "pillOffTitle": "No cycle opens on its own; Run a cycle now opens one",
+      "pressed": "Pressed",
+      "refusedEntry": "ignore refused",
+      "spentTitle": "DeepSeek dollars this cycle spent",
+      "startCaption": "Chiron ranks the live friction, then heals walk his list",
+      "title": "Cycles",
+      "toggle": "Show the worklist of the {{door}} cycle started {{ago}}",
+      "waiting": "Waiting: {{why}}"
+    },
+    "schedule": {
+      "hourDown": "One hour earlier",
+      "hourLabel": "Hour the nightly cycle opens, UTC",
+      "hourUp": "One hour later",
+      "label": "Nightly maintenance cycle",
+      "off": "Off: only Run a cycle now opens one. On, a cycle opens every day at the hour beside it, once the box is quiet.",
+      "on": "Every day at {{slot}} a cycle opens on its own: Chiron ranks what hurt over the last two weeks, and heals walk his list one after another. It waits for a quiet box — nothing opens beside a walking run. Takes effect at the next slot."
+    }
+  },
+  "jev": {
+    "title": "Jev",
+    "refresh": "Refresh",
+    "reading": "Asking the Jev reader…",
+    "unreachable": {
+      "title": "The Jev reader could not be asked",
+      "retry": "Try again"
+    },
+    "empty": {
+      "title": "Jev has not been called yet",
+      "message": "The first ask writes the ledger. The switches below are what let one happen."
+    },
+    "sections": {
+      "burn": "Balance and burn",
+      "net": "What Jev saves",
+      "netHint": "all time",
+      "consumers": "Biggest consumers",
+      "feed": "What Jev is doing now",
+      "controls": "Switches, cache, counters and no-send",
+      "reference": "Who calls Jev"
+    },
+    "burn": {
+      "leftOf": "left of {{credit}}",
+      "unknown": "balance unknown — no account file to price from",
+      "estimate": "estimate",
+      "estimateTitle": "TypeSafe has no balance API — credit minus priced usage, including purged rows",
+      "today": "today",
+      "week": "7 days",
+      "all": "all time",
+      "calls": "{{n}} calls"
+    },
+    "chart": {
+      "max": "max {{value}}",
+      "seriesUsd": "$ per day",
+      "seriesTokens": "tokens per day — no price on file",
+      "total": "14 days · {{value}} · {{calls}} calls",
+      "barTitle": "{{date}} · {{calls}} calls · {{tokens}} tok · {{usd}}",
+      "label": "Spend by day, the last 14 days"
+    },
+    "net": {
+      "chars": "chars",
+      "tokens": "≈ {{value}} session tokens",
+      "legend": "+ kept out of sessions, − added",
+      "filtered": "lines filtered",
+      "filteredHint": "in → kept",
+      "saved": "chars the filter left unread",
+      "savedHint": "≈ {{value}} session tokens",
+      "byCaller": "Net context by caller",
+      "empty": "Jev has not kept any context out yet"
+    },
+    "consumers": {
+      "ofSpend": "{{share}} of spend ({{range}})",
+      "noTop": "No priced call in this range",
+      "rangeTotal": "of {{usd}} · {{tokens}} tok · {{calls}} calls ({{range}})",
+      "noAsks": "no description yet",
+      "rangeLabel": "Range",
+      "range": {
+        "today": "today",
+        "7d": "7d",
+        "30d": "30d",
+        "all": "all"
+      },
+      "columns": {
+        "caller": "caller",
+        "calls": "calls",
+        "tokens": "tokens",
+        "usd": "$",
+        "share": "share",
+        "avg_latency_s": "avg latency",
+        "unavailable": "unavailable",
+        "cache_hits": "cache hits",
+        "refusals": "refusals"
+      },
+      "expand": "Show the verbs of {{caller}}",
+      "collapse": "Hide the verbs of {{caller}}",
+      "pick": "Show only {{caller}} in the feed",
+      "noVerbs": "no priced call — cache hits and refusals only",
+      "empty": "No caller in this range"
+    },
+    "feed": {
+      "caption": "newest first · updates every 10 s · no text: the ledger keeps the verb, the answer and the size, never what was asked",
+      "filtered": "only {{caller}}",
+      "clear": "Clear the caller filter",
+      "empty": "Nothing in the feed yet",
+      "columns": {
+        "when": "when",
+        "caller": "caller",
+        "verb": "verb",
+        "answer": "answer",
+        "tokens": "tokens",
+        "latency": "latency",
+        "outcome": "outcome"
+      },
+      "ok": "ok",
+      "unavailable": "unavailable",
+      "cacheHit": "cache hit",
+      "refused": "refused",
+      "report": "report"
+    },
+    "controls": {
+      "switches": {
+        "title": "Switches",
+        "unreadable": "The switch files could not be read — the positions below are not known",
+        "master": "Jev",
+        "masterHint": "the master — off, nothing is sent anywhere",
+        "prompts": "Prompts",
+        "promptsHint": "let a hook ask about what a session was told",
+        "toolOutput": "Tool output",
+        "toolOutputHint": "let a hook ask about what a command printed",
+        "offWhileMasterOff": "off while the master is off"
+      },
+      "cache": {
+        "title": "Replay cache",
+        "keys": "keys",
+        "draws": "draws",
+        "bytes": "bytes",
+        "fileBytes": "file size",
+        "error": "could not be read: {{error}}",
+        "caption": "armed only in processes started with JEV_CACHE=1",
+        "clear": "Clear",
+        "confirmTitle": "Clear the replay cache?",
+        "confirmMessage": "Every cached answer goes. The next ask of each key is sent again and paid for.",
+        "keep": "Keep it",
+        "confirm": "Clear it"
+      },
+      "budget": {
+        "title": "Ask counters",
+        "key": "key",
+        "used": "used",
+        "last": "last used",
+        "ago": "{{ago}} ago",
+        "empty": "No counter on disk — no process has asked under a budget",
+        "caption": "the ceiling is JEV_BUDGET_CALLS in the asking process"
+      },
+      "noSend": {
+        "title": "Never sent",
+        "file": "file",
+        "missing": "missing",
+        "empty": "No path on file — the built-in list stands",
+        "caption": "path prefixes whose output never leaves this machine, whatever the switches say"
+      }
+    },
+    "reference": {
+      "columns": {
+        "caller": "caller",
+        "asks": "asks",
+        "source": "source",
+        "calls": "calls (all time)",
+        "last": "last seen"
+      },
+      "unmapped": "unmapped",
+      "unmappedLine": "no description yet — add it to the Jev consumer map",
+      "never": "never",
+      "ago": "{{ago}} ago",
+      "empty": "No caller is known yet"
+    }
   },
   "kanban": {
     "loading": "Reading the board…",
@@ -283,6 +591,10 @@
     "pipeline": "Pipeline",
     "phaseCount_one": "{{count}} phase",
     "phaseCount": "{{count}} phases",
+    "lanesAtOnce": "{{count}} phases at once",
+    "wave": "wave {{n}}",
+    "waveAlongside": "runs alongside {{phases}}",
+    "wavePhase": "Phase {{phase}}",
     "spawns": "spawns {{used}}/{{max}}",
     "planSpend_one": "{{spawns}} spawns · ${{cost}} across {{count}} run",
     "planSpend": "{{spawns}} spawns · ${{cost}} across {{count}} runs",
@@ -312,7 +624,11 @@
     },
     "toast": {
       "stopping": "stopping — the runner was asked to park this run",
-      "resumed": "resumed — the run is moving again"
+      "resumed": "resumed — the run is moving again",
+      "model": "model set — the next phase goes where this says",
+      "scheduled": "scheduled — the watchdog presses Start at that time",
+      "unscheduled": "scheduled start cancelled",
+      "arcStarted": "arc started — card 1 is on its way"
     },
     "dismiss": "Dismiss",
     "ended": "ended {{elapsed}} ago",
@@ -355,6 +671,47 @@
       "ended": "finished {{elapsed}} ago",
       "replanning": "Replanning Phase {{phase}}",
       "pausedReplan": "Replan of Phase {{phase}} paused — it resumes with the run"
+    },
+    "arcs": "Arcs",
+    "arcCards": "{{done}} of {{total}} done",
+    "arcCard": "Card {{n}}",
+    "arcWalking": "walking",
+    "arcStalled": "stalled",
+    "arcComplete": "complete",
+    "arcNotStarted": "not started",
+    "arcQueued": "queued",
+    "arcPaused": "paused",
+    "arcDragHint": "drag a card the runner has not started to change its place",
+    "arcViewing": "Card {{n}} of {{total}}",
+    "arcPrevious": "Previous card",
+    "arcNextCard": "Next card",
+    "arcStrip": "Cards of {{title}}",
+    "arcNoPhases": "Plan not written yet",
+    "arcMorePhases": "+{{n}} more",
+    "arcFewerPhases": "Show fewer",
+    "model": {
+      "label": "Model for this run’s builders",
+      "arcLabel": "Model for every card in this arc",
+      "deepseek": "DeepSeek",
+      "claude": "Claude",
+      "auto": "Chat switch",
+      "deepseekTitle": "Send this run’s builders to DeepSeek Flash from its next phase, whatever the chat’s switch says. A phase already building keeps the model it started on.",
+      "claudeTitle": "Send this run’s builders to Claude from its next phase, whatever the chat’s switch says. A phase already building keeps the model it started on.",
+      "autoTitle": "Follow the chat’s DeepSeek switch from its next phase, instead of the runner’s DeepSeek default.",
+      "arcDeepseekTitle": "Every card of this arc sends its builders to DeepSeek Flash — the card walking now from its next phase.",
+      "arcClaudeTitle": "Every card of this arc sends its builders to Claude — the card walking now from its next phase.",
+      "arcAutoTitle": "Every card of this arc follows the chat’s DeepSeek switch.",
+      "refused": "Model not set"
+    },
+    "schedule": {
+      "label": "Scheduled start",
+      "startAt": "Start at {{time}}",
+      "cancel": "Cancel",
+      "starts": "starts {{time}}",
+      "runTitle": "Start this run when DeepSeek’s daily peak lifts — the watchdog presses Start at that time, within two minutes",
+      "arcTitle": "Start this arc when DeepSeek’s daily peak lifts — the watchdog presses Start at that time, within two minutes",
+      "cancelTitle": "Cancel the scheduled start; nothing starts until Start is pressed",
+      "refused": "Schedule"
     }
   },
   "navigation": {
@@ -596,6 +953,7 @@
     "subagents": {
       "title": "Subagents",
       "empty": "No subagents in this chat",
+      "clearCompleted": "Clear completed",
       "back": "Back to subagents",
       "loading": "Loading transcript…",
       "notFound": "No transcript on disk yet",

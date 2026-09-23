@@ -9,16 +9,6 @@ import SettingsRow from '@/modules/settings/SettingsRow';
 import SettingsToggle from '@/modules/settings/SettingsToggle';
 
 /**
- * How many consumers the net line names before it stops, and the count the line below it carries.
- *
- * The list is sorted by value descending, so a cut at five lands on the tail — and the tail is where
- * the NEGATIVE consumers live, the ones that added text to sessions. Those are exactly the rows a
- * reader needs to reconcile the net line with the rows printed under it: without the "and N more"
- * line the five rows can sum to more than the net above them with nothing on the panel to say why.
- */
-const TOP_CONSUMERS = 5;
-
-/**
  * One narrower opt-in's words: the four states its row can be drawn in — the description it carries
  * while it counts, and the two it carries while the master holds it, split by whether its stored
  * value is on, because a stored on under an off master is the pairing the master row warns about.
@@ -29,11 +19,6 @@ type ScopeRow = {
   gatedOn: string;
   gatedOff: string;
 };
-
-/** A signed character count, as `jev stats` prints one: a `+` on what a consumer kept out of sessions. */
-function signedChars(value: number): string {
-  return `${value > 0 ? '+' : ''}${value.toLocaleString()}`;
-}
 
 /**
  * Rendered by AgentCategoryContentSection directly under `RunnerModelContent`, in Claude's
@@ -47,12 +32,12 @@ function signedChars(value: number): string {
  *
  * The scope rows are drawn from `JEV_SCOPES` and the table below rather than written out one by one,
  * so a scope the server gains is one entry here and nothing else: every row's gating, its press and
- * the master's warning follow from the list. The read, the writes, the re-read and the ledger all
- * live in `useJevSwitches`.
+ * the master's warning follow from the list. The read, the writes and the re-read all live in
+ * `useJevSwitches`; the Jev readings themselves are the Jev tab's, not this panel's.
  */
 export default function JevContent() {
   const { t } = useTranslation('settings');
-  const { state, stats, unreadable, saving, setMaster, setScope, refresh } = useJevSwitches();
+  const { state, unreadable, saving, setMaster, setScope, refresh } = useJevSwitches();
 
   const masterLabel = t('agents.jev.master.label', { defaultValue: 'Jev semantic judgment' });
   // A switch drawn off for a switch that is on is the one thing these rows must never do, and they
@@ -120,48 +105,12 @@ export default function JevContent() {
           defaultValue: 'Scripts and sessions may ask TypeSafe’s Jev for a yes/no, a pick-one, or to filter a large output before reading it. Off: nothing leaves this machine.',
         });
 
-  // The ledger is read-only furniture under the rows, and it is allowed to be absent: a failed
-  // stats read draws nothing rather than a wrong total. Zero calls is its own state — the house has
-  // never asked Jev anything — and it is said as such rather than as a row of zeros.
-  const ledgerLines = stats === null ? [] : [stats.present
-    ? t('agents.jev.stats', {
-        defaultValue: 'Jev ledger: {{calls}} calls · {{tokens}} Jev tokens spent · {{linesIn}} lines filtered → {{linesKept}} kept',
-        calls: stats.calls.toLocaleString(),
-        tokens: stats.tokens.toLocaleString(),
-        linesIn: stats.linesIn.toLocaleString(),
-        linesKept: stats.linesKept.toLocaleString(),
-      })
-    : t('agents.jev.statsEmpty', { defaultValue: 'Jev ledger: no calls recorded yet.' })];
-
-  // The meter: what this house's consumers of Jev have together kept OUT of sessions, and who did it.
-  // Both numbers come off the ledger rather than being recomputed here — the panel's whole point is
-  // that its figure and `jev stats`' are the same one, down to the divide-by-4 for session tokens. A
-  // ledger with no `saved` line yet shows nothing extra, exactly as that command prints no NET line.
-  const topConsumers = stats === null ? [] : stats.byCaller.slice(0, TOP_CONSUMERS);
-  const consumerLines = topConsumers.length === 0 || stats === null
-    ? []
-    : [
-        t('agents.jev.net', {
-          defaultValue: 'Jev net: {{chars}} chars ≈ {{tokens}} session tokens (+ kept out, − added)',
-          chars: signedChars(stats.netChars),
-          tokens: signedChars(Math.floor(stats.netChars / 4)),
-        }),
-        ...topConsumers.map((consumer) => t('agents.jev.consumer', {
-          defaultValue: '{{caller}}: {{chars}} chars',
-          caller: consumer.caller,
-          chars: signedChars(consumer.chars),
-        })),
-        // The rows this cut dropped, said out loud. The tail is the negatives, so a panel that
-        // stopped at five would show a net its own five rows cannot add up to, with nothing saying
-        // which consumers moved it — and `jev stats` is the whole list, printed the same way.
-        ...(stats.byCaller.length > topConsumers.length
-          ? [t('agents.jev.consumerMore', {
-              defaultValue: '… and {{more}} more — `jev stats` lists every consumer.',
-              more: stats.byCaller.length - topConsumers.length,
-            })]
-          : []),
-      ];
-  const meterLines = [...ledgerLines, ...consumerLines];
+  // D11: Settings owns the switches and nothing else. The readings it used to draw here — the ledger
+  // total and the per-consumer net list — are the Jev tab's, whose "What Jev saves" section draws the
+  // same numbers from the one reader. One line of copy says where they went; no reading is left here.
+  const netPointer = t('agents.jev.netPointer', {
+    defaultValue: 'Per-caller context kept out is on the Jev tab, next to Heal.',
+  });
 
   return (
     <SettingsCard divided>
@@ -222,11 +171,9 @@ export default function JevContent() {
         );
       })}
 
-      {meterLines.length > 0 && (
-        <div className="space-y-1 px-4 py-3 text-xs text-muted-foreground">
-          {meterLines.map((line) => <div key={line}>{line}</div>)}
-        </div>
-      )}
+      <div className="space-y-1 px-4 py-3 text-xs text-muted-foreground">
+        <div>{netPointer}</div>
+      </div>
     </SettingsCard>
   );
 }

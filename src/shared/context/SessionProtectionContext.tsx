@@ -32,6 +32,18 @@ type RunningSessionApiItem = {
 type RunningSessionsApiPayload = {
   data?: {
     sessions?: RunningSessionApiItem[];
+    /**
+     * Conversations with a subagent still running, whether or not they carry a live run. Beside
+     * `sessions` rather than on it, because the chat this is usually about has no run left: its
+     * turn ended and its backgrounded agent did not.
+     */
+    subagentSessionIds?: unknown;
+    /**
+     * Conversations with a question or permission prompt waiting, whether or not they carry a live
+     * run. Beside `sessions` for the same reason: a prompt outlives the turn that raised it, and a
+     * row can only light if this list reaches the sessions the registry has forgotten.
+     */
+    awaitingInputSessionIds?: unknown;
   };
 };
 
@@ -43,11 +55,18 @@ type SessionProtectionActions = {
 };
 
 const NO_RUNNING_SESSIONS: readonly RunningSessionListItem[] = [];
+const NO_SESSION_IDS: readonly string[] = [];
+
+/** Whether two id lists name the same sessions, so the poll can keep the previous array. */
+const sessionIdListsMatch = (left: readonly string[], right: readonly string[]): boolean =>
+  left.length === right.length && left.every((id, index) => id === right[index]);
 
 const SessionProtectionStateContext = createContext<SessionActivityMap | null>(null);
 const SessionProtectionActionsContext = createContext<SessionProtectionActions | null>(null);
 const BusySessionIdsContext = createContext<ReadonlySet<string> | null>(null);
 const RunningSessionsContext = createContext<readonly RunningSessionListItem[]>(NO_RUNNING_SESSIONS);
+const SubagentRunningSessionIdsContext = createContext<ReadonlySet<string> | null>(null);
+const AwaitingInputSessionIdsContext = createContext<ReadonlySet<string> | null>(null);
 
 const asOptionalString = (value: unknown): string | null =>
   typeof value === 'string' && value.length > 0 ? value : null;
@@ -74,19 +93,19 @@ const runningSessionListsMatch = (
   });
 
 /**
- * The set of session ids currently producing a response, with a stable identity
- * while membership is unchanged.
+ * A set of session ids with a stable identity while membership is unchanged — what every
+ * membership-only consumer of the activity map and of the running-sessions poll reads.
  *
- * Every provider `status` frame rewrites an entry's `statusText`, which
- * allocates a new activity map several times a second during a run. Consumers
- * that only need membership — the sidebar renders a dot per row and a running
- * count — would re-render on all of it.
+ * Both sources rewrite themselves constantly: every provider `status` frame rewrites an entry's
+ * `statusText`, allocating a new activity map several times a second during a run, and the
+ * five-second poll rebuilds its running list whether or not anything moved. Consumers that only
+ * need membership — the sidebar renders a dot per row and a running count — would re-render on all
+ * of it. Deriving the set from a membership key, rather than from the collection, keeps its
+ * identity stable without reading a ref during render. Session ids never contain a NUL, so it is a
+ * safe separator.
  */
-function useBusySessionIds(processingSessions: SessionActivityMap): ReadonlySet<string> {
-  // Deriving the set from a membership key, rather than from the map, keeps its
-  // identity stable across the `statusText` rewrites without reading a ref
-  // during render. Session ids never contain a NUL, so it is a safe separator.
-  const membershipKey = [...processingSessions.keys()].sort().join('\u0000');
+function useSessionIdSet(sessionIds: Iterable<string>): ReadonlySet<string> {
+  const membershipKey = [...sessionIds].sort().join('\u0000');
 
   return useMemo(
     () => new Set(membershipKey ? membershipKey.split('\u0000') : []),
@@ -118,6 +137,15 @@ export function SessionProtectionProvider({ children }: { children: ReactNode })
   } = useSessionProtection();
 
   const [runningSessions, setRunningSessions] = useState<readonly RunningSessionListItem[]>(NO_RUNNING_SESSIONS);
+  // Kept as its own list rather than hung on the runs above, because the sessions it names are
+  // usually NOT among them: a backgrounded agent outlives the turn that launched it, so the chat
+  // holding one has no run left to hang anything on.
+  const [subagentSessionIds, setSubagentSessionIds] = useState<readonly string[]>(NO_SESSION_IDS);
+  // Answered by the server's own approval map rather than read off the runs below, and that is the
+  // whole point of it: a question outlives the turn that asked it, so the chat it waits in is
+  // usually NOT among the runs — a backgrounded agent's completion wakes the CLI for a continuation
+  // turn no run is registered for, and a re-adopted host re-issues the prompt it was parked on.
+  const [awaitingInputSessionIds, setAwaitingInputSessionIds] = useState<readonly string[]>(NO_SESSION_IDS);
   // A send still waiting in the socket's outbox has not reached the server, so the server cannot list
   // it yet. Its spinner stays, which keeps a second press on the composer's queue path instead of
   // becoming a second send the server would refuse.
@@ -158,6 +186,24 @@ export function SessionProtectionProvider({ children }: { children: ReactNode })
 
         return runningSessionListsMatch(previous, next) ? previous : next;
       });
+
+      // Sorted before it becomes state: the set below is built from a membership key, and an order
+      // the server is free to change must not read as a change of membership.
+      const subagents = (Array.isArray(payload.data?.subagentSessionIds)
+        ? payload.data.subagentSessionIds
+        : []
+      ).filter((id): id is string => typeof id === 'string' && id.length > 0).sort();
+      setSubagentSessionIds((previous) => (
+        sessionIdListsMatch(previous, subagents) ? previous : subagents
+      ));
+
+      const awaiting = (Array.isArray(payload.data?.awaitingInputSessionIds)
+        ? payload.data.awaitingInputSessionIds
+        : []
+      ).filter((id): id is string => typeof id === 'string' && id.length > 0).sort();
+      setAwaitingInputSessionIds((previous) => (
+        sessionIdListsMatch(previous, awaiting) ? previous : awaiting
+      ));
 
       syncProcessingSessions(
         sessions
@@ -219,15 +265,27 @@ export function SessionProtectionProvider({ children }: { children: ReactNode })
     ],
   );
 
-  const busySessionIds = useBusySessionIds(processingSessions);
+  const busySessionIds = useSessionIdSet(processingSessions.keys());
+  const subagentRunningSessionIds = useSessionIdSet(subagentSessionIds);
+  // Both sources, because they answer different halves of the same question: the run-scoped flag
+  // covers a question asked inside a live turn, the list covers one still waiting after the turn
+  // that asked it ended. A runtime that answers only per-session keeps working through the first.
+  const awaitingInputSessionIdSet = useSessionIdSet([
+    ...runningSessions.filter((run) => run.awaitingInput).map((run) => run.sessionId),
+    ...awaitingInputSessionIds,
+  ]);
 
   return (
     <SessionProtectionActionsContext.Provider value={actions}>
       <BusySessionIdsContext.Provider value={busySessionIds}>
         <RunningSessionsContext.Provider value={runningSessions}>
-          <SessionProtectionStateContext.Provider value={processingSessions}>
-            {children}
-          </SessionProtectionStateContext.Provider>
+          <SubagentRunningSessionIdsContext.Provider value={subagentRunningSessionIds}>
+            <AwaitingInputSessionIdsContext.Provider value={awaitingInputSessionIdSet}>
+              <SessionProtectionStateContext.Provider value={processingSessions}>
+                {children}
+              </SessionProtectionStateContext.Provider>
+            </AwaitingInputSessionIdsContext.Provider>
+          </SubagentRunningSessionIdsContext.Provider>
         </RunningSessionsContext.Provider>
       </BusySessionIdsContext.Provider>
     </SessionProtectionActionsContext.Provider>
@@ -247,24 +305,34 @@ export function useBusySessionIdSet(): ReadonlySet<string> {
 }
 
 /**
- * The running sessions with a question or permission prompt waiting on the user, from the same
- * 5-second refresh. A sidebar row shows these as a yellow dot in place of its spinner: the run is
- * not working, it is waiting.
+ * The sessions with a question or permission prompt waiting on the user, from the same 5-second
+ * refresh. A sidebar row shows these as a yellow dot in place of its spinner — and, when the chat
+ * has no run left to spin, as a dot on its own: a question outlives the turn that asked it, so the
+ * set is the server's own approval map, not the runs.
  */
 export function useAwaitingInputSessionIdSet(): ReadonlySet<string> {
-  const runningSessions = useContext(RunningSessionsContext);
-  // A membership key, as `useBusySessionIds`: the running list is rebuilt whenever a run's
-  // `lastActivity` moves, and every sidebar row reads this set — keyed on the list, each poll
-  // during a run would re-render every row past its memo.
-  const membershipKey = runningSessions
-    .filter((run) => run.awaitingInput)
-    .map((run) => run.sessionId)
-    .sort()
-    .join('\u0000');
-  return useMemo(
-    () => new Set(membershipKey ? membershipKey.split('\u0000') : []),
-    [membershipKey],
-  );
+  const awaitingInputSessionIds = useContext(AwaitingInputSessionIdsContext);
+  if (!awaitingInputSessionIds) {
+    throw new Error('useAwaitingInputSessionIdSet must be used within SessionProtectionProvider');
+  }
+  return awaitingInputSessionIds;
+}
+
+/**
+ * The conversations with a subagent still running, from the same 5-second refresh. A sidebar row
+ * shows one as a purple dot, which it wears ALONGSIDE its spinner or its yellow dot rather than in
+ * place of them, and whether or not its own turn is still going.
+ *
+ * This is the only mark the sidebar has for work that outlives its own turn: a backgrounded agent
+ * keeps running after the run that launched it has left the registry, and nothing in the chat's own
+ * loaded rows says so.
+ */
+export function useSubagentRunningSessionIdSet(): ReadonlySet<string> {
+  const subagentRunningSessionIds = useContext(SubagentRunningSessionIdsContext);
+  if (!subagentRunningSessionIds) {
+    throw new Error('useSubagentRunningSessionIdSet must be used within SessionProtectionProvider');
+  }
+  return subagentRunningSessionIds;
 }
 
 /**

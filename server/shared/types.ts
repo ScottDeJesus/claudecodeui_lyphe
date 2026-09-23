@@ -211,6 +211,7 @@ export type GatewayEventKind =
   | 'loading_progress'
   | 'runner_state'
   | 'soul_launch_state'
+  | 'arc_state'
   | 'kanban_metis_state'
   | 'kanban_event'
   | 'universe_activity'
@@ -304,12 +305,14 @@ export type KanbanBoardEvent = {
 export type RunnerRunState = 'live' | 'paused' | 'queued' | 'stale' | 'ended';
 /** One phase's outcome as the runner spells it, from `progress.json.phases[].state`. */
 export type RunnerPhaseState = 'shipped' | 'running' | 'blocked' | 'deferred' | 'pending';
-/** One row of `progress.json.phases[]`. `note` is the runner's own short word for the state (a ship date, `builder-blocked`, `depends`) and is free text — it reaches the DOM as a text node, never as markup. */
-export type RunnerPhaseRow = { rank: number; id: string; title: string; state: RunnerPhaseState; note: string };
+/** One row of `progress.json.phases[]`. `note` is the runner's own short word for the state (a ship date, `builder-blocked`, `depends`) and is free text — it reaches the DOM as a text node, never as markup. `wave` is the phase's 1-based wave in the plan's whole map (`independence.waves(plan)`, what `plan-runner swarm <plan>` prints), `null` for a phase no wave can place and on a file from before the field; always written by `readPhaseRow`, optional for frames crossing a version boundary, as `lanes` is. */
+export type RunnerPhaseRow = { rank: number; id: string; title: string; state: RunnerPhaseState; note: string; wave?: number | null };
 /** One `runner.log` stage change. `at` is the runner's LOCAL ISO timestamp to the second, kept as the string it wrote — never re-parsed into an epoch, since it carries no zone to parse it against. `detail` is `''` when the stage word stood alone. */
 export type RunnerTimelineEntry = { at: string; phase_id: string; stage: string; detail: string };
 /** Where the run stands, from `progress.json.position`. `pipeline` is the phase's own chain as the runner composed it (`heph → athena → prometheus`), so a phase with no code change carries a shorter one. `stage_since` is epoch SECONDS. */
 export type RunnerPosition = { rank: number; total: number; phase_id: string; title: string; remain: number; pipeline: string; stage: string; stage_detail: string; stage_since: number };
+/** One live lane of a run, from `progress.json.lanes[]` (`hooks/plan_runner/progress.py::_lanes`). `lane` is the lane's id — which IS the phase id it carries, a phase running on exactly one lane — `rank` the phase's place in the census, `stage`/`stage_detail` the runner's own stage words, `stage_since` epoch SECONDS like every timestamp here. */
+export type RunnerLaneRow = { lane: string; phase_id: string; rank: number; title: string; stage: string; stage_detail: string; stage_since: number };
 /**
  * One run as this lane reads it off disk. Every field but `state` and `timeline` is `progress.json`'s own;
  * `state` is this lane's classification and `timeline` is `runner.log` parsed.
@@ -323,18 +326,48 @@ export type RunnerPosition = { rank: number; total: number; phase_id: string; ti
  * last announced — a fact to show, never something to signal: this server does not own that process.
  * `position` is `null` while the runner has not composed one yet, which a live run does show in its first seconds.
  * `line` is the composed status-bar line the terminal bar renders, carried through unaltered.
+ * `lanes` is `progress.json.lanes[]` — one row per LIVE lane, lowest rank first, `[]` on a serial run — and the
+ * `?` is about the PRODUCER, not this reader: `classifyRun` always writes the key (`readLanes` answers `[]` for an
+ * absent, null or malformed one, so a `progress.json` from before lanes shipped still classifies), but a snapshot
+ * crossing a version boundary — a server binary older than this shape, or the client's own mirror — carries none.
  * `blocked_causes` is the receipt's `blocked` map, phase id → the cause the runner wrote (`crash`, `budget`, `athena: …`), `{}` until
  * the run ends. It is the only record of a phase the runner halted on a crash or a budget: that phase's row never turns `blocked`.
  */
 /** The fix-it session on a blocked phase, from `progress.json.repair`: the one IN FLIGHT (`repairing`, `step` the sub-stage it is on; `paused` while the run waits out a rate limit), else the last one finished (`fixed` — the phase walks again — or `failed`). `by` says whose session it is: `unblock` is the run's own outing, walked by the run's process; `heal` is the heal drain's, which works while the run itself is halted. `live` is whether the process doing a `heal` repair is alive right now (always `false` for an `unblock`, whose liveness is the run's). `resumed` is whether a finished repair put the phase back on the walk: a cleared unblock always did, a heal only when it re-armed the phase's spec — a heal can cure the cause and leave the phase standing; `null` when the heal never measured it. `since` and `ended_at` are epoch SECONDS; `k` is the number of the outing this repair belongs to, and `limit` its per-phase ceiling (0 = none carried, as for a heal). */
 export type RunnerRepair = { phase_id: string; state: 'repairing' | 'paused' | 'fixed' | 'failed'; by: 'replan' | 'unblock' | 'heal'; live: boolean; resumed: boolean | null; step: string; k: number; limit: number; since: number | null; ended_at: number | null; reason: string };
-export type RunnerRunSnapshot = { run_id: string; plan_path: string; plan_title: string; /** A test's run, never the operator's: its plan sits in a scratch root (the runner's own fixtures under the temp dir) or its id is a probe's `fixture-` run. Hidden from every runs list unless a probe opts in, and never pushed as a notification. */ test_run: boolean; state: RunnerRunState; status: string; started_at: number; heartbeat_at: number; stopped_at: number | null; /** `run.json`'s `queued_until`, `null` on every run that was not created parked and on a queued one given no window to wait for (a bare `--queue` outside DeepSeek's peak hours). Epoch SECONDS, like every timestamp here. */ queued_until: number | null; launched_by_session: string | null; outcome: string | null; ended_at: number | null; blocked_causes: Record<string, string>; pid: number | null; position: RunnerPosition | null; repair: RunnerRepair | null; phases: RunnerPhaseRow[]; spawns: number; max_spawns: number; cost_usd: number; plan_runs: number; plan_spawns: number; plan_cost_usd: number; plan_planning_usd: number; plan_review_usd: number; plan_scouts_usd: number; plan_total_usd: number; tokens: number; plan_tokens: number; line: string; timeline: RunnerTimelineEntry[] };
+export type RunnerRunSnapshot = { run_id: string; plan_path: string; plan_title: string; /** A test's run, never the operator's: its plan sits in a scratch root (the runner's own fixtures under the temp dir) or its id is a probe's `fixture-` run. Hidden from every runs list unless a probe opts in, and never pushed as a notification. */ test_run: boolean; state: RunnerRunState; status: string; started_at: number; heartbeat_at: number; stopped_at: number | null; /** `run.json`'s `queued_until`, `null` on every run that was not created parked and on a queued one given no window to wait for (a bare `--queue` outside DeepSeek's peak hours). Epoch SECONDS, like every timestamp here. */ queued_until: number | null; /** `run.json`'s `start_at`: the operator's SCHEDULED Start on a queued run (`plan-runner schedule`), pressed by the watchdog's tick when it comes; `null` when none was asked for (the key absent too). Epoch SECONDS. */ start_at: number | null; /** The run's own model word off `run.json:model`; `null` only on a record born before the runner wrote its default, which reads `deepseek` (`effectiveModelWord`). */ model: RunnerModelChoice | null; launched_by_session: string | null; outcome: string | null; ended_at: number | null; blocked_causes: Record<string, string>; pid: number | null; position: RunnerPosition | null; /** The run's LIVE lanes, lowest rank first, `[]` on a serial run. Always written by `classifyRun`, and OPTIONAL for the frames that cross a version boundary: a snapshot from a binary older than this shape has no such field, and a required one would have the card map `undefined`. */ lanes?: RunnerLaneRow[]; repair: RunnerRepair | null; phases: RunnerPhaseRow[]; spawns: number; max_spawns: number; cost_usd: number; plan_runs: number; plan_spawns: number; plan_cost_usd: number; plan_planning_usd: number; plan_review_usd: number; plan_scouts_usd: number; plan_total_usd: number; tokens: number; plan_tokens: number; line: string; timeline: RunnerTimelineEntry[] };
 /** The whole picture, pushed on change over `/ws`. `runs` is ordered by `started_at` ascending, oldest first, the order the terminal bar uses. `at` is epoch MILLISECONDS (`Date.now()`), unlike every field inside a snapshot. */
 export type RunnerStateEvent = { kind: 'runner_state'; runs: RunnerRunSnapshot[]; at: number };
-/** The two verbs this server may relay. Starting a run needs a plan and an intent lock and is `/execute`'s act, never a button's. */
-export type RunnerVerb = 'stop' | 'resume';
+/** A run's or an arc's OWN model word, as `run.json:model` and `arc.json:model` record it (`hooks/plan_runner/run_model.py`) and as the model control sends it through `POST /runs/:id/model` and `POST /arcs/:arc/model`: `deepseek` (the runner's default, written at birth), `claude`, or `auto` — follow the chat's DeepSeek switch. The server checks a request against exactly these three before anything is spawned, so the argv word is always ours. */
+export type RunnerModelChoice = 'deepseek' | 'claude' | 'auto';
+/** The verbs this server may relay: `stop`, `resume`, `model` (the run's own DeepSeek / Claude word; restarts nothing) and `schedule` (a QUEUED run's Start at a time — `offpeak`, an ISO timestamp, or `none` to clear). Starting a run from a plan is `/execute`'s act, never a button's; a queued run's Start, now or scheduled, is the operator's. */
+export type RunnerVerb = 'stop' | 'resume' | 'model' | 'schedule';
+/** `GET /runs/offpeak`: the runner's next DeepSeek off-peak moment in epoch SECONDS (`plan-runner offpeak`, derived from `deepseek.PEAK_UTC`), or `null` when the runner could not answer. The card's `Start at …` button shows it in the reader's clock and never computes it. */
+export type RunnerOffpeak = { at: number | null };
 /** What one relayed verb did. `ok` is the runner's own exit being 0 — a refusal is a RESULT, not an error, and `stderr` carries the runner's own line whole so the reader sees the verdict rather than our paraphrase. `reason` is present only when the runner never got to answer: it timed out, or its binary could not be spawned. */
 export type RunnerVerbResult = { ok: boolean; verb: RunnerVerb; run_id: string; exit: number | null; stdout: string; stderr: string; reason?: 'timeout' | 'spawn-failed' };
+
+//----------------- ARC DECK: a stack of plans walked one card after another ------------
+// An arc is a stack: one orchestrating plan listing ordered cards, each card a plan of its own, walked one
+// after another. The runner keeps one record per arc under `~/.claude/state/arcs/<name>/` — `arc.json` (the
+// whole picture, written whole through `os.replace`), `receipt.json` (present ⇒ the arc is over) and
+// `resume_brief.md` — and this server only READS them. The deck never computes the order: `current` and
+// `last_started` are the runner's own decisions, copied out of `arc.json`. Every timestamp is epoch SECONDS,
+// because that is what the runner's Python writes (`time.time()`). Mirrored field-for-field in `src/shared/types.ts`.
+
+/** One card's walk, as the runner spells it in `arc.json:cards[].state` (`hooks/plan_runner/arcs.py:CARD_STATES`). `unminted` is a card whose run the runner has not created yet — each card is created at its own turn — and `stalled` is one whose latest run carries a receipt that is not `complete`. */
+export type ArcCardState = 'unminted' | 'queued' | 'walking' | 'paused' | 'complete' | 'stalled';
+/** One phase of an arc card's plan, as `arc.json:cards[].phases[]` writes it (`hooks/plan_runner/arc_phases.py`): the phase's `id` and heading `title` in plan order, and `shipped` — the runner's own census verdict, true only for a phase whose ship-log line has landed. A plan not yet on disk has no phases, and its card carries `[]`. */
+export type ArcCardPhase = { id: string; title: string; shipped: boolean };
+/** One card of an arc, as `arc.json:cards[]` writes it. `plan_path` is the card's own `plan` field: an ABSOLUTE path, since the runner resolves the bare basename against the arc file's directory. `charter` is free text and reaches the DOM as a text node, never as markup. `cost_usd` and `spawns` are the card's run's books, `0` before it has any. `phases` is the card's plan's phase list, re-read by the runner on every sync (the watchdog's two-minute tick), so a plan that lands or a phase that ships reaches the deck within one tick. */
+export type ArcCardSnapshot = { position: number; plan_path: string; title: string; charter: string; run_id: string | null; state: ArcCardState; run_status: string | null; ended_at: number | null; cost_usd: number; spawns: number; phases: ArcCardPhase[] };
+/** One arc, as `<arcs dir>/<name>/arc.json` records it. `current` is the position of the first non-complete card — the card the walk acts on next, `null` once every card is complete — and `last_started` is the highest position that has started; BOTH are the runner's own decisions, copied here and never recomputed, because they are what tells the deck which card is live and which may still be dragged. `test_arc` is whether the arc lives in a hidden root (`isHiddenProjectPath(arc_path)`), the same rule a run's `test_run` follows, so a `/tmp` fixture never reaches the operator's deck. `has_receipt` is the arc's own `receipt.json` on disk — the arc has finished. `now` is the runner's recorded word that this arc walks through DeepSeek's peak hours. */
+export type ArcSnapshot = { arc: string; arc_path: string; title: string; test_arc: boolean; status: 'not-started' | 'walking' | 'stalled' | 'complete'; started_at: number | null; ended_at: number | null; synced_at: number; has_receipt: boolean; now: boolean; /** `arc.json`'s `start_at`: the operator's SCHEDULED `arc start` (`plan-runner arc schedule`), pressed by the watchdog's tick; `null` when none was asked for, and always once the arc has started. Epoch SECONDS. */ start_at: number | null; /** The arc's ONE model word off `arc.json:model` (`plan-runner arc model`), handed to every card it mints; `null` only on a record synced before the runner wrote its default, which reads `deepseek` (`effectiveModelWord`). */ model: RunnerModelChoice | null; current: number | null; last_started: number; cards: ArcCardSnapshot[] };
+/** The whole deck, pushed on change over `/ws`. `at` is epoch MILLISECONDS (`Date.now()`), unlike every field inside a snapshot. */
+export type ArcStateEvent = { kind: 'arc_state'; arcs: ArcSnapshot[]; at: number };
+/** What one relayed arc verb did — the shape `RunnerVerbResult` gives a run's verbs, with the arc's name where the run id was, since `plan-runner arc reorder|model|start|schedule <name> …` names an arc rather than a run. `reason` is present only when the runner never got to answer: it timed out, or its binary could not be spawned. */
+export type ArcVerbResult = { ok: boolean; arc: string; exit: number | null; stdout: string; stderr: string; reason?: 'timeout' | 'spawn-failed' };
+// ---------------------------
 /**
  * How a launcher soul is going while it is out, and how it ended once its receipt landed.
  *
@@ -344,7 +377,7 @@ export type RunnerVerbResult = { ok: boolean; verb: RunnerVerb; run_id: string; 
  */
 export type SoulLaunchState = 'running' | 'completed' | 'failed' | 'stopped';
 /**
- * One launcher soul — a `/dispatch` hand started through `plan-runner soul` — as its pin draws it.
+ * One launcher soul — a soul a session started by hand through `plan-runner soul` — as its pin draws it.
  *
  * `provider` is the one the pin PAINTS, and it is settled the way a bill is: `result.json`'s word
  * once that landed, and `spec.json`'s pin before then, because that is the only reading there is.
@@ -786,8 +819,25 @@ export type ProviderPermissionDecision = {
 };
 
 export type ProviderRuntimePermissionGateway = {
-  resolve(requestId: string, decision: ProviderPermissionDecision): void;
+  /**
+   * Settles the approval a decision belongs to.
+   *
+   * `approvalKey` is the in-app panel's request id, OR the ask's own `promptKey` when the answer
+   * came from a phone: a push outlives the process that sent it, so a tap names a prompt the
+   * successor re-issued under a request id of its own. A runtime resolves both.
+   */
+  resolve(approvalKey: string, decision: ProviderPermissionDecision): void;
   listPending(sessionId: string): unknown[];
+  /**
+   * Every session with an approval waiting right now, whether or not it still has a run.
+   *
+   * Beside `listPending` rather than derived from it, because the gateway that holds the approvals
+   * is the only party that can enumerate them: a prompt outlives the run that raised it (a
+   * backgrounded agent's continuation turn, a re-adopted host), so a caller holding a list of runs
+   * cannot ask this question session by session. Read by `sessionsService
+   * .listAwaitingInputSessionIds` for the sidebar's yellow dot.
+   */
+  listPendingSessions(): string[];
 };
 
 /**
@@ -1989,3 +2039,70 @@ export type DeepseekBalance =
 // tail-slices instead.
 /** What one subagent transcript read answers. `found` is `false` when the session, provider, file or launch cannot be resolved — then `activity` is empty, `total` is 0, `inFlight` is `false` and `finishedAt` is `null`, and "not found" is never an HTTP error but this shape with a 200. `activity` is the LAST `SUBAGENT_TRANSCRIPT_LIMIT` (1000) entries, each truncated for transport, and `total` is the untruncated entry count. */
 export type SubagentTranscriptResult = { found: boolean; activity: SubagentActivity[]; total: number; inFlight: boolean; finishedAt: string | null };
+
+// ---------------------------
+//----------------- CRON REGISTRY: the tracked record of every scheduled job ------------
+//
+// FOUR consumers, which is why this contract lives here rather than beside any one of them:
+// the schedules module's read service (the registry screen), its sync service (the reconcile
+// that writes), the module's CLI door (add/remove/list/sync), and — mirrored field-for-field —
+// `src/shared/types.ts` for the Schedules tab.
+/** Which of the two things a tracked row is: `cron` is a line the box's crontab runs, `scheduled-prompt` is a message the app will send at a time the operator chose. The kind decides which half of `CronJobState` the row may carry — the two never trade values. */
+export type CronJobKind = 'cron' | 'scheduled-prompt';
+/** Whose job it is — always `user`: the registry tracks the operator's own crontab and scheduled prompts, and the OS's system cron is not read (operator ruling 2026-09-21: nothing the packages ship belongs on the screen). It stays a field because every stored row and every id carries it. */
+export type CronJobOrigin = 'user';
+/** Every state a tracked job can be in. The four cron values and the three scheduled-prompt values share one union because a row of either kind is read through the same shape — but a row is only ever one kind's set, never a mix. */
+export type CronJobState =
+  | 'ok' | 'failed' | 'missing' | 'unknown'   // a cron row is only ever one of these four
+  | 'pending' | 'sent' | 'cancelled';         // a scheduled-prompt row adds these three
+/** How far a tracked row has moved from what the box actually holds: `none` when the sync's read agrees with the record, `adopted` when the row was just discovered, `missing` when the line is gone from the box, `changed` when the schedule or the command moved underneath it. Only the CLI door clears drift. */
+export type CronJobDrift = 'none' | 'adopted' | 'missing' | 'changed';
+/** One tracked job, exactly as the registry holds it: one crontab line or one scheduled prompt, with everything the screen shows and the sync writes. Every field is declared here — a later phase writes what this shape carries and invents nothing. */
+export type CronJob = {
+  id: string;                 // stable: `${kind}:${origin}:${sha1(command).slice(0,12)}`
+  kind: CronJobKind;
+  name: string;               // the operator's plain name; derived from the command on adoption
+  purpose: string | null;     // why it exists — null until someone says
+  tags: string[];             // short lowercase words for what it is for at a glance ('cleanup'); [] when none
+  owner: string;              // 'lyphe' for a crontab line; the asking user's id for a prompt
+  origin: CronJobOrigin;      // always 'user' — see CronJobOrigin
+  expression: string;         // the raw cron expression, verbatim
+  scheduleText: string;       // plain words, e.g. 'every hour at :47'
+  command: string;            // the command line as the box holds it
+  logPath: string | null;     // absolute path from a `>>` redirection, else null
+  state: CronJobState;
+  drift: CronJobDrift;
+  driftDetail: string | null; // what differs, in one clause; null when drift is 'none'
+  lastRunAt: string | null;   // ISO-8601 with offset, written by the sync
+  lastResult: string | null;  // 'invoked' when only the journal saw it; null when nothing did
+  nextRunAt: string | null;   // a scheduled-prompt row's own `scheduled_for`; null for a cron row
+  note: string | null;        // anything the record must carry that no other field holds
+  source: string;             // 'crontab -l' | '/etc/cron.d/<f>' | '/etc/crontab' | 'scheduled_messages'
+  trackedAt: string;          // ISO-8601 — when this row entered the registry
+  updatedAt: string;          // ISO-8601 — when the sync last touched it
+};
+/** What one sync run did, told as counts rather than as a diff: what the box showed, what the registry gained, what it had to mark gone, and how long the read took. `ok: false` still carries a report — a sync that failed still ran, and the error text is the reason, never an exception thrown at the caller. */
+export type CronSyncReport = {
+  ranAt: string;
+  ok: boolean;
+  error: string | null;
+  seen: number;      // cron lines read off the box this run
+  adopted: number;   // rows the registry gained
+  missing: number;   // rows now marked missing
+  changed: number;   // rows whose schedule or command moved
+  ms: number;
+};
+
+// THE STATE MAPPING, named here so no phase has to invent it. A `cron` row's state is
+// 'ok' when the sync saw its line on the box, 'missing' when it did not, 'failed' when a
+// reader could not answer for it, 'unknown' before any sync. A `scheduled-prompt` row
+// carries `ScheduledMessageStatus` (`server/modules/database/index.ts:62`) ONE-TO-ONE —
+// 'pending' -> 'pending', 'sent' -> 'sent', 'failed' -> 'failed', 'cancelled' -> 'cancelled'.
+// Nothing is collapsed: 'pending' is the operator's own question and must survive the trip.
+
+/** The whole registry as one read: every tracked job, and the last sync that touched them — the answer `GET /api/schedules` gives. `lastSync: null` means no sync has ever been recorded, which is not the same as a sync that found nothing. */
+export type CronRegistrySnapshot = {
+  readAt: string;
+  jobs: CronJob[];
+  lastSync: CronSyncReport | null;
+};

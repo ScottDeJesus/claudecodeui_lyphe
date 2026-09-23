@@ -9,7 +9,7 @@ import type { LLMProvider, Project, ProjectSession, SessionWithProvider } from '
 import { api } from '@/shared/api';
 import { useSessionForkingProviders } from '@/shared/hooks/useProviderCapabilities';
 import { useCliVersion } from '@/shared/hooks/useCliVersion';
-import { useAwaitingInputSessionIdSet } from '@/shared/context/SessionProtectionContext';
+import { useAwaitingInputSessionIdSet, useSubagentRunningSessionIdSet } from '@/shared/context/SessionProtectionContext';
 import { createSessionViewModel, formatCompactAge } from '@/modules/sidebar/utils/sidebarProjectFormatting';
 import SidebarSessionMeta from '@/modules/sidebar/SidebarSessionMeta';
 import { useCompactSidebar } from '@/modules/sidebar/hooks/useCompactSidebar';
@@ -40,29 +40,60 @@ type CopyState = 'loading' | 'idle' | 'copying' | 'copied' | 'error';
 /**
  * The mark beside a running session: a spinner while it works, a yellow dot while a question or
  * permission prompt waits on the user — the run is paused on them, not busy.
+ *
+ * Two of the three are NOT about this row's own run. The purple dot says a subagent launched from
+ * this chat is still working, usually after the turn that launched it ended; the yellow dot says a
+ * question is waiting, and a question outlives the turn that asked it too — a backgrounded agent's
+ * completion wakes the CLI for a continuation turn no run is registered for. Either is drawn beside
+ * the spinner when there is one, and on its own when there is not — including on the selected row,
+ * which is the row a reader is most likely to be watching.
  */
-function SessionRunIndicator({ awaitingInput, t }: { awaitingInput: boolean; t: TFunction }) {
-  if (awaitingInput) {
-    const label = t('simpleList.awaitingInput');
-    return (
-      <Tooltip content={label} position="top">
-        <span
-          role="status"
-          aria-label={label}
-          className="vv-pulse flex h-5 w-5 items-center justify-center"
-        >
-          {/* The same 8px disc as the simple list's unread dot, in the warning ink. */}
-          <span aria-hidden="true" className="h-2 w-2 rounded-full bg-warn-ink" />
-        </span>
-      </Tooltip>
-    );
-  }
+function SessionRunIndicator({
+  isProcessing,
+  awaitingInput,
+  subagentsRunning,
+  t,
+}: {
+  isProcessing: boolean;
+  awaitingInput: boolean;
+  subagentsRunning: boolean;
+  t: TFunction;
+}) {
+  const label = t('simpleList.awaitingInput');
   return (
-    <Tooltip content={t('tooltips.processingSessionIndicator', 'Processing session')} position="top">
-      <span className="flex h-5 w-5 items-center justify-center rounded-md text-muted-foreground">
-        <Loader2 className="h-3 w-3 animate-spin" />
-      </span>
-    </Tooltip>
+    <>
+      {(isProcessing || awaitingInput) && (awaitingInput ? (
+        <Tooltip content={label} position="top">
+          <span
+            role="status"
+            aria-label={label}
+            className="vv-pulse flex h-5 w-5 items-center justify-center"
+          >
+            {/* The same 8px disc as the simple list's unread dot, in the warning ink. */}
+            <span aria-hidden="true" className="h-2 w-2 rounded-full bg-warn-ink" />
+          </span>
+        </Tooltip>
+      ) : (
+        <Tooltip content={t('tooltips.processingSessionIndicator', 'Processing session')} position="top">
+          <span className="flex h-5 w-5 items-center justify-center rounded-md text-muted-foreground">
+            <Loader2 className="h-3 w-3 animate-spin" />
+          </span>
+        </Tooltip>
+      ))}
+      {subagentsRunning && (
+        <Tooltip content={t('simpleList.subagentsRunning')} position="top">
+          <span
+            data-testid="session-subagents-running"
+            role="status"
+            aria-label={t('simpleList.subagentsRunning')}
+            className="flex h-5 w-5 items-center justify-center"
+          >
+            {/* The pinned strip's own running mark, in its own ink. */}
+            <span aria-hidden="true" className="h-2 w-2 animate-pulse rounded-full bg-purple-500 dark:bg-purple-400" />
+          </span>
+        </Tooltip>
+      )}
+    </>
   );
 }
 
@@ -97,6 +128,7 @@ function SidebarSessionItem({
   const [providerSessionId, setProviderSessionId] = useState<string | null>(null);
   const providerIdRequestRef = useRef(0);
   const isAwaitingInput = useAwaitingInputSessionIdSet().has(session.id);
+  const isSubagentRunning = useSubagentRunningSessionIdSet().has(session.id);
   const showAttentionIndicator = needsAttention && !isSelected;
   const showRecentIndicator = !showAttentionIndicator && !isProcessing && sessionView.isActive;
   const providerLabel = LLM_PROVIDER_LABELS[session.__provider];
@@ -285,9 +317,14 @@ function SidebarSessionItem({
                 >
                   {sessionView.sessionName}
                 </div>
-                {isProcessing ? (
-                  <span className="ml-auto flex-shrink-0">
-                    <SessionRunIndicator awaitingInput={isAwaitingInput} t={t} />
+                {isProcessing || isAwaitingInput || isSubagentRunning ? (
+                  <span className="ml-auto flex flex-shrink-0 items-center gap-1">
+                    <SessionRunIndicator
+                      isProcessing={isProcessing}
+                      awaitingInput={isAwaitingInput}
+                      subagentsRunning={isSubagentRunning}
+                      t={t}
+                    />
                   </span>
                 ) : null}
               </div>
@@ -485,14 +522,19 @@ function SidebarSessionItem({
                 >
                   {sessionView.sessionName}
                 </div>
-                {isProcessing ? (
+                {isProcessing || isAwaitingInput || isSubagentRunning ? (
                   <span
                     className={cn(
-                      'ml-auto flex-shrink-0 transition-opacity duration-200',
+                      'ml-auto flex flex-shrink-0 items-center gap-1 transition-opacity duration-200',
                       isEditing ? 'opacity-0' : 'group-hover:opacity-0',
                     )}
                   >
-                    <SessionRunIndicator awaitingInput={isAwaitingInput} t={t} />
+                    <SessionRunIndicator
+                      isProcessing={isProcessing}
+                      awaitingInput={isAwaitingInput}
+                      subagentsRunning={isSubagentRunning}
+                      t={t}
+                    />
                   </span>
                 ) : null}
               </div>
@@ -620,6 +662,6 @@ function SidebarSessionItem({
  *
  * SidebarProjectSessions hands every row but the one being renamed a constant
  * draft, and the session objects come from a per-project cache, so the compare
- * succeeds for the rest. See sidebarRowProps.test.tsx.
+ * succeeds for the rest.
  */
 export default memo(SidebarSessionItem);

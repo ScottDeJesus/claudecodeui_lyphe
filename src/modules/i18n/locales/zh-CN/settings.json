@@ -374,12 +374,7 @@
         "gatedOn": "被上方的总开关拦住——但该 opt-in 保存为开启，因此一旦打开 Jev 就会立即发送命令输出。",
         "gatedOff": "被上方的总开关拦住：请先打开 Jev 再更改此项。"
       },
-      "unreadable": "无法从服务器读取这些开关，因此其位置未知——这与关闭不同。每当此页面重新获得焦点时都会重试。",
-      "stats": "Jev 账本：{{calls}} 次调用 · 消耗 {{tokens}} 个 Jev token · 过滤 {{linesIn}} 行 → 保留 {{linesKept}} 行",
-      "statsEmpty": "Jev 账本：尚无调用记录。",
-      "net": "Jev 净额：{{chars}} 字符 ≈ 会话 {{tokens}} token（+ 省下，− 增加）",
-      "consumer": "{{caller}}：{{chars}} 字符",
-      "consumerMore": "… 另有 {{more}} 个 — 完整列表见 `jev stats`。"
+      "unreadable": "无法从服务器读取这些开关，因此其位置未知——这与关闭不同。每当此页面重新获得焦点时都会重试。"
     },
     "login": {
       "title": "登录",

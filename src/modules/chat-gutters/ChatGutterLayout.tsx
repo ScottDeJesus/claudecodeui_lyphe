@@ -3,12 +3,19 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ComponentType, ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { EmbedWidgetBody, SubagentWidgetBody, useClaimSubagentStrip, useEmbedWidgetState, useSubagentWidgetCount } from '@/modules/chat';
+import {
+  EmbedWidgetBody,
+  SubagentWidgetBody,
+  SubagentWidgetClearCompleted,
+  useClaimSubagentStrip,
+  useEmbedWidgetState,
+  useSubagentWidgetCount,
+} from '@/modules/chat';
 import { GUTTER_SIDES, useGutterPlacements, widgetsOn } from '@/modules/chat-gutters/hooks/useGutterPlacements';
 import { GutterColumn } from '@/modules/chat-gutters/GutterColumn';
 import { GutterWidgetFrame } from '@/modules/chat-gutters/GutterWidgetFrame';
 import { MemoryWidgetBody, useMemoryIntake } from '@/modules/memory-intake';
-import { RunnerWidgetBody, useRunnerRuns } from '@/modules/plan-runner';
+import { RunnerWidgetBody, useArcs, useRunnerRuns } from '@/modules/plan-runner';
 import type { GutterSide, GutterWidgetId } from '@/shared/types';
 import { otherOverlayHoldsEscape } from '@/shared/ui/overlayEscape';
 import { cn } from '@/shared/utils';
@@ -72,7 +79,11 @@ export function ChatGutterLayout({
 }) {
   const { t } = useTranslation();
   const { placements, moveWidget, toggleWidget } = useGutterPlacements(sessionId);
-  const { count: runnerCount } = useRunnerRuns();
+  const { count: runCount } = useRunnerRuns();
+  // The Runner widget draws the arc deck above its runs, so its badge counts both: every run the
+  // lane carries, plus the arcs still walking — the same unfinished-arc count that holds the tab open.
+  const { count: arcCount } = useArcs();
+  const runnerCount = runCount + arcCount;
   const { pendingCount } = useMemoryIntake();
   const subagentCount = useSubagentWidgetCount(sessionId);
   const { count: embedCount, newest: newestEmbed, known: embedsKnown } = useEmbedWidgetState(sessionId);
@@ -227,6 +238,12 @@ export function ChatGutterLayout({
   // WHAT A WIDGET IS, in one table: a third widget costs one entry here and nothing else in this
   // file. The hooks stay at the top level — a table cannot call one conditionally — so the entries
   // only read what they returned.
+  //
+  // A widget may also name a HEADER ACTION: one optional component the frame draws in its header
+  // row, between the toggle and the fullscreen switch — the Subagents widget's "Clear completed" is
+  // the one there is. It is handed the chat and NOTHING else, reading its own state and drawing
+  // nothing when it has nothing to offer, so this table stays a table of names and the layout never
+  // learns what any of those controls do.
   const widgets: Record<
     GutterWidgetId,
     {
@@ -236,6 +253,8 @@ export function ChatGutterLayout({
       Body: ComponentType<{ sessionId: string | null }>;
       /** Set by a widget whose body is itself a frame: the card gives it its whole inside. */
       flush?: boolean;
+      /** A widget's own control for the frame's header row, drawn beside the fullscreen switch. */
+      HeaderAction?: ComponentType<{ sessionId: string | null }>;
     }
   > = {
     runner: {
@@ -255,6 +274,9 @@ export function ChatGutterLayout({
       count: subagentCount,
       icon: BotIcon,
       Body: SubagentWidgetBody,
+      // Its act on the whole list, worn in the header rather than above the list: it appears only
+      // while a row has finished, and only its own component knows whether one has.
+      HeaderAction: SubagentWidgetClearCompleted,
     },
     embed: {
       title: t('gutters.embed.title'),
@@ -268,7 +290,7 @@ export function ChatGutterLayout({
   };
 
   const renderWidget = (widget: GutterWidgetId): ReactNode => {
-    const { title, count, icon, Body, flush } = widgets[widget];
+    const { title, count, icon, Body, flush, HeaderAction } = widgets[widget];
 
     return (
       <GutterWidgetFrame
@@ -282,6 +304,10 @@ export function ChatGutterLayout({
         onDragEnd={endDrag}
         fullscreen={fullscreen === widget}
         onToggleFullscreen={() => setFullscreen((current) => (current === widget ? null : widget))}
+        // NO BOUNDARY AROUND THIS, unlike the body: the workspace's fallback is a full panel, and a
+        // panel drawn inside a 44px header row is a clipped red sliver. The frame's own chrome — the
+        // toggle, the switch — stands outside the body's boundary today for the same reason.
+        headerAction={HeaderAction ? <HeaderAction sessionId={sessionId} /> : undefined}
         flush={flush}
       >
         {/* Its own boundary, inside its own frame: a body that throws costs this gutter and leaves

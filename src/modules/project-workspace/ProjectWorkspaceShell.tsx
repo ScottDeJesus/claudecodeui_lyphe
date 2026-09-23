@@ -16,8 +16,12 @@ function ProjectWorkspaceShell({
 }: ProjectWorkspaceShellProps) {
   return (
     <AppSwitcherProvider>
+      {/* `pwa-status-clear` is the frame's opt-in to the status-bar offset in a standalone PWA
+          (see src/index.css): this shell and the drawer it holds are the only layers whose
+          persistent chrome has to clear the iOS status bar. Overlays must NOT take it — they
+          cover the whole screen and pad their own content. */}
       <div
-        className="fixed inset-0 flex bg-background"
+        className="pwa-status-clear fixed inset-0 flex bg-background"
         style={{ bottom: 'var(--keyboard-height, 0px)' }}
       >
         <ProjectEffects navigate={navigate} />

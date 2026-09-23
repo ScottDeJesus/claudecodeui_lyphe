@@ -140,12 +140,16 @@ function Settings({ isOpen, onClose, projects = [], initialTab = 'agents' }: Set
   const isAuthenticated = Boolean(loginProvider && providerAuthStatus[loginProvider].authenticated);
 
   // The scrim and the panel take the Verve dialog's own two classes rather than a second set of
-  // colour utilities. Settings is not a `Dialog` — it is a bare full-screen overlay with no
-  // portal — but "one overlay treatment" is about the paint, and this is where that paint lives.
-  // Below `md` the panel is a full-bleed sheet, so it gives the radius back.
+  // colour utilities. Settings is not a `Dialog` — `SidebarModals` supplies the portal, which is
+  // what puts this at the end of `document.body` above the whole workspace shell — but "one
+  // overlay treatment" is about the paint, and this is where that paint lives.
+  // Below `md` the panel is a full-bleed sheet, so it gives the radius back, and in a standalone
+  // PWA it takes the safe-area inset as padding (`pwa-notch-safe`, src/index.css): the sheet's
+  // own background then reaches the screen edge while its title and close button stay clear of
+  // the status bar.
   return (
     <div className="vv-dialog__backdrop modal-backdrop fixed inset-0 z-[9999] flex items-center justify-center md:p-4">
-      <div className="vv-dialog__panel flex h-full w-full flex-col overflow-hidden max-md:rounded-none md:h-[90vh] md:max-w-4xl">
+      <div className="pwa-notch-safe vv-dialog__panel flex h-full w-full flex-col overflow-hidden max-md:rounded-none md:h-[90vh] md:max-w-4xl">
         {/* Header */}
         <div className="flex flex-shrink-0 items-center gap-3 border-b border-border px-4 py-3.5 md:px-5">
           <h2 className="font-serif text-[22px] font-normal leading-none text-foreground">{t('title')}</h2>

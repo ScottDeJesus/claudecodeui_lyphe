@@ -24,6 +24,14 @@ type OpenedTranscript = {
  * is the press: a row here opens the subagent's transcript in place, beside the conversation. The
  * strip above the chat box opens the same view in a dialog, having no room of its own for it.
  *
+ * CLEAR COMPLETED IS UP IN THE HEADER, NOT HERE (`subagents/SubagentWidgetClearCompleted.tsx`). It
+ * is the widget's act and no one else's, but it acts on the LIST rather than on a row, so it is
+ * drawn where the list's title is — the frame's own `headerAction` slot, beside the fold and the
+ * fullscreen switch — and this body draws rows and nothing above them. Running rows are never
+ * touched by it, and it appears only while there is something for it to take. The strip above the
+ * chat box keeps only the per-row dismissal: it holds a window of rows and no room for chrome, and
+ * the widget is where a reader goes to tidy up.
+ *
  * ONE ROW AT A TIME, AND NEVER ACROSS A CHAT. The open target is held WITH the session it was
  * opened in, and a target whose tag no longer matches the widget's own session is read as none:
  * switching chats therefore returns the widget to its list without an effect to remember, and a

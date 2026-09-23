@@ -49,6 +49,13 @@ export type KeepaliveReattach = {
   heldForBackgroundWork: boolean;
   /** The launch profile the host recorded at spawn (chat-process.ts); null from an older host. */
   profile: Record<string, unknown> | null;
+  /**
+   * The CLI version that host's own process announced at init, read from its journal by
+   * re-adoption (hosts.ts, `lastReportedCliVersion`); null when its journal holds no such line.
+   * It rides beside the profile rather than inside it because the two are recorded by different
+   * hands: the meta is what the API launched the CLI with, the journal is what the CLI said.
+   */
+  cliVersion: string | null;
   /** The tool-call ids whose work was still outstanding when the meta was last written. */
   deferredTools: string[];
 };

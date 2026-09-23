@@ -9,10 +9,20 @@ type MenuItem = {
   description?: string;
   /** Marks the row as the current choice — filled and ticked, so it survives greyscale. */
   selected?: boolean;
+  /**
+   * A count out loud at the row's end, drawn only above zero. The Tabs overflow is the one
+   * caller: a tab collapsed into the menu keeps the number its dot stood for.
+   */
+  count?: number;
 };
 
 type MenuProps = {
   trigger: ReactNode;
+  /**
+   * The trigger's accessible name and hover title, for a trigger that draws no words of its own —
+   * the Tabs overflow's glyph. A trigger that already reads as words needs none.
+   */
+  triggerLabel?: string;
   items: MenuItem[];
   onSelect: (id: string) => void;
   /** Panel width in px. The panel is what `align` places, so it is what a width sizes. */
@@ -23,16 +33,16 @@ type MenuProps = {
 /**
  * A choice list hung under whatever the caller hands in as its trigger.
  *
- * Used by the sidebar module (Phase 5) for its project filter and by the settings module
- * (Phase 4) for the picker rows that are not plain Selects — a Select owns ONE value and
- * shows it in its own trigger; a Menu decorates a trigger the caller already drew.
+ * Used by the kit's own Tabs, as the More menu an overflowing row collapses its trailing tabs
+ * into — the workspace's two rows in the sidebar. A Select owns ONE value and shows it in its
+ * own trigger; a Menu decorates a trigger the caller already drew.
  *
  * Dismissal is two-way for the same reason Select's is: a pointer outside closes it, and
  * Escape closes it without moving the pointer, handing focus back to the trigger rather than
  * dropping it on <body> when the panel unmounts underneath it. There is deliberately NO focus
  * trap and no arrow-key roving — every item is a tab stop, and no site asks for more.
  */
-export function Menu({ trigger, items, onSelect, width, align = 'left' }: MenuProps) {
+export function Menu({ trigger, triggerLabel, items, onSelect, width, align = 'left' }: MenuProps) {
   // Whether the panel is showing. Not derivable: `selected` is the choice already made, and
   // the panel is open precisely while the reader is reconsidering it.
   const [open, setOpen] = useState(false);
@@ -73,6 +83,8 @@ export function Menu({ trigger, items, onSelect, width, align = 'left' }: MenuPr
         className="vv-menu__trigger"
         aria-haspopup="menu"
         aria-expanded={open}
+        aria-label={triggerLabel}
+        title={triggerLabel}
         onClick={() => setOpen((wasOpen) => !wasOpen)}
       >
         {trigger}
@@ -111,6 +123,11 @@ export function Menu({ trigger, items, onSelect, width, align = 'left' }: MenuPr
                 <span className="block">{item.label}</span>
                 {item.description && <span className="vv-menu__description block">{item.description}</span>}
               </span>
+              {item.count !== undefined && item.count > 0 && (
+                <span className="vv-menu__count" data-tone="neutral">
+                  {item.count}
+                </span>
+              )}
             </li>
           ))}
         </ul>

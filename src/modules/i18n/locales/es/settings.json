@@ -374,12 +374,7 @@
         "gatedOn": "Retenido por el interruptor maestro de arriba — pero esta opción está guardada como activada, así que encender Jev envía la salida de comandos de inmediato.",
         "gatedOff": "Retenido por el interruptor maestro de arriba: enciende Jev para cambiar esto."
       },
-      "unreadable": "No se pudieron leer los interruptores del servidor, así que su posición es desconocida — no es lo mismo que apagado. Se reintentan cada vez que esta página recupera el foco.",
-      "stats": "Registro de Jev: {{calls}} llamadas · {{tokens}} tokens de Jev gastados · {{linesIn}} líneas filtradas → {{linesKept}} conservadas",
-      "statsEmpty": "Registro de Jev: aún no hay llamadas registradas.",
-      "net": "Neto de Jev: {{chars}} caracteres ≈ {{tokens}} tokens de sesión (+ conservados, − añadidos)",
-      "consumer": "{{caller}}: {{chars}} caracteres",
-      "consumerMore": "… y {{more}} más — `jev stats` los enumera todos."
+      "unreadable": "No se pudieron leer los interruptores del servidor, así que su posición es desconocida — no es lo mismo que apagado. Se reintentan cada vez que esta página recupera el foco."
     },
     "login": {
       "title": "Iniciar sesión",

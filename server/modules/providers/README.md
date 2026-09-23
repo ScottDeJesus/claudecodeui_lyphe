@@ -81,7 +81,8 @@ conversation's CLI into a tmux server through it instead of as a child of the AP
 lets a chat session outlive an API restart. There is one CLI per conversation, not per message:
 the first message spawns it and every later one is pushed into its open input stream
 (`claude-runtime.provider.js` §`queryClaudeSDK`; the queue, the idle closer and the live-vs-launch
-setting split are in `list/claude/chat-process.ts`). `claude-runtime.provider.js` imports `armKeepaliveSpawn` and
+setting split are in `list/claude/chat-process.ts`, and the bounded reading of the installed CLI
+that split compares against is `list/claude/installed-cli-version.ts`). `claude-runtime.provider.js` imports `armKeepaliveSpawn` and
 `keepaliveReadopt` from it; `server/index.ts` calls `readoptKeepaliveSessions` once per boot
 through the providers barrel — before `server.listen`, except on a handover boot, where it waits
 for the retiring server to exit first. The mechanism, that exception, its gate, its fallback, and

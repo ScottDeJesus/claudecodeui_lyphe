@@ -29,6 +29,14 @@ type ChatRunStatus = 'running' | 'completed';
  *   stale comparison's only input. `null` until the init message arrives, and
  *   `null` for a provider that reports none; it is never filled in from the
  *   installed binary, which is a different process and may be a newer build.
+ *   A run re-adopted after an API restart is stamped the moment it is adopted,
+ *   from its host's own journal of what that CLI process said — the same fact,
+ *   recorded by the process itself, so the retirement decision at the next
+ *   message reads the version the process actually announced rather than a
+ *   blank. It is NOT what makes an old host visible in the report: `running[]`
+ *   holds runs while a turn is in flight, and a host adopted between turns is
+ *   completed the moment it is registered (`readopt.ts`'s `turnCompleteSent`
+ *   branch), so an idle stale host is listed by no report at all.
  * - `lastEventAt`: when this run last showed a sign of life. Starts at
  *   `startedAt` and moves with every recorded event, so "has this gone quiet?"
  *   is answerable from outside without the registry knowing who asks or what

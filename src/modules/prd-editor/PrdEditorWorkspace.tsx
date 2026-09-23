@@ -57,9 +57,14 @@ export default function PrdEditorWorkspace({
         isFullscreen ? 'md:p-0' : 'md:p-4',
       )}
     >
+      {/* `pwa-notch-safe` rides the CARD, not the layer. Below `md` this layer has no background of
+          its own (`md:bg-black/50`), so padding it would leave a strip of the app showing around
+          the card on a phone in the home-screen app; the card's own header — where Close lives —
+          takes the inset as padding instead. At `md` and up the layer keeps its `md:p-4`/`md:p-0`
+          gutter untouched and this class, on the card, is 0 where the inset is 0. */}
       <div
         className={cn(
-          'bg-white dark:bg-gray-900 shadow-2xl flex flex-col',
+          'pwa-notch-safe bg-white dark:bg-gray-900 shadow-2xl flex flex-col',
           'w-full h-full md:rounded-lg md:shadow-2xl',
           isFullscreen
             ? 'md:w-full md:h-full md:rounded-none'

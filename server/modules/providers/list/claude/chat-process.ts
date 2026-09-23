@@ -14,11 +14,13 @@
  *   `applyFlagSettings` (effort) and `setPermissionMode` are live, and so is GROWING the allowed
  *   tool list (a newly allowed tool merely reaches `canUseTool`, which reads the live options).
  *   cwd, MCP servers, a resume anchor, a conversation restarted from scratch, any change to the
- *   disallowed list (it shapes the model's tool context at launch) and a SHRUNK allowed list (the
- *   CLI holds the launch list as allow rules it resolves before ever asking `canUseTool`) are
- *   launch arguments and are not.
+ *   disallowed list (it shapes the model's tool context at launch), a SHRUNK allowed list (the
+ *   CLI holds the launch list as allow rules it resolves before ever asking `canUseTool`) and the
+ *   installed CLI version (a running process is the build it was started with) are launch
+ *   arguments and are not. The version is the one launch argument that is ORDERED rather than
+ *   compared: only a process behind the binary is replaced, never one ahead of a reading.
  *
- * consumer: claude-runtime.provider.js
+ * consumer: claude-runtime.provider.js, session-host/idle-version-sweep.ts (the version rule)
  */
 
 import type { SDKUserMessage } from '@anthropic-ai/claude-agent-sdk';
@@ -163,6 +165,15 @@ export type LaunchProfile = {
   ultracode: boolean;
   allowedTools: string[];
   disallowedTools: string[];
+  /**
+   * The Claude CLI version this process's own init announced — null until it announces one,
+   * and null for a re-adopted process whose host has no such record.
+   *
+   * NEVER the installed binary's version. That is a different process's fact, taken from the
+   * probe, and adopting it here would mark a stale process current for the rest of its life:
+   * the one comparison this field exists for would then answer "same" every time.
+   */
+  cliVersion: string | null;
 };
 
 type SdkOptionsShape = {
@@ -180,7 +191,8 @@ type SdkOptionsShape = {
 export function launchProfileOf(
   sdkOptions: SdkOptionsShape,
   mcpUnreadable = false,
-  unknown = false
+  unknown = false,
+  cliVersion: string | null = null
 ): LaunchProfile {
   const permissionMode = sdkOptions.permissionMode ?? 'default';
   return {
@@ -194,7 +206,8 @@ export function launchProfileOf(
     effort: sdkOptions.effort ?? null,
     ultracode: typeof sdkOptions.settings === 'object' && sdkOptions.settings?.ultracode === true,
     allowedTools: [...(sdkOptions.allowedTools ?? [])],
-    disallowedTools: [...(sdkOptions.disallowedTools ?? [])]
+    disallowedTools: [...(sdkOptions.disallowedTools ?? [])],
+    cliVersion: typeof cliVersion === 'string' ? cliVersion : null
   };
 }
 
@@ -210,6 +223,43 @@ export type LivePlan = { respawn: string; changes: null } | { respawn: null; cha
 const sameList = (a: string[], b: string[]): boolean =>
   a.length === b.length && a.every((entry, index) => entry === b[index]);
 
+/** The leading numeric parts of a version line (`v2.1.280-beta.1` → `[2, 1, 280]`), or null. */
+const versionNumbers = (version: string): number[] | null => {
+  const match = /^v?(\d+(?:\.\d+)*)/.exec(version.trim());
+  return match ? match[1].split('.').map(Number) : null;
+};
+
+/**
+ * Whether the process on `liveVersion` is BEHIND the binary on `installedVersion` — the only
+ * direction in which a version replaces a process.
+ *
+ * The installed side is a reading (cached at most 60 s, dropped the moment the binary changes on
+ * disk) while the live side is what a process announced at its own init, which is never a reading
+ * and never stale. So the two can differ because the process is old, and that is the whole point of
+ * the rule — or because the reading is old, which is no reason to touch a healthy process: a
+ * differing pair decided by "not equal" alone would retire a current process and spawn the very
+ * same build again, once per message, for as long as the reading stood, each time paying a cold
+ * start and a full resume replay. A version that cannot be ordered falls back to the plain
+ * difference, because a build nobody can compare is not a reason to leave a conversation on an old
+ * binary for good — and a pair like that only differs when the strings genuinely do.
+ *
+ * Exported because the same rule decides a retirement that no message asked for: the idle host a
+ * version install leaves behind (session-host's `idle-version-sweep.ts`). A second comparison there
+ * — "differs", say — would be a second answer to "is this process old", and the two would drift the
+ * first time one of them learned about a build that sorts oddly. consumer: idle-version-sweep.ts
+ */
+export const isBehindInstalled = (liveVersion: string, installedVersion: string): boolean => {
+  const live = versionNumbers(liveVersion);
+  const installed = versionNumbers(installedVersion);
+  if (!live || !installed) return true;
+  for (let index = 0; index < Math.max(live.length, installed.length); index += 1) {
+    const left = live[index] ?? 0;
+    const right = installed[index] ?? 0;
+    if (left !== right) return left < right;
+  }
+  return false;
+};
+
 /**
  * Decides whether the next message can go into the running process, and what to apply to it
  * first. A respawn reason names the launch argument that changed.
@@ -222,6 +272,18 @@ export function planLiveChanges(
   if (turn.resumeFromScratch) return { respawn: 'the conversation restarts from scratch', changes: null };
   if (next.resumeSessionAt) return { respawn: 'an edited message resumes from an earlier point', changes: null };
   if (next.cwd !== live.cwd) return { respawn: `the working directory changed to ${next.cwd ?? 'none'}`, changes: null };
+  // The installed CLI is one more launch argument: a process runs the version it was started
+  // with, so a message that would reuse a host older than the binary on disk retires it and
+  // spawns afresh — here, at the moment of the message, rather than leaving the conversation
+  // on the old build under a label that names the new one. BOTH sides must have spoken: a
+  // process that has not announced its version, or a binary that cannot be read (`null`), is a
+  // "not heard", and never a reason to replace a healthy process. A pair that both sides HAVE
+  // spoken must be ordered, not merely different — see `isBehindInstalled`: the installed side is
+  // a reading, and a reading older than the process is not a reason to replace it.
+  if (typeof live.cliVersion === 'string' && typeof next.cliVersion === 'string'
+    && live.cliVersion !== next.cliVersion && isBehindInstalled(live.cliVersion, next.cliVersion)) {
+    return { respawn: `cli ${live.cliVersion} → ${next.cliVersion}`, changes: null };
+  }
   if (live.unknown) {
     // Re-adopted: nothing to diff against, so apply every live setter once. A bypass request
     // on a process that was not launched with it fails at the SDK and falls back to a respawn.

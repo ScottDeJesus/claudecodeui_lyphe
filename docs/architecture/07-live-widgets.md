@@ -86,7 +86,7 @@ Read [the realtime stream](./02-realtime-stream.md) for how a reply arrives, and
 | `src/modules/chat/embeds/collectEmbedTargets.ts` | `collectEmbedTargets` — every embed a chat has declared, read out of its own messages through the one classifier |
 | `src/modules/chat/embeds/embedSource.ts` | `publishEmbedSource`, `useChatEmbedTargets`, `useEmbedWidgetState` — the chat's list, published for the widget that draws it, and whether it has arrived at all |
 | `src/modules/chat/embeds/EmbedWidgetBody.tsx` | `EmbedWidgetBody` — the gutter widget: the follow latch, the one-row dropdown (house presets, the chat's addresses, `Type an address…`), the way out, and `EmbedUrlFrame` filling the card |
-| `src/modules/chat-gutters/GutterWidgetFrame.tsx` | The gutter card, and its `fullscreen` / `onToggleFullscreen` / `flush` props |
+| `src/modules/chat-gutters/GutterWidgetFrame.tsx` | The gutter card, and its `fullscreen` / `onToggleFullscreen` / `flush` / `headerAction` props |
 | `src/modules/widgets/embedUrl.ts` | `isLoopbackHost` and `resolveEmbedUrl` — a loopback address moved onto the host that reached this page, because an `src` is resolved by the reader's browser |
 | `src/modules/widgets/docspaceOrigin.ts` | `DOCSPACE_EMBED_DEFAULT_PORT`, `resolveDocSpaceOrigin`, `docspaceEmbedUrl`, `docspaceStudioUrl`, and `isForeignOrigin` — the gate on `allow-same-origin` |
 | `src/modules/widgets/DocSpaceFrame.tsx` | `DOCSPACE_SANDBOX`, `DOCSPACE_READY_TIMEOUT_MS` and `DocSpaceFrame` — the second frame: a `src` on ArchPulse's origin, the latched theme, the ready timer, and the `framed` prop that drops its own border where a card already draws one |
@@ -588,7 +588,10 @@ fullscreen at once, two identical panels on one layer that one Escape leaves tog
 Escape listener, with the same dialog stand-down, and drops it when the region narrows past the
 gutters' threshold. The switch is a second control, so it
 is a second button beside the header's toggle rather than inside it — a button within a button is
-invalid markup — which is the one change to a header that used to be entirely one control.
+invalid markup — and the header row therefore holds every control at once: the toggle, the frame's
+switch, and one node the widget itself supplies through `headerAction` (the Subagents widget's
+"Clear completed" is the only one; [06-tool-view.md](06-tool-view.md) §Subagents). Each is a sibling
+of the toggle, so a press meant for one of them folds nothing and drags nothing.
 
 A retraction is the one thing that ends fullscreen without the reader: a fence that flashes back to
 the streaming half unmounts `WidgetFrame` entirely, and the card comes back as a card. That is the
@@ -606,13 +609,17 @@ caller in the app — the panel and the tab's own gate both read `runner:*` thro
 What fills it is a FEED — a headless component owned by the module whose data it carries, which
 subscribes to whatever it likes and calls `publish`. The first is `RunnerFeed` in
 `src/modules/plan-runner/`, documented in [plan-runner.md](../plan-runner.md) under *Consumers*.
-Two more have followed and both kept the shape: `SoulLaunchFeed` in `src/modules/dispatch-souls/`
-([dispatch-souls.md](../dispatch-souls.md)) and `UniverseFeed` in `src/modules/universe/`, which
-publishes a once-a-second digest rather than the raw activity stream
-([plan-runner.md](../plan-runner.md) §"The feed"). A further lane (git delegation, Task Master)
-lands the same way — a sibling `*Feed.tsx` in ITS own module and never as a line in `live-bus/`.
-That rule is what keeps this file from acquiring a switch over frame kinds it has no business
-knowing, and it is why the bus can be read without knowing anything about the runner.
+Three more have followed and all three kept the shape: `ArcFeed`, beside `RunnerFeed` in that same
+module, publishes the arc deck's own `arc:*` ([plan-runner.md](../plan-runner.md) §"The arc deck");
+`SoulLaunchFeed` in `src/modules/dispatch-souls/` ([dispatch-souls.md](../dispatch-souls.md)); and
+`UniverseFeed` in `src/modules/universe/`, which publishes a once-a-second digest rather than the raw
+activity stream ([plan-runner.md](../plan-runner.md) §"The feed"). A further lane (git delegation,
+Task Master) lands the same way — a sibling `*Feed.tsx`, usually in ITS own module, though `ArcFeed`
+is the exception: the arc deck reads the runner's own state directory rather than owning one of its
+own, so its feed never became a second job for `RunnerFeed`. Every feed lands as a component, never
+as a line in `live-bus/`. That rule is what keeps this file from acquiring a switch over frame kinds
+it has no business knowing, and it is why the bus can be read without knowing anything about the
+runner.
 
 **The vocabulary is an allowlist, and the shapes are anchored.** `LIVE_TOPIC_ALLOWLIST` holds four
 patterns today — `runner:*` (every run as one array), `runner:<run_id>` with the route's own

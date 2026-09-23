@@ -7,7 +7,14 @@ import { ActionMenu, type ActionMenuItem, LLMProviderLogo, Select, Switch, Toolt
 
 /**
  * The board's one row of chrome: which board you are looking at, how it stands in six counts,
- * whether it is running itself, and the three things you can do to the board as a whole.
+ * whether it is running itself, and the two things you can do to the board you are on.
+ *
+ * MAKING A BOARD IS THE SWITCHER'S, NOT THE MENU'S. It used to sit in the `…` beside Rename and
+ * Archive, and the operator's report of it was "no way to select or create other boards": the
+ * glyph carries no word, sits at the far end of the row past two switches, and holds two verbs
+ * that act on the CURRENT board — so nothing about it says a new one starts there. The moment a
+ * reader wants a board that does not exist is the moment they have the switcher open and cannot
+ * find it, which is exactly where the row now is.
  *
  * IT INVENTS NO SHELL. `h-12`, a bottom border and no background of its own — it sits inside the
  * workspace tab and inherits the chrome the tab already draws. A second page-level header here
@@ -32,8 +39,8 @@ import { ActionMenu, type ActionMenuItem, LLMProviderLogo, Select, Switch, Toolt
  * The DeepSeek switch beside it wears the whale rather than a colour of its own. Two bare
  * switches in one cramped edge are two identical tracks a reader has to label by position, and a
  * second accent for the second one would be a second palette. The mark is the whole distinction:
- * the same whale, at the same size, that the composer's Flash chip already carries — so the two
- * are learned once. The word rides beside it from `sm` up and stands down on a phone, exactly as
+ * the same whale, at the same size, that the composer's Flash chip carries while it is on — so the
+ * two are learned once. The word rides beside it from `sm` up and stands down on a phone, exactly as
  * that chip's does, because the mark alone is what a reader who has met it once actually reads
  * and the board's name must keep its width. "Autonomy" keeps its word at every width: it has no
  * mark, and a switch with neither is a switch whose positions have to be discovered by pressing.
@@ -58,8 +65,8 @@ type KanbanBoardHeaderProps = {
   onSelectBoard: (boardId: string) => void;
   onToggleAutonomy: (next: boolean) => void;
   onToggleDeepseekFlash: (next: boolean) => void;
-  /** Both name-entry rows. The panel raises the surface, because it holds the `projectId` a new
-   *  board is labelled with and the hook that writes it. */
+  /** Raised from the switcher's own action row. The panel holds the name surface and the hook
+   *  that writes it, so both name-entry rows are raised rather than handled here. */
   onNewBoard: () => void;
   onRenameBoard: () => void;
   onArchiveBoard: () => void;
@@ -83,9 +90,10 @@ export function KanbanBoardHeader({
   const options = boards.map((board) => ({ value: board.id, label: board.name }));
   const hasBoard = currentBoardId !== null;
 
+  // The two verbs that act on the board you are ALREADY on. Making a new one is not among them:
+  // it rides in the switcher, which is where a reader looking for a board they cannot find goes.
+  // Archiving hides a board and deletes nothing, which is why it is not marked as danger.
   const items: ActionMenuItem[] = [
-    { key: 'new-board', label: t('kanban.board.newBoard'), onSelect: onNewBoard },
-    // Archiving hides a board and deletes nothing, which is why it is not marked as danger.
     { key: 'rename-board', label: t('kanban.board.rename'), disabled: !hasBoard, onSelect: onRenameBoard },
     { key: 'archive-board', label: t('kanban.board.archive'), disabled: !hasBoard, onSelect: onArchiveBoard },
   ];
@@ -104,6 +112,11 @@ export function KanbanBoardHeader({
           placeholder={t('kanban.board.noBoard')}
           ariaLabel={t('kanban.board.switcher')}
           size="sm"
+          // New board lives HERE and not behind the `…`, because the question it answers is the
+          // switcher's own: a reader opens this list to find a board, and when the one they want
+          // is not in it the way to make it must be under their hand — not behind an unlabelled
+          // glyph at the far end of the row, past two switches.
+          action={{ label: t('kanban.board.newBoard'), onSelect: onNewBoard }}
         />
       </div>
 

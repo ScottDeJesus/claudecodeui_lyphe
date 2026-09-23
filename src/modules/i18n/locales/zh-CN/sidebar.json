@@ -170,6 +170,7 @@
     "iconDefault": "默认",
     "iconOption": "{{name}} 图标",
     "unread": "已完成，尚未阅读",
-    "dragHandle": "拖动以重新排序"
+    "dragHandle": "拖动以重新排序",
+    "subagentsRunning": "子代理运行中"
   }
 }

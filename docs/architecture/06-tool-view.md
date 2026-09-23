@@ -392,7 +392,9 @@ the whole row to `SubagentPanel` and never calls `ToolRenderer` for it.
 
 The panel is a tool row (`toolRow.ts`'s frame, no caret, no stripe): the mark of the provider the
 agent ran on (`subagentMarkProvider` — DeepSeek's whale when the agent's own model is a DeepSeek
-one, else the session's provider; the robot only when none is known), the agent type, `/`, the
+one, else the session's provider; the robot only when none is known; Claude's
+`ClaudeCodeMark` mascot rather than the starburst, as every chat and subagent row draws it, through
+`LLMProviderLogo`'s `claudeMark="mascot"`), the agent type, `/`, the
 description, the nickname, then its figures (`N tools`, tokens, finish time — hidden when the row
 itself is under 480px, a container query in `index.css`, so a phone or a narrow chat column keeps
 the description and the outcome) and the outcome pill — `Finished`, `Failed` or
@@ -474,8 +476,9 @@ line and the agent card's header.
 
 **A chat's pinned rows come from the whole history.** They are drawn in the strip above the chat box
 whenever the desktop chat gutters are NOT showing, and in the chat gutter's Subagents widget
-(`SubagentWidgetBody.tsx`) while they are — the same rows from the same derivation, so either
-surface keeps an agent in view while it runs and after it finishes, until the reader dismisses it.
+(`SubagentWidgetBody.tsx` for the list and `SubagentWidgetClearCompleted.tsx` in its header) while they
+are — the same rows from the same derivation, so either surface keeps an agent in view while it runs
+and after it finishes, until the reader dismisses it.
 The rows are derived by `src/modules/chat/hooks/usePinnedSubagentRows.ts`, which `PinnedSubagents.tsx`
 is only the drawing and the memo boundary for. `ChatInterface` also publishes that same derivation's
 inputs — tagged with the open chat's own session id — through
@@ -501,13 +504,13 @@ like a loaded container.
 **A pin is not always an `Agent` tool call.** The pinned rows hold TWO KINDS OF ROW, sorted into one list
 — running first by oldest launch, then finished by newest finish — because the reader is asking it
 one question, *what is working for me right now*, and the answer would be a lie if half of it were
-somewhere else. The second kind is a LAUNCHER SOUL: a `/dispatch` hand started as a detached
+somewhere else. The second kind is a LAUNCHER SOUL: a soul a session started by hand as a detached
 `plan-runner soul` child, which streams nothing into this transcript at all. Both kinds are drawn
 alike: `LLMProviderLogo` centred on the row's height beside its two lines — an `Agent` subagent on
 the provider it ran on (`subagentMarkProvider`, the same reading the transcript row takes; the robot
 only when none is known), a soul
-on the endpoint paying for it (the DeepSeek whale, or Claude's). No coloured left rule; the status
-column carries the state.
+on the endpoint paying for it (the DeepSeek whale, or Claude's mascot). No coloured left rule; the
+status column carries the state.
 
 That row is a JOIN, and it is the reason the two halves are in different modules. **Ownership comes
 from this transcript**: the launcher's receipt, `SOUL LAUNCHED launch=<id> …`, read off the result of
@@ -527,6 +530,27 @@ and the reader's act is the same either way. The list is read through a module-s
 (`useDismissedPins()` / `dismissPin()`, over `useSyncExternalStore`) rather than a private `useState`,
 so every copy of the rows — the strip and the gutter widget alike, whichever has the claim above —
 drops a dismissed row in the same frame; a `storage` listener folds in another tab's dismissal too.
+
+**Clear completed** is the widget's alone (`subagents/SubagentWidgetClearCompleted.tsx`), and it is worn
+in the widget's HEADER rather than above its list: it acts on the list rather than on a row, so it
+belongs where the list's title is, and it gets there through the frame's one generic slot —
+`GutterWidgetFrame`'s `headerAction`, drawn between the collapse toggle and the fullscreen switch, a
+node the frame knows nothing about (`ChatGutterLayout`'s widget table names the component as
+`HeaderAction`). It is a SIBLING of the toggle and never a child of it, since the header is itself a
+`<button>` and the drag handle: a control inside it could not be pressed without folding the card,
+and nothing has to stop a press from travelling, because the click and the drag both belong to that
+other button and this one is outside it. It is a 28px `CheckCheck` button whose accessible name and
+hover title are `gutters.subagents.clearCompleted` — at the gutter's narrowest drawn column, 306px
+measured, the title has 124px of box and the word would spend most of it — and it shows in BOTH
+folds, because it reports a fact about the chat rather than about the fold. It is drawn only while a
+row has actually finished — an offer to clear nothing is a control a reader has to press to learn it
+does nothing — reading the same rows through `useSubagentWidgetRows` that the body beneath it draws;
+that second reading costs no fetch, since the hook is a subscription to two stores the chat already
+published, and both readers drop a cleared row in the same frame. It dismisses every row
+`rowRunning()` reports as done and never a running one, through `dismissMany` → `dismissPins(ids)`:
+ONE storage write and ONE publish for the whole list, where dismissing eight rows one at a time would
+repaint every copy of them eight times. The strip keeps only the per-row X — it holds a window of
+rows and has no room for chrome, and the widget is where a reader goes to tidy up.
 
 **Click to read, live.** Both row components take `onOpen`/`openLabel`: the row's root is a
 keyboard-and-mouse button, its dismiss control calls `event.stopPropagation()` so a click on the X
@@ -566,6 +590,21 @@ the file's last write is still running. A `<task-notification>` turn in the pare
 there is one, overrides all of these. A BACKGROUNDED agent's finish time is that last record's,
 when no notification gives one; a foreground agent's is its own `tool_result` row's stamp in the
 parent, which is the better source and the one used.
+
+**The same rule, one strip away.** The sidebar's chat rows carry a purple dot for a conversation
+with an agent still running — the mark the strip draws per agent, drawn per chat. It has to come
+from the server for the ordinary case, not the edge one: a backgrounded agent outlives the turn
+that launched it, so the chat it belongs to is usually not open and its transcript is loaded
+nowhere. `hasRunningSubagent` (same file as `collectSessionAgents`) is that answer, asked through
+the same container selection and the same four-hour window, and it rides the existing five-second
+running-sessions poll as a top-level `subagentSessionIds` rather than a second poller. One case
+separates the two readings, and it is the resume: the strip times a row from
+`subagent.resume.at ?? message.timestamp` (`usePinnedSubagentRows`'s `startedAtMs`), while
+`collectSessionAgents` times it from the original launch, so a resume landing more than four hours
+after that launch leaves the row pinned as running in its own chat while the dot stays dark. What
+the endpoint does to keep the answer cheap — the candidate window, the sidechain freshness gate,
+and the history cache it shares with the chat's own reads — is documented in
+`server/modules/providers/services/session-subagent-runs.service.ts`.
 
 Those sidechain files are also why the full-history cache takes a second freshness value. It is
 keyed on the parent transcript's stat, and an agent writes its own file continuously while the

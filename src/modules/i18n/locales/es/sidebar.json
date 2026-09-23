@@ -176,6 +176,7 @@
     "iconDefault": "Predeterminado",
     "iconOption": "Icono {{name}}",
     "unread": "Finalizado, sin leer",
-    "dragHandle": "Arrastra para reordenar"
+    "dragHandle": "Arrastra para reordenar",
+    "subagentsRunning": "Subagentes en ejecución"
   }
 }

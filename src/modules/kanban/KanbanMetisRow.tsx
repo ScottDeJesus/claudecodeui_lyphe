@@ -22,11 +22,11 @@ import { cn } from '@/shared/utils';
  * the list folds to a few rows the moment a conversation opens, so the row that becomes the open
  * one scrolls itself back into its list — a highlight below the fold tells nobody anything.
  *
- * THE MARK, NEVER THE WORD. The provider is the same logo the composer's DeepSeek switch, the soul
- * pins and the board header draw, through the one door that branches on a provider name
- * (`LLMProviderLogo`). It is not hidden from the accessibility tree: no word beside it spells the
- * provider, so the logo's own `role="img"` name is how a screen reader learns which vendor's money
- * this row is spending.
+ * THE MARK, NEVER THE WORD. The provider is drawn through the one door that branches on a provider
+ * name (`LLMProviderLogo`), which the board header still wears; the composer's switch draws the
+ * mascot itself in its off state, and the soul pins wear Claude's mascot. It is not hidden from the
+ * accessibility tree: no word beside it spells the provider, so the logo's own `role="img"` name is
+ * how a screen reader learns which vendor's money this row is spending.
  *
  * THE STATE IS A BADGE, AND RUNNING IS THE ONE THAT MOVES. Four states, four tones from the closed
  * set (doctrine §5): `info` while she runs, `positive` when she finished on her own, `neutral` when

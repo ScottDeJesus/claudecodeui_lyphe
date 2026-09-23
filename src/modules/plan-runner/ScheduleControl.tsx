@@ -1,0 +1,53 @@
+import { useTranslation } from 'react-i18next';
+
+import { useOffpeak } from '@/modules/plan-runner/hooks/useOffpeak';
+import { scheduleClock } from '@/modules/plan-runner/runState';
+import { Button } from '@/shared/ui';
+
+type ScheduleControlProps = {
+  /** Whose Start this schedules: one queued run's (`plan-runner schedule`) or one unstarted arc's (`arc schedule`). */
+  scope: 'run' | 'arc';
+  /** The scheduled moment as the last frame read it off disk (`start_at`, epoch SECONDS), or `null`. */
+  startAt: number | null;
+  /** A verb is in flight for this run or arc: the buttons refuse a second press until it answers. */
+  busy: boolean;
+  /** Relays `offpeak` (schedule) or `none` (cancel). */
+  onSchedule: (when: 'offpeak' | 'none') => void;
+};
+
+/**
+ * `Start at 3:00 AM` — or, once scheduled, `Cancel`. Used by `RunCard`'s queued footer and `ArcDeck`'s header:
+ * the same control on both, so one shape means one thing.
+ *
+ * THE TIME IS THE RUNNER'S: `useOffpeak` relays `plan-runner offpeak` (the end of DeepSeek's last daily peak
+ * window, derived from `deepseek.PEAK_UTC`), and this control only renders it in the reader's clock. Until the
+ * runner answers, the button waits rather than guessing. NOTHING OPTIMISTIC: whether it reads `Start at …` or
+ * `Cancel` is `startAt`, the record as the last frame carried it; a press relays the word and the next frame
+ * redraws. The watchdog's two-minute tick is what presses Start then — the note says the operator's time.
+ *
+ * Handles, the scope's own: `data-runner-schedule` / `data-arc-schedule` on the group (the current `start_at`,
+ * or empty), `…-schedule-set` on `Start at …` and `…-schedule-cancel` on `Cancel`.
+ */
+export function ScheduleControl({ scope, startAt, busy, onSchedule }: ScheduleControlProps) {
+  const { t } = useTranslation();
+  const offpeakAt = useOffpeak();
+  const prefix = scope === 'run' ? 'data-runner-schedule' : 'data-arc-schedule';
+
+  return (
+    <div role="group" aria-label={t('runner.schedule.label')} className="inline-flex items-center"
+      {...{ [prefix]: startAt === null ? '' : String(startAt) }}>
+      {startAt === null ? (
+        <Button type="button" variant="secondary" size="sm" disabled={busy || offpeakAt === null}
+          title={t(scope === 'run' ? 'runner.schedule.runTitle' : 'runner.schedule.arcTitle')}
+          onClick={() => onSchedule('offpeak')} {...{ [`${prefix}-set`]: '' }}>
+          {t('runner.schedule.startAt', { time: offpeakAt === null ? '…' : scheduleClock(offpeakAt) })}
+        </Button>
+      ) : (
+        <Button type="button" variant="ghost" size="sm" disabled={busy} title={t('runner.schedule.cancelTitle')}
+          onClick={() => onSchedule('none')} {...{ [`${prefix}-cancel`]: '' }}>
+          {t('runner.schedule.cancel')}
+        </Button>
+      )}
+    </div>
+  );
+}

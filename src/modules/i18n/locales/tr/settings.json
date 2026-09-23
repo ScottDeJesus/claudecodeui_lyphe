@@ -347,12 +347,7 @@
         "gatedOn": "Yukarıdaki ana anahtar tarafından tutuluyor — ancak bu opt-in açık olarak kayıtlı, dolayısıyla Jev'i açmak komut çıktısını hemen gönderir.",
         "gatedOff": "Yukarıdaki ana anahtar tarafından tutuluyor: bunu değiştirmek için önce Jev'i açın."
       },
-      "unreadable": "Anahtarlar sunucudan okunamadı, bu yüzden konumları bilinmiyor — kapalı olmakla aynı şey değil. Bu sayfa odağı her geri aldığında yeniden denenir.",
-      "stats": "Jev defteri: {{calls}} çağrı · {{tokens}} Jev token harcandı · {{linesIn}} satır süzüldü → {{linesKept}} tutuldu",
-      "statsEmpty": "Jev defteri: henüz çağrı kaydedilmedi.",
-      "net": "Jev net: {{chars}} karakter ≈ {{tokens}} oturum tokenı (+ tutulan, − eklenen)",
-      "consumer": "{{caller}}: {{chars}} karakter",
-      "consumerMore": "… ve {{more}} tane daha — hepsini `jev stats` listeler."
+      "unreadable": "Anahtarlar sunucudan okunamadı, bu yüzden konumları bilinmiyor — kapalı olmakla aynı şey değil. Bu sayfa odağı her geri aldığında yeniden denenir."
     },
     "login": {
       "title": "Giriş Yap",

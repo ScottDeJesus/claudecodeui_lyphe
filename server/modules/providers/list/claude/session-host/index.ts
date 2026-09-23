@@ -26,3 +26,11 @@ export type { KeepaliveReattach } from './spawner.js';
  * consumer: server/index.ts, through the providers barrel
  */
 export { readoptKeepaliveSessions, releaseKeepaliveOwnership } from './readopt.js';
+
+/**
+ * The sweep over idle hosts left on an older build by an install, and its subscription to the
+ * installed reading. `readoptKeepaliveSessions` calls the subscription itself; this export is for a
+ * PROBE, which never holds the keepalive claim and therefore cannot get it that way.
+ * consumer: .verify probes only
+ */
+export { retireStaleIdleHosts, watchInstalledCliVersionChanges } from './idle-version-sweep.js';

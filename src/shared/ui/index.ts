@@ -21,6 +21,12 @@
  * the doctrine's other test: they are mechanism — pointer capture, a viewport clamp,
  * a dock hit-test, a clamped divider — which no arrangement of the parts here can
  * produce, so every screen that wants either composes it rather than rebuilding it.
+ *
+ * ClaudeCodeMark came in with one consumer, the composer's DeepSeek chip, by the operator's ruling
+ * that a mark is a kit glyph and never an inline one-off: a brand mark drawn inside one module is
+ * the copy the next module to need it re-draws slightly differently. The chat module's transcript
+ * and subagent rows now draw it too, for Claude, through `LLMProviderLogo`'s `claudeMark="mascot"`
+ * — the same door and the same one glyph, not a copy of it with its own grid.
  */
 
 // The library's paint, imported once for its side effect so that every consumer of this
@@ -45,6 +51,7 @@ export { Banner } from '@/shared/ui/Banner';
 export { Button, buttonVariants } from '@/shared/ui/Button';
 export { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/shared/ui/Card';
 export { Chip } from '@/shared/ui/Chip';
+export { ClaudeCodeMark } from '@/shared/ui/ClaudeCodeMark';
 export { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/shared/ui/Collapsible';
 export { Command, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem } from '@/shared/ui/Command';
 export { DarkModeToggle } from '@/shared/ui/DarkModeToggle';

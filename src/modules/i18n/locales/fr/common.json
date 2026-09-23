@@ -350,6 +350,7 @@
     "subagents": {
       "title": "Sous-agents",
       "empty": "Aucun sous-agent dans cette conversation",
+      "clearCompleted": "Effacer les terminés",
       "back": "Retour aux sous-agents",
       "loading": "Chargement de la transcription…",
       "notFound": "Pas encore de transcription sur le disque",

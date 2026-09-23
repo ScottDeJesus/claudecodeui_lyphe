@@ -12,8 +12,11 @@ import { usePaletteOpsRegister } from '@/modules/command-palette';
 import { KanbanPanel } from '@/modules/kanban';
 import { MemoryIntakePanel } from '@/modules/memory-intake';
 import { RunnerPanel } from '@/modules/plan-runner';
+import { HealPanel } from '@/modules/heal';
+import { JevPanel } from '@/modules/jev';
 import { TaskMasterPanel, useTaskMasterProjectSync } from '@/modules/task-master';
 import { UniversePanel } from '@/modules/universe';
+import { SchedulesPanel } from '@/modules/schedules';
 import type { AppTab, GitRepository, Project, ProjectChoice, ProjectSession, SessionEstablishedContext, SessionNavigationOptions, SettingsMainTab } from '@/shared/types';
 import { api } from '@/shared/api';
 import { useUiPreferences } from '@/shared/context/UiPreferencesContext';
@@ -108,6 +111,7 @@ function WorkspaceMain({
     shouldShowShellTab,
     shouldShowMemoryTab,
     shouldShowRunnerTab,
+    shouldShowHealTab,
     preferencesSettled,
   } = useWorkspaceTabGates(activeTab);
 
@@ -419,6 +423,19 @@ function WorkspaceMain({
             </div>
           )}
 
+          {shouldShowHealTab && activeTab === 'heal' && (
+            <div className="h-full overflow-hidden">
+              <HealPanel />
+            </div>
+          )}
+
+          {/* No gate, like the board below: the tab is always on the strip. */}
+          {activeTab === 'jev' && (
+            <div className="h-full overflow-hidden">
+              <JevPanel />
+            </div>
+          )}
+
           {/* No gate: the board is always on the strip, the way chat, files and git are. It is also
               GLOBAL — the project it is handed is a first-run hint about which board to select, not
               a filter — so nothing here unmounts or refetches when the open project changes. */}
@@ -433,6 +450,14 @@ function WorkspaceMain({
           {activeTab === 'universe' && (
             <div className="h-full overflow-hidden">
               <UniversePanel />
+            </div>
+          )}
+
+          {/* No gate, for the same reason as the board and the sky: the registry describes the
+              box itself, so nothing here depends on which project is open. */}
+          {activeTab === 'schedules' && (
+            <div className="h-full overflow-hidden">
+              <SchedulesPanel />
             </div>
           )}
 

@@ -399,15 +399,27 @@
   z-index: 20;
   margin: 0;
   padding: 6px;
-  list-style: none;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-card);
   box-shadow: var(--shadow-overlay);
   animation: vv-pop 0.3s var(--ease-enter) both;
+  display: flex;
+  flex-direction: column;
   /* A long list scrolls inside the panel: unbounded, a picker of many projects ran past the
-     bottom of the screen and over the composer, with most choices unreachable. */
+     bottom of the screen and over the composer, with most choices unreachable. The CAP is here
+     and the scrolling is on the list below, so an action row keeps its place at the bottom. */
   max-height: min(20rem, 50dvh);
+  /* The panel is as wide as its trigger, and a trigger that has been squeezed — the board
+     switcher on a phone is 115px — wrapped every name onto two lines and "New board" onto three.
+     A floor lets it grow rightwards off its `left: 0` anchor, capped at the viewport so it can
+     never hang off the edge. Wider triggers are untouched: they are already past the floor. */
+  min-width: min(14rem, calc(100vw - 24px));
+}
+.vv-select__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
   overflow-y: auto;
   overscroll-behavior: contain;
 }
@@ -425,6 +437,24 @@
 .vv-select__option[aria-selected='true'] { background: var(--accent-soft); color: var(--accent-ink); }
 .vv-select__option[aria-selected='true']::after { content: '✓'; font-size: 12px; color: var(--accent); }
 
+/* The row that makes a new one. Behind a hairline and in the accent, because it is not a choice
+   among the choices above it — a reader scanning the list must not count it as one. */
+.vv-select__action {
+  margin-top: 6px;
+  padding: 9px 12px;
+  border: 0;
+  border-top: 1px solid var(--border);
+  background: transparent;
+  color: var(--accent-ink);
+  font-family: var(--font-body);
+  font-size: 14px;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 0.15s;
+}
+.vv-select__action:hover { background: var(--accent-soft); }
+
 /* Dense form, for narrow chrome. The stock trigger is ~46px tall and towers over the `sm`
    Button it shares a strip with in the sidebar; this sits at that button's own 36px. Below
    the sidebar's compact breakpoint the 44px touch floor outranks the density. */
@@ -435,6 +465,7 @@
 }
 .vv-select--sm .vv-select__chevron { font-size: 9px; }
 .vv-select--sm .vv-select__option { padding: 6px 10px; font-size: 13px; }
+.vv-select--sm .vv-select__action { padding: 8px 10px; font-size: 13px; }
 @media (max-width: 767px) {
   .vv-select--sm .vv-select__trigger { min-height: 44px; }
 }

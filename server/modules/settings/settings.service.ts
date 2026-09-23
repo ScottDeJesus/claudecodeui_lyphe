@@ -1,8 +1,12 @@
 import { AppError } from '@/shared/utils.js';
 
-import type { JevLedgerStats } from './jev-ledger.js';
 import { JEV_SCOPES } from './jev-switches.js';
 import type { JevScopeKey, JevSwitches } from './jev-switches.js';
+import { readHealModel, writeHealModel } from './heal-model-switch.js';
+import type { HealModel } from './heal-model-switch.js';
+import { readHealCycle, writeHealCycle } from './heal-cycle-switch.js';
+import { readHealCap, readHealMaster, writeHealCap, writeHealMaster } from './heal-switch.js';
+import { readSwarmSwitch, writeSwarmSwitch } from './swarm-switch.js';
 
 /**
  * Every field a `PUT /jev` body may name — the master plus each scope in the table — for the two
@@ -63,7 +67,6 @@ type SettingsDependencies = {
     read(): Promise<JevSwitches>;
     writeMaster(enabled: boolean): Promise<void>;
     writeScope(scope: JevScopeKey, enabled: boolean): Promise<void>;
-    readStats(): Promise<JevLedgerStats>;
   };
   getVapidPublicKey(): string | null;
 };
@@ -211,6 +214,164 @@ export function createSettingsService(dependencies: SettingsDependencies) {
       // answer the UI renders should be what is on disk, not what we asked for.
       return { enabled: await dependencies.deepseekFlash.read() };
     },
+    /**
+     * The swarm switch: whether the plan runner runs several phases of one plan at once, and the
+     * optional ceiling it runs under.
+     *
+     * Unlike the DeepSeek switch above it — the one switch here injected as a dependency, because a
+     * Kanban board carries its own copy of that flag and needs a second writer — this one is not a
+     * dependency of this service: it reads and writes `swarm-switch.ts` directly, the way the metis
+     * spawner reads its own flag writer and the way the heal switches below read theirs. There is one
+     * swarm flag and no second path to it, so an injected pair would carry nothing the module does not.
+     */
+    async getSwarm() {
+      return readSwarmSwitch();
+    },
+    async setSwarm(enabledInput: unknown, lanesInput: unknown) {
+      if (typeof enabledInput !== 'boolean') {
+        throw new AppError('enabled must be a boolean', {
+          code: 'INVALID_SWARM_STATE',
+          statusCode: 400,
+        });
+      }
+      // The ceiling is OPTIONAL, and both ways of saying "none" mean the same thing: absent, or
+      // an explicit null. `null` is the uncapped default the operator asked for, so it is a
+      // position and never an error — a caller turning the switch on with no ceiling chosen gets
+      // `on`, every phase the independence rule frees at once.
+      const lanes = lanesInput === undefined || lanesInput === null ? null : lanesInput;
+      // A COUNT, and one both languages can hold. `Number.isSafeInteger` is exactly the line where
+      // this server's double and the runner's arbitrary-precision int stop agreeing — the reader in
+      // `swarm-switch.ts` says so at the same line, and answers one lane past it rather than the
+      // number — so a ceiling above it is a value the row would draw as `1 lane` while the runner
+      // honoured nine quadrillion, and `1e21` is worse still: `Math.trunc(1e21).toString()` is
+      // `1e+21`, a token NEITHER grammar accepts, so an ON press would leave a flag both readers
+      // call OFF. Refused at the door, where the count enters, rather than narrowed on the way out.
+      // A float is refused with it: a ceiling is a number of lanes, and silently truncating one is
+      // how the row and the file first disagree.
+      if (lanes !== null && (typeof lanes !== 'number' || !Number.isSafeInteger(lanes))) {
+        throw new AppError('lanes must be a whole number of lanes, or null for no ceiling', {
+          code: 'INVALID_SWARM_STATE',
+          statusCode: 400,
+        });
+      }
+      await writeSwarmSwitch(enabledInput, lanes);
+      // Read back rather than echo the input, for the reason above — and here the file is the one
+      // that holds the truth about the ceiling: `null` reads back as `null`, and a count reads back
+      // exactly as it was written, because nothing on either side narrows it.
+      return readSwarmSwitch();
+    },
+    /**
+     * The heal reflex's MASTER switch: whether the reflex may LAUNCH at all, over and above the cap
+     * beside it. A flag file steering a worker this host runs detached from a hook, so it is
+     * machine-wide rather than a row any signed-in operator owns.
+     *
+     * No count rides on this line — the file is the one word `off`, or `on` — and the row that draws
+     * it reads back the side the server read off disk. `off` stops LAUNCHES and nothing else: an
+     * ending still indexes the friction it saw, and the typed `/heal` door is the operator's own hand
+     * and is never gated by it.
+     */
+    async getHealMaster() {
+      return { enabled: await readHealMaster() };
+    },
+    async setHealMaster(enabledInput: unknown) {
+      if (typeof enabledInput !== 'boolean') {
+        throw new AppError('enabled must be a boolean', {
+          code: 'INVALID_HEAL_MASTER_STATE',
+          statusCode: 400,
+        });
+      }
+      await writeHealMaster(enabledInput);
+      // Read back rather than echo the input: the switch is a file another process reads, and the
+      // answer the UI renders should be what is on disk, not what we asked for.
+      return { enabled: await readHealMaster() };
+    },
+    /**
+     * The heal reflex's CYCLE SCHEDULE: when the maintenance cycle opens, and the UTC hour it opens at.
+     * A flag file of the family above, machine-wide for the same reason.
+     *
+     * `hour` rides on the PUT body beside `enabled` as `lanes` does on the swarm one: the file is ONE
+     * line — `off`, or `on <hour>` — so the hour is REQUIRED and held to a whole hour of the day, and
+     * no press can be drawn as a time it never asked for. Unlike the master this is not the launch
+     * gate but a CLOCK: `off` stops the scheduled cycle and nothing else, because a pressed cycle is
+     * the operator's own hand.
+     */
+    async getHealCycle() {
+      return readHealCycle();
+    },
+    async setHealCycle(enabledInput: unknown, hourInput: unknown) {
+      if (typeof enabledInput !== 'boolean') {
+        throw new AppError('enabled must be a boolean', {
+          code: 'INVALID_HEAL_CYCLE_STATE',
+          statusCode: 400,
+        });
+      }
+      // A whole hour of the day and nothing else: the worker reads `on <N>` as written, and answers
+      // anything past 23 with the shipped hour — a fraction or a string is a schedule it drops.
+      if (typeof hourInput !== 'number' || !Number.isInteger(hourInput) || hourInput < 0 || hourInput > 23) {
+        throw new AppError('hour must be a whole hour of the day, 0..23', {
+          code: 'INVALID_HEAL_CYCLE_STATE',
+          statusCode: 400,
+        });
+      }
+      // Read back rather than echo the input: the file another process reads is the answer.
+      await writeHealCycle({ enabled: enabledInput, hour: hourInput });
+      return readHealCycle();
+    },
+    /**
+     * The ceiling on a day's DeepSeek spend. A negative one is refused at the door: the worker's own
+     * gate is `cap >= 0`, so a negative file parks NOTHING and the refusal keeps the row and the worker
+     * from disagreeing. A cap of ZERO is admitted, and it bites — the day's spend has already reached
+     * it, so every heal is barred until local midnight.
+     */
+    async getHealCap() {
+      return { usd: await readHealCap() };
+    },
+    async setHealCap(usdInput: unknown) {
+      const usd = usdInput === undefined || usdInput === null ? null : usdInput;
+      // A dollar amount the worker can measure spend against: finite, and zero or more. `NaN` and
+      // `Infinity` are refused — a cap that cannot be compared to spend is a control that silently
+      // does nothing. A NEGATIVE is refused for the reason above: the worker reads it as no ceiling,
+      // so admitting one would answer the operator with a cap the reflex is not acting on. Zero is
+      // admitted, and is the tightest ceiling there is — it bars every heal until tomorrow.
+      if (usd !== null && (typeof usd !== 'number' || !Number.isFinite(usd) || usd < 0)) {
+        throw new AppError('usd must be a non-negative dollar amount, or null for no ceiling', {
+          code: 'INVALID_HEAL_CAP',
+          statusCode: 400,
+        });
+      }
+      await writeHealCap(usd);
+      return { usd: await readHealCap() };
+    },
+    /**
+     * The heal reflex's MODEL switch: which model a heal's souls run on — DeepSeek's billed flash, or
+     * the operator's own Claude subscription. Its own file, so the heal's choice never moves the chat
+     * composer's switch and the chat's never moves the heal's; the file names a side in every state,
+     * and absent is `deepseek`, the side it shipped on.
+     *
+     * The cap above is a DEEPSEEK number: the worker sums the day's heals that ran on DeepSeek, so a
+     * heal moved onto Claude is not a dollar any ceiling bounds and carries no cap, no dollar figure
+     * and no warning of its own.
+     */
+    async getHealModel() {
+      return { model: await readHealModel() };
+    },
+    async setHealModel(modelInput: unknown) {
+      // THE TWO WORDS ARE THE BODY, and there is no third value: the file names a side in every state
+      // (`deepseek` when it is absent), so a press always writes a model and a `null` is a request the
+      // route cannot honour rather than the clear it was before this switch had its own default.
+      const model: HealModel | undefined =
+        modelInput === 'deepseek' || modelInput === 'claude' ? modelInput : undefined;
+      if (model === undefined) {
+        throw new AppError("model must be 'deepseek' or 'claude'", {
+          code: 'INVALID_HEAL_MODEL_STATE',
+          statusCode: 400,
+        });
+      }
+      await writeHealModel(model);
+      // Read back rather than echo the input, for the reason above: this is a file another process
+      // parses at every ending, so the answer the UI renders is what is on disk.
+      return { model: await readHealModel() };
+    },
     async getJev() {
       return dependencies.jev.read();
     },
@@ -307,9 +468,6 @@ export function createSettingsService(dependencies: SettingsDependencies) {
       // Read back rather than echo the request: these are files another process reads at call time,
       // and the answer the panel renders — the live fields included — should be what is on disk now.
       return dependencies.jev.read();
-    },
-    async getJevStats() {
-      return dependencies.jev.readStats();
     },
     getVapidPublicKey() {
       return { publicKey: dependencies.getVapidPublicKey() };

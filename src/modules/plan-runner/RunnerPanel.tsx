@@ -2,7 +2,9 @@ import { ActivityIcon } from 'lucide-react';
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { ArcGallery } from '@/modules/plan-runner/ArcGallery';
 import { dismissRun } from '@/modules/plan-runner/dismissedRuns';
+import { useArcs } from '@/modules/plan-runner/hooks/useArcs';
 import { useRunnerRuns } from '@/modules/plan-runner/hooks/useRunnerRuns';
 import { RunCard } from '@/modules/plan-runner/RunCard';
 import { byUrgencyThenNewest } from '@/modules/plan-runner/runState';
@@ -31,11 +33,14 @@ import { Badge, EmptyState, ScrollArea } from '@/shared/ui';
  * operator's own run puts on screen at the same moment is never mistaken for the one under test.
  *
  * The EmptyState is reachable and is not dead code: the tab is STICKY, so a person standing here
- * when the last run ends keeps the tab and meets this instead of the tab vanishing under them.
+ * when the last run ends keeps the tab and meets this instead of the tab vanishing under them. It
+ * shows only when there is neither a run NOR an arc: an arc whose next card has no run yet is still
+ * something to look at, and `ArcGallery` draws it above the run list, inside the same scroll.
  */
 export function RunnerPanel() {
   const { t } = useTranslation();
   const { runs, count, carriedIds } = useRunnerRuns();
+  const { arcs } = useArcs();
 
   const ordered = useMemo(() => [...runs].sort(byUrgencyThenNewest), [runs]);
 
@@ -51,12 +56,13 @@ export function RunnerPanel() {
         {count > 0 && <Badge tone="neutral">{count}</Badge>}
       </div>
 
-      {count === 0 ? (
+      {count === 0 && arcs.length === 0 ? (
         <div className="flex flex-1 items-center justify-center p-4">
           <EmptyState icon={ActivityIcon} title={t('runner.empty')} />
         </div>
       ) : (
         <ScrollArea className="flex-1">
+          <ArcGallery />
           {/* A measured column, centred, the way the memory queue's is: these are short cards, and
               letting one run the full width of a desktop workspace strands a line of text in a
               field of empty surface. What lets a title wrap at 390px is `w-full break-words` on the

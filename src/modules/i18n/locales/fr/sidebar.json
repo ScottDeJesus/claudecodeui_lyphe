@@ -176,6 +176,7 @@
     "iconDefault": "Par défaut",
     "iconOption": "Icône {{name}}",
     "unread": "Terminé, pas encore lu",
-    "dragHandle": "Glisser pour réordonner"
+    "dragHandle": "Glisser pour réordonner",
+    "subagentsRunning": "Sous-agents en cours"
   }
 }

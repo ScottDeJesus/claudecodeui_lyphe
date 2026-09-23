@@ -91,7 +91,7 @@ This is the shared vocabulary every document uses. Both unions are declared in
 | `session_upserted` | gateway | Sidebar delta. Owned by the projects state, not by chat. |
 | `loading_progress` | gateway | Project scan progress. |
 | `runner_state` | gateway | The plan runner's runs, pushed on change. |
-| `soul_launch_state` | gateway | The launcher souls a `/dispatch` started, pushed on change. Feeds the soul pins in the strip above the composer when the desktop chat gutters are not showing, and in the gutter's Subagents widget while they are ([dispatch-souls.md](../dispatch-souls.md)). |
+| `soul_launch_state` | gateway | The launcher souls a session started by hand, pushed on change. Feeds the soul pins in the strip above the composer when the desktop chat gutters are not showing, and in the gutter's Subagents widget while they are ([dispatch-souls.md](../dispatch-souls.md)). |
 | `universe_map` | gateway | The estate map was rebuilt because a tracked repo's HEAD moved; carries the `mapId` a client refetches `GET /api/universe/map` for. Excused from the chat reducer beside `runner_state`/`soul_launch_state`. |
 | `universe_activity` | gateway | Coalesced estate activity — journal lines and Claude transcript edits resolved onto map stars. At most ten frames a second, and none at all while the estate is quiet; carries the held `mapId`, a `rows` array and a `dropped` count. Excused from the chat reducer. See [01-websocket-transport.md](./01-websocket-transport.md) §"Fan-out: who receives what". |
 | `protocol_error` | gateway | The request was rejected or never started. No `complete` follows. |

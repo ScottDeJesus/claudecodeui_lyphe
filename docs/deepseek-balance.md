@@ -16,7 +16,7 @@ switch. A balance that reads unknown says nothing about whether builds are ridin
 switch says nothing about whether there is money left to ride it with.
 
 There is now a THIRD place a reader meets DeepSeek here, and it spends no key at all: a soul a
-`/dispatch` launched draws a pin among the chat's pinned rows — in the strip above the composer when
+session launched by hand draws a pin among the chat's pinned rows — in the strip above the composer when
 the desktop chat gutters are not showing, in the gutter's Subagents widget while they are — wearing
 the whale when that soul ran on this account ([dispatch-souls.md](dispatch-souls.md)). It reads a finished launch's own receipt, so it
 answers a question neither of the other two can — *did this particular build actually get billed
@@ -174,9 +174,10 @@ summer, an hour earlier in winter).
 Two surfaces wear it, off that one rule. `DeepseekPeakHours` sits directly under the balance in the
 account panel: a badge — green `Off-peak — half price`, amber `Peak — full price` — then a line saying
 until when, and the full-price hours one per line, re-read on the panel's minute tick. And the
-composer's Flash chip (`ComposerDeepSeekSwitch`) takes the same tone as its outline, in both
-positions of the switch, with the rate as the first sentence of its tooltip: the warning is on the
-control that would spend the money. The chip re-renders through `useRateChangeTick`, one timer set
+composer's Flash chip (`ComposerDeepSeekSwitch`) takes the same tone as its outline while the switch
+is on, with the rate as the first sentence of its tooltip: the warning is on the control that is
+spending the money. Off, the chip wears Claude's mark and the plain border, with no rate, because
+nothing DeepSeek bills is being spent. The chip re-renders through `useRateChangeTick`, one timer set
 to the next boundary, not a minute tick — the colour changes four times a day. When DeepSeek moves
 its hours, `PEAK_WINDOWS_UTC` is the one line to change.
 

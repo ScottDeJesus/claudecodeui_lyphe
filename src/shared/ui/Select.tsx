@@ -5,6 +5,13 @@ import { cn } from '@/shared/utils';
 
 type SelectOption = { value: string; label: string };
 
+/**
+ * The one row in the panel that is not a choice — it MAKES something to choose, and closes the
+ * panel on the way. A picker whose list is empty or missing the thing you came for is a dead end
+ * otherwise, and the way out of that dead end belongs where the reader already is.
+ */
+type SelectAction = { label: string; onSelect: () => void };
+
 type SelectProps = {
   options: SelectOption[];
   value: string;
@@ -14,6 +21,8 @@ type SelectProps = {
   ariaLabel: string;
   /** `sm` is the dense form for narrow chrome (the sidebar), sized to the `sm` Button. */
   size?: 'md' | 'sm';
+  /** Optional. Drawn under the list, behind a hairline, outside the listbox. */
+  action?: SelectAction;
 };
 
 /**
@@ -22,6 +31,11 @@ type SelectProps = {
  * manager (Phase 8) for its sort order — the native `<select>` cannot be painted in Verve's
  * shape, so this is the one place the app spells a styled one.
  *
+ * An optional `action` draws ONE row under the list, behind a hairline and outside the listbox —
+ * the kanban board switcher's "New board". It is a button and not an option, because choosing it
+ * makes a thing rather than picking one, and a listbox that held a button would announce the
+ * button as a choice.
+ *
  * Dismissal is deliberately two-way: a pointer anywhere outside closes it, and Escape closes
  * it without moving the pointer at all. A panel that only closes on a click is a panel a
  * keyboard user is stuck inside — and Escape returns focus to the trigger, because the list
@@ -29,7 +43,7 @@ type SelectProps = {
  * reader back to the top of the page. An outside pointerdown does NOT take focus: the pointer
  * has already chosen where to go.
  */
-export function Select({ options, value, onChange, placeholder = 'Choose…', ariaLabel, size = 'md' }: SelectProps) {
+export function Select({ options, value, onChange, placeholder = 'Choose…', ariaLabel, size = 'md', action }: SelectProps) {
   // Whether the overlay list is showing. It cannot be derived: `value` is the choice already
   // made, and the list is open precisely while the reader is reconsidering it.
   const [open, setOpen] = useState(false);
@@ -79,29 +93,48 @@ export function Select({ options, value, onChange, placeholder = 'Choose…', ar
 
       {open && (
         // The panel owns Escape while it is up — see `shared/ui/overlayEscape`.
-        <ul className="vv-select__panel" role="listbox" aria-label={ariaLabel} {...OWNS_ESCAPE}>
-          {options.map((option) => (
-            <li
-              key={option.value}
-              className="vv-select__option flex items-center justify-between gap-2"
-              role="option"
-              aria-selected={option.value === value}
-              tabIndex={0}
+        // A div holding the listbox rather than being it: the action row is a button, and a button
+        // is not a thing a listbox may contain. The list is what scrolls, so the action stays put
+        // at the bottom of a panel of thirty boards instead of hiding under the thirtieth.
+        <div className="vv-select__panel" {...OWNS_ESCAPE}>
+          <ul className="vv-select__list" role="listbox" aria-label={ariaLabel}>
+            {options.map((option) => (
+              <li
+                key={option.value}
+                className="vv-select__option flex items-center justify-between gap-2"
+                role="option"
+                aria-selected={option.value === value}
+                tabIndex={0}
+                onClick={() => {
+                  onChange(option.value);
+                  setOpen(false);
+                }}
+                onKeyDown={(event) => {
+                  if (event.key !== 'Enter' && event.key !== ' ') return;
+                  event.preventDefault();
+                  onChange(option.value);
+                  setOpen(false);
+                }}
+              >
+                {option.label}
+              </li>
+            ))}
+          </ul>
+
+          {action && (
+            <button
+              type="button"
+              className="vv-select__action flex w-full items-center gap-2"
               onClick={() => {
-                onChange(option.value);
                 setOpen(false);
-              }}
-              onKeyDown={(event) => {
-                if (event.key !== 'Enter' && event.key !== ' ') return;
-                event.preventDefault();
-                onChange(option.value);
-                setOpen(false);
+                action.onSelect();
               }}
             >
-              {option.label}
-            </li>
-          ))}
-        </ul>
+              <span aria-hidden="true">+</span>
+              {action.label}
+            </button>
+          )}
+        </div>
       )}
     </div>
   );

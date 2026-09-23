@@ -245,14 +245,16 @@ Broadcasts `kind: loading_progress` while project snapshots are being built.
 Broadcasts per-session `kind: session_upserted` deltas when provider session artifacts change (no full project snapshots).
 3. `modules/plan-runner/runner-watcher.service.ts`
 Broadcasts `kind: runner_state` when the plan runner's state directory changes, reaching this set through `modules/websocket/index.js` rather than a deep import.
-4. `modules/dispatch-souls/dispatch-souls.module.ts`
-Broadcasts `kind: soul_launch_state` when a `/dispatch` launch directory changes, the same `modules/websocket/index.js` way.
-5. `modules/universe/universe.module.ts`
+4. `modules/plan-runner/arc-lane.ts`
+Broadcasts `kind: arc_state` when an arc directory under `~/.claude/state/arcs/` changes, over the same `broadcast` closure `plan-runner.module.ts` hands item 3 — one composition root, two lanes, the same socket set.
+5. `modules/dispatch-souls/dispatch-souls.module.ts`
+Broadcasts `kind: soul_launch_state` when a hand-launched soul's directory changes, the same `modules/websocket/index.js` way.
+6. `modules/universe/universe.module.ts`
 Broadcasts `kind: universe_map` when a tracked repo's HEAD moves, and `kind: universe_activity` — the coalesced journal-and-transcript feed, at most ten frames a second and none while the estate is quiet — from the two taps in the same module ([docs/architecture/01-websocket-transport.md](../../../docs/architecture/01-websocket-transport.md) §"Fan-out: who receives what").
-6. `modules/kanban-metis/kanban-metis.module.ts`
-Broadcasts `kind: kanban_metis_state` when a board's live Metis sessions change, on the same `createPolledLane` shape as items 3 and 4.
+7. `modules/kanban-metis/kanban-metis.module.ts`
+Broadcasts `kind: kanban_metis_state` when a board's live Metis sessions change, on the same `createPolledLane` shape as items 3, 4 and 5.
 
-7. `modules/websocket/services/chat-run-registry.service.ts`
+8. `modules/websocket/services/chat-run-registry.service.ts`
 Broadcasts per-session `kind: session_upserted` when a run ends — once per run,
 from the terminal `complete` — so the sidebar re-reads the row whose
 `last_completed_at` (and `last_read_at`, when the chat was on screen) it just

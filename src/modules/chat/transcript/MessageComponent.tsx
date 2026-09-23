@@ -5,7 +5,6 @@ import { GitBranchIcon, PencilIcon } from 'lucide-react';
 import { MARKDOWN_CARDS_CLASS } from '@/shared/constants';
 import { LLMProviderLogo } from '@/shared/ui';
 import { cn } from '@/shared/utils';
-
 import type { ChatMessage, ClaudePermissionSuggestion, PermissionGrantResult, LLMProvider,DiffLine,Project } from '@/shared/types';
 import { formatUsageLimitText, stripProposedPlanEnvelope } from '@/modules/chat/utils/chatFormatting';
 import { ToolRenderer, ToolErrorDisplay, SubagentPanel, shouldHideToolResult } from '@/modules/chat/tools';
@@ -253,10 +252,14 @@ const MessageComponent = memo(({ message, prevMessage, previewAnchor = '', isRun
         <div className="w-full">
           {!isGrouped && (
             /* One mark and one caption, whoever is speaking.
-               A model's turn is marked by the LOGO of the agent that answered — the same
-               `LLMProviderLogo` the sidebar puts on every session row — because that mark
-               says WHO, and a plain disc said nothing a reader could not already read in
-               the caption. Error and tool turns keep a dot: they are STATES, not speakers,
+               A model's turn is marked by the mark of the agent that answered, through the shared
+               `LLMProviderLogo` the sidebar also draws — asked here for the Claude MASCOT
+               (`claudeMark="mascot"`), the coding tool's own pixel figure, rather than the
+               starburst it defaults to: this mark says WHO answered, and who answered is Claude
+               Code working in this conversation. The sidebar, settings, onboarding and accounts
+               keep the starburst, because there the mark names the provider a session or an
+               account is opened on. A plain disc said nothing a reader could not already read in
+               the caption. Error and tool turns keep that disc: they are STATES, not speakers,
                and no provider owns them. An error turn is amber rather than red — nothing
                here is destructive, something went wrong — and it says so in the word beside
                the dot, so the state survives a screen with no colour at all. */
@@ -269,7 +272,7 @@ const MessageComponent = memo(({ message, prevMessage, previewAnchor = '', isRun
                   }`}
                 />
               ) : (
-                <LLMProviderLogo provider={provider} className="h-5 w-5 flex-none" />
+                <LLMProviderLogo provider={provider} claudeMark="mascot" className="h-5 w-5 flex-none" />
               )}
               <span className="text-xs uppercase tracking-[0.14em] text-ink-faint">
                 {shouldShowResponseTime || !messageTime.isValid ? speakerName : `${speakerName} · ${formattedTime}`}

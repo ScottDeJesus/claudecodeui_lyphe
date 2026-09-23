@@ -112,6 +112,7 @@
     "plainModeTooltip": "每則訊息都附帶 /plain 傳送：簡短、易讀的回覆",
     "deepseekFlash": "DeepSeek Flash",
     "deepseekFlashShort": "Flash",
+    "deepseekFlashOffShort": "Claude",
     "deepseekFlashTooltip": "開啟期間，plan runner 的建構之魂（建構者、修復輪與 Athena）在 DeepSeek Flash 上執行。Prometheus 與偵察者仍留在 Claude。",
     "deepseekFlashReading": "正在讀取開關…",
     "deepseekFlashUnreadable": "無法讀取開關——按下以重試。",

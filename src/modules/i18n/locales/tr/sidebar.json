@@ -173,6 +173,7 @@
     "iconDefault": "Varsayılan",
     "iconOption": "{{name}} simgesi",
     "unread": "Bitti, henüz okunmadı",
-    "dragHandle": "Sıralamak için sürükleyin"
+    "dragHandle": "Sıralamak için sürükleyin",
+    "subagentsRunning": "Alt ajanlar çalışıyor"
   }
 }

@@ -32,7 +32,11 @@ export type RunnerEndingMeta = {
   /** The first blocked phase in plan order and its cause, or `null` when nothing is blocked. */
   blockedPhase: string | null;
   blockCause: string | null;
-  /** From the run's FIRST start: a resumed run keeps its original `started_at`, parked hours included. */
+  /**
+   * The run's WALK: `ended_at - started_at`. `started_at` is the Start press, never a queue wait — a
+   * run created PARKED is stamped by the press that lifts it out of the queue, while a run merely
+   * STOPPED and resumed keeps its original start, so a pause counts and a park does not.
+   */
   durationMs: number;
   /** The plan's spend over every run of it — the counter the operator asked never to reset. */
   costUsd: number;

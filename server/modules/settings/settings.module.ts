@@ -11,7 +11,6 @@ import {
 } from '@/modules/notifications/index.js';
 
 import { readDeepseekFlashSwitch, writeDeepseekFlashSwitch } from './deepseek-flash-switch.js';
-import { readJevLedgerStats } from './jev-ledger.js';
 import { readJevSwitches, writeJevMasterSwitch, writeJevScopeSwitch } from './jev-switches.js';
 import { createSettingsRouter } from './settings.routes.js';
 import { createSettingsService } from './settings.service.js';
@@ -54,7 +53,6 @@ const settingsService = createSettingsService({
     read: () => readJevSwitches(),
     writeMaster: (enabled) => writeJevMasterSwitch(enabled),
     writeScope: (scope, enabled) => writeJevScopeSwitch(scope, enabled),
-    readStats: () => readJevLedgerStats(),
   },
   getVapidPublicKey: getPublicKey,
 });

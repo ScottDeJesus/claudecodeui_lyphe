@@ -113,6 +113,7 @@
     "plainModeTooltip": "Envoyer chaque message avec /plain : réponses courtes et lisibles",
     "deepseekFlash": "DeepSeek Flash",
     "deepseekFlashShort": "Flash",
+    "deepseekFlashOffShort": "Claude",
     "deepseekFlashTooltip": "Tant que ceci est actif, les âmes de construction du plan runner — le builder, sa passe de correction et Athena — tournent sur DeepSeek Flash. Prometheus et les scouts restent sur Claude.",
     "deepseekFlashReading": "Lecture de l'interrupteur…",
     "deepseekFlashUnreadable": "L'interrupteur n'a pas pu être lu — appuyez pour réessayer.",

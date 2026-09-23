@@ -85,15 +85,30 @@ export function useDismissedPins(): Set<string> {
 }
 
 /**
- * The reader's act, in one place: take this row away for good. Written through to storage, then
- * published as the new snapshot so every copy of the rows drops it in the same frame.
+ * The reader's act, in one place: take these rows away for good. Written through to storage, then
+ * published as the new snapshot so every copy of the rows drops them in the same frame.
+ *
+ * IT TAKES A LIST because the widget's "Clear completed" is ONE act on many rows, and dismissing
+ * them one at a time would be one storage write and one publish per row — every copy of the list
+ * re-rendered N times, with the rows shrinking under the reader's cursor on each. Ids already
+ * dismissed cost nothing; a call with nothing new in it publishes nothing at all, so a press with
+ * no work in it cannot repaint the strip.
  */
-export function dismissPin(id: string): void {
-  const next = new Set(getSnapshot());
-  next.add(id);
+export function dismissPins(ids: string[]): void {
+  const current = getSnapshot();
+  const added = ids.filter((id) => !current.has(id));
+  if (added.length === 0) return;
+
+  const next = new Set(current);
+  for (const id of added) next.add(id);
   writeDismissed(next);
   dismissed = next;
   for (const listener of listeners) listener();
+}
+
+/** One row, through the same door. */
+export function dismissPin(id: string): void {
+  dismissPins([id]);
 }
 
 function readDismissed(): Set<string> {

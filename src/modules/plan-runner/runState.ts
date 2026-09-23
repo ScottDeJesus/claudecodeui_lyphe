@@ -126,6 +126,83 @@ export function seenStages(run: RunnerRunSnapshot): string[] {
 }
 
 /**
+ * One live lane of a run: `lane` is the lane's id — the phase id it carries, a phase running on
+ * exactly one lane — `rank` the phase's place in the census, `stage`/`stage_detail` the runner's
+ * own stage words and `stage_since` epoch SECONDS, like every timestamp in a snapshot.
+ *
+ * Declared here rather than imported: the server's `RunnerRunSnapshot` gained this array in the
+ * swarm work, and the client's mirror of that shape has not been widened yet, so the card reads
+ * the rows defensively (see {@link runLanes}) instead of naming a field the mirror does not have.
+ * When the mirror catches up this type is the one to replace with the shared import.
+ */
+export type RunnerLane = {
+  lane: string;
+  phase_id: string;
+  rank: number;
+  title: string;
+  stage: string;
+  stage_detail: string;
+  stage_since: number;
+};
+
+/** One lane row as the card can draw it, or `null` for a record nothing can be drawn from. */
+function asLane(raw: unknown): RunnerLane | null {
+  if (raw === null || typeof raw !== 'object') return null;
+  const held = raw as Record<string, unknown>;
+  // The id pair is the row's identity: a lane with no id has no key to render under, and a lane
+  // with no phase has no name to show, so either missing is the whole row dropped.
+  if (typeof held.lane !== 'string' || typeof held.phase_id !== 'string') return null;
+  const number = (value: unknown) => (typeof value === 'number' && Number.isFinite(value) ? value : 0);
+  const text = (value: unknown) => (typeof value === 'string' ? value : '');
+  return {
+    lane: held.lane,
+    phase_id: held.phase_id,
+    rank: number(held.rank),
+    title: text(held.title),
+    stage: text(held.stage),
+    stage_detail: text(held.stage_detail),
+    stage_since: number(held.stage_since),
+  };
+}
+
+/**
+ * The lanes the run is walking right now — the array to map over, `[]` on everything else.
+ *
+ * EMPTY IS THE ORDINARY ANSWER, not a failure, and it has two causes at once: a serial run writes
+ * an empty table, and a snapshot from a server older than this shape carries no such field at all.
+ * A malformed table is `[]` too — the lane rows are one more thing the card may lose, never the
+ * card itself — and rows are carried as they arrive, lowest rank first, which is the order the
+ * runner wrote them in (`hooks/plan_runner/progress.py::_lanes`).
+ */
+export function runLanes(run: RunnerRunSnapshot): RunnerLane[] {
+  // The narrowing is the mirror's gap, not a guess: the field is genuinely absent from the client's
+  // `RunnerRunSnapshot` today, so it is read off the value rather than through the type.
+  const raw: unknown = (run as RunnerRunSnapshot & { lanes?: unknown }).lanes;
+  if (!Array.isArray(raw)) return [];
+  return raw.map(asLane).filter((lane): lane is RunnerLane => lane !== null);
+}
+
+/**
+ * Each phase that SHARES its wave → the ids it shares it with, in plan order: the swarm mark's input.
+ *
+ * `wave` is the runner's own number (`hooks/plan_runner/progress.py::_waves`, the map `plan-runner
+ * swarm <plan>` prints); this only groups the rows by it and never re-derives it. A phase alone in
+ * its wave, or with no wave at all (`null`, or a frame from before the field), is absent — no
+ * companions, so no mark: the absence is the statement.
+ */
+export function waveCompanions(run: RunnerRunSnapshot): Map<string, string[]> {
+  const byWave = new Map<number, string[]>();
+  for (const phase of run.phases ?? []) {
+    if (typeof phase.wave === 'number') byWave.set(phase.wave, [...(byWave.get(phase.wave) ?? []), phase.id]);
+  }
+  const alongside = new Map<string, string[]>();
+  for (const ids of byWave.values()) {
+    if (ids.length > 1) for (const id of ids) alongside.set(id, ids.filter((other) => other !== id));
+  }
+  return alongside;
+}
+
+/**
  * How much of the plan is behind the run. Shipped phases only — `deferred` is a phase the run
  * decided not to walk, and counting it as progress would report a plan more finished than it is.
  */
@@ -158,4 +235,17 @@ export const STATE_ORDER: Record<RunnerRunState, number> = { live: 0, stale: 1, 
 export function byUrgencyThenNewest(a: RunnerRunSnapshot, b: RunnerRunSnapshot): number {
   const recency = (run: RunnerRunSnapshot) => run.ended_at ?? run.started_at;
   return STATE_ORDER[a.state] - STATE_ORDER[b.state] || recency(b) - recency(a);
+}
+
+/**
+ * A scheduled moment in the reader's own clock: `3:00 AM` today, `Sep 23, 3:00 AM` any other day. The date
+ * rides whenever the moment is not today, because DeepSeek's off-peak lifts at 3 AM Pacific — past the
+ * operator's midnight — and a bare `3:00 AM` read in the evening names a time that has already passed. Used by
+ * `RunCard`'s queued note and `ScheduleControl`'s `Start at …`, so the note and the button name one time one way.
+ */
+export function scheduleClock(epochSeconds: number, now: number = Date.now()): string {
+  const moment = new Date(epochSeconds * 1000);
+  const time: Intl.DateTimeFormatOptions = { hour: 'numeric', minute: '2-digit' };
+  if (moment.toDateString() === new Date(now).toDateString()) return moment.toLocaleTimeString([], time);
+  return moment.toLocaleString([], { month: 'short', day: 'numeric', ...time });
 }

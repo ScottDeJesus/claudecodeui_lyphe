@@ -3,7 +3,7 @@ import {
   getStoredAuthToken,
   storeAuthToken,
 } from '@/shared/authToken';
-import type { FileLinePatch, NtfySettingsInput, SubagentTranscriptResult } from '@/shared/types';
+import type { FileLinePatch, JevRange, NtfySettingsInput, RunnerModelChoice, SubagentTranscriptResult } from '@/shared/types';
 import { IS_PLATFORM } from '@/shared/utils';
 import { readVoiceConfig, voiceConfigHeaders } from '@/shared/voiceConfig';
 
@@ -591,13 +591,44 @@ export const api = {
     deepseekFlash: () => get('/api/settings/deepseek-flash'),
     saveDeepseekFlash: (enabled: boolean) => put('/api/settings/deepseek-flash', { enabled }),
 
+    // The plan runner's swarm switch — whether it runs several phases of a plan at once, and the
+    // optional ceiling it runs under. Same host-wide shape as the switch above, for the same
+    // reason, and the same answer read back off disk: `lanes` is a count the operator chose, or
+    // `null` for no ceiling at all, which is what a bare `on` in the flag means.
+    swarmSwitch: () => get('/api/settings/swarm'),
+    saveSwarmSwitch: (state: { enabled: boolean; lanes: number | null }) =>
+      put('/api/settings/swarm', state),
+
+    // The heal reflex's MASTER switch — the reflex's whole launching, on one word. `off` stops it
+    // launching from the next ending onwards while an ending still indexes, and the typed `/heal`
+    // door is never gated by it; `on` is what the flag file being absent has always meant. Same
+    // host-wide shape as the two above, for the same reason: a file on this host, not a preference
+    // the browser owns.
+    healMaster: () => get('/api/settings/heal-master'),
+    saveHealMaster: (enabled: boolean) => put('/api/settings/heal-master', { enabled }),
+
+    // The reflex's two knob files, beside the master switch and in the swarm switch's shape: the
+    // nightly cycle's schedule (on/off and its UTC hour) and the day's spend ceiling. Both answer
+    // the state read back off disk, never what was typed. `usd: null` is NO CEILING.
+    healCycle: () => get('/api/settings/heal-cycle'),
+    saveHealCycle: (state: { enabled: boolean; hour: number }) => put('/api/settings/heal-cycle', state),
+    healCap: () => get('/api/settings/heal-cap'),
+    saveHealCap: (usd: number | null) => put('/api/settings/heal-cap', { usd }),
+
+    // The heal reflex's MODEL switch — which model a heal's souls run on, its own file beside the
+    // chat composer's DeepSeek switch rather than the same one, so the two can disagree: the heal's
+    // choice never moves the chat's, and the chat's never moves the heal's. The body is ALWAYS one of
+    // the two words — the file names a side in every state, and an absent file means `deepseek`.
+    healModel: () => get('/api/settings/heal-model'),
+    saveHealModel: (model: 'deepseek' | 'claude') =>
+      put('/api/settings/heal-model', { model }),
+
     // The house Jev switches, same shape of answer for the same reason: flag files on this host,
     // not per-user preferences. `saveJev` sends only the switches named, so a PUT that moves one
     // never moves another, and both calls answer with the state read back off disk.
     jev: () => get('/api/settings/jev'),
     saveJev: (patch: { master?: boolean; prompts?: boolean; toolOutput?: boolean }) =>
       put('/api/settings/jev', patch),
-    jevStats: () => get('/api/settings/jev/stats'),
 
     push: {
       vapidPublicKey: () => get('/api/settings/push/vapid-public-key'),
@@ -699,17 +730,59 @@ export const api = {
     reject: (id: string) => post(`/api/memory/${encodeURIComponent(id)}/reject`, {}),
   },
 
-  // The plan-runner lane (docs/plan-runner.md). The server READS the runner's state directory and
-  // relays two verbs to the runner's own binary; it never writes a state file and never starts a
-  // run. The reads are plain gets. The two writes are read from the RAW response, like
-  // `memory.approve` above and for the same reason: a 409 here carries the runner's own
-  // verdict — its refusal in its own `stderr`, with the run left exactly as it was — and putting it
-  // through `readApiJson` would turn that verdict into a thrown error the caller cannot show.
+  // The plan-runner lane (docs/plan-runner.md). The server READS the runner's state directory —
+  // runs and arc decks alike — and relays a run's four verbs and an arc's reorder, model word, start
+  // and schedule to the runner's own binary; it never writes a state file and never starts a run
+  // from a plan. The reads are plain gets. The
+  // verbs are read from the RAW response, like `memory.approve` above and for the same reason: a
+  // 409 here carries the runner's own verdict — its refusal in its own `stderr`, with the run (or
+  // the arc) left exactly as it was — and putting it through `readApiJson` would turn that verdict
+  // into a thrown error the caller cannot show.
   planRunner: {
     runs: () => get('/api/plan-runner/runs'),
     run: (id: string) => get(`/api/plan-runner/runs/${encodeURIComponent(id)}`),
     stop: (id: string) => post(`/api/plan-runner/runs/${encodeURIComponent(id)}/stop`, {}),
     resume: (id: string) => post(`/api/plan-runner/runs/${encodeURIComponent(id)}/resume`, {}),
+    // The run's own DeepSeek / Claude word (`auto` follows the chat's switch); restarts nothing.
+    model: (id: string, model: RunnerModelChoice) => post(`/api/plan-runner/runs/${encodeURIComponent(id)}/model`, { model }),
+    // A QUEUED run's Start at a time — `offpeak`, an ISO instant with a zone, or `none` to cancel — and the
+    // runner's next off-peak moment the `Start at …` button shows (`{ at }`, epoch seconds, or null).
+    schedule: (id: string, when: string) => post(`/api/plan-runner/runs/${encodeURIComponent(id)}/schedule`, { when }),
+    offpeak: () => get('/api/plan-runner/runs/offpeak'),
+    // The arc deck: every arc the runner is walking, and the verbs the deck owns — a drag that
+    // reorders the cards the runner has not started yet, and the arc's ONE model word, which every
+    // card it mints inherits. Both are read from the RAW response like the writes above: a 409
+    // carries the runner's own refusal sentence whole.
+    arcs: () => get('/api/plan-runner/arcs'),
+    arcReorder: (arc: string, from: number, to: number) => post(`/api/plan-runner/arcs/${encodeURIComponent(arc)}/reorder`, { from, to }),
+    arcModel: (arc: string, model: RunnerModelChoice) => post(`/api/plan-runner/arcs/${encodeURIComponent(arc)}/model`, { model }),
+    // The deck header's Start (`arc start`) and its `Start at …` / Cancel (`arc schedule`), raw like the rest.
+    arcStart: (arc: string) => post(`/api/plan-runner/arcs/${encodeURIComponent(arc)}/start`, {}),
+    arcSchedule: (arc: string, when: string) => post(`/api/plan-runner/arcs/${encodeURIComponent(arc)}/schedule`, { when }),
+  },
+
+  // The heal reflex, the runner's twin lane: the worker's own summary (the tab's whole poll),
+  // one kind's rows WHEN the operator opens that kind — never inside the poll — and the two hands
+  // that change something, a cycle's Start/Stop and the ignore table. Its switches ride under
+  // `settings` beside `healMaster`, where every flag file on this host lives.
+  heal: {
+    summary: () => get('/api/heal/summary'),
+    byKind: (kind: string) => get(`/api/heal/kind/${encodeURIComponent(kind)}`),
+    ignore: () => get('/api/heal/ignore'),
+    addIgnore: (body: { tool: string; pattern: string; reason: string }) =>
+      post('/api/heal/ignore', body),
+    // A refusal is a 200 answer `{cycle, started: false, stage, why}`, never an error.
+    cycleStart: () => post('/api/heal/cycle', {}),
+    cycleStop: () => post('/api/heal/cycle/stop', {}),
+  },
+
+  // The Jev tab: one reader answer per window, and the one thing the tab can CHANGE — the replay
+  // cache. Both go through the server's door, which runs `scripts/jev`; nothing in the browser reads
+  // the ledger, the account file or the cache for itself. The window and the feed length ride the
+  // query string, where the route holds each to a token shape before it can reach an argument.
+  jev: {
+    summary: (range: JevRange, feed: number) => get(`/api/jev/summary?range=${range}&feed=${feed}`),
+    clearCache: () => post('/api/jev/cache/clear', {}),
   },
 
   // The Kanban board (docs/kanban.md). Boards are GLOBAL: the selected board is a server-side
@@ -856,7 +929,7 @@ export const api = {
     remove: (id: string) => del(`/api/apps/${encodeURIComponent(id)}`),
   },
 
-  // The launcher souls a `/dispatch` started with `plan-runner soul`, read off the launcher's own
+  // The launcher souls a session started by hand with `plan-runner soul`, read off the launcher's own
   // state root. One plain read, for the seed the `soul_launch_state` frame cannot cover: the frame
   // is sent only on a CHANGE, so a page mounting while nothing moves has nothing to paint.
   dispatchSouls: {
@@ -870,6 +943,16 @@ export const api = {
   // hook parses the body, because nothing about the map belongs to this module's shape.
   universe: {
     map: () => get('/api/universe/map'),
+  },
+
+  // The cron registry the Schedules tab draws: every job the last sync wrote, and the one control
+  // that makes the server re-read the box. `list` is a plain read of the tables — it never scans
+  // anything — and `sync` runs a sync and answers with its report, whether that run succeeded or
+  // not. The panel's hook POSTs the sync and then re-reads through `list`, which is why the two
+  // paths are one entry here rather than a method on the panel.
+  schedules: {
+    list: () => get('/api/schedules'),
+    sync: () => post('/api/schedules/sync'),
   },
 
   // The transcript of ONE subagent — an `Agent`-tool row addressed by the tool call that spawned it,

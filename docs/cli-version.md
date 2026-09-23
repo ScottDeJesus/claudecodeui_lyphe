@@ -5,6 +5,14 @@ One route, `GET /api/cli-version`, mounted behind `authenticateToken` in `server
 what the binary a run WOULD spawn answers to `--version` now, and what each live run's own process
 announced at init. It answers 200 always — an unreadable binary is a fact in words, never an error wall.
 
+The same two facts decide a retirement, and they are read from ONE cache to do it: the installed
+reading is `cli-version.service.ts`'s `readInstalledCliVersion`, which the route serves and the chat
+runtime asks at send time. A conversation whose CLI process is older than the binary on disk is
+replaced at its next message (§"The version is a launch argument" below), so the route's "restart
+this" and the runtime's "I already did" can never be two answers. "Older" is meant literally: the
+comparison orders the two versions rather than noticing that they differ, and the reading stops
+standing as soon as the binary behind it changes — see rules 6 and 8.
+
 ```json
 { "installed": "2.1.261", "reason": null, "binaryPath": "/home/you/.npm-global/bin/claude",
   "running": [{ "sessionId": "…", "startedAt": 1788621023058, "cliVersion": "2.1.261" }] }
@@ -35,26 +43,92 @@ starts below them.
    stamps it at the top of the `for await` message loop from `message.claude_code_version`, through
    `ChatSessionWriter.setCliVersion` into the registry's `ChatRun`. Top of the loop on purpose: the
    session-id branch below is pre-closed on every resumed turn, so a stamp inside it would miss them.
+   The SAME line records it on the live process's launch profile (`profile.cliVersion`), which is what
+   the next message compares — one fact, written twice, never one taken for the other. A host that
+   outlived its API re-adopts from the run's own journal instead (`lastReportedCliVersion`), because
+   the journal is that process's record of what it said and the meta is only what the API launched it
+   with; a process that has not spoken carries `null`, which is "not heard", never "different".
 
 4. **A run is listed before its process has spoken.** The registry admits it at send time, a beat ahead
    of the init message, so `cliVersion: null` is a real state of a healthy run, as it is for a provider
    whose adapter never stamps. Filling it from `installed` would report every run current — the state
    this route exists to detect. Stale = a `cliVersion` differing from `installed`; a null is unknown.
+   That is the DISPLAY's sentence, and it stays an inequality: a run ahead of a reading it has already
+   moved past is shown stale for as long as the reading stands, which is now the install's own instant
+   (rule 6) and is the conservative direction — the person is told about a difference a restart settles
+   by hand. The runtime, which ACTS, is stricter and orders the two (rule 8).
+   A re-adopted run is stamped from its host's journal the moment it is adopted, so the retirement
+   decision reads what that process actually announced rather than a blank. That stamp is not what
+   puts a stale host in the report: `running[]` holds a run while a turn is in flight, and a host
+   adopted between turns is completed as it is registered (`readopt.ts`, the `turnCompleteSent`
+   branch), so an IDLE stale host is listed by no report at all — it is retired by the server
+   instead, on a version change or at boot (rule 9), and its next message spawns on the new build.
 
 5. **The parse is a ladder, and a tie is null.** `--version` is read line-wise, since an nvm or npm
    shim prints its own line first; the CLI is identified rather than positioned — the `(Claude Code)`
    signature it signs with, then any line naming Claude, then any version-shaped line. A rung answers
    only when exactly one line holds it: two are a guess, so it falls to null rather than name a shim's.
 
-6. **One spawn per window, shared.** A read version stands 60 s; a failure stands 10 s, because the
-   operator repairing a broken CLI is the person watching this route. The exec carries a 10 s ceiling,
-   and the in-flight promise is shared and cleared in a `finally` — clear it on the fulfilled path
-   alone and a probe that once rejected is handed back, still rejected, for the life of the process.
+6. **One spawn per window, shared, and the window ends when the BINARY changes.** A read version
+   stands 60 s; a failure stands 10 s, because the operator repairing a broken CLI is the person
+   watching this route. The exec carries a 10 s ceiling, and the in-flight promise is shared and
+   cleared in a `finally` — clear it on the fulfilled path alone and a probe that once rejected is
+   handed back, still rejected, for the life of the process. The cache is the process's ONE reading
+   (`readInstalledCliVersion`), shared by this route and by the runtime's retirement decision, so
+   those two cannot hold different answers for a window.
+   The window is a claim about a file, so it is dropped when the file changes: every ask fingerprints
+   the file the reading came from — that path, plus its mtime (`fingerprintOf`) — and probes again the
+   moment it differs, so an upgrade is seen on the first ask after the install rather than on the first
+   ask after the minute. That path comes off the reading itself, so the fingerprint costs two syscalls
+   and NO resolver call (a resolver is asked once per probe and no more, which is what phase-14's
+   rejection gate counts). A path that is no longer a file still gets a stable fingerprint of its own,
+   so a binary that appears, disappears or moves re-probes rather than standing on a clock; a reading
+   with no path at all (the CLI is chosen when a run starts) has no file to watch and the windows above
+   decide alone, exactly as before.
 
 7. **Nothing is persisted.** No column, no migration, no session field: a version is true only while
    its run is alive. `running[]` is the registry's own `listRunningRuns()`, which already keeps
    `status === 'running'` — three fields are copied off it, and this service joins and filters nothing.
    `startedAt` is epoch MILLISECONDS.
+
+8. **The installed version is a LAUNCH argument.** A CLI process runs the build it was started with, so
+   a message that would reuse a host older than the binary retires it and spawns afresh — at the moment
+   of the message, not after a manual restart. The decision is `planLiveChanges` in `chat-process.ts`
+   (the reason reads `cli 2.1.278 → 2.1.280`); the bounded read behind it is `installed-cli-version.ts`
+   (`installedCliVersionForLaunch`, 1.5 s — a null is "not heard" and joins the process as it is), and
+   the profile field is `LaunchProfile.cliVersion`. Three guards keep it from firing on a healthy
+   process: BOTH sides must be strings; a process that has not announced itself is unknown, not stale;
+   and the read is asked only when the running process has a version of its own, so an adapter that
+   never speaks never spends a probe. A turn IN FLIGHT is never retired for a version — that is the
+   banner's case, below.
+   The comparison is ORDERED, not an inequality (`isBehindInstalled`): only a process BEHIND the
+   binary is replaced. The live side is what a process announced at its own init and is never stale;
+   the installed side is a reading, and a reading older than the process is no reason to replace it —
+   on "differs" alone, a current process would be retired and respawned as the same build once per
+   message until the reading turned over, each time paying a cold start and a full resume replay. Two
+   versions that cannot be ordered fall back to the plain difference: a build nobody can compare is
+   not a reason to leave a conversation on an old binary for good.
+
+9. **An IDLE host is retired when the reading MOVES, and at every boot — that is what makes the
+   restart automatic.** Rule 8 acts on a message; a host between turns had no message to act on it,
+   so it sat on the old build for up to the idle closer's two hours and no surface said so (rule 4:
+   an idle host is in no report). `idle-version-sweep.ts` runs the SAME test — both sides a version
+   string, the ordered comparison, and no work in flight — on two triggers, and it reuses
+   `planLiveChanges`'s `isBehindInstalled` rather than restating it: the probe's cache moving from one
+   version string to a different one (`cli-version-change.ts`, whose observer the keepalive's owning
+   process subscribes to at boot), and boot re-adoption, where the keepers are put through it after
+   `retireOlderHosts`. "In flight" is asked in two places because the two triggers cannot ask it in
+   the same one: at a boot the run registry is EMPTY — it is per-process memory and nothing has run
+   yet — so `chatRunRegistry.isProcessing` answers *no* for every session on the machine, and the
+   host's own meta is the only surviving witness: `turnCompleteSent` false (a turn was accepted and
+   has not reported) or `heldForBackgroundWork` / a non-empty `deferredTools` (work the result did
+   not wait for) keeps it. The log line is `[keepalive] retiring idle host <hostId>: cli 2.1.278 →
+   2.1.280`, a kept host says so in one line of its own, and the retirement is the same
+   wind-down as a supersede (`end_input`, then SIGTERM over the host's own socket), so the
+   conversation is untouched and its next message spawns fresh and resumes. There is no timer: the
+   change trigger rides the probe the client already polls and the send path already asks, and a
+   machine with no client open is covered at the next boot. `null` on either side retires nothing,
+   and a turn in flight is never touched — that case is the banner's, below.
 
 ## The client's one reading
 
@@ -71,9 +145,19 @@ It hands back `installed`, the route's own `reason`, `staleSessionIds`, `staleVe
 and `refresh()`.
 
 **Stale is one sentence.** A run in `running[]` whose `cliVersion` is a *string* and differs from
-`installed`. A null `cliVersion` is "not heard yet" — never stale. `installed: null` makes NOTHING
+`installed`. A null `cliVersion` is "not heard yet" — never stale. The server's replacement is the
+stricter rule (it orders the two and replaces only a process behind the binary — rule 8), so this
+client test can name a run stale in the moment after an upgrade in which no retirement would happen;
+it is a display, and its answer is the conservative one. `installed: null` makes NOTHING
 stale, which is why rule 2 above answers null rather than a stand-in version. A finished conversation
 is not stale either: it is not in `running[]` at all.
+
+**And stale no longer means "somebody must press something" for an idle conversation.** A run is listed
+while a turn is in flight, and a process between turns the server replaces ITSELF — on a version
+change or at boot (rule 9), which is the same reading being polled here; what is left for a person is
+the turn that is running NOW, which is the banner's own case. The three surfaces still read one hook
+and one comparison — the client is told the same fact it always was, and the server has stopped
+waiting for it.
 
 **A read publishes only when the body CHANGED, and only in TOKEN order.** The last body is kept
 verbatim, so a poll that answers the same JSON republishes nothing and an idle app does not re-render
@@ -120,13 +204,17 @@ the route's OWN words — never a stand-in `0.0.0`, and never one not-known stan
 The fifth is the state every cold mount passes through: `installed` and `reason` are both null, so
 nothing has been read and nothing may be explained.
 
-The banner is the one place the fact carries an action. It stands above the transcript because it
-describes the turn being read, and it leaves on its own when that run ends — the stale set empties
-and the banner goes with it, dismissed or not:
+The banner is the one place the fact carries an action, and it stands for the case the automatic
+retirement cannot cover — a turn already running, which keeps the version it started on. It stands
+above the transcript because it describes the turn being read, and it leaves on its own when that run
+ends (the stale set empties and the banner goes with it, dismissed or not). Its copy names the
+automatic half as the automatic half — an idle conversation restarts itself (rule 9) — so the press
+below it is offered for the turn it is describing, not as the only way off an old build:
 
-> This conversation is running Claude CLI 2.1.240. Version 2.1.261 is installed on your machine, but
-> a conversation keeps the version it started with while a turn is in progress. Restarting stops this
-> one and resumes the same conversation on 2.1.261 — every message is kept.
+> This conversation is running Claude CLI 2.1.240. Version 2.1.261 is installed on your machine — an
+> idle conversation restarts on its own and picks it up, and one that is answering keeps the version
+> its turn started on. Restarting stops this turn and resumes the same conversation on 2.1.261 —
+> every message is kept.
 
 *Stay on 2.1.240* hides it for that run only. What is stored is `sessionId:version` in component
 state — a new version is a different fact and asks again, and nothing is persisted, so a reload asks
@@ -231,8 +319,40 @@ because all three read one hook.
 - **The 15 s cap's LENGTH is unmeasured.** `phase-15.mjs` R6 waits 16.5 s and reads the toast, so any
   cap shorter than that reads the same. What is proven is that the cap speaks, not when.
 - **`installed` is cached, `running` is not.** The route serves `installed` from its own ≤60 s window
-  while listing runs live, so for up to a minute after a real upgrade the NEWEST run is the one
-  reported stale, with the two versions the wrong way round.
+  while listing runs live, so a run that reached a new binary inside that window is reported stale
+  until the window or the fingerprint ends it. The window no longer outlives the binary: an install
+  changes the file the reading is about, and the next ask probes (`fingerprintOf`, rule 6), so
+  the blind stretch is the install's own instant rather than the whole minute.
+  The runtime reads that same cache — deliberately, one cache, one answer — and its decision is
+  ORDERED (rule 8), so the two states this window used to confuse are now told apart: a reading older
+  than the process replaces nothing (the process is ahead of a stale measurement, and retiring it
+  would spawn the same build again per message), while a process older than the reading is retired at
+  its next message, which is the point of the rule. What is left is small and named: a binary that is
+  swapped in the instant between one ask's fingerprint and its probe answers with the version it had,
+  and a binary whose content changes while its path and mtime do not (an in-place edit that preserves
+  the timestamp) is invisible to the fingerprint and stands out its window like any reading.
+- **The retirement wait is bounded at 1.5 s, and its length is measured against a cold cache only.**
+  A warm reading answers in microseconds; the bound exists for a cache that goes cold against a binary
+  that will not answer `--version`, and it is short of the probe's own 10 s ceiling so a message is
+  never held for a binary nobody is watching. Nothing breaks if it elapses: a null joins the process,
+  and the NEXT message retries — the probe's in-flight promise is shared, so the retry is cheap.
+- **The idle sweep fires on a TRANSITION and at a boot — never on a clock.** An idle host is retired
+  when the reading moves (`cli-version-change.ts`) or when the server boots (rule 9); nothing sweeps
+  in between. So a stale idle host whose turn is in flight exactly at boot, on a machine where the
+  version then stops moving, stays on the old build until its next message — the rule the sweep was
+  built on, not a hole in it. A boot cannot ask the run registry that question (it is empty until
+  something runs), so it asks the host's meta instead, and it keeps a host that was mid-turn or
+  holding background work for the same reason the runtime's idle closer refuses to close one; a
+  sweep that skipped such a host says so in one line, so the near-miss is visible rather than
+  inferred. A second API process sweeps nothing: the subscription is registered
+  after the keepalive claim (`readopt.ts`), so the process that does not own this machine's hosts
+  touches none of them — the same reason it adopts none. And the walk is deferred a turn of the event
+  loop, so neither the version poll nor a message send ever waits on tmux for it.
+- **A sweep the reading provokes can retire the host that provoked it.** The message path's own
+  bounded read is the same shared probe, so a message that finds an install also fires the sweep —
+  and the sweep skips that host, because `dispatchRun` registered its run before the read was asked
+  (`chatRunRegistry.isProcessing`). Any OTHER idle host behind the binary is retired in that same
+  moment, which is the feature, not a side effect.
 - **The disabled-with-reason state is near-unreachable.** Switching conversations during `stopping`
   abandons the restart, which clears `restartPending`; the only window where another conversation's
   button is disabled is the `resuming` phase — at most five seconds, usually one tick.
@@ -253,6 +373,9 @@ because all three read one hook.
 route mid-run — and spends it ONCE: the observation lands in `.verify/artifacts/phase-14-live-run.json`
 and later runs read it back. Deleting that file re-measures, at the cost of a turn. The resumed-turn
 stamp is settled by where the stamp line sits and what seeds the guard below it, never by a second turn.
+Its snapshot of `claude-runtime.provider.js` is bounded rather than counted to a phase's own diff: the
+gate now asserts what that bound stood for — the file is still JavaScript, its cliVersion footprint is
+one call, and the DECISION is in `chat-process.ts` while the probe is in `installed-cli-version.ts`.
 
 `node .verify/phase-15.mjs` proves the client, in headless Chromium and with ZERO real turns: the run's
 six-turn budget was already spent, so both halves of the disagreement are REPLAYED. `/api/cli-version`
@@ -264,3 +387,42 @@ order and how long after the `complete`. The live route is still read once with 
 and the footer asserted against the version the binary answers NOW rather than a literal that would
 pass while stale. Shots are `15-baseline-footer-light`, `15-stale-chip-light`, `15-banner-light`,
 `15-banner-dark` and `15-resumed-light`. See [verification.md](verification.md).
+
+The idle sweep was proven LIVE, on a conversation the probe made itself, by MOVING THE READING
+rather than installing anything. Six steps, and no message is sent between the move and the
+observation, which is the whole point: (1) create a conversation through the API and send one real
+turn, so its host is born on the installed build; (2) read that host's `cliVersion` off its own
+journal; (3) forge the journal's init line to an older string — `2.1.278` — which is the state an
+install leaves behind (the version sits JSON-ESCAPED inside the journal's own `line` field, as
+`claude_code_version\":\"2.1.280\"`, so a plain-string match finds nothing and the forge silently
+does nothing); (4) ask `/api/cli-version` and assert no run is in flight for that
+conversation, the registry's own answer being one of the sweep's two witnesses (`busyReason` in
+`idle-version-sweep.ts` is the other); (5) point `CLAUDE_CLI_PATH` at
+a one-line stub that answers `--version` and move the reading in two asks — the first caches
+`2.1.279`, editing the stub's answer to `2.1.280` and asking again is the transition that fires it;
+(6) read the log, `listLiveHosts`, `tmux` and the host's three files. The stub lives only in the
+probe's own environment: the real `claude` on `PATH` is never pointed at, and every other live host
+was first MEASURED to be on the reading the stub would serve, so the sweep could not reach one.
+
+Observed, with nothing sent in between: `[keepalive] retiring idle host
+239cca8a-b5cf-405e-8710-9430b934985e-mucz1zjr: cli 2.1.278 → 2.1.280`; the host gone from
+`listLiveHosts`, from `tmux` and from disk (all three files); the three other live hosts still
+listed on the SAME pids (`3541241`, `3622011`, `3582704`); and then ONE message, which spawned a new
+host for that conversation whose own init line reports `2.1.280`, while the reply still knew the word
+the first turn had written into the conversation.
+
+The BOOT trigger was then proven on a real turn in flight, with no stub at all: a conversation made
+through the API, a real turn started by a scheduled message and held open (`sleep 50`), its journal
+forged to `2.1.278` as above, and an ordinary dev handover — a real boot of the running server. That
+boot logged `[keepalive] keeping host …-muczst10 on cli 2.1.278: a turn was in flight — it is
+retired at its next message, not now`, re-adopted the host, and left its journal, socket and tmux
+session intact; when the turn landed and the boot was repeated, the SAME host on the SAME forged
+version logged `[keepalive] retiring idle host …-muczst10: cli 2.1.278 → 2.1.280` and took its files
+with it. The forged record is OVERWRITTEN by the first re-adoption — the CLI re-announces the build
+it actually runs — so the second boot forge again first. A genuinely old process re-announces the OLD
+build, which is exactly why the boot test stands for the case it exists for. The trigger also proved
+itself unprompted the moment the code landed: the next boot logged `[keepalive] retiring idle host
+639a1d96-…: cli 2.1.276 → 2.1.280` and the same for `66071067-…`, then `re-adopted 3 host(s), swept 0
+dead host file(s)`. No timer exists behind either trigger: the change rides the client's own ~1 min
+poll of the route it already polls, and a machine nobody polls is covered by the next boot and the
+next message.

@@ -44,29 +44,35 @@ import path from 'node:path';
 /**
  * The name the runner's lock store goes by inside the default state root. Used ONLY to skip it
  * when listing run directories — it is a sibling of the runs, never one of them. Finding a lock
- * goes through {@link LOCK_DIR}, which is a different path for the reason recorded there.
+ * goes through {@link LOCK_DIR} — the same store under the default root, a different one once
+ * `PLAN_RUNNER_STATE_DIR` is set, which is what that constant's own note is about.
  */
 const LOCKS_DIR_NAME = 'locks';
 
 /**
- * Where the runner's locks actually are — absolute, and deliberately NOT derived from whatever
- * state root this lane was pointed at.
+ * Where the runner's locks are read from — absolute, and (unlike the run directories) NOT derived
+ * from the state root this lane was pointed at.
  *
- * The runner hardcodes it. `state_lock.py:36-37` expands `~/.claude/state/runner` at IMPORT time
- * and joins `locks` onto it, and nothing under `hooks/plan_runner/` reads `PLAN_RUNNER_STATE_DIR`
- * at all — `scripts/runner_statusline.py:101` is that variable's only reader anywhere in the
- * runner, and it moves the RUN directories alone. So the env moves where runs are read from and
- * does not move where locks are written.
+ * It was written when that was right: the runner expanded a fixed `~/.claude/state/runner` at
+ * import and no module under `hooks/plan_runner/` read `PLAN_RUNNER_STATE_DIR`. That stopped being
+ * true on 2026-09-22 — `state_lock.py:38-43` now resolves that env at import for `RUNNER_DIR` and
+ * joins `LOCK_DIR` onto it, `costs` imports the same resolution, and `scripts/runner_watchdog.py`
+ * and the quiet checkpoint's `scripts/quiet_checkpoint_runs.py` mirror it. The runner therefore
+ * moves the runs and their lock store TOGETHER (a root that moved one alone would read the other
+ * tree's locks), and this constant is now the one reader that disagrees.
  *
- * Deriving this from `stateDir` was therefore symmetrical and wrong: point the env at a hermetic
- * tree and every lock lookup misses, every run falls back to its progress file, and every healthy
- * long phase reads `stale` — the exact failure the lock beat exists to prevent, arriving silently
- * and only under the configuration meant to be the safe one.
+ * In the default configuration both name the same directory, so nothing is wrong today. Under a
+ * moved env every lookup here misses, every run falls back to its progress file, and every healthy
+ * long phase reads `stale` — silently, and only under the configuration meant to be the safe one.
  *
- * No env of our own here, on purpose: the runner has none, and inventing one would be a second
- * answer to "where are the locks" that could disagree with the program that writes them.
+ * The cure is to thread the root this lane already resolves for the runs
+ * (`plan-runner.module.ts:157`) through {@link readRunLockBeat} and {@link pruneVanishedReads} and
+ * delete this constant. That is a signature change plus a server rebuild, so it is the operator's
+ * call and not this module's — and once it lands, deriving the store from `stateDir` is CORRECT
+ * rather than the bug the earlier version of this comment warned against: the symmetry was wrong
+ * because the RUNNER kept the two apart, never because the two belong apart.
  *
- * One lock per PLAN rather than per run (`state_lock.py:93-96`), which is why a lock is found by
+ * One lock per PLAN rather than per run (`state_lock.py:116`), which is why a lock is found by
  * hashing a plan path and not by naming a run.
  */
 const LOCK_DIR = path.join(os.homedir(), '.claude', 'state', 'runner', 'locks');
@@ -305,11 +311,12 @@ export function readRunFiles(dir: string): RunnerRunFiles {
  * falls back to the progress file, and that run is judged by its own last write, which is then a
  * real lapse rather than an artefact.
  *
- * `realpath` mirrors `lock_path` exactly (`state_lock.py:93-96`): the runner hashes the RESOLVED
+ * `realpath` mirrors `lock_path` exactly (`state_lock.py:116`): the runner hashes the RESOLVED
  * plan path so two symlinks to one plan share one lock, and a hash of the unresolved spelling
  * would simply miss the file and silently degrade every symlinked plan to the fallback.
  *
- * Takes no state root, because a lock's location does not depend on one — see {@link LOCK_DIR}.
+ * Takes no state root yet: the lock it reads is located by {@link LOCK_DIR}, which is where this
+ * lane and the runner still disagree once `PLAN_RUNNER_STATE_DIR` moves — see that constant.
  */
 export function readRunLockBeat(planPath: string, runId: string): number | null {
   let resolvedPlanPath: string;

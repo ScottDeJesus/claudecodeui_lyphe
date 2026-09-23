@@ -35,21 +35,26 @@ it.
    `soul_launch_state`, `universe_map` and `universe_activity` HAVE a kind and carry no session
    id of their own, so they are returned early by name — one shared `case` group — the same way
    `session_upserted` and `loading_progress` are. Each is a picture of the whole box owned by a
-   reader outside the transcript, republished into the live bus by its own feed. Returning
-   rather than breaking is the whole of it: without the case such a frame falls through to the
-   `default`, inherits the viewed session's id, and lands in the open transcript as a message
-   row — which for `universe_activity` would mean a row per coalesced frame, up to ten a second,
-   for as long as anything in the estate is busy
+   reader outside the transcript, republished into the live bus by its own feed. Each RETURNs
+   rather than breaking, to say so and to stay off the provider path below — no stream buffering,
+   no store append, no UI side effect
    ([01-websocket-transport.md](./01-websocket-transport.md) §"Fan-out: who receives what").
-   **`kanban_event` and `kanban_metis_state` are also sessionless, but neither is in that
-   `case` group today** — both fall through to `default` and land in whatever session is
-   currently viewed. See [01-websocket-transport.md](./01-websocket-transport.md) §"The chat
-   protocol coming down".
-2. **The default action is "append to the store".** Read the switch as a filter, not a
-   dispatcher: gateway kinds and the two streaming kinds are handled specially, five
-   kinds are control events that are deliberately *not* stored, and everything else —
-   `text`, `tool_use`, `tool_result`, `thinking`, `error`, `task_notification` — just
-   becomes a row.
+   **That `case` group names the lanes; it is not what stops them.** What stops them is the
+   stamp: a row joins the transcript only if a numeric `seq` says the RUN wrote it, and no
+   sessionless lane frame carries one (`writtenByRun` at `:253`). A lane that is not in the
+   group — `arc_state`, `kanban_event`, `kanban_metis_state` — is stopped by the stamp all the
+   same, which is the point: the group lagged the lanes it was meant to fence, and the frame
+   that slipped past it landed in the viewed transcript with no `id`, where the store's
+   `removeOptimisticUserEchoes` read `id.startsWith` off `undefined` and threw inside the
+   websocket listener — losing that frame and every frame after it, and freezing the open chat
+   until the page was reloaded (`sessionMessageReconciliation.ts:111` is the guard that makes
+   the merge total).
+2. **The default action is "append to the store" — for a frame the run stamped.** Read the
+   switch as a filter, not a dispatcher: gateway kinds and the two streaming kinds are handled
+   specially, five kinds are control events that are deliberately *not* stored, and everything
+   else with a numeric `seq` — `text`, `tool_use`, `tool_result`, `thinking`, `error`,
+   `task_notification` — just becomes a row. A frame with no `seq` belongs to no run and stops
+   here.
 3. **A streaming reply is one row, not many.** `updateStreaming` writes a row with the id
    `__streaming_<sessionId>` and replaces it in place on every flush. The transcript's
    row count stays flat while the text grows. `finalizeStreaming` rewrites that same array
@@ -158,10 +163,13 @@ Four things in that picture are easy to get backwards:
   change is applied to the running query, and so is a GROWN allowed-tool list; a changed
   working directory, MCP configuration, an edited message (`resumeAnchorId`), a conversation
   restarted from scratch, any change to the disallowed list or a tool REMOVED from the allowed
-  list (both are launch arguments the CLI resolves before ever asking the callback) retires the
+  list (both are launch arguments the CLI resolves before ever asking the callback), and the
+  installed CLI version itself (a process runs the build it was started with) retire the
   process — interrupt first, then end-of-input — and spawns a fresh one. The launch profile
   travels in the host meta, so a re-adopted process is diffed against what it was really
-  launched with.
+  launched with; the version [comes from the host's own journal](../cli-version.md), because
+  only that process can say what it is on. A turn already in flight is never retired for a
+  version: it keeps the build it started on, and the banner above its transcript says so.
 - **A Claude run can outlive the API process too, and then `seq` restarts at 1.** The CLI
   lives in a tmux server rather than in the API's cgroup, and the API re-adopts it on boot
   with a *fresh* registry run — so a client that reconnects across a restart holds a cursor
@@ -404,9 +412,19 @@ tail. A background session that finishes keeps its live rows until it is opened.
 Abort is a server-side transaction. `chat.abort` requires a run in `running` status —
 otherwise the server answers `protocol_error` with code `NO_ACTIVE_RUN` — then stops the
 runtime and calls `completeRun` with `aborted: true`. For Claude, stopping is an interrupt the CLI
-answers within `INTERRUPT_GRACE_MS` (5 s), then end-of-input; a CLI that does not answer in time, or
-whose interrupt fails, is killed through the query's `AbortController` (SIGTERM, then SIGKILL — via
-its keepalive host when it has one), so Stop always completes the run. The killed process usually emits its
+answers within `INTERRUPT_GRACE_MS` (5 s), and **Stop ends the reply, not the work the reply
+started**. The interrupt ends only the turn: what follows it depends on what the process still has
+running. With nothing in flight, end-of-input as before. With background work in flight — a
+backgrounded subagent or Bash job, a watcher, a scheduled wake-up — the process is left alive and
+idle as the session's live process, so that work's completion still wakes the agent and lands in
+the chat as it would after a normal turn, and the operator's next message joins the same process;
+the idle closer ends it once nothing is running. One follow-up ends that work early: a message that
+changes a launch argument (model, cwd, allowed tools, the CLI's own version) respawns the process,
+and a respawn retires the one holding the work — end-of-input, which is what takes it down
+(`addSession` logs it). A CLI that does not answer in time, or whose
+interrupt fails, is killed through the query's `AbortController` (SIGTERM, then SIGKILL — via its
+keepalive host when it has one), and that is the only path a Stop is allowed to take background
+work down with it, so Stop always completes the run. The killed process usually emits its
 own `complete` a moment later; `decorateAndRecordEvent` drops it, because a run already
 marked completed cannot complete twice. The partial reply that streamed before the abort
 stays in the transcript as an ordinary assistant row.
@@ -457,7 +475,15 @@ itself, with nobody asked — so the runtime also registers a **`PreToolUse` hoo
 `promptForToolDecision`, returning the decision as `hookSpecificOutput.permissionDecision`.
 The hook reads `sdkOptions.permissionMode` at call time — a live settings change is seen — and
 stands aside in every other mode, because there `canUseTool` is already asking and answering in
-both would put one question on the wire twice. The matcher declares `timeout: 86_400` — the
+both would put one question on the wire twice. The CLI's own **`Notification` hook** announces a
+permission prompt of its own accord: it arms a six-second timer on a pending tool ask and notifies
+under `notification_type: 'permission_prompt'` when that fires, and the runtime keeps that one type
+off the wire for the same reason — `promptForToolDecision` has already raised it, carrying the
+question text and the answer buttons, so a push from the hook would ask the human twice and say
+less the second time. That type has a second, broader producer inside the CLI, where a dialog
+announced under no type of its own defaults to it: the guard filters the type's **dominant
+producer**, not the last word on the type, and a dialog family that ever reaches a human through no
+other door has to be re-read against it. The matcher declares `timeout: 86_400` — the
 SDK reads that field in **seconds**, so a day, which is what keeps the SDK from killing a hook
 that is deliberately waiting on a person. The wait itself has no timeout for an interactive tool,
 through either caller; an ordinary tool's wait is `CLAUDE_TOOL_APPROVAL_TIMEOUT_MS` and the

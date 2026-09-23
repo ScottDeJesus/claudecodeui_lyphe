@@ -555,9 +555,9 @@ function ChatInterface({
             >
               <span className="text-sm leading-relaxed">
                 This conversation is running Claude CLI {openSessionCliVersion}. Version {installedCliVersion} is
-                installed on your machine, but a conversation keeps the version it started with while a turn is in
-                progress. Restarting stops this one and resumes the same conversation on {installedCliVersion} — every
-                message is kept.
+                installed on your machine — an idle conversation restarts on its own and picks it up, and one that is
+                answering keeps the version its turn started on. Restarting stops this turn and resumes the same
+                conversation on {installedCliVersion} — every message is kept.
               </span>
             </Banner>
           </div>

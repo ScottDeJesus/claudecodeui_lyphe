@@ -1,6 +1,6 @@
 ---
 name: frontend-module-standards
-description: Enforce this repository's React and TypeScript frontend module architecture standards. Use whenever creating, modifying, refactoring, or reviewing frontend code under `src/`, including feature modules, components, hooks, contexts, shared UI, API access, state, utilities, and frontend tests. Do not apply these rules to backend code under `server/` or non-frontend scaffolding.
+description: Enforce this repository's React and TypeScript frontend module architecture standards. Use whenever creating, modifying, refactoring, or reviewing frontend code under `src/`, including feature modules, components, hooks, contexts, shared UI, API access, state, and utilities. Do not apply these rules to backend code under `server/` or non-frontend scaffolding.
 ---
 
 # Frontend Module Standards
@@ -9,7 +9,7 @@ Apply these rules only to frontend code under `src/`. Preserve the requested tas
 
 ## Inspect before editing
 
-1. Identify the owning feature module and its existing barrel, components, hooks, contexts, utilities, state, API usage, and tests.
+1. Identify the owning feature module and its existing barrel, components, hooks, contexts, utilities, state, and API usage.
 2. Search for existing shared types, utilities, constants, UI components, hooks, and contexts before adding a new definition.
 3. Search for every consumer before moving a definition or changing a module's public exports.
 4. Distinguish application-source imports from package imports before applying the `@` alias rules.
@@ -41,8 +41,7 @@ src/modules/<feature>/
 |-- hooks/
 |-- context/
 |-- modals/
-|-- utils/
-`-- tests/
+`-- utils/
 ```
 
 ## Design exports deliberately
@@ -153,13 +152,6 @@ Treat React state, reducer state, context state, and external-store state as fro
 - When a feature module contains only one modal, keep it directly in the module.
 - Keep a modal in `src/shared/ui/` only when it is a genuinely reusable UI primitive used by multiple different modules.
 
-## Test within the owner
-
-- Put feature-module tests in `src/modules/<feature>/tests/`.
-- Put tests for shared frontend code in `src/shared/tests/`.
-- Add or update focused tests for changed hooks, utilities, API behavior, state transitions, and component behavior when applicable.
-- Do not place feature-specific tests in the shared test directory.
-
 ## Verify the result
 
 Before finishing:
@@ -168,7 +160,7 @@ Before finishing:
 2. Confirm all cross-module imports go through the owning module's `index.ts`.
 3. Confirm module barrels contain only necessary, documented public exports.
 4. Confirm frontend code introduces no interfaces and uses `export type` and `import type` correctly.
-5. Confirm types, utilities, constants, hooks, contexts, UI components, modals, and tests follow their ownership and usage rules.
+5. Confirm types, utilities, constants, hooks, contexts, UI components, and modals follow their ownership and usage rules.
 6. Confirm shared types, utilities, and constants use the required comments and grouping separators.
 7. Confirm every newly introduced state declaration explains why it exists or is marked as possibly unnecessary.
 8. Run `npm run build:client`, `npm run typecheck`, and `npm run lint` when the task scope and environment permit. This house writes no unit tests; verification is running the real app.

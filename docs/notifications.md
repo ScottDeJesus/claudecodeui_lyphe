@@ -80,8 +80,8 @@ The events raised today:
 
 | Code | Kind | Raised by |
 | --- | --- | --- |
-| `permission.required` | `action_required` | The Claude runtime, when a tool waits for approval. Its `meta` carries the `requestId` and the raw `toolInput`, which is what lets the push carry answer buttons (§"Answering from the phone") |
-| `agent.notification` | `action_required` | The Claude runtime's Notification hook |
+| `permission.required` | `action_required` | The Claude runtime, when a tool waits for approval. Its `meta` carries the `promptKey` (the ask's identity, which outlives the process that raised it), the `requestId` and the raw `toolInput`, which is what lets the push carry answer buttons (§"Answering from the phone") and what keeps a re-issue from pushing again (§"One question, one push") |
+| `agent.notification` | `action_required` | The Claude runtime's Notification hook, for every type but `permission_prompt` — that type's dominant producer is the six-second pending-ask timer behind the prompt `permission.required` has already pushed, with the question and its answer buttons on it |
 | `run.stopped` | `stop` | All four runtimes (Claude, Codex, Cursor, OpenCode) when a run ends |
 | `run.background_completed` | `background` | The Claude runtime, when background work finishes after its turn |
 | `run.failed` | `error` | All four runtimes, when a run crashes; and the Claude runtime again for a `result` message that carries an error |
@@ -258,24 +258,29 @@ and a tap makes the phone send `POST <appUrl>/api/ntfy/act?t=<token>`:
 | `ExitPlanMode` | Approve · Revise | Approves the plan, or declines it with "User asked to revise the plan" |
 | Any other tool | Approve · Deny | Allows the tool, or denies it with "User denied tool use" |
 
-Buttons need a `meta.requestId` and a `meta.toolInput` on the `permission.required` event, and a
-stored app URL. The Claude runtime puts both on the event — the request id it is waiting on, and
-the tool's raw input — so on a configured instance a permission push carries buttons. With no app
-URL stored there is nowhere for a button to POST, and the push goes out with none. Which buttons a tool gets, and what each one means, is
+Buttons need a `meta.promptKey` (the ask's identity) and a `meta.toolInput` on the
+`permission.required` event, and a stored app URL. They are built for every such event, whether
+or not that event's own push goes out (§"One question, one push"). The Claude runtime puts both on the event — the
+prompt key it is waiting on, and the tool's raw input — so on a configured instance a permission
+push carries buttons; a producer that names only a `meta.requestId` still gets buttons, keyed that
+one ask at a time. With no app URL stored there is nowhere for a button to POST, and the push goes
+out with none. Which buttons a tool gets, and what each one means, is
 `ntfy-action-decisions.service.ts`; the token service below knows nothing about tools.
 
 **The token** (`ntfy-action-token.service.ts`) is
-`<base64url JSON payload>.<base64url HMAC-SHA256 of that segment>`. The payload names the request,
+`<base64url JSON payload>.<base64url HMAC-SHA256 of that segment>`. The payload names the prompt,
 the user, the one decision its button stands for, an expiry and a random nonce, so a Deny token
 cannot be edited into Approve without breaking the signature. The key is
 `app_config.ntfy_action_secret`, created on first use like `jwt_secret`. A token works once, and
-spending it retires its sibling buttons: the request is forgotten as the token is spent — before
+spending it retires its sibling buttons: the prompt is forgotten as the token is spent — before
 the runtime is told, so a failure there cannot leave a reusable token. A question's or plan's
 buttons stay good for 4 hours, and the runtime waits for those indefinitely. Any other tool's
 buttons stay good for 5 minutes, but the Claude runtime waits only 55 seconds for an approval
 (`CLAUDE_TOOL_APPROVAL_TIMEOUT_MS`) and then denies the tool itself: a tap after that is too
-late, and the route cannot tell (§"Gotchas"). Pending requests and spent tokens live in server
-memory, so a restart (a dev handover included) voids every outstanding button.
+late, and the route cannot tell (§"Gotchas"). Spent tokens live in server memory; a registered
+prompt is re-registered by whichever successor re-issues it (§"One question, one push"), so a
+restart (a dev handover included) no longer voids the buttons of a question that is still parked.
+Rotating the signing secret does — every outstanding button dies with it.
 
 **The route** (`ntfy-action.routes.ts`) answers in plain text:
 
@@ -284,7 +289,7 @@ memory, so a restart (a dev handover included) voids every outstanding button.
 | 200 | `Answered: <button label>` | The decision was handed to the runtime, which may no longer be waiting (§"Gotchas") |
 | 400 | `missing token` · `malformed token` · `malformed payload` · `unknown option` | Not a token this server minted |
 | 401 | `bad signature` · `expired` · `unknown decision` | Forged, altered or out of time |
-| 410 | `already answered` · `no longer pending` | Spent, or its request is gone (answered by a sibling, timed out, or the server restarted) |
+| 410 | `already answered` · `no longer pending` | Spent, or its prompt is gone (answered by a sibling, timed out, or the session's approval was settled before this server took the question over) |
 | 429 | `too many attempts` | 20 GUESSED tokens from one client inside a minute — a signed token is never refused this way |
 | 500 | `could not answer` | The runtime threw while taking the decision; the token is spent anyway |
 
@@ -306,6 +311,50 @@ arrives from `127.0.0.1`, and any finer answer could come only from a header the
 which would sell an unlimited budget for the price of rotating it. So all callers share one budget.
 That is safe precisely because of the rule above, and it is why the checks in `.verify/ntfy` hand
 the budget back (one signed token) instead of trying to claim an address of their own.
+
+### One question, one push
+
+A question parks the CLI, and the process that pushed it does not survive to see the answer. The
+dev server boots a fresh process behind the running one on every save under `server/`, and each
+successor re-adopts the session hosts: the replayed `can_use_tool` request makes the runtime ask
+again, so `promptForToolDecision` runs a second, third, twelfth time for the SAME question — new
+request id, and, before this, a fresh push each time. Measured 2026-09-22: one AskUserQuestion at
+17:51:32, 23 handovers in seven minutes while builders saved server files, and 12 identical pushes
+on the phone, one per handover.
+
+Two halves make one push:
+
+- **The prompt key** (`promptKeyFor` in `claude-runtime.provider.js`) is the ask's own identity:
+  the tool use id the CLI stamped on the call, which the replayed request carries unchanged. The
+  re-issue keeps its own `requestId` — the in-app `permission_request` frame is a new ask for the
+  panel — but carries the same key, and the notification's `dedupeKey` is built on the key.
+- **The memory of the push** (`ntfy-pushed-prompts.service.ts`) is a record on disk at
+  `~/.cloudcli/ntfy-pushed-prompts.json`, keyed by the prompt key and forgotten after the
+  question's own window (4 hours — the same window its buttons live for). The channel checks it
+  before publishing and writes it only once a publish has been ACCEPTED, so a predecessor killed
+  between its question and its push leaves no record and the successor still pushes: a question
+  that was never announced is always announced once. Two servers on one box share the file, so a
+  write takes an exclusive lock and a lost read-modify-write is what that lock exists to stop.
+  Failing to take the lock in a second abandons that one record rather than waiting — the cost of
+  a missing record is one push too many, and the cost of blocking is a stalled fan-out.
+
+The whole point of the ordering is the failure it rules out. A record written at emit time would
+turn a predecessor's death mid-publish into a question nobody is ever told about. What it leaves
+open is the mirror window — a predecessor killed after ntfy accepted the push but before the
+record lands — and there the successor pushes a second time. At-least-once, chosen knowingly: a
+rare double on a save storm beats a question that is never announced.
+
+The buttons survive the relay too. The push a predecessor sent carries a token naming the
+prompt key, and a successor re-registers that prompt on every re-issue — the registration happens
+while the buttons are built, ahead of EVERY skip the channel can make (the already-pushed check,
+the watched-session skip and the short-run one alike) — so a tap on the one push that went out
+still finds the question, which the successor is asking under a request id of its own.
+`resolveToolApproval` looks the key up when no request id matches.
+
+That ordering is load-bearing, not incidental. The watched-session skip is the one that shows why:
+a question pushed while the chat tab was hidden, then brought on screen, then handed over, would
+have had its re-issue dropped by the presence check before anything re-registered it — and the tap
+that came an hour later, on a phone that still showed the push, would answer nothing (410).
 
 ### How a push is published
 
@@ -394,15 +443,10 @@ also exported from the module's `index.ts` for any caller that has to show an ev
   by the counter, and answering clears the record), and the header is deliberately ignored, so no
   caller can win a private budget by rotating one. Putting a real reverse proxy in front would be
   the only way to tell clients apart honestly, and would need `trust proxy` set to mean anything.
-- **"Answered" does not mean the runtime took it.** `resolveToolApproval` returns nothing — it
-  offers the decision to every provider, and one no longer waiting ignores it — so the route answers
-  `200 Answered: …` for a request that is already settled. Two ways to get there: the request was
-  answered in the browser first — nothing retires the phone's buttons yet, so a question's
-  four-hour button stays live in ntfy's message cache after the answer. `forgetPendingAction`
-  (`ntfy-action-token.service.ts`) is the seam that closes it; what is left is re-exporting it from
-  `modules/notifications/index.ts` and calling it beside the one `permission_resolved` send in
-  `promptForToolDecision` (`claude-runtime.provider.js`) — one line each, in a phase whose manifest
-  holds both files. That one send now serves both callers, so it is one site and not two. Or an
-  ordinary tool's 55-second approval wait ran out and the runtime denied it while its button was
-  still good for 5 minutes. Either way the phone reports `Answered: Approve` and nothing changes —
-  in the second case, for a tool Claude was refused.
+- **`200 Answered:` means the decision reached the runtime, not that the tool was allowed.**
+  `resolveToolApproval` returns nothing — it offers the decision to every provider, and one no
+  longer waiting ignores it. A prompt the runtime has stopped waiting on is retired as it settles
+  (`forgetPendingAction`, called from `promptForToolDecision` for every outcome: answered, denied,
+  aborted or timed out), so a late tap meets `410 no longer pending` rather than a button that
+  reports success and changes nothing. What a 200 still cannot promise is what the tool then did
+  with the decision — a `deny` is a `deny`, and the phone asked for it.

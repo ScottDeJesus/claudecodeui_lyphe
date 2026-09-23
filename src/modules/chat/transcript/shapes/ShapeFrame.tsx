@@ -231,7 +231,10 @@ export function ShapeFrame({ kind, title, collapseKey, actions, children, classN
         // sits in with the app live around it, so a dialog opened from it — the command palette, a
         // confirm — must still come up in front; at a higher layer it opened invisibly and kept the
         // keyboard (measured by Athena's review). Shared with the gutter widgets' fullscreen.
-        fullscreen && 'fixed inset-0 z-[45] m-0 flex flex-col rounded-none border-0 bg-card shadow-none',
+        // `pwa-notch-safe` for the same reason `z-[45]` is here: fullscreen is the screen. In the
+        // home-screen app the header row — and the fullscreen switch out of it — would otherwise
+        // sit in the status-bar band at the top and the notch band at the side (see src/index.css).
+        fullscreen && 'pwa-notch-safe fixed inset-0 z-[45] m-0 flex flex-col rounded-none border-0 bg-card shadow-none',
         className
       )}
     >

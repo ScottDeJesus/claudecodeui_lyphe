@@ -346,12 +346,7 @@
         "gatedOn": "Trattenuto dall’interruttore principale qui sopra — ma questa opzione è memorizzata accesa, quindi accendere Jev invia subito l’output dei comandi.",
         "gatedOff": "Trattenuto dall’interruttore principale qui sopra: accendi Jev per cambiarlo."
       },
-      "unreadable": "Non è stato possibile leggere gli interruttori dal server, quindi la loro posizione è sconosciuta — non è la stessa cosa di spento. Vengono ritentati ogni volta che questa pagina torna in primo piano.",
-      "stats": "Registro Jev: {{calls}} chiamate · {{tokens}} token Jev spesi · {{linesIn}} righe filtrate → {{linesKept}} mantenute",
-      "statsEmpty": "Registro Jev: nessuna chiamata registrata finora.",
-      "net": "Netto Jev: {{chars}} caratteri ≈ {{tokens}} token di sessione (+ mantenuti, − aggiunti)",
-      "consumer": "{{caller}}: {{chars}} caratteri",
-      "consumerMore": "… e altri {{more}} — `jev stats` li elenca tutti."
+      "unreadable": "Non è stato possibile leggere gli interruttori dal server, quindi la loro posizione è sconosciuta — non è la stessa cosa di spento. Vengono ritentati ogni volta che questa pagina torna in primo piano."
     },
     "login": {
       "title": "Accedi",

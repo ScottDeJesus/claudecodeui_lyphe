@@ -30,6 +30,9 @@ export {
 } from '@/modules/notifications/services/session-presence.service.js';
 // Used by the server entrypoint to mount the public tap-to-answer route at /api/ntfy/act.
 export { createNtfyActionRoutes } from '@/modules/notifications/ntfy-action.routes.js';
+// Used by the Claude runtime the moment an approval resolves, whichever door it came through: the
+// prompt's phone buttons must stop answering a question that is already settled.
+export { forgetPendingAction } from '@/modules/notifications/services/ntfy-action-token.service.js';
 // getPublicKey: used by Settings to expose the Web Push subscription key.
 export { getPublicKey } from './vapid-keys.service.js';
 // configureWebPush: used by the server entrypoint during notification startup.

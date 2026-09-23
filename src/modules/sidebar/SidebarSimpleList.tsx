@@ -3,7 +3,7 @@ import type { TFunction } from 'i18next';
 
 import { api } from '@/shared/api';
 import { Button, EmptyState } from '@/shared/ui';
-import { useAwaitingInputSessionIdSet, useBusySessionIdSet } from '@/shared/context/SessionProtectionContext';
+import { useAwaitingInputSessionIdSet, useBusySessionIdSet, useSubagentRunningSessionIdSet } from '@/shared/context/SessionProtectionContext';
 import type { Project, ProjectSession, RecentConversationListItem, SessionWithProvider } from '@/shared/types';
 import { useSimpleChatList } from '@/modules/sidebar/hooks/useSimpleChatList';
 import { useSimpleChatProject } from '@/modules/sidebar/hooks/useSimpleChatProject';
@@ -56,6 +56,7 @@ export default function SidebarSimpleList({
 }: SidebarSimpleListProps) {
   const busySessionIds = useBusySessionIdSet();
   const awaitingInputSessionIds = useAwaitingInputSessionIdSet();
+  const subagentRunningSessionIds = useSubagentRunningSessionIdSet();
 
   const { rows, hasMore, isLoading, hasError, reload, loadMore, patchLocal, removeLocal, moveLocal } =
     useSimpleChatList(selectedSession?.id ?? null);
@@ -195,6 +196,7 @@ export default function SidebarSimpleList({
               isSelected={selectedSession?.id === row.sessionId}
               isRunning={busySessionIds.has(row.sessionId)}
               isAwaitingInput={awaitingInputSessionIds.has(row.sessionId)}
+              isSubagentRunning={subagentRunningSessionIds.has(row.sessionId)}
               isRemoveFailed={failedSessionId === row.sessionId}
               onSelect={() => handleRowSelect(row)}
               onArchive={() => remove(row, 'archive')}

@@ -13,6 +13,9 @@
  * - A host whose turn already reported `complete` has its run completed the instant it is
  *   registered. Leaving it `running` would wedge the session behind RUN_IN_PROGRESS
  *   (chat-websocket.service.ts:228-238) with no terminal event left to release it.
+ * - The boot does not hand a conversation back to a build it has already replaced: the keepers go
+ *   through the same version test a message applies (`idle-version-sweep.ts`), and the process that
+ *   took the claim is the one that keeps watching for the next install.
  *
  * consumer: index.ts — re-exported through the providers barrel for server/index.ts
  */
@@ -24,8 +27,11 @@ import { sessionsDb } from '@/modules/database/index.js';
 import { chatRunRegistry, runDetachedChatTurn } from '@/modules/websocket/index.js';
 import type { ProviderRuntimeGateway } from '@/modules/websocket/index.js';
 
+import { installedCliVersionForLaunch } from '../installed-cli-version.js';
+
 import { lastTurnFinishedAt, listLiveHosts, retireHost, retireOlderHosts, sessionsDir, sweepDeadHosts } from './hosts.js';
 import type { LiveHost } from './hosts.js';
+import { retireStaleIdleHosts, watchInstalledCliVersionChanges } from './idle-version-sweep.js';
 import { keepaliveEnabled } from './spawner.js';
 
 /** `supervised`: this boot is the systemd unit's own child (server/index.ts knows; this module is not told how). */
@@ -62,6 +68,7 @@ function readoptHost(host: LiveHost, deps: ReadoptDeps): boolean {
           turnCompleteSent: host.turnCompleteSent,
           heldForBackgroundWork: host.heldForBackgroundWork,
           profile: host.profile,
+          cliVersion: host.cliVersion,
           deferredTools: host.deferredTools
         }
       },
@@ -194,11 +201,22 @@ export async function readoptKeepaliveSessions(
   // litter under either setting, so the sweep above still stands.
   if (!keepaliveEnabled()) return { readopted: 0, swept };
 
-  // Newest wins, exactly as the provider's supersede branch decides it at runtime (D-8).
+  // This process owns the keepalive from here on, so it is also the one that watches the installed
+  // reading for an INSTALL: a host left idle on an older build is retired the moment the version
+  // moves, not only at its next message (`idle-version-sweep.ts`). Registered after the claim,
+  // never before: the process that did not take the claim touches nothing.
+  watchInstalledCliVersionChanges();
+
+  // Newest wins, exactly as the provider's supersede branch decides it at runtime (D-8). Then the
+  // version test, on the survivors: a restart after an install must not re-adopt a host on the
+  // build the install replaced. The reading is the same cached one the route serves and the
+  // message path asks, taken with the send path's own bound — a boot must not wait out a binary
+  // that will not answer `--version`, and a `null` retires nothing.
   const keepers = retireOlderHosts(listLiveHosts());
+  const fresh = retireStaleIdleHosts(keepers, await installedCliVersionForLaunch());
 
   let readopted = 0;
-  for (const host of keepers) {
+  for (const host of fresh) {
     if (readoptHost(host, deps)) readopted += 1;
   }
 

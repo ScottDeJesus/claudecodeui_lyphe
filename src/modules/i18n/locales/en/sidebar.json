@@ -187,6 +187,7 @@
     "iconDefault": "Default",
     "iconOption": "{{name}} icon",
     "unread": "Finished, not read yet",
-    "dragHandle": "Drag to reorder"
+    "dragHandle": "Drag to reorder",
+    "subagentsRunning": "Subagents running"
   }
 }

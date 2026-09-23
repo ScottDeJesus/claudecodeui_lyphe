@@ -112,6 +112,7 @@
     "plainModeTooltip": "すべてのメッセージを /plain 付きで送信: 短く読みやすい返答",
     "deepseekFlash": "DeepSeek Flash",
     "deepseekFlashShort": "Flash",
+    "deepseekFlashOffShort": "Claude",
     "deepseekFlashTooltip": "これがオンの間、plan runner のビルド担当ソウル（ビルダー・修正パス・Athena）は DeepSeek Flash で実行されます。Prometheus とスカウトは Claude のままです。",
     "deepseekFlashReading": "スイッチを読み取り中…",
     "deepseekFlashUnreadable": "スイッチを読み取れませんでした — 押して再試行してください。"

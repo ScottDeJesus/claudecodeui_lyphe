@@ -349,12 +349,7 @@
         "gatedOn": "Retenu par l’interrupteur maître ci-dessus — mais cette option est mémorisée activée : activer Jev enverra donc immédiatement la sortie des commandes.",
         "gatedOff": "Retenu par l’interrupteur maître ci-dessus : activez Jev pour modifier ceci."
       },
-      "unreadable": "Les interrupteurs n’ont pas pu être lus depuis le serveur : leur position est inconnue — ce n’est pas la même chose que désactivé. Une nouvelle tentative a lieu chaque fois que cette page reprend le focus.",
-      "stats": "Journal Jev : {{calls}} appels · {{tokens}} jetons Jev dépensés · {{linesIn}} lignes filtrées → {{linesKept}} conservées",
-      "statsEmpty": "Journal Jev : aucun appel enregistré pour l’instant.",
-      "net": "Net Jev : {{chars}} caractères ≈ {{tokens}} jetons de session (+ conservés, − ajoutés)",
-      "consumer": "{{caller}} : {{chars}} caractères",
-      "consumerMore": "… et {{more}} de plus — `jev stats` les liste tous."
+      "unreadable": "Les interrupteurs n’ont pas pu être lus depuis le serveur : leur position est inconnue — ce n’est pas la même chose que désactivé. Une nouvelle tentative a lieu chaque fois que cette page reprend le focus."
     },
     "login": {
       "title": "Connexion",

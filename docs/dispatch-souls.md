@@ -8,7 +8,7 @@ with nothing to do with polling — see §"The routes and the frame" below.
 
 What it feeds is a PIN: one row among the chat's pinned subagent rows — drawn in the strip above the
 composer when the desktop chat gutters are not showing, and in the gutter's Subagents widget while
-they are — for a soul a `/dispatch` or `/inline` started, drawn beside the `Agent`-tool agents already there. The
+they are — for a soul a session started by hand or `/inline`'s chain launched, drawn beside the `Agent`-tool agents already there. The
 row itself belongs to the chat module — derived by
 `src/modules/chat/hooks/usePinnedSubagentRows.ts` and drawn by
 `src/modules/chat/transcript/PinnedSubagents.tsx` (the same row, in the gutter, by
@@ -244,15 +244,17 @@ box-wide `case` group beside `runner_state`, `universe_map` and `universe_activi
 rather than break: without the case the frame falls through the switch's `default`, inherits the
 viewed session's id, and is appended to the open transcript as a message row.
 
-## The mechanism it shares with the plan runner and a board's Metis
+## The mechanism it shares with the plan runner, the arc deck and a board's Metis
 
 The poll itself is not this lane's. `server/shared/polled-lane.service.ts` (`createPolledLane`) is
 the read-picture / compare / broadcast-on-change loop that every state lane on this server runs:
 this one, the plan runner's (`plan-runner/runner-watcher.service.ts`, now a thin adapter that
-supplies its own `snapshot` and `frame` and nothing else), and a board's own Metis sessions
-(`kanban-metis/kanban-metis.module.ts`, the `kanban_metis_state` frame). Why it polls rather than
-watches, when it speaks, why the dedup records a picture as sent only AFTER the send returns, and
-why a failing tick never takes the interval down with it are documented once, there.
+supplies its own `snapshot` and `frame` and nothing else), the arc deck's
+(`plan-runner/arc-lane.ts`, the `arc_state` frame, over the same broadcast closure the run lane
+uses), and a board's own Metis sessions (`kanban-metis/kanban-metis.module.ts`, the
+`kanban_metis_state` frame). Why it polls rather than watches, when it speaks, why the dedup records
+a picture as sent only AFTER the send returns, and why a failing tick never takes the interval down
+with it are documented once, there.
 
 What is THIS lane's and not the mechanism's: the launch root (`DISPATCH_SOULS_STATE_DIR`, defaulting
 to `~/.claude/state/dispatch-souls`), the two-second cadence, the six-hour window, and the frame.
@@ -266,7 +268,7 @@ env var may reach. It is read once, at composition, so moving it means restartin
 |---|---|
 | `src/modules/dispatch-souls/SoulLaunchFeed.tsx` | The lane's one door into the live bus, and the ONLY place in the client that names the `soul_launch_state` frame. Headless: it renders its children unchanged. `App` mounts it inside `LiveBusProvider`, inside the auth gate, below `WebSocketProvider` — nested inside `RunnerFeed`, because a feed is a wrapper and not a sibling. |
 | `hooks/useSoulLaunches.ts` | The read side: the retained `souls:*` topic as a `Map` keyed by launch id. A map rather than the array because the reader asks one lookup per anchored id. `undefined` (nothing retained) and `[]` (the lane is empty) collapse to an empty map — to a screen they are the same instruction. |
-| `src/modules/chat/transcript/SoulLaunchPinRow.tsx` | One soul's row, drawn to be indistinguishable in SHAPE from the agent rows beside it. Its mark is `LLMProviderLogo` on the launch's provider — the DeepSeek whale, or Claude's — centred beside its two lines, as an `Agent` subagent's row carries its own provider's logo. The row is also a button: an `onOpen` prop, given by both the strip (in a dialog) and the gutter's Subagents widget (in place), opens this soul's transcript live through the second route above ([architecture/06-tool-view.md](architecture/06-tool-view.md) §Subagents). |
+| `src/modules/chat/transcript/SoulLaunchPinRow.tsx` | One soul's row, drawn to be indistinguishable in SHAPE from the agent rows beside it. Its mark is `LLMProviderLogo` on the launch's provider — the DeepSeek whale, or Claude's mascot — centred beside its two lines, as an `Agent` subagent's row carries its own provider's mark. The row is also a button: an `onOpen` prop, given by both the strip (in a dialog) and the gutter's Subagents widget (in place), opens this soul's transcript live through the second route above ([architecture/06-tool-view.md](architecture/06-tool-view.md) §Subagents). |
 
 The row lives in the CHAT module, not in `dispatch-souls/`: the pinned rows it lands among are the chat's, and
 a lane must not reach back into it.
@@ -331,6 +333,6 @@ looking at the real client — not asserting the shapes:
 - [deepseek-balance.md](deepseek-balance.md) — the account those souls spend.
 - `~/.claude/hooks/README.md` §Runner (`soul`) and `~/.claude/hooks/GOTCHAS.md` #35, #36 — the
   launcher's own side, and the contract this lane binds it to.
-- `~/.claude/skills/dispatch/sections/deepseek.md` (the §2b procedure, attached to the
-  conductor's own `Skill` call by `~/.claude/hooks/skill_router.py` when the switch reads
-  `on`) — the conductor who starts these souls.
+- `~/.claude/skills/heal/sections/deepseek.md` (the DeepSeek-door procedure, attached to
+  `/heal`'s own `Skill` call by `~/.claude/hooks/skill_router.py` when the switch reads
+  `on`) — the door for ONE hand-launched soul.

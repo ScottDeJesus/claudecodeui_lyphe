@@ -26,8 +26,12 @@ import type { AnyRecord, NormalizedMessage, SubagentActivity } from '@/shared/ty
  * Mirrors `RUNNING_BELIEVED_FOR_MS` in the chat's pinned rows (`PinnedSubagents.tsx`), drawn in the
  * strip above the chat box when the desktop chat gutters are not showing and in the gutter's
  * Subagents widget while they are: a "running" row older than this is not believed.
+ *
+ * Read by the sidebar's purple dot too (`hasRunningSubagent`, and the candidate window in
+ * `session-subagent-runs.service.ts`), so the three answers to "is an agent still out there" are
+ * one window rather than three.
  */
-const RUNNING_BELIEVED_FOR_MS = 4 * 60 * 60 * 1000;
+export const RUNNING_BELIEVED_FOR_MS = 4 * 60 * 60 * 1000;
 /**
  * Mirrors `FINISHED_SHOWN_FOR_MS` in the chat's pinned rows (`PinnedSubagents.tsx`), drawn in the
  * strip above the chat box when the desktop chat gutters are not showing and in the gutter's
@@ -157,6 +161,76 @@ export function collectSessionAgents(messages: NormalizedMessage[], now: number 
     agents.push(compactContainer(message));
   }
   return agents;
+}
+
+/**
+ * Whether one container is an agent the chat's pinned strip paints as RUNNING — the whole of the
+ * rule the sidebar's purple dot rests on, written once.
+ *
+ * The first reading is the history reader's own word, and the other three are its absence:
+ * `readSubagentSummary` on the client falls through to the launch receipt when a container carries
+ * no `subagent` metadata, and this is that fall-through, case for case.
+ *
+ * - `running` — the reader resolved a backgrounded launch with no report back yet, or a resumed
+ *   agent still writing. The ordinary case this dot exists for.
+ * - no metadata, NO result — the call is still out: the parent transcript has the tool call and
+ *   nothing has answered it. A foreground agent mid-flight reads this way, and the strip pins it.
+ * - no metadata, a receipt that is not an error and was handed back asynchronously (`isAsync`) —
+ *   the launch acknowledgement says the agent went out to work in the background, and no report
+ *   has folded back onto the call yet.
+ *
+ * And NOT anything with an error for a result. That is the reading that would be wrong to take:
+ * the harness refusing a launch (a PreToolUse hook denial, the planner go-gate, a rejected
+ * dispatch) leaves an error and no agent, and it is dozens a day in this house. The strip paints
+ * those `failed`; a dot that counted them would blink purple for four hours over work that never
+ * started.
+ */
+function isRunningContainer(message: NormalizedMessage): boolean {
+  const status = message.subagent?.status;
+  if (status) {
+    return status === 'running';
+  }
+  const result = message.toolResult;
+  if (!result) {
+    return true;
+  }
+  const receipt = result.toolUseResult as { isAsync?: unknown } | undefined;
+  return !result.isError && receipt?.isAsync === true;
+}
+
+/**
+ * Whether this conversation has a subagent running RIGHT NOW — the question the sidebar's purple
+ * dot asks, and the answer the chat's pinned strip draws its own purple disc from.
+ *
+ * Asked through `collectSessionAgents` deliberately, rather than by re-walking the messages: the
+ * containers it offers and the four-hour launch window it applies to an unfinished one ARE the
+ * strip's selection, so the dot can never light on an agent the strip would not pin.
+ */
+export function hasRunningSubagent(messages: NormalizedMessage[], now: number = Date.now()): boolean {
+  return collectSessionAgents(messages, now).some(isRunningContainer);
+}
+
+/**
+ * Whether the session's subagent sidechains moved recently enough that one of its agents could
+ * still be believed running — the cheap question a full transcript read may be skipped on.
+ *
+ * Safe as a gate, and only because of what `running` is made of: a container reads `running` only
+ * while its agent's own transcript has not reached a closing reply (`inFlight`), and `inFlight` is
+ * itself bounded by `IN_FLIGHT_BELIEVED_FOR_MS`, the same four hours. So an agent the strip calls
+ * running wrote its sidechain inside the window, and a session whose sidechains are all older than
+ * it holds no running agent.
+ */
+export async function hasFreshSubagentSidechains(
+  transcriptPath: string,
+  providerSessionId: string,
+  now: number = Date.now(),
+): Promise<boolean> {
+  const stamp = await readSubagentStamp(transcriptPath, providerSessionId);
+  if (!stamp) {
+    return false;
+  }
+  const newestMs = Number(stamp.slice(stamp.indexOf(':') + 1));
+  return Number.isFinite(newestMs) && now - newestMs < RUNNING_BELIEVED_FOR_MS;
 }
 
 /**

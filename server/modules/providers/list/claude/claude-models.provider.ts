@@ -28,9 +28,11 @@ const ULTRACODE_EFFORT_OPTION = {
  * `default` and `best` are POLICY selectors — "whatever your deployment recommends", "the
  * latest and greatest" — and the bare `sonnet`/`opus` aliases sat beside their `[1m]` twins.
  * All four were duplicates of an entry already in this list: the CLI's own baked catalog
- * resolves `opus` to claude-opus-5 and `sonnet` to claude-sonnet-5, and BOTH are natively 1M
- * (`context.window: 1e6, native_1m: true`), so the `[1m]` suffix changes nothing for this
- * generation.
+ * resolves `opus` to claude-opus-5-5 (the id a `--model opus` child reports on its own init
+ * line and `modelUsage` key, measured 2026-09-22 on Claude Code 2.1.280) and `sonnet` to
+ * claude-sonnet-5, and BOTH are natively 1M (`context.window: 1e6, native_1m: true`), so the
+ * `[1m]` suffix changes nothing for this generation. The alias is what the composer keeps
+ * sending; only what it resolves to moves, which is the whole point of naming it.
  *
  * `opusplan` — the CLI's Opus-plans-then-Sonnet-executes mode — is gone for the same reason:
  * planning here runs through its own flow, and the alias had never been selected once.
@@ -71,7 +73,7 @@ export const CLAUDE_PREDEFINED_MODELS: ProviderModelsDefinition = {
     },
     {
       value: 'opus[1m]',
-      label: 'Opus 5 (1M context)',
+      label: 'Opus 5.5 (1M context)',
       description: 'Latest Opus model with a 1M context window.',
       effort: {
         default: 'high',

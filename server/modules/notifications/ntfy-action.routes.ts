@@ -22,7 +22,8 @@ import { consumeActionToken } from '@/modules/notifications/services/ntfy-action
 import type { NtfyActionDecision } from '@/modules/notifications/services/ntfy-action-token.service.js';
 
 type ToolApprovalRuntime = {
-  resolveToolApproval(requestId: string, decision: { allow: boolean; updatedInput?: unknown; message?: string }): void;
+  /** By the prompt's own key, which is what a token names — see `PendingAction.promptKey`. */
+  resolveToolApproval(approvalKey: string, decision: { allow: boolean; updatedInput?: unknown; message?: string }): void;
 };
 
 /** Guesses one client may spend inside a window before it is refused outright. */
@@ -147,7 +148,9 @@ export function createNtfyActionRoutes(dependencies: { runtime: ToolApprovalRunt
     if (!decision) return answer(400, 'unknown option', decisionKind(verdict.decision));
 
     try {
-      dependencies.runtime.resolveToolApproval(verdict.action.requestId, decision);
+      // By prompt, not by ask: this tap may name a push a predecessor process sent before a
+      // handover, and the successor is asking that same question under its own request id now.
+      dependencies.runtime.resolveToolApproval(verdict.action.promptKey, decision);
     } catch (error) {
       console.error('[ntfy] action could not be applied', error instanceof Error ? error.message : error);
       return answer(500, 'could not answer', decisionKind(verdict.decision));

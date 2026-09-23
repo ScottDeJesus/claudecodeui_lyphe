@@ -281,7 +281,8 @@ const COPY_BY_CODE = new Map<string, CodeCopy>([
       headline: 'Plan finished',
       body: [
         runnerShippedText(meta),
-        // "since start", not "in": a resumed run keeps its first start, parked hours included.
+        // "since start" is the WALK: a parked run is stamped by its Start press,
+        // while a stopped-then-resumed one keeps its first start.
         durationMs && durationMs > 0 ? `${humanDuration(durationMs)} since start` : null,
         cost === null ? null : `$${cost.toFixed(2)} on this plan`,
       ].filter((part): part is string => part !== null).join(' · '),

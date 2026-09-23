@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 
 import { api } from '@/shared/api';
 import { useToast } from '@/shared/context/ToastContext';
-import type { RunnerVerb } from '@/shared/types';
+import type { RunnerModelChoice, RunnerVerb } from '@/shared/types';
 
 /** The runner's answer, as much of it as this hook reads. Both fields are free text it wrote. */
 type VerbBody = { stderr?: unknown; stdout?: unknown };
@@ -31,7 +31,7 @@ async function readBody(response: Response): Promise<VerbBody | null> {
 }
 
 /**
- * Stop and Resume for one run, and what to say about each.
+ * Stop, Resume, the model word and the scheduled Start for one run, and what to say about each.
  *
  * NO CONFIRMATION DIALOG GUARDS STOP, deliberately. Stop is a PAUSE — it parks the run and
  * `resume` un-parks it, so the press is reversible by the button that replaces it. A dialog in
@@ -52,16 +52,22 @@ async function readBody(response: Response): Promise<VerbBody | null> {
  * `resumeWord` is the word ON THE BUTTON that pressed it, and the refusal answers in that word: a
  * queued run's button says Start, and a refusal headed "Resume" names a verb the operator never
  * saw. The runner's own sentence underneath is the same either way — it is `resume` that runs.
+ *
+ * `setModel` relays `plan-runner model <id> <word>` and `schedule` relays `plan-runner schedule <id>
+ * offpeak|none` under the same `busy` guard, so every control on the card refuses a second press together. NOTHING OPTIMISTIC: the
+ * control re-draws from the next `runner_state` frame, which reads `run.json:model` back.
  */
 export function useRunnerVerbs(runId: string, resumeWord?: string): {
   stop(): Promise<void>;
   resume(): Promise<void>;
+  setModel(choice: RunnerModelChoice): Promise<void>;
+  schedule(when: 'offpeak' | 'none'): Promise<void>;
   busy: RunnerVerb | null;
 } {
   const { t } = useTranslation();
   const toast = useToast();
 
-  // The verb in flight, so both buttons refuse a second press while one is out. Essential: the
+  // The verb in flight, so every control refuses a second press while one is out. Essential: the
   // runner takes a lock and a double-press would race two processes at the same run directory.
   const [busy, setBusy] = useState<RunnerVerb | null>(null);
 
@@ -76,19 +82,26 @@ export function useRunnerVerbs(runId: string, resumeWord?: string): {
   }, []);
 
   const send = useCallback(
-    async (verb: RunnerVerb): Promise<void> => {
+    async (verb: RunnerVerb, word?: string): Promise<void> => {
       if (!mountedRef.current) return;
       setBusy(verb);
 
       try {
         const response = verb === 'stop'
           ? await api.planRunner.stop(runId)
-          : await api.planRunner.resume(runId);
+          : verb === 'model'
+            ? await api.planRunner.model(runId, (word ?? 'deepseek') as RunnerModelChoice)
+            : verb === 'schedule'
+              ? await api.planRunner.schedule(runId, word ?? 'none')
+              : await api.planRunner.resume(runId);
         const body = await readBody(response);
         if (!mountedRef.current) return;
 
         if (response.ok) {
-          const said = verb === 'stop' ? 'runner.toast.stopping' : 'runner.toast.resumed';
+          const said = verb === 'stop' ? 'runner.toast.stopping'
+            : verb === 'model' ? 'runner.toast.model'
+              : verb === 'schedule' ? (word === 'none' ? 'runner.toast.unscheduled' : 'runner.toast.scheduled')
+                : 'runner.toast.resumed';
           toast({ tone: 'positive', title: t(said) });
           return;
         }
@@ -97,7 +110,9 @@ export function useRunnerVerbs(runId: string, resumeWord?: string): {
         // on stderr, but a verb that exits non-zero having said its piece on stdout is still
         // telling the reader something, and an empty toast tells them nothing at all.
         const said = firstLine(body?.stderr) || firstLine(body?.stdout) || t('messages.operationFailed');
-        const title = verb === 'stop' ? t('runner.stop') : (resumeWord ?? t('runner.resume'));
+        const title = verb === 'stop' ? t('runner.stop')
+          : verb === 'model' ? t('runner.model.refused')
+            : verb === 'schedule' ? t('runner.schedule.refused') : (resumeWord ?? t('runner.resume'));
         toast({ tone: 'warn', title, message: said });
       } catch (error) {
         // The request never completed — the API is down, or the deadline passed. That is the
@@ -113,6 +128,8 @@ export function useRunnerVerbs(runId: string, resumeWord?: string): {
 
   const stop = useCallback(() => send('stop'), [send]);
   const resume = useCallback(() => send('resume'), [send]);
+  const setModel = useCallback((choice: RunnerModelChoice) => send('model', choice), [send]);
+  const schedule = useCallback((when: 'offpeak' | 'none') => send('schedule', when), [send]);
 
-  return { stop, resume, busy };
+  return { stop, resume, setModel, schedule, busy };
 }

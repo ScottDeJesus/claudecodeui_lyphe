@@ -2,7 +2,9 @@ import { ActivityIcon, PinIcon } from 'lucide-react';
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { ArcGallery } from '@/modules/plan-runner/ArcGallery';
 import { dismissRun } from '@/modules/plan-runner/dismissedRuns';
+import { useArcs } from '@/modules/plan-runner/hooks/useArcs';
 import { useRunnerRuns } from '@/modules/plan-runner/hooks/useRunnerRuns';
 import { RunCard } from '@/modules/plan-runner/RunCard';
 import { byUrgencyThenNewest } from '@/modules/plan-runner/runState';
@@ -46,13 +48,21 @@ function SessionPin() {
  * "this session launched it". The prop arrives already resolved to an APP session id by the server,
  * so a plain equality is the whole test.
  *
- * IT READS THE BUS AND DRAWS NO FRAME. `useRunnerRuns` hands it the retained lane, so it paints on
- * its first render and owns no state of its own; the chrome, the slots and the scrolling belong to
- * `src/modules/chat-gutters`.
+ * THE ARC DECK COMES FIRST, AS IT DOES ON THE TAB. `ArcGallery`'s gutter home — flush, one whole
+ * card per view — sits above the runs, so an arc whose next card has no run yet is on screen beside
+ * the transcript exactly as it is on the tab. The EmptyState shows only when there is neither a run
+ * NOR an arc, the tab's own rule.
+ *
+ * IT READS THE BUS AND DRAWS NO FRAME. `useRunnerRuns` and `useArcs` hand it the retained lanes, so
+ * it paints on its first render and owns no state of its own; the chrome, the slots and the
+ * scrolling belong to `src/modules/chat-gutters`.
+ *
+ * Used by `src/modules/chat-gutters` (`ChatGutterLayout`), as the Runner widget's body.
  */
 export function RunnerWidgetBody({ sessionId }: { sessionId: string | null }) {
   const { t } = useTranslation();
   const { runs, carriedIds } = useRunnerRuns();
+  const { arcs } = useArcs();
 
   // The lane, sorted once and split once. Both groups keep the urgency order a single stable
   // filter preserves, so "mine" is a lift rather than a second ordering to keep in step.
@@ -62,38 +72,43 @@ export function RunnerWidgetBody({ sessionId }: { sessionId: string | null }) {
     return { mine: ordered.filter(isMine), rest: ordered.filter((run) => !isMine(run)) };
   }, [runs, sessionId]);
 
-  if (runs.length === 0) {
+  if (runs.length === 0 && arcs.length === 0) {
     return <EmptyState icon={ActivityIcon} title={t('runner.empty')} />;
   }
 
   return (
-    <ul className="flex min-w-0 flex-col gap-3">
-      {[...mine, ...rest].map((run) => {
-        const isMine = sessionId !== null && run.launched_by_session === sessionId;
-        return (
-          <li
-            key={run.run_id}
-            data-testid="runner-widget-run"
-            data-run-id={run.run_id}
-            data-pinned={String(isMine)}
-            className="flex min-w-0 flex-col gap-1"
-          >
-            {isMine && <SessionPin />}
-            <RunCard
-              run={run}
-              defaultOpen={false}
-              // Dismiss is offered exactly where the tab offers it: an ended run whose ending is on
-              // the card. `carriedIds` is the unfiltered lane, because that is what a dismissal
-              // prunes the stored list against.
-              onDismiss={
-                run.state === 'ended' && run.ended_at !== null
-                  ? () => dismissRun({ run_id: run.run_id, ended_at: run.ended_at as number }, carriedIds)
-                  : undefined
-              }
-            />
-          </li>
-        );
-      })}
-    </ul>
+    <div className="flex min-w-0 flex-col gap-4">
+      <ArcGallery home="gutter" />
+      {runs.length > 0 && (
+        <ul className="flex min-w-0 flex-col gap-3">
+          {[...mine, ...rest].map((run) => {
+            const isMine = sessionId !== null && run.launched_by_session === sessionId;
+            return (
+              <li
+                key={run.run_id}
+                data-testid="runner-widget-run"
+                data-run-id={run.run_id}
+                data-pinned={String(isMine)}
+                className="flex min-w-0 flex-col gap-1"
+              >
+                {isMine && <SessionPin />}
+                <RunCard
+                  run={run}
+                  defaultOpen={false}
+                  // Dismiss is offered exactly where the tab offers it: an ended run whose ending is on
+                  // the card. `carriedIds` is the unfiltered lane, because that is what a dismissal
+                  // prunes the stored list against.
+                  onDismiss={
+                    run.state === 'ended' && run.ended_at !== null
+                      ? () => dismissRun({ run_id: run.run_id, ended_at: run.ended_at as number }, carriedIds)
+                      : undefined
+                  }
+                />
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </div>
   );
 }

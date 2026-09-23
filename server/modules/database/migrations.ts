@@ -2,6 +2,8 @@ import { Database } from 'better-sqlite3';
 
 import {
   APP_CONFIG_TABLE_SCHEMA_SQL,
+  CRON_JOBS_TABLE_SCHEMA_SQL,
+  CRON_SYNC_RUNS_TABLE_SCHEMA_SQL,
   LAST_SCANNED_AT_SQL,
   NOTIFICATION_CHANNEL_ENDPOINTS_TABLE_SCHEMA_SQL,
   PROJECTS_TABLE_SCHEMA_SQL,
@@ -556,6 +558,21 @@ const migrateKanbanBoardsColumns = (db: Database): void => {
   addColumnToTableIfNotExists(db, 'kanban_boards', columnNames, 'concurrency', 'INTEGER NOT NULL DEFAULT 1');
 };
 
+/**
+ * Adds `tags` to a `cron_jobs` table already on disk: a JSON array of short words saying what a
+ * job is FOR at a glance (`cleanup`, `backup`). `CRON_JOBS_TABLE_SCHEMA_SQL` is `IF NOT EXISTS`,
+ * so its declaration reaches only a fresh database; this is the half that reaches the live one.
+ * Existing rows take `'[]'` — no tags, which is what they had.
+ */
+const migrateCronJobsColumns = (db: Database): void => {
+  if (!tableExists(db, 'cron_jobs')) {
+    return;
+  }
+
+  const columnNames = getTableInfo(db, 'cron_jobs').map((column) => column.name);
+  addColumnToTableIfNotExists(db, 'cron_jobs', columnNames, 'tags', "TEXT NOT NULL DEFAULT '[]'");
+};
+
 export const runMigrations = (db: Database) => {
   try {
     const usersTableInfo = db.prepare('PRAGMA table_info(users)').all() as { name: string }[];
@@ -604,6 +621,11 @@ export const runMigrations = (db: Database) => {
     addSessionUserStateColumns(db);
     ensureProjectsForSessionPaths(db);
     db.exec(SCHEDULED_MESSAGES_TABLE_SCHEMA_SQL);
+    // The cron registry: what the box schedules, and one row per sync that read it. Neither
+    // table references another, so they sit here rather than behind any rebuild above.
+    db.exec(CRON_JOBS_TABLE_SCHEMA_SQL);
+    migrateCronJobsColumns(db);
+    db.exec(CRON_SYNC_RUNS_TABLE_SCHEMA_SQL);
     // After the projects rebuild above: the boards table references projects(project_id).
     db.exec(KANBAN_SCHEMA_SQL);
     migrateKanbanBoardsColumns(db);

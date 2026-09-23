@@ -137,7 +137,7 @@ export function KanbanPanel({ projectId }: KanbanPanelProps) {
             title={t('kanban.noBoard.title')}
             message={t('kanban.noBoard.message')}
             actionLabel={t('kanban.noBoard.action')}
-            // The same name surface the header's New-board row opens: a first board is a board, and
+            // The same name surface the switcher's New-board row opens: a first board is a board, and
             // it is named the one way a board is named.
             onAction={() => setDialog('new')}
           />

@@ -319,6 +319,7 @@
     "subagents": {
       "title": "Subagenten",
       "empty": "Keine Subagenten in diesem Chat",
+      "clearCompleted": "Abgeschlossene entfernen",
       "back": "Zurück zu den Subagenten",
       "loading": "Transkript wird geladen…",
       "notFound": "Noch kein Transkript auf der Festplatte",

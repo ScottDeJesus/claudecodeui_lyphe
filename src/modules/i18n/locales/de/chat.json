@@ -112,6 +112,7 @@
     "plainModeTooltip": "Jede Nachricht mit /plain senden: kurze, überfliegbare Antworten",
     "deepseekFlash": "DeepSeek Flash",
     "deepseekFlashShort": "Flash",
+    "deepseekFlashOffShort": "Claude",
     "deepseekFlashTooltip": "Solange das an ist, laufen die Bau-Souls des Plan-Runners — der Builder, sein Fix-Durchlauf und Athena — auf DeepSeek Flash. Prometheus und die Scouts bleiben auf Claude.",
     "deepseekFlashReading": "Der Schalter wird gelesen…",
     "deepseekFlashUnreadable": "Der Schalter konnte nicht gelesen werden — zum erneuten Versuch tippen.",

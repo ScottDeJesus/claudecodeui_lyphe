@@ -1,3 +1,4 @@
+import { Network } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 import { useElapsed } from '@/shared/hooks/useElapsed';
@@ -30,20 +31,33 @@ function clockOf(at: string): string {
  * log to draw itself. The elapsed clock runs only for the phase that is genuinely in flight:
  * every other row passes `null` and buys no interval at all, so a five-phase card holds one timer
  * here rather than five (`@/shared/hooks/useElapsed`).
+ *
+ * A PHASE THAT CAN SWARM SAYS SO, AND WITH WHOM. `alongside` is the phases sharing this one's wave
+ * (`waveCompanions`); with any, the row wears the swarm mark — the `Network` glyph every swarm
+ * surface wears, in a neutral badge reading `wave N`, since it is information and not a state —
+ * titled with the companions by name. With none it wears nothing. The number is what groups the
+ * rows on a phone, where no title shows: every row reading `wave 3` walks together.
+ * `data-runner-wave` on the row and on the mark is the browser harness's handle.
  */
 export function PhaseRow({
   phase,
   timeline,
   isCurrent,
   stageSince,
+  alongside = [],
 }: {
   phase: RunnerPhaseRow;
   timeline: RunnerTimelineEntry[];
   isCurrent: boolean;
   stageSince: number | null;
+  alongside?: string[];
 }) {
   const { t } = useTranslation();
   const running = isCurrent && phase.state === 'running';
+  const wave = alongside.length > 0 && typeof phase.wave === 'number' ? phase.wave : undefined;
+  const companions = t('runner.waveAlongside', {
+    phases: alongside.map((id) => t('runner.wavePhase', { phase: id })).join(', '),
+  });
   const elapsed = useElapsed(running ? stageSince : null);
 
   // What the badge adds after the state word: how long the phase has been where it is while it
@@ -71,7 +85,7 @@ export function PhaseRow({
     );
 
   return (
-    <Collapsible className="min-w-0" data-phase-id={phase.id}>
+    <Collapsible className="min-w-0" data-phase-id={phase.id} data-runner-wave={wave}>
       {/* Nothing here truncates: the title wraps, and the badge wraps onto the next line when the
           row is too tight to hold both — a phase name or a block reason cut short is unreadable
           on a phone, which is where this list is read. */}
@@ -79,9 +93,22 @@ export function PhaseRow({
         <span className="flex-none font-mono text-xs" aria-hidden="true">{PHASE_GLYPH[phase.state]}</span>
         <span className="flex-none font-mono text-xs text-muted-foreground">{phase.rank}</span>
         <span className="min-w-0 flex-1 basis-40 break-words text-sm leading-snug">{phase.title}</span>
-        <Badge tone={phaseStateTone(phase.state)} className="min-w-0 break-words">
-          {suffix ? `${stateWord} · ${suffix}` : stateWord}
-        </Badge>
+        {/* The state and the mark wrap as ONE unit, so on a phone the title keeps its own line and
+            both drop beneath it together. The state leads in the DOM — what a screen reader hears
+            first, and on a phone every row's state then starts at the same edge; from `sm` the mark
+            is drawn first, so the state badges keep the right-hand column. */}
+        <span className="flex min-w-0 max-w-full flex-wrap items-center gap-x-2 gap-y-1">
+          <Badge as="span" tone={phaseStateTone(phase.state)} className="min-w-0 break-words">
+            {suffix ? `${stateWord} · ${suffix}` : stateWord}
+          </Badge>
+          {wave !== undefined && (
+            <Badge as="span" tone="neutral" className="flex-none gap-1 sm:order-first" title={companions} data-runner-wave={wave}>
+              <Network className="h-3 w-3 flex-none" aria-hidden="true" />
+              {t('runner.wave', { n: wave })}
+              <span className="sr-only">{`, ${companions}`}</span>
+            </Badge>
+          )}
+        </span>
       </CollapsibleTrigger>
       <CollapsibleContent>{rows}</CollapsibleContent>
     </Collapsible>

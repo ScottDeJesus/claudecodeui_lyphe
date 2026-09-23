@@ -121,6 +121,7 @@
     "plainModeTooltip": "모든 메시지를 /plain과 함께 전송: 짧고 읽기 쉬운 답변",
     "deepseekFlash": "DeepSeek Flash",
     "deepseekFlashShort": "Flash",
+    "deepseekFlashOffShort": "Claude",
     "deepseekFlashTooltip": "이것이 켜져 있는 동안 plan runner의 빌드 영혼(빌더, 수정 패스, Athena)은 DeepSeek Flash에서 실행됩니다. Prometheus와 스카우트는 Claude에 남습니다.",
     "deepseekFlashReading": "스위치를 읽는 중…",
     "deepseekFlashUnreadable": "스위치를 읽지 못했습니다 — 눌러서 다시 시도하세요.",

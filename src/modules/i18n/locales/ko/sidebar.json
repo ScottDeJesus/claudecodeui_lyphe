@@ -170,6 +170,7 @@
     "iconDefault": "기본",
     "iconOption": "{{name}} 아이콘",
     "unread": "완료됨, 아직 읽지 않음",
-    "dragHandle": "드래그하여 순서 변경"
+    "dragHandle": "드래그하여 순서 변경",
+    "subagentsRunning": "서브에이전트 실행 중"
   }
 }

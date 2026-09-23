@@ -4,6 +4,9 @@ export { default as ChatExportMenu, type ChatExportSurface } from '@/modules/cha
 // The open chat's pinned rows as the desktop gutter draws them: the list, and the transcript a row
 // opens. Its consumer is the chat-gutters module, which mounts it as the third widget.
 export { SubagentWidgetBody } from '@/modules/chat/subagents/SubagentWidgetBody';
+// The widget's "Clear completed", worn in the frame's HEADER rather than above its list: it is the
+// Subagents widget's `HeaderAction`. Consumer: chat-gutters, which mounts it in the header slot.
+export { SubagentWidgetClearCompleted } from '@/modules/chat/subagents/SubagentWidgetClearCompleted';
 // How many rows that widget holds, for the count beside its tab. Consumer: chat-gutters.
 export { useSubagentWidgetCount } from '@/modules/chat/hooks/useSubagentWidgetRows';
 // Says "the strip lives in me now" for as long as a region draws those rows itself, so the chat

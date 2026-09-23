@@ -3,6 +3,9 @@ export { closeConnection, getConnection, getDatabasePath } from '@/modules/datab
 export { apiKeysDb } from '@/modules/database/repositories/api-keys.js';
 export { appConfigDb } from '@/modules/database/repositories/app-config.js';
 export { credentialsDb } from '@/modules/database/repositories/credentials.js';
+// cronJobsDb: the cron registry's own tables — read by the schedules module's read service, written
+// by its sync service and by the module's CLI door (add / remove / list / sync).
+export { cronJobsDb } from '@/modules/database/repositories/cron-jobs.db.js';
 export { githubTokensDb } from '@/modules/database/repositories/github-tokens.js';
 // The Kanban board's repositories: used by the kanban module — its board verbs mint through
 // `kanbanIdsDb`, its cards are summarised through `kanbanCardsDb`, its audit log is appended

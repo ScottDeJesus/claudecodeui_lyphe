@@ -348,6 +348,7 @@
     "subagents": {
       "title": "子代理",
       "empty": "此对话中没有子代理",
+      "clearCompleted": "清除已完成",
       "back": "返回子代理",
       "loading": "正在加载记录…",
       "notFound": "磁盘上还没有记录",

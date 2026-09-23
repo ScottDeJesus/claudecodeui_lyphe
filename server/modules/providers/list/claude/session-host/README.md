@@ -23,6 +23,7 @@ This directory is the mechanism's one home; every other doc describes what an op
 | `armKeepaliveSpawn(sdkOptions, ctx)` | `claude-runtime.provider.js` | Sets `sdkOptions.spawnClaudeCodeProcess` and returns the handle a `result` is acked through, or `null` when the gate is off or the turn has no app session id |
 | `keepaliveReadopt(reattach, appSessionId)` | `claude-runtime.provider.js` | The same armed/not-armed answer, asked before `sdkOptions` exists, so the two can never disagree |
 | `readoptKeepaliveSessions({ runtime })` | `server/index.ts`, through the providers barrel | The boot step (below) — before `server.listen` on a plain boot, deferred to the supervisor's takeover on a handover boot |
+| `retireStaleIdleHosts(hosts, installed)`, `watchInstalledCliVersionChanges()` | `.verify` probes only | The version sweep and its subscription (§"The idle host an install leaves behind"); the boot step calls the subscription itself, and a probe cannot — it never holds the keepalive claim |
 | `KeepaliveHandle`, `KeepaliveReattach` | `claude-runtime.provider.js` | The two types those calls traffic in |
 
 ## Where things live
@@ -135,7 +136,7 @@ cursor silently.
 
 ```json
 { "hostId": "…", "appSessionId": "…", "userId": null, "cwd": "…", "startedAt": 0, "pid": 0,
-  "turnCompleteSent": false, "heldForBackgroundWork": false,
+  "turnCompleteSent": false, "heldForBackgroundWork": false, "deferredTools": [], "profile": {},
   "deliveredSeq": 0, "pendingResults": [], "pendingControl": [], "exited": null }
 ```
 
@@ -144,6 +145,12 @@ cursor silently.
 decides whether the CLI is held after it) — persisted rather than re-derived, because re-deriving
 them from the journal's content would be a second copy of the loop's result/phantom/background
 decisions. A re-adopted run initializes both from here.
+
+`profile` is what the API launched the CLI with, and its `cliVersion` is **null when the meta is
+written** — the meta is written at spawn, before the CLI has said anything. What the CLI later said
+is in the journal (`system/init`'s `claude_code_version`), and THAT is what a re-adoption reads
+(`hosts.ts`'s `lastReportedCliVersion`) and hands the provider as `KeepaliveReattach.cliVersion`.
+Two records by two hands on purpose: the meta is the launch, the journal is the answer.
 
 Liveness is always the tmux session, never this file: a meta says what a host believed when it
 last wrote, and only `tmux has-session` says whether anything is still running.
@@ -204,16 +211,67 @@ In order, once it runs:
 2. `retireOlderHosts(listLiveHosts())` — newest `startedAt` per app session wins, exactly as the
    provider's supersede branch decides it at run time. The losers get `end_input`, then `SIGTERM`
    after `RETIRE_KILL_DELAY_MS`, over their own socket rather than by signal.
-3. Per keeper: no session row left → retire it (nothing to re-adopt into). Otherwise
+3. `retireStaleIdleHosts(keepers, installed)` — the version test, on the survivors: a host idle
+   between turns whose journal reports a build BEHIND the installed one is retired here rather than
+   handed back (`idle-version-sweep.ts`, §"The idle host an install leaves behind"). The reading is
+   the shared cached one, taken with the send path's 1.5 s bound; `null` retires nothing. The
+   process that took the keepalive claim is also the one that subscribes to the next install.
+4. Per keeper: no session row left → retire it (nothing to re-adopt into). Otherwise
    `runDetachedChatTurn` with `content: ''` and `options.keepalive = { reattach: true, hostId, …
    }`, not awaited. `beforeRun` completes the registry run at once when `turnCompleteSent` was
    already true, so a finished turn is never observable as `running`.
-4. One line: `[keepalive] re-adopted N host(s), swept M`.
+5. One line: `[keepalive] re-adopted N host(s), swept M dead host file(s)` — `M` is
+   `sweepDeadHosts`' litter, never a version sweep; a host retired by the version test above logs its
+   own `retiring idle host …` line.
 
 It composes `runDetachedChatTurn` rather than re-implementing `dispatchRun`: the session row
 lookup, the busy check and the run-completion safety net stay in one place. Anything addressed to
 a host — a note, a kill, an `end_input` — goes through that run's own handle, never through the
 app session id, because a supersede overlap would address the wrong host.
+
+## The idle host an install leaves behind
+
+A CLI process runs the build it was started with, so a message that would reuse a host older than
+the binary on disk retires it and spawns afresh (`chat-process.ts`). Until this existed that was the
+ONLY thing that acted on a stale host: one between turns sat on the old build for up to the idle
+closer's two hours, and nothing in the UI said so — the version report lists `running[]`, and an
+idle host has no run.
+
+`idle-version-sweep.ts` closes that gap with the same test the message path applies — both sides a
+version string, the process BEHIND the binary (the ordered comparison, so a downgrade retires
+nothing ahead of it), and no work in flight — on two triggers:
+
+| Trigger | When it fires | What it covers |
+|---|---|---|
+| The installed reading MOVES | The shared probe's cache goes from one version string to a different one (`cli-version-change.ts`); the sweep subscribes once per boot, in the process that holds the keepalive | The operator who leaves the app open across an upgrade: the client polls the version route about once a minute, the poll re-probes, and the sweep rides that — no timer of its own |
+| Boot re-adoption | `retireStaleIdleHosts` on the keepers, step 3 above | A server that was down when the install happened, and a machine with no browser open |
+
+A retired host is wound down exactly like a superseded one — `end_input`, then `SIGTERM` over its own
+socket — so its conversation is untouched: the next message spawns fresh and resumes. One line per
+host, `[keepalive] retiring idle host <hostId>: cli <old> → <new>`, and the walk is DEFERRED one turn
+of the event loop so the version poll and the message send that asked for the reading never wait on
+tmux. The sweep is registered after the keepalive claim, so a second API beside the serving one
+sweeps nothing — the same rule that stops it adopting.
+
+What the two triggers still do not reach: a host idle and stale at boot whose turn is in flight (it
+is not retired, correctly), with no further version change while the server lives. Its next message
+retires it, which is the rule the sweep was built on rather than a replacement for it.
+
+"In flight" is answered in two places, because the boot trigger cannot use the runtime's one. At a
+boot the run registry is empty — per-process memory, and this step runs before the port is listening
+— so `chatRunRegistry.isProcessing` says *no* for every host on the machine. The host's own meta is
+then the only witness, and it carries the two bits the runtime's own idle closer reads
+(`claude-runtime.provider.js`): `turnCompleteSent` false, meaning a turn was accepted and has not
+reported, and `heldForBackgroundWork` (or the non-empty `deferredTools` it is derived from), meaning
+the result did not wait for work still running. A socket retirement interrupts FIRST and then ends
+the CLI's stdin: the EOF, not the interrupt, is what takes the background work still running in that
+CLI down, and the exit frame that follows deletes the journal — so both bits are the difference
+between ending a process and destroying an answer. A Stop, by contrast, ends only the turn: a process
+with background work still in flight is left alive and idle, on purpose, so that work still reports
+back (`abortClaudeSDKSession`). A host
+kept for either reason logs one line, `[keepalive] keeping host <hostId> on cli <old>: <why>`, so the
+near-miss is visible; the sweep is otherwise unchanged, and a host that is genuinely idle is still
+retired the moment the reading moves.
 
 ## Why three files here are plain JavaScript
 

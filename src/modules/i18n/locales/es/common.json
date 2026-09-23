@@ -350,6 +350,7 @@
     "subagents": {
       "title": "Subagentes",
       "empty": "No hay subagentes en este chat",
+      "clearCompleted": "Borrar completados",
       "back": "Volver a los subagentes",
       "loading": "Cargando la transcripción…",
       "notFound": "Todavía no hay transcripción en el disco",

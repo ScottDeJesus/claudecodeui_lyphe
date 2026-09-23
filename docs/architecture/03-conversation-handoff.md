@@ -267,7 +267,7 @@ What remains is a `Map<sessionId, SessionActivity>` of `{ statusText, canInterru
 | --- | --- |
 | `markSessionProcessing` | The composer, just before `chat.send`; a `chat_subscribed` ack with `isProcessing: true`; a `status` frame carrying text; a `permission_request` |
 | `markSessionIdle` | `complete`; `protocol_error`; a `chat_subscribed` ack with `isProcessing: false` |
-| `syncProcessingSessions` | Every 5 s, and when the tab becomes visible again, from `GET /api/providers/sessions/running`, which returns `chatRunRegistry.listRunningRuns()` |
+| `syncProcessingSessions` | Every 5 s, and when the tab becomes visible again, from `GET /api/providers/sessions/running`, which returns `chatRunRegistry.listRunningRuns()` beside `subagentSessionIds` — the conversations a subagent is still running in, live run or not — and `awaitingInputSessionIds`, the conversations a question is waiting in, live run or not |
 
 Two guards make it stable:
 
@@ -280,13 +280,28 @@ Two guards make it stable:
   send that has not reached the registry yet.
 
 Consumers: `useProcessingSessions` (chat — the activity line and the abort button),
-`useBusySessionIdSet` (sidebar — membership only, derived from a sorted membership key so
-its `Set` identity survives the several-times-a-second `statusText` rewrites; pinned by
-`src/shared/tests/busySessionIds.test.tsx`), `useAwaitingInputSessionIdSet` (sidebar — the running
-sessions whose poll item carries `awaitingInput`, i.e. a Claude question or permission prompt is
-pending in `permissions.listPending`; a row draws a yellow dot in place of its spinner; same
-membership-key identity), and `isSessionProcessing` (`useProjectsState`,
+`useBusySessionIdSet` (sidebar — membership only, derived by `useSessionIdSet` from a sorted
+membership key so its `Set` identity survives the several-times-a-second `statusText` rewrites),
+`useAwaitingInputSessionIdSet` (sidebar — the sessions a Claude question or permission prompt is
+waiting in, taken from the payload's `awaitingInputSessionIds` and from any run whose own item
+carries `awaitingInput`; a row draws a yellow dot in place of its spinner, and on its own when its
+turn has already ended — a question outlives the turn that asked it; same membership-key identity),
+`useSubagentRunningSessionIdSet` (sidebar — the sessions named by the
+payload's `subagentSessionIds`; a row draws a purple dot BESIDE its spinner or yellow dot, and on
+its own when its turn has already ended, which is the ordinary case; same membership-key identity),
+and `isSessionProcessing` (`useProjectsState`,
 to decide whether a `session_upserted` for the viewed session should force a reload).
+
+Both the purple dot and the yellow dot are marks on the response that are not about a live run,
+which is why each is a top-level list rather than a field on each item. A backgrounded `Agent` call
+outlives the turn that launched it, so the chat it belongs to has left `sessions` by the time the
+dot matters; and a question outlives its turn the same way — the agent's completion wakes the CLI
+for a continuation turn no run is registered for, and the `AskUserQuestion` it asks is pending on
+screen while the registry has forgotten the session. A mark read off the runs alone cannot light for
+either. What the server answers for the subagent side, and what it costs to answer, is
+`session-subagent-runs.service.ts`'s own subject; the awaiting side is the approval map itself,
+asked through `listPendingSessions` — see `permissions.listPendingSessions` in the provider runtime
+and `sessionsService.listAwaitingInputSessionIds`.
 
 ## Reconciling live events with the persisted transcript
 
@@ -389,14 +404,9 @@ sequenceDiagram
   TB->>TB: truncateAt from the replay, or a refresh once the run is done
 ```
 
-Tests that pin this: `server/modules/websocket/tests/chat-edit-send.test.ts` ("an edit
-resumes through the turn before the one being replaced", "editing the first prompt starts the
-conversation over", "every subscribed client is told to drop the superseded turns", "a
-refused send never rewinds the conversation", "a provider that has to branch to rewind is
-rewound before the run, not during it") and
-`src/modules/chat/tests/sessionStoreTruncate.test.tsx` ("keeps the replacement the cut was
-made for", "keeps the replacement last when the kept history comes back re-stamped", "keeps
-only the newest replacement when an earlier attempt was refused").
+No test file pins this: this project keeps none. The behavior above is verified by running it —
+send a real `chat.edit-send` on each provider shape and read `history_truncated`, the transcript
+and the tagged echo off the live app.
 
 ## Multi-tab and multi-client
 
@@ -538,14 +548,14 @@ pick up. The client half is at [cli-version.md](../cli-version.md).
 
 | If you touch | Also check |
 | --- | --- |
-| `ChatSessionWriter.send` | `chat-run-registry.test.ts` ("session_created is swallowed and persisted as the provider-id mapping"), and that no frame can escape without `sessionId` remapped and a `seq` |
+| `ChatSessionWriter.send` | That `session_created` is swallowed and persisted as the provider-id mapping, and that no frame can escape without `sessionId` remapped and a `seq` |
 | `decorateAndRecordEvent` | The exactly-one-`complete` contract, `replayEvents` ordering, and `MAX_BUFFERED_EVENTS_PER_RUN` truncation |
 | `captureProviderSessionId` or `recordProviderSessionId` | That a *different* announced id still remaps the row — Claude's `resumeFromScratch` path depends on it |
-| `sessionsDb.assignProviderSessionId` | `sessions-provider-mapping.test.ts`, plus `repointSessionToProviderSession` and `detachProviderSession`, which must stay distinct |
+| `sessionsDb.assignProviderSessionId` | That a *different* announced id still remaps the row, plus `repointSessionToProviderSession` and `detachProviderSession`, which must stay distinct |
 | `handleChatSubscribe` | The client's `lastSeqRef` semantics, the "completed runs are not replayed" rule, and the reconnect ordering in `ChatInterface.handleWebSocketReconnect` |
-| `truncateAt` | `removeOptimisticUserEchoes` (`replacesAfterRowCount`), `readSortTime` (`replacesAnchorId`), and `sessionStoreTruncate.test.tsx` |
+| `truncateAt` | `removeOptimisticUserEchoes` (`replacesAfterRowCount`) and `readSortTime` (`replacesAnchorId`) |
 | `handleChatEditSend` | Both provider shapes — `resolveEditAnchor` for Claude, `rewindSession` for Codex — and that a refused run never rewinds |
 | `session-upsert-broadcast.service.ts` | The sidebar reducer's alias dedupe and empty-summary guard in `useProjectsState.ts`. It is the only builder; keep it that way |
-| The busy map's shape | `useBusySessionIdSet`'s membership-key memo (sidebar re-render cost), `busySessionIds.test.tsx`, and the 5 s running-sessions reconciliation |
+| The busy map's shape | `useSessionIdSet`'s membership-key memo, which every sidebar mark reads its set through (sidebar re-render cost), and the 5 s running-sessions reconciliation |
 | `useSessionStore` slot fields | [the message store doc](./04-message-store-and-lazy-loading.md), `recomputeMergedIfNeeded`'s reference-equality cache, and the pagination helpers |
 | Anything that would make a session id mutable | Nothing should need this. A mutable id breaks slots, `lastSeqRef`, the busy map, the run registry key and the URL at once |

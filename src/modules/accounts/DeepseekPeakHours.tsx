@@ -15,8 +15,8 @@ type DeepseekPeakHoursProps = {
  * own clock. Used by `AccountPopover`, directly under the balance: the money and the price of
  * spending it are one question, asked in one place.
  *
- * Green off-peak, amber at peak — the same two tones the composer's Flash chip wears, off the
- * same rule (`deepseekPeakHours.ts`), so the panel and the chip can never disagree.
+ * Green off-peak, amber at peak — the same two tones the composer's Flash chip wears while it is
+ * on, off the same rule (`deepseekPeakHours.ts`), so the panel and the chip can never disagree.
  */
 export function DeepseekPeakHours({ now }: DeepseekPeakHoursProps) {
   const { peak, changesAt } = deepseekPeakStatus(now);

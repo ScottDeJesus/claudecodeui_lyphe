@@ -29,22 +29,42 @@ function versionOfId(modelId: string): string | null {
   return parts.length > 0 ? parts.join('.') : null;
 }
 
-/** The generation a label claims: "Sonnet 5 (1M context)" → "5", "Fable 5.1" → "5.1". */
-function versionOfLabel(label: string): string | null {
-  return /(\d+(?:\.\d+)*)/.exec(label)?.[1] ?? null;
-}
+/**
+ * The aside a label carries about the entry it was written for: `Opus 5.5 (1M context)` →
+ * `Opus 5.5`. A parenthetical is a claim about the entry named in `OPTIONS`, so it never rides
+ * along onto a generation that entry does not describe.
+ */
+const LABEL_ASIDE = /\s*\([^)]*\)/g;
+
+/** Wherever a label states its own generation: `GPT-5.6 Sol` → `5.6`, `Opus 5.5` → `5.5`. */
+const LABEL_VERSION = /\d+(?:\.\d+)*/;
 
 /**
- * Whether a label may stand for an id. A label that names no generation fits any id of its
- * family; one that does must AGREE with it — the catalog's `opus` alias matches every opus id
- * ever recorded, and since these labels carry version numbers, letting an `claude-opus-4-8`
- * turn be captioned "Opus 5" would put a number on screen that nothing in the record supports.
+ * The name a caption reads, for an id of a family the catalog carries.
+ *
+ * The FAMILY comes from the catalog — it is the only part of a model's name a static list can
+ * hold, and it is what the composer's alias is keyed by. The GENERATION comes off the record: a
+ * stored turn carries the id the SDK actually ran, and a list written months earlier may not
+ * overrule it. So `Opus 5.5 (1M context)` captions the id `claude-opus-5-5` as "Opus 5.5", the
+ * `claude-opus-5` id that answered every turn before it as "Opus 5", and even a generation this
+ * catalog never offered, `claude-opus-4-8`, as "Opus 4.8" rather than as the entry the list
+ * happens to hold today.
+ *
+ * The record's generation goes WHERE THE LABEL PUT ITS OWN, word for word around it. A label may
+ * carry words after the number — `GPT-5.6 Sol` names a variant, not a version — so assembling the
+ * family by deleting the label's digits would reorder those words and leave the separator that
+ * joined them behind ("GPT- Sol 5.6"). Substituting in place keeps every word of the label and
+ * every separator between them; a label stating no generation of its own takes the record's at
+ * its end.
+ *
+ * An id carrying no version, or a label left with no words of its own, falls back to the label
+ * verbatim — the catalog's own words are the last honest thing available.
  */
-function generationAgrees(label: string, modelId: string): boolean {
-  const labelVersion = versionOfLabel(label);
-  const idVersion = versionOfId(modelId);
-  if (!labelVersion || !idVersion) return true;
-  return labelVersion === idVersion;
+function captionFor(option: ProviderModelOption, modelId: string): string {
+  const label = (option.label || option.value).replace(LABEL_ASIDE, '').trim();
+  const version = versionOfId(modelId);
+  if (!version || !label) return option.label || option.value;
+  return LABEL_VERSION.test(label) ? label.replace(LABEL_VERSION, version) : `${label} ${version}`;
 }
 
 /**
@@ -72,16 +92,16 @@ export function resolveModelLabel(
   if (exact) return exact.label || exact.value;
 
   const segments = new Set(tokensOf(modelId));
-  // Longest alias first, so `opus[1m]` (segments opus + 1m) wins over `opus` when
-  // the id carries both, and `opusplan` over `opus` when it carries that.
+  // Longest alias first, so a catalog carrying both `opus[1m]` and a bare `opus` names an id
+  // that carries `opus` and `1m` with the `[1m]` entry rather than the plain one.
   const alias = options
     .filter((option) => !CATALOG_SELECTORS.has(option.value))
     .map((option) => ({ option, tokens: tokensOf(option.value) }))
     .filter(({ tokens }) => tokens.length > 0 && tokens.every((token) => segments.has(token)))
     .sort((left, right) => right.tokens.join('').length - left.tokens.join('').length)[0];
 
-  if (alias && generationAgrees(alias.option.label || '', modelId)) {
-    return alias.option.label || alias.option.value;
+  if (alias) {
+    return captionFor(alias.option, modelId);
   }
 
   // Last: the same alias set with the `[1m]` suffix normalized away, which is what the CLI
@@ -94,8 +114,8 @@ export function resolveModelLabel(
     .filter(({ tokens }) => tokens.length > 0 && tokens.every((token) => segments.has(token)))
     .sort((left, right) => right.tokens.join('').length - left.tokens.join('').length)[0];
 
-  if (suffixless && generationAgrees(suffixless.option.label || '', modelId)) {
-    return suffixless.option.label || suffixless.option.value;
+  if (suffixless) {
+    return captionFor(suffixless.option, modelId);
   }
 
   return null;

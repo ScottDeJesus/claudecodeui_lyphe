@@ -7,15 +7,28 @@
  * `false` for a channel it does not know. Sending never rejects: a failed
  * push is logged once by the publisher and the next channel is unaffected.
  *
- * Before publishing it skips a session the user is watching in a browser tab,
- * attaches tap-to-answer buttons to a permission request, and collapses bursts
- * of the same code into the first push plus one summary per minute.
+ * Before publishing it attaches tap-to-answer buttons to a permission request,
+ * skips a session the user is watching in a browser tab, and collapses bursts of
+ * the same code into the first push plus one summary per minute. The buttons come
+ * first, ahead of both skips: building them is also how the prompt is re-registered
+ * for the phone's tap, so every re-issue of a question re-arms its buttons even on
+ * the re-issues this channel pushes nothing for.
+ *
+ * A permission prompt is pushed once, not once per process that asks it: the
+ * ask's key is checked against the record on disk of prompts already pushed
+ * (`ntfy-pushed-prompts.service.ts`), and written there the moment a publish is
+ * accepted. A question that parks the CLI is re-issued by every successor the
+ * dev server's handovers boot, and each of them would otherwise buzz the phone.
  */
 
 import { buildNtfyActions } from '@/modules/notifications/services/ntfy-action-decisions.service.js';
 import { getAppUrl, getNtfyConfig } from '@/modules/notifications/services/ntfy-config.service.js';
 import type { NtfyConfig } from '@/modules/notifications/services/ntfy-config.service.js';
 import { createFloodControl } from '@/modules/notifications/services/ntfy-flood-control.service.js';
+import {
+  rememberPromptPushed,
+  wasPromptPushed,
+} from '@/modules/notifications/services/ntfy-pushed-prompts.service.js';
 import { publishNtfy } from '@/modules/notifications/services/ntfy-publish.service.js';
 import type {
   NtfyAction,
@@ -150,17 +163,37 @@ function ranLongEnough(event: ChannelEvent, longRunMinutes: number): boolean {
 }
 
 /**
- * The tap-to-answer buttons, only for a permission request that names its
- * request id, and only when the phone has an app URL to send the tap to.
- * A failure here (say, the signing secret cannot be stored) costs the
- * buttons, never the push: the most urgent push still says "look".
+ * The key this prompt is answered by: the ask's own identity (`promptKey`, the runtime's name for
+ * the tool call) when it is on the event, its request id otherwise — a producer that predates the
+ * key still gets working buttons, keyed one attempt at a time exactly as it used to be.
  */
-function actionsFor(userId: unknown, event: ChannelEvent, appUrl: string | null): NtfyAction[] {
-  const requestId = event.meta?.requestId;
-  if (event.code !== 'permission.required' || typeof requestId !== 'string' || !requestId || !appUrl) return [];
+function promptKeyOf(event: ChannelEvent): string | null {
+  if (event.code !== 'permission.required') return null;
+  for (const candidate of [event.meta?.promptKey, event.meta?.requestId]) {
+    if (typeof candidate === 'string' && candidate) return candidate;
+  }
+  return null;
+}
+
+/**
+ * The tap-to-answer buttons, only for a permission request that names its prompt, and only when
+ * the phone has an app URL to send the tap to. Building them also REGISTERS the prompt, which is
+ * how a successor re-registers the question a predecessor's push still points at — so this runs
+ * before EVERY skip in `send`, and a push this channel does not send still leaves its buttons
+ * answerable on the push that did go out.
+ * A failure here (say, the signing secret cannot be stored) costs the buttons, never the push:
+ * the most urgent push still says "look".
+ */
+function actionsFor(
+  userId: unknown,
+  event: ChannelEvent,
+  appUrl: string | null,
+  promptKey: string | null,
+): NtfyAction[] {
+  if (!promptKey || !appUrl) return [];
   try {
     return buildNtfyActions({
-      requestId,
+      promptKey,
       userId: String(userId),
       sessionId: event.sessionId ?? null,
       toolName: typeof event.meta?.toolName === 'string' ? event.meta.toolName : '',
@@ -205,12 +238,25 @@ export const ntfyChannel = {
     try {
       const config = getNtfyConfig(Number(userId));
       if (!config?.enabled || !config.topic) return null;
+
+      // Built before every skip below. Building the buttons is also how the prompt is registered
+      // for the phone's tap, and a successor must re-register the question its predecessor's push
+      // still points at even on the re-issues it pushes nothing for — including the one it skips
+      // because the session is being watched right now. Behind that check, a push sent while the
+      // tab was hidden went dead the moment the operator opened the chat: the next handover's
+      // re-issue never re-registered, and the tap that came later found no prompt to answer.
+      const appUrl = getAppUrl();
+      const promptKey = promptKeyOf(event);
+      const actions = actionsFor(userId, event, appUrl, promptKey);
+
       if (event.sessionId && isSessionWatched(presenceUserId(userId), event.sessionId)) return null;
       if (event.code === 'run.stopped' && !ranLongEnough(event, config.longRunMinutes)) return null;
 
-      const appUrl = getAppUrl();
       const click = clickFor(appUrl, event.sessionId);
-      const actions = actionsFor(userId, event, appUrl);
+      // The phone has this question already: a successor re-issues the prompt it inherited, and
+      // one ask is one push. Its `permission_request` still reaches the chat — that door is the
+      // runtime's — and the buttons built above still answer the push that did go out.
+      if (promptKey && wasPromptPushed(promptKey)) return null;
       const message: NtfyMessage = {
         title: payload.title,
         message: payload.body,
@@ -226,7 +272,11 @@ export const ntfyChannel = {
         return null;
       }
 
-      return await publishNtfy(targetFor(config), message);
+      const published = await publishNtfy(targetFor(config), message);
+      // Only a push the server took is remembered. A refused or unreachable one leaves no record,
+      // so the next re-issue tries again rather than leaving the question unanswered.
+      if (promptKey && published.ok) rememberPromptPushed(promptKey);
+      return published;
     } catch (error) {
       console.warn('[ntfy] send skipped', error instanceof Error ? error.message : error);
       return null;

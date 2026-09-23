@@ -24,7 +24,7 @@ import SoulLaunchPinRow from '@/modules/chat/transcript/SoulLaunchPinRow';
  * remembered in this browser, so a reload does not bring the row back.
  *
  * TWO KINDS OF PIN SIT IN THIS ONE STRIP. An `Agent`-tool subagent is a row in the transcript; a
- * launcher soul started by `/dispatch` is a detached child that writes nothing here, so its pin is
+ * launcher soul a session started by hand is a detached child that writes nothing here, so its pin is
  * joined in from the server's lane by launch id (`src/modules/dispatch-souls/`) against the ids
  * the transcript's own tool results name. They are sorted into ONE list, because the reader is
  * asking one question of the strip — what is working for me right now — and the answer would be a

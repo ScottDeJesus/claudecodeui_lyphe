@@ -8,12 +8,17 @@
  * is. This file imports the token service; the token service never imports it.
  */
 
+import { QUESTION_WINDOW_MS } from '@/modules/notifications/services/ntfy-pushed-prompts.service.js';
 import { mintActionToken, registerPendingAction } from '@/modules/notifications/services/ntfy-action-token.service.js';
 import type { NtfyActionDecision, PendingAction } from '@/modules/notifications/services/ntfy-action-token.service.js';
 import type { NtfyAction } from '@/modules/notifications/services/ntfy-publish.service.js';
 
-/** A question or a plan may wait for hours; an ordinary tool approval is stale within minutes. */
-const LONG_LIVED_TTL_MS = 4 * 60 * 60_000;
+/**
+ * A question or a plan may wait for hours; an ordinary tool approval is stale within minutes.
+ * The long window is the question's own, shared with the memory of its push: a button that
+ * outlives that memory would answer a prompt the phone was told about as a new one.
+ */
+const LONG_LIVED_TTL_MS = QUESTION_WINDOW_MS;
 const SHORT_LIVED_TTL_MS = 5 * 60_000;
 const LONG_LIVED_TOOLS = new Set(['AskUserQuestion', 'ExitPlanMode']);
 /** ntfy shows at most three buttons; a question with more options is answered in the app. */
@@ -64,12 +69,16 @@ function buttonChoicesFor(toolName: string, toolInput: unknown): ButtonChoice[] 
 
 /**
  * The buttons for one `permission.required` push, each carrying its own signed
- * single-use token. Consumed by the ntfy channel. Registers the request with
+ * single-use token. Consumed by the ntfy channel. Registers the prompt with
  * the token service first — only when it gets at least one button — because a
- * token expires with its request.
+ * token expires with its prompt.
+ *
+ * Keyed by the prompt and not by the ask that carried it: the channel builds
+ * these again on every re-issue, including the ones whose push it skips, so a
+ * successor re-registers the prompt a predecessor's push is still pointing at.
  */
 export function buildNtfyActions(input: {
-  requestId: string;
+  promptKey: string;
   userId: string | number;
   sessionId: string | null;
   toolName: string;
@@ -81,7 +90,7 @@ export function buildNtfyActions(input: {
 
   const userId = String(input.userId);
   registerPendingAction({
-    requestId: input.requestId,
+    promptKey: input.promptKey,
     userId,
     sessionId: input.sessionId,
     toolName: input.toolName,
@@ -92,7 +101,7 @@ export function buildNtfyActions(input: {
   return choices.map((choice): NtfyAction => ({
     action: 'http',
     label: choice.label,
-    url: `${input.appUrl}/api/ntfy/act?t=${mintActionToken(input.requestId, userId, choice.decision)}`,
+    url: `${input.appUrl}/api/ntfy/act?t=${mintActionToken(input.promptKey, userId, choice.decision)}`,
     method: 'POST',
     clear: true,
   }));
