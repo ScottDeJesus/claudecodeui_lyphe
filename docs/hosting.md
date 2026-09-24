@@ -84,7 +84,7 @@ documentation home is [`docs/MANUAL.md (applications)`](MANUAL.md).
   event is one line — `[supervisor] boot failed — previous server kept: <first error line>` — with
   the next save booting again. The retired process still takes its WebSocket connections with it,
   so the browser drops and reconnects in about 3 s — onto a port that is already answering — and
-  the git-delegation run store re-subscribes on `websocket_reconnected` (see `git-panel.md`). The
+  the git-delegation run store re-subscribes on `websocket_reconnected` (see `docs/MANUAL.md (git-panel)`). The
   state machine, every log line, the two environment bits and the failure table are in
   [`deploy/dev-supervisor/README.md`](../deploy/dev-supervisor/README.md), the mechanism's one
   home. What the same handover costs a Claude turn already in flight is its own rule below.
