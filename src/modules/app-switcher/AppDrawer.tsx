@@ -226,10 +226,11 @@ export function AppDrawer() {
             {formOpen ? (
               <NewApplicationForm onSubmit={handleSubmitNewApplication} onCancel={handleCloseForm} />
             ) : !registryRead ? (
-              <div aria-busy="true" className="flex flex-col gap-2">
-                <div className="vv-skeleton h-[68px] rounded-xl" />
-                <div className="vv-skeleton h-[68px] rounded-xl" />
-                <div className="vv-skeleton h-[68px] rounded-xl" />
+              <div aria-busy="true" className="flex flex-col gap-1.5">
+                {/* The placeholder is the row it stands in for: 47px is that row's measured two-line height. */}
+                <div className="vv-skeleton h-[47px] rounded-xl" />
+                <div className="vv-skeleton h-[47px] rounded-xl" />
+                <div className="vv-skeleton h-[47px] rounded-xl" />
               </div>
             ) : showEmpty ? (
               <div className="rounded-xl bg-card">
@@ -241,7 +242,7 @@ export function AppDrawer() {
                 />
               </div>
             ) : (
-              <ul className="flex flex-col gap-2">
+              <ul className="flex flex-col gap-1.5">
                 {/* File order, dividers among the apps. A row whose app is missing from `apps` is skipped. */}
                 {rows.map((row, index) => {
                   const position = { first: index === 0, last: index === rows.length - 1 };

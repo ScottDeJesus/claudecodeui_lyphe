@@ -10,6 +10,7 @@ import { isSelfOrigin, resolveAppUrl } from '@/modules/app-switcher/utils/resolv
 import type { AppEntry } from '@/shared/app-types';
 import { ActionMenu, Card, Input } from '@/shared/ui';
 import type { ActionMenuItem } from '@/shared/ui';
+import { OWNS_ESCAPE } from '@/shared/ui/overlayEscape';
 import { cn } from '@/shared/utils';
 
 /**
@@ -194,23 +195,28 @@ export function AppDrawerRow({ app, position, onMove, onRemove, onOpenInDualScre
       aria-hidden="true"
       data-initial={icon ? undefined : initialOf(app.name)}
       className={cn(
-        'grid h-9 w-9 flex-none place-items-center overflow-hidden rounded-[9px] border font-serif text-[19px] leading-none',
+        'grid h-7 w-7 flex-none place-items-center overflow-hidden rounded-[7px] border font-serif text-[15px] leading-none',
         !icon && 'before:content-[attr(data-initial)]',
         onScreen ? 'border-primary/30 bg-primary/10 text-accent-ink' : 'border-border bg-secondary text-muted-foreground',
       )}
     >
-      {icon && <img src={icon} alt="" className="h-6 w-6 object-contain" />}
+      {icon && <img src={icon} alt="" className="h-5 w-5 object-contain" />}
     </span>
   );
 
   if (draft !== null) {
     return (
       <li>
-        <Card className="flex min-h-[58px] items-center gap-3 py-2.5 pl-3 pr-2">
+        <Card className="flex min-h-[44px] items-center gap-3 py-1.5 pl-3 pr-2">
           {tile}
           <span className="flex min-w-0 flex-1 flex-col gap-1">
-            <span className="truncate text-[14.5px] font-medium leading-[1.65] text-foreground">{app.name}</span>
+            <span className="truncate text-[14.5px] font-medium leading-tight text-foreground">{app.name}</span>
             <Input
+              // The field states that it owns Escape while it is open (`shared/ui/overlayEscape`).
+              // Without the marker the drawer's Dialog stands the field down and closes the sheet
+              // before this input's own handler below is reached — `Dialog.tsx` listens on `window`
+              // in the capture phase, which no `stopPropagation` on the event's way down can stop.
+              {...OWNS_ESCAPE}
               value={draft}
               onChange={(event) => setDraft(event.target.value)}
               onKeyDown={handleDescriptionKey}
@@ -230,20 +236,20 @@ export function AppDrawerRow({ app, position, onMove, onRemove, onOpenInDualScre
 
   return (
     <li>
-      <Card className="flex min-h-[58px] items-center gap-1 pr-2 transition-colors duration-200 hover:border-input">
+      <Card className="flex min-h-[44px] items-center gap-1 pr-2 transition-colors duration-200 hover:border-input">
         <button
           type="button"
           aria-pressed={isSelf ? undefined : onScreen}
           onClick={handleSelect}
-          className="flex min-w-0 flex-1 items-center gap-3 self-stretch rounded-[11px] py-2.5 pl-3 text-left"
+          className="flex min-w-0 flex-1 items-center gap-3 self-stretch rounded-[11px] py-1.5 pl-3 text-left"
         >
           {tile}
-          <span className="flex min-w-0 flex-col gap-0.5">
+          <span className="flex min-w-0 flex-col gap-0">
             <span className="flex min-w-0 items-center gap-1.5">
-              <span className="truncate text-[14.5px] font-medium leading-[1.65] text-foreground">{app.name}</span>
+              <span className="truncate text-[14.5px] font-medium leading-tight text-foreground">{app.name}</span>
               {isSelf && <ExternalLink className="h-3 w-3 flex-none text-ink-faint" aria-hidden="true" />}
             </span>
-            <span className="truncate text-xs leading-[1.65] text-ink-faint">
+            <span className="truncate text-xs leading-tight text-ink-faint">
               {onScreen ? t('applications.hostOnScreen', { host: secondLine }) : secondLine}
             </span>
           </span>
@@ -260,7 +266,7 @@ export function AppDrawerRow({ app, position, onMove, onRemove, onOpenInDualScre
           portal
           variant="ghost"
           size="icon"
-          triggerClassName="h-10 w-10 rounded-[9px] text-ink-faint hover:text-foreground"
+          triggerClassName="h-8 w-8 rounded-[9px] text-ink-faint hover:text-foreground"
         />
       </Card>
     </li>

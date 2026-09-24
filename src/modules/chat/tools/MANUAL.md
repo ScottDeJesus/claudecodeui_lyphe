@@ -33,8 +33,7 @@ tools/
 │   │   └── TextContent.tsx         # Plain text / JSON / code
 ├── configs/
 │   └── toolConfigs.ts              # All tool configs + ToolDisplayConfig type
-├── ToolRenderer.tsx                # Main router (React.memo wrapped)
-└── README.md
+└── ToolRenderer.tsx                # Main router (React.memo wrapped)
 ```
 
 ---

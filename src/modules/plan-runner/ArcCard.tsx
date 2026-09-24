@@ -2,11 +2,12 @@ import type { DragEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { ArcPhaseList } from '@/modules/plan-runner/ArcPhaseList';
+import { dismissRun } from '@/modules/plan-runner/dismissedRuns';
 import { useRunnerRuns } from '@/modules/plan-runner/hooks/useRunnerRuns';
-import { PhaseRow } from '@/modules/plan-runner/PhaseRow';
-import { PipelineStrip } from '@/modules/plan-runner/PipelineStrip';
+import { RunControls } from '@/modules/plan-runner/RunControls';
+import { RunClock, RunFace, RunStateBadge } from '@/modules/plan-runner/RunFace';
+import { SessionPin } from '@/modules/plan-runner/SessionPin';
 import { ARC_CARD_DRAG_TYPE, cardDraggable, cardTone } from '@/modules/plan-runner/arcState';
-import { pipelineForRun, seenStages, waveCompanions } from '@/modules/plan-runner/runState';
 import { Badge, Card, Chip } from '@/shared/ui';
 import type { ArcCardLayer, ArcCardSnapshot, ArcCardState, ArcSnapshot } from '@/shared/types';
 import { cn } from '@/shared/utils';
@@ -25,6 +26,12 @@ type ArcCardProps = {
   arc: ArcSnapshot;
   card: ArcCardSnapshot;
   layer: ArcCardLayer;
+  /**
+   * The open chat's session, when the card is drawn in the chat gutter: a run this chat launched
+   * wears the same pin here that the gutter's run list puts on it. `null` on the Runner tab, where
+   * there is no open chat and so no "mine".
+   */
+  pinnedSessionId?: string | null;
 };
 
 /**
@@ -92,50 +99,68 @@ export function dragScopePosition(types: readonly string[], arcName: string): nu
 }
 
 /**
- * One card of an arc's deck: which card it is, what it lands, and where the walk stands on it.
+ * One card of an arc's deck: which card it is, what it lands, where the walk stands on it — and THE
+ * RUN ITSELF, whole, for the card the runner has minted a run for.
  *
  * IT COMPOSES AND DOES NOT DRAW. The frame is `Card`, the number is a `Chip`, the state is a
  * `Badge` whose tone is `cardTone`'s — nothing here spells a colour, so both themes paint it
  * through the token blocks. A done card is quieter through OPACITY alone: the tone still says
  * "complete" in its own hue, and dimness says "behind you" without inventing a sixth colour.
  *
+ * THE RUN IS DRAWN HERE AND NOT BELOW THE DECK. A card's run used to appear twice — inside the card
+ * and again as a `RunCard` under the gallery — and it is one plan, so it is drawn once, in its card
+ * (operator, 2026-09-24: "Arc cards should display their progress and info inside the plan cards
+ * nested in the arc, not creating a duplicate plan below it"). The run list subtracts every run an
+ * arc card owns (`arcOwnedRunIds`), which is also why THIS join may not be partial: the card draws
+ * the run the record names whatever state it is in — walking, paused, queued, or ended — because a
+ * state the card skipped would be a run that had vanished from the screen entirely.
+ *
+ * WHAT THE RUN WEARS IS `RunFace`'s, not a copy: the same word, the same clock, the same meter, the
+ * same strip, the same verbs as a `RunCard` in the lists below, so one run cannot read two ways on
+ * one screen. Two things are deliberately NOT here: the run's own model control — the deck header
+ * carries the arc's ONE toggle (operator, 2026-09-22: "an arc plan should have 1 toggle"), and that
+ * toggle re-pins every minted, unfinished card's run — and the plan's file name, which would be a
+ * second name over a card that is already the plan's.
+ *
  * `draggable` is the rule's answer, never a constant: only a card the runner has not started may
  * be picked up (`cardDraggable`), and the grab cursor and the hint appear only on those, so a card
  * that cannot move never promises that it can.
  *
- * THE PHASES ARE THE PLAN'S. A card with no run draws the phase list the runner wrote into its
- * record (`arc.json:cards[].phases`, `shipped` and `blocked` from the runner's own readers); a
- * `walking`/`paused` card draws its LIVE run's phases instead, which carry the real state, so the
- * card that has a run never shows two answers (the record stands in until the run has composed
- * any). A plan not written yet draws "Plan not written yet". Beside the badge, a card with a phase
- * behind it and phases still ahead draws `10 of 18 · 8 blocked` — the count over the very rows
- * beneath it, so a `stalled` card says HOW MUCH held it rather than leaving the reader to count the
- * ⛔s, and a card nothing has happened to yet says nothing at all.
+ * THE PHASES ARE THE PLAN'S, AND THEY ARE DISCLOSED ONCE. A card with no run draws the phase list
+ * the runner wrote into its record (`arc.json:cards[].phases`, `shipped` and `blocked` from the
+ * runner's own readers); a card with a run draws its LIVE run's phases instead, which carry the real
+ * state — and it draws them in ONE place, the run's own `RunFace`, because one plan's rows listed
+ * twice under each other inside one card is the operator's complaint in miniature ("not creating a
+ * duplicate plan", 2026-09-24). The record's list stands in for the one case where nothing else
+ * would draw those rows at all: a run that has not composed its phases yet. A plan
+ * not written yet draws "Plan not written yet". Beside the badge, a card with a phase behind it and
+ * phases still ahead draws `10 of 18 · 8 blocked` — the count over the very rows beneath it, so a
+ * `stalled` card says HOW MUCH held it rather than leaving the reader to count the ⛔s, and a card
+ * nothing has happened to yet says nothing at all.
  *
  * Every card fills its strip slot's height (`h-full`): the deck stretches its row to the tallest
  * card, so the strip does not jump as it scrolls.
  *
- * The data attributes are the browser harness's handles: position, state and layer are read off
- * the DOM to prove the strip draws the walk's order and each card's place in it.
+ * The data attributes are the browser harness's handles: position, state, layer and the session pin
+ * are read off the DOM to prove the strip draws the walk's order, each card's place in it, and —
+ * `data-arc-card-run`, carrying the run's id — that the plan under this card is drawn here ONCE.
  *
  * Used by `ArcDeck`, once per card of the strip.
  */
 
-export function ArcCard({ arc, card, layer }: ArcCardProps) {
+export function ArcCard({ arc, card, layer, pinnedSessionId = null }: ArcCardProps) {
   const { t } = useTranslation();
   const draggable = cardDraggable(arc, card);
 
-  // THE CARD'S LIVING RUN, JOINED BY `run_id` AND NEVER BY PLAN PATH: a plan can have been walked
-  // more than once, and the run the record minted this card against is the only one whose stages
-  // and phase belong on its face.
-  const { runs } = useRunnerRuns();
-  const live = card.state === 'walking' || card.state === 'paused'
-    ? (runs.find((run) => run.run_id === card.run_id) ?? null)
-    : null;
+  // THE CARD'S RUN, JOINED BY `run_id` AND NEVER BY PLAN PATH: a plan can have been walked more
+  // than once, and the run the record minted this card against is the only one whose stages and
+  // phase belong on its face. Every state, for the reason the file's own comment gives: this run is
+  // not in the list below the deck, so the card is the one place it is drawn.
+  const { runs, carriedIds } = useRunnerRuns();
+  const live = card.run_id === null ? null : (runs.find((run) => run.run_id === card.run_id) ?? null);
   // An ended or queued run has nothing in flight — no stage lights and no clock ticks — exactly as
-  // `RunCard` draws it; only a phase that is genuinely running gets a clock.
+  // `RunFace` draws it; only a phase that is genuinely running gets a clock.
   const inert = live !== null && (live.state === 'ended' || live.state === 'queued');
-  const phase = live?.phases.find((row) => row.id === (live.position?.phase_id ?? null)) ?? null;
   // A run whose progress has not composed its phases yet carries `[]`: the record's list stands in
   // until it does, so a freshly walking card never reads "Plan not written yet". A record phase the
   // ship log's LAST ⛔ stands over (`blocked`, `arc_phases.py`) takes the run's own blocked state,
@@ -147,6 +172,11 @@ export function ArcCard({ arc, card, layer }: ArcCardProps) {
         title: entry.title,
         state: entry.shipped ? ('shipped' as const) : entry.blocked ? ('blocked' as const) : ('pending' as const),
       }));
+  // WHICHEVER LIST IS DRAWN, ONE OF THEM IS. `RunFace` below carries the run's own rows, so the
+  // record's list is drawn only when the run composed none — otherwise the same phases would run
+  // down the card twice, which is what the run strip did to the card's own list after the merge
+  // (see the file's header: disclosed once, never both).
+  const runDrawsPhases = live !== null && live.phases.length > 0;
 
   // THE COUNT RIDES THE SAME ROWS the list draws above it, so the two can never disagree: a card
   // whose run ended with a ⛔ reads `10 of 18 · 8 blocked` under its `stalled` badge, which is how a
@@ -157,6 +187,16 @@ export function ArcCard({ arc, card, layer }: ArcCardProps) {
   const shipped = phaseList.filter((row) => row.state === 'shipped').length;
   const blocked = phaseList.filter((row) => row.state === 'blocked').length;
   const counts = (shipped > 0 || blocked > 0) && shipped < phaseList.length ? { shipped, blocked } : null;
+
+  // THE CHAT'S OWN RUN, PINNED HERE. `launched_by_session` arrives already resolved to an app
+  // session id by the server, so a plain equality is the whole test — and `null` on either side is
+  // not a match, since "no session launched it" is not "this session launched it".
+  const mine = pinnedSessionId !== null && live !== null && live.launched_by_session === pinnedSessionId;
+  // Dismiss is offered exactly where the lists offer it: an ended run whose ending is on the card.
+  // `carriedIds` is the unfiltered lane, because that is what a dismissal prunes against.
+  const dismiss = live !== null && live.state === 'ended' && live.ended_at !== null
+    ? () => dismissRun({ run_id: live.run_id, ended_at: live.ended_at as number }, carriedIds)
+    : undefined;
 
   /**
    * The drag carries the card's position as the card type's value, the `<arc>:<position>` copy the
@@ -176,6 +216,7 @@ export function ArcCard({ arc, card, layer }: ArcCardProps) {
       data-arc-card={card.position}
       data-arc-card-state={card.state}
       data-arc-layer={layer}
+      data-pinned={String(mine)}
       draggable={draggable}
       onDragStart={handleDragStart}
       title={draggable ? t('runner.arcDragHint') : undefined}
@@ -188,6 +229,10 @@ export function ArcCard({ arc, card, layer }: ArcCardProps) {
     >
       <div className="flex min-w-0 items-center gap-2">
         <Chip size="sm">{t('runner.arcCard', { n: card.position })}</Chip>
+        {/* The pin sits with the card's own marks, not inside the run strip below: it is a fact
+            about this card — the run it holds is the open chat's — and it reads the same way the
+            gutter's run list pins one. */}
+        {mine && <SessionPin />}
         {/* The counts ride the badge's own row, in the reader's language, as two strings the
             separator sits between — `data-arc-card-phases` is the browser harness's handle. */}
         {counts && (
@@ -211,28 +256,25 @@ export function ArcCard({ arc, card, layer }: ArcCardProps) {
         {card.title}
       </p>
       <p className="line-clamp-2 min-w-0 break-words text-xs leading-snug text-muted-foreground">{card.charter}</p>
-      <ArcPhaseList phases={phaseList} currentId={inert ? null : (live?.position?.phase_id ?? null)} />
+      {!runDrawsPhases && (
+        <ArcPhaseList phases={phaseList} currentId={inert ? null : (live?.position?.phase_id ?? null)} />
+      )}
       {live && (
-        // THE RUN, ON THE CARD IT BELONGS TO. `data-arc-card-run` is the browser harness's handle:
-        // it names the run the strip was drawn from, so a probe can prove the join is by `run_id`.
-        <div className="mt-1 flex min-w-0 flex-col gap-1.5" data-arc-card-run={live.run_id}>
-          <PipelineStrip
-            stages={pipelineForRun(live)}
-            active={inert ? '' : (live.position?.stage ?? '')}
-            detail={inert ? '' : (live.position?.stage_detail ?? '')}
-            seen={seenStages(live)}
-          />
-          {phase && (
-            <PhaseRow
-              phase={phase}
-              // Filtered here rather than inside the row, as `RunCard` does it: the timeline is one
-              // list for the whole run, and a row that scanned it would walk it once per card.
-              timeline={live.timeline.filter((entry) => entry.phase_id === phase.id)}
-              isCurrent={!inert && phase.id === (live.position?.phase_id ?? null)}
-              stageSince={inert ? null : (live.position?.stage_since ?? null)}
-              alongside={waveCompanions(live).get(phase.id)}
-            />
-          )}
+        // THE RUN, ON THE CARD IT BELONGS TO — the same display a `RunCard` draws, minus the frame.
+        // `data-arc-card-run` names it, so a probe can prove the plan is drawn here once and only
+        // here; `data-arc-card-run-state` names the state, which is what the merged card has to
+        // carry for a run in any of them (a queued one's Start, an ended one's outcome).
+        <div
+          className="mt-1 flex min-w-0 flex-col gap-2"
+          data-arc-card-run={live.run_id}
+          data-arc-card-run-state={live.state}
+        >
+          <div className="flex min-w-0 flex-wrap items-center gap-2">
+            <RunStateBadge run={live} />
+            <RunClock run={live} />
+          </div>
+          <RunFace run={live} defaultOpen={false} />
+          <RunControls run={live} onDismiss={dismiss} showModel={false} />
         </div>
       )}
     </Card>

@@ -1,35 +1,17 @@
-import { ActivityIcon, PinIcon } from 'lucide-react';
+import { ActivityIcon } from 'lucide-react';
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { ArcGallery } from '@/modules/plan-runner/ArcGallery';
 import { dismissRun } from '@/modules/plan-runner/dismissedRuns';
 import { useArcs } from '@/modules/plan-runner/hooks/useArcs';
+import { useArcRunIds } from '@/modules/plan-runner/hooks/useArcRunIds';
 import { useRunnerRuns } from '@/modules/plan-runner/hooks/useRunnerRuns';
 import { RunCard } from '@/modules/plan-runner/RunCard';
+import { SessionPin } from '@/modules/plan-runner/SessionPin';
 import { byUrgencyThenNewest } from '@/modules/plan-runner/runState';
 import type { RunnerRunSnapshot } from '@/shared/types';
-import { Badge, EmptyState } from '@/shared/ui';
-
-/**
- * The mark on a run THIS chat launched: a glyph AND a word.
- *
- * Colour is never the whole signal (design doctrine :147-149) and neither is a shape, so the pin
- * carries the glance and the badge carries the words. The tone is `info` — which run is the open
- * chat's is news about which ROW this is, never a verdict on the run itself.
- *
- * Written here and once more in `MemoryWidgetBody.tsx`. Two copies is below design doctrine §2's
- * promote-on-the-third rule, and the two consumers live in different modules.
- */
-function SessionPin() {
-  const { t } = useTranslation();
-  return (
-    <span data-session-pin className="inline-flex items-center gap-1" title={t('gutters.pin.title')}>
-      <PinIcon aria-hidden="true" className="h-3.5 w-3.5" />
-      <Badge tone="info">{t('gutters.pin.label')}</Badge>
-    </span>
-  );
-}
+import { EmptyState } from '@/shared/ui';
 
 /**
  * The plan-runner runs as the desktop chat gutter draws them: the open chat's runs first, the rest
@@ -53,6 +35,12 @@ function SessionPin() {
  * the transcript exactly as it is on the tab. The EmptyState shows only when there is neither a run
  * NOR an arc, the tab's own rule.
  *
+ * A RUN AN ARC CARD OWNS IS NOT LISTED HERE — the card draws it, whole, and the same plan twice was
+ * the operator's complaint (2026-09-24). `useArcRunIds` is the one rule for which those are, read
+ * by the tab's panel too; what it filters is the LIST alone, so the count and the empty state still
+ * speak of runs that are on screen, inside a deck. The pin travels to the deck for the same reason:
+ * a run this chat launched that is drawn in an arc card wears its pin THERE, on the card.
+ *
  * IT READS THE BUS AND DRAWS NO FRAME. `useRunnerRuns` and `useArcs` hand it the retained lanes, so
  * it paints on its first render and owns no state of its own; the chrome, the slots and the
  * scrolling belong to `src/modules/chat-gutters`.
@@ -63,23 +51,28 @@ export function RunnerWidgetBody({ sessionId }: { sessionId: string | null }) {
   const { t } = useTranslation();
   const { runs, carriedIds } = useRunnerRuns();
   const { arcs } = useArcs();
+  const arcRunIds = useArcRunIds();
 
   // The lane, sorted once and split once. Both groups keep the urgency order a single stable
-  // filter preserves, so "mine" is a lift rather than a second ordering to keep in step.
-  const { mine, rest } = useMemo(() => {
-    const ordered = [...runs].sort(byUrgencyThenNewest);
+  // filter preserves, so "mine" is a lift rather than a second ordering to keep in step. The
+  // runs an arc card draws are dropped BEFORE the split: a card owns one run whichever chat
+  // launched it, and the deck is where that run is drawn.
+  const { listed, mine, rest } = useMemo(() => {
+    const ordered = [...runs].filter((run) => !arcRunIds.has(run.run_id)).sort(byUrgencyThenNewest);
     const isMine = (run: RunnerRunSnapshot) => sessionId !== null && run.launched_by_session === sessionId;
-    return { mine: ordered.filter(isMine), rest: ordered.filter((run) => !isMine(run)) };
-  }, [runs, sessionId]);
+    return { listed: ordered, mine: ordered.filter(isMine), rest: ordered.filter((run) => !isMine(run)) };
+  }, [runs, sessionId, arcRunIds]);
 
+  // The empty state speaks of the LANE, not of this list: a run an arc card draws is on this very
+  // screen, and saying "nothing" over it would be the widget's one lie.
   if (runs.length === 0 && arcs.length === 0) {
     return <EmptyState icon={ActivityIcon} title={t('runner.empty')} />;
   }
 
   return (
     <div className="flex min-w-0 flex-col gap-4">
-      <ArcGallery home="gutter" />
-      {runs.length > 0 && (
+      <ArcGallery home="gutter" pinnedSessionId={sessionId} />
+      {listed.length > 0 && (
         <ul className="flex min-w-0 flex-col gap-3">
           {[...mine, ...rest].map((run) => {
             const isMine = sessionId !== null && run.launched_by_session === sessionId;

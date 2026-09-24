@@ -79,9 +79,16 @@ async function requestReorder(arcName: string, from: number, to: number): Promis
  * AN ARC NOT YET STARTED offers its Start in the header — `arc start` now, or `Start at …` for the watchdog to
  * press at DeepSeek's next off-peak moment (`ScheduleControl`), with `starts <time>` once scheduled.
  *
+ * `pinnedSessionId` travels through to the cards untouched: the deck knows nothing about "mine", it
+ * only carries the gutter's answer to the card that has to decide it.
+ *
  * Used by `ArcGallery`, once per arc on the lane, in either of its homes.
  */
-export function ArcDeck({ arc, cardFillsStrip = false }: { arc: ArcSnapshot; cardFillsStrip?: boolean }) {
+export function ArcDeck({ arc, cardFillsStrip = false, pinnedSessionId = null }: {
+  arc: ArcSnapshot;
+  cardFillsStrip?: boolean;
+  pinnedSessionId?: string | null;
+}) {
   const { t } = useTranslation();
   const cards = deckLayers(arc);
   const status = STATUS[arc.status] ?? STATUS['not-started'];
@@ -219,7 +226,7 @@ export function ArcDeck({ arc, cardFillsStrip = false }: { arc: ArcSnapshot; car
       >
         {cards.map(({ card, layer }) => (
           <li key={card.position} className={cn('flex-none snap-center', cardFillsStrip ? 'w-full' : 'w-72 max-w-full')}>
-            <ArcCard arc={arc} card={card} layer={layer} />
+            <ArcCard arc={arc} card={card} layer={layer} pinnedSessionId={pinnedSessionId} />
           </li>
         ))}
       </ol>

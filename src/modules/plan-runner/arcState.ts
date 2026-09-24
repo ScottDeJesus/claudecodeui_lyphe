@@ -84,3 +84,33 @@ export function arcProgress(arc: ArcSnapshot): { done: number; total: number } {
   const cards = arc.cards ?? [];
   return { done: cards.filter((card) => card.state === 'complete').length, total: cards.length };
 }
+
+/**
+ * Every `run_id` the decks drawn on the lane OWN — one per card that has a run behind it, off
+ * `arc.json:cards[].run_id`, the runner's own join between a card and the run it minted for the
+ * card's plan (`hooks/plan_runner/arcs.py:card_state` writes it for every state but `unminted`).
+ *
+ * THE RUN LIST MUST NOT DRAW WHAT A CARD ALREADY DRAWS. A card draws its own run, so a run list
+ * that also drew it put the same plan on screen twice (operator, 2026-09-24: "Arc cards should
+ * display their progress and info inside the plan cards nested in the arc, not creating a duplicate
+ * plan below it"). `RunnerPanel` and `RunnerWidgetBody` both subtract this set from the runs they
+ * list, reading it from here rather than each keeping its own copy of the rule, so the two homes
+ * can never disagree about which run belongs where.
+ *
+ * ONLY WHAT IS DRAWN COUNTS. This takes the arcs the gallery is actually holding, not every arc on
+ * the host: an arc the deck has dropped (a complete one past its keep window, or a test arc in a
+ * tab that hides them) draws nothing, so the run it owned stays in the list rather than vanishing
+ * from a screen that no longer shows the card it belonged to.
+ *
+ * A run the deck does NOT own — a second walk of a plan whose newest run is not a card's `run_id`,
+ * or a plan no arc names — is absent from the set, so it keeps its own card below the deck.
+ */
+export function arcOwnedRunIds(arcs: ArcSnapshot[]): Set<string> {
+  const owned = new Set<string>();
+  for (const arc of arcs) {
+    for (const card of arc.cards ?? []) {
+      if (card.run_id !== null) owned.add(card.run_id);
+    }
+  }
+  return owned;
+}

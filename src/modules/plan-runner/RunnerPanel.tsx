@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { ArcGallery } from '@/modules/plan-runner/ArcGallery';
 import { dismissRun } from '@/modules/plan-runner/dismissedRuns';
 import { useArcs } from '@/modules/plan-runner/hooks/useArcs';
+import { useArcRunIds } from '@/modules/plan-runner/hooks/useArcRunIds';
 import { useRunnerRuns } from '@/modules/plan-runner/hooks/useRunnerRuns';
 import { RunCard } from '@/modules/plan-runner/RunCard';
 import { byUrgencyThenNewest } from '@/modules/plan-runner/runState';
@@ -24,6 +25,13 @@ import { Badge, EmptyState, ScrollArea } from '@/shared/ui';
  * disclosure per card to see the phases would be charging them twice for one request. (A folded
  * card is what a single-card slot would want, which is why the prop exists at all.)
  *
+ * A RUN AN ARC CARD OWNS IS NOT LISTED HERE. The card draws it, whole — progress, stage, clock,
+ * verbs — and drawing it again below the deck was the same plan twice (operator, 2026-09-24).
+ * `useArcRunIds` is the one rule for which runs those are, read by the gutter widget too, so the
+ * two homes cannot disagree about where a run belongs. What it filters is the LIST alone: the
+ * count below still counts them, because a run drawn inside a card is on this very screen and a
+ * "0" over a panel that is showing one would be the header lying about the lane.
+ *
  * THE COUNT INCLUDES PAUSED RUNS AND ENDED RUNS NOT YET DISMISSED, and it agrees with the tab's badge because both read the same
  * `count` off the same hook — the badge from `useWorkspaceTabGates`, this header from here, one
  * value with two readers. A badge of 3 over a panel of 2 cards would make a liar of one of them.
@@ -41,8 +49,12 @@ export function RunnerPanel() {
   const { t } = useTranslation();
   const { runs, count, carriedIds } = useRunnerRuns();
   const { arcs } = useArcs();
+  const arcRunIds = useArcRunIds();
 
-  const ordered = useMemo(() => [...runs].sort(byUrgencyThenNewest), [runs]);
+  const ordered = useMemo(
+    () => runs.filter((run) => !arcRunIds.has(run.run_id)).sort(byUrgencyThenNewest),
+    [runs, arcRunIds],
+  );
 
   return (
     <div className="flex h-full flex-col" data-runner-panel>

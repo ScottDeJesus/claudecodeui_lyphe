@@ -21,7 +21,7 @@ two letters on the avatar. Everything but the balance comes from this app's own 
 `CLOUDCLI_ACCOUNTS_ROOT`, default `~/.cloudcli/accounts`). `server/index.ts` mounts them at `/api`
 behind `authenticateToken`, applied by PREFIX — the comment at the mount says why a list of paths is
 not enough. What the client must do with what they answer is §"The rules that bite" below. The
-balance does not come from there, and its own server half is [deepseek-balance.md](deepseek-balance.md).
+balance does not come from there, and its own server half is MAN-511.
 
 **Two origins, one panel.** The balance is not a third usage window and not a second reading of the
 same account — it is a different account, at a different vendor, reached by a route of its own. So
@@ -94,7 +94,7 @@ touched, so the answers may not change underneath it. What each answer looks lik
 9. **Nothing in this lane is callable by an agent.** The four routes sit behind `authenticateToken`
    on the app's own mount, and no MCP verb, no dispatch path and no board tool reaches them: a
    switch or a capture is a person pressing a row. The same fence over the memory lane's own two
-   verbs is [memory-intake.md](memory-intake.md) §"The fence".
+   verbs is MAN-606.
 
 ## MAN-462 — What the footer row says
 section: accounts/002 What the footer row says
@@ -284,7 +284,7 @@ section: accounts/007 What is left standing
   one key in this box's `.env`, one figure — and the route is scoped to `authenticateToken` and no
   further, so a second person signing in reads the same number under THEIR name and nothing on
   screen says whose it is. Correct for a single-operator box, worth knowing on a shared one; the
-  server half is [deepseek-balance.md](deepseek-balance.md) §"What is left standing".
+  server half is MAN-518.
 - **`ProviderLoginModal` has no Escape handler.** It is a plain fixed overlay rather than the
   library `Dialog`: this panel's own dismissals stand down while it is up, and nothing takes their
   place, so an Escape there reaches `ChatInterface`'s abort gate unmarked and would end a turn
@@ -337,13 +337,13 @@ accounts lane can answer is read live through the server; everything it is not d
 drift, and a lane that cannot answer — is replayed into the two READS in the browser, touching no
 server and no account. Shots are
 `13-footer`, `13-popover`, `13-popover-unreachable` and `13-rail`. See
-[verification.md](verification.md).
+MAN-670.
 
 **The balance line is on those shots and in none of those gates.** `phase-13.mjs` predates it and
 asserts nothing about it, so the standing gate would stay green if the figure vanished from both
 registers. Its own procedure — the route with a real token, the unknown exercised by BOOTING from a
 keyless `.env`, and the vendor-body table against a local fake — is
-[deepseek-balance.md](deepseek-balance.md) §"Proving it", and it is written out there rather than
+MAN-522, and it is written out there rather than
 pinned as a script. Note also that opening this panel is now an outbound vendor call from the
 server: a probe that needs the figure to be a known value answers `/api/deepseek/balance` with
 `page.route`, never api.deepseek.com, which no browser-context stub can reach.
@@ -1129,7 +1129,7 @@ child's env carries `CLAUDE_SURFACE=cloudcli`, and its system prompt gains `SURF
 — one sentence naming the fence and the bus (`WIDGET_SIGNAL`), one naming the embed body and the
 fullscreen switch (`EMBED_SIGNAL`), then a short paragraph naming the
 four markdown conventions this surface draws as components (`MARKDOWN_SIGNAL`; what it names, and
-why only four, is [docs/architecture/MANUAL.md (08-rendered-shapes)](docs/architecture/MANUAL.md (08-rendered-shapes))
+why only four, is [docs/architecture/MANUAL.md (08-rendered-shapes)](architecture/MANUAL.md)
 §"The triggers"). Both come from `surface-signal.ts` and nowhere else — never `.env`,
 never a systemd unit, never `process.env` read at module load. A terminal launch of `claude` reads
 neither, so their absence is what tells a turn it is not talking to CloudCLI's chat; the runner's
@@ -1156,7 +1156,7 @@ must differ from this app's before any iframe is rendered. Everything else — a
 parse, one whose `kind` is a word the classifier does not know, one that merely contains the word —
 is HTML, so nothing that renders today can change shape. The full shape of the fence, all three
 sandboxes, the origin invariant and the bus it talks to is
-[docs/architecture/MANUAL.md (07-live-widgets)](docs/architecture/MANUAL.md (07-live-widgets)) §"The DocSpace kind" and
+[docs/architecture/MANUAL.md (07-live-widgets)](architecture/MANUAL.md) §"The DocSpace kind" and
 §"The embed kind".
 
 That second body shape — a fence whose content is the JSON naming a DocSpace block — renders
@@ -1168,7 +1168,7 @@ a login-free API, so a grant the HTML widget's `srcDoc` sandbox never may hold i
 precisely because the origin differs. The widget sentence (`WIDGET_SIGNAL` in `surface-signal.ts`)
 carries this in its own clause: anything that should persist, be edited by the reader, or be read back on a
 later turn is steered toward a DocSpace block instead of a one-off HTML fence. The full protocol
-both frames speak is still [docs/architecture/MANUAL.md (07-live-widgets)](docs/architecture/MANUAL.md (07-live-widgets))
+both frames speak is still [docs/architecture/MANUAL.md (07-live-widgets)](architecture/MANUAL.md)
 §"The DocSpace kind".
 
 A LIVE embed of any kind wears the same card header every other shape in the transcript wears:
@@ -1418,7 +1418,7 @@ again too.
 
 The banner is also the ONLY thing that stands there. By operator ruling 2026-09-09 nothing else renders
 above the transcript — the reasoning is with the lane that provoked it,
-[plan-runner.md](plan-runner.md) §"The runner card" — and `.verify/phase-25.mjs` measures the
+MAN-641 — and `.verify/phase-25.mjs` measures the
 transcript's height against its chat root minus the composer and this banner, so a second region
 above the messages reddens that gate whatever it is named. This banner is inside the measurement,
 not an exception to it: it earns the height because it describes the very turn being read and
@@ -1575,7 +1575,7 @@ section: cli-version/008 What is left standing
 section: cli-version/009 Proving it
 
 `node .verify/phase-14.mjs`, mostly `fetch` and `tsx` against the running dev server; see
-[verification.md](verification.md). It spends one real Haiku turn — a `sleep 20`, wide enough to ask the
+MAN-670. It spends one real Haiku turn — a `sleep 20`, wide enough to ask the
 route mid-run — and spends it ONCE: the observation lands in `.verify/artifacts/phase-14-live-run.json`
 and later runs read it back. Deleting that file re-measures, at the cost of a turn. The resumed-turn
 stamp is settled by where the stamp line sits and what seeds the guard below it, never by a second turn.
@@ -1592,7 +1592,7 @@ press, so what is measured is which frames the PAGE put on the wire, for which c
 order and how long after the `complete`. The live route is still read once with the page's own token,
 and the footer asserted against the version the binary answers NOW rather than a literal that would
 pass while stale. Shots are `15-baseline-footer-light`, `15-stale-chip-light`, `15-banner-light`,
-`15-banner-dark` and `15-resumed-light`. See [verification.md](verification.md).
+`15-banner-dark` and `15-resumed-light`. See MAN-670.
 
 The idle sweep was proven LIVE, on a conversation the probe made itself, by MOVING THE READING
 rather than installing anything. Six steps, and no message is sent between the move and the
@@ -1641,14 +1641,14 @@ section: deepseek-balance/000
 One route, `GET /api/deepseek/balance`, mounted behind `authenticateToken` in `server/index.ts` and
 wired in `server/modules/deepseek/deepseek.module.ts`. It answers the money left on the DeepSeek
 account this host's `deepseek-flash` builds spend — a different account from the Claude slots
-[accounts.md](accounts.md) describes, at a different vendor, reached by a route of its own. It answers 200 always: a key
+MAN-460 describes, at a different vendor, reached by a route of its own. It answers 200 always: a key
 this host does not hold, a key the vendor refused, a timeout and an unreadable body are five facts in
 words, never an error wall.
 
 It is the SECOND surface on this box built around one credential, and the other is not a route:
 `DEEPSEEK_API_KEY` is declared once in `.env.example`, and what puts builds on `deepseek-flash` in
 the first place is the switch under **Settings → Agents → Claude**
-([plan-runner.md](plan-runner.md) §"The DeepSeek switch"). The switch writes a file the plan runner
+(MAN-628). The switch writes a file the plan runner
 polls and never touches the vendor; this route touches the vendor and knows nothing about the
 switch. A balance that reads unknown says nothing about whether builds are riding DeepSeek, and the
 switch says nothing about whether there is money left to ride it with.
@@ -1656,7 +1656,7 @@ switch says nothing about whether there is money left to ride it with.
 There is now a THIRD place a reader meets DeepSeek here, and it spends no key at all: a soul a
 session launched by hand draws a pin among the chat's pinned rows — in the strip above the composer when
 the desktop chat gutters are not showing, in the gutter's Subagents widget while they are — wearing
-the whale when that soul ran on this account ([dispatch-souls.md](dispatch-souls.md)). It reads a finished launch's own receipt, so it
+the whale when that soul ran on this account (MAN-523). It reads a finished launch's own receipt, so it
 answers a question neither of the other two can — *did this particular build actually get billed
 here* — and it says nothing about the balance or the switch's current position. When DeepSeek
 refuses or never answers a soul, it ends having done no work — nothing is re-run on Claude — and the
@@ -1854,8 +1854,7 @@ section: deepseek-balance/004 The usage door
   its contract promises). A fault's message is the child's own fault line, or the fixed string
   `deepseek-usage failed`.
 - The API tab is its reader: `useDeepseekUsage` polls `api.deepseek.usage` and `DeepseekUsagePanel`
-  draws the payload — the whole usage surface is [api-tab.md](api-tab.md) §"Where each DeepSeek number
-  comes from".
+  draws the payload — the whole usage surface is MAN-471.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/deepseek/deepseek.routes.ts
 
@@ -2031,7 +2030,7 @@ section: design-login/003 Rules
    new command to a pty already running the old one.
 5. The description says read AND write: the CLI's own panel and the minted URL both carry both scopes.
 6. The pty slot is keyed by a digest of the whole command
-   ([docs/architecture/MANUAL.md (01-websocket-transport)](docs/architecture/MANUAL.md (01-websocket-transport)) §"The `/shell`
+   ([docs/architecture/MANUAL.md (01-websocket-transport)](architecture/MANUAL.md) §"The `/shell`
    socket"), so each row reattaches only to a pty running its own command.
 7. A parked design pty lives `PTY_SESSION_TIMEOUT` (30 min). Another `Authenticate` press reattaches
    to the pending authorization; it does not mint a second.
@@ -2091,7 +2090,7 @@ row itself belongs to the chat module — derived by
 `src/modules/chat/hooks/usePinnedSubagentRows.ts` and drawn by
 `src/modules/chat/transcript/PinnedSubagents.tsx` (the same row, in the gutter, by
 `src/modules/chat/subagents/SubagentWidgetBody.tsx`),
-[docs/architecture/MANUAL.md (06-tool-view)](docs/architecture/MANUAL.md (06-tool-view)) §Subagents; this lane is the half of
+[docs/architecture/MANUAL.md (06-tool-view)](architecture/MANUAL.md) §Subagents; this lane is the half of
 the row that knows whether the soul is still alive.
 
 The launcher is a separate program — `~/.claude/hooks/plan_runner/solo/`, reached as
@@ -2372,7 +2371,7 @@ section: dispatch-souls/012 The client
 |---|---|
 | `src/modules/dispatch-souls/SoulLaunchFeed.tsx` | The lane's one door into the live bus, and the ONLY place in the client that names the `soul_launch_state` frame. Headless: it renders its children unchanged. `App` mounts it inside `LiveBusProvider`, inside the auth gate, below `WebSocketProvider` — nested inside `RunnerFeed`, because a feed is a wrapper and not a sibling. |
 | `hooks/useSoulLaunches.ts` | The read side: the retained `souls:*` topic as a `Map` keyed by launch id. A map rather than the array because the reader asks one lookup per anchored id. `undefined` (nothing retained) and `[]` (the lane is empty) collapse to an empty map — to a screen they are the same instruction. |
-| `src/modules/chat/transcript/SoulLaunchPinRow.tsx` | One soul's row, drawn to be indistinguishable in SHAPE from the agent rows beside it. Its mark is `LLMProviderLogo` on the launch's provider — the DeepSeek whale, or Claude's mascot — centred beside its two lines, as an `Agent` subagent's row carries its own provider's mark. The row is also a button: an `onOpen` prop, given by both the strip (in a dialog) and the gutter's Subagents widget (in place), opens this soul's transcript live through the second route above ([docs/architecture/MANUAL.md (06-tool-view)](docs/architecture/MANUAL.md (06-tool-view)) §Subagents). |
+| `src/modules/chat/transcript/SoulLaunchPinRow.tsx` | One soul's row, drawn to be indistinguishable in SHAPE from the agent rows beside it. Its mark is `LLMProviderLogo` on the launch's provider — the DeepSeek whale, or Claude's mascot — centred beside its two lines, as an `Agent` subagent's row carries its own provider's mark. The row is also a button: an `onOpen` prop, given by both the strip (in a dialog) and the gutter's Subagents widget (in place), opens this soul's transcript live through the second route above ([docs/architecture/MANUAL.md (06-tool-view)](architecture/MANUAL.md) §Subagents). |
 
 The row lives in the CHAT module, not in `dispatch-souls/`: the pinned rows it lands among are the chat's, and
 a lane must not reach back into it.
@@ -2437,9 +2436,9 @@ governs: /home/lyphe/.claude/state/deepseek_flash.flag
 ## MAN-538 — Cross-references
 section: dispatch-souls/015 Cross-references
 
-- [docs/architecture/MANUAL.md (06-tool-view)](docs/architecture/MANUAL.md (06-tool-view)) §Subagents — the pinned rows themselves,
+- [docs/architecture/MANUAL.md (06-tool-view)](architecture/MANUAL.md) §Subagents — the pinned rows themselves,
   and the `Agent`-tool pin this one sits beside.
-- [docs/architecture/MANUAL.md (01-websocket-transport)](docs/architecture/MANUAL.md (01-websocket-transport)) — the frame tables
+- [docs/architecture/MANUAL.md (01-websocket-transport)](architecture/MANUAL.md) — the frame tables
   and the broadcaster set.
 - [docs/MANUAL.md (plan-runner)](MANUAL.md) — the sibling lane, the shared feed pattern, and the DeepSeek
   switch this lane paints the result of.
@@ -2490,7 +2489,7 @@ section: file-manager/001 The rules that bite
    so that one arm alone can carry a `:line`. The chat's markdown links and file chips are that
    arm's callers, and both hand over the line the reference names, as read by `parseFileRef` in
    `src/modules/chat/transcript/shapes/detect.ts` — whose grammar, and the two policies it is read
-   under, is [docs/architecture/MANUAL.md (08-rendered-shapes)](docs/architecture/MANUAL.md (08-rendered-shapes))
+   under, is [docs/architecture/MANUAL.md (08-rendered-shapes)](architecture/MANUAL.md)
    §"The triggers".
 
 3. **State is keyed by project AND directory, and both halves are load-bearing.** A read is shown
@@ -2610,7 +2609,7 @@ section: files-api/000
 
 Five routes live under `/api/file-tree`, mounted behind `authenticateToken` like everything else
 in that namespace and wired in `file-tree.module.ts`. Three carry the
-[file manager](file-manager.md) — the listing, the preview and the upload; two, `edit-window` and
+file manager (MAN-539) — the listing, the preview and the upload; two, `edit-window` and
 `edit`, read and write a text file in line-numbered windows rather than whole, so a save never holds
 the file it is writing into memory.
 
@@ -2741,7 +2740,7 @@ it through to the screen. `python3 .verify/probe-files-api.py` (prints `API OK`)
 routes over HTTP — the windows and their clamps, the patches and the bytes they leave outside the
 edited range, the refusals it can stage, an in-project symlink that writes its target and stays a
 link, one pointing out of the project that changes nothing, the stale-revision guard, and the line
-model of rule 11. See [verification.md](verification.md).
+model of rule 11. See MAN-670.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-7.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-files-api.py, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-lineopen.mjs
 
@@ -2853,7 +2852,7 @@ section: git-panel/002 The rules that bite
 
 8. **Opening a row shows a diff; the only way out is Files.** One row at a time, a second click
    closes it, and `Open in Files` hands the path to the workspace's file manager — see
-   [file-manager.md](file-manager.md). It is offered only while the repository on screen is the
+   MAN-539. It is offered only while the repository on screen is the
    workspace's own project, because Files browses that project and no other. `GitDiffViewer`
    bounds what it paints at 200,000 characters and 1,500 lines and says so when it has cut
    something, so a huge diff cannot freeze the tab.
@@ -3021,7 +3020,7 @@ The reading half is `node .verify/phase-10.mjs`, headless Chromium against the r
 It spends no Claude turn and writes nothing — the states no repository on this host is in are
 replayed from the server's own bodies. The button is `node .verify/phase-11.mjs`, which presses it
 for real once — behind a websocket seal it re-proves before every press — and drives every other
-finished state through the real hook and the real card. See [verification.md](verification.md).
+finished state through the real hook and the real card. See MAN-670.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-10.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-11.mjs
 
@@ -3163,7 +3162,7 @@ section: hosting/002 Rules that bite
   documents the `VITE_DOCSPACE_EMBED_ORIGIN` override for an ArchPulse on another host, and a
   value that resolves back onto this app's own origin draws an error card instead of a frame. The
   invariant and the gate that enforces it are at
-  [docs/architecture/MANUAL.md (07-live-widgets)](docs/architecture/MANUAL.md (07-live-widgets)) §"The DocSpace kind".
+  [docs/architecture/MANUAL.md (07-live-widgets)](architecture/MANUAL.md) §"The DocSpace kind".
 - **A server heal no longer kills an in-flight Claude session, and the API that comes back
   re-adopts it.** A turn's CLI is now exec'd inside the `cloudcli-sessions` tmux server rather
   than as a child of the API, so `systemctl restart cloudcli-server-dev` tears down only the
@@ -4358,7 +4357,7 @@ never hidden by the one just opened. `KanbanMetisConversation` draws no header o
 `SubagentTranscriptView`'s own sticky row (Back, a label built from the session's model and state off
 the same four keys `KanbanMetisRow`'s state table holds, and a "Live" badge while it runs) is the
 only one, reached the same way the old panel body reached it — `sessionId={null}`,
-`target={{ kind: 'metis', id }}` ([06-tool-view.md](docs/architecture/MANUAL.md (06-tool-view)) §"Click to read,
+`target={{ kind: 'metis', id }}` ([docs/architecture/MANUAL.md (06-tool-view)](architecture/MANUAL.md) §"Click to read,
 live"). An unlisted session — reaped, or dropped by a seed — is named by its session id alone, and
 the composer is still offered; the server, not this record, is the gate on whether the child is in
 fact still running. Beneath the transcript sits a composer built from `PromptInput`'s primitives
@@ -4459,7 +4458,7 @@ the queue is the whole estate's, so the same list shows under whichever project 
 `src/modules/memory-intake/` is one provider (`context/MemoryIntakeContext`), two bodies that read
 it — the Memory tab's pane (`MemoryIntakePanel`) and the desktop chat gutter's own body
 (`MemoryWidgetBody`; its sibling for runs is `RunnerWidgetBody` in `src/modules/plan-runner`,
-[plan-runner.md](plan-runner.md) §"The runner card") — two rows (`MemoryCandidateRow` for a pending
+MAN-641) — two rows (`MemoryCandidateRow` for a pending
 candidate, the read-only `MemoryApprovedRow` for one already filed) and two hooks: `useMemoryReview`,
 the write lifecycle both bodies share, and `useApprovedMemories`, which reads the filed list beside
 the provider's own queue. The pane also mounts `LessonReviewList`, a section of its own beneath the
@@ -4467,7 +4466,7 @@ queue (§"What the panel says"); it is the pane's alone, so the barrel does not 
 exports the provider, its hook, `MemoryIntakePanel` and `MemoryWidgetBody`. The server half — the four routes, the read/write contracts, the failure
 vocabulary — is the native module this page describes in §"The native module"; nothing in `src/` is
 served by a proxy any more. The accounts and usage reads are the sibling module's, documented at
-[accounts.md](accounts.md). The shapes on the wire are read from their declarations, not from a copy
+MAN-460. The shapes on the wire are read from their declarations, not from a copy
 here (see §"Where the shapes live").
 
 **One provider, one poller.** `App.tsx` mounts `MemoryIntakeProvider` inside `ProtectedRoute`, so
@@ -4483,7 +4482,7 @@ section: memory-intake/001 Where the tab is, and when
 
 The tab sits on the workspace's house row in the sidebar — the second of its two rows, the one for
 surfaces that read the same whichever project is open — after the board, the sky and the schedules,
-before the Runner and Heal tabs ([plan-runner.md](plan-runner.md) §"The Runner tab") and any plugin
+before the Runner and Heal tabs (MAN-642) and any plugin
 tab, and it carries the pending count. The strip's built-in tabs are icon-only, so that count never reaches
 Verve's `.vv-tabs__count` pill — `Tabs` draws that for word tabs only. The glyph wears a bare accent
 dot instead, and the number is spelled out in the tab's `title` (`Memory (2)`), which is what
@@ -4505,7 +4504,7 @@ tabs that vanish when a preference is switched off — tasks, shell, browser —
 workspace pointed at a tab no longer on the bar leaves an empty pane. The Memory tab is DATA-gated
 rather than preference-gated, its gate is written to hold while it is selected, and a fourth effect
 would fight that rule. The Runner tab is the second tab written this way and takes the rule whole,
-snap-back and all — that is, none ([plan-runner.md](plan-runner.md) §"The Runner tab"). Two kinds of
+snap-back and all — that is, none (MAN-642). Two kinds of
 tab, two policies, each in the layer that owns the act: the gate rule in the hook that decides a tab
 exists, the navigation where `setActiveTab` is.
 
@@ -4570,8 +4569,7 @@ the staged list, the one lesson opened whole, and the two reviews — is `useLes
 its own, reading on mount and again after every write. Its badge reads `N staged` against the list it
 read, or `N+ staged` when that read landed at the route's own ceiling (500 rows) — the most the client
 can honestly claim without a total from the server. Its docstring carries the row and state design.
-The lessons themselves — the store and its routes — belong to the board: [kanban.md](kanban.md)
-§"The lessons lane".
+The lessons themselves — the store and its routes — belong to the board: MAN-590.
 
 **Its two verbs are the review itself.** `useLessonReview` reads the staged list on mount and again
 after every write, then drives one write per lesson through `api.kanban.approveLesson` /
@@ -4670,7 +4668,7 @@ what to trim; the card stays PENDING, the text is held per id for this tab's nex
 refresh that follows also picks up the copy the server recorded on the row for every other tab. A
 generic sentence in its place would leave the person with a pending card and no reason. That text
 reaches the screen untouched: a refusal is the module's own plain English, the same rule the account
-switcher's writes follow ([accounts.md](accounts.md) §"The two writes").
+switcher's writes follow (MAN-465).
 
 Two presses are handled by identity, not by a flag. The in-flight guard is a ref, read
 synchronously, because `busyId` is a render value and lands too late to stop a second press in the
@@ -4708,12 +4706,12 @@ dangling index pointer), and `memory-caps.ts` (the size budgets, ported number-f
 edits — so the two move together rather than drift apart). `index.ts` barrels the three for
 `memory-intake.module.ts`, which the server entrypoint mounts at `/api/memory` behind
 `authenticateToken` — and nowhere else: it is not on the board's router, so neither of that router's
-two mounts ([kanban.md](kanban.md) §"The routes", §"The kanban-pm MCP surface") can reach it.
+two mounts (MAN-587, MAN-594) can reach it.
 
 **The provenance column is `legacy_id`, and it is `NULL UNIQUE`.** A row that carries one carries a
 provenance id minted elsewhere, so that id can appear at most once in this table and a row staged
 here is never in conflict with it. `memory_candidates` carries no `board_id` and is not a board
-satellite ([kanban.md](kanban.md) §"The tables").
+satellite (MAN-563).
 
 The four routes are `GET /`, `GET /:candidateId`, `POST /:candidateId/approve` and
 `POST /:candidateId/reject` — the four contracts this page describes, and
@@ -4724,7 +4722,7 @@ malformed id (`/^[A-Za-z0-9_-]{1,64}$/`) is refused at the door on all four.
 **The client points here, and only here.** `MemoryIntakeContext`, `useApprovedMemories`,
 `useMemoryReview` and the row all read and write through `api.memory` in `src/shared/api.ts`, whose
 five calls are the four routes below. Nothing in `src/` calls a proxy any more, for this lane or any
-other: the accounts and usage reads are `server/modules/accounts/` ([accounts.md](accounts.md)).
+other: the accounts and usage reads are `server/modules/accounts/` (MAN-460).
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts, /home/lyphe/.claude/hooks/enforce_memory_limits.py
 
@@ -4793,7 +4791,7 @@ at zero while it is selected, then dropped on the first tab change and brought b
 waits again. The zero-count half is produced by answering the tab's own read (`GET /api/memory`, the
 path `api.memory.pending` calls) inside the page and re-reading through the provider's own visibility
 path, so the live queue is left exactly as it was found. Shots are `20-memory-light`, `20-memory-expanded-light`, `20-memory-empty-light`,
-`20-memory-390-light` and `20-memory-dark`. See [verification.md](verification.md).
+`20-memory-390-light` and `20-memory-dark`. See MAN-670.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-19.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-20.mjs
 
@@ -5061,7 +5059,7 @@ section: notifications/004 The ntfy channel/008 Answering from the phone
 
 Questions and plan approvals raise `permission.required` in **every** permission mode, the
 bypassing ones included — see
-[docs/architecture/MANUAL.md (02-realtime-stream)](docs/architecture/MANUAL.md (02-realtime-stream)) §"Permission requests"
+[docs/architecture/MANUAL.md (02-realtime-stream)](architecture/MANUAL.md) §"Permission requests"
 for the two callers that ask. That is what makes an unattended run answerable from a phone rather
 than silently auto-answered.
 
@@ -6034,22 +6032,38 @@ that safe is one fence kept at both ends — every id begins `fixture-live-widge
 `createFixtureRun` refuses to build another, `removeRun` refuses to delete a directory not named
 that way, and every caller removes it in a `finally`.
 
-`createFixtureRun()` → `{runId, dir, planPath}`, a five-phase run at phase 2 of 5, stage `builder`,
-with three `runner.log` lines. Then `touchStage(run, stage, detail)` moves it and appends a line,
+`createFixtureRun({ runId, planName, launchedBySession })` → `{runId, dir, planPath}`, a five-phase run at
+phase 2 of 5, stage `builder`, with three `runner.log` lines. The default id is unique per call
+(`Date.now()` plus a UUID slice — a probe staging several fixtures in one loop once built them all in one
+directory); `planName` gives the run a plan file of its own (two fixtures on one plan read as one plan
+re-walked, the older one superseded); `launchedBySession` is the app session id the card's session pin
+compares against (default `null`, nothing launched it). Then `touchStage(run, stage, detail)` moves it and appends a line,
 `pauseRun` / `unpauseRun` set and clear `run.json.stopped_at`, `queueRun(run, untilEpoch = null)` parks
 it the same way plus the runner's own `status: 'queued'` and `queued_until` — the shape `start --queue`
 or DeepSeek's peak hours creates, told apart from a plain pause by those two fields alone — and
 `unpauseRun` clears its marks too, the way a real Start does, `staleRun` ages the heartbeat past
-the 900 s cut, `endRun(run, status = 'complete', endedAt = now)` writes a receipt shaped like the
-runner's own — an old `endedAt` proves the 24-hour window — `reopenRun` renames it aside the way a
+the 900 s cut, `endRun(run, status = 'complete', endedAt = now, { finished })` writes a receipt shaped like the
+runner's own — an old `endedAt` proves the 24-hour window; `finished` (default `status === 'complete'`)
+ships every phase not deferred, `false` blocks every phase not shipped or deferred, so a `complete`
+receipt over blocked phases is writable; `laneRun(run, count = 2)` writes that many rows into
+`progress.json.lanes`; `reopenRun` renames it aside the way a
 resume does, and `removeRun` takes the directory and the fixture plan away. `run.json` carries the runner's FULL record rather than the five fields this lane reads,
 because `plan-runner stop` loads it through `state.load` before it looks for a lock: a record short
 of a field fails with a decode error instead of the refusal a probe is there to observe.
 
 One visible side effect, and it is expected: while the fixture exists, the terminal status bar lists
 it beside the real runs, for the seconds it lives.
+`.verify/lib/arc-run-fixture.mjs` writes one fake arc deck whose cards hold REAL fixture runs — the deck
+`probe-arc-run-merge.mjs` is drawn on, since the rule that keeps a run off the list below a deck is
+keyed on `run_id` and needs cards naming runs the lane carries. `writeRunArcFixture({ liveRun, endedRun })`
+takes two `createFixtureRun` handles and writes `~/.claude/state/arcs/fixture-arc-runs/arc.json`
+(`RUN_ARC = 'fixture-arc-runs'`): card 1 done, no run · card 2 walking, holds `liveRun` · card 3 complete,
+holds `endedRun` · card 4 unminted, no run. `arc_path` is under `/tmp/arc-run-fixture` and names no file,
+so `plan-runner arc tick` answers `file gone` and never syncs or presses it, and only a tab holding
+`cloudcli:show-test-runs` (the harness) draws it. `removeRunArcFixture()` removes the state directory and
+the `/tmp` root by literal path, behind a guard; every caller runs it in a `finally`.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/runner-fixture.mjs
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/arc-run-fixture.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/runner-fixture.mjs
 
 ## MAN-639 — Consumers
 section: plan-runner/015 Consumers
@@ -6060,7 +6074,7 @@ The frame goes out over `connectedClients` — every open `/ws` socket — and n
 third-party plugin frontends that have no business seeing it (the reasoning at
 `taskmaster.routes.ts:30-50`). It is `kind`-keyed and declared in `GatewayEventKind`, unlike Task
 Master's `type`-keyed frames, so the protocol tables in
-[docs/architecture/MANUAL.md (01-websocket-transport)](docs/architecture/MANUAL.md (01-websocket-transport)) stay honest.
+[docs/architecture/MANUAL.md (01-websocket-transport)](architecture/MANUAL.md) stay honest.
 
 `useChatRealtimeHandlers.ts` carries `case 'runner_state': return;`, and it must RETURN rather than
 break: without the case the frame falls through the switch's `default`, inherits the viewed
@@ -6103,7 +6117,7 @@ than a failure — the next frame fills it — and is logged, not surfaced.
 
 The bus itself — the topic allowlist, the retained values, the synchronous replay, and why it knows
 no producer — is documented on
-[docs/architecture/MANUAL.md (07-live-widgets)](docs/architecture/MANUAL.md (07-live-widgets)). This lane was simply its first
+[docs/architecture/MANUAL.md (07-live-widgets)](architecture/MANUAL.md). This lane was simply its first
 publisher. **Three more have arrived and all three kept the shape**: `ArcFeed.tsx` publishes `arc:*`
 beside it in this same module (§"The arc deck" below), `SoulLaunchFeed.tsx` in
 `src/modules/dispatch-souls/` publishes `souls:*` the same way, and `UniverseFeed.tsx` in
@@ -6120,12 +6134,17 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/architecture/MANUAL.md
 ## MAN-641 — The runner card
 section: plan-runner/015 Consumers/017 The runner card
 
-`RunCard` is the lane's first screen: one plan-runner run, whole. The runner card has two homes —
+`RunCard` is the lane's first screen: one plan-runner run, whole. It is the FRAME only — the `Card`
+shell, the plan's file name and its H1. The run's own display is four pieces: `RunStateBadge` and
+`RunClock` (`RunFace.tsx`, the card's header), `RunFace` (`RunFace.tsx`, the body) and `RunControls`
+(`RunControls.tsx`, the footer). `ArcCard` draws the same pieces for the run its plan card owns, so one
+run reads one way in a run list and inside an arc. The runner card has two homes —
 the Runner tab (`RunnerPanel`), and the desktop chat gutter's Runner widget (`RunnerWidgetBody`),
 which sits beside the transcript and never over it. The arc deck has the same two homes, drawn
 above the runs in each (§"The arc deck" → "The gallery"), and the widget's badge counts both: the
 runs plus the arcs not yet complete. The widget's empty state shows only when there is neither a
-run nor an arc — the tab's own rule.
+run nor an arc — the tab's own rule. A run an arc card owns is listed in neither home
+(§"The arc deck" → "The run on the card").
 
 **It was pinned above the transcript once, and that is why the rule is written down.** The card was
 built into a `flex-none` band between the CLI-version banner and the messages in
@@ -6151,7 +6170,7 @@ own order follows `STATE_ORDER` (`runState.ts`): live, then stale, then queued, 
 ended, newest first inside each — queued outranks paused because its Start is the card's whole point,
 where a paused run can wait.
 
-**What it composes.** `RunCard` pulls the library together and declares nothing of its own:
+**What it composes.** `RunCard` and the four pieces above pull the library together and declare nothing of their own:
 `Card` / `CardHeader` / `CardTitle` / `CardContent` / `CardFooter` for the shell, `Badge` for the
 run and phase states, `Meter` for shipped-of-total with spawns and spend beneath it, `Chip` +
 `Shimmer` for the stage strip (`PipelineStrip`), `Collapsible` + `CollapsibleTrigger` +
@@ -6248,7 +6267,7 @@ below): only a LIVE run can be stopped, since
 `plan-runner stop` looks for a lock naming the run and a stale run's daemon is gone, so offering
 Stop there would be inviting a refusal. A parked or dead run offers Resume, over the same `resume`
 call — EXCEPT a QUEUED run, whose button reads Start instead
-(`queued ? t('runner.start') : t('runner.resume')` in `RunCard.tsx`) though it fires the identical
+(`queued ? t('runner.start') : t('runner.resume')` in `RunControls.tsx`) though it fires the identical
 `resume` request underneath: `resume` un-parks a run the operator stopped exactly as it un-parks one
 DeepSeek's clock parked, and the word on the button is the only difference — the operator never types
 `plan-runner resume` for either. Start is the operator's press — made now, or made ahead of time through
@@ -6308,14 +6327,15 @@ other locale falls back.
 
 The tab that mounts it is the next section.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/MANUAL.md, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/ChatInterface.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/composer/ActivityIndicator.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useElapsed.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/utils.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-runner-model-pin.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-runner-schedule.mjs
+governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/MANUAL.md, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/ChatInterface.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/composer/ActivityIndicator.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/plan-runner/RunCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/plan-runner/RunControls.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/plan-runner/RunFace.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/plan-runner/RunnerWidgetBody.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useElapsed.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/utils.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-runner-model-pin.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-runner-schedule.mjs
 
 ## MAN-642 — The Runner tab
 section: plan-runner/015 Consumers/018 The Runner tab
 
 `RunnerPanel` is where every run on the lane is drawn — one of `RunCard`'s two callers now that the
-desktop chat gutter's Runner widget is the other (§"The runner card"). It reads `useRunnerRuns` (and
-`useArcs`, for whether the gallery above the runs has anything to draw) and nothing else — no fetch on mount, no state of its own — so selecting the tab paints on the FIRST
+desktop chat gutter's Runner widget is the other (§"The runner card"). It reads `useRunnerRuns`, `useArcs`
+(whether the gallery above the runs has anything to draw) and `useArcRunIds` (which runs that gallery
+already draws) and nothing else — no fetch on mount, no state of its own — so selecting the tab paints on the FIRST
 render with whatever the bus was already holding rather than blanking until the runner next moves.
 
 **The gate rule is the memory tab's, and the Runner tab is the second tab to take it.**
@@ -6342,12 +6362,13 @@ pill at all: `Tabs` renders that pill for word tabs only, and marks an icon tab 
 reading this strip's count reads the title.
 
 **The panel.** A header carrying `runner.title` and the count, then one `<RunCard defaultOpen />`
-per run — `defaultOpen` is the one variance the card offers, and the tab is what wants it: a person
+per run no arc card owns — `defaultOpen` is the one variance the card offers, and the tab is what wants it: a person
 who navigated here has already asked for the runs. Order is live → stale → paused, newest first
 inside each: live because something is happening to it, stale because a lapsed heartbeat is the one
 state that may want a hand, paused last because a parked run is parked on purpose. Paused runs ARE
 counted and ARE listed — that is the whole reason the lane carries them where the statusline drops
-them. The count and the panel cannot disagree: both read `count` off the same hook. `EmptyState`
+them. The count and the panel cannot disagree: both read `count` off the same hook, and a run an arc
+card owns still counts — it is on this screen, inside its card. `EmptyState`
 (`runner.empty`) shows only when the count is zero AND `useArcs()`'s own `arcs` array is empty too
 — not `arcCount` (§"The arc deck" below) — reachable precisely because the tab is sticky. `ArcGallery`
 mounts above the run list in the same scroll when an arc exists (§"The arc deck" below).
@@ -6355,6 +6376,8 @@ mounts above the run list in the same scroll when an arc exists (§"The arc deck
 **The palette.** `CommandPalette`'s `NAV_TABS` carries a `Go to Runner` row, and the Navigate group
 filters that static list through `visibleTabs` — which `ProjectCommandPalette` builds from the same
 gate. The row therefore appears exactly when the tab does, and never while the gate is off.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/plan-runner/RunnerPanel.tsx
 
 ## MAN-643 — The arc deck
 section: plan-runner/015 Consumers/019 The arc deck
@@ -6433,13 +6456,12 @@ comes from the RECORD: the runner writes each card's `phases` (`[{id, title, shi
 heading, the census mention's own line; a hand-written ship stamp is cut off a title; `blocked` is
 set for a phase the ship log's LATEST entry for it holds ⛔), and `readCard` copies it
 through, so a plan that lands, or a phase that ships or blocks, reaches the deck within one watchdog tick. A
-`walking`/`paused` card with its run on the lane draws its LIVE run's phases instead, which carry the
-real state, so the card that has a run never shows two answers — until that run has composed any
-phases, when the record's list stands in. A plan not written yet (`[]`) draws
+card whose run is on the lane does not draw this list: the run's own LIVE rows (`RunFace`, §"The run
+on the card") carry the real state and stand in its place, so one plan's phases are never listed twice
+inside one card — until that run has composed any phases, when this list stands in. A plan not written yet (`[]`) draws
 one muted line, `runner.arcNoPhases` (`data-arc-no-phases`). Past eight rows the rest folds behind a
 `Collapsible` "+N more", so a long plan does not tower over its neighbours. It is not `PhaseRow`:
-that row discloses a run's timeline, which a card without a run does not have. A `walking` or
-`paused` card adds its own run strip below (§"The run strip").
+that row discloses a run's timeline, which a card without a run does not have.
 
 **The feed.** `ArcFeed.tsx` is `RunnerFeed`'s twin and the only place in the client that names the
 `arc_state` frame. `App` mounts it nested directly inside `RunnerFeed` — never beside it — because
@@ -6455,7 +6477,8 @@ answers `{arcs, count}`. `count` is arcs whose `status !== 'complete'`, the numb
 reads as `arcCount`; a finished arc keeps its place in `arcs` until the server drops it from the
 frame. `test_arc` arcs are filtered through the same `cloudcli:show-test-runs` `localStorage` switch
 `useRunnerRuns` reads, copied rather than imported so the two hooks stay independent readings of one
-convention.
+convention. `useArcRunIds()` (`hooks/useArcRunIds.ts`) is `arcOwnedRunIds` over `useArcs().arcs`,
+memoised on that array: the one place a run list learns which runs a deck already draws.
 
 **The pure rules**, `arcState.ts`, no React in it. `deckLayers(arc)` answers every card in position
 order with its layer: `done` (complete), `top` (the card at `arc.current`; none once every card is
@@ -6467,7 +6490,9 @@ offering a drop the runner's own `arcs.reorder` would only refuse (§"The drag" 
 `cardTone(state)` maps a card's state to a `Badge` tone and is never `danger`: a `stalled` card is
 one the runner presses again the moment its spec moves, not a fault. `arcProgress(arc)`
 counts complete CARDS against the total — not
-`useArcs()`'s `count`, which is unfinished ARCS across the whole deck. `current` and `last_started`
+`useArcs()`'s `count`, which is unfinished ARCS across the whole deck. `arcOwnedRunIds(arcs)` answers the
+set of every `run_id` the given arcs' cards carry (`arc.json:cards[].run_id`, non-null) — the rule
+behind §"The run on the card". `current` and `last_started`
 are always read off the snapshot, never recomputed from the card states — the runner's own
 decisions, and a card walked out of order (`--now`) would disagree with a client that tried to
 guess them.
@@ -6494,13 +6519,33 @@ The tick's line for a held card REPORTS: `stalled <n> — <k> phases to heal, it
 
 The deck draws; the runner presses.
 
-**The run strip.** `ArcCard`'s live card, while `walking` or `paused`, joins the lane by `run_id` —
-never by plan path, since a plan can have been walked more than once — and, when found, draws the
-same `PipelineStrip` and `PhaseRow` `RunCard` draws (§"The runner card" above), filtered to the
-card's own current phase. A card whose run is not on the lane draws no strip at all; one whose run
-has ended or is still queued draws the strip muted — no active stage, no clock — exactly as
-`RunCard` does. `data-arc-card-run` on the wrapping node names the run the strip was drawn from,
-the harness's handle for proving the join.
+**The run on the card.** A card the runner has minted a run for joins the lane by `run_id` — never by
+plan path, since a plan can have been walked more than once — and, when the run is found, draws that
+run itself, in every state (walking, paused, queued or ended: a state the card skipped would be a run
+gone from the screen). Under the charter it draws the pieces `RunCard` draws, minus the frame
+(§"The runner card" above): `RunStateBadge` and `RunClock`, `RunFace` (repair strip, meter, stage
+strip, lanes, phase list) and `RunControls` with `showModel={false}` — the deck header's ONE toggle
+re-pins every minted, unfinished card's run. `RunFace`'s rows REPLACE `ArcPhaseList` on that card;
+the record's list is drawn only for a run with no composed phases. An ended run's Dismiss rides the
+card, as it does a list card. An ended or queued run lights no stage and ticks no
+clock. A card whose run is not on the lane draws no run block. `data-arc-card-run` on the wrapping
+node names the run drawn and `data-arc-card-run-state` its state, the harness's handles for proving
+the plan is drawn once.
+
+That is why no run list draws the run again: `RunnerPanel` and `RunnerWidgetBody` both subtract
+`useArcRunIds()` from the runs they list (operator, 2026-09-24: "Arc cards should display their
+progress and info inside the plan cards nested in the arc, not creating a duplicate plan below it").
+Only decks the gallery is drawing count — a deck it has dropped (a complete arc past its keep window,
+a test arc in a tab that hides them) owns nothing, so its run stays in the list — and a second walk
+of a plan whose newest run is not a card's `run_id`, or a plan no arc names, keeps its own
+`RunCard`. The LIST is all that is filtered: the tab's count, the widget's badge and both empty states
+still count an arc-owned run.
+
+The open chat's pin travels with the run. `ArcGallery`'s `pinnedSessionId` (the gutter home's alone,
+handed through `ArcDeck`) reaches `ArcCard`, which draws `SessionPin` (`SessionPin.tsx`, `data-session-pin`:
+a glyph and the `gutters.pin.label` word) beside its `Card {{n}}` chip, and sets `data-pinned`, when
+its run's `launched_by_session` equals it. `RunnerWidgetBody` draws the same `SessionPin` over a
+listed run of the open chat's; the Memory gutter keeps its own copy.
 
 **The drag.** A card's `draggable` handler puts three things on the `DataTransfer`: the dragged
 card's position as a decimal string under `ARC_CARD_DRAG_TYPE` (`application/x-cloudcli-arc-card`,
@@ -6529,7 +6574,7 @@ card's own fallback rule (§"The runner card" above).
 the RAW response, like the two run verbs above: a 409 carries the runner's own refusal sentence
 whole.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/plan-runner/ArcCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/plan-runner/ArcDeck.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/plan-runner/ArcGallery.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/plan-runner/arcState.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/plan-runner/hooks/useArcRunIds.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/plan-runner/SessionPin.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts
 
 ## MAN-644 — Proving it
 section: plan-runner/020 Proving it
@@ -6573,22 +6618,39 @@ The operator's own runs are read by every gate and NEVER named in a request — 
 executed while the probe runs is one of them, and a verb sent to it would stop the run that is
 running the probe.
 
-The arc deck's own three probes, each printing exactly one final line:
+The arc deck's own four probes, each printing exactly one final line:
 
 - `node .verify/probe-arc-deck.mjs` → `ARC DECK PASS walks=4 gutter=2 reorder=ok shots=6` — the strip at a
   desktop and a phone viewport, light and dark: position order, layers, the live card scrolled into
   view, one right-arrow step, each card's phase rows (one list folded past eight; card 2's ten shipped
   and eight ⛔), the stalled card's `stalled` badge beside `10 of 18 · 8 blocked` and the landed card's
   missing count line, one height, no vertical scroll in the strip (a wheel over it moves the page),
-  the same deck in the chat gutter's Runner widget in both themes, and a drag of card 4 onto card 3
+  the same deck in the chat gutter's Runner widget in both themes (`lib/arc-gutter-walk.mjs`; the
+  widget's badge equals its listed rows + the runs drawn on arc cards + the unfinished decks — a complete deck
+  is drawn, never counted), and a drag of card 4 onto card 3
   written into the arc file by the runner. Its six shots land in `.verify/artifacts/`.
 - `node .verify/probe-arc-fill.mjs` → `ARC FILL PASS deck=fixture-arc reorder=ok shots=2` — a drop
   reordering a fixture deck through the runner.
+- `node .verify/probe-arc-run-merge.mjs [--before <client url>]` → `ARC RUN MERGE PASS walks=<n>
+  artifacts=.verify/artifacts` — an arc's run drawn ONCE, inside its card (`[data-arc-card-run]`), and never
+  again as a list card, in the Runner tab (desktop and 390px, both themes) and the chat gutter's widget
+  (both themes): 6 walks a side, 12 with `--before`. Four real fixture runs (`lib/runner-fixture.mjs`) and a
+  deck around two of them (`lib/arc-run-fixture.mjs`): `live` on card 2, `ended` on card 3, `twin` (a second
+  walk of `live`'s plan, a `run_id` no card names) and `loner` (a plan no arc names). Asserted: `live` and
+  `ended` each drawn on their card and in no list; `twin` and `loner` still list cards (the subtraction is
+  keyed on `run_id`, never the plan path); the tab's title count and the widget's badge still count every
+  run; the pin travels (`data-pinned` and one `[data-session-pin]` on the card of the chat's own run, none
+  on the tab); zero console errors past pre-auth. `--before` drives a pre-change client through
+  `openConsole({ appUrl })` and prints the pair; without it the probe prints `before: NOT MEASURED`.
+  The before client is the probe's header recipe: `git archive HEAD` into `/tmp/arc-run-before`, build,
+  then `sleep 100000 | npx vite preview --host 127.0.0.1 --port 5185 --strictPort --outDir
+  /tmp/arc-run-before/dist` — `vite preview` exits when its stdin ends. 2026-09-24: `:5184`'s bundle
+  (built 2026-09-22 21:48) lacked `data-runner-panel`, so it cannot be the before.
 - `bash ~/.claude/scripts/runner_fixtures/arc_proof.sh` → `ARC PROOF PASS cards=2/2
   receipt=complete handover=<s>s pressed-by=<landing-door|watchdog> shots=2` — the live two-card arc
   under the real runner, driving `probe-arc-stack.mjs`.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/MANUAL.md, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-23.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-24.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-25.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-26.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-27.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-arc-deck.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-arc-fill.mjs, /home/lyphe/.claude/scripts/runner_fixtures/arc_proof.sh
+governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/MANUAL.md, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/arc-gutter-walk.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-23.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-24.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-25.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-26.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-27.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-arc-deck.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-arc-fill.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-arc-run-merge.mjs, /home/lyphe/.claude/scripts/runner_fixtures/arc_proof.sh
 
 ## MAN-645 — The Schedules tab
 section: schedules/000
@@ -6891,7 +6953,7 @@ Two things a reader will look for and not find, so nobody re-derives them:
 ## MAN-660 — Cross-references
 section: schedules/015 Cross-references
 
-- [kanban.md](kanban.md), [plan-runner.md](plan-runner.md) — the other two lanes documented in this
+- MAN-559, MAN-624 — the other two lanes documented in this
   register, and the same shape of page.
 - The contract, declared once: `server/shared/types.ts` (`CRON REGISTRY`) — mirrored in
   `src/shared/types.ts`. The client's two endpoints live in `src/shared/api.ts` (`api.schedules`)
@@ -7021,7 +7083,7 @@ transcript on disk. Archiving (the only thing Remove ever does) does not delete 
 it, and even that only removes the file, never edits its content. How a session's on-disk identity
 is minted, mapped and merged with the filesystem watcher's own view is a separate mechanism this
 feature does not change; see
-[docs/architecture/MANUAL.md (03-conversation-handoff)](docs/architecture/MANUAL.md (03-conversation-handoff)).
+[docs/architecture/MANUAL.md (03-conversation-handoff)](architecture/MANUAL.md).
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/architecture/MANUAL.md
 
@@ -7205,6 +7267,9 @@ non-zero or prints a line beginning with `[FAIL]`. A `[NOTE]` line is an observa
 never fails a run. Each phase script opens with `openConsole()` from `.verify/lib/console.mjs`,
 which launches headless Chromium, signs in through the real forms, lands on a selected
 project, and hands back the page plus `shoot()`, `api()`, and the console errors it collected.
+`openConsole({ appUrl })` drives another client than `:5183` — a pre-change `dist` served by
+`vite preview` on a port of its own — and returns `appUrl` for the caller's own `goto`s; it exists for a
+before/after pair (`probe-arc-run-merge.mjs`).
 
 The page runs with the service worker **blocked** and the app's two `api.github.com` calls
 **answered locally** — browser-context settings that `src/` knows nothing about. A service
@@ -7617,7 +7682,7 @@ preference and puts the previous value straight back, which is the same preferen
 already writes through the app's real Dark Mode switch, and no other preference is touched. Like
 every browser probe here it ends in `ensureTheme` twice and leaves the dev account on
 whichever mode ran last. Shots are `22-widget-light`, `22-widget-dark` and `22-widget-390-light`. Its
-contract is at [docs/architecture/MANUAL.md (07-live-widgets)](docs/architecture/MANUAL.md (07-live-widgets)).
+contract is at [docs/architecture/MANUAL.md (07-live-widgets)](architecture/MANUAL.md).
 
 Phase 23 is the plan-runner lane, and it is back to fetch and a socket — no browser, because nothing
 in it is visual. It signs in the way `phase-7.mjs` does and holds the token for every read and every
@@ -7659,7 +7724,7 @@ of the probe and buys the real modules at every link. The specifiers are read ou
 the way phase-22 reads them, and TWO of them are compared — the bus as `useWidgetBridge` resolves it
 against the bus as `RunnerFeed` resolves it — because if those ever differ the app has two buses and
 every widget goes silent with nothing wrong in the code. It reuses phase-23's fixture
-(`.verify/lib/runner-fixture.mjs`, unchanged), so one fake run travels the same real path: the state
+(`.verify/lib/runner-fixture.mjs`), so one fake run travels the same real path: the state
 directory the server is already reading, the same poll, the same frame. Six widgets read it. Eleven
 gates, in order: the retained list replayed to a widget on the way in — the providers are mounted
 first and the bus is filled BEFORE a single widget is rendered, so what the widget shows can only
@@ -7697,7 +7762,7 @@ chat view would pass just as happily against a server that never sent a run, a b
 or a lane that was never wired at all. It would be
 measuring nothing and reporting a success. The reading is therefore taken in two halves and the
 ORDER is load-bearing. First the data is proved to arrive: phase-23's fixture
-(`.verify/lib/runner-fixture.mjs`, unchanged) writes a real run to the real state directory, and
+(`.verify/lib/runner-fixture.mjs`) writes a real run to the real state directory, and
 `GET /api/plan-runner/runs` is polled until the server lists it beside the operator's own runs.
 Only then is the chat view read — and held open for five seconds rather than glanced at once,
 because the frame travels on the watcher's own 2 s poll and a single early sample would find an
@@ -7726,7 +7791,7 @@ reading is therefore a `[NOTE]` recording the baseline — how many tabs, at wha
 BELOW IS WRITTEN AGAINST THE LANE'S ABSOLUTE TOTAL, because the operator's own runs start and finish
 inside the probe's own window and such a gate would go red for a run it does not test. Three
 disciplines replace it, and the probe's header states the same three. The fixture's ARRIVAL is the
-one count delta: phase-23's fixture (`.verify/lib/runner-fixture.mjs`, unchanged) must raise the
+one count delta: phase-23's fixture (`.verify/lib/runner-fixture.mjs`) must raise the
 count to at least one above the baseline, which is falsifiable whatever else is running. Every other
 reading about the fixture is SCOPED TO ITS OWN CARD by `data-run-id` — its pause, its end, its meter,
 its phases — so each is judged per-run; where a lane total is printed beside such a gate it is an
@@ -7740,8 +7805,11 @@ glyph carries a bare dot. Seventeen gates: the fixture reaching the app over
 `GET /api/plan-runner/runs`, which is the one reading that tells a failing UI gate from an empty
 lane; the tab on the bar, marked with its dot, its count raised by the fixture; `Go to Runner` in the
 command palette; the tab opening a panel holding a card with the fixture's own `data-run-id`; that
-card arriving with its phase list already open, which is the panel's one variance; the count equal
-to the number of cards drawn; the Meter reading the fixture's `1 / 5` at 20%; the PipelineStrip
+card arriving with its phase list already open, which is the panel's one variance; the tab's title
+count equal to the run cards the panel draws plus the runs drawn inside arc cards
+(`[data-arc-card-run]` — a run an arc card owns is drawn in its card and filtered out of the run list), the
+unfinished decks printed beside it and never a term: the tab counts runs alone, the gutter's badge adds
+the decks (`lib/arc-gutter-walk.mjs`); the Meter reading the fixture's `1 / 5` at 20%; the PipelineStrip
 drawing the reviewed six-stage chain; one row per phase with its title; a phase row expanding onto
 the two stages the fixture's log says it walked; Stop offered on a live run and its REFUSAL spoken
 aloud; `pauseRun` repainting the card as PAUSED with a Resume button and the run STILL LISTED in
@@ -7822,7 +7890,7 @@ the iframe with an error card, so every gate touching the iframe runs inside a f
 window — which is why gate 8 remounts the gallery before it flips. Gate 8 also writes the `theme`
 preference and puts it straight back; no other preference is touched. Shots are `28-docspace-light`,
 `28-docspace-dark` and `28-docspace-390-light`. Its contract is at
-[docs/architecture/MANUAL.md (07-live-widgets)](docs/architecture/MANUAL.md (07-live-widgets)) §"The DocSpace kind".
+[docs/architecture/MANUAL.md (07-live-widgets)](architecture/MANUAL.md) §"The DocSpace kind".
 
 Phase 29 is the same block read from both ends at once, and it is the only probe here that writes
 into the REAL DocSpace store. Where phase 28 required nothing of ArchPulse, this one stands a
@@ -7854,7 +7922,7 @@ exceptions (9). It sends no Claude turn. Its fixture page is titled
 OUTERMOST `finally` by the id the probe minted and no other — DocSpace holds the operator's real
 pages, so the title prefix is the fence at both ends and a cleanup that fails reddens the run.
 Shots are `29-docspace-light`, `29-docspace-dark` and `29-docspace-390-light`. Its two contracts
-are [docs/architecture/MANUAL.md (07-live-widgets)](docs/architecture/MANUAL.md (07-live-widgets)) §"The DocSpace kind" for
+are [docs/architecture/MANUAL.md (07-live-widgets)](architecture/MANUAL.md) §"The DocSpace kind" for
 this half and ArchPulse's own MAN-238 for the other.
 
 Keepalive survival is the one proof here that is not a phase and is not in `all.mjs`, because what
@@ -8149,7 +8217,7 @@ column really called `1` the same accessible name in one header row.
 `TranscriptRenderContext.Provider value={{ isExporting: true }}` — the state
 `export/TranscriptExportDocument.tsx` renders the transcript in — and requires every shape, every
 row, every header word and the bars to be present while ZERO copy, sort or toggle controls are drawn;
-see [06-tool-view.md](docs/architecture/MANUAL.md (06-tool-view)) §"Rendering into an exported document" for why a
+see [docs/architecture/MANUAL.md (06-tool-view)](architecture/MANUAL.md) §"Rendering into an exported document" for why a
 control drawn there would look alive and do nothing. It renders live rather than through
 `renderToStaticMarkup`, which is the honest measurement for what is being asked: the flag decides
 whether a control is *drawn*, and one never drawn cannot be serialised either. That mount is spelled
@@ -8570,7 +8638,7 @@ things. Each is listed with what its red line means:
 export. That component reads `useTheme()`, and the export mounts no `ThemeProvider`, so mounting it
 there throws and nothing downloads. The fence keeps the same frame with the source inside it, so the
 export counts the same kinds the screen does (see
-[rendered shapes](docs/architecture/MANUAL.md (08-rendered-shapes)) §"Collapse and export").
+[rendered shapes](architecture/MANUAL.md) §"Collapse and export").
 
 It spends no Claude turn. The seal swallows `chat.send`, `chat.edit-send`, `chat.abort` and
 `chat.subscribe`, and the run ends by proving the seal still held and that the page never tried to
@@ -8903,7 +8971,7 @@ node .verify/ntfy/question-probe.mjs
 It is the end-to-end proof that a question reaches a phone and the phone's answer reaches the
 model, and it spends **two real Claude turns**. It runs the same script twice, once with
 `permissionMode: 'bypassPermissions'` and once with `default`, because those are the two doors
-into `promptForToolDecision` ([docs/architecture/MANUAL.md (02-realtime-stream)](docs/architecture/MANUAL.md (02-realtime-stream))
+into `promptForToolDecision` ([docs/architecture/MANUAL.md (02-realtime-stream)](architecture/MANUAL.md)
 §"Permission requests"): in the bypassing mode the `PreToolUse` hook is the only way to a human,
 in `default` `canUseTool` asks and the hook must stand aside. Each run creates a Claude session
 in `/tmp/cloudcli-ntfy-probe`, asks the model for one `AskUserQuestion` with two options, waits
@@ -8914,7 +8982,7 @@ that the signed token needs no CloudCLI session. Then it waits for `permission_r
 turn's `complete`, counts the `permission_request` frames for that session (two would mean the
 hook and `canUseTool` both asked) and the pushes opening it (a second, titled "Claude needs you",
 is the CLI's own `Notification` hook announcing the same prompt — see
-[docs/architecture/MANUAL.md (02-realtime-stream)](docs/architecture/MANUAL.md (02-realtime-stream)) §"Permission requests"),
+[docs/architecture/MANUAL.md (02-realtime-stream)](architecture/MANUAL.md) §"Permission requests"),
 and reads the model's last words for the answer the phone sent. It passes on exactly:
 
 ```
@@ -9157,3 +9225,38 @@ dropped WebSocket rather than a refused request, but it is a transient either wa
 `phase-23.mjs`, whose socket reopens itself through the handover and says so in a `[NOTE]`.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/MANUAL.md
+
+## MAN-1469 — The drawer's application row and divider — size, Escape claim, probes
+
+`AppDrawerRow.tsx` (the row), `AppDrawerDivider.tsx` (the divider among the rows) and `AppDrawer.tsx` (the list and its loading placeholder). Two lines per row: the name, then the description — the resolved host when it has none. Screen: MAN-487.
+
+## Measured size — 2026-09-24, identical at 1280 and 390px, dark and light
+
+| Part | Value | Class / where |
+|---|---|---|
+| Row, two lines | 47px | driven by the two lines; `min-h-[44px]` is only the floor |
+| Both lines | one ratio | `leading-tight` on name and description alike |
+| Tile | 28px, letter 15px, radius 7px | `h-7 w-7` |
+| Kebab trigger | 32px, radius 9px | `h-8 w-8 rounded-[9px]` — the size and radius of the divider's kebab, so the list carries one "…" |
+| Row-to-row step | 6px | list `gap-1.5` |
+| Row with the description field open | 68px; its `Input` 32px | |
+| Divider strip | 38px | its own 32px kebab sets the floor; not edited |
+| Divider title, 64 characters at 390px | box 222px, ellipsised; list and sheet 298/342 px wide, page 390px, its kebab at x 288–320 | `min-w-0 truncate` — `flex-none` gave the button a 538px max-content box, ran the list to 614px in a 298px column and put the kebab at x 604–636, off a 390px screen |
+| Loading placeholder | three `h-[47px]` skeleton rows | the literal IS the row's two-line height — change both together |
+
+## Escape in an inline field — the row's description, the divider's title
+
+- Both draft `Input`s carry `{...OWNS_ESCAPE}` (`src/shared/ui/overlayEscape.ts`). `Dialog`'s `window`-capture listener stands down for them, the press reaches the field's own handler, and the draft reverts while the sheet stands.
+- `stopPropagation` in the field's own handler cannot do this: the dialog's capture listener runs first and closes the sheet (measured both fields, 2026-09-24, before the marker: `[role="dialog"]` count 0, FAB `aria-expanded="false"`, a just-added divider gone with its draft).
+- The marker is honest only because each draft renders solely while its field is open. A field that is always mounted must not carry it.
+- Residual, both fields: a FAILED save leaves the field open with its error; with focus elsewhere the dialog stands down and nothing handles Escape until focus returns to the field. Measured 2026-09-24 (divider PATCH forced to 500): two presses leave the drawer standing and the field open, and a press after refocusing the field puts the title back.
+- GOTCHA — the divider's kebab does NOT leave its field open. `ActionMenu` hands focus back to its trigger as it closes, and unlike the row (whose draft branch unmounts the kebab and the menu with it) the divider keeps the menu mounted while it edits, so the field blurs at once and `save()` sees an unchanged draft. A divider with a BLANK title renders no title button, so the kebab is its only route to a title: as measured 2026-09-24 that route leaves 0 fields open, so a blank divider cannot be titled from the drawer at all. The row's shape — drop the kebab while the field is open — is the candidate repair; unrepaired, and not this file's to decide.
+
+## Probes (dev client at `http://127.0.0.1:5183`, login `verve`)
+
+| Command | Reads |
+|---|---|
+| `node .verify/app-rows-thin.mjs before\|after` | every row's height, tile and kebab boxes, the step, the divider strip, at 1280 and 390px in both themes; then a kebab open/Escape-close with the drawer still open and a row tap. Writes `.verify/artifacts/app-rows-thin-<label>*.{json,png}` |
+| `node .verify/app-rows-escape.mjs <label>` | the row's description field and the divider's title field: Escape after "Add divider" (drawer standing, draft discarded) and on a titled divider; a 64-character divider title at 390px with the kebab's box and the list/sheet overflow; the failed-save residual, forced with a 500 on the divider PATCH. Asserts each, prints the rest, adds the dividers it needs and removes them through their own kebabs, then checks `apps.local.json` back at its baseline hash. Writes `.verify/artifacts/app-rows-escape-divider-390-<label>.png`. `before` FAILs 10 checks on the pre-marker file, `after` PASSes |
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/AppDrawerDivider.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/AppDrawerRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/AppDrawer.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/app-rows-escape.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/app-rows-thin.mjs

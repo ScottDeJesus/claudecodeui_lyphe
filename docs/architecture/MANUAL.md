@@ -12,10 +12,8 @@ section: 01-websocket-transport/000
 *One websocket server, four paths, and the small protocol that runs over the chat one.
 Covers routing, auth, the frame vocabulary in both directions, and how a client catches up
 after a drop. What the frames turn into on screen is
-[the realtime stream](docs/architecture/MANUAL.md (02-realtime-stream)); which ids they carry is
-[conversation handoff](docs/architecture/MANUAL.md (03-conversation-handoff)).*
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/architecture/MANUAL.md
+[the realtime stream](MANUAL.md); which ids they carry is
+[conversation handoff](MANUAL.md).*
 
 ## MAN-289 — In one paragraph
 section: 01-websocket-transport/001 In one paragraph
@@ -254,7 +252,7 @@ provider-native id from there:
 
 A send for a session with no row is refused with `SESSION_NOT_FOUND` and told to create it
 over REST first (`:184-189`) — that is the entry point in
-[conversation handoff](docs/architecture/MANUAL.md (03-conversation-handoff)).
+[conversation handoff](MANUAL.md).
 
 Attachments get the same treatment. `filterAttachmentsToUploadStore` (`:34-56`) resolves
 every path against the global upload store (`~/.cloudcli/assets`, where
@@ -263,8 +261,6 @@ directory: relative paths are anchored there, absolute paths must already be ins
 traversal or subdirectories are dropped with a warning. Survivors are deduped by path and
 re-split into `attachments` / `images` / `files` before the runtime sees them (`:253-276`).
 The rejected shapes are covered by `tests/chat-attachment-filter.test.ts`.
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/architecture/MANUAL.md
 
 ## MAN-305 — Protocol errors have their own kind
 section: 01-websocket-transport/007 The chat protocol going up/009 Protocol errors have their own kind
@@ -551,7 +547,7 @@ section: 01-websocket-transport/016 Drop, reconnect, replay/017 What survives a 
 That table is about the *socket* dropping. A Claude run also survives the API **process** being
 replaced, and recovers differently: it is rebuilt on boot as a fresh registry run, which makes
 the reconnecting client's remembered cursor a previous run's — see
-[02-realtime-stream.md](docs/architecture/MANUAL.md (02-realtime-stream)) §"One run, end to end". `handleChatSubscribe`
+[docs/architecture/MANUAL.md (02-realtime-stream)](MANUAL.md) §"One run, end to end". `handleChatSubscribe`
 catches that one case on the way in: a requested `lastSeq` above the run's own `lastSeq` is
 treated as 0, so the new run replays from its start instead of replaying nothing.
 
@@ -805,10 +801,8 @@ section: 01-websocket-transport/024 Where to look when something breaks
 | Duplicate messages after a reload | The completed-run replay guard (`chat-websocket.service.ts:494`) |
 | The spinner never clears | The terminal `complete` — `completeRun:279`, `completeRunIfCurrent:296` |
 | A run is terminated early, or two runs appear | `completeRunIfCurrent:296` and the queued-message race |
-| "Session not found" on send | The session was never created over REST — [conversation handoff](docs/architecture/MANUAL.md (03-conversation-handoff)) |
+| "Session not found" on send | The session was never created over REST — [conversation handoff](MANUAL.md) |
 | A plugin frontend receiving chat frames | Something is broadcasting over `wss.clients` instead of `connectedClients` |
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/architecture/MANUAL.md
 
 ## MAN-321 — If you change this, check that
 section: 01-websocket-transport/025 If you change this, check that
@@ -827,22 +821,18 @@ section: 01-websocket-transport/025 If you change this, check that
 | The reconnect timing or the `ws` memo | Both `chat.subscribe` senders — `useChatSessionState.ts:664` and `ChatInterface.tsx:263` — and whether either now fires with a stale `lastSeq` |
 | `attachWebSocketHeartbeat` | `tests/websocket-heartbeat.service.test.ts`, and that the interval is still shorter than the shortest proxy idle timeout in front of the app |
 
-Related: [the realtime stream](docs/architecture/MANUAL.md (02-realtime-stream)) for what the frames become,
-[conversation handoff](docs/architecture/MANUAL.md (03-conversation-handoff)) for the ids they carry,
-[the index](docs/architecture/MANUAL.md (README)) for the rest of the set.
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/architecture/MANUAL.md
+Related: [the realtime stream](MANUAL.md) for what the frames become,
+[conversation handoff](MANUAL.md) for the ids they carry,
+[the index](MANUAL.md) for the rest of the set.
 
 ## MAN-322 — The realtime stream
 section: 02-realtime-stream/000
 
 *One frame's journey from a provider CLI to a rendered row, and the buffer that keeps a
 fast reply from re-rendering the transcript on every token. The socket itself is
-[the websocket layer](docs/architecture/MANUAL.md (01-websocket-transport)); which session id a frame carries is
-[conversation handoff](docs/architecture/MANUAL.md (03-conversation-handoff)); how a tool frame becomes a card is
-[tool views](docs/architecture/MANUAL.md (06-tool-view)).*
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/architecture/MANUAL.md
+[the websocket layer](MANUAL.md); which session id a frame carries is
+[conversation handoff](MANUAL.md); how a tool frame becomes a card is
+[tool views](MANUAL.md).*
 
 ## MAN-323 — In one paragraph
 section: 02-realtime-stream/001 In one paragraph
@@ -878,7 +868,7 @@ it.
    reader outside the transcript, republished into the live bus by its own feed. Each RETURNs
    rather than breaking, to say so and to stay off the provider path below — no stream buffering,
    no store append, no UI side effect
-   ([01-websocket-transport.md](docs/architecture/MANUAL.md (01-websocket-transport)) §"Fan-out: who receives what").
+   ([docs/architecture/MANUAL.md (01-websocket-transport)](MANUAL.md) §"Fan-out: who receives what").
    **That `case` group names the lanes; it is not what stops them.** What stops them is the
    stamp: a row joins the transcript only if a numeric `seq` says the RUN wrote it, and no
    sessionless lane frame carries one (`writtenByRun` at `:253`). A lane that is not in the
@@ -915,11 +905,11 @@ it.
    keeps `realtimeMessages` and `serverMessages` in separate arrays and computes `merged`
    from them. `complete` triggers a REST refresh of the persisted tail; the live copy of
    the reply survives until the persisted copy demonstrably supersedes it. Details in
-   [the message store](docs/architecture/MANUAL.md (04-message-store-and-lazy-loading)).
+   [the message store](MANUAL.md).
 8. **The delta buffer belongs to the chat pane, not to a session.** There is one
    `accumulatedStreamRef` and one `streamTimerRef` for the whole `ChatInterface`. Two
    sessions streaming at once share them. This is a real limitation, not a subtlety —
-   see [Cross-session behaviour](#cross-session-behaviour).
+   see Cross-session behaviour (MAN-333).
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/architecture/MANUAL.md, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useChatRealtimeHandlers.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useSessionProtection.ts
 
@@ -1013,7 +1003,7 @@ Four things in that picture are easy to get backwards:
   installed CLI version itself (a process runs the build it was started with) retire the
   process — interrupt first, then end-of-input — and spawns a fresh one. The launch profile
   travels in the host meta, so a re-adopted process is diffed against what it was really
-  launched with; the version [comes from the host's own journal](../MANUAL.md (cli-version)), because
+  launched with; the version [comes from the host's own journal](../MANUAL.md), because
   only that process can say what it is on. A turn already in flight is never retired for a
   version: it keeps the build it started on, and the banner above its transcript says so.
 - **A Claude run can outlive the API process too, and then `seq` restarts at 1.** The CLI
@@ -1212,7 +1202,7 @@ Four surprises, all of them intended:
   reload is a navigation of a frame the reader can type into, so what a retraction discards
   there is an unsaved edit rather than a tick. In practice a reply is done writing a fence
   before a reader has reached it, and the streaming gate keeps the frame from mounting at
-  all until the fence is closed. See [live widgets](docs/architecture/MANUAL.md (07-live-widgets)) §"The fence" and
+  all until the fence is closed. See [live widgets](MANUAL.md) §"The fence" and
   §"The DocSpace kind".
 - **The same component renders finished replies**, with `isStreaming: false` and no split.
   That is deliberate. `MessageComponent` used to swap `<StreamingMarkdown>` for
@@ -1234,9 +1224,9 @@ Four surprises, all of them intended:
   again on the next delta. Fences and inline marks cross the map rather than obey it —
   fences take the flag as a prop through `CodeBlock`, and file chips, colour swatches and
   keycaps draw on both halves. That, and the probes that hold each half, is
-  [rendered shapes](docs/architecture/MANUAL.md (08-rendered-shapes)) §"Streaming".
+  [rendered shapes](MANUAL.md) §"Streaming".
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/architecture/MANUAL.md, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/utils/streamingMarkdown.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/utils/streamingMarkdown.ts
 
 ## MAN-331 — Run lifecycle and busy state
 section: 02-realtime-stream/009 Run lifecycle and busy state
@@ -1412,7 +1402,7 @@ section: 02-realtime-stream/012 Gotchas and why the code looks like this
 - **A streaming reply does not re-trigger auto-scroll.** The follow effect depends on
   `chatMessages.length`, and an in-place rewrite does not change it. Within one streamed
   block the browser pins the pane; the next row that arrives re-follows. See
-  [scrolling](docs/architecture/MANUAL.md (05-scrolling)).
+  [scrolling](MANUAL.md).
 - **The 100 ms flush publishes the whole reply, not the delta.** Anyone optimising this
   into an incremental append has to also handle the case where a flush is skipped, which
   is exactly what the current design makes impossible to get wrong.
@@ -1448,7 +1438,7 @@ section: 02-realtime-stream/012 Gotchas and why the code looks like this
 - **Frames without `kind` are dropped before anything else happens.** If events are
   clearly arriving and nothing renders, check that first.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/architecture/MANUAL.md, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/utils.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/shared/utils.ts
 
 ## MAN-335 — If you change this, check that
 section: 02-realtime-stream/013 If you change this, check that
@@ -1465,12 +1455,10 @@ section: 02-realtime-stream/013 If you change this, check that
 | The `status` branch | Both arms. The `token_budget` arm is scoped to the viewed session on purpose, and the other arm currently has no producer — a new producer will start writing status text into the activity map for the first time. |
 | Session-switch cleanup in `useChatSessionState` | `resetStreamingState` is the only thing that unwinds a shared buffer mid-stream. Removing that call re-introduces cross-session text bleed. |
 
-Related: [the websocket layer](docs/architecture/MANUAL.md (01-websocket-transport)) for the transport and the replay
-contract, [the message store](docs/architecture/MANUAL.md (04-message-store-and-lazy-loading)) for what happens to
-a row after `appendRealtime`, [tool views](docs/architecture/MANUAL.md (06-tool-view)) for how a paired
-`tool_use` becomes a card, and [the index](docs/architecture/MANUAL.md (README)) for the rest of the set.
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/architecture/MANUAL.md
+Related: [the websocket layer](MANUAL.md) for the transport and the replay
+contract, [the message store](MANUAL.md) for what happens to
+a row after `appendRealtime`, [tool views](MANUAL.md) for how a paired
+`tool_use` becomes a card, and [the index](MANUAL.md) for the rest of the set.
 
 ## MAN-336 — In one paragraph
 section: 03-conversation-handoff/000 In one paragraph
@@ -1484,10 +1472,8 @@ So "the handoff" is not about ids at all. It is about ownership, and a conversat
 hands in four places: a draft becomes a persisted row, a live run's frames become a
 transcript on disk, the filesystem watcher's provisional sidebar row is merged into the app
 row, and an edit moves the conversation onto a different provider transcript. The transport
-underneath is [the websocket layer](docs/architecture/MANUAL.md (01-websocket-transport)); how frames become
-rendered messages is [the realtime stream](docs/architecture/MANUAL.md (02-realtime-stream)).
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/architecture/MANUAL.md
+underneath is [the websocket layer](MANUAL.md); how frames become
+rendered messages is [the realtime stream](MANUAL.md).
 
 ## MAN-337 — Mental model
 section: 03-conversation-handoff/001 Mental model
@@ -1709,7 +1695,7 @@ Navigation happens once. `ChatInterface.handleSessionEstablished` sets `currentS
 calls `onSessionEstablished` (which registers the optimistic row) and then
 `onNavigateToSession`, which is `ProjectMainRegion.handleNavigateToSession` doing
 `navigate('/session/:id')`. The only other navigate in this area is the alias fix-up
-described under [transcripts on disk](#transcripts-on-disk), and it fires only when the URL
+described under transcripts on disk (MAN-348), and it fires only when the URL
 holds a provider-native id.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/MANUAL.md, /home/lyphe/.claude/MANUAL.md
@@ -1725,7 +1711,7 @@ section: 03-conversation-handoff/007 Switching sessions in the UI
 | Re-render | `notify(sessionId)` bumps the tick only when the written session is the active one, so A's background frames cost no renders |
 | Live subscription | The `chat.subscribe` effect in `useChatSessionState.ts` fires for B with B's `lastSeq`. A is never unsubscribed — there is no `chat.unsubscribe` frame, and the only server-side audience state is each run's connection set |
 | History | If B's slot has a `fetchedAt` and the session key matches, nothing is refetched; only `isStale` (`STALE_THRESHOLD_MS = 30_000`) may trigger a bounded tail refresh. Otherwise `fetchFromServer` loads the newest `SESSION_MESSAGES_PAGE_SIZE = 20` rows |
-| Scroll and pagination | Reset in the same load effect and by the scroll effects; see [scrolling](docs/architecture/MANUAL.md (05-scrolling)) |
+| Scroll and pagination | Reset in the same load effect and by the scroll effects; see [scrolling](MANUAL.md) |
 | Streaming buffer | `resetStreamingState()` clears `streamTimerRef` and `accumulatedStreamRef`. These are per-`ChatInterface`, not per-slot |
 
 A background run therefore keeps accumulating. Frames for A arrive on the same socket,
@@ -1739,8 +1725,6 @@ of unmounting it.
 `selectedSession`, navigates to `/` and increments `newSessionTrigger`, which drives a
 dedicated reset effect in `useChatSessionState.ts`. The counter exists because the click
 must still do something when the app is already in that exact visible state.
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/architecture/MANUAL.md
 
 ## MAN-344 — Session protection: the busy map
 section: 03-conversation-handoff/008 Session protection: the busy map
@@ -1835,9 +1819,7 @@ session, at most one trailing request, and a session that cannot refresh right n
 hidden, or no longer the viewed session) stays marked dirty until `flushPending` runs on
 activation. The fetch itself is `refreshLatestSlotFromServer`, which pulls the newest 20 rows
 and stitches them onto the cached suffix, bridging with extra requests for turns bigger than
-one page. See [the message store](docs/architecture/MANUAL.md (04-message-store-and-lazy-loading)).
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/architecture/MANUAL.md
+one page. See [the message store](MANUAL.md).
 
 ## MAN-346 — Editing an already-sent message
 section: 03-conversation-handoff/010 Editing an already-sent message
@@ -2065,10 +2047,8 @@ section: 03-conversation-handoff/015 If you change this, check that
 | `handleChatEditSend` | Both provider shapes — `resolveEditAnchor` for Claude, `rewindSession` for Codex — and that a refused run never rewinds |
 | `session-upsert-broadcast.service.ts` | The sidebar reducer's alias dedupe and empty-summary guard in `useProjectsState.ts`. It is the only builder; keep it that way |
 | The busy map's shape | `useSessionIdSet`'s membership-key memo, which every sidebar mark reads its set through (sidebar re-render cost), and the 5 s running-sessions reconciliation |
-| `useSessionStore` slot fields | [the message store doc](docs/architecture/MANUAL.md (04-message-store-and-lazy-loading)), `recomputeMergedIfNeeded`'s reference-equality cache, and the pagination helpers |
+| `useSessionStore` slot fields | [the message store doc](MANUAL.md), `recomputeMergedIfNeeded`'s reference-equality cache, and the pagination helpers |
 | Anything that would make a session id mutable | Nothing should need this. A mutable id breaks slots, `lastSeqRef`, the busy map, the run registry key and the URL at once |
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/architecture/MANUAL.md
 
 ## MAN-352 — In one paragraph
 section: 04-message-store-and-lazy-loading/000 In one paragraph
@@ -2107,7 +2087,7 @@ section: 04-message-store-and-lazy-loading/001 Mental model
 5. **Server history and live frames are different shapes of the same conversation.**
    `prepareTranscriptMessages` runs on REST reads only, so the transcript mid-run does not
    match the transcript after a refresh. Reconciliation, not equality, is the contract — see
-   [the realtime stream](docs/architecture/MANUAL.md (02-realtime-stream)).
+   [the realtime stream](MANUAL.md).
 6. **The render list is narrowed three times, and none of them is virtualization.**
    `visibleMessages` is a tail slice of `chatMessages` (100 rows by default); each surviving
    row mounts its content only near the viewport; and each *mounted* row still skips layout
@@ -2123,7 +2103,7 @@ section: 04-message-store-and-lazy-loading/001 Mental model
    `chatStorage.ts`'s `safeLocalStorage`, are the only chat state that touches localStorage).
    The provider's transcript file is the source of truth and a reload re-fetches the tail page.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/architecture/MANUAL.md, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/chatDrafts.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/chatDrafts.ts
 
 ## MAN-354 — The pieces
 section: 04-message-store-and-lazy-loading/002 The pieces
@@ -2204,9 +2184,9 @@ renders.
 `idle` or `error` when it settles (also `idle` when `canRequest` refuses). Nothing else in the
 store touches it. `'streaming'` is declared in the `SessionStatus` union but no code path
 assigns it — streaming is visible through the `__streaming_<sessionId>` row instead, and busy
-state lives in the processing map described in [the realtime stream](docs/architecture/MANUAL.md (02-realtime-stream)).
+state lives in the processing map described in [the realtime stream](MANUAL.md).
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/architecture/MANUAL.md, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useSessionStore.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useSessionStore.ts
 
 ## MAN-357 — The merge
 section: 04-message-store-and-lazy-loading/004 The slot/005 The merge
@@ -2408,9 +2388,7 @@ sequenceDiagram
 `captureScrollRestoreState` records the first `.chat-message` whose bottom is at or below the
 container top, plus its offset from the top. After the commit, the layout effect either
 re-pins that anchor (`anchor.isConnected`) or falls back to a `scrollHeight` delta. See
-[scrolling](docs/architecture/MANUAL.md (05-scrolling)) for the full arbitration.
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/architecture/MANUAL.md
+[scrolling](MANUAL.md) for the full arbitration.
 
 ## MAN-363 — When the tail moves under you
 section: 04-message-store-and-lazy-loading/009 Pagination: the tail-page model/011 When the tail moves under you
@@ -2484,11 +2462,9 @@ Standalone `tool_result` rows are already gone — Claude and Codex drop them in
 `prepareTranscriptMessages` (which also unifies ask-tool calls, collapses consecutive checklist
 snapshots and caps tool output), Cursor filters `kind === 'tool_result'` itself, and OpenCode's
 normalizer never emits one. This does not hold for live frames — see
-[the realtime stream](docs/architecture/MANUAL.md (02-realtime-stream)).
+[the realtime stream](MANUAL.md).
 
 ---
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/architecture/MANUAL.md
 
 ## MAN-365 — Row-level laziness
 section: 04-message-store-and-lazy-loading/013 Row-level laziness
@@ -2499,7 +2475,7 @@ section: 04-message-store-and-lazy-loading/013 Row-level laziness
 wraps every rendered row — a `MessageComponent` or a `ToolGroupContainer` — in a
 `LazyMessageRow`.
 
-Three constants shape it, all listed under [the numbers](#the-numbers). Two details about them
+Three constants shape it, all listed under the numbers (MAN-355). Two details about them
 are easy to get wrong. `INITIAL_MOUNTED_TAIL_ROWS` is counted over the *grouped* list, so a
 collapsed tool group of nine calls spends one of the thirty. And `LAZY_ROW_VIEWPORT_MARGIN_PX`
 is a `rootMargin` of `1200px 0px` on the scroll container, so the band is 1200 px above *and*
@@ -2687,7 +2663,7 @@ section: 04-message-store-and-lazy-loading/016 Gotchas and why the code looks li
   would be one more thing to forget to call.
 - **The store keys sessions directly, with no alias table.** The app session id is allocated by
   `POST /api/providers/sessions` before the first send — see
-  [conversation handoff](docs/architecture/MANUAL.md (03-conversation-handoff)) — so nothing downstream re-keys a slot.
+  [conversation handoff](MANUAL.md) — so nothing downstream re-keys a slot.
 - **A fold the reader set by hand cannot live inside the row.** The row's whole subtree
   unmounts once it leaves the 1200 px band, so `useState` holding an open-or-closed flag is
   forgotten the moment the reader scrolls past it and comes back — and the row returns shorter
@@ -2696,7 +2672,7 @@ section: 04-message-store-and-lazy-loading/016 Gotchas and why the code looks li
   `openedTurns` Set, keyed by the turn's anchor id; `transcript/shapes/collapseState.ts`'s
   Map, keyed by a hash of the block's own text rather than by a message id — one reply carries
   three different ids before it settles, synthetic then finalised then persisted ([the realtime
-  stream](docs/architecture/MANUAL.md (02-realtime-stream)) §"Text streaming"), while the text the reader folded does not
+  stream](MANUAL.md) §"Text streaming"), while the text the reader folded does not
   change at all; and `transcript/shapes/TabbedCode.tsx`'s `chosenTabs` Map, which remembers the
   tab a code group last showed under the same content-addressed key as its fold.
   All three are written only by a click, so they grow with human effort rather than with
@@ -2712,8 +2688,6 @@ section: 04-message-store-and-lazy-loading/016 Gotchas and why the code looks li
   The search-jump effect keys off the `null` to re-arm itself for the next activation, which
   it must not do for a genuine network error.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/architecture/MANUAL.md
-
 ## MAN-369 — If you change this, check that
 section: 04-message-store-and-lazy-loading/017 If you change this, check that
 
@@ -2724,24 +2698,20 @@ section: 04-message-store-and-lazy-loading/017 If you change this, check that
 | `computeMerged` / `dedupeAdjacentAssistantEchoes` | `sessionStoreTruncate.test.tsx` and `sessionMessageReconciliation.test.ts`; the edit/replacement ordering is asserted there. |
 | Any mutator | It must assign a **new** `serverMessages`/`realtimeMessages` array rather than mutating one in place, or `recomputeMergedIfNeeded` sees unchanged references and skips the recompute. |
 | `normalizedToChatMessages` | The `WeakMap` projection cache invalidation keys, and `useChatMessages.test.ts` which pins object reuse across prepends and streaming. |
-| `LazyMessageRow` / `useLazyRowObserver` | Search jumps, which address rows by `data-message-timestamp` on the permanent wrapper; scroll anchor restore, which selects `.chat-message` inside the *mounted* content ([scrolling](docs/architecture/MANUAL.md (05-scrolling))); and the three module-level stores that exist only because a row's subtree unmounts — `CollapsibleUserText`, `transcript/shapes/collapseState.ts` and `TabbedCode`'s `chosenTabs`. |
+| `LazyMessageRow` / `useLazyRowObserver` | Search jumps, which address rows by `data-message-timestamp` on the permanent wrapper; scroll anchor restore, which selects `.chat-message` inside the *mounted* content ([scrolling](MANUAL.md)); and the three module-level stores that exist only because a row's subtree unmounts — `CollapsibleUserText`, `transcript/shapes/collapseState.ts` and `TabbedCode`'s `chosenTabs`. |
 | `INITIAL_MOUNTED_TAIL_ROWS` | The initial scroll-to-bottom, which relies on the newest rows having real measured heights. |
 | The history cache's key or validity check | `sessions.service.test.ts` and the Cursor/OpenCode bypass — their history does not live in `jsonl_path`. |
-| `prepareTranscriptMessages` | The live-vs-history divergence documented in [the realtime stream](docs/architecture/MANUAL.md (02-realtime-stream)) and the tool grouping in [the tool view](docs/architecture/MANUAL.md (06-tool-view)). |
-| `truncateAt` or `replacesAnchorId` | `history_truncated` emission order in the gateway ([websocket transport](docs/architecture/MANUAL.md (01-websocket-transport))) and `removeOptimisticUserEchoes`. |
+| `prepareTranscriptMessages` | The live-vs-history divergence documented in [the realtime stream](MANUAL.md) and the tool grouping in [the tool view](MANUAL.md). |
+| `truncateAt` or `replacesAnchorId` | `history_truncated` emission order in the gateway ([websocket transport](MANUAL.md)) and `removeOptimisticUserEchoes`. |
 | `visibleMessageCount` or who writes it | All four writers: `INITIAL_VISIBLE_MESSAGES` on session change, `+SESSION_MESSAGES_PAGE_SIZE` on prepend, `Infinity` on "Load all", `Math.max` with `resolveSearchWindowSize` on a search jump, plus `loadEarlierMessages` stepping 100. A shrink anywhere can scroll the transcript out from under the user. |
 | `messagesRepresentSamePersistedRow` | Every other helper in `sessionMessagePagination.ts` — all overlap detection funnels through it, so loosening it silently glues unrelated pages together and tightening it turns every refresh into a full bridge walk. |
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/architecture/MANUAL.md
 
 ## MAN-370 — Scrolling
 section: 05-scrolling/000
 
 *Where the transcript sits, who is allowed to move it, and the rules that stop the app from
 fighting the user. Paging and row mounting are covered in
-[the message store and lazy loading](docs/architecture/MANUAL.md (04-message-store-and-lazy-loading)).*
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/architecture/MANUAL.md
+[the message store and lazy loading](MANUAL.md).*
 
 ## MAN-371 — In one paragraph
 section: 05-scrolling/001 In one paragraph
@@ -2845,7 +2815,7 @@ composer's textarea highlight overlay and its own dropdown, the command menu, th
 rename input, the mobile terminal's momentum scroller, and the file manager's preview pane, which
 reveals a targeted line by writing two NAMED scrollers of its own rather than reaching for
 `scrollIntoView` — the same discipline this page holds the transcript to, argued out for that pane
-in [the file manager](../MANUAL.md (file-manager)) §"The rules that bite".
+in [the file manager](../MANUAL.md) §"The rules that bite".
 
 governs: /home/lyphe/.claude/MANUAL.md
 
@@ -3156,15 +3126,13 @@ search hit is not supposed to land at the bottom.
 
 **Filling a short screen.** A 20-row page with "Show work", thinking or the compaction summary off can leave one
 reply and nothing to scroll, so `fillViewportWithHistory` (asked by `ChatMessagesPane` after
-every commit; see [the message store](docs/architecture/MANUAL.md (04-message-store-and-lazy-loading))) loads older
+every commit; see [the message store](MANUAL.md)) loads older
 history until the transcript overflows by 200 px. While the reader has not scrolled up it
 passes `pinToBottom`, and `loadOlderMessages` **re-arms `pendingInitialScrollRef`** instead
 of setting `pendingScrollRestoreRef`: the older page lands above and the settle loop keeps
 the newest reply in view. An anchor restore there would pin a row near the top and let the
 tail drift off screen as the prepended rows change the heights below it. `visibleMessageCount` is
 in the loop's dependencies so a fill that only widens the window re-runs it too.
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/architecture/MANUAL.md
 
 ## MAN-384 — Switching sessions
 section: 05-scrolling/012 Opening a session, switching, and coming back/014 Switching sessions
@@ -3394,13 +3362,11 @@ section: 05-scrolling/021 If you change this, check that
 | `LazyMessageRow` placeholder height, the `.chat-message` class placement, or the 1200 px observer margin | Prepend anchor scan, search-jump row lookup, and `lazyMessageRow.test.tsx`. |
 | `SEARCH_SCROLL_RETRIES`, the retry delay, or `findRenderedMessageElement` | The cross-session cancellation test and `searchTargetLocator.test.ts`; `allowNearest` must stay on the final attempt only. |
 | `.chat-message` containment or `content-visibility` | The export override in `buildTranscriptHtml.tsx` mirrors these declarations. |
-| Session load or pagination in `useChatSessionState.ts` | `pendingScrollRestoreRef`, `liveScrollStateRef`, `pendingInitialScrollRef`, `searchScrollActiveRef` and `wasNearTopRef` are all handled by the session-change effect — see [the message store](docs/architecture/MANUAL.md (04-message-store-and-lazy-loading)). |
+| Session load or pagination in `useChatSessionState.ts` | `pendingScrollRestoreRef`, `liveScrollStateRef`, `pendingInitialScrollRef`, `searchScrollActiveRef` and `wasNearTopRef` are all handled by the session-change effect — see [the message store](MANUAL.md). |
 | Composer send or the activity indicator | `handleSubmit` forces `isUserScrolledUp` false and scrolls unconditionally at +100 ms; the indicator changes the pane's padding without a scroll event. |
-| Tool card expand/collapse | Nothing scrolls today — see [tool views](docs/architecture/MANUAL.md (06-tool-view)). Adding a `scrollIntoView` there adds a sixth writer with no claim ref. |
+| Tool card expand/collapse | Nothing scrolls today — see [tool views](MANUAL.md). Adding a `scrollIntoView` there adds a sixth writer with no claim ref. |
 
-Related: [the realtime stream](docs/architecture/MANUAL.md (02-realtime-stream)) for how rows arrive.
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/architecture/MANUAL.md
+Related: [the realtime stream](MANUAL.md) for how rows arrive.
 
 ## MAN-392 — In one paragraph
 section: 06-tool-view/000 In one paragraph
@@ -3414,10 +3380,8 @@ result that arrives seconds later, deciding what to show in between, collapsing 
 same tool into one row, and nesting a running subagent's calls inside the row that spawned
 it.
 
-Read [the realtime stream](docs/architecture/MANUAL.md (02-realtime-stream)) first for how the frames arrive, and
-[the message store](docs/architecture/MANUAL.md (04-message-store-and-lazy-loading)) for what `merged` means.
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/architecture/MANUAL.md
+Read [the realtime stream](MANUAL.md) first for how the frames arrive, and
+[the message store](MANUAL.md) for what `merged` means.
 
 ## MAN-393 — Mental model
 section: 06-tool-view/001 Mental model
@@ -4208,7 +4172,7 @@ which today is `DataTable`'s copy-as-CSV action and its sort headers, `DiffBlock
 `TabbedCode`'s tab strip. With no strip, an exported tab group draws every fence stacked, so the
 export keeps the languages the reader never clicked. `CodeFence` asks it too, about what it may
 MOUNT rather than draw: in an export a mermaid fence is its source, never `MermaidDiagram` (see
-[rendered shapes](docs/architecture/MANUAL.md (08-rendered-shapes)) §"Collapse and export"). Keeping both in one module is
+[rendered shapes](MANUAL.md) §"Collapse and export"). Keeping both in one module is
 the point: a shape that remembers the rule for itself is a chance to ship one that exports empty,
 and the next shape gets the rule for free by calling whichever of the two fits. The `interactive`
 half is not cosmetic — an export inlines the app's stylesheets (`export/buildTranscriptHtml.tsx`),
@@ -4217,7 +4181,7 @@ Prop-drilling instead would mean threading a flag through `ChatMessagesPane`,
 `LazyMessageRow`, `MessageComponent`, `ToolRenderer` and `CollapsibleDisplay` — every one
 memoized, and four with no other reason to know exports exist.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/architecture/MANUAL.md, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/export/TranscriptExportDocument.tsx
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/export/TranscriptExportDocument.tsx
 
 ## MAN-409 — Gotchas and why the code looks like this
 section: 06-tool-view/017 Gotchas and why the code looks like this
@@ -4379,10 +4343,8 @@ are never this app's — and `classifyWidgetBody` is the one place the three are
 one of them is drawn inside the transcript's ordinary shape card, which carries a fullscreen
 switch that hands the frame the whole viewport without reloading it.
 
-Read [the realtime stream](docs/architecture/MANUAL.md (02-realtime-stream)) for how a reply arrives, and
-[tool views](docs/architecture/MANUAL.md (06-tool-view)) for the other way a block of model output becomes UI.
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/architecture/MANUAL.md
+Read [the realtime stream](MANUAL.md) for how a reply arrives, and
+[tool views](MANUAL.md) for the other way a block of model output becomes UI.
 
 ## MAN-412 — Mental model
 section: 07-live-widgets/001 Mental model
@@ -4728,7 +4690,7 @@ sandbox tokens, so a change that drops either reddens the same gate.
 
 **A canvas block opens in READ in this frame** — pan locked, its Read/Edit switch the way into
 Edit. The mode is the block's own default on every surface, so nothing here asks whether it is
-framed; the hooks that mode rides on are the README's (§"Embedding one block"), not this file's,
+framed; the hooks that mode rides on are MAN-238's, not this section's,
 and `.verify/probe-docspace-canvas.mjs` reads them from inside the frame.
 
 **A frame that never answers is a fault the reader cannot see**, so `DocSpaceFrame` arms a timer
@@ -5090,9 +5052,9 @@ section: 07-live-widgets/013 Gotchas
   `ThemeProvider`.** That is why `WidgetFrame` keeps every context read inside `WidgetFrameLive`,
   behind the mount gate, rather than following mermaid's shape exactly. The transcript export
   never mounts `MermaidDiagram`: `CodeFence` draws a mermaid fence's source there instead (see
-  [rendered shapes](docs/architecture/MANUAL.md (08-rendered-shapes)) §"Collapse and export").
+  [rendered shapes](MANUAL.md) §"Collapse and export").
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/architecture/MANUAL.md, /home/lyphe/.claude/claudecodeui_lyphe/src/main.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-22.mjs
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/main.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-22.mjs
 
 ## MAN-425 — If you change this, check that
 section: 07-live-widgets/014 If you change this, check that
@@ -5147,11 +5109,9 @@ may never render less than the markdown it replaced** — and the rest of this d
 consequences.
 
 Every path below is under `src/modules/chat/transcript/` unless it says otherwise. Read
-[the realtime stream](docs/architecture/MANUAL.md (02-realtime-stream)) §"Incremental markdown rendering" for the settled and
-pending halves every streaming rule here leans on, and [live widgets](docs/architecture/MANUAL.md (07-live-widgets)) for the
+[the realtime stream](MANUAL.md) §"Incremental markdown rendering" for the settled and
+pending halves every streaming rule here leans on, and [live widgets](MANUAL.md) for the
 one fence this feature routes around.
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/architecture/MANUAL.md
 
 ## MAN-427 — Mental model
 section: 08-rendered-shapes/001 Mental model
@@ -5255,7 +5215,7 @@ section: 08-rendered-shapes/002 The pieces
 | `shapes/elements/plain.tsx` | `PlainRule`, `PlainHeading` (forwards hast properties, so GFM's `sr-only` footnote label stays hidden), `PlainDiv`, and `ShapeDiv`, which routes the three plugin wrappers |
 | `shapes/elements/inlineText.tsx` | `renderInline` — the one seam where a block's rendered inline content gets file chips |
 | `shapes/code/index.tsx` | `CodeBlock` (the `code` override's dispatcher: inline or block, then the widget branch) and `CodePre` |
-| `shapes/code/EmbedFrame.tsx` | `EmbedFrame` — the card a LIVE embed wears: the one `ShapeFrame` header every shape draws, `flush` so the iframe reaches the card's own edge, plus an `a[data-docspace-open]` action carrying a DocSpace block's studio deep link. `CodeBlock` hands it to `WidgetFrame` as its `frame`, and `WidgetFrame` calls it only behind its mount and streaming gates; it imports nothing from `@/modules/widgets` and classifies no body. See [live widgets](docs/architecture/MANUAL.md (07-live-widgets)) §"The DocSpace kind" |
+| `shapes/code/EmbedFrame.tsx` | `EmbedFrame` — the card a LIVE embed wears: the one `ShapeFrame` header every shape draws, `flush` so the iframe reaches the card's own edge, plus an `a[data-docspace-open]` action carrying a DocSpace block's studio deep link. `CodeBlock` hands it to `WidgetFrame` as its `frame`, and `WidgetFrame` calls it only behind its mount and streaming gates; it imports nothing from `@/modules/widgets` and classifies no body. See [live widgets](MANUAL.md) §"The DocSpace kind" |
 | `shapes/code/CodeFence.tsx` | The fence precedence, and `FenceBlock`, today's highlighted block. Injects the `cc-syntax-theme` style at module scope |
 | `shapes/code/InlineCode.tsx` | Today's inline code span, or a colour swatch, keycaps or a file chip |
 | `shapes/MarkdownLink.tsx` | The `a` override. Asks `parseFileRef` under its loose link policy and forwards the `:line` |
@@ -5301,7 +5261,7 @@ section: 08-rendered-shapes/002 The pieces
 What each probe asserts, and which of its gates redden on which defect, is
 [docs/MANUAL.md (verification)](../MANUAL.md) §"The browser harness".
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/architecture/MANUAL.md, /home/lyphe/.claude/claudecodeui_lyphe/docs/MANUAL.md, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/surface-signal.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/command-palette/context/PaletteOpsContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/markdown-preview/MermaidDiagram.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/constants.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/artifacts/shapes-elements-baseline.html, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/mountReact.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/shapes-fixture.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-32.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-33.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-34.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-markdown-cards.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-baseline.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-detect.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-fences.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-groups.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-inline.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-lineopen.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-lists.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-prose.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-tables.mjs, /home/lyphe/.claude/MANUAL.md
+governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/MANUAL.md, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/surface-signal.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/command-palette/context/PaletteOpsContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/markdown-preview/MermaidDiagram.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/constants.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/artifacts/shapes-elements-baseline.html, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/mountReact.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/shapes-fixture.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-32.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-33.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-34.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-markdown-cards.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-baseline.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-detect.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-fences.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-groups.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-inline.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-lineopen.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-lists.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-prose.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-tables.mjs, /home/lyphe/.claude/MANUAL.md
 
 ## MAN-429 — The triggers
 section: 08-rendered-shapes/003 The triggers
@@ -5464,14 +5424,12 @@ watched.
   stay.
 
 The saved file inlines the app's stylesheets, so a control drawn into it would paint its hover and
-do nothing. See [tool views](docs/architecture/MANUAL.md (06-tool-view)) §"Rendering into an exported document" for the rule
+do nothing. See [tool views](MANUAL.md) §"Rendering into an exported document" for the rule
 this follows. `mermaid` is the one exception: an export draws the fence's SOURCE, as the ordinary
 highlighted block inside the same `diagram` frame. A static render runs no effect for mermaid to
 draw in, and no `ThemeProvider` sits above `MermaidDiagram`'s `useTheme()`, which throws outside
 one. `CodeFence` makes that choice from `useShapeInteractive`, so the diagram component is never
 mounted into an export.
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/architecture/MANUAL.md
 
 ## MAN-431 — Streaming
 section: 08-rendered-shapes/005 Streaming
@@ -5503,12 +5461,10 @@ which `probe-shapes-inline.mjs` holds under 4 ms for 42,000 characters holding 4
 the same on both sides of the settle boundary. The reasoning lives in `elements/inlineText.tsx`.
 
 **A block that crosses the boundary remounts.** The split can retract, putting a settled block back
-in the pending half, which is a different parent (see [live widgets](docs/architecture/MANUAL.md (07-live-widgets))
+in the pending half, which is a different parent (see [live widgets](MANUAL.md)
 §"The fence" for the measured restart). A shape there drops to plain markup until it settles again,
 then mounts fresh and re-reads its fold from the map, so the fold returns when its payload is
 unchanged.
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/architecture/MANUAL.md
 
 ## MAN-432 — Element cards
 section: 08-rendered-shapes/006 Element cards
@@ -5642,7 +5598,7 @@ compounding rule** follows from the unit — an `md-*` size goes on a text leaf,
 and body wrappers, and never on a container that holds another sized element, where it would
 multiply. `ShapeFrame` writes `data-text-scale="flow"` on every frame's root so a probe can confirm
 the scale is in force. `MarkdownContent.tsx` (every tool markdown body — see
-[tool views](docs/architecture/MANUAL.md (06-tool-view)) §"Content renderers") carries `text-chat-tool` beside its existing
+[tool views](MANUAL.md) §"Content renderers") carries `text-chat-tool` beside its existing
 `prose-sm`, and `markdownCards.css`'s R5, R11, R12 and R17 (§"Element cards") spell `md-meta` and
 `md-body` where they spelled `text-xs`/`text-sm` before.
 
@@ -5701,7 +5657,7 @@ so the static render carries no `data-vv-enter` and draws no animation (§"Colla
 the whole export contract). *Reduced motion draws no rule at all* — the stylesheet and the meter's
 rule beside it are both inside the query, so the card is simply there.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/architecture/MANUAL.md, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/verve/MANUAL.md, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/utils.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/verve/MANUAL.md, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/utils.ts
 
 ## MAN-434 — Gotchas
 section: 08-rendered-shapes/008 Gotchas
@@ -5754,7 +5710,7 @@ section: 08-rendered-shapes/009 If you change this, check that
 | `useShapeCollapse` or `useShapeInteractive` | The tables, fences and groups probes' export mounts still draw every shape whole with zero controls, and a fold still survives its row remounting |
 | `data-vv-enter`, `shapeMotion.css`'s selectors, or `hasEntered`/`markEntered` | `phase-34.mjs`'s `M` gates: a first settled mount carries the marker and plays the rise, a later mount of the same content carries neither, and reduced motion draws no rule at all |
 | `LeadIn`, `LeadInTitleContext`, or the rung predicates it asks (`tableRung`/`listRung`) | `phase-34.mjs`'s `L` gates: three list frames titled from their own line, a table no rung claimed left with its paragraph above it, and a link inside a lead-in title still folding from the chevron alone. `LeadIn` asks the SAME predicates the ladders use, so a rung answered two ways loses a paragraph or gives a table a second frame |
-| `EmbedFrame`, or `WidgetFrame`'s `frame` prop | `phase-34.mjs`'s `E` gates: a settled widget and a DocSpace fence wear the card header, an export and a streaming fence draw their raw source and no frame, and the DocSpace action points at the studio ([live widgets](docs/architecture/MANUAL.md (07-live-widgets)) §"The DocSpace kind") |
+| `EmbedFrame`, or `WidgetFrame`'s `frame` prop | `phase-34.mjs`'s `E` gates: a settled widget and a DocSpace fence wear the card header, an export and a streaming fence draw their raw source and no frame, and the DocSpace action points at the studio ([live widgets](MANUAL.md) §"The DocSpace kind") |
 | `ShapeFrame`'s markers | Every probe finds shapes by `data-shape`, `data-collapsed` and `data-shape-toggle`; a title and a body are read by `data-shape-title` and `data-shape-body`, a header by `data-shape-header`, its icon by `data-shape-icon`, its actions by `data-shape-actions`, and the scale itself by `data-text-scale`. Rename one and gates that never read this source go quiet |
 | A new `ShapeKind`, or a kind's icon/tone in `SHAPE_KINDS` | Adding a kind with no `SHAPE_KINDS` entry is a type error at the call site, but the icon's existence in the installed `lucide-react` is not type-checked — confirm the import resolves before shipping |
 | A new named size in `tailwind.config.js`'s `fontSize`, or the `chat-tool` ratio | `src/shared/utils.ts`'s `extendTailwindMerge` list names every `text-<name>` this app spends as a font size; a size added there and not to that list is read as a text COLOUR by `cn()`'s merger and silently stops following the reader's setting (§"Header, type and motion") |
@@ -5775,7 +5731,7 @@ section: 08-rendered-shapes/009 If you change this, check that
 | `markdownCards.css`, or the scope class its selectors spell | `probe-markdown-cards.mjs`: G2 reads the frame, G4 the badges and G7 the `.not-prose` exclusion back off the document, G1 proves the class moved no DOM and G15 that no margin moved. That probe spells `chat-md-cards` as a literal it cannot be told to rename, so renaming the class reddens it until the file is edited too |
 | `PlainList`'s or `PlainRule`'s class string | On a carded surface `markdownCards.css` overrides it by specificity, so run `probe-markdown-cards.mjs` as well as `probe-shapes-baseline.mjs`: the baseline compares the class string on a body that carries no cards, and cannot see the carded surface losing it |
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/architecture/MANUAL.md, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/utils.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/utils.ts
 
 ## MAN-436 — In one paragraph
 section: 09-universe/000 In one paragraph
@@ -5787,8 +5743,8 @@ resolve onto map stars and reach the canvas over one websocket frame kind, while
 frame kind and over REST. Nothing on the sky is invented — an edit flares its star, an execution sends a comet
 along edges the graph really has, and a quiet estate is a dark sky. **The map's schema has one home**, the
 module docstring of `scripts/universe/build.py` (lines 1-95, the code that writes it); this document points at
-it rather than restating it. See [07-live-widgets.md](docs/architecture/MANUAL.md (07-live-widgets)) for the bus a digest rides, and
-[02-realtime-stream.md](docs/architecture/MANUAL.md (02-realtime-stream)) for the transport.
+it rather than restating it. See [docs/architecture/MANUAL.md (07-live-widgets)](MANUAL.md) for the bus a digest rides, and
+[docs/architecture/MANUAL.md (02-realtime-stream)](MANUAL.md) for the transport.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/architecture/MANUAL.md
 
@@ -6025,7 +5981,7 @@ changes only what the sky costs to draw (`UniverseTweaksPanel.tsx`'s `WORDS.rend
 nothing has happened for 20 s, nothing at all while the tab is hidden, and a single frame for a visitor who
 asked for less motion (`:108,132-139,158-168`). All four answer *when* a frame is owed and none of them what
 that frame repaints: the fast path is held for the live layer, whose comets, flares and labels move every
-frame, and the star layer keeps to a cadence of its own ([the frame's cost](#what-a-frame-costs) below). The
+frame, and the star layer keeps to a cadence of its own (the frame's cost, MAN-446, below). The
 window measures IDLENESS, not presence, so a page left open overnight ticks rather than burning a core on a sky
 nobody is watching. `mode()` answers which of the four
 the frame now drawing was scheduled on, not the one queued next (`:71-74,114-119,171-174`) — the field
@@ -6282,23 +6238,21 @@ section: README/002 Reading order
 
 | # | Document | Why it comes here |
 | --- | --- | --- |
-| 1 | [WebSocket transport](docs/architecture/MANUAL.md (01-websocket-transport)) | The pipe everything rides on. Read first — the frame tables below are its vocabulary. |
-| 2 | [The realtime stream](docs/architecture/MANUAL.md (02-realtime-stream)) | One run's full journey, from provider output to a rendered reply. The heart of the system. |
-| 3 | [Conversation handoff](docs/architecture/MANUAL.md (03-conversation-handoff)) | Which ids exist, and the four points where a conversation changes hands. Answers "why does this conversation have two ids". |
-| 4 | [The message store and lazy loading](docs/architecture/MANUAL.md (04-message-store-and-lazy-loading)) | Where messages live in the client, and how a huge transcript loads without freezing the tab. |
-| 5 | [Scrolling](docs/architecture/MANUAL.md (05-scrolling)) | Where the view sits, and why five different pieces of code move it. |
-| 6 | [Tool views](docs/architecture/MANUAL.md (06-tool-view)) | How a tool call becomes UI. Needs the message model from 2 and 4. |
-| 7 | [Live widgets](docs/architecture/MANUAL.md (07-live-widgets)) | How a `widget` fence becomes a live frame — two of them, chosen by the body: a sandboxed HTML document, or one DocSpace block embedded from ArchPulse's own origin. Late, because it needs the streaming markdown pipeline from 2 — and the transport from 1 once a widget can subscribe to live data. |
-| 8 | [Rendered shapes](docs/architecture/MANUAL.md (08-rendered-shapes)) | How ordinary markdown in a settled reply becomes a component — a sortable table, a callout, a verdict banner, a file chip — and why a block that misses its trigger renders exactly as it always did. After 7, because both share the `code` override's dispatcher, and it needs the streaming split from 2. |
-| 9 | [Project Universe](docs/architecture/MANUAL.md (09-universe)) | How four repositories become one map and how the estate's real journal and transcript activity is drawn on it — the crawler and its registry, the two taps, the two websocket frames, and the tab. Last, because it adds two frame kinds to 1's tables and a second consumer to the stream in 2, and its map is the only thing here that is not about a conversation. |
+| 1 | [WebSocket transport](MANUAL.md) | The pipe everything rides on. Read first — the frame tables below are its vocabulary. |
+| 2 | [The realtime stream](MANUAL.md) | One run's full journey, from provider output to a rendered reply. The heart of the system. |
+| 3 | [Conversation handoff](MANUAL.md) | Which ids exist, and the four points where a conversation changes hands. Answers "why does this conversation have two ids". |
+| 4 | [The message store and lazy loading](MANUAL.md) | Where messages live in the client, and how a huge transcript loads without freezing the tab. |
+| 5 | [Scrolling](MANUAL.md) | Where the view sits, and why five different pieces of code move it. |
+| 6 | [Tool views](MANUAL.md) | How a tool call becomes UI. Needs the message model from 2 and 4. |
+| 7 | [Live widgets](MANUAL.md) | How a `widget` fence becomes a live frame — two of them, chosen by the body: a sandboxed HTML document, or one DocSpace block embedded from ArchPulse's own origin. Late, because it needs the streaming markdown pipeline from 2 — and the transport from 1 once a widget can subscribe to live data. |
+| 8 | [Rendered shapes](MANUAL.md) | How ordinary markdown in a settled reply becomes a component — a sortable table, a callout, a verdict banner, a file chip — and why a block that misses its trigger renders exactly as it always did. After 7, because both share the `code` override's dispatcher, and it needs the streaming split from 2. |
+| 9 | [Project Universe](MANUAL.md) | How four repositories become one map and how the estate's real journal and transcript activity is drawn on it — the crawler and its registry, the two taps, the two websocket frames, and the tab. Last, because it adds two frame kinds to 1's tables and a second consumer to the stream in 2, and its map is the only thing here that is not about a conversation. |
 
 **In a hurry?** Read 1 and 2.
 **Debugging something a user can see?** Start at 5 or 6.
 **Chasing a duplicated or vanishing message?** Start at 3, then 4.
 
 ---
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/architecture/MANUAL.md
 
 ## MAN-452 — The protocol, in two tables
 section: README/003 The protocol, in two tables
@@ -6337,7 +6291,7 @@ section: README/003 The protocol, in two tables/004 Server → client: the `kind
 | `runner_state` | gateway | The plan runner's runs, pushed on change. |
 | `soul_launch_state` | gateway | The launcher souls a session started by hand, pushed on change. Feeds the soul pins in the strip above the composer when the desktop chat gutters are not showing, and in the gutter's Subagents widget while they are ([docs/MANUAL.md (dispatch-souls)](../MANUAL.md)). |
 | `universe_map` | gateway | The estate map was rebuilt because a tracked repo's HEAD moved; carries the `mapId` a client refetches `GET /api/universe/map` for. Excused from the chat reducer beside `runner_state`/`soul_launch_state`. |
-| `universe_activity` | gateway | Coalesced estate activity — journal lines and Claude transcript edits resolved onto map stars. At most ten frames a second, and none at all while the estate is quiet; carries the held `mapId`, a `rows` array and a `dropped` count. Excused from the chat reducer. See [01-websocket-transport.md](docs/architecture/MANUAL.md (01-websocket-transport)) §"Fan-out: who receives what". |
+| `universe_activity` | gateway | Coalesced estate activity — journal lines and Claude transcript edits resolved onto map stars. At most ten frames a second, and none at all while the estate is quiet; carries the held `mapId`, a `rows` array and a `dropped` count. Excused from the chat reducer. See [docs/architecture/MANUAL.md (01-websocket-transport)](MANUAL.md) §"Fan-out: who receives what". |
 | `protocol_error` | gateway | The request was rejected or never started. No `complete` follows. |
 
 One more kind never crosses the wire: **`websocket_reconnected`** is synthesized inside
@@ -6417,19 +6371,19 @@ section: README/008 Symptom lookup
 
 | Symptom | Start here |
 | --- | --- |
-| Message appears twice, or vanishes on refresh | [3](docs/architecture/MANUAL.md (03-conversation-handoff)), then [4](docs/architecture/MANUAL.md (04-message-store-and-lazy-loading)) |
-| Spinner never stops | [2](docs/architecture/MANUAL.md (02-realtime-stream)) — look for the terminal `complete` |
-| A second tab froze mid-run | [1](docs/architecture/MANUAL.md (01-websocket-transport)) — writer fan-out and replay |
-| Transcript opens part-way up, or jumps while reading | [5](docs/architecture/MANUAL.md (05-scrolling)) |
-| Old messages never load, or loading is slow | [4](docs/architecture/MANUAL.md (04-message-store-and-lazy-loading)) |
-| A tool renders wrong, or a group collapses oddly | [6](docs/architecture/MANUAL.md (06-tool-view)) |
-| Markdown in a reply drew as a card, banner or chip it should not have — or lost words doing it | [8](docs/architecture/MANUAL.md (08-rendered-shapes)) — the trigger table, then `detect.ts` |
-| Nothing arrives at all after a network blip | [1](docs/architecture/MANUAL.md (01-websocket-transport)) — reconnect and `lastSeq` |
-| A live session reads as idle, or replays itself, right after the API restarted | [2](docs/architecture/MANUAL.md (02-realtime-stream)) — a re-adopted run's fresh `seq`, and [docs/MANUAL.md (hosting)](../MANUAL.md) |
+| Message appears twice, or vanishes on refresh | [3](MANUAL.md), then [4](MANUAL.md) |
+| Spinner never stops | [2](MANUAL.md) — look for the terminal `complete` |
+| A second tab froze mid-run | [1](MANUAL.md) — writer fan-out and replay |
+| Transcript opens part-way up, or jumps while reading | [5](MANUAL.md) |
+| Old messages never load, or loading is slow | [4](MANUAL.md) |
+| A tool renders wrong, or a group collapses oddly | [6](MANUAL.md) |
+| Markdown in a reply drew as a card, banner or chip it should not have — or lost words doing it | [8](MANUAL.md) — the trigger table, then `detect.ts` |
+| Nothing arrives at all after a network blip | [1](MANUAL.md) — reconnect and `lastSeq` |
+| A live session reads as idle, or replays itself, right after the API restarted | [2](MANUAL.md) — a re-adopted run's fresh `seq`, and [docs/MANUAL.md (hosting)](../MANUAL.md) |
 
 ---
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/architecture/MANUAL.md, /home/lyphe/.claude/claudecodeui_lyphe/docs/MANUAL.md, /home/lyphe/.claude/MANUAL.md
+governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/MANUAL.md, /home/lyphe/.claude/MANUAL.md
 
 ## MAN-458 — Related module docs
 section: README/009 Related module docs

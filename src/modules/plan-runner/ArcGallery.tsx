@@ -28,10 +28,17 @@ import { cn } from '@/shared/utils';
  * way the Memory widget heads its own sections. The home is written on the DOM
  * (`data-arc-gallery="tab|gutter"`) so a probe can tell the two apart.
  *
+ * `pinnedSessionId` is the gutter home's alone — the open chat's session, handed down to the cards
+ * so a card holding a run this chat launched wears the gutter's own pin. The tab passes nothing:
+ * there is no open chat there, and so no "mine".
+ *
  * Used by `RunnerPanel` above its run list (the tab home), and by `RunnerWidgetBody` above the
  * gutter widget's runs (the gutter home).
  */
-export function ArcGallery({ home = 'tab' }: { home?: 'tab' | 'gutter' }) {
+export function ArcGallery({ home = 'tab', pinnedSessionId = null }: {
+  home?: 'tab' | 'gutter';
+  pinnedSessionId?: string | null;
+}) {
   const { t } = useTranslation();
   const { arcs } = useArcs();
 
@@ -49,7 +56,7 @@ export function ArcGallery({ home = 'tab' }: { home?: 'tab' | 'gutter' }) {
       <ul className="flex min-w-0 flex-col gap-4">
         {arcs.map((arc) => (
           <li key={arc.arc} className="min-w-0">
-            <ArcDeck arc={arc} cardFillsStrip={home === 'gutter'} />
+            <ArcDeck arc={arc} cardFillsStrip={home === 'gutter'} pinnedSessionId={pinnedSessionId} />
           </li>
         ))}
       </ul>
