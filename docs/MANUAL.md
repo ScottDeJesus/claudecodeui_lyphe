@@ -2569,7 +2569,10 @@ once`), and it explains a plan sitting still under `one at a time`. A `Collapsib
 `PlanPhaseRow`s: glyph (`PHASE_GLYPH` ✅ ▶ ·), position, title, a word — `running` (info) only while the
 phase is `running` AND `busy`; `running` and not busy is a walk that ended and is not yet settled, drawn
 `settling` in neutral; `done`; `not started` — then `n rounds · <spend>` (the phase's own, the same rule; a phase not yet walked has none and the field is dropped) and the assignee in mono; folded
-beneath, one line per stage: launch time, name, soul, verdict, the stage's `<spend>`.
+beneath, one line per stage: launch time (`clockOf`), name, soul, verdict, the stage's `<spend>`; a phase
+with no stage reads `dispatcher.noStages`. Handles: `data-dispatcher-clock` on the clock,
+`data-dispatcher-phase=<key>` with `data-phase-status` on each phase row, `data-dispatcher-stage` on each
+stage line.
 
 **The event feed.** A second `Collapsible`, folded, headed `dispatcher.events` (`45 events`): the LAST 30
 events newest first, one mono line each — the ISO's time part (`clockOf`, `18:28:17Z`: the `Z` stays, the
@@ -6373,9 +6376,9 @@ run reads one way in a run list and inside an arc. The runner card has two homes
 the Runner tab (`RunnerPanel`), and the desktop chat gutter's Runner widget (`RunnerWidgetBody`) —
 both in `src/modules/runner-tab`, the host above this lane and the dispatcher's (§"The Runner tab") —
 which sits beside the transcript and never over it. The arc deck has the same two homes, drawn
-above the runs in each (§"The arc deck" → "The gallery"), and the widget's badge counts both: the
-runs plus the arcs not yet complete. The widget's empty state shows only when there is neither a
-run nor an arc — the tab's own rule. A run an arc card owns is listed in neither home
+above the runs in each (§"The arc deck" → "The gallery"), and the widget's badge counts the runs, the v3 plans
+and the arcs not yet complete. The widget's empty state shows only when there is no run, no plan and
+no arc — the tab's own rule. A run an arc card owns is listed in neither home
 (§"The arc deck" → "The run on the card").
 
 **It was pinned above the transcript once, and that is why the rule is written down.** The card was
@@ -6567,8 +6570,8 @@ box's switch, shown on its meter's sub-line — and `ScheduleControl`'s `plan` s
 prefix (`data-dispatcher-schedule`) and a title (`dispatcher.scheduleTitle`); the button text and
 `useOffpeak` are this lane's, because `dispatcher offpeak` prints the same hour.
 
-Its strings live under `runner.*` in `src/modules/i18n/locales/en/common.json`, English only; every
-other locale falls back.
+Its strings live under `runner.*`, and the v3 plan card's under `dispatcher.*`, in
+`src/modules/i18n/locales/en/common.json`, English only; every other locale falls back.
 
 The tab that mounts it is the next section.
 
@@ -6630,9 +6633,12 @@ id-space, so the other lane's dismissals stand; a plan's ending is
 — not `arcCount` (§"The arc deck" below) — reachable precisely because the tab is sticky. `ArcGallery`
 mounts above the run list in the same scroll when an arc exists (§"The arc deck" below).
 
-**The gutter.** `RunnerWidgetBody` draws the same plan cards FOLDED above the runs: the open chat's
-plans first (`session_app_id === sessionId`, with `SessionPin`), the rest behind, then the runs by the
-same rule. The widget's badge in `ChatGutterLayout` counts runs, plans and unfinished arcs.
+**The gutter.** `RunnerWidgetBody` draws the same plan cards FOLDED below the arc deck and above the
+runs: the open chat's plans first (`session_app_id === sessionId`, with `SessionPin`), the rest behind,
+then the runs by the same rule. A plan's row is `li[data-testid=runner-widget-plan]` carrying
+`data-plan-name` and `data-pinned` (`true` for the open chat's); a run's is `runner-widget-run`. The
+widget's `EmptyState` shows only when there is no run, no plan and no arc. The widget's badge in
+`ChatGutterLayout` counts runs, plans and unfinished arcs.
 
 **The palette.** `CommandPalette`'s `NAV_TABS` carries a `Go to Runner` row, and the Navigate group
 filters that static list through `visibleTabs` — which `ProjectCommandPalette` builds from the same
