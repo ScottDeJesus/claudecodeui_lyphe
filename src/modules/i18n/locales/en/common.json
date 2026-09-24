@@ -52,7 +52,7 @@
       "athenaPending": "Athena · not yet",
       "by": "Fired by {{reason}} · built by {{builder}}",
       "closed": "{{count}} rows closed",
-      "costTitle": "DeepSeek’s share of this heal — what the daily cap counts, never the chain’s whole bill",
+      "costTitle": "DeepSeek’s share of this heal — what the daily cap counts, never the chain’s whole bill. The tokens beside it are the chain’s Claude souls’ own work — a vendor’s tokens are its own business, so a heal only DeepSeek walked draws none",
       "costTitleOld": "Booked before 2026-09-23, when a heal booked its chain’s WHOLE bill: the Claude stages in this number were your subscription, not DeepSeek — though the daily cap counts them as DeepSeek all the same",
       "costTitleUnbooked": "Nothing booked yet — a heal books its cost when it ends",
       "empty": {

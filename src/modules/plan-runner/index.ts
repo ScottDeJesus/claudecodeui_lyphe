@@ -12,7 +12,8 @@ export { useArcRunIds } from '@/modules/plan-runner/hooks/useArcRunIds';
 export { byUrgencyThenNewest } from '@/modules/plan-runner/runState';
 // What a run, a plan and a soul have spent, in the one spelling every card draws it in: paid dollars
 // labelled by the vendor that billed them (`$0.41 DeepSeek`, and nothing at all when nothing was
-// billed — Claude work is counted in tokens, never dollars), and the tokens either way. Exported
+// billed — Claude work is counted in tokens, never dollars), and the CLAUDE records' tokens, which
+// are nothing at all where a vendor billed the work. DOLLARS **OR** TOKENS, BY WHO WAS USED. Exported
 // because THREE lanes draw this figure off three different records — the run card here, the
 // dispatcher's plan card and the chat strip's launcher-soul pin — and a per-lane copy of it is how
 // one app says `$0.41` on one screen and `0.41 USD` on the next.

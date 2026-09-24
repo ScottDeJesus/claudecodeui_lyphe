@@ -142,9 +142,11 @@ function readCached(filePath: string, parse: (raw: string) => unknown): unknown 
  * of the weekly budget once the planner, his scouts and the review were counted.
  *
  * `planning`/`review`/`scouts` are PAID dollars (Claude rows price at 0 — `costs.PRICES` holds
- * vendor models only), and `tokens`/`tokensIn`/`tokensOut` are the same rows' whole cost: a planner
- * or a review that rode the operator's subscription is counted here alone (operator rule,
- * 2026-09-24).
+ * vendor models only), and `tokens`/`tokensIn`/`tokensOut` are THE CLAUDE ROWS' ALONE — a
+ * planner or a review that rode the operator's subscription is counted here and nowhere in the
+ * dollars, and a row a vendor billed is the other way round (operator rule, 2026-09-24: a spend
+ * figure is dollars OR tokens, by who was used). ONE predicate decides both halves of a row
+ * (`rowRidesClaude`), so the two can never be taken from different records.
  */
 export type PlanLedger = {
   planning: number; review: number; scouts: number;
@@ -167,6 +169,10 @@ export function readPlanLedger(planPath: string): PlanLedger {
     if (kind !== 'planning' && kind !== 'review' && kind !== 'scouts') continue;
     const cost = rowPaidUsd(row as Record<string, unknown>);
     if (cost > 0) out[kind] += cost;
+    // The tokens are THE CLAUDE HALF and nothing else: a row whose every model is a vendor's is a
+    // bill, and its tokens are that vendor's own business (operator rule, 2026-09-24). Same test as
+    // `rowPaidUsd`, one predicate — a row can never show a vendor's dollars beside Claude's tokens.
+    if (!rowRidesClaude(row as Record<string, unknown>)) continue;
     // Every token billed on the outing (in + out + cache read + cache write) — the "⛁ tok" unit.
     const tokens = Number((row as Record<string, unknown>).tokens);
     if (Number.isFinite(tokens) && tokens > 0) out.tokens += tokens;
@@ -181,7 +187,9 @@ export function readPlanLedger(planPath: string): PlanLedger {
   return out;
 }
 
-/** The vendor prefix a card is billed for — `costs.PAID_MODELS`' models, which are DeepSeek's. */
+/** The vendor prefix a card is billed for — `costs.PAID_PREFIX`, the word test `costs.paid_word`
+ *  asks, which is what the Python side reads a row's models through (`costs.row_rides_claude`); the
+ *  two must answer alike about one row, tier and all. */
 const PAID_MODEL_PREFIX = 'deepseek';
 
 /** The keys of a record field that may be a name→count map, `[]` for anything else. */
@@ -202,8 +210,23 @@ function mapKeys(value: unknown): string[] {
  * shape with nothing to go on, and it keeps its stored figure: this is a reader, not a re-pricer.
  */
 export function rowPaidUsd(row: Record<string, unknown>): number {
+  return rowRidesClaude(row) ? 0 : storedCost(row);
+}
+
+/**
+ * Whether a ledger ROW rode the operator's Claude subscription — the one predicate behind both of a
+ * row's halves, `costs.row_rides_claude` ported: its models NAME what billed it, so a row whose
+ * every model is Claude is a subscription row whatever dollar figure it stored, and a row that
+ * names no model at all is the one shape with nothing to go on (it keeps its stored figure, and its
+ * tokens are read as a vendor's — the direction that never shows a vendor's tokens as Claude's).
+ */
+function rowRidesClaude(row: Record<string, unknown>): boolean {
   const named = [...mapKeys(row.by_model), ...mapKeys(row.models)].map((word) => word.toLowerCase());
-  if (named.length > 0 && !named.some((word) => word.startsWith(PAID_MODEL_PREFIX))) return 0;
+  return named.length > 0 && !named.some((word) => word.startsWith(PAID_MODEL_PREFIX));
+}
+
+/** A ledger row's stored dollar figure, `0` for anything that is not a positive number. */
+function storedCost(row: Record<string, unknown>): number {
   const cost = Number(row.cost_usd);
   return Number.isFinite(cost) && cost > 0 ? cost : 0;
 }
@@ -223,6 +246,78 @@ export function receiptRidesClaude(receipt: unknown): boolean {
     ? Object.values(providers as Record<string, unknown>).map((word) => String(word ?? ''))
     : [];
   return words.length > 0 && words.every((word) => word === '' || word === 'claude');
+}
+
+/** The word a phase carries when it rode the operator's Claude subscription (`receiptRidesClaude`). */
+const CLAUDE_PROVIDER = 'claude';
+
+/** Every phase word a run record names, in either shape the runner writes them. */
+function phaseWords(record: Record<string, unknown>): string[] {
+  const providers = record.providers;
+  if (providers !== null && typeof providers === 'object' && !Array.isArray(providers)) {
+    const words = Object.values(providers as Record<string, unknown>).map((word) => String(word ?? ''));
+    if (words.length > 0) return words;
+  }
+  const phases = record.phases;
+  if (Array.isArray(phases)) {
+    return phases
+      .filter((row): row is Record<string, unknown> => row !== null && typeof row === 'object')
+      .map((row) => String(row.provider ?? ''));
+  }
+  return [];
+}
+
+/**
+ * A record's token count, `0` for anything that is not a finite number — so a mistyped field reads
+ * as "not recorded" and never as `NaN` walking all the way to the DOM.
+ */
+function tokenCount(value: unknown): number {
+  const count = Number(value);
+  return Number.isFinite(count) && count > 0 ? count : 0;
+}
+
+/**
+ * ONE RUN RECORD's tokens AS THE CLAUDE HALF — `plan_runner/costs.py:run_claude_tokens`, ported,
+ * and the same answer it gives: what the subscription spent of a run, which is the only token
+ * figure any card states.
+ *
+ * A SPEND FIGURE IS DOLLARS **OR** TOKENS, BY WHO WAS USED (operator rule, 2026-09-24). A run is an
+ * AGGREGATE of children on both providers, so its token figure is not the record's own word but its
+ * children's: `$0.32 DeepSeek · 12.4M in · 80k out` counts the CLAUDE phases and never a vendor's.
+ * Three answers, in the order the record can support them.
+ *
+ * 1. A run walked since the rule carries the half itself — `tokens_claude_in`/`tokens_claude_out`,
+ *    folded at the one place a child's ending meets the run (`stages._spawn`). Read as stored.
+ * 2. An older run carries ONE all-child tally and a phase→provider map naming what each phase rode.
+ *    Where that map names no vendor, the tally IS the subscription's — read as its own split, or as
+ *    the total alone on a record written before the split shipped.
+ * 3. Where the map names BOTH, the tally cannot be split from the record, and this reader does NOT
+ *    open the children's logs to split it (INV-4299: "a display does not open a child log to correct
+ *    it"). Such a run reads all zeroes — the dollars alone, never a figure that counts a vendor's
+ *    tokens as the subscription's.
+ *
+ * A record naming no phase word at all is read as PAID, which is `receiptRidesClaude`'s own reading
+ * of the empty word and the same direction the dollars take.
+ */
+export function runClaudeTokens(
+  record: unknown,
+): { tokens: number; tokensIn: number; tokensOut: number } {
+  const zero = { tokens: 0, tokensIn: 0, tokensOut: 0 };
+  if (record === null || typeof record !== 'object' || Array.isArray(record)) return zero;
+  const rec = record as Record<string, unknown>;
+  if (typeof rec.tokens_claude_in === 'number' || typeof rec.tokens_claude_out === 'number') {
+    const read = tokenCount(rec.tokens_claude_in);
+    const written = tokenCount(rec.tokens_claude_out);
+    return { tokens: read + written, tokensIn: read, tokensOut: written };
+  }
+  const words = phaseWords(rec);
+  if (words.length === 0 || words.some((word) => word !== '' && word !== CLAUDE_PROVIDER)) return zero;
+  const read = tokenCount(rec.tokens_in);
+  const written = tokenCount(rec.tokens_out);
+  const total = tokenCount(rec.tokens);
+  return read > 0 || written > 0
+    ? { tokens: total, tokensIn: read, tokensOut: written }
+    : { tokens: total, tokensIn: 0, tokensOut: 0 };
 }
 
 /** A JSON array, or `null` for anything else. */

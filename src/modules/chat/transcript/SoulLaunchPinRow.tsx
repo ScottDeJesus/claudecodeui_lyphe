@@ -41,11 +41,13 @@ type SoulLaunchPinRowProps = {
 };
 
 /**
- * What the founding cost reads as, through the one spelling of it (`plan-runner/spend.ts`): the
- * PAID figure labelled by the vendor that billed it (`$0.41 DeepSeek`), its tokens beside it, and
- * NOTHING at all for a soul that rode the operator's Claude subscription — a soul's work on the
- * subscription is counted in tokens in and out, so a `$0.00` here would be a price that does not
- * exist. `''` while the launch is still out, which is what the caller draws nothing for.
+ * What the founding cost reads as, through the one spelling of it (`plan-runner/spend.ts`), and A
+ * SPEND FIGURE IS DOLLARS **OR** TOKENS, BY WHO WAS USED (operator rule, 2026-09-24): a soul
+ * DeepSeek billed reads the PAID figure labelled by that vendor (`$0.28 DeepSeek`) and NO tokens,
+ * and one that rode the operator's Claude subscription reads `1.2M in · 48k out` and no `$` at all.
+ * The two halves are settled on the record the lane serves — the tokens are `null` throughout on a
+ * vendor's receipt (`soul-launch.service.ts:receiptTokens`) — so this row draws whichever half the
+ * soul actually spent, and `''` while the launch is still out.
  */
 function costLabel(launch: SoulLaunchSnapshot, t: TFunction): string {
   return spendText(t, launch.cost_usd, launch.tokens_in, launch.tokens_out, launch.tokens);

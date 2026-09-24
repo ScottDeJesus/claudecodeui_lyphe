@@ -20,6 +20,7 @@ import {
   readStringOrNull,
   readPlanLedger,
   receiptRidesClaude,
+  runClaudeTokens,
   type PlanLedger,
   type RunnerRunFiles,
 } from './runner-state.transport.js';
@@ -349,6 +350,9 @@ export function classifyRun(
   // The run's PAID dollars, read once and carried by all four cost fields below: 0 for a run whose
   // own receipt says it rode Claude (`paidRunCost`), whatever figure a pre-rule record stored.
   const paidCostUsd = paidRunCost(progress, files.receipt);
+  // The run's tokens as its CLAUDE half (`runClaudeTokens`): the stored pair where the run carries
+  // it, else the record's own phase words, else all zeroes beside a vendor's dollars.
+  const half = runClaudeTokens(progress);
 
   // The lock's beat when one names a MOVING run, the progress file's own otherwise. An ended run
   // is never aged, so its lock is never asked for — which is what lets the transport's lock cache
@@ -424,15 +428,20 @@ export function classifyRun(
     plan_review_usd: 0,
     plan_scouts_usd: 0,
     plan_total_usd: paidCostUsd,
-    tokens: readNumber(field(progress, 'tokens'), 0),
-    plan_tokens: readNumber(field(progress, 'tokens'), 0),
+    // A SPEND FIGURE IS DOLLARS **OR** TOKENS, BY WHO WAS USED (operator rule, 2026-09-24), and the
+    // tokens here are THE CLAUDE HALF alone (`runClaudeTokens`, the port of `costs.run_claude_tokens`):
+    // a run a vendor billed reads all of these 0 beside its `$`, never the vendor's own tokens as
+    // the subscription's. The stored half (`tokens_claude_in`/`_out`, folded by `stages._spawn`) is
+    // read first, and a run that predates it is read through its own phase→provider map.
+    tokens: half.tokens,
+    plan_tokens: half.tokens,
     // The same tally SPLIT (`plan_runner/state.py:RunState.tokens_in`/`tokens_out`), so the card can
     // draw `1.2M in · 48k out` rather than one number. Absent on a run older than the split: the
     // total stands alone and the card says only that (never `0 in · 0 out` beside a real total).
-    tokens_in: readNumber(field(progress, 'tokens_in'), 0),
-    tokens_out: readNumber(field(progress, 'tokens_out'), 0),
-    plan_tokens_in: readNumber(field(progress, 'tokens_in'), 0),
-    plan_tokens_out: readNumber(field(progress, 'tokens_out'), 0),
+    tokens_in: half.tokensIn,
+    tokens_out: half.tokensOut,
+    plan_tokens_in: half.tokensIn,
+    plan_tokens_out: half.tokensOut,
     line: readString(field(progress, 'line')),
     timeline: parseTimeline(files.logLines),
   };
@@ -518,19 +527,23 @@ function ledgerFor(planPath: string): PlanLedger {
  * finite, non-negative number adds nothing rather than poisoning the sum.
  *
  * The dollars are the PAID ones (`paidRunCost`), so the receipt comes along: a run whose own
- * receipt says it rode Claude adds 0 to this plan however many dollars its record stored.
+ * receipt says it rode Claude adds 0 to this plan however many dollars its record stored. The
+ * TOKENS are the same run's CLAUDE half (`runClaudeTokens`) and never `run.json`'s raw all-child
+ * tally, whose sum is both providers' — a plan's token figure must be the subscription's alone
+ * (operator rule, 2026-09-24), the same reading `costs._scan_runs` gives.
  */
 function tally(books: Map<string, PlanBooks>, run: unknown, receipt: unknown): void {
   const planPath = readStringOrNull(field(run, 'plan_path'));
   if (planPath === null || field(run, 'status') === 'dry-run') return;
   const held = books.get(planPath) ?? { runs: 0, spawns: 0, cost: 0, tokens: 0, tokensIn: 0, tokensOut: 0 };
+  const half = runClaudeTokens(run);
   books.set(planPath, {
     runs: held.runs + 1,
     spawns: held.spawns + Math.max(0, readNumber(field(run, 'spawns'), 0)),
     cost: held.cost + paidRunCost(run, receipt),
-    tokens: held.tokens + Math.max(0, readNumber(field(run, 'tokens'), 0)),
-    tokensIn: held.tokensIn + Math.max(0, readNumber(field(run, 'tokens_in'), 0)),
-    tokensOut: held.tokensOut + Math.max(0, readNumber(field(run, 'tokens_out'), 0)),
+    tokens: held.tokens + half.tokens,
+    tokensIn: held.tokensIn + half.tokensIn,
+    tokensOut: held.tokensOut + half.tokensOut,
   });
 }
 

@@ -31,8 +31,9 @@ export function PlanPhaseRow({ phase }: { phase: DispatcherPhase }) {
   const tone = word.settling ? 'neutral' : phaseStatusTone(phase);
   const label = word.settling ? t('dispatcher.settling') : t(`dispatcher.phase.${word.key}`);
   // The phase's own books, read the one way (`spend.ts`): paid dollars where an API billed them,
-  // its tokens either way. A phase that has not walked yet has neither, and the line loses the
-  // field rather than wearing a `$0.00`.
+  // its CLAUDE records' tokens — DOLLARS **OR** TOKENS, BY WHO WAS USED, so a phase the vendor
+  // walked shows no tokens and one on the subscription shows no `$`. A phase that has not walked
+  // yet has neither, and the line loses the field rather than wearing a `$0.00`.
   const spend = spendText(t, phase.cost_usd, phase.tokens_in, phase.tokens_out, phase.tokens);
   const books = [t('dispatcher.rounds', { count: phase.rounds }), spend].filter(Boolean).join(' · ');
 

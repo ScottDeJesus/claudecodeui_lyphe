@@ -128,7 +128,7 @@ function costTitle(heal: HealCard, t: ReturnType<typeof useTranslation>['t']): s
   if (booked === 'chain-total') {
     return t('heal.cards.costTitleOld', { defaultValue: 'Booked before 2026-09-23, when a heal booked its chain’s WHOLE bill: the Claude stages in this number were your subscription, not DeepSeek — though the daily cap counts them as DeepSeek all the same' });
   }
-  return t('heal.cards.costTitle', { defaultValue: 'DeepSeek’s share of this heal — what the daily cap counts, never the chain’s whole bill. The tokens beside it are the whole chain’s, Claude stages included.' });
+  return t('heal.cards.costTitle', { defaultValue: 'DeepSeek’s share of this heal — what the daily cap counts, never the chain’s whole bill. The tokens beside it are the chain’s Claude souls’ own work — a vendor’s tokens are its own business, so a heal only DeepSeek walked draws none' });
 }
 
 function HealCardView({ heal, onOpenChain }: { heal: HealCard; onOpenChain: (heal: HealCard) => void }) {
@@ -165,13 +165,13 @@ function HealCardView({ heal, onOpenChain }: { heal: HealCard; onOpenChain: (hea
           ) : (
             <Badge as="span" tone="positive">{t('heal.cards.quiet', { defaultValue: 'quiet after landing' })}</Badge>
           ))}
-          {/* The row's `cost_usd` is today the DeepSeek share of what the chain spent — the same figure
-              the daily cap counts, and not the chain's own total (a stage that rode Claude is the
-              operator's subscription). WHICH OF THOSE THIS NUMBER IS DEPENDS ON WHEN THE HEAL ENDED,
-              and the title says whose it is — the rows already on screen were booked before the recipe
-              changed and carry their chains' whole bills. A heal that rode Claude alone bills 0 there,
-              and the cell then reads its TOKENS instead of a `$0.00` (`spendText`, the one spelling the
-              run cards use) — an empty cell when the worker recorded neither. */}
+          {/* A SPEND FIGURE IS DOLLARS **OR** TOKENS, BY WHO WAS USED (operator rule, 2026-09-24): the row's
+              `cost_usd` is the DeepSeek share of what the chain spent — what the daily cap counts — and the
+              `tokens*` beside it are the chain's CLAUDE half alone, so a heal that only ever paid the vendor
+              draws its `$` and no tokens and one that rode the subscription draws its tokens and no `$`
+              (`spendText`, the one spelling the run cards use). WHICH NUMBER THE `$` IS depends on when the
+              heal ended — the title says whose it is, because the rows on screen from before the 2026-09-23
+              recipe change carry their chains' whole bills. An empty cell when the worker recorded neither. */}
           <span className="ml-auto font-mono text-muted-foreground" title={costTitle(heal, t)}>
             {spendText(t, heal.cost_usd, heal.tokens_in, heal.tokens_out, heal.tokens)}
           </span>

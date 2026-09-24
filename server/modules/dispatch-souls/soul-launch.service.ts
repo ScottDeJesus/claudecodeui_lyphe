@@ -107,6 +107,32 @@ function receiptCostUsd(result: unknown, ended: boolean): number | null {
 }
 
 /**
+ * The receipt's tokens: its own three counts, and ALL OF THEM `null` where a vendor billed it.
+ *
+ * A SPEND FIGURE IS DOLLARS **OR** TOKENS, BY WHO WAS USED (operator rule, 2026-09-24): a soul on
+ * the operator's Claude subscription reads `1.2M in · 48k out` and no `$`, and one DeepSeek billed
+ * reads `$0.28 DeepSeek` and NO tokens — DeepSeek's tokens are DeepSeek's own business, which is
+ * the other half of the same rule `receiptCostUsd` keeps for the money. `null` rather than `0` for
+ * the same reason it returns `null` while the soul is out: the pin draws nothing for a figure that
+ * was never a figure of this kind, and `0` would read as a measured amount.
+ *
+ * `provider` is the launch's resolved word ({@link providerOf}), so a receipt that names nothing
+ * falls back to the pin the launcher wrote — never to showing a vendor's tokens as Claude's.
+ */
+function receiptTokens(
+  result: unknown,
+  ended: boolean,
+  provider: 'deepseek' | 'claude',
+): { tokens: number | null; tokens_in: number | null; tokens_out: number | null } {
+  if (!ended || provider !== 'claude') return { tokens: null, tokens_in: null, tokens_out: null };
+  return {
+    tokens: readNumberOrNull(field(result, 'tokens')),
+    tokens_in: readNumberOrNull(field(result, 'tokens_in')),
+    tokens_out: readNumberOrNull(field(result, 'tokens_out')),
+  };
+}
+
+/**
  * One launch directory's snapshot, or `null` when this lane does not carry that launch.
  *
  * A launch is carried while it is OUT, and for {@link DEFAULT_ENDED_KEEP_S} after its receipt.
@@ -144,6 +170,7 @@ export function classifyLaunch(
   // this lane is a pin list, not an archive.
   if (now - (endedAt ?? startedAt) >= keepS) return null;
 
+  const provider = providerOf(spec, result, ended);
   return {
     launch_id: files.launchId,
     role: readString(field(spec, 'role')),
@@ -151,7 +178,7 @@ export function classifyLaunch(
     // The task the soul was handed, as its brief's first line. `''` when it could not be read —
     // absent is honest, and the row simply carries no description.
     brief: files.briefLine,
-    provider: providerOf(spec, result, ended),
+    provider,
     // DeepSeek refused this soul or never answered it: the receipt says why, and nothing ran on
     // Claude instead (the launcher never re-routes a soul).
     blocked: readString(field(result, 'provider_blocked')) !== '',
@@ -163,18 +190,18 @@ export function classifyLaunch(
     // The receipt's own figures, and NOTHING while it is out: a live soul's spend is not knowable
     // from this side, and a zero would read as "free" rather than as "not yet".
     //
-    // `cost_usd` is PAID dollars: a soul on the operator's Claude subscription recorded 0 there
-    // (`plan_runner/costs.py:result_cost`), and a pre-rule receipt that stored dollars reads 0 too
-    // where the receipt NAMES Claude (`receiptCostUsd`) — the tokens beside it are the whole of what
-    // it spent, and the pin draws no `$` at all rather than `$0.00`.
+    // AND ONE HALF OR THE OTHER, NEVER BOTH (operator rule, 2026-09-24): `cost_usd` is PAID dollars
+    // — a soul on the operator's Claude subscription recorded 0 there (`plan_runner/costs.py:
+    // result_cost`), and a pre-rule receipt that stored dollars reads 0 too where the receipt NAMES
+    // Claude (`receiptCostUsd`) — and the tokens are THE SUBSCRIPTION'S, `null` throughout where a
+    // vendor billed the soul (`receiptTokens`). So a pin draws `$0.28 DeepSeek` with no tokens or
+    // `1.2M in · 48k out` with no `$`, never both, and never `$0.00`.
     // `tokens_in`/`tokens_out` are `null` on a receipt written before the split shipped, which is
     // what tells the pin to say the total alone (`usageText`, `src/modules/plan-runner/spend.ts`)
     // rather than `0 in · 0 out`.
     duration_s: ended ? readNumberOrNull(field(result, 'duration_s')) : null,
     cost_usd: receiptCostUsd(result, ended),
-    tokens: ended ? readNumberOrNull(field(result, 'tokens')) : null,
-    tokens_in: ended ? readNumberOrNull(field(result, 'tokens_in')) : null,
-    tokens_out: ended ? readNumberOrNull(field(result, 'tokens_out')) : null,
+    ...receiptTokens(result, ended, provider),
   };
 }
 

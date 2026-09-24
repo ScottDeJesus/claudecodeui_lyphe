@@ -141,8 +141,8 @@ type RunFaceProps = {
  * run's own counters alone read as a reset (operator, 2026-09-11). The plan's whole bill leads
  * once anything outside this run was spent on it — the planner, the review, a scout wave, an
  * earlier run (operator, 2026-09-12: "I'd like to see totals"). This run's share follows beside
- * its ceiling, because the ceiling is per run; the tokens are the plan's, in the unit and shape
- * `hooks/plan_runner/costs.py` prints.
+ * its ceiling, because the ceiling is per run; the token half is the plan's CLAUDE records alone,
+ * in the unit and shape `hooks/plan_runner/costs.py` prints.
  *
  * A SWARMED RUN SHOWS ITS LANES: with the switch on the run walks several phases at once, and the
  * strip and the ◆ position can name only one of them, so EVERY live lane gets a row beneath the
@@ -169,8 +169,9 @@ export function RunFace({ run, defaultOpen }: RunFaceProps) {
   const anyBlocked = run.phases.some((phase) => phase.state === 'blocked');
   const currentPhaseId = run.position?.phase_id ?? null;
   // What this run's plan has spent, in the two figures the operator reads (see `spend.ts`): the
-  // plan's PAID dollars, where each kind of them went, and the tokens either way. A plan that rode
-  // Claude has no `$` in it at all — its whole reading is the token figure.
+  // plan's PAID dollars, where each kind of them went, and its CLAUDE records' tokens — A SPEND
+  // FIGURE IS DOLLARS **OR** TOKENS, BY WHO WAS USED, so a plan that only ever paid the vendor has
+  // no token figure at all and one that rode Claude has no `$` in it: its whole reading is tokens.
   const outside = run.plan_planning_usd + run.plan_review_usd + run.plan_scouts_usd;
   const across = run.plan_runs > 1 || outside > 0;
   const counters = across

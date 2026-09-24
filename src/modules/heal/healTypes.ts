@@ -103,13 +103,18 @@ export type HealCard = {
    */
   cost_usd: number;
   /**
-   * The chain's tokens beside the dollars, and the same reading the run cards use: `tokens_in` is
-   * what its souls READ (input + cache read + cache write), `tokens_out` what they wrote, and
-   * `tokens` the total as the chain recorded it. The dollar figure above is a PAYING API's share
-   * alone, so a heal that rode the operator's Claude subscription bills 0 there and these are the
-   * whole of what it spent — which is why the card draws them when there is no `$` to draw
-   * (operator rule, 2026-09-24). `undefined` from a worker build older than the keys, which reads
-   * as "not recorded" and never as zero.
+   * The chain's tokens beside the dollars, THE CLAUDE HALF ALONE, and the same reading the run
+   * cards use: `tokens_in` is what its CLAUDE souls READ (input + cache read + cache write),
+   * `tokens_out` what they wrote, and `tokens` the total as the chain recorded it
+   * (`chain_state.usage`, which zeroes a stage a vendor billed). Both parts read `0` against a real
+   * total on a chain whose stages kept no split — a record older than the split — and the card then
+   * states the total alone (`⛁ 2.6M tok`, `usageText`), never a fabricated `2.6M in · 0 out`.
+   * A SPEND FIGURE IS DOLLARS
+   * **OR** TOKENS, BY WHO WAS USED (operator rule, 2026-09-24): the dollar figure above is a
+   * PAYING API's share alone, so a heal that only ever paid the vendor bills there and draws NO
+   * tokens here — they are the vendor's own business — while one that rode the subscription
+   * bills 0 and draws these and no `$`. `undefined` from a worker build older than the keys,
+   * which reads as "not recorded" and never as zero.
    */
   tokens?: number;
   tokens_in?: number;

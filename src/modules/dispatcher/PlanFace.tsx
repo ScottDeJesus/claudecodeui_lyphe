@@ -75,9 +75,11 @@ export function PlanFace({ plan, defaultOpen }: { plan: DispatcherPlan; defaultO
   const { route } = useDispatcherPlans();
   const progress = phaseProgress(plan);
   // What the plan has spent: its PAID dollars (`$0.41 DeepSeek`, labelled by what was billed) and
-  // its tokens either way — a plan walked on the operator's Claude subscription shows the tokens
-  // and no `$` at all, never a `$0.00`. `spend.ts` owns the rule, so this card, the run card and
-  // the soul pins cannot spell it three ways.
+  // its CLAUDE records' tokens — A SPEND FIGURE IS DOLLARS **OR** TOKENS, BY WHO WAS USED, so a
+  // plan the vendor billed everywhere shows the `$` and no tokens, one walked on the operator's
+  // Claude subscription shows the tokens and no `$` at all (never a `$0.00`), and a mixed one
+  // shows both, its token half counting the Claude stages only. `spend.ts` owns the rule, so this
+  // card, the run card and the soul pins cannot spell it three ways.
   const spend = spendText(t, plan.cost_usd, plan.tokens_in, plan.tokens_out, plan.tokens);
   const sub = [spend, t('dispatcher.rounds', { count: plan.rounds }), route?.word ?? '']
     .filter(Boolean).join(' · ');

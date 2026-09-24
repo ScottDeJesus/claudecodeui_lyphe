@@ -3,12 +3,26 @@ import type { TFunction } from 'i18next';
 /**
  * What a run — or a soul, or a plan — has SPENT, as every card in this app writes it.
  *
- * TWO FIGURES, ONE RULE. Claude work is counted in tokens in and out, never in dollars: the
- * operator's subscription is not a bill, and a card that says `$0.00` over an afternoon of work is
- * worse than one that says nothing (operator rule, 2026-09-24). Dollars are shown only when a
- * PAYING API billed them — DeepSeek is the one this house holds — and then labelled by what was
- * paid (`$0.41 DeepSeek`), so a vendor figure can never be read as a Claude one. A run that rode
- * Claude therefore reads its tokens and no `$` at all.
+ * A SPEND FIGURE IS DOLLARS **OR** TOKENS, BY WHO WAS USED (operator rule, 2026-09-24). A `$` is a
+ * PAYING API's bill, labelled by the vendor that charged it (`$0.28 DeepSeek`); tokens are the
+ * operator's Claude subscription's own work, read as `1.2M in · 48k out`. A record has one or the
+ * other, never both at once:
+ *
+ *   `$0.28 DeepSeek`                      a soul, stage or run DeepSeek billed — NO tokens
+ *   `10.3k in · 80 out`                   a record on the subscription — no `$`, never `$0.00`
+ *   `$0.32 DeepSeek · 12.4M in · 80k out` an AGGREGATE that used both hands, its token half
+ *                                         counting the CLAUDE records only, never a vendor's
+ *
+ * A pure-DeepSeek aggregate is dollars only and a pure-Claude one tokens only, which the shapes
+ * above give for free: each half is empty on its own. A vendor's tokens are its own business —
+ * DeepSeek's own words, which is why they are not shown beside its bill.
+ *
+ * THE HALF IS SETTLED UPSTREAM, NOT HERE. Every figure this module renders is already the right
+ * half when it arrives: the server reads a run's, a plan's or a soul's CLAUDE half and zeroes a
+ * vendor's tokens (`server/modules/plan-runner/runner-state.service.ts`,
+ * `server/modules/dispatch-souls/soul-launch.service.ts`), and the CLI does the same in
+ * `plan_runner/costs.py`. So this file needs no provider parameter — it formats, and the
+ * either/or falls out of the two figures being one or the other.
  *
  * ONE SPELLING, FOUR SCREENS. The run card (`RunFace`), the dispatcher's plan card (`PlanFace`,
  * `PlanPhaseRow`) and the chat strip's launcher-soul pin (`SoulLaunchPinRow`) all draw the same
@@ -18,9 +32,10 @@ import type { TFunction } from 'i18next';
  *
  * THE FIGURES ARE THE RUNNER'S OWN. `cost_usd` is PAID dollars by construction —
  * `hooks/plan_runner/costs.py:result_cost` returns 0 for a child on the Claude subscription — and
- * the tokens are the child's usage, split into what it READ (input + cache read + cache write) and
- * what it wrote. A record written before the split shipped carries the total alone, which reads as
- * the `⛁ n tok` form rather than as `0 in · 0 out`; the split is omitted, the total never is.
+ * the tokens are the CLAUDE half of the child's usage, split into what it READ (input + cache read
+ * + cache write) and what it wrote. A record written before the split shipped carries the total
+ * alone, which reads as the `⛁ n tok` form rather than as `0 in · 0 out`; the split is omitted,
+ * the total never is.
  *
  * NOTHING HERE IS TRANSLATED-BY-HAND: the numbers are formatted here, the words come from the
  * caller's `t` (namespace `common`), so the strip and the tab say the same thing in one language.
@@ -48,10 +63,12 @@ function count(value: number | null | undefined): number | null {
 }
 
 /**
- * The paid half: `$0.41 DeepSeek`, or `''` when nothing was billed.
+ * The paid half: `$0.28 DeepSeek`, or `''` when nothing was billed.
  *
  * The empty string is the rule, not an oversight — a figure of 0 means the work rode Claude, and
- * `$0.00` would read as "this cost nothing" when what it means is "this was not a bill".
+ * `$0.00` would read as "this cost nothing" when what it means is "this was not a bill". It is also
+ * what makes a Claude figure read as tokens alone: with this half empty, {@link spendText} joins
+ * one part rather than two.
  */
 export function paidText(t: TFunction, usd: number | null | undefined): string {
   return paidWith(t, usd, 'runner.paid');
@@ -116,8 +133,10 @@ export function usageText(
 }
 
 /**
- * Both halves, in the order they are read: what was paid, then the tokens. One figure is normal —
- * a Claude run has no first half and a record with no usage has no second.
+ * Both halves, in the order they are read: what was paid, then the tokens. ONE FIGURE IS NORMAL
+ * and is the whole point — a Claude record has no first half, a record a vendor billed has no
+ * second, and an aggregate that used both hands has both, its token half counting the CLAUDE
+ * records only (settled upstream, never here).
  */
 export function spendText(
   t: TFunction,
