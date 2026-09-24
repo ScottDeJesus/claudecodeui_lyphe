@@ -37,6 +37,21 @@ export type PolledLaneDependencies<TPicture, TFrame> = {
   snapshot: () => TPicture | Promise<TPicture>;
   /** Wraps one picture as the frame to send. Called only when the picture changed. */
   frame: (picture: TPicture) => TFrame;
+  /**
+   * How this lane turns a picture into the string it compares for change — the one question "did
+   * anything move?" is answered with. The default is the whole picture, `JSON.stringify`ed, which is
+   * right for every lane whose reading is pure data.
+   *
+   * A lane whose picture carries a CLOCK RE-DERIVED ON EVERY READ has to state its own, or its
+   * picture differs from itself between two ticks and the lane speaks on every one of them. The
+   * dispatcher's is the one that does: `report.py::snapshot` stamps `generated_at` from the
+   * dispatcher's own clock at second resolution, on a poll of two seconds, so its lane drops that key
+   * here (`dispatcher-watcher.service.ts`).
+   *
+   * What is compared is not what is sent. `frame` is what goes on the wire and it carries the clock
+   * whole, so a lane's own serialization changes WHEN the lane speaks and never WHAT it says.
+   */
+  serialize?: (picture: TPicture) => string;
   /** Puts one frame on every open chat socket. Called only when the picture changed. */
   broadcast: (frame: TFrame) => void;
   /** How often to look, in milliseconds. */
@@ -85,10 +100,17 @@ export function createPolledLane<TPicture, TFrame>(
   let inFlight: Promise<TPicture> | null = null;
 
   /**
-   * The last picture that was BROADCAST, serialized. Comparing the string rather than the value is
-   * what makes "changed" mean "any field of anything in it moved", which is what a client needs,
-   * and it is the same test that catches an entry appearing, an entry ending and a heartbeat going
-   * stale.
+   * The comparison this lane makes: one picture as the string that decides whether the frame goes
+   * out. `serialize` on the dependencies is where a lane replaces it, and where the one lane that
+   * does says why.
+   */
+  const compare = dependencies.serialize ?? ((picture: TPicture): string => JSON.stringify(picture));
+
+  /**
+   * The last picture that was BROADCAST, as `compare` writes it. Comparing the string rather than the
+   * value is what makes "changed" mean "any field of anything in it moved", which is what a client
+   * needs, and it is the same test that catches an entry appearing, an entry ending and a heartbeat
+   * going stale.
    *
    * `null` means nothing has been announced on this lane yet, so the first tick always speaks —
    * including the empty picture, which is a fact a client needs and not a non-event.
@@ -132,7 +154,7 @@ export function createPolledLane<TPicture, TFrame>(
       return;
     }
     try {
-      const serialized = JSON.stringify(next);
+      const serialized = compare(next);
       picture = next;
       if (serialized === lastBroadcast) return;
       // Recorded AFTER the send returns, never before. `lastBroadcast` is a claim that this picture

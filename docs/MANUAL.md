@@ -2356,7 +2356,14 @@ uses), a board's own Metis sessions (`kanban-metis/kanban-metis.module.ts`, the
 the `dispatcher_state` frame — the one lane here whose reading is a SUBPROCESS, and the reason the
 mechanism takes a snapshot that may answer a PROMISE: a tick that finds a previous read still out
 is SKIPPED rather than queued, `current()` answers the `initial` picture its caller passed until the
-first reading lands, and such a lane is refused at construction without one). Why it polls rather than watches, when it speaks, why the dedup records
+first reading lands, and such a lane is refused at construction without one). That dispatcher lane
+is also the one that supplies the mechanism's `serialize` — how a picture becomes the string a lane
+compares for change, the whole picture `JSON.stringify`ed by default: its document is stamped
+`generated_at` from the dispatcher's own clock at SECOND resolution on a poll of two seconds, so
+compared whole it would differ from itself on every tick and the lane would put its 28 KB frame on
+every open socket every two seconds on a host where nothing moved. The read's clock is left out of
+the comparison and out of nothing else — every frame still carries it, since a client is owed the
+reading's own time beside the frame's arrival one. Why it polls rather than watches, when it speaks, why the dedup records
 a picture as sent only AFTER the send returns, and why a failing tick never takes the interval down
 with it are documented once, there.
 
@@ -2477,6 +2484,15 @@ answers the `initial` picture — the shape's own empties, in the watcher — un
 lands. A read of the live store is ~170 ms for a 27 KB document, under a tenth of the interval, and a
 read that throws leaves the LAST good picture on the tab with one line in the journal per distinct
 message.
+
+The one key of that picture this lane treats as a clock rather than as content is `generated_at`: the
+dispatcher derives it at second resolution on every read, so the watcher supplies the mechanism's
+`serialize` (its own `changeOf`) and that key alone is left out of the comparison. Compared whole,
+the picture would differ from itself on every tick and the lane would put ~28 KB on every open socket
+every two seconds on a host where nothing moved. Every frame still carries the key whole: a client is
+owed the reading's own time next to the frame's arrival time. On the live host, 120 s of listening
+over 59 reads — 59 distinct readings of that clock and no other movement — puts one frame on the
+wire, and that one is the first tick after a restart.
 
 **The read.** `readDispatcherState({ bin, timeoutMs, env })` runs `dispatcher status --json` by argv,
 `cwd` the home directory, `maxBuffer` 4 MiB (`dispatcher-state.transport.ts` — the document carries

@@ -14,7 +14,9 @@ import type { DispatcherPicture } from './dispatcher-state.service.js';
  *
  * This is the one lane on the server whose reading is a SUBPROCESS, so its snapshot answers a
  * promise; the lane's own rules cover that (a tick with a reading still out is skipped, and the
- * picture it serves meanwhile is the last one that landed).
+ * picture it serves meanwhile is the last one that landed). It is also the one lane whose picture
+ * carries a clock of its own, so it is the one lane that states how its pictures are compared
+ * (`changeOf`) — without that, it would speak on every tick.
  */
 
 export type DispatcherWatcherDependencies = {
@@ -57,10 +59,30 @@ const EMPTY_PICTURE: DispatcherPicture = {
   generated_at: '',
 };
 
+/**
+ * The picture as the lane compares it for change: everything but the read's own clock.
+ *
+ * `report.py::snapshot` stamps `generated_at` from the dispatcher's clock at SECOND resolution on
+ * every read, and this lane polls every two seconds, so two successive readings can never carry the
+ * same one. Compared whole, the picture would therefore differ from itself on every single tick — and
+ * the lane would put its ~28 KB frame on every open socket every two seconds on a host where nothing
+ * moved, which is the one thing a change-only lane exists not to do.
+ *
+ * `generated_at` is a READING CLOCK: it says when the dispatcher looked, not what it found. Every
+ * frame still carries it whole (`frame` below spreads the picture as the service built it), because
+ * a client is owed the reading's own time next to the frame's arrival time — so this is the
+ * comparison and nothing else.
+ */
+function changeOf(picture: DispatcherPicture): string {
+  const { generated_at: readAt, ...moving } = picture;
+  return JSON.stringify(moving);
+}
+
 export function createDispatcherWatcher(dependencies: DispatcherWatcherDependencies): DispatcherWatcher {
   return createPolledLane<DispatcherPicture, DispatcherStateEvent>({
     ...dependencies,
     initial: EMPTY_PICTURE,
+    serialize: changeOf,
     // The document's own keys, exactly as the service built them, plus the frame's two: its kind and
     // its millisecond clock (`at`), which is what tells a client when the picture was read.
     frame: (picture) => ({ kind: 'dispatcher_state', ...picture, at: Date.now() }),
