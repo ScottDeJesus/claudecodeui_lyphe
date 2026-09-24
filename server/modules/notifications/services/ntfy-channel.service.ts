@@ -113,7 +113,8 @@ async function publishSummary(last: SuppressedPush, suppressedCount: number): Pr
 
 function priorityFor(event: ChannelEvent): NtfyMessage['priority'] {
   // A plan run ends a few times a day and closes hours of work: its finish is not a chat turn's quiet stop.
-  if (event.code === 'runner.finished') return 3;
+  // The v3 dispatcher's `dispatcher.finished` is the same fact told by the other lane, and gets the same number.
+  if (event.code === 'runner.finished' || event.code === 'dispatcher.finished') return 3;
   switch (event.kind) {
     case 'action_required':
     case 'error':
@@ -130,8 +131,14 @@ function priorityFor(event: ChannelEvent): NtfyMessage['priority'] {
 
 /** ntfy renders a tag that names an emoji as that emoji in front of the title. */
 function tagsFor(event: ChannelEvent): string[] {
-  // A blocked plan asks for a hand; nothing crashed, so it is not the siren a failed run gets.
-  if (event.code === 'runner.blocked') return ['warning'];
+  // A plan that is blocked, or an arc card the start ladder refused, asks for a hand; nothing crashed, so
+  // neither is the siren a failed run gets. Deliberately NOT in `COLLAPSIBLE_CODES` either: a refusal's own
+  // once-only promise is kept by the runner's episode key (`arc-refusals.service.ts`), and a window that
+  // swallowed a SECOND, different refusal inside the same minute would break it.
+  // `dispatcher.relaunched` joins them for the third time in this file's vocabulary: a phase taken up again is
+  // a plan that changed its mind, not a crash — the same `warning` tag rather than the siren, and the same
+  // once-only promise kept by the ending's own event-id key (`dispatcher-endings.service.ts`).
+  if (event.code === 'runner.blocked' || event.code === 'runner.arc_stuck' || event.code === 'dispatcher.relaunched') return ['warning'];
   switch (event.kind) {
     case 'action_required':
       return ['question'];

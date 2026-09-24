@@ -432,5 +432,14 @@
     "appearanceLight": "라이트 모드",
     "appearanceDark": "다크 모드",
     "divider": "애플리케이션 크기 조절"
+  },
+  "gitPanel": {
+    "lastPushed": "마지막 push {{when}}",
+    "neverPushed": "여기에서는 아직 push하지 않았습니다",
+    "age": {
+      "justNow": "방금 전",
+      "minutesAgo": "{{count}}분 전",
+      "hoursAgo": "{{count}}시간 전"
+    }
   }
 }

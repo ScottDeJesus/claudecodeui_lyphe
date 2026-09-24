@@ -297,5 +297,24 @@
       "warning": "警告",
       "caution": "注意"
     }
+  },
+  "question": {
+    "needsInput": "Claude があなたの回答を待っています",
+    "selectAll": "当てはまるものをすべて選択",
+    "other": "その他...",
+    "otherPlaceholder": "回答を入力...",
+    "skip": "スキップ",
+    "skipAll": "すべてスキップ",
+    "back": "戻る",
+    "next": "次へ",
+    "submit": "送信",
+    "skipped": "スキップ済み",
+    "noAnswer": "回答なし",
+    "yourAnswer": "あなたの回答",
+    "yourWords": "あなたの言葉",
+    "showFull": "質問をすべて表示",
+    "showLess": "折りたたむ",
+    "showDetails": "質問全文とすべての選択肢を表示",
+    "hideDetails": "質問全文を隠す"
   }
 }

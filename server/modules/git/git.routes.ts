@@ -8,7 +8,7 @@ import { AppError } from '@/shared/utils.js';
 
 // cross-spawn: drop-in spawn with Windows .cmd/PATHEXT resolution.
 import { parseGitLogWithStats, parseGitStatusOutput } from './git-parsing.service.js';
-import { deleteLocalBranch } from './git-branch.service.js';
+import { deleteLocalBranch, readLastPushedAt } from './git-branch.service.js';
 
 type GitRouterDependencies = {
   fileSystem: typeof import('node:fs/promises');
@@ -1193,11 +1193,21 @@ router.get('/remote-status', async (req, res) => {
 
     // Check if there's a remote tracking branch (smart detection)
     let trackingBranch;
+    let upstreamRef;
     let remoteName;
     try {
       const { stdout } = await spawnAsync('git', ['rev-parse', '--abbrev-ref', `${branch}@{upstream}`], { cwd: projectPath });
       trackingBranch = stdout.trim();
       remoteName = trackingBranch.split('/')[0]; // Extract remote name (e.g., "origin/main" -> "origin")
+      // The FULL name of that same ref, for the two reads that have to name one ref exactly. Git
+      // resolves a short name by its own dwim order, where `refs/heads/<name>` comes BEFORE
+      // `refs/remotes/<name>`: a repository holding a local branch called `origin/main` would have
+      // the counts and the push reflog read off THAT branch, while the panel names the
+      // remote-tracking one — and the reflog read would answer "not pushed from here" about a
+      // branch that was. `@{upstream}` resolves through the branch's own configuration, never
+      // through that order.
+      const { stdout: fullRef } = await spawnAsync('git', ['rev-parse', '--symbolic-full-name', `${branch}@{upstream}`], { cwd: projectPath });
+      upstreamRef = fullRef.trim();
     } catch (error) {
       return res.json({
         hasRemote,
@@ -1210,11 +1220,20 @@ router.get('/remote-status', async (req, res) => {
 
     // Get ahead/behind counts
     const { stdout: countOutput } = await spawnAsync(
-      'git', ['rev-list', '--count', '--left-right', `${trackingBranch}...HEAD`],
+      'git', ['rev-list', '--count', '--left-right', `${upstreamRef}...HEAD`],
       { cwd: projectPath }
     );
     
     const [behind, ahead] = countOutput.trim().split('\t').map(Number);
+
+    // When this copy last pushed, read off the upstream ref's own reflog — the same local-only
+    // source as the counts above, and null when it records no push (cloned here and never pushed,
+    // or the entry has expired) so the panel can say that instead of inventing a time.
+    const lastPushedAt = await readLastPushedAt({
+      projectPath,
+      trackingRef: upstreamRef,
+      runCommand: spawnAsync
+    });
 
     res.json({
       hasRemote: true,
@@ -1224,7 +1243,8 @@ router.get('/remote-status', async (req, res) => {
       remoteName,
       ahead: ahead || 0,
       behind: behind || 0,
-      isUpToDate: ahead === 0 && behind === 0
+      isUpToDate: ahead === 0 && behind === 0,
+      lastPushedAt
     });
   } catch (error) {
     console.error('Git remote status error:', error);

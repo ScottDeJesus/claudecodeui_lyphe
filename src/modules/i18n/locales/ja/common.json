@@ -432,5 +432,14 @@
     "appearanceLight": "ライト表示",
     "appearanceDark": "ダーク表示",
     "divider": "アプリケーションの幅を変更"
+  },
+  "gitPanel": {
+    "lastPushed": "最後の push は {{when}}",
+    "neverPushed": "この環境からはまだ push していません",
+    "age": {
+      "justNow": "たった今",
+      "minutesAgo": "{{count}}分前",
+      "hoursAgo": "{{count}}時間前"
+    }
   }
 }

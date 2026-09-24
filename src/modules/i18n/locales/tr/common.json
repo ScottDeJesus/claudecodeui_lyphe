@@ -435,5 +435,14 @@
     "appearanceLight": "Açık görünüm",
     "appearanceDark": "Koyu görünüm",
     "divider": "Uygulamaları yeniden boyutlandır"
+  },
+  "gitPanel": {
+    "lastPushed": "Son push {{when}}",
+    "neverPushed": "Buradan henüz push yapılmadı",
+    "age": {
+      "justNow": "az önce",
+      "minutesAgo": "{{count}} dk önce",
+      "hoursAgo": "{{count}} sa önce"
+    }
   }
 }

@@ -436,5 +436,14 @@
     "appearanceLight": "Apariencia clara",
     "appearanceDark": "Apariencia oscura",
     "divider": "Cambiar el tamaño de las aplicaciones"
+  },
+  "gitPanel": {
+    "lastPushed": "Último push {{when}}",
+    "neverPushed": "Aún no se ha hecho push desde aquí",
+    "age": {
+      "justNow": "justo ahora",
+      "minutesAgo": "hace {{count}} min",
+      "hoursAgo": "hace {{count}} h"
+    }
   }
 }

@@ -346,5 +346,24 @@
       "warning": "警告",
       "caution": "注意"
     }
+  },
+  "question": {
+    "needsInput": "Claude 需要你的回答",
+    "selectAll": "選擇所有適用項目",
+    "other": "其他...",
+    "otherPlaceholder": "輸入你的回答...",
+    "skip": "略過",
+    "skipAll": "全部略過",
+    "back": "上一步",
+    "next": "下一步",
+    "submit": "送出",
+    "skipped": "已略過",
+    "noAnswer": "未作答",
+    "yourAnswer": "你的回答",
+    "yourWords": "你的原話",
+    "showFull": "顯示完整問題",
+    "showLess": "收合",
+    "showDetails": "顯示完整問題與所有選項",
+    "hideDetails": "隱藏完整問題"
   }
 }

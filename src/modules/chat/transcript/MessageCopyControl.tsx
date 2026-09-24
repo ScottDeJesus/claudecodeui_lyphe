@@ -62,9 +62,12 @@ const MessageCopyControl = ({
   const menuRef = useRef<HTMLDivElement | null>(null);
   const copyFeedbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // The dropdown is rendered in a portal so it escapes the chat message's
-  // `contain: paint` box (which would otherwise clip it). Anchor it to the
-  // trigger, flipping above when there isn't room below.
+  // The dropdown is rendered in a portal, not inside the row: `position: fixed` is only
+  // viewport-anchored while no ancestor between the menu and the root becomes its containing
+  // block or clip box — which `.chat-message` was, by `contain: paint`, until 2026-09-24 (see
+  // `src/index.css`). The menu is anchored to the trigger by viewport rect here, so it keeps
+  // working either way; the portal is what makes that independent of the row's own layout.
+  // Anchor it to the trigger, flipping above when there isn't room below.
   const openDropdown = () => {
     const rect = triggerRef.current?.getBoundingClientRect();
     if (rect) {

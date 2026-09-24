@@ -329,5 +329,24 @@
       "warning": "경고",
       "caution": "주의"
     }
+  },
+  "question": {
+    "needsInput": "Claude가 입력을 기다리고 있습니다",
+    "selectAll": "해당하는 항목을 모두 선택",
+    "other": "기타...",
+    "otherPlaceholder": "답변을 입력하세요...",
+    "skip": "건너뛰기",
+    "skipAll": "모두 건너뛰기",
+    "back": "뒤로",
+    "next": "다음",
+    "submit": "제출",
+    "skipped": "건너뜀",
+    "noAnswer": "답변 없음",
+    "yourAnswer": "내 답변",
+    "yourWords": "직접 입력한 답변",
+    "showFull": "질문 전체 보기",
+    "showLess": "접기",
+    "showDetails": "질문 전체와 모든 선택지 보기",
+    "hideDetails": "질문 전체 숨기기"
   }
 }

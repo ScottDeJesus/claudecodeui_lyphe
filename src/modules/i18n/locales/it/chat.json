@@ -310,5 +310,24 @@
       "warning": "Avviso",
       "caution": "Attenzione"
     }
+  },
+  "question": {
+    "needsInput": "Claude ha bisogno della tua risposta",
+    "selectAll": "Seleziona tutte quelle pertinenti",
+    "other": "Altro...",
+    "otherPlaceholder": "Scrivi la tua risposta...",
+    "skip": "Salta",
+    "skipAll": "Salta tutte",
+    "back": "Indietro",
+    "next": "Avanti",
+    "submit": "Invia",
+    "skipped": "Saltata",
+    "noAnswer": "Nessuna risposta",
+    "yourAnswer": "La tua risposta",
+    "yourWords": "Con parole tue",
+    "showFull": "Mostra la domanda intera",
+    "showLess": "Mostra meno",
+    "showDetails": "Mostra la domanda intera e tutte le opzioni",
+    "hideDetails": "Nascondi la domanda intera"
   }
 }

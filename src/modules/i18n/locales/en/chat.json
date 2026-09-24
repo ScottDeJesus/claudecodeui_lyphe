@@ -384,5 +384,24 @@
       "warning": "Warning",
       "caution": "Caution"
     }
+  },
+  "question": {
+    "needsInput": "Claude needs your input",
+    "selectAll": "Select all that apply",
+    "other": "Other...",
+    "otherPlaceholder": "Type your answer...",
+    "skip": "Skip",
+    "skipAll": "Skip all",
+    "back": "Back",
+    "next": "Next",
+    "submit": "Submit",
+    "skipped": "Skipped",
+    "noAnswer": "No answer provided",
+    "yourAnswer": "Your answer",
+    "yourWords": "In your words",
+    "showFull": "Show full question",
+    "showLess": "Show less",
+    "showDetails": "Show the full question and every option",
+    "hideDetails": "Hide the full question"
   }
 }

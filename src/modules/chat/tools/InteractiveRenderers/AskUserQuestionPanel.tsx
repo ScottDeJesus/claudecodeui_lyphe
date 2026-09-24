@@ -1,6 +1,11 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
+import { ChevronLeft } from 'lucide-react';
 
-import type { PermissionPanelProps,Question } from '@/shared/types';
+import type { PermissionPanelProps, Question } from '@/shared/types';
+import { Badge, Button, Card, Input } from '@/shared/ui';
+import { QuestionText } from '@/modules/chat/tools/ContentRenderers/QuestionText';
+import { QuestionOptionRow } from '@/modules/chat/tools/InteractiveRenderers/QuestionOptionRow';
 
 /** Stable fallback so the memoized handlers below are not invalidated on every
  *  render by a fresh `[]` literal when a request carries no questions. */
@@ -32,6 +37,7 @@ export const AskUserQuestionPanel: React.FC<PermissionPanelProps> = ({
   request,
   onDecision,
 }) => {
+  const { t } = useTranslation('chat');
   const input = request.input as { questions?: Question[] } | undefined;
   const questions: Question[] = input?.questions ?? NO_QUESTIONS;
 
@@ -188,52 +194,42 @@ export const AskUserQuestionPanel: React.FC<PermissionPanelProps> = ({
   const isFirst = currentStep === 0;
   const hasCurrentSelection = selected.size > 0 || (isOtherOn && (otherTexts.get(currentStep) || '').trim().length > 0);
 
+  // Keyboard help, so it gives way below `sm`: with it, "Skip all · Back · Submit" in German or
+  // Russian ran past a 390px card and clipped Submit against its edge.
+  const keyHintClass = 'ml-1.5 hidden font-mono text-[10px] opacity-60 sm:inline';
+
   return (
     <div
       ref={containerRef}
       tabIndex={-1}
       onKeyDown={handleKeyDown}
+      data-question-card="pending"
       className={`w-full outline-none transition-all duration-500 ease-out ${
         mounted ? 'translate-y-0 opacity-100' : 'translate-y-3 opacity-0'
       }`}
     >
-      <div className="relative overflow-hidden rounded-2xl border border-gray-200/80 bg-white shadow-lg dark:border-gray-700/50 dark:bg-gray-800/90 dark:shadow-2xl">
-        {/* Accent line */}
-        <div className="absolute left-0 right-0 top-0 h-[2px] bg-gradient-to-r from-blue-500 via-cyan-400 to-teal-400" />
-
-        {/* Header + Question — compact */}
-        <div className="px-4 pb-2 pt-3.5">
-          <div className="mb-1.5 flex items-center gap-2.5">
-            {/* Question icon */}
-            <div className="relative flex-shrink-0">
-              <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-gradient-to-br from-blue-500/10 to-cyan-500/10 dark:from-blue-400/15 dark:to-cyan-400/15">
-                <svg className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.75} stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827m0 3h.01" />
-                </svg>
-              </div>
-              <div className="absolute -right-0.5 -top-0.5 h-2 w-2 animate-pulse rounded-full bg-cyan-400 dark:bg-cyan-500" />
-            </div>
-
-            <div className="flex min-w-0 flex-1 items-center gap-2">
-              <span className="text-[10px] font-medium uppercase tracking-wide text-gray-400 dark:text-gray-500">
-                Claude needs your input
-              </span>
-              {q.header && (
-                <span className="inline-flex items-center rounded border border-blue-100 bg-blue-50 px-1.5 py-px text-[9px] font-semibold uppercase tracking-wider text-blue-600 dark:border-blue-800/50 dark:bg-blue-900/30 dark:text-blue-400">
-                  {q.header}
-                </span>
-              )}
-            </div>
-
-            {/* Step counter */}
+      <Card className="overflow-hidden shadow-none">
+        {/* Header: who is asking and about what, then the question in body type. */}
+        <div className="px-3 pb-2 pt-3 sm:px-4">
+          <div className="mb-2 flex min-w-0 items-center gap-2">
+            {/* Pending, in the frame's "Waiting for you" tone. */}
+            <span aria-hidden className="vv-pulse h-2 w-2 flex-shrink-0 rounded-full bg-warn-ink" />
+            <span className="truncate text-xs font-medium uppercase tracking-[0.14em] text-ink-faint">
+              {t('question.needsInput', { defaultValue: 'Claude needs your input' })}
+            </span>
+            {q.header && (
+              <Badge as="span" tone="neutral" className="vv-badge--compact flex-shrink-0 uppercase tracking-wider">
+                {q.header}
+              </Badge>
+            )}
             {!isSingle && (
-              <span className="flex-shrink-0 text-[10px] tabular-nums text-gray-400 dark:text-gray-500">
+              <span className="ml-auto flex-shrink-0 text-xs tabular-nums text-ink-faint">
                 {currentStep + 1}/{total}
               </span>
             )}
           </div>
 
-          {/* Progress dots (multi-question) */}
+          {/* Progress (multi-question) */}
           {!isSingle && (
             <div className="mb-2 flex items-center gap-1">
               {questions.map((_, i) => (
@@ -241,200 +237,116 @@ export const AskUserQuestionPanel: React.FC<PermissionPanelProps> = ({
                   key={i}
                   type="button"
                   onClick={() => setCurrentStep(i)}
-                  className={`h-[3px] rounded-full transition-all duration-300 ${
-                    i === currentStep
-                      ? 'w-5 bg-blue-500 dark:bg-blue-400'
-                      : i < currentStep
-                        ? 'w-2.5 bg-blue-300 dark:bg-blue-600'
-                        : 'w-2.5 bg-gray-200 dark:bg-gray-700'
+                  aria-label={`${i + 1}/${total}`}
+                  className={`h-1 rounded-full transition-all duration-move ${
+                    i === currentStep ? 'w-5 bg-primary' : i < currentStep ? 'w-2.5 bg-primary/50' : 'w-2.5 bg-input'
                   }`}
                 />
               ))}
             </div>
           )}
 
-          {/* Question text */}
-          <p className="whitespace-pre-wrap text-[14px] font-medium leading-snug text-gray-900 dark:text-gray-100">
-            {q.question}
-          </p>
+          <QuestionText text={q.question} />
           {multi && (
-            <span className="text-[10px] text-gray-400 dark:text-gray-500">Select all that apply</span>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {t('question.selectAll', { defaultValue: 'Select all that apply' })}
+            </p>
           )}
         </div>
 
-        {/* Options — tight spacing. Only the LIST scrolls past twelve rem; the "Other" row and its
-            field sit in their own block below, so nothing a person types into is ever clipped. */}
-        <div className="scrollbar-thin max-h-48 overflow-y-auto px-4" role={multi ? 'group' : 'radiogroup'} aria-label={q.question}>
-          <div className="space-y-1">
-            {q.options.map((opt, optIdx) => {
-              const isSelected = selected.has(opt.label);
-              return (
-                <button
-                  key={opt.label}
-                  type="button"
-                  onClick={() => toggleOption(currentStep, opt.label, multi)}
-                  className={`group flex w-full items-center gap-2.5 rounded-lg border px-3 py-2 text-left transition-all duration-150 ${
-                    isSelected
-                      ? 'border-blue-300 bg-blue-50/80 ring-1 ring-blue-200/50 dark:border-blue-600 dark:bg-blue-900/25 dark:ring-blue-700/30'
-                      : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50/60 dark:border-gray-700/60 dark:hover:border-gray-600 dark:hover:bg-gray-700/40'
-                  }`}
-                >
-                  {/* Keyboard hint */}
-                  <kbd className={`flex h-5 w-5 flex-shrink-0 items-center justify-center rounded font-mono text-[10px] transition-all duration-150 ${
-                    isSelected
-                      ? 'bg-blue-500 font-semibold text-white dark:bg-blue-500'
-                      : 'border border-gray-200 bg-gray-100 text-gray-400 group-hover:border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-500 dark:group-hover:border-gray-600'
-                  }`}>
-                    {optIdx + 1}
-                  </kbd>
-
-                  <div className="min-w-0 flex-1">
-                    <div className={`text-[13px] leading-tight transition-colors duration-150 ${
-                      isSelected
-                        ? 'font-medium text-gray-900 dark:text-gray-100'
-                        : 'text-gray-700 dark:text-gray-300'
-                    }`}>
-                      {opt.label}
-                    </div>
-                    {opt.description && (
-                      <div className={`text-[11px] leading-snug transition-colors duration-150 ${
-                        isSelected
-                          ? 'text-blue-600/70 dark:text-blue-300/70'
-                          : 'text-gray-400 dark:text-gray-500'
-                      }`}>
-                        {opt.description}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Selection check */}
-                  {isSelected && (
-                    <svg className="h-4 w-4 flex-shrink-0 text-blue-500 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
-                    </svg>
-                  )}
-                </button>
-              );
-            })}
+        {/* Options. Only the LIST scrolls past twelve rem; the "Other" row and its field sit in their
+            own block below, so nothing a person types into is ever clipped. */}
+        <div className="scrollbar-thin max-h-48 overflow-y-auto px-3 sm:px-4" role={multi ? 'group' : 'radiogroup'} aria-label={q.question}>
+          <div className="space-y-1.5">
+            {q.options.map((opt, optIdx) => (
+              <QuestionOptionRow
+                key={opt.label}
+                label={opt.label}
+                description={opt.description}
+                selected={selected.has(opt.label)}
+                keyHint={String(optIdx + 1)}
+                choice={multi ? 'checkbox' : 'radio'}
+                onClick={() => toggleOption(currentStep, opt.label, multi)}
+              />
+            ))}
           </div>
         </div>
 
         {/* "Other" — outside the scroller above. Inside it, with three or more options, the field
             landed below the twelve-rem fold and was clipped against the footer's Submit button,
             hiding the lower half of what was being typed. Measured 2026-09-10. */}
-        <div className="px-4 pb-2 pt-1">
-          <div className="space-y-1">
-            {/* "Other" option */}
-            <button
-              type="button"
-              onClick={() => toggleOther(currentStep, multi)}
-              className={`group flex w-full items-center gap-2.5 rounded-lg border px-3 py-2 text-left transition-all duration-150 ${
-                isOtherOn
-                  ? 'border-blue-300 bg-blue-50/80 ring-1 ring-blue-200/50 dark:border-blue-600 dark:bg-blue-900/25 dark:ring-blue-700/30'
-                  : 'border-dashed border-gray-200 hover:border-gray-300 hover:bg-gray-50/60 dark:border-gray-700/60 dark:hover:border-gray-600 dark:hover:bg-gray-700/40'
-              }`}
-            >
-              <kbd className={`flex h-5 w-5 flex-shrink-0 items-center justify-center rounded font-mono text-[10px] transition-all duration-150 ${
-                isOtherOn
-                  ? 'bg-blue-500 font-semibold text-white dark:bg-blue-500'
-                  : 'border border-gray-200 bg-gray-100 text-gray-400 group-hover:border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-500 dark:group-hover:border-gray-600'
-              }`}>
-                0
-              </kbd>
-              <span className={`text-[13px] leading-tight transition-colors ${
-                isOtherOn
-                  ? 'font-medium text-gray-900 dark:text-gray-100'
-                  : 'text-gray-500 dark:text-gray-400'
-              }`}>
-                Other...
-              </span>
-              {isOtherOn && (
-                <svg className="ml-auto h-4 w-4 flex-shrink-0 text-blue-500 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
-                </svg>
-              )}
-            </button>
+        <div className="space-y-1.5 px-3 pb-3 pt-1.5 sm:px-4">
+          <QuestionOptionRow
+            label={t('question.other', { defaultValue: 'Other...' })}
+            selected={isOtherOn}
+            keyHint="0"
+            dashed
+            onClick={() => toggleOther(currentStep, multi)}
+          />
 
-            {/* Other text input — inline */}
-            {isOtherOn && (
-              <div className="pl-[30px] pr-0.5">
-                <div className="relative">
-                  <input
-                    ref={otherInputRef}
-                    type="text"
-                    value={otherTexts.get(currentStep) || ''}
-                    onChange={(e) => setOtherText(currentStep, e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault();
-                        if (isLast) handleSubmit();
-                        else setCurrentStep(s => s + 1);
-                      }
-                      // Prevent container keydown from firing
-                      e.stopPropagation();
-                    }}
-                    placeholder="Type your answer..."
-                    // pr-14 reserves the badge's width on the right, so typed text never runs
-                    // under the "Enter" hint that sits inside the field.
-                    className="w-full rounded-lg border-0 bg-gray-50 py-1.5 pl-3 pr-14 text-[13px] text-gray-900 outline-none ring-1 ring-gray-200 transition-shadow duration-200 placeholder:text-gray-400 focus:ring-2 focus:ring-blue-400 dark:bg-gray-900/60 dark:text-gray-100 dark:ring-gray-700 dark:placeholder:text-gray-600 dark:focus:ring-blue-500"
-                  />
-                  <kbd className="absolute right-2 top-1/2 -translate-y-1/2 rounded border border-gray-200 bg-gray-100 px-1 py-0.5 font-mono text-[9px] text-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-600">
-                    Enter
-                  </kbd>
-                </div>
-              </div>
-            )}
-          </div>
+          {isOtherOn && (
+            <div className="relative pl-9">
+              <Input
+                ref={otherInputRef}
+                type="text"
+                value={otherTexts.get(currentStep) || ''}
+                onChange={(e) => setOtherText(currentStep, e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    if (isLast) handleSubmit();
+                    else setCurrentStep(s => s + 1);
+                  }
+                  // Prevent container keydown from firing
+                  e.stopPropagation();
+                }}
+                placeholder={t('question.otherPlaceholder', { defaultValue: 'Type your answer...' })}
+                // pr-16 reserves the keycap's width on the right, so typed text never runs under the
+                // "Enter" hint that sits inside the field.
+                className="h-9 pr-16"
+              />
+              <kbd className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 rounded border border-border bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
+                Enter
+              </kbd>
+            </div>
+          )}
         </div>
 
-        {/* Footer — compact */}
-        <div className="flex items-center justify-between gap-2 border-t border-gray-100 bg-gray-50/50 px-4 py-2 dark:border-gray-700/50 dark:bg-gray-800/50">
-          <button
-            type="button"
-            onClick={handleSkip}
-            className="text-[11px] text-gray-400 transition-colors hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
-          >
-            {isSingle ? 'Skip' : 'Skip all'}
-            <span className="ml-1 text-[9px] text-gray-300 dark:text-gray-600">Esc</span>
-          </button>
+        {/* Footer */}
+        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border bg-muted/40 px-3 py-2 sm:px-4">
+          <Button type="button" variant="ghost" size="sm" onClick={handleSkip} className="h-8 px-2 text-muted-foreground">
+            {isSingle ? t('question.skip', { defaultValue: 'Skip' }) : t('question.skipAll', { defaultValue: 'Skip all' })}
+            <span className={keyHintClass}>Esc</span>
+          </Button>
 
-          <div className="flex items-center gap-1.5">
+          <div className="ml-auto flex items-center gap-1.5">
             {!isSingle && !isFirst && (
-              <button
-                type="button"
-                onClick={() => setCurrentStep(s => s - 1)}
-                className="inline-flex items-center gap-0.5 rounded-lg px-2.5 py-1.5 text-[11px] font-medium text-gray-600 transition-all duration-150 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700/60"
-              >
-                <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-                </svg>
-                Back
-              </button>
+              <Button type="button" variant="ghost" size="sm" onClick={() => setCurrentStep(s => s - 1)} className="h-8 px-2.5">
+                <ChevronLeft aria-hidden />
+                {t('question.back', { defaultValue: 'Back' })}
+              </Button>
             )}
 
             {isLast ? (
-              <button
+              <Button
                 type="button"
+                size="sm"
                 onClick={handleSubmit}
                 disabled={!hasCurrentSelection && !Object.keys(buildAnswers()).length}
-                className="inline-flex items-center gap-1 rounded-lg bg-gradient-to-r from-blue-600 to-blue-500 px-3.5 py-1.5 text-[11px] font-semibold text-white shadow-sm transition-all duration-200 hover:shadow-md disabled:cursor-not-allowed disabled:opacity-30 disabled:shadow-none dark:from-blue-500 dark:to-blue-600"
+                className="h-8 px-3.5"
               >
-                Submit
-                <span className="ml-0.5 font-mono text-[9px] opacity-70">Enter</span>
-              </button>
+                {t('question.submit', { defaultValue: 'Submit' })}
+                <span className={keyHintClass}>Enter</span>
+              </Button>
             ) : (
-              <button
-                type="button"
-                onClick={() => setCurrentStep(s => s + 1)}
-                className="inline-flex items-center gap-1 rounded-lg bg-gradient-to-r from-blue-600 to-blue-500 px-3.5 py-1.5 text-[11px] font-semibold text-white shadow-sm transition-all duration-200 hover:shadow-md dark:from-blue-500 dark:to-blue-600"
-              >
-                Next
-                <span className="ml-0.5 font-mono text-[9px] opacity-70">Enter</span>
-              </button>
+              <Button type="button" size="sm" onClick={() => setCurrentStep(s => s + 1)} className="h-8 px-3.5">
+                {t('question.next', { defaultValue: 'Next' })}
+                <span className={keyHintClass}>Enter</span>
+              </Button>
             )}
           </div>
         </div>
-      </div>
+      </Card>
     </div>
   );
 };

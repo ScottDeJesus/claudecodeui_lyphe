@@ -335,5 +335,24 @@
       "warning": "Advertencia",
       "caution": "Precaución"
     }
+  },
+  "question": {
+    "needsInput": "Claude necesita tu respuesta",
+    "selectAll": "Selecciona todas las que correspondan",
+    "other": "Otra...",
+    "otherPlaceholder": "Escribe tu respuesta...",
+    "skip": "Omitir",
+    "skipAll": "Omitir todas",
+    "back": "Atrás",
+    "next": "Siguiente",
+    "submit": "Enviar",
+    "skipped": "Omitida",
+    "noAnswer": "Sin respuesta",
+    "yourAnswer": "Tu respuesta",
+    "yourWords": "En tus palabras",
+    "showFull": "Ver pregunta completa",
+    "showLess": "Ver menos",
+    "showDetails": "Ver la pregunta completa y todas las opciones",
+    "hideDetails": "Ocultar la pregunta completa"
   }
 }

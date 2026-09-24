@@ -10,6 +10,8 @@ import { resolveClaudeCodeExecutablePath } from '@/shared/claude-cli-path.js';
 import { expandHome } from '@/shared/utils.js';
 
 import { createArcLane } from './arc-lane.js';
+import { createArcRefusalsNotifier } from './arc-refusals.service.js';
+import type { ArcRefusal } from './arc-refusals.service.js';
 import { createPlanRunnerRouter } from './plan-runner.routes.js';
 import { sweepPlanArchive } from './plan-archive.service.js';
 import { createRunnerEndingsNotifier } from './runner-endings.service.js';
@@ -60,6 +62,14 @@ const VERB_TIMEOUT_MS = 20000;
 const ANNOUNCED_THROUGH_KEY = 'plan_runner_announced_through';
 
 /**
+ * The `app_config` key holding the arc-refusal EPISODE keys already announced, as a JSON array — durable
+ * for the same reason and in the same place as the ending watermark, and a SET rather than a watermark
+ * because a card's refusals are not ordered in time with anything else on the host: two arcs can be stuck
+ * at once, and each is owed exactly one push (`arc-refusals.service.ts`).
+ */
+const ARC_REFUSALS_KEY = 'plan_runner_arc_refusals';
+
+/**
  * How long the plans-archive sweep waits after construction before its first pass, in milliseconds.
  *
  * A settle window of ~2 min, for its own reason: a boot still warming must not race the first
@@ -85,6 +95,31 @@ const buildEndingEvent = createNotificationEvent as (input: {
   severity: 'info' | 'warning';
   dedupeKey: string | null;
 }) => object;
+
+/** The same alias for a card a press refused (`arc-refusals.service.ts`), whose meta is its own shape. */
+const buildRefusalEvent = createNotificationEvent as (input: {
+  provider: 'system';
+  kind: 'error';
+  code: 'runner.arc_stuck';
+  meta: { sessionName: string; position: number; cardTitle: string; reason: string; exit: number };
+  severity: 'warning';
+  dedupeKey: string | null;
+}) => object;
+
+/**
+ * The `app_config` value the refusal notifier keeps: a JSON array of episode keys. Anything at all in the
+ * row — a hand-edited value, a row written by a build that stored another shape — reads as "nothing has
+ * been announced yet", which costs one duplicate push and never a lost one.
+ */
+function readRefusalKeys(raw: string | null): string[] {
+  if (raw === null) return [];
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed.filter((key): key is string => typeof key === 'string') : [];
+  } catch {
+    return [];
+  }
+}
 
 /**
  * The directory holding the Claude CLI, or `null`.
@@ -139,7 +174,7 @@ function resolveLaunchingSessions(runs: RunnerRunSnapshot[]): RunnerRunSnapshot[
 
 /**
  * Builds the plan-runner lane for the server entrypoint: the poll, the frame, the three run verbs, and
- * the notification each ending earns.
+ * the notification each ending — and each card the start ladder REFUSED — earns.
  *
  * The composition root is the only place here that reads the environment, names a path, spawns
  * anything or touches a socket. Everything under it takes what it needs as an argument, which is
@@ -221,6 +256,46 @@ export function createPlanRunnerModule({ heldPlanPaths }: PlanRunnerDependencies
     },
   });
 
+  /**
+   * The arc deck's notifier: a card a press REFUSED reaches the phone once, and once only while
+   * the refusal stands (`arc-refusals.service.ts`). Built here beside the endings notifier because it is the
+   * same kind of thing — a standing fact about the host, read off the frame the tabs already receive, told to
+   * every active user and left to each user's own switches and channels.
+   */
+  const refusals = createArcRefusalsNotifier({
+    readAnnounced: () => readRefusalKeys(appConfigDb.get(ARC_REFUSALS_KEY)),
+    writeAnnounced: (keys) => appConfigDb.set(ARC_REFUSALS_KEY, JSON.stringify(keys)),
+    // One user's failure costs that user's push and nothing more, exactly as an ending's does: letting it
+    // throw would leave the refusal due, and its retry would push again to every user already told.
+    announce: (refusal) => {
+      for (const userId of userDb.getActiveUserIds()) {
+        try {
+          notifyUserIfEnabled({
+            userId,
+            event: buildRefusalEvent({
+              provider: 'system',
+              kind: 'error',
+              code: 'runner.arc_stuck',
+              meta: {
+                sessionName: refusal.arcTitle,
+                position: refusal.position,
+                cardTitle: refusal.cardTitle,
+                reason: refusal.reason,
+                exit: refusal.exit,
+              },
+              severity: 'warning',
+              // The orchestrator's dedupe is process-wide, so the key carries the user: without it a second
+              // user's push reads as a repeat of the first's.
+              dedupeKey: `runner-arc:${userId}:${refusal.key}`,
+            }),
+          });
+        } catch (error) {
+          logErrorOnce(`[PlanRunner] could not announce a refused arc card to user ${userId}: ${error instanceof Error ? error.message : String(error)}`);
+        }
+      }
+    },
+  });
+
   const watcher = createRunnerWatcher({
     // Epoch SECONDS: every timestamp the runner writes comes from Python's `time.time()`, and a
     // millisecond clock compared against one of them makes every run on the host read live.
@@ -266,7 +341,17 @@ export function createPlanRunnerModule({ heldPlanPaths }: PlanRunnerDependencies
     arcsDir: expandHome(process.env.PLAN_RUNNER_ARCS_DIR || path.join(path.dirname(stateDir), 'arcs')),
     bin,
     claudeBinDir,
-    broadcast,
+    // Refusals are read off the SAME frame the deck draws — never a second read of the same directories,
+    // which could see a different picture — and only when it changed: a refusal always changes it. A failure
+    // to announce never costs the tabs their frame.
+    broadcast: (frame) => {
+      try {
+        refusals.observe(frame.arcs);
+      } catch (error) {
+        logErrorOnce(`[PlanRunner] could not announce a refused arc card: ${error instanceof Error ? error.message : String(error)}`);
+      }
+      broadcast(frame);
+    },
     pollMs: POLL_MS,
     timeoutMs: VERB_TIMEOUT_MS,
     endedKeepS: ENDED_KEEP_S,

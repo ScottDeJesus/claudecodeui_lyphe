@@ -492,9 +492,23 @@
 
 /* Mobile optimizations and components */
 @layer components {
-  .chat-messages-pane {
-    contain: layout style paint;
-  }
+  /* NO `contain` ON `.chat-messages-pane` OR `.chat-message`, AND IT IS NOT AN OMISSION.
+     Containment came in on both with the Electron commit (`97c9b67b`, 2026-06-29) and was
+     removed on 2026-09-24 because it silently broke every fullscreen card in the chat: `contain:
+     layout` (and `paint`, and `content`, which is both) makes the element the CONTAINING BLOCK for
+     its `position: fixed` descendants, so a live card going fullscreen sized itself to its row — a
+     1440x900 window showed an 802x2259.5 card, mid-transcript, taller than the screen — and
+     `paint`/`content` clipped it there as well (`layout` alone does not clip; it is enough on its
+     own to break fullscreen). All of it with `pos=fixed`, `z=45` and every state attribute correct,
+     which is why it read as "fullscreen does not work" rather than as a layout fault. The gutter
+     widgets, which live outside this pane, filled the screen the whole time. What the pane actually
+     spends its time on is off-screen ROWS, and that is `LazyMessageRow`'s job — it unmounts them.
+     Dropping both rules measured inert: on a 19-row transcript, zero row geometry moved and
+     `scrollHeight` was unchanged. `chat-composer-shell` keeps `contain: layout style` (no fixed
+     descendants there). Re-adding either rule re-breaks fullscreen, silently, for every transcript
+     card — as do `content-visibility: auto` on a row, and an ancestor `transform`, `filter`,
+     `perspective`, `will-change: transform` or `backdrop-filter`, none of which shows up in an audit
+     shaped like `contain` (`.verify/contain-fixed-mechanism.mjs` measures all of them). */
 
   .chat-composer-shell {
     contain: layout style;
@@ -550,13 +564,12 @@
     clip-path: inset(-8px -8px 0 -8px);
   }
 
-  /* Contained, never render-skipped: a `content-visibility: auto` row reports a stand-in
-     height until the browser draws it, and the transcript's settle loop, its fill check
-     and LazyMessageRow's measured heights all read row geometry on a row's first frame.
-     Off-screen cost is LazyMessageRow's job — it unmounts rows outside its band. */
-  .chat-message {
-    contain: layout style paint;
-  }
+  /* Never render-skipped and never contained. `content-visibility: auto` is out because a row
+     reports a stand-in height until the browser draws it, and the transcript's settle loop, its
+     fill check and LazyMessageRow's measured heights all read row geometry on a row's first
+     frame; `contain` is out for the reason the pane's comment gives — a row that contains is the
+     containing block for the fullscreen card inside it. Off-screen cost is LazyMessageRow's job:
+     it unmounts rows outside its band. */
 
   /* Mobile touch optimization and safe areas */
   @media (max-width: 768px) {

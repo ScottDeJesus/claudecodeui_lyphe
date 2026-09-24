@@ -8,9 +8,13 @@ import { Badge } from '@/shared/ui';
  * Used by JevPanel as its last block: every caller the consumer map or the ledger knows, what it
  * asks, where it lives, how often it has called all-time and when it last did.
  *
- * A caller the map has no line for is the one row that asks for work: it wears `unmapped` and says
- * where the description goes, because a name in the ledger with no sentence beside it is a caller
- * nobody can judge the spend of.
+ * Two rows carry no file. A RETIRED caller is one whose sender is gone while the ledger keeps its
+ * rows — the classifier the heal reflex used to run, say — so it wears `retired` and its line says
+ * what it asked and when it stopped: history, with no work owing.
+ *
+ * An UNMAPPED caller is the one row that asks for work: it wears `unmapped` and says where the
+ * description goes, because a name in the ledger with no sentence beside it is a caller nobody can
+ * judge the spend of.
  */
 export function JevReference({ reference }: { reference: JevReferenceRow[] }) {
   const { t } = useTranslation();
@@ -43,12 +47,15 @@ export function JevReference({ reference }: { reference: JevReferenceRow[] }) {
             <tr key={row.caller} className="border-b border-border/60 align-top" data-jev-reference-row={row.caller}>
               <td className="whitespace-nowrap py-1.5 pr-3">
                 <span className="font-mono text-xs">{row.caller}</span>
-                {!row.mapped && (
+                {row.retired && (
+                  <Badge as="span" tone="neutral" className="ml-2 text-xs">{t('jev.reference.retired', { defaultValue: 'retired' })}</Badge>
+                )}
+                {!row.mapped && !row.retired && (
                   <Badge as="span" tone="warn" className="ml-2 text-xs"><span aria-hidden="true">▲</span>&nbsp;{t('jev.reference.unmapped', { defaultValue: 'unmapped' })}</Badge>
                 )}
               </td>
               <td className="min-w-[14rem] py-1.5 pr-3 text-xs">
-                {row.mapped && row.asks !== null
+                {row.asks !== null
                   ? row.asks
                   : <span className="text-muted-foreground">{t('jev.reference.unmappedLine', { defaultValue: 'no description yet — add it to the Jev consumer map' })}</span>}
               </td>

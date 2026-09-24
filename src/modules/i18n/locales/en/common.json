@@ -339,6 +339,7 @@
       },
       "unmapped": "unmapped",
       "unmappedLine": "no description yet — add it to the Jev consumer map",
+      "retired": "retired",
       "never": "never",
       "ago": "{{ago}} ago",
       "empty": "No caller is known yet"
@@ -842,6 +843,8 @@
     "arcCard": "Card {{n}}",
     "arcWalking": "walking",
     "arcStalled": "stalled",
+    "arcStuck": "stuck",
+    "arcStuckReason": "cannot start — {{reason}}",
     "arcComplete": "complete",
     "arcNotStarted": "not started",
     "arcQueued": "queued",
@@ -1206,5 +1209,14 @@
     "appearanceLight": "Light appearance",
     "appearanceDark": "Dark appearance",
     "divider": "Resize applications"
+  },
+  "gitPanel": {
+    "lastPushed": "Last pushed {{when}}",
+    "neverPushed": "Not pushed from here yet",
+    "age": {
+      "justNow": "just now",
+      "minutesAgo": "{{count}}m ago",
+      "hoursAgo": "{{count}}h ago"
+    }
   }
 }

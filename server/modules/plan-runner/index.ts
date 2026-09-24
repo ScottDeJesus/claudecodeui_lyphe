@@ -15,3 +15,10 @@ export type { PlanCost, PlanCostByKind } from './plan-cost.service.js';
 // once instead of reaching into the file.
 export { sweepPlanArchive } from './plan-archive.service.js';
 export type { PlanArchiveSweep } from './plan-archive.service.js';
+
+// The next DeepSeek off-peak moment, off a command that prints one line. Two lanes want the same
+// clock and there is deliberately only one of it: the v3 dispatcher's `offpeak` verb prints
+// `plan-runner offpeak`'s line byte for byte (`hooks/dispatcher/cmd/schedule.py:16`), so the clock
+// is TOLD which binary to ask rather than owning one. A second copy of this file would be a second
+// cache to keep in step with the one the card's `Start at …` button reads.
+export { createOffpeakClock } from './runner-offpeak.service.js';

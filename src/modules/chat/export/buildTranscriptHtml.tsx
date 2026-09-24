@@ -105,8 +105,10 @@ ${styles}
     border: 1px solid var(--border); background: transparent; color: inherit;
     border-radius: 0.5rem; padding: 0.375rem 0.75rem; font-size: 0.75rem; cursor: pointer;
   }
-  /* Off-screen skipping is a scrolling optimisation; in a printed document it
-     leaves blank pages. */
+  /* Off-screen skipping is a scrolling optimisation; in a printed document it leaves blank
+     pages. Nothing in the app sets either property today — LazyMessageRow unmounts rows
+     instead, and the containment that used to sit on .chat-message was removed on
+     2026-09-24 — so this is a guard on the exported file, not a mirror of a live declaration. */
   .chat-message { content-visibility: visible !important; contain-intrinsic-size: auto !important; }
   @media print {
     .chat-export-theme-toggle { display: none; }

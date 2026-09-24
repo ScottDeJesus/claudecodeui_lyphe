@@ -62,6 +62,7 @@ import { createDispatchSoulsModule } from './modules/dispatch-souls/index.js';
 import { createHealModule } from './modules/heal/index.js';
 import { createJevModule } from './modules/jev/index.js';
 import { createPlanRunnerModule, planCostFor } from './modules/plan-runner/index.js';
+import { createDispatcherModule } from './modules/dispatcher/index.js';
 import { createUniverseModule } from './modules/universe/index.js';
 import { fileTreeRoutes } from './modules/file-tree/index.js';
 import { worktreesRoutes } from './modules/worktrees/index.js';
@@ -264,6 +265,12 @@ app.use('/api/deepseek', authenticateToken, createDeepseekModule());
 // points one way: the runner is handed a reading, and neither module imports the other.
 const planRunner = createPlanRunnerModule({ heldPlanPaths: plansHeldByLease });
 app.use('/api/plan-runner', authenticateToken, planRunner.router);
+
+// The v3 dispatcher's plans — the poll behind the `dispatcher_state` frame, and the relay for the
+// dispatcher's own stop/resume/park/unpark/schedule (protected). Built out here for the same reason
+// `planRunner` is: its poll starts after `listen` and stops on shutdown.
+const dispatcher = createDispatcherModule();
+app.use('/api/dispatcher', authenticateToken, dispatcher.router);
 
 // The heal reflex's ledger, the switches that steer it, and the door to a heal on demand
 // (protected — this is the operator's own friction record, and this app is reachable from a LAN).
@@ -522,6 +529,9 @@ async function startServer() {
             // frames it broadcasts are for sockets this server is only now able to accept.
             planRunner.start();
 
+            // The dispatcher's plans, read off its own command and broadcast the same way.
+            dispatcher.start();
+
             // The launcher souls, read off their own state root and broadcast the same way.
             dispatchSouls.start();
 
@@ -540,6 +550,7 @@ async function startServer() {
             // process new connections. Never awaited — open WebSockets keep it from resolving.
             server.close();
             planRunner.stop();
+            dispatcher.stop();
             dispatchSouls.stop();
             universe.stop();
             stopRunStallWatchdog?.();

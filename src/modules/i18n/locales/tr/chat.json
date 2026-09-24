@@ -310,5 +310,24 @@
       "warning": "Uyarı",
       "caution": "Dikkat"
     }
+  },
+  "question": {
+    "needsInput": "Claude yanıtınızı bekliyor",
+    "selectAll": "Uygun olanların tümünü seçin",
+    "other": "Diğer...",
+    "otherPlaceholder": "Yanıtınızı yazın...",
+    "skip": "Atla",
+    "skipAll": "Tümünü atla",
+    "back": "Geri",
+    "next": "İleri",
+    "submit": "Gönder",
+    "skipped": "Atlandı",
+    "noAnswer": "Yanıt verilmedi",
+    "yourAnswer": "Yanıtınız",
+    "yourWords": "Kendi sözlerinizle",
+    "showFull": "Sorunun tamamını göster",
+    "showLess": "Daha az göster",
+    "showDetails": "Sorunun tamamını ve tüm seçenekleri göster",
+    "hideDetails": "Sorunun tamamını gizle"
   }
 }

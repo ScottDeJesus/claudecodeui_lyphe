@@ -599,6 +599,15 @@ export const api = {
     saveSwarmSwitch: (state: { enabled: boolean; lanes: number | null }) =>
       put('/api/settings/swarm', state),
 
+    // The dispatcher's park-at-peak switch — the fourth flag file on this host, and the same shape
+    // as the three above for the same reason: a file the dispatcher's own process re-reads, not a
+    // preference the browser owns. On, an Accept during DeepSeek's peak window queues the plan and
+    // arms the hour it lifts; off, Accept walks now. Both calls answer with the state read back off
+    // disk, never with what was sent.
+    parkAtPeakSwitch: () => get('/api/settings/park-at-peak'),
+    saveParkAtPeakSwitch: (state: { enabled: boolean }) =>
+      put('/api/settings/park-at-peak', state),
+
     // The heal reflex's MASTER switch — the reflex's whole launching, on one word. `off` stops it
     // launching from the next ending onwards while an ending still indexes, and the typed `/heal`
     // door is never gated by it; `on` is what the flag file being absent has always meant. Same

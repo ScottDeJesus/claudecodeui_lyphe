@@ -20,6 +20,7 @@ const STATE_KEY: Record<ArcCardState, string> = {
   paused: 'runner.arcPaused',
   complete: 'runner.arcComplete',
   stalled: 'runner.arcStalled',
+  stuck: 'runner.arcStuck',
 };
 
 type ArcCardProps = {
@@ -137,6 +138,11 @@ export function dragScopePosition(types: readonly string[], arcName: string): nu
  * phases still ahead draws `10 of 18 · 8 blocked` — the count over the very rows beneath it, so a
  * `stalled` card says HOW MUCH held it rather than leaving the reader to count the ⛔s, and a card
  * nothing has happened to yet says nothing at all.
+ *
+ * A CARD THAT CANNOT START SAYS SO, ON ITSELF. A press the start ladder REFUSES (the lint, the switch, the
+ * intent lock, the arc's order gate) used to leave the card looking merely unstarted — measured 2026-09-24:
+ * 38 refusals over 76 minutes under a header reading "Walking". The stamp, the `stuck` state and the gate's
+ * own sentence are the RUNNER's (`hooks/plan_runner/arc_refused.py`), copied here whole.
  *
  * Every card fills its strip slot's height (`h-full`): the deck stretches its row to the tallest
  * card, so the strip does not jump as it scrolls.
@@ -256,6 +262,18 @@ export function ArcCard({ arc, card, layer, pinnedSessionId = null }: ArcCardPro
         {card.title}
       </p>
       <p className="line-clamp-2 min-w-0 break-words text-xs leading-snug text-muted-foreground">{card.charter}</p>
+      {/* WHY THIS CARD CANNOT START — the runner's own stamp, whole (`arc.json:cards[].refusal`,
+          `arc_refused.py`), in the badge's amber. The sentence is the refusing gate's, captured off its
+          stderr: nothing is re-derived and nothing softened, so it cannot disagree with the brief or the push. */}
+      {card.refusal !== null && (
+        <p
+          data-arc-card-refusal
+          title={card.refusal.reason}
+          className="min-w-0 break-words text-xs leading-snug text-warn-ink"
+        >
+          {t('runner.arcStuckReason', { reason: card.refusal.reason })}
+        </p>
+      )}
       {!runDrawsPhases && (
         <ArcPhaseList phases={phaseList} currentId={inert ? null : (live?.position?.phase_id ?? null)} />
       )}

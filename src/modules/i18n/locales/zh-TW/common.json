@@ -432,5 +432,14 @@
     "appearanceLight": "淺色外觀",
     "appearanceDark": "深色外觀",
     "divider": "調整應用程式大小"
+  },
+  "gitPanel": {
+    "lastPushed": "上次推送 {{when}}",
+    "neverPushed": "尚未從此處推送",
+    "age": {
+      "justNow": "剛剛",
+      "minutesAgo": "{{count}} 分鐘前",
+      "hoursAgo": "{{count}} 小時前"
+    }
   }
 }

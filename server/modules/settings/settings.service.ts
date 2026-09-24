@@ -1,11 +1,13 @@
 import { AppError } from '@/shared/utils.js';
 
+import { kickDispatcher } from './dispatcher-kick.js';
 import { JEV_SCOPES } from './jev-switches.js';
 import type { JevScopeKey, JevSwitches } from './jev-switches.js';
 import { readHealModel, writeHealModel } from './heal-model-switch.js';
 import type { HealModel } from './heal-model-switch.js';
 import { readHealCycle, writeHealCycle } from './heal-cycle-switch.js';
 import { readHealCap, readHealMaster, writeHealCap, writeHealMaster } from './heal-switch.js';
+import { getParkAtPeakState, setParkAtPeakState } from './park-at-peak-switch.js';
 import { readSwarmSwitch, writeSwarmSwitch } from './swarm-switch.js';
 
 /**
@@ -212,7 +214,12 @@ export function createSettingsService(dependencies: SettingsDependencies) {
       await dependencies.deepseekFlash.write(enabledInput);
       // Read back rather than echo the input: the switch is a file another daemon reads, and the
       // answer the UI renders should be what is on disk, not what we asked for.
-      return { enabled: await dependencies.deepseekFlash.read() };
+      const state = { enabled: await dependencies.deepseekFlash.read() };
+      // THE FLIP IS THE EVENT: the dispatcher is handed it at once, so a phase it was holding for
+      // want of a lane is taken up now rather than at the next session event. Fire-and-forget, and
+      // the kick swallows its own failures — the answer owed to the caller is the file's.
+      void kickDispatcher();
+      return state;
     },
     /**
      * The swarm switch: whether the plan runner runs several phases of one plan at once, and the
@@ -258,7 +265,31 @@ export function createSettingsService(dependencies: SettingsDependencies) {
       // Read back rather than echo the input, for the reason above — and here the file is the one
       // that holds the truth about the ceiling: `null` reads back as `null`, and a count reads back
       // exactly as it was written, because nothing on either side narrows it.
-      return readSwarmSwitch();
+      const state = await readSwarmSwitch();
+      // The flip is the event, as on the DeepSeek switch above: a swarm that was just turned on has
+      // phases the rule was holding for want of a lane, and they are taken up on the kick rather
+      // than at the next session event.
+      void kickDispatcher();
+      return state;
+    },
+    /**
+     * The dispatcher's park-at-peak switch: whether an Accept during DeepSeek's peak window queues
+     * the plan and arms the hour it lifts, or walks now.
+     *
+     * Both bodies live in `park-at-peak-switch.ts` — the file's own reader and writer are there with
+     * them — and are delegated to verbatim, because this file is over its ceiling: what belongs here
+     * is the line that hands a flip to the dispatcher, not the switch's own transport.
+     */
+    async getParkAtPeak() {
+      return getParkAtPeakState();
+    },
+    async setParkAtPeak(enabledInput: unknown) {
+      const state = await setParkAtPeakState(enabledInput);
+      // The flip is the event: on, the next Accept has an hour to arm, and the dispatcher can act on
+      // a plan that is already queued. A refused input has thrown by now and nothing was written, so
+      // no kick rides on a press that never moved the file.
+      void kickDispatcher();
+      return state;
     },
     /**
      * The heal reflex's MASTER switch: whether the reflex may LAUNCH at all, over and above the cap

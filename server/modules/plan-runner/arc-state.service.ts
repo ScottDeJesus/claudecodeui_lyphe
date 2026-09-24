@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-import type { ArcCardPhase, ArcCardSnapshot, ArcCardState, ArcSnapshot } from '@/shared/types.js';
+import type { ArcCardPhase, ArcCardRefusal, ArcCardSnapshot, ArcCardState, ArcSnapshot } from '@/shared/types.js';
 import { isHiddenProjectPath } from '@/shared/hidden-project-paths.js';
 import { readRunnerModelChoice } from '@/shared/utils.js';
 
@@ -13,18 +13,21 @@ import { readRunnerModelChoice } from '@/shared/utils.js';
  *
  * TWO fields are deliberately NOT computed here: `current` and `last_started` belong to the runner, which
  * decides the order under the arc's own lock (`hooks/plan_runner/arcs.py`); a recomputation would drift.
+ * `state` and `status` are read the same way, and for the same reason: the runner derives both in one
+ * function, so a card and the arc over it can never disagree — the arc reads `stuck` while ANY of its cards
+ * wears `stuck`, not only the current one.
  */
 
-/** The six words `hooks/plan_runner/arcs.py:CARD_STATES` writes, and the only ones this lane accepts. */
-const CARD_STATES: readonly ArcCardState[] = ['unminted', 'queued', 'walking', 'paused', 'complete', 'stalled'];
+/** The seven words `hooks/plan_runner/arcs.py:CARD_STATES` writes, and the only ones this lane accepts. */
+const CARD_STATES: readonly ArcCardState[] = ['unminted', 'queued', 'walking', 'paused', 'complete', 'stalled', 'stuck'];
 
-/** The four `hooks/plan_runner/arcs.py:ARC_STATUSES` writes. */
-const ARC_STATUSES = ['walking', 'stalled', 'not-started', 'complete'] as const;
+/** The five `hooks/plan_runner/arcs.py:ARC_STATUSES` writes. */
+const ARC_STATUSES = ['walking', 'stalled', 'not-started', 'complete', 'stuck'] as const;
 
 type ArcStatus = ArcSnapshot['status'];
 
-/** The deck's order: what is moving, then what needs a hand, then what has not begun, then what is finished. */
-const STATUS_RANK: Record<ArcStatus, number> = { walking: 0, stalled: 1, 'not-started': 2, complete: 3 };
+/** The deck's order: what is moving, then what needs a hand, then what has not begun, then what is finished. A `stuck` arc holds a card no door will start — a walk that cannot finish until the operator cures a plan — so it sorts ahead of even a walking one, where the reader's eye lands first. */
+const STATUS_RANK: Record<ArcStatus, number> = { stuck: 0, walking: 1, stalled: 2, 'not-started': 3, complete: 4 };
 
 /** A string, or the fallback. Free text from the runner reaches the DOM as a text node, never as markup. */
 function readString(value: unknown, fallback = ''): string {
@@ -72,6 +75,24 @@ function readPhases(value: unknown): ArcCardPhase[] {
 }
 
 /**
+ * The refusal standing on one card, off `arc.json:cards[].refusal`, or `null`. Read field by field and
+ * never judged: `reason` is the START LADDER's own sentence (the lint's first finding, the switch, the
+ * intent lock, the order gate), carried as free text a person reads and never as markup. An entry missing
+ * its reason reads as no refusal at all — a card drawn `stuck` with nothing to say would be worse than one
+ * drawn `unminted`, which is what a record from before this field means anyway.
+ */
+function readRefusal(value: unknown): ArcCardRefusal | null {
+  const reason = readString(field(value, 'reason'));
+  if (!reason) return null;
+  return {
+    exit: readNumber(field(value, 'exit'), 0),
+    reason,
+    firstSeen: readNumber(field(value, 'first_seen'), 0),
+    lastSeen: readNumber(field(value, 'last_seen'), 0),
+  };
+}
+
+/**
  * One card, off `arc.json:cards[]`. `position` falls back to the card's place in the array and `state` to
  * `unminted`, so a card the reader cannot place is drawn where it was written rather than dropped.
  */
@@ -89,6 +110,7 @@ function readCard(raw: unknown, index: number): ArcCardSnapshot {
     cost_usd: readNumber(field(raw, 'cost_usd'), 0),
     spawns: readNumber(field(raw, 'spawns'), 0),
     phases: readPhases(field(raw, 'phases')),
+    refusal: readRefusal(field(raw, 'refusal')),
   };
 }
 

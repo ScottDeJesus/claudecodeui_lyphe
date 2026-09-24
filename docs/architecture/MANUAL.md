@@ -2088,10 +2088,10 @@ section: 04-message-store-and-lazy-loading/001 Mental model
    `prepareTranscriptMessages` runs on REST reads only, so the transcript mid-run does not
    match the transcript after a refresh. Reconciliation, not equality, is the contract — see
    [the realtime stream](MANUAL.md).
-6. **The render list is narrowed three times, and none of them is virtualization.**
-   `visibleMessages` is a tail slice of `chatMessages` (100 rows by default); each surviving
-   row mounts its content only near the viewport; and each *mounted* row still skips layout
-   and paint off-screen via `content-visibility: auto`. Every row keeps a DOM node throughout.
+6. **The render list is narrowed twice, and neither is virtualization.**
+   `visibleMessages` is a tail slice of `chatMessages` (100 rows by default), and each
+   surviving row mounts its content only near the viewport — `LazyMessageRow`, with a 1200px
+   band. Every row keeps a DOM node throughout.
 7. **A row's wrapper element never unmounts.** It carries `data-message-timestamp` whenever
    the row has a timestamp, so a search jump can find and scroll to a row whose content is
    still a placeholder. Scroll *anchor restore* is different — it selects `.chat-message`,
@@ -2513,22 +2513,23 @@ Three details make this safe rather than jumpy:
   entries entirely, so a row keeps both its mounted state and its recorded height; acting on
   them would re-measure the whole transcript on the next activation.
 
-`useLazyRowObserver` returns `null` when `IntersectionObserver` is undefined (jsdom), and
-`LazyMessageRow` treats `lazyRows === null` as "always mounted" — the pre-existing behaviour,
-so component tests are unaffected.
+`useLazyRowObserver` returns `null` when `IntersectionObserver` is undefined, and
+`LazyMessageRow` treats `lazyRows === null` as "always mounted" — the fallback for an
+environment with no observer, where every row is real and nothing is measured.
 
-`src/modules/chat/tests/lazyMessageRow.test.tsx` covers exactly these four behaviours:
-*"starts far rows as an addressable placeholder instead of mounting content"*, *"unmounts to a
-placeholder of the measured height and remounts when near again"*, *"ignores the zero-rect
-non-intersections a hidden tab reports"*, and *"keeps every row mounted where
-IntersectionObserver does not exist"*.
-
-This layers on top of CSS containment, not instead of it: `.chat-message` in `src/index.css`
-carries `contain: layout style paint` and `content-visibility: auto` with
-`contain-intrinsic-size: auto 180px` — 240px for assistant rows, 96px for user, tool and error
-rows — which lets a *mounted* off-screen row skip layout, paint and style. Note that
-`.chat-message` is on the row's content, not on `LazyMessageRow`'s wrapper: an unmounted row
-is a bare sized `div`, so it costs nothing to skip either way.
+**This unmounting IS the mechanism; no CSS takes part in it.** `.chat-message` in `src/index.css`
+carried `contain: layout style paint` (since the Electron commit, `97c9b67b`, until 2026-09-24)
+and `content-visibility: auto` with `contain-intrinsic-size` (until 2026-09-11, `75e7f3f0`);
+both are gone, and neither may come back. `content-visibility`
+because a render-skipped row reports a stand-in height until the browser draws it, and every
+geometry reader in the transcript reads a row on its first frame; `contain` because it makes the
+element the CONTAINING BLOCK for a fullscreen card's `position: fixed` box — the whole reason a
+card asking for the screen came back an 802×2259.5 box mid-transcript, taller than the 900px
+window it asked for (2026-09-24; the long form is under
+[lazy rows and height stability](MAN-388)). Its `paint` half also clipped the card there;
+`contain: layout` alone does not clip and breaks fullscreen all the same. `.chat-message`
+is on the row's content, not on `LazyMessageRow`'s wrapper, so an unmounted row is a bare sized
+`div` either way — there is nothing there worth skipping.
 
 ---
 
@@ -2579,16 +2580,16 @@ and superseded by this document. Its verdict was *no for the sidebar, not yet fo
 The reasoning worth keeping:
 
 1. **The list is already bounded twice** — a 100-row tail window plus
-   `content-visibility: auto`, which is the browser's native version of what windowing buys.
-   Now three times, with `LazyMessageRow`.
+   `LazyMessageRow`, which unmounts a row's content outside a 1200px band around the
+   viewport.
 2. **The scroll machinery reads the DOM.** Anchor restore does
    `querySelectorAll('.chat-message')` + `getBoundingClientRect`, then checks
    `anchor.isConnected` and falls back to a `scrollHeight` delta. A virtualizer unmounts that
    node by design and turns `scrollHeight` into a synthetic spacer. Search jumps do the same
    through `[data-message-timestamp]`.
-3. **Ctrl+F and cross-message selection would narrow to the viewport.** `content-visibility`
-   subtrees are reachable by find-in-page in Chromium, Firefox and Safari; unmounted DOM is
-   not. The assessment was careful about the size of this loss: the reachable range would go
+3. **Ctrl+F and cross-message selection would narrow to the viewport.** A virtualizer
+   unmounts rows by design, and unmounted DOM is reachable by find-in-page in no browser. The
+   assessment was careful about the size of this loss: the reachable range would go
    from the ~100-message window to roughly the viewport, not from "the whole transcript".
    `LazyMessageRow` pays a smaller version of the same price, and only for rows more than
    `LAZY_ROW_VIEWPORT_MARGIN_PX` away.
@@ -2783,12 +2784,9 @@ section: 05-scrolling/003 The pieces
 | `src/modules/chat/hooks/useLazyRowObserver.ts` | One `IntersectionObserver` per pane, rooted at the scroll container, `LAZY_ROW_VIEWPORT_MARGIN_PX = 1200`. |
 | `src/modules/chat/utils/searchTargetLocator.ts` | `findSearchTargetIndex` resolves a sidebar hit against loaded data; `resolveSearchWindowSize` sizes the render window. |
 | `src/modules/chat/utils/messageKeys.ts` | `getIntrinsicMessageKey` — stable render keys, so a prepend does not remount the rows below it. |
-| `src/index.css` | `.chat-messages-pane` / `.chat-message` containment, mobile `touch-action`, document-level overscroll containment, `.search-highlight-flash`. |
+| `src/index.css` | Mobile `touch-action`, document-level overscroll containment, `.search-highlight-flash`. **Neither the pane nor a row carries `contain`** — containment makes the element the containing block for a fullscreen card's `position: fixed` box, which is what a card asking for the screen sized itself to (MAN-388). |
 | `src/modules/project-workspace/hooks/useVisualViewportKeyboardOffset.ts` | Publishes `--keyboard-height` so the shell shrinks above the iOS keyboard. |
 | `src/shared/ui/ScrollArea.tsx` | **Not used by chat.** Every caller is a pane outside the transcript — `FileTree.tsx`, `SidebarContent.tsx`, `MemoryIntakePanel.tsx` and the Runner tab's `RunnerPanel.tsx`. Grep before trusting that list to be complete; the rule is the exclusion, not the roll call. |
-| `src/modules/chat/tests/transcriptScrollOwnership.test.tsx` | Pins the two ownership bugs — the deferred scroll and the cross-session search jump. |
-| `src/modules/chat/tests/lazyMessageRow.test.tsx` | Pins placeholder height and the hidden-tab zero-rect case. |
-| `src/modules/chat/tests/searchTargetLocator.test.ts` | Pins snippet-first resolution, the timestamp fallback and the window size. |
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/index.css, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/ChatInterface.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useChatComposerState.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useChatSessionState.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useLazyRowObserver.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/ChatMessagesPane.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/LazyMessageRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/LoadAllMessagesOverlay.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/utils/messageKeys.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/utils/searchTargetLocator.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/hooks/useVisualViewportKeyboardOffset.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/ScrollArea.tsx
 
@@ -3234,18 +3232,31 @@ Three details exist purely to protect the scroll position:
    the rows around the viewport are exactly the mounted ones.
 3. **Zero-sized rects are ignored.** A hidden Chat tab (`display: none`) reports
    `isIntersecting: false` with a `0x0` rect. Treating that as "scrolled away" would wipe
-   every row's mounted state and its measured height. `lazyMessageRow.test.tsx` pins this
-   as *"ignores the zero-rect non-intersections a hidden tab reports"*.
+   every row's mounted state and its measured height, and re-measure the whole transcript on
+   the tab's next activation.
 
 Rows never yet measured fall back to `ESTIMATED_ROW_HEIGHT_PX = 100` and rely on the
 browser's own scroll anchoring while they settle.
 
-CSS contains each row but never skips rendering one (`src/index.css`):
-
-```css
-.chat-messages-pane { contain: layout style paint; }
-.chat-message { contain: layout style paint; }
-```
+**NEITHER `.chat-messages-pane` NOR `.chat-message` MAY CARRY `contain`.** Both did —
+`contain: layout style paint`, carried since the Electron commit (`97c9b67b`, 2026-06-29) —
+until 2026-09-24, when it turned out to have been breaking every fullscreen card in the chat. Any
+`contain: layout` — or `paint`, or `content`, which is both — makes the element the **containing
+block** for its `position: fixed` descendants, so a live card asked for the whole screen sized
+itself to the pane's box: measured in a 1440×900 window as an 802×2259.5 box mid-transcript, taller
+than the window itself, with `pos=fixed`, `z=45` and every fullscreen state attribute already
+correct —
+which is why it read as "fullscreen does not work" rather than as a layout fault. The gutter
+widgets, whose fullscreen lives outside this pane, filled the screen the whole time. Nothing
+here needs containment: the cost it was aimed at is off-screen rows, and those `LazyMessageRow`
+unmounts. Dropping both rules measured inert — on a 19-row transcript no row geometry moved and
+`scrollHeight` did not change. Re-adding either rule re-breaks fullscreen, silently — and so does
+`content-visibility: auto` on a row, or an ancestor `transform`, `filter`, `perspective`,
+`will-change: transform` or `backdrop-filter`: none of those shows up in a `contain`-shaped audit,
+and `content-visibility: auto` leaves `contain` computed as `none` while containing the card
+exactly as `content` does.
+`.verify/contain-fixed-mechanism.mjs` measures every one of them, plus the two effects apart
+(containing block without clipping).
 
 **RULE: no `content-visibility` on transcript rows.** A render-skipped row reports a stand-in
 height until the browser draws it, a frame or more later. Every geometry reader here reads a
@@ -3338,11 +3349,15 @@ section: 05-scrolling/020 Gotchas and why the code looks like this
   few dozen mounted rows instead of ~1 GB with seven thousand. Every geometry guarantee in
   `LazyMessageRow` — measure-before-unmount, permanent wrapper, zero-rect filter — exists to
   make that trade invisible.
-- **`content-visibility: auto` is overridden for exports.**
-  `src/modules/chat/export/buildTranscriptHtml.tsx` emits
-  `.chat-message { content-visibility: visible !important; contain-intrinsic-size: auto !important; }`
+- **The export neutralises off-screen skipping nothing in `src/` sets.**
+  `src/modules/chat/export/buildTranscriptHtml.tsx` still emits
+  `.chat-message { content-visibility: visible !important; contain-intrinsic-size: auto !important; }`,
   with the comment "off-screen skipping is a scrolling optimisation; in a printed document it
-  leaves blank pages."
+  leaves blank pages." Nothing in the app sets either property today — `LazyMessageRow`'s
+  unmounting is the whole mechanism, and it is untouched by the override — so the rule is a
+  guard on a printed document rather than a mirror of a live declaration. That is also why it is
+  kept: the export is a file a person opens, and its correctness should not depend on the app
+  never growing a skipping declaration again.
 - **Where `IntersectionObserver` does not exist (jsdom), every row stays mounted.**
   `useLazyRowObserver` returns `null` and `LazyMessageRow` treats that as "always mounted".
   Tests that need the lazy path install a stub observer and drive it by hand.
@@ -3361,7 +3376,7 @@ section: 05-scrolling/021 If you change this, check that
 | `getIntrinsicMessageKey` or the key map in `ChatMessagesPane` | The prepend restore needs the anchor element to survive; unstable keys remount rows and drop it to the height-delta fallback. |
 | `LazyMessageRow` placeholder height, the `.chat-message` class placement, or the 1200 px observer margin | Prepend anchor scan, search-jump row lookup, and `lazyMessageRow.test.tsx`. |
 | `SEARCH_SCROLL_RETRIES`, the retry delay, or `findRenderedMessageElement` | The cross-session cancellation test and `searchTargetLocator.test.ts`; `allowNearest` must stay on the final attempt only. |
-| `.chat-message` containment or `content-visibility` | The export override in `buildTranscriptHtml.tsx` mirrors these declarations. |
+| `.chat-message` or `.chat-messages-pane` gaining `contain`, any `content-visibility` on a row, or an ancestor `transform`/`filter`/`perspective`/`will-change` | A fullscreen card's `fixed inset: 0` is sized (and, under `paint`/`content`, clipped) by that ancestor instead of the viewport — `contain: layout` alone is enough, and it shows in neither a `contain`-shaped nor a clip-shaped audit; a render-skipped row also reports a stand-in height to every geometry reader in the transcript. [Lazy rows and height stability](MAN-388). |
 | Session load or pagination in `useChatSessionState.ts` | `pendingScrollRestoreRef`, `liveScrollStateRef`, `pendingInitialScrollRef`, `searchScrollActiveRef` and `wasNearTopRef` are all handled by the session-change effect — see [the message store](MANUAL.md). |
 | Composer send or the activity indicator | `handleSubmit` forces `isUserScrolledUp` false and scrolls unconditionally at +100 ms; the indicator changes the pane's padding without a scroll event. |
 | Tool card expand/collapse | Nothing scrolls today — see [tool views](MANUAL.md). Adding a `scrollIntoView` there adds a sixth writer with no claim ref. |
@@ -4098,7 +4113,7 @@ permission entry with `buildClaudeToolPermissionEntry`, appends it to the stored
 no entry can be derived — and then answers *every* pending request that computes the same
 entry in one call. That batch is why `handlePermissionDecision` takes an array of ids.
 
-`AskUserQuestionPanel` is a keyboard-first stepper: number keys pick options, `0` toggles a
+`AskUserQuestionPanel` is a keyboard-first stepper, drawn from the same `QuestionText` and `QuestionOptionRow` as the answered card so a question reads the same before and after: number keys pick options, `0` toggles a
 free-text "Other", `Enter` advances or submits on the last question, `Escape` skips — from a
 window-level capture listener that acts only when the key was pressed inside the panel: it marks
 the event so `ChatInterface`'s document-level abort gate, gated on `defaultPrevented`, leaves the
@@ -4130,7 +4145,7 @@ the shaping lives in the config's `getContentProps`.
 | `file-list` | `ContentRenderers/FileListContent.tsx` | Grep and Glob results | Comma-separated basenames, click to open, capped at `max-h-48` |
 | `todo-list` | `ContentRenderers/TodoListContent.tsx` → `TodoList.tsx` → `Queue.tsx` | TodoWrite input, TodoRead result | `TodoListContent` keeps only values with string `content` and `status`; `TodoList` normalizes the status and renders a `Queue` |
 | `task` | `ContentRenderers/TaskListContent.tsx` | TaskList and TaskGet results | Regex-parses `#15. [in_progress] Subject` lines out of plain text into rows |
-| `question-answer` | `ContentRenderers/QuestionAnswerContent.tsx` | AskUserQuestion input | The only stateful renderer — it expands one question at a time. Guards every field, because transcript payloads are runtime data |
+| `question-answer` | `ContentRenderers/QuestionAnswerContent.tsx` → `AnsweredQuestion.tsx` | AskUserQuestion input | The only stateful renderer: the pending panel while the run waits, then one `AnsweredQuestion` per question, each expanding on its own. The question: `QuestionText` (the tool-body markdown, `breaks` on, a blank line put at each list boundary so a trailing `Run it?` never joins the last item), clamped when long. The chosen options: `QuestionOptionRow`s. The operator's own words: ONE `blockquote`. An answer becomes option rows only when it is WHOLLY known labels joined by `", "`, matched longest first; anything else is ONE note exactly as sent — the string cannot tell a label plus a note from a note that opens with a label, so the record never shows a tap the string does not prove. A single-select answer is one label or one note. Guards every field, because transcript payloads are runtime data |
 | `text` | `ContentRenderers/TextContent.tsx` | Default, exec, WebSearch, WebFetch | `format` is `'plain' \| 'json' \| 'code'`; no config sets `'json'` |
 | `success-message` | inline SVG in `ToolRenderer` | nothing | The branch exists; no config sets the type or `getMessage` |
 

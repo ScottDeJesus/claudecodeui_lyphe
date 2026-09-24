@@ -1,0 +1,136 @@
+import type { DispatcherEvent, DispatcherPhase, DispatcherPlan, DispatcherStage } from '@/shared/types.js';
+
+import { each, field, isCount, isCountOrNull, isFlag, isRecord, isText, isTextOrNull, names, need, oneOf } from './dispatcher-state.transport.js';
+
+/**
+ * One plan of the dispatcher's document, read field by field into the types the card draws.
+ *
+ * The plan is the one big shape in that document — its approval, its armed hour, thirteen of its own
+ * keys, and its phases with their stages and its own log — so it is read here, beside the transport
+ * vocabulary, rather than in `dispatcher-state.service.ts`, which reads the picture AROUND a plan
+ * (the route, the daemon, the home) and this server's two acts on the whole. Both halves refuse a
+ * field they cannot read, for the reason the service states once: this document is printed whole by
+ * a process that has exited, so a field that does not match is a DIFFERENT BUILD of the dispatcher,
+ * never a torn write, and a made-up plan on the operator's screen is worse than a stale one.
+ *
+ * REFERENCES ARE KEYS, never ids (INV-183): an event names its phase by KEY and `null` when it
+ * names none, and `waits_on` is a list of plan names. Nothing here resolves one to the other — the
+ * store's own report did that, and two resolutions would be two answers.
+ */
+
+/**
+ * The document's plan as it validates: every key `report.py` writes, which is every key of
+ * `DispatcherPlan` but the one this server adds (`session_app_id`, resolved in the service).
+ */
+export type DocumentPlan = Omit<DispatcherPlan, 'session_app_id'>;
+
+/** The seven words a plan's status may be (`report.status_word`'s one precedence). Anything else is a build this lane cannot draw. */
+export const PLAN_STATUSES: readonly DispatcherPlan['status'][] = ['idle', 'parked', 'queued', 'scheduled', 'paused', 'live', 'complete'];
+
+/** The three words a phase's status may be (`phase_chain`'s own column). */
+export const PHASE_STATUSES: readonly DispatcherPhase['status'][] = ['not started', 'running', 'done'];
+
+/** `plan.approved`: the two keys of an approval, or `null` on a plan nobody has approved. */
+function approvedOf(value: unknown): DispatcherPlan['approved'] {
+  if (value === null) return null;
+  const approved = need(value, isRecord, 'plan.approved');
+  return {
+    at: need(field(approved, 'at'), isText, 'plan.approved.at'),
+    by: need(field(approved, 'by'), isText, 'plan.approved.by'),
+  };
+}
+
+/** `plan.schedule`: the armed hour read back out of systemd at the instant of the read (`schedule.armed`), or `null` when none is armed. */
+function scheduleOf(value: unknown): DispatcherPlan['schedule'] {
+  if (value === null) return null;
+  const hour = need(value, isRecord, 'plan.schedule');
+  return {
+    start_at: need(field(hour, 'start_at'), isText, 'plan.schedule.start_at'),
+    unit: need(field(hour, 'unit'), isText, 'plan.schedule.unit'),
+  };
+}
+
+/**
+ * One `stages` row: the ten columns `phase_chain` projects out of the chain record. `verdict` is the
+ * soul's own outcome word and is free text — the card draws it as written.
+ */
+function stageOf(raw: unknown): DispatcherStage {
+  const stage = need(raw, isRecord, 'stage');
+  return {
+    name: need(field(stage, 'name'), isText, 'stage.name'),
+    soul: need(field(stage, 'soul'), isTextOrNull, 'stage.soul'),
+    launch_id: need(field(stage, 'launch_id'), isTextOrNull, 'stage.launch_id'),
+    session_id: need(field(stage, 'session_id'), isTextOrNull, 'stage.session_id'),
+    resumed_sid: need(field(stage, 'resumed_sid'), isTextOrNull, 'stage.resumed_sid'),
+    launched_at: need(field(stage, 'launched_at'), isTextOrNull, 'stage.launched_at'),
+    returned_at: need(field(stage, 'returned_at'), isTextOrNull, 'stage.returned_at'),
+    output_path: need(field(stage, 'output_path'), isTextOrNull, 'stage.output_path'),
+    verdict: need(field(stage, 'verdict'), isTextOrNull, 'stage.verdict'),
+    cost_usd: need(field(stage, 'cost_usd'), isCount, 'stage.cost_usd'),
+  };
+}
+
+/**
+ * One phase, addressed by its key (INV-183). `busy` is the walker's liveness, read from its chain —
+ * never the status column, which says what the phase has ACHIEVED and not whether anything holds it
+ * (INV-186).
+ */
+function phaseOf(raw: unknown): DispatcherPhase {
+  const phase = need(raw, isRecord, 'phase');
+  return {
+    key: need(field(phase, 'key'), isText, 'phase.key'),
+    position: need(field(phase, 'position'), isCount, 'phase.position'),
+    title: need(field(phase, 'title'), isText, 'phase.title'),
+    assignee: need(field(phase, 'assignee'), isText, 'phase.assignee'),
+    status: oneOf(field(phase, 'status'), PHASE_STATUSES, 'phase.status'),
+    chain_id: need(field(phase, 'chain_id'), isTextOrNull, 'phase.chain_id'),
+    done_at: need(field(phase, 'done_at'), isTextOrNull, 'phase.done_at'),
+    waits_on: names(field(phase, 'waits_on'), 'phase.waits_on'),
+    busy: need(field(phase, 'busy'), isFlag, 'phase.busy'),
+    rounds: need(field(phase, 'rounds'), isCount, 'phase.rounds'),
+    cost_usd: need(field(phase, 'cost_usd'), isCount, 'phase.cost_usd'),
+    start_here: names(field(phase, 'start_here'), 'phase.start_here'),
+    stages: each(field(phase, 'stages'), 'phase.stages', stageOf),
+  };
+}
+
+/** One line of a plan's log. Its `id` must be a number: the endings watermark counts it (`dispatcher-endings.service.ts`). */
+function eventOf(raw: unknown): DispatcherEvent {
+  const event = need(raw, isRecord, 'event');
+  return {
+    id: need(field(event, 'id'), isCount, 'event.id'),
+    at: need(field(event, 'at'), isText, 'event.at'),
+    phase: need(field(event, 'phase'), isTextOrNull, 'event.phase'),
+    kind: need(field(event, 'kind'), isText, 'event.kind'),
+    detail: need(field(event, 'detail'), isTextOrNull, 'event.detail'),
+  };
+}
+
+/** One plan whole. Its `name` is read first, so every later refusal can name the plan it came from. */
+export function planOf(raw: unknown): DocumentPlan {
+  const plan = need(raw, isRecord, 'plan');
+  const name = need(field(plan, 'name'), isText, 'plan.name');
+  return {
+    name,
+    v3: need(field(plan, 'v3'), isText, 'plan.v3'),
+    state: need(field(plan, 'state'), isText, 'plan.state'),
+    status: oneOf(field(plan, 'status'), PLAN_STATUSES, `status of ${name}`),
+    repo: need(field(plan, 'repo'), isText, 'plan.repo'),
+    goal: need(field(plan, 'goal'), isTextOrNull, 'plan.goal'),
+    delivers: need(field(plan, 'delivers'), isTextOrNull, 'plan.delivers'),
+    session: need(field(plan, 'session'), isTextOrNull, 'plan.session'),
+    author: need(field(plan, 'author'), isTextOrNull, 'plan.author'),
+    created_at: need(field(plan, 'created_at'), isText, 'plan.created_at'),
+    updated_at: need(field(plan, 'updated_at'), isText, 'plan.updated_at'),
+    completed_at: need(field(plan, 'completed_at'), isTextOrNull, 'plan.completed_at'),
+    prompted_at: need(field(plan, 'prompted_at'), isTextOrNull, 'plan.prompted_at'),
+    paused: need(field(plan, 'paused'), isFlag, 'plan.paused'),
+    approved: approvedOf(field(plan, 'approved')),
+    waits_on: names(field(plan, 'waits_on'), 'plan.waits_on'),
+    schedule: scheduleOf(field(plan, 'schedule')),
+    cost_usd: need(field(plan, 'cost_usd'), isCount, 'plan.cost_usd'),
+    rounds: need(field(plan, 'rounds'), isCount, 'plan.rounds'),
+    phases: each(field(plan, 'phases'), 'plan.phases', phaseOf),
+    events: each(field(plan, 'events'), 'plan.events', eventOf),
+  };
+}

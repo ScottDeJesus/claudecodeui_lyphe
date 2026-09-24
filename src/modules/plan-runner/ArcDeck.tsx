@@ -17,11 +17,12 @@ import { cn, effectiveModelWord } from '@/shared/utils';
 
 type ArcStatus = ArcSnapshot['status'];
 
-/** The arc's own word and tone — the same hues a card's state wears, one level up. */
+/** The arc's own word and tone — the same hues a card's state wears, one level up. `stuck` is there because the runner derives it (`arcs._derive`): an arc with a card it cannot start is not walking — whichever card that is, since the word rides the arc while ANY of its cards wears it — and a header reading "walking" over a card that is refused every two minutes is the lie this word exists to end. */
 const STATUS: Record<ArcStatus, { key: string; tone: Tone }> = {
   'not-started': { key: 'runner.arcNotStarted', tone: 'neutral' },
   walking: { key: 'runner.arcWalking', tone: 'info' },
   stalled: { key: 'runner.arcStalled', tone: 'warn' },
+  stuck: { key: 'runner.arcStuck', tone: 'warn' },
   complete: { key: 'runner.arcComplete', tone: 'positive' },
 };
 

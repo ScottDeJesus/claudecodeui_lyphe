@@ -411,5 +411,14 @@
     "appearanceLight": "Светлое оформление",
     "appearanceDark": "Тёмное оформление",
     "divider": "Изменить размер приложений"
+  },
+  "gitPanel": {
+    "lastPushed": "Последний push {{when}}",
+    "neverPushed": "С этой машины ещё не отправляли",
+    "age": {
+      "justNow": "только что",
+      "minutesAgo": "{{count}} мин. назад",
+      "hoursAgo": "{{count}} ч. назад"
+    }
   }
 }

@@ -37,13 +37,18 @@ export function deckLayers(arc: ArcSnapshot): { card: ArcCardSnapshot; layer: Ar
 }
 
 /**
- * Whether a card may be picked up at all: only one the runner has NOT started — `queued` or
- * `unminted`, never one with a run behind it — and only a position past `last_started`, the
- * highest position that has begun. A card at or below that line has a run, or has had one, and
- * moving it would rewrite an order the runner has already walked.
+ * Whether a card may be picked up at all: only one the runner has NOT started — `queued`, `unminted`, or
+ * `stuck`, never one with a run behind it — and only a position past `last_started`, the highest position
+ * that has begun. A card at or below that line has a run, or has had one, and moving it would rewrite an
+ * order the runner has already walked.
+ *
+ * A `stuck` CARD IS LIFTABLE, and that is not a courtesy: a refusal is a fact about the card's PLAN, not
+ * about the place it holds, and the runner keeps the stamp on the card itself (by plan path, `arc_refused`)
+ * across a move. Leaving it out would make the deck refuse a drag it allowed a moment before the refusal
+ * landed — the same card, the same turn, a new gate invented by this one word.
  */
 export function cardDraggable(arc: ArcSnapshot, card: ArcCardSnapshot): boolean {
-  return (card.state === 'queued' || card.state === 'unminted') && card.position > arc.last_started;
+  return (card.state === 'queued' || card.state === 'unminted' || card.state === 'stuck') && card.position > arc.last_started;
 }
 
 /**
@@ -68,14 +73,16 @@ export function reorderAllowed(arc: ArcSnapshot, from: number, to: number): bool
 
 /**
  * How a card's state reaches the eye. Never `danger`: a stalled card is a card the runner is
- * already pressing again the moment a cure lands (`repress_key`, `arc_walk`), not a denial and not
- * a hand's to fix. `unminted`, `queued` and `paused` are all `neutral` — nothing is wrong with a
- * card the runner has not got to yet, and amber would read as though something had gone amiss.
+ * already pressing again the moment a cure lands (`repress_key`, `arc_walk`), and a `stuck` one is a card
+ * whose next tick is doing the same — neither is a denial and neither is a hand's to fix. `unminted`,
+ * `queued` and `paused` are all `neutral` — nothing is wrong with a card the runner has not got to yet,
+ * and amber would read as though something had gone amiss. `stuck` is `warn` for the reason `stalled` is:
+ * the walk has STOPPED there until a plan is cured, and the card is where a reader sees it.
  */
 export function cardTone(state: ArcCardState): Tone {
   if (state === 'complete') return 'positive';
   if (state === 'walking') return 'info';
-  if (state === 'stalled') return 'warn';
+  if (state === 'stalled' || state === 'stuck') return 'warn';
   return 'neutral';
 }
 
