@@ -103,9 +103,9 @@ that split compares against is `list/claude/installed-cli-version.ts`). `claude-
 through the providers barrel — before `server.listen`, except on a handover boot, where it waits
 for the retiring server to exit first. The mechanism, that exception, its gate, its fallback, and
 why three of its files are plain ESM JavaScript, are in
-[`session-host/README.md`](list/claude/session-host/README.md) §"Re-adoption, on boot".
+[`server/modules/providers/list/claude/session-host/MANUAL.md (README)`](server/modules/providers/list/claude/session-host/MANUAL.md (README)) §"Re-adoption, on boot".
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/chat-process.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/installed-cli-version.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/chat-process.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/installed-cli-version.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/session-host/MANUAL.md
 
 ## MAN-700 — What Each Facet Does
 section: README/004 What Each Facet Does

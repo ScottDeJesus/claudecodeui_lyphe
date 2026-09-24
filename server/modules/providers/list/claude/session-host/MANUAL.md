@@ -331,9 +331,11 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/keepalive-cases-p4.mjs
 ## MAN-694 — See also
 section: README/012 See also
 
-- [`docs/hosting.md`](../../../../../../docs/hosting.md) §"What runs", §"Rules that bite" — the
+- [`docs/MANUAL.md (hosting)`](../../../../../../docs/MANUAL.md) §"What runs", §"Rules that bite" — the
   unit, the stop switch, what a restart now costs a turn
-- [`docs/verification.md`](../../../../../../docs/verification.md) §"The keepalive cases" — how
+- [`docs/MANUAL.md (verification)`](../../../../../../docs/MANUAL.md) §"The keepalive cases" — how
   each ending above is driven against the real units
-- [`docs/architecture/02-realtime-stream.md`](../../../../../../docs/architecture/02-realtime-stream.md)
+- [`docs/architecture/MANUAL.md (02-realtime-stream)`](../../../../../../docs/architecture/MANUAL.md)
   §"One run, end to end" — why a re-adopted run restarts `seq` at 1
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/architecture/MANUAL.md, /home/lyphe/.claude/claudecodeui_lyphe/docs/MANUAL.md
