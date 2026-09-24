@@ -44,7 +44,7 @@ titles and commands are unchanged.
    new command to a pty already running the old one.
 5. The description says read AND write: the CLI's own panel and the minted URL both carry both scopes.
 6. The pty slot is keyed by a digest of the whole command
-   ([architecture/01-websocket-transport.md](architecture/01-websocket-transport.md) §"The `/shell`
+   ([docs/architecture/MANUAL.md (01-websocket-transport)](docs/architecture/MANUAL.md (01-websocket-transport)) §"The `/shell`
    socket"), so each row reattaches only to a pty running its own command.
 7. A parked design pty lives `PTY_SESSION_TIMEOUT` (30 min). Another `Authenticate` press reattaches
    to the pending authorization; it does not mint a second.

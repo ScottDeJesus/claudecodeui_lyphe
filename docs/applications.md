@@ -303,7 +303,7 @@ pick, how do I add one:
   app beside itself is not what "Open in dual screen" says. A kebab left open takes the next Escape itself, and the sheet
   goes on the press after it — the shared overlay-Escape contract every portalled `ActionMenu`
   carries (`src/shared/ui/overlayEscape.ts`, documented in
-  [`verve/README.md`](../src/shared/ui/verve/README.md) §"The overlay half"). Removing an app that
+  [`src/shared/ui/verve/MANUAL.md (README)`](../src/shared/ui/verve/MANUAL.md) §"The overlay half"). Removing an app that
   is UP takes its pane down first, in the render the press was made in, so a refusal then names it
   in the banner: the reader's screen changed for a removal that did not happen, and the notice has
   to say so. A row naming this app (§"The self-origin rule") carries only Open in a new tab and

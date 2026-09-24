@@ -221,7 +221,7 @@ case, not a special one.
 itself: the module barrel (`server/modules/kanban/index.ts`) exports it on its own name for one
 caller — the plan-runner module's plans-archive sweep, composed once in `server/index.ts` and
 called afresh on every pass, never captured, so a lease taken after that module was built still
-stops the plan it is on from moving (see [plan-runner.md](plan-runner.md)). It answers every plan
+stops the plan it is on from moving (see [docs/MANUAL.md (plan-runner)](MANUAL.md)). It answers every plan
 path a live, non-archived card's plan or build lease is holding, fresh by the same staleness
 window above, and names no card: an empty list is the ordinary answer on a quiet board.
 
@@ -474,7 +474,7 @@ there, and switching it back on shows the same data.
 **A second board column, `deepseekFlash`, round-trips beside `autonomy`.** It reached
 `kanban_boards` in the same phase as `claimableCount` (§"The services") — the board's own
 DeepSeek Flash switch, mirroring the host-wide flag file the plan runner polls
-([plan-runner.md](plan-runner.md) §"The DeepSeek switch") but scoped to one board. The header row
+([docs/MANUAL.md (plan-runner)](MANUAL.md) §"The DeepSeek switch") but scoped to one board. The header row
 now draws it too, beside Autonomy: a second `Switch` wearing the DeepSeek mark
 (`LLMProviderLogo`) rather than a colour of its own, with a `Tooltip` naming what the switch
 moves. That composition is now WIRED, not a scaffold: `useKanbanBoards` reads `deepseekFlash`
@@ -529,7 +529,7 @@ statement, every one of them excluding archived cards:
 - `memoryPendingEstate` — handed IN by the composition root rather than computed here, because the
   rows behind it are `memory_candidates` and this module never imports `memory-intake`: the board
   cannot see that lane's table, and a count it computed for itself would be the board reading a
-  sibling's rows sideways (§[memory-intake.md](memory-intake.md)).
+  sibling's rows sideways (§[docs/MANUAL.md (memory-intake)](MANUAL.md)).
 
 Every estate-wide key carries the word ESTATE in its name, so no caller can read a number taken across
 the whole install as one board's own. The read is read-only — no transaction, no audit row, no frame —
@@ -592,7 +592,7 @@ ahead of the credential check, the way the guard's other refusals are (§"The ka
 and reading the corpus are exactly what a build is for.
 
 **Reviewed from the Memory tab, not from the board.** The two review routes' one caller in this app
-is `LessonReviewList` ([memory-intake.md](memory-intake.md) §"Beneath the queue, the lessons") — a
+is `LessonReviewList` ([docs/MANUAL.md (memory-intake)](MANUAL.md) §"Beneath the queue, the lessons") — a
 section of the Memory tab rather than a control on the board itself, the same estate-not-board
 placement above. It reads the staged list at the route's own ceiling through `useLessonReview` and
 calls the two review verbs through the same hook.
@@ -691,7 +691,7 @@ by `CLOUDCLI_RATE_LIMIT_PATH` (`{ last_rate_limit_at, reset_at }`, epoch seconds
 **The state frame.** `kanban_metis_state` (`{ kind, sessions: KanbanMetisSession[], at }`) is
 broadcast to every open `/ws` socket on the shared polled-lane cadence (2 s, `createPolledLane`) —
 the same loop the plan-runner and launcher-souls lanes run
-([plan-runner.md](plan-runner.md) §"What the runner writes, and where"). The panel seeds from
+([docs/MANUAL.md (plan-runner)](MANUAL.md) §"What the runner writes, and where"). The panel seeds from
 `GET /sessions` for the case a frame cannot cover: a page mounting while nothing is moving. A
 session record carries `sessionId`, `boardId`, `boardName`, `provider` (`'deepseek' | 'claude'`),
 `model`, `owner`, `launchedBy` (`'operator' | 'driver'`), `state` (`'running' | 'completed' |
@@ -973,12 +973,12 @@ repository does not own and has no forward encoder for. The `null` reaches both 
 exists, which is why the panel reads her transcript by the session id the board minted, through the
 route above and the `scanProjectsRoot` fallback behind it. The providers module's own scan-roots
 table records the same refusal from the read side:
-[server/modules/providers/README.md](../server/modules/providers/README.md).
+[server/modules/providers/MANUAL.md (README)](../server/modules/providers/MANUAL.md).
 
 **The hooks seam.** One module, `~/.claude/hooks/kanban_metis.py`, holds the predicate and never
 raises: `SESSION_ROOT`, `board_id(payload_or_cwd)` (the leaf under that root, else `None`) and
 `is_board_session(payload_or_cwd)`. One consumer, one early return, and the same predicate is
-stated from the hooks' own side in `~/.claude/hooks/README.md` §"Metis-session scoping":
+stated from the hooks' own side in MAN-753:
 
 - `metis_session.maybe_stamp` gains a FOURTH create trigger: any event whose payload `cwd` is a
   board session stamps the Metis-presence marker, without a typed `/pm` — the board-issued identity
@@ -991,7 +991,7 @@ stated from the hooks' own side in `~/.claude/hooks/README.md` §"Metis-session 
 they do for an operator's session: **G1** lints the same `pm-*.plan.md` plans `/execute`
 would mis-handle, **G2** blocks a git write while a build marker is live — though the plan-path
 cleanup retired that marker's only producer, so it is OFF for every session today, board Metis
-included (`hooks/GOTCHAS.md` #29) — **G5** sends a decision to `post_design_questions` instead of a
+included (INV-29) — **G5** sends a decision to `post_design_questions` instead of a
 terminal prompt nobody is watching, and **G10** blocks destructive SQL from an unattended session.
 
 ## The pilot panel
@@ -1032,7 +1032,7 @@ never hidden by the one just opened. `KanbanMetisConversation` draws no header o
 `SubagentTranscriptView`'s own sticky row (Back, a label built from the session's model and state off
 the same four keys `KanbanMetisRow`'s state table holds, and a "Live" badge while it runs) is the
 only one, reached the same way the old panel body reached it — `sessionId={null}`,
-`target={{ kind: 'metis', id }}` ([06-tool-view.md](architecture/06-tool-view.md) §"Click to read,
+`target={{ kind: 'metis', id }}` ([06-tool-view.md](docs/architecture/MANUAL.md (06-tool-view)) §"Click to read,
 live"). An unlisted session — reaped, or dropped by a seed — is named by its session id alone, and
 the composer is still offered; the server, not this record, is the gate on whether the child is in
 fact still running. Beneath the transcript sits a composer built from `PromptInput`'s primitives
@@ -1075,7 +1075,7 @@ consulted for them.** The seam is `flag_path()` in `~/.claude/hooks/plan_runner/
 reads `PLAN_RUNNER_DEEPSEEK_FLAG_PATH` **at call time** and falls back to the host-wide path only
 when it is unset — so the two switches never mix, and a flip of the host-wide flag cannot move a
 board's sessions. The host-wide file, its own reader and writer, and the client surfaces that draw
-it are [plan-runner.md](plan-runner.md) §"The DeepSeek switch"; the board side of the rule is stated
+it are [docs/MANUAL.md (plan-runner)](MANUAL.md) §"The DeepSeek switch"; the board side of the rule is stated
 here and nowhere else.
 
 ## Proving it

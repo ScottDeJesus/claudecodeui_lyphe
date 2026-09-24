@@ -13,7 +13,7 @@ row itself belongs to the chat module — derived by
 `src/modules/chat/hooks/usePinnedSubagentRows.ts` and drawn by
 `src/modules/chat/transcript/PinnedSubagents.tsx` (the same row, in the gutter, by
 `src/modules/chat/subagents/SubagentWidgetBody.tsx`),
-[architecture/06-tool-view.md](architecture/06-tool-view.md) §Subagents; this lane is the half of
+[docs/architecture/MANUAL.md (06-tool-view)](docs/architecture/MANUAL.md (06-tool-view)) §Subagents; this lane is the half of
 the row that knows whether the soul is still alive.
 
 The launcher is a separate program — `~/.claude/hooks/plan_runner/solo/`, reached as
@@ -127,7 +127,7 @@ what a launch MEANS.
 `provider` and `status`, `spec.json`'s `provider`, and the directory layout are all read from here,
 by a program in another repository, on a two-second poll. Reword the receipt line and every soul
 unpins; rename a field and the pin paints the wrong vendor. The estate carries the same rule from
-its own side: `~/.claude/hooks/GOTCHAS.md` #36, surfaced in `~/.claude/hooks/README.md` §Runner.
+its own side: INV-36, surfaced in MAN-838.
 
 **Every timestamp in a launch directory is epoch SECONDS**, because the launcher's Python wrote them
 with `time.time()`. Only the frame's own `at` is milliseconds. Read one as the other and every launch
@@ -190,8 +190,8 @@ file while the soul is still out. Neither is sufficient alone; without the log a
 a healthy DeepSeek pin for hours.
 
 This is the third surface on this box where a reader meets DeepSeek, and the only one that spends no
-key: the switch's controls write the flag ([plan-runner.md](plan-runner.md) §"The DeepSeek switch"),
-the account readout asks the vendor ([deepseek-balance.md](deepseek-balance.md)), and the pin simply
+key: the switch's controls write the flag ([docs/MANUAL.md (plan-runner)](MANUAL.md) §"The DeepSeek switch"),
+the account readout asks the vendor ([docs/MANUAL.md (deepseek-balance)](MANUAL.md)), and the pin simply
 paints the mark of the endpoint that was billed.
 
 ## The windows
@@ -240,7 +240,7 @@ which would also deliver it to `/shell`, `/plugin-ws` and `/desktop-notification
 parsed and dropped, and on `/plugin-ws` handed to third-party plugin frontends that have no business
 seeing it. `useChatRealtimeHandlers` carries `case 'soul_launch_state': return;` in the shared
 box-wide `case` group beside `runner_state`, `universe_map` and `universe_activity`
-(`docs/architecture/01-websocket-transport.md` §"Fan-out: who receives what"), and it must RETURN
+(MAN-315), and it must RETURN
 rather than break: without the case the frame falls through the switch's `default`, inherits the
 viewed session's id, and is appended to the open transcript as a message row.
 
@@ -268,7 +268,7 @@ env var may reach. It is read once, at composition, so moving it means restartin
 |---|---|
 | `src/modules/dispatch-souls/SoulLaunchFeed.tsx` | The lane's one door into the live bus, and the ONLY place in the client that names the `soul_launch_state` frame. Headless: it renders its children unchanged. `App` mounts it inside `LiveBusProvider`, inside the auth gate, below `WebSocketProvider` — nested inside `RunnerFeed`, because a feed is a wrapper and not a sibling. |
 | `hooks/useSoulLaunches.ts` | The read side: the retained `souls:*` topic as a `Map` keyed by launch id. A map rather than the array because the reader asks one lookup per anchored id. `undefined` (nothing retained) and `[]` (the lane is empty) collapse to an empty map — to a screen they are the same instruction. |
-| `src/modules/chat/transcript/SoulLaunchPinRow.tsx` | One soul's row, drawn to be indistinguishable in SHAPE from the agent rows beside it. Its mark is `LLMProviderLogo` on the launch's provider — the DeepSeek whale, or Claude's mascot — centred beside its two lines, as an `Agent` subagent's row carries its own provider's mark. The row is also a button: an `onOpen` prop, given by both the strip (in a dialog) and the gutter's Subagents widget (in place), opens this soul's transcript live through the second route above ([architecture/06-tool-view.md](architecture/06-tool-view.md) §Subagents). |
+| `src/modules/chat/transcript/SoulLaunchPinRow.tsx` | One soul's row, drawn to be indistinguishable in SHAPE from the agent rows beside it. Its mark is `LLMProviderLogo` on the launch's provider — the DeepSeek whale, or Claude's mascot — centred beside its two lines, as an `Agent` subagent's row carries its own provider's mark. The row is also a button: an `onOpen` prop, given by both the strip (in a dialog) and the gutter's Subagents widget (in place), opens this soul's transcript live through the second route above ([docs/architecture/MANUAL.md (06-tool-view)](docs/architecture/MANUAL.md (06-tool-view)) §Subagents). |
 
 The row lives in the CHAT module, not in `dispatch-souls/`: the pinned rows it lands among are the chat's, and
 a lane must not reach back into it.
@@ -298,7 +298,7 @@ frame arrives would otherwise land after it and put the older picture back on sc
   moment the next row crosses its own window; a backgrounded tab is throttled, so a row can outstay
   its two hours until the tab is looked at again. Without the timer at all a finished row sat there
   until an unrelated repaint, up to four hours past its window — this is the smaller of the two.
-- **Nothing in `all.mjs` measures the pin.** See [verification.md](verification.md) §"What bites
+- **Nothing in `all.mjs` measures the pin.** See [docs/MANUAL.md (verification)](MANUAL.md) §"What bites
   people".
 
 ## Proving it
@@ -324,14 +324,14 @@ looking at the real client — not asserting the shapes:
 
 ## Cross-references
 
-- [architecture/06-tool-view.md](architecture/06-tool-view.md) §Subagents — the pinned rows themselves,
+- [docs/architecture/MANUAL.md (06-tool-view)](docs/architecture/MANUAL.md (06-tool-view)) §Subagents — the pinned rows themselves,
   and the `Agent`-tool pin this one sits beside.
-- [architecture/01-websocket-transport.md](architecture/01-websocket-transport.md) — the frame tables
+- [docs/architecture/MANUAL.md (01-websocket-transport)](docs/architecture/MANUAL.md (01-websocket-transport)) — the frame tables
   and the broadcaster set.
-- [plan-runner.md](plan-runner.md) — the sibling lane, the shared feed pattern, and the DeepSeek
+- [docs/MANUAL.md (plan-runner)](MANUAL.md) — the sibling lane, the shared feed pattern, and the DeepSeek
   switch this lane paints the result of.
-- [deepseek-balance.md](deepseek-balance.md) — the account those souls spend.
-- `~/.claude/hooks/README.md` §Runner (`soul`) and `~/.claude/hooks/GOTCHAS.md` #35, #36 — the
+- [docs/MANUAL.md (deepseek-balance)](MANUAL.md) — the account those souls spend.
+- MAN-838(`soul`) and INV-35, INV-36 — the
   launcher's own side, and the contract this lane binds it to.
 - `~/.claude/skills/heal/sections/deepseek.md` (the DeepSeek-door procedure, attached to
   `/heal`'s own `Skill` call by `~/.claude/hooks/skill_router.py` when the switch reads

@@ -210,11 +210,11 @@ Prove a handover: `bash .verify/handover/smoke.sh` → `HANDOVER old=<pid> new=<
 
 ## See also
 
-- [docs/hosting.md](../../docs/hosting.md) §"Rules that bite" — the one rule this puts on a person
+- [docs/MANUAL.md (hosting)](../../docs/MANUAL.md) §"Rules that bite" — the one rule this puts on a person
   editing `server/`, and §"What runs" for the unit's place among the dev services and the watchdog
   that heals a first boot this package deliberately does not retry.
-- [docs/verification.md](../../docs/verification.md) §"The handover cases" — the five cases that
+- [docs/MANUAL.md (verification)](../../docs/MANUAL.md) §"The handover cases" — the five cases that
   drive every row of the failure table above against the live unit, what each one edits, and the
   seam probe that reaches the modes a working supervisor never produces.
-- [`session-host/README.md`](../../server/modules/providers/list/claude/session-host/README.md)
+- [`server/modules/providers/list/claude/session-host/MANUAL.md (README)`](../../server/modules/providers/list/claude/session-host/MANUAL.md)
   §"Re-adoption, on boot" — the duty `takeover` releases, and why it cannot be released sooner.

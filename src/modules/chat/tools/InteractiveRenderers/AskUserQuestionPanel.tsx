@@ -54,7 +54,7 @@ export const AskUserQuestionPanel: React.FC<PermissionPanelProps> = ({
   // digits into option toggles and their Enter into an answer they never chose. An empty field
   // is not a draft: the panel takes focus, so `1`, `Enter` and `Esc` work as its chips promise.
   // `preventScroll`: the panel lives inside the transcript, whose scroll position has one owner
-  // (`useChatSessionState`, docs/architecture/05-scrolling.md). A bare focus() on a row 900px
+  // (`useChatSessionState`, docs/architecture/MANUAL.md (05-scrolling)). A bare focus() on a row 900px
   // down dragged the pane to it — the same silent jump the owner's own writers guard against
   // — so the pane's follow logic decides whether the new row is brought into view, never this.
   useEffect(() => {
@@ -158,7 +158,7 @@ export const AskUserQuestionPanel: React.FC<PermissionPanelProps> = ({
   }, [currentStep, questions, toggleOption, toggleOther, handleSubmit]);
 
   // Escape skips — from a window-level CAPTURE listener, the shape the accounts panel uses
-  // (docs/accounts.md). ChatInterface aborts the running turn from a document-level capture
+  // (docs/MANUAL.md (accounts)). ChatInterface aborts the running turn from a document-level capture
   // listener gated on `defaultPrevented`, and window capture runs first: marking the event here
   // is what keeps "Skip all — Esc" from killing the run instead. Only a key pressed INSIDE the
   // panel is the panel's: elsewhere Escape keeps its app-wide meaning. And inside the "Other"

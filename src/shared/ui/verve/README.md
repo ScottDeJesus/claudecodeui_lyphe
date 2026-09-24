@@ -39,7 +39,7 @@ This note says how the Verve design language is wired into this repo.
    scope class's descendants, `:has()`, `::marker`. It still spells Tailwind names through `@apply`,
    the transcript's named `md-body`, `md-meta`, `md-code` and `md-stat` sizes included, and there are
    two today, side by side under `src/modules/chat/transcript/`: `markdownCards.css`
-   ([08-rendered-shapes.md](../../../../docs/architecture/08-rendered-shapes.md) §"Element cards")
+   ([docs/architecture/MANUAL.md (08-rendered-shapes)](../../../../docs/architecture/MANUAL.md) §"Element cards")
    and `shapes/shapeMotion.css` (its §"Header, type and motion").
 
 4. **Tone is a token swap, not a rule.** Put `data-tone="neutral|info|positive|warn|danger"`
@@ -57,7 +57,7 @@ This note says how the Verve design language is wired into this repo.
    every bar at full width. That rule sits inside a `prefers-reduced-motion: no-preference` query, so
    a reader who asked for less motion gets a still meter. The chat sets the marker, on the frames it
    draws and only on a card the reader has not watched arrive
-   ([08-rendered-shapes.md](../../../../docs/architecture/08-rendered-shapes.md) §"Header, type and
+   ([docs/architecture/MANUAL.md (08-rendered-shapes)](../../../../docs/architecture/MANUAL.md) §"Header, type and
    motion"); a bare `.vv-meter` under no such marker never animates.
 
 5. **Colour animates only across a theme flip.** `body.vv-anim` sets a transition with
@@ -82,7 +82,7 @@ This note says how the Verve design language is wired into this repo.
    `tokens.css`, so a library piece a shape composes inherits the reader's chat text size and the
    same piece built bare — outside any frame — falls back to the literal it always had. The frame
    side of the swap, and the five named sizes it stands beside, is
-   [08-rendered-shapes.md](../../../../docs/architecture/08-rendered-shapes.md) §"Header, type and motion".
+   [docs/architecture/MANUAL.md (08-rendered-shapes)](../../../../docs/architecture/MANUAL.md) §"Header, type and motion".
 
 ## The library those tokens paint
 
@@ -201,4 +201,4 @@ counted one carries one plural key per category `Intl.PluralRules` gives its lan
 ## Where the rest lives
 
 - How the numbers above are measured, and the baselines a change must not regress:
-  [`docs/verification.md`](../../../../docs/verification.md)
+  [`docs/MANUAL.md (verification)`](../../../../docs/MANUAL.md)

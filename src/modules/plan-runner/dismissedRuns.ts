@@ -18,7 +18,7 @@ import { readUserPreference, subscribeToUserPreferences, writeUserPreference } f
  * alone would swallow that second ending silently, so the key is `{run_id, ended_at}` and a run
  * that ends anew is a new card.
  *
- * The write is MERGED into the `planRunner` blob (`docs/chat-contracts.md` §5 — a replaced blob
+ * The write is MERGED into the `planRunner` blob (MAN-498 — a replaced blob
  * drops whatever else lives under the key), capped so the list cannot grow without bound, and
  * pruned to runs still on the lane plus the one being added: a run the lane no longer carries can
  * never match anything again, so keeping it would only push a live entry off the cap. The lane

@@ -18,8 +18,8 @@ may never render less than the markdown it replaced** — and the rest of this d
 consequences.
 
 Every path below is under `src/modules/chat/transcript/` unless it says otherwise. Read
-[the realtime stream](./02-realtime-stream.md) §"Incremental markdown rendering" for the settled and
-pending halves every streaming rule here leans on, and [live widgets](./07-live-widgets.md) for the
+[the realtime stream](docs/architecture/MANUAL.md (02-realtime-stream)) §"Incremental markdown rendering" for the settled and
+pending halves every streaming rule here leans on, and [live widgets](docs/architecture/MANUAL.md (07-live-widgets)) for the
 one fence this feature routes around.
 
 ## Mental model
@@ -120,7 +120,7 @@ one fence this feature routes around.
 | `shapes/elements/plain.tsx` | `PlainRule`, `PlainHeading` (forwards hast properties, so GFM's `sr-only` footnote label stays hidden), `PlainDiv`, and `ShapeDiv`, which routes the three plugin wrappers |
 | `shapes/elements/inlineText.tsx` | `renderInline` — the one seam where a block's rendered inline content gets file chips |
 | `shapes/code/index.tsx` | `CodeBlock` (the `code` override's dispatcher: inline or block, then the widget branch) and `CodePre` |
-| `shapes/code/EmbedFrame.tsx` | `EmbedFrame` — the card a LIVE embed wears: the one `ShapeFrame` header every shape draws, `flush` so the iframe reaches the card's own edge, plus an `a[data-docspace-open]` action carrying a DocSpace block's studio deep link. `CodeBlock` hands it to `WidgetFrame` as its `frame`, and `WidgetFrame` calls it only behind its mount and streaming gates; it imports nothing from `@/modules/widgets` and classifies no body. See [live widgets](./07-live-widgets.md) §"The DocSpace kind" |
+| `shapes/code/EmbedFrame.tsx` | `EmbedFrame` — the card a LIVE embed wears: the one `ShapeFrame` header every shape draws, `flush` so the iframe reaches the card's own edge, plus an `a[data-docspace-open]` action carrying a DocSpace block's studio deep link. `CodeBlock` hands it to `WidgetFrame` as its `frame`, and `WidgetFrame` calls it only behind its mount and streaming gates; it imports nothing from `@/modules/widgets` and classifies no body. See [live widgets](docs/architecture/MANUAL.md (07-live-widgets)) §"The DocSpace kind" |
 | `shapes/code/CodeFence.tsx` | The fence precedence, and `FenceBlock`, today's highlighted block. Injects the `cc-syntax-theme` style at module scope |
 | `shapes/code/InlineCode.tsx` | Today's inline code span, or a colour swatch, keycaps or a file chip |
 | `shapes/MarkdownLink.tsx` | The `a` override. Asks `parseFileRef` under its loose link policy and forwards the `:line` |
@@ -144,7 +144,7 @@ one fence this feature routes around.
 | `shapes/TabbedCode.tsx` | A plugin `tabbed-code` group as the shared `Tabs` over the rendered fences |
 | `shapes/ShapeSection.tsx` | A plugin `section` wrapper: the heading's words become its fold button. `SECTION_FLOW` restates Typography's positional margins |
 | `src/modules/markdown-preview/MermaidDiagram.tsx` | Draws a `mermaid` fence, shared with the PRD editor. Its failure line reads `common.shapes.diagramFailed` |
-| `src/modules/command-palette/context/PaletteOpsContext.tsx` | `openFileReference(path, line?)` — the door a chip and a file link open through. The rest of the chain is [file-manager.md](../file-manager.md) |
+| `src/modules/command-palette/context/PaletteOpsContext.tsx` | `openFileReference(path, line?)` — the door a chip and a file link open through. The rest of the chain is [docs/MANUAL.md (file-manager)](../MANUAL.md) |
 | `server/modules/providers/list/claude/surface-signal.ts` | `SURFACE_PROMPT_APPEND` — `WIDGET_SIGNAL` then `MARKDOWN_SIGNAL`, the four conventions a model is told about |
 | `src/modules/i18n/locales/<locale>/chat.json` | Every shape string, under `shapes`, in all eleven locales |
 | `.verify/lib/mountReact.mjs` | Mounts a second React root over the running page from the dev server's own modules |
@@ -164,7 +164,7 @@ one fence this feature routes around.
 | `.verify/phase-34.mjs` | The falsifiable probe for the rendered-markdown verve: lead-in frames, header wash, the text scale, framed embeds, and the entrance — a first settled mount carries `data-vv-enter` and plays the rise, a later mount of the same content carries neither, and reduced motion draws no rule at all |
 
 What each probe asserts, and which of its gates redden on which defect, is
-[verification.md](../verification.md) §"The browser harness".
+[docs/MANUAL.md (verification)](../MANUAL.md) §"The browser harness".
 
 ## The triggers
 
@@ -265,7 +265,7 @@ What "matches" means, rung by rung:
   down and a pass after it would never see a pair written under a heading.
 
 **What the model is told.** `SURFACE_PROMPT_APPEND` reaches every Claude turn sent through
-CloudCLI's chat (see [chat-contracts.md](../chat-contracts.md) §"7. A widget fence is the opt-in,
+CloudCLI's chat (see [docs/MANUAL.md (chat-contracts)](../MANUAL.md) §"7. A widget fence is the opt-in,
 and only on this surface" for where it is set, and why only there). Its
 `MARKDOWN_SIGNAL` names only the four conventions a model would not write unprompted — the `stats`
 fence, the `VERDICT:` line with its counts, `path/to/file.ext:line`, and `mermaid` — and says in one
@@ -323,7 +323,7 @@ watched.
   stay.
 
 The saved file inlines the app's stylesheets, so a control drawn into it would paint its hover and
-do nothing. See [tool views](./06-tool-view.md) §"Rendering into an exported document" for the rule
+do nothing. See [tool views](docs/architecture/MANUAL.md (06-tool-view)) §"Rendering into an exported document" for the rule
 this follows. `mermaid` is the one exception: an export draws the fence's SOURCE, as the ordinary
 highlighted block inside the same `diagram` frame. A static render runs no effect for mermaid to
 draw in, and no `ThemeProvider` sits above `MermaidDiagram`'s `useTheme()`, which throws outside
@@ -359,7 +359,7 @@ which `probe-shapes-inline.mjs` holds under 4 ms for 42,000 characters holding 4
 the same on both sides of the settle boundary. The reasoning lives in `elements/inlineText.tsx`.
 
 **A block that crosses the boundary remounts.** The split can retract, putting a settled block back
-in the pending half, which is a different parent (see [live widgets](./07-live-widgets.md)
+in the pending half, which is a different parent (see [live widgets](docs/architecture/MANUAL.md (07-live-widgets))
 §"The fence" for the measured restart). A shape there drops to plain markup until it settles again,
 then mounts fresh and re-reads its fold from the map, so the fold returns when its payload is
 unchanged.
@@ -383,7 +383,7 @@ carded body size over `PlainTable`'s own smaller default. Seventeen rules, R1–
 (`text-accent-ink` — the bullet, every `::marker`, the number pill's numeral, the title, the footnote
 chip) and its washes are the accent FILL at low alpha (`bg-primary/…` — the pill, the quotation, the
 chip behind that reference). That is the same pair the shapes draw between a green word and a green
-shape ([verve/README.md](../../src/shared/ui/verve/README.md) rule 3), and the frame itself stays the
+shape ([src/shared/ui/verve/MANUAL.md (README)](../../src/shared/ui/verve/MANUAL.md) rule 3), and the frame itself stays the
 neutral hairline it was: Verve spends the accent sparingly, so a card is not a green box, it is a
 neutral box whose marks are green. Two rules spend no accent at all — R14 inks a struck word the
 muted foreground and R15 washes display maths in `bg-muted/50` — because those are the two marks a
@@ -492,7 +492,7 @@ compounding rule** follows from the unit — an `md-*` size goes on a text leaf,
 and body wrappers, and never on a container that holds another sized element, where it would
 multiply. `ShapeFrame` writes `data-text-scale="flow"` on every frame's root so a probe can confirm
 the scale is in force. `MarkdownContent.tsx` (every tool markdown body — see
-[tool views](./06-tool-view.md) §"Content renderers") carries `text-chat-tool` beside its existing
+[tool views](docs/architecture/MANUAL.md (06-tool-view)) §"Content renderers") carries `text-chat-tool` beside its existing
 `prose-sm`, and `markdownCards.css`'s R5, R11, R12 and R17 (§"Element cards") spell `md-meta` and
 `md-body` where they spelled `text-xs`/`text-sm` before.
 
@@ -508,7 +508,7 @@ the frame; the same component built bare — Settings' own `Badge`, say — find
 any ancestor and keeps the px it always had. `phase-34.mjs`'s `T4` reads the framed case and `T6`
 pins eight bare library class strings' literal size as a ratchet, so a later change to one of those
 literals is a deliberate, measured one. The library's own side of the contract is
-[verve/README.md](../../src/shared/ui/verve/README.md) rule 7.
+[src/shared/ui/verve/MANUAL.md (README)](../../src/shared/ui/verve/MANUAL.md) rule 7.
 
 **`cn()` has to be told the five names are sizes, not colours.** `tailwind-merge` reads an unknown
 `text-<name>` utility as a text COLOUR by default, so an unextended merger answers `cn('text-md-body',
@@ -557,7 +557,7 @@ rule beside it are both inside the query, so the card is simply there.
   `.verify/artifacts/shapes-elements-baseline.html` is pinned to the PRE-MOVE renderer. A DOM
   change means the change is wrong, not the artifact: re-capturing from the current tree compares
   the new DOM with itself and can never fail again. How it was captured, and the only legitimate way
-  to re-establish it, is in [verification.md](../verification.md).
+  to re-establish it, is in [docs/MANUAL.md (verification)](../MANUAL.md).
 - **`FILE_REF_SCAN` carries the `g` flag.** Use it only with `match`, `matchAll`, `replace` or
   `split`. `test` and `exec` keep `lastIndex` between calls, so a second identical `test` answers
   `false`, and a scan built on them drops every other hit without a sound.
@@ -598,7 +598,7 @@ rule beside it are both inside the query, so the card is simply there.
 | `useShapeCollapse` or `useShapeInteractive` | The tables, fences and groups probes' export mounts still draw every shape whole with zero controls, and a fold still survives its row remounting |
 | `data-vv-enter`, `shapeMotion.css`'s selectors, or `hasEntered`/`markEntered` | `phase-34.mjs`'s `M` gates: a first settled mount carries the marker and plays the rise, a later mount of the same content carries neither, and reduced motion draws no rule at all |
 | `LeadIn`, `LeadInTitleContext`, or the rung predicates it asks (`tableRung`/`listRung`) | `phase-34.mjs`'s `L` gates: three list frames titled from their own line, a table no rung claimed left with its paragraph above it, and a link inside a lead-in title still folding from the chevron alone. `LeadIn` asks the SAME predicates the ladders use, so a rung answered two ways loses a paragraph or gives a table a second frame |
-| `EmbedFrame`, or `WidgetFrame`'s `frame` prop | `phase-34.mjs`'s `E` gates: a settled widget and a DocSpace fence wear the card header, an export and a streaming fence draw their raw source and no frame, and the DocSpace action points at the studio ([live widgets](./07-live-widgets.md) §"The DocSpace kind") |
+| `EmbedFrame`, or `WidgetFrame`'s `frame` prop | `phase-34.mjs`'s `E` gates: a settled widget and a DocSpace fence wear the card header, an export and a streaming fence draw their raw source and no frame, and the DocSpace action points at the studio ([live widgets](docs/architecture/MANUAL.md (07-live-widgets)) §"The DocSpace kind") |
 | `ShapeFrame`'s markers | Every probe finds shapes by `data-shape`, `data-collapsed` and `data-shape-toggle`; a title and a body are read by `data-shape-title` and `data-shape-body`, a header by `data-shape-header`, its icon by `data-shape-icon`, its actions by `data-shape-actions`, and the scale itself by `data-text-scale`. Rename one and gates that never read this source go quiet |
 | A new `ShapeKind`, or a kind's icon/tone in `SHAPE_KINDS` | Adding a kind with no `SHAPE_KINDS` entry is a type error at the call site, but the icon's existence in the installed `lucide-react` is not type-checked — confirm the import resolves before shipping |
 | A new named size in `tailwind.config.js`'s `fontSize`, or the `chat-tool` ratio | `src/shared/utils.ts`'s `extendTailwindMerge` list names every `text-<name>` this app spends as a font size; a size added there and not to that list is read as a text COLOUR by `cn()`'s merger and silently stops following the reader's setting (§"Header, type and motion") |

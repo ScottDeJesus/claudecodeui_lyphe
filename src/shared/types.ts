@@ -2100,7 +2100,7 @@ export type MemoryReviewOutcome =
 //----------------- CLI VERSION ------------
 // The client mirror of `GET /api/cli-version` (`server/shared/types.ts` § CLI VERSION CONTRACTS,
 // where every field is documented against the server's behaviour). Kept here rather than in the
-// hook because three screens and one composer read it. `docs/cli-version.md` is the prose.
+// hook because three screens and one composer read it. `docs/MANUAL.md (cli-version)` is the prose.
 
 /**
  * One live run and the CLI version its own process announced at init.

@@ -23,7 +23,7 @@ The `session_upserted` delta builders; the providers module's sessions watcher f
 5. `runDetachedChatTurn` (and the `ProviderRuntimeGateway` type)  
 Runs one chat turn with no socket attached. Two consumers: the scheduled-messages module drives it from a timer, and keepalive re-adoption (`session-host/readopt.ts`) composes it on boot to give each CLI that outlived the API its run back (`beforeRun` exists for that caller — it settles a run whose turn already finished before the provider is asked for anything). Both compose it rather than re-implementing the dispatch, which is what keeps the session row lookup, the busy check and the run-completion safety net in one place.
 6. `startRunStallWatchdog()`  
-Starts the sweep that turns a silent run into one `session.stuck` notification, and returns the function that stops it. Called once by `server/index.ts` inside the `listen` callback and stopped on shutdown, for the same reason the plan runner is: the notification is about runs this process is only now able to host. It lives in this module because the registry it reads owns runs — no provider knows it exists. What counts as silence, and which runs are deliberately never announced, is [docs/notifications.md](../../../docs/notifications.md) §"A silent run is noticed from outside".
+Starts the sweep that turns a silent run into one `session.stuck` notification, and returns the function that stops it. Called once by `server/index.ts` inside the `listen` callback and stopped on shutdown, for the same reason the plan runner is: the notification is about runs this process is only now able to host. It lives in this module because the registry it reads owns runs — no provider knows it exists. What counts as silence, and which runs are deliberately never announced, is [docs/MANUAL.md (notifications)](../../../docs/MANUAL.md) §"A silent run is noticed from outside".
 
 ## Why Dependency Injection Is Used
 
@@ -251,7 +251,7 @@ Broadcasts `kind: arc_state` when an arc directory under `~/.claude/state/arcs/`
 5. `modules/dispatch-souls/dispatch-souls.module.ts`
 Broadcasts `kind: soul_launch_state` when a hand-launched soul's directory changes, the same `modules/websocket/index.js` way.
 6. `modules/universe/universe.module.ts`
-Broadcasts `kind: universe_map` when a tracked repo's HEAD moves, and `kind: universe_activity` — the coalesced journal-and-transcript feed, at most ten frames a second and none while the estate is quiet — from the two taps in the same module ([docs/architecture/01-websocket-transport.md](../../../docs/architecture/01-websocket-transport.md) §"Fan-out: who receives what").
+Broadcasts `kind: universe_map` when a tracked repo's HEAD moves, and `kind: universe_activity` — the coalesced journal-and-transcript feed, at most ten frames a second and none while the estate is quiet — from the two taps in the same module ([docs/architecture/MANUAL.md (01-websocket-transport)](../../../docs/architecture/MANUAL.md) §"Fan-out: who receives what").
 7. `modules/kanban-metis/kanban-metis.module.ts`
 Broadcasts `kind: kanban_metis_state` when a board's live Metis sessions change, on the same `createPolledLane` shape as items 3, 4 and 5.
 

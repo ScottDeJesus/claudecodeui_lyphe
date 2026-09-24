@@ -279,7 +279,7 @@ export function createCliVersionService(dependencies: CliVersionServiceDependenc
         // Taken AFTER the probe, so a binary swapped WHILE the probe ran makes the pair disagree —
         // the reading is the exec'd file's, the fingerprint the replacement's — and the cache then
         // serves that pre-swap reading for the rest of its window instead of re-probing. Narrow (the
-        // swap must land inside the probe) and named in `docs/cli-version.md`'s "what is left
+        // swap must land inside the probe) and named in `docs/MANUAL.md (cli-version)`'s "what is left
         // standing" bullets. What the fingerprint is for is the common case, a file that changed
         // BETWEEN two asks: there it re-probes on the next ask rather than serving a stale reading.
         lastFingerprint = fingerprintOf(result.binaryPath);

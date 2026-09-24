@@ -5,7 +5,7 @@ document preview, or the editor. `src/modules/file-manager/` is `DirectoryListin
 `FileBreadcrumb` and `PreviewPane` under the one `FileManager` its barrel exports, with
 `useFileManagerState` holding where it is and `useEditGuard` settling what an open does to an
 unsaved session. The server half — the routes, the refusal table, the no-overwrite rule — is
-[files-api.md](files-api.md).
+[docs/MANUAL.md (files-api)](MANUAL.md).
 
 ## The rules that bite
 
@@ -32,7 +32,7 @@ unsaved session. The server half — the routes, the refusal table, the no-overw
    so that one arm alone can carry a `:line`. The chat's markdown links and file chips are that
    arm's callers, and both hand over the line the reference names, as read by `parseFileRef` in
    `src/modules/chat/transcript/shapes/detect.ts` — whose grammar, and the two policies it is read
-   under, is [architecture/08-rendered-shapes.md](architecture/08-rendered-shapes.md)
+   under, is [docs/architecture/MANUAL.md (08-rendered-shapes)](docs/architecture/MANUAL.md (08-rendered-shapes))
    §"The triggers".
 
 3. **State is keyed by project AND directory, and both halves are load-bearing.** A read is shown
@@ -76,7 +76,7 @@ unsaved session. The server half — the routes, the refusal table, the no-overw
    or invented number is the common case — so where the file's length is known the ask is clamped to
    the LAST line, that line is marked, and the footer names both numbers. The verdict is read off
    `totalLines` and never off a short window: the server also cuts a window on its character budget
-   (see [files-api.md](files-api.md) §"The rules that bite", on a preview bounded in bytes), so
+   (see [docs/MANUAL.md (files-api)](MANUAL.md) §"The rules that bite", on a preview bounded in bytes), so
    "shorter than asked for" is not "past the end". Re-asking for a window already on screen
    re-scrolls to it without a second read.
 
@@ -98,7 +98,7 @@ unsaved session. The server half — the routes, the refusal table, the no-overw
    of the view are dropped once they are clean, and the touched lines are never evicted at all, so a
    200,000-line file is a few hundred lines in memory and never the file. The gutter numbers the
    FILE's lines, not the document's. A save is the touched line range alone, addressed by the
-   revision the window was read from ([files-api.md](files-api.md) §"The rules that bite", rules 9
+   revision the window was read from ([docs/MANUAL.md (files-api)](MANUAL.md) §"The rules that bite", rules 9
    and 10); Mod-s and the toolbar's Save both send it, and a second press joins the write already in
    flight rather than repeating it. A write from anywhere else — or a window answered from a
    different revision while the document is dirty — stops the fetching and draws the conflict
@@ -140,4 +140,4 @@ banner, the open-while-dirty dialog, a tab switch that keeps the unsaved session
 writes nothing. The document previews and the pane's routing (rules 5 and 10) are proven by
 `node .verify/probe-files-previews.mjs` (`PREVIEWS OK`), which also holds the negative that matters
 for the bundle: no preview library is fetched until a file of its kind opens. See
-[verification.md](verification.md).
+[docs/MANUAL.md (verification)](MANUAL.md).

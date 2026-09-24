@@ -8,7 +8,7 @@
  * scrolls past it and comes back.
  *
  * The key is CONTENT-ADDRESSED, never a message id. A message id changes three times as a reply
- * finalises and is superseded (`docs/architecture/02-realtime-stream.md:280-285`); the text the
+ * finalises and is superseded (MAN-329); the text the
  * reader folded does not. Keying on the id would re-open every block the reader had just shut.
  *
  * The Map is only ever written by a click, so it grows with human effort rather than with

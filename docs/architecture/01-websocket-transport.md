@@ -3,8 +3,8 @@
 *One websocket server, four paths, and the small protocol that runs over the chat one.
 Covers routing, auth, the frame vocabulary in both directions, and how a client catches up
 after a drop. What the frames turn into on screen is
-[the realtime stream](./02-realtime-stream.md); which ids they carry is
-[conversation handoff](./03-conversation-handoff.md).*
+[the realtime stream](docs/architecture/MANUAL.md (02-realtime-stream)); which ids they carry is
+[conversation handoff](docs/architecture/MANUAL.md (03-conversation-handoff)).*
 
 ## In one paragraph
 
@@ -172,8 +172,8 @@ immediately hand `subscribe` to the hook that does the real work:
 | `ProjectWorkspaceRoute.tsx:32` | `useProjectsState` | `session_upserted`, `loading_progress`, `websocket_reconnected`, plus a sessionId-keyed "attention" marker for background sessions | project list, sidebar rows, session aliasing, selection |
 | `TaskMasterContext.tsx:102` | itself | `taskmaster-project-updated`, `taskmaster-tasks-updated` (`type`-keyed) | task board data |
 | `RunnerFeed.tsx` | itself | `runner_state`, `websocket_reconnected` | none of its own — it publishes the retained runner topics into the live bus |
-| `ArcFeed.tsx` | itself | `arc_state`, `websocket_reconnected` | none of its own — it publishes the retained `arc:*` topic into the live bus ([plan-runner.md](../plan-runner.md) §"The arc deck") |
-| `SoulLaunchFeed.tsx` | itself | `soul_launch_state`, `websocket_reconnected` | none of its own — it publishes the retained `souls:*` topic into the live bus ([dispatch-souls.md](../dispatch-souls.md)) |
+| `ArcFeed.tsx` | itself | `arc_state`, `websocket_reconnected` | none of its own — it publishes the retained `arc:*` topic into the live bus ([docs/MANUAL.md (plan-runner)](../MANUAL.md) §"The arc deck") |
+| `SoulLaunchFeed.tsx` | itself | `soul_launch_state`, `websocket_reconnected` | none of its own — it publishes the retained `souls:*` topic into the live bus ([docs/MANUAL.md (dispatch-souls)](../MANUAL.md)) |
 | `UniverseFeed.tsx` | itself | `universe_activity`, `universe_map`, `websocket_reconnected` | none of its own — it publishes the retained `universe:*` digest into the live bus, and `useUniverseStream` reads the same frames for the tab's canvas (`src/modules/universe/`) |
 
 The call sites the table does not row — `SessionProtectionContext.tsx`, `useSessionPresence.ts`,
@@ -213,7 +213,7 @@ Shell or Git reports `null`): it announces at mount, on every session or connect
 on `websocket_reconnected`, on `visibilitychange` and every 30 s while the tab is visible, and
 announces `sessionId: null` on the way out — which is how an event about a session you are
 already watching goes unpushed
-([notifications.md](../notifications.md) §"What gets pushed, and how loud", *Not while you are
+([docs/MANUAL.md (notifications)](../MANUAL.md) §"What gets pushed, and how loud", *Not while you are
 watching*).
 
 ### The client is not trusted past the session id
@@ -227,7 +227,7 @@ provider-native id from there:
 
 A send for a session with no row is refused with `SESSION_NOT_FOUND` and told to create it
 over REST first (`:184-189`) — that is the entry point in
-[conversation handoff](./03-conversation-handoff.md).
+[conversation handoff](docs/architecture/MANUAL.md (03-conversation-handoff)).
 
 Attachments get the same treatment. `filterAttachmentsToUploadStore` (`:34-56`) resolves
 every path against the global upload store (`~/.cloudcli/assets`, where
@@ -511,7 +511,7 @@ asks for whatever the first did not already deliver.
 That table is about the *socket* dropping. A Claude run also survives the API **process** being
 replaced, and recovers differently: it is rebuilt on boot as a fresh registry run, which makes
 the reconnecting client's remembered cursor a previous run's — see
-[02-realtime-stream.md](./02-realtime-stream.md) §"One run, end to end". `handleChatSubscribe`
+[02-realtime-stream.md](docs/architecture/MANUAL.md (02-realtime-stream)) §"One run, end to end". `handleChatSubscribe`
 catches that one case on the way in: a requested `lastSeq` above the run's own `lastSeq` is
 treated as 0, so the new run replays from its start instead of replaying nothing.
 
@@ -646,7 +646,7 @@ it anyway would be ten frames a second saying nothing.
 Reasoning that belongs to polling-rather-than-watching for the other four lanes lives at
 `polled-lane.service.ts`, not in any lane. The launcher lane's own half — what it reads off a launch
 directory, how it classifies a soul and which provider its pin paints — is
-[dispatch-souls.md](../dispatch-souls.md). A board's own Metis lane has no write-up of its own yet.
+[docs/MANUAL.md (dispatch-souls)](../MANUAL.md). A board's own Metis lane has no write-up of its own yet.
 
 A socket joins `connectedClients` when `handleChatConnection` runs
 (`chat-websocket.service.ts:589`) and leaves on close (`:632`) — closing a tab removes a
@@ -715,7 +715,7 @@ with 1008 (`:47-50`); the client then sends one `register` frame carrying `devic
 (`:61-63`). The socket-to-device registry itself lives in
 `server/modules/notifications/services/desktop-notification-clients.service.ts`. What the server
 sends down that socket — the notification payload, and the web push and ntfy channels beside it —
-is in [notifications.md](../notifications.md).
+is in [docs/MANUAL.md (notifications)](../MANUAL.md).
 
 ## Gotchas and why the code looks like this
 
@@ -750,7 +750,7 @@ is in [notifications.md](../notifications.md).
 | Duplicate messages after a reload | The completed-run replay guard (`chat-websocket.service.ts:494`) |
 | The spinner never clears | The terminal `complete` — `completeRun:279`, `completeRunIfCurrent:296` |
 | A run is terminated early, or two runs appear | `completeRunIfCurrent:296` and the queued-message race |
-| "Session not found" on send | The session was never created over REST — [conversation handoff](./03-conversation-handoff.md) |
+| "Session not found" on send | The session was never created over REST — [conversation handoff](docs/architecture/MANUAL.md (03-conversation-handoff)) |
 | A plugin frontend receiving chat frames | Something is broadcasting over `wss.clients` instead of `connectedClients` |
 
 ## If you change this, check that
@@ -769,6 +769,6 @@ is in [notifications.md](../notifications.md).
 | The reconnect timing or the `ws` memo | Both `chat.subscribe` senders — `useChatSessionState.ts:664` and `ChatInterface.tsx:263` — and whether either now fires with a stale `lastSeq` |
 | `attachWebSocketHeartbeat` | `tests/websocket-heartbeat.service.test.ts`, and that the interval is still shorter than the shortest proxy idle timeout in front of the app |
 
-Related: [the realtime stream](./02-realtime-stream.md) for what the frames become,
-[conversation handoff](./03-conversation-handoff.md) for the ids they carry,
-[the index](./README.md) for the rest of the set.
+Related: [the realtime stream](docs/architecture/MANUAL.md (02-realtime-stream)) for what the frames become,
+[conversation handoff](docs/architecture/MANUAL.md (03-conversation-handoff)) for the ids they carry,
+[the index](docs/architecture/MANUAL.md (README)) for the rest of the set.

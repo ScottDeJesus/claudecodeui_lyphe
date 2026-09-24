@@ -2,7 +2,7 @@
 
 *Where the transcript sits, who is allowed to move it, and the rules that stop the app from
 fighting the user. Paging and row mounting are covered in
-[the message store and lazy loading](./04-message-store-and-lazy-loading.md).*
+[the message store and lazy loading](docs/architecture/MANUAL.md (04-message-store-and-lazy-loading)).*
 
 ## In one paragraph
 
@@ -98,7 +98,7 @@ composer's textarea highlight overlay and its own dropdown, the command menu, th
 rename input, the mobile terminal's momentum scroller, and the file manager's preview pane, which
 reveals a targeted line by writing two NAMED scrollers of its own rather than reaching for
 `scrollIntoView` — the same discipline this page holds the transcript to, argued out for that pane
-in [the file manager](../file-manager.md) §"The rules that bite".
+in [the file manager](../MANUAL.md (file-manager)) §"The rules that bite".
 
 ## The single scroll container
 
@@ -117,9 +117,9 @@ offset.
 
 **`flex-1` is the whole height rule: every `flex-none` sibling above the pane is height the
 conversation loses.** Exactly one thing stands there — the CLI-version banner
-([../cli-version.md](../cli-version.md)) — and by operator ruling 2026-09-09 nothing else may,
+([docs/MANUAL.md (cli-version)](../MANUAL.md)) — and by operator ruling 2026-09-09 nothing else may,
 not a card, not a strip, not a chip. The plan-runner lane provoked it and keeps the reasoning
-([../plan-runner.md](../plan-runner.md) §"The runner card"); what matters here is that the rule is
+([docs/MANUAL.md (plan-runner)](../MANUAL.md) §"The runner card"); what matters here is that the rule is
 MEASURED and not merely written down. `.verify/phase-25.mjs`
 reads the pane's height against its chat root, minus the composer below and the banner above, and
 fails a new region above the transcript whatever that region is named.
@@ -396,7 +396,7 @@ search hit is not supposed to land at the bottom.
 
 **Filling a short screen.** A 20-row page with "Show work", thinking or the compaction summary off can leave one
 reply and nothing to scroll, so `fillViewportWithHistory` (asked by `ChatMessagesPane` after
-every commit; see [the message store](./04-message-store-and-lazy-loading.md)) loads older
+every commit; see [the message store](docs/architecture/MANUAL.md (04-message-store-and-lazy-loading))) loads older
 history until the transcript overflows by 200 px. While the reader has not scrolled up it
 passes `pinToBottom`, and `loadOlderMessages` **re-arms `pendingInitialScrollRef`** instead
 of setting `pendingScrollRestoreRef`: the older page lands above and the settle loop keeps
@@ -618,8 +618,8 @@ a scroll event.
 | `LazyMessageRow` placeholder height, the `.chat-message` class placement, or the 1200 px observer margin | Prepend anchor scan, search-jump row lookup, and `lazyMessageRow.test.tsx`. |
 | `SEARCH_SCROLL_RETRIES`, the retry delay, or `findRenderedMessageElement` | The cross-session cancellation test and `searchTargetLocator.test.ts`; `allowNearest` must stay on the final attempt only. |
 | `.chat-message` containment or `content-visibility` | The export override in `buildTranscriptHtml.tsx` mirrors these declarations. |
-| Session load or pagination in `useChatSessionState.ts` | `pendingScrollRestoreRef`, `liveScrollStateRef`, `pendingInitialScrollRef`, `searchScrollActiveRef` and `wasNearTopRef` are all handled by the session-change effect — see [the message store](./04-message-store-and-lazy-loading.md). |
+| Session load or pagination in `useChatSessionState.ts` | `pendingScrollRestoreRef`, `liveScrollStateRef`, `pendingInitialScrollRef`, `searchScrollActiveRef` and `wasNearTopRef` are all handled by the session-change effect — see [the message store](docs/architecture/MANUAL.md (04-message-store-and-lazy-loading)). |
 | Composer send or the activity indicator | `handleSubmit` forces `isUserScrolledUp` false and scrolls unconditionally at +100 ms; the indicator changes the pane's padding without a scroll event. |
-| Tool card expand/collapse | Nothing scrolls today — see [tool views](./06-tool-view.md). Adding a `scrollIntoView` there adds a sixth writer with no claim ref. |
+| Tool card expand/collapse | Nothing scrolls today — see [tool views](docs/architecture/MANUAL.md (06-tool-view)). Adding a `scrollIntoView` there adds a sixth writer with no claim ref. |
 
-Related: [the realtime stream](./02-realtime-stream.md) for how rows arrive.
+Related: [the realtime stream](docs/architecture/MANUAL.md (02-realtime-stream)) for how rows arrive.

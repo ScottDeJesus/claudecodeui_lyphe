@@ -44,15 +44,15 @@ one of those two paths disagreeing with the other.
 
 | # | Document | Why it comes here |
 | --- | --- | --- |
-| 1 | [WebSocket transport](./01-websocket-transport.md) | The pipe everything rides on. Read first — the frame tables below are its vocabulary. |
-| 2 | [The realtime stream](./02-realtime-stream.md) | One run's full journey, from provider output to a rendered reply. The heart of the system. |
-| 3 | [Conversation handoff](./03-conversation-handoff.md) | Which ids exist, and the four points where a conversation changes hands. Answers "why does this conversation have two ids". |
-| 4 | [The message store and lazy loading](./04-message-store-and-lazy-loading.md) | Where messages live in the client, and how a huge transcript loads without freezing the tab. |
-| 5 | [Scrolling](./05-scrolling.md) | Where the view sits, and why five different pieces of code move it. |
-| 6 | [Tool views](./06-tool-view.md) | How a tool call becomes UI. Needs the message model from 2 and 4. |
-| 7 | [Live widgets](./07-live-widgets.md) | How a `widget` fence becomes a live frame — two of them, chosen by the body: a sandboxed HTML document, or one DocSpace block embedded from ArchPulse's own origin. Late, because it needs the streaming markdown pipeline from 2 — and the transport from 1 once a widget can subscribe to live data. |
-| 8 | [Rendered shapes](./08-rendered-shapes.md) | How ordinary markdown in a settled reply becomes a component — a sortable table, a callout, a verdict banner, a file chip — and why a block that misses its trigger renders exactly as it always did. After 7, because both share the `code` override's dispatcher, and it needs the streaming split from 2. |
-| 9 | [Project Universe](./09-universe.md) | How four repositories become one map and how the estate's real journal and transcript activity is drawn on it — the crawler and its registry, the two taps, the two websocket frames, and the tab. Last, because it adds two frame kinds to 1's tables and a second consumer to the stream in 2, and its map is the only thing here that is not about a conversation. |
+| 1 | [WebSocket transport](docs/architecture/MANUAL.md (01-websocket-transport)) | The pipe everything rides on. Read first — the frame tables below are its vocabulary. |
+| 2 | [The realtime stream](docs/architecture/MANUAL.md (02-realtime-stream)) | One run's full journey, from provider output to a rendered reply. The heart of the system. |
+| 3 | [Conversation handoff](docs/architecture/MANUAL.md (03-conversation-handoff)) | Which ids exist, and the four points where a conversation changes hands. Answers "why does this conversation have two ids". |
+| 4 | [The message store and lazy loading](docs/architecture/MANUAL.md (04-message-store-and-lazy-loading)) | Where messages live in the client, and how a huge transcript loads without freezing the tab. |
+| 5 | [Scrolling](docs/architecture/MANUAL.md (05-scrolling)) | Where the view sits, and why five different pieces of code move it. |
+| 6 | [Tool views](docs/architecture/MANUAL.md (06-tool-view)) | How a tool call becomes UI. Needs the message model from 2 and 4. |
+| 7 | [Live widgets](docs/architecture/MANUAL.md (07-live-widgets)) | How a `widget` fence becomes a live frame — two of them, chosen by the body: a sandboxed HTML document, or one DocSpace block embedded from ArchPulse's own origin. Late, because it needs the streaming markdown pipeline from 2 — and the transport from 1 once a widget can subscribe to live data. |
+| 8 | [Rendered shapes](docs/architecture/MANUAL.md (08-rendered-shapes)) | How ordinary markdown in a settled reply becomes a component — a sortable table, a callout, a verdict banner, a file chip — and why a block that misses its trigger renders exactly as it always did. After 7, because both share the `code` override's dispatcher, and it needs the streaming split from 2. |
+| 9 | [Project Universe](docs/architecture/MANUAL.md (09-universe)) | How four repositories become one map and how the estate's real journal and transcript activity is drawn on it — the crawler and its registry, the two taps, the two websocket frames, and the tab. Last, because it adds two frame kinds to 1's tables and a second consumer to the stream in 2, and its map is the only thing here that is not about a conversation. |
 
 **In a hurry?** Read 1 and 2.
 **Debugging something a user can see?** Start at 5 or 6.
@@ -91,9 +91,9 @@ This is the shared vocabulary every document uses. Both unions are declared in
 | `session_upserted` | gateway | Sidebar delta. Owned by the projects state, not by chat. |
 | `loading_progress` | gateway | Project scan progress. |
 | `runner_state` | gateway | The plan runner's runs, pushed on change. |
-| `soul_launch_state` | gateway | The launcher souls a session started by hand, pushed on change. Feeds the soul pins in the strip above the composer when the desktop chat gutters are not showing, and in the gutter's Subagents widget while they are ([dispatch-souls.md](../dispatch-souls.md)). |
+| `soul_launch_state` | gateway | The launcher souls a session started by hand, pushed on change. Feeds the soul pins in the strip above the composer when the desktop chat gutters are not showing, and in the gutter's Subagents widget while they are ([docs/MANUAL.md (dispatch-souls)](../MANUAL.md)). |
 | `universe_map` | gateway | The estate map was rebuilt because a tracked repo's HEAD moved; carries the `mapId` a client refetches `GET /api/universe/map` for. Excused from the chat reducer beside `runner_state`/`soul_launch_state`. |
-| `universe_activity` | gateway | Coalesced estate activity — journal lines and Claude transcript edits resolved onto map stars. At most ten frames a second, and none at all while the estate is quiet; carries the held `mapId`, a `rows` array and a `dropped` count. Excused from the chat reducer. See [01-websocket-transport.md](./01-websocket-transport.md) §"Fan-out: who receives what". |
+| `universe_activity` | gateway | Coalesced estate activity — journal lines and Claude transcript edits resolved onto map stars. At most ten frames a second, and none at all while the estate is quiet; carries the held `mapId`, a `rows` array and a `dropped` count. Excused from the chat reducer. See [01-websocket-transport.md](docs/architecture/MANUAL.md (01-websocket-transport)) §"Fan-out: who receives what". |
 | `protocol_error` | gateway | The request was rejected or never started. No `complete` follows. |
 
 One more kind never crosses the wire: **`websocket_reconnected`** is synthesized inside
@@ -165,15 +165,15 @@ unrelated to the change that caused them.
 
 | Symptom | Start here |
 | --- | --- |
-| Message appears twice, or vanishes on refresh | [3](./03-conversation-handoff.md), then [4](./04-message-store-and-lazy-loading.md) |
-| Spinner never stops | [2](./02-realtime-stream.md) — look for the terminal `complete` |
-| A second tab froze mid-run | [1](./01-websocket-transport.md) — writer fan-out and replay |
-| Transcript opens part-way up, or jumps while reading | [5](./05-scrolling.md) |
-| Old messages never load, or loading is slow | [4](./04-message-store-and-lazy-loading.md) |
-| A tool renders wrong, or a group collapses oddly | [6](./06-tool-view.md) |
-| Markdown in a reply drew as a card, banner or chip it should not have — or lost words doing it | [8](./08-rendered-shapes.md) — the trigger table, then `detect.ts` |
-| Nothing arrives at all after a network blip | [1](./01-websocket-transport.md) — reconnect and `lastSeq` |
-| A live session reads as idle, or replays itself, right after the API restarted | [2](./02-realtime-stream.md) — a re-adopted run's fresh `seq`, and [hosting.md](../hosting.md) |
+| Message appears twice, or vanishes on refresh | [3](docs/architecture/MANUAL.md (03-conversation-handoff)), then [4](docs/architecture/MANUAL.md (04-message-store-and-lazy-loading)) |
+| Spinner never stops | [2](docs/architecture/MANUAL.md (02-realtime-stream)) — look for the terminal `complete` |
+| A second tab froze mid-run | [1](docs/architecture/MANUAL.md (01-websocket-transport)) — writer fan-out and replay |
+| Transcript opens part-way up, or jumps while reading | [5](docs/architecture/MANUAL.md (05-scrolling)) |
+| Old messages never load, or loading is slow | [4](docs/architecture/MANUAL.md (04-message-store-and-lazy-loading)) |
+| A tool renders wrong, or a group collapses oddly | [6](docs/architecture/MANUAL.md (06-tool-view)) |
+| Markdown in a reply drew as a card, banner or chip it should not have — or lost words doing it | [8](docs/architecture/MANUAL.md (08-rendered-shapes)) — the trigger table, then `detect.ts` |
+| Nothing arrives at all after a network blip | [1](docs/architecture/MANUAL.md (01-websocket-transport)) — reconnect and `lastSeq` |
+| A live session reads as idle, or replays itself, right after the API restarted | [2](docs/architecture/MANUAL.md (02-realtime-stream)) — a re-adopted run's fresh `seq`, and [docs/MANUAL.md (hosting)](../MANUAL.md) |
 
 ---
 
@@ -182,6 +182,6 @@ unrelated to the change that caused them.
 These stay authoritative for their own module's API surface; the documents above explain
 how the pieces fit together.
 
-- `server/modules/websocket/README.md` — the gateway's service map.
-- `server/modules/providers/README.md` — the provider abstraction.
-- `src/modules/chat/tools/README.md` — the tool config registry, from the module's side.
+- `server/modules/websocket/MANUAL.md (README)` — the gateway's service map.
+- `server/modules/providers/MANUAL.md (README)` — the provider abstraction.
+- `src/modules/chat/tools/MANUAL.md (README)` — the tool config registry, from the module's side.

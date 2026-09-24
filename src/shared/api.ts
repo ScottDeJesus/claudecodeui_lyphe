@@ -716,7 +716,7 @@ export const api = {
     capture: () => post('/api/accounts/capture', {}),
   },
 
-  // The memory-intake lane (docs/memory-intake.md): what a session PROPOSES and a person reviews.
+  // The memory-intake lane (docs/MANUAL.md (memory-intake)): what a session PROPOSES and a person reviews.
   // The reads answer 200 with the `reachable` envelope the panel, the tab gates and the command
   // palette all branch on — it is a fact about the read now rather than about a remote server, and
   // no shape moved when the lane moved here. The two writes are read from the RAW response for the
@@ -730,7 +730,7 @@ export const api = {
     reject: (id: string) => post(`/api/memory/${encodeURIComponent(id)}/reject`, {}),
   },
 
-  // The plan-runner lane (docs/plan-runner.md). The server READS the runner's state directory —
+  // The plan-runner lane (docs/MANUAL.md (plan-runner)). The server READS the runner's state directory —
   // runs and arc decks alike — and relays a run's four verbs and an arc's reorder, model word, start
   // and schedule to the runner's own binary; it never writes a state file and never starts a run
   // from a plan. The reads are plain gets. The
@@ -786,7 +786,7 @@ export const api = {
     clearCache: () => post('/api/jev/cache/clear', {}),
   },
 
-  // The Kanban board (docs/kanban.md). Boards are GLOBAL: the selected board is a server-side
+  // The Kanban board (docs/MANUAL.md (kanban)). Boards are GLOBAL: the selected board is a server-side
   // setting, so switching projects never switches boards, and the only method here that names a
   // project is the first-mount lookup that adopts a board for the project the panel opened with.
   // Writes carry no actor — there is no per-user identity on this board yet, and the server
@@ -807,8 +807,8 @@ export const api = {
     vitals: (id: string) => get(`/api/kanban/boards/${encodeURIComponent(id)}/vitals`),
     cardPlanCost: (id: string) => get(`/api/kanban/cards/${encodeURIComponent(id)}/plan-cost`),
 
-    // The lessons lane's REVIEW surface (docs/memory-intake.md; the store itself is
-    // docs/kanban.md's). Every call here is a person's: STAGING a lesson is the agent's, over MCP,
+    // The lessons lane's REVIEW surface (docs/MANUAL.md (memory-intake); the store itself is
+    // docs/MANUAL.md (kanban)'s). Every call here is a person's: STAGING a lesson is the agent's, over MCP,
     // and this app never writes one.
     //
     // `lessons` asks for `staged` and nothing else, at the route's own ceiling rather than its
@@ -878,7 +878,7 @@ export const api = {
     events: (query: string) => get(`/api/kanban/events${query}`),
   },
 
-  // The board's Metis fleet (docs/kanban.md): who this board has out working for it, the four verbs
+  // The board's Metis fleet (docs/MANUAL.md (kanban)): who this board has out working for it, the four verbs
   // over a session, the nudge that wakes the driver, and the driver's own reading of the board.
   // `sessions` is the SEED — the fleet is pushed on change as a `kanban_metis_state` frame, which a
   // panel mounting between two changes would otherwise wait for with nothing on screen. `launch` is
@@ -914,7 +914,7 @@ export const api = {
     transcript: readKanbanMetisTranscript,
   },
 
-  // The application registry (docs/applications.md): the rows the switcher's drawer lists, each a
+  // The application registry (docs/MANUAL.md (applications)): the rows the switcher's drawer lists, each a
   // `{host}`-templated url this reader resolves against their own hostname. Three verbs and no
   // more — `list` is read on mount and on every drawer open rather than polled, because the
   // registry changes when the operator or a builder edits the file, and a row that appears a
@@ -977,12 +977,12 @@ export const api = {
     metis: readKanbanMetisTranscript,
   },
 
-  // The installed Claude CLI and the version each LIVE run is on (docs/cli-version.md). It
+  // The installed Claude CLI and the version each LIVE run is on (docs/MANUAL.md (cli-version)). It
   // answers 200 even when no version could be read — an unreadable binary is a fact in words,
   // so the caller reads the body's `installed`/`reason` rather than the status.
   cliVersion: () => get('/api/cli-version'),
 
-  // The money left on this host's DeepSeek account (docs/deepseek-balance.md). A different account
+  // The money left on this host's DeepSeek account (docs/MANUAL.md (deepseek-balance)). A different account
   // from the Claude slots the switcher holds, and a different origin: the server reads it from the
   // vendor with the key it holds, so the key never reaches this side. Answers 200 always, for the
   // same reason `accounts.usage` does — no reading is a reading in words, never an error wall.
@@ -990,7 +990,7 @@ export const api = {
     balance: () => get('/api/deepseek/balance'),
 
     // What this host has spent on DeepSeek and who spent it, one window at a time
-    // (docs/deepseek-balance.md). The server answers by running the ledger reader as a command, so
+    // (docs/MANUAL.md (deepseek-balance)). The server answers by running the ledger reader as a command, so
     // the whole payload is one object and the tab reads it whole — every figure it draws is already
     // in the body, and no number is derived on this side. `feed` is the newest-first tail length.
     usage: (range: DeepseekRange, feed: number) => get(`/api/deepseek/usage?range=${range}&feed=${feed}`),

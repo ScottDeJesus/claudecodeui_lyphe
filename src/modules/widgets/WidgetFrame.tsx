@@ -26,7 +26,7 @@ import { otherOverlayHoldsEscape } from '@/shared/ui/overlayEscape';
  * this string.
  *
  * If a future edit needs `MermaidDiagram`'s fallback to diverge from this one again, that is a
- * deliberate re-tone with its own baseline re-capture (`docs/architecture/08-rendered-shapes.md`
+ * deliberate re-tone with its own baseline re-capture (`docs/architecture/MANUAL.md (08-rendered-shapes)`
  * §"Gotchas"), never a quiet copy back of a palette literal this gate rejects.
  */
 const FALLBACK_CLASSES =

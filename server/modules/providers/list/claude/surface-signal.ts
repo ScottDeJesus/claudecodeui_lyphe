@@ -16,12 +16,12 @@
 
 export const SURFACE_ENV = { CLAUDE_SURFACE: 'cloudcli' } as const;
 
-// The widget fence: the raw HTML frame and the DocSpace embed (docs/architecture/07-live-widgets.md).
+// The widget fence: the raw HTML frame and the DocSpace embed (docs/architecture/MANUAL.md (07-live-widgets)).
 // Another session owns these bytes — change a character here only on purpose, never in passing.
 const WIDGET_SIGNAL =
   "On this surface (CloudCLI, CLAUDE_SURFACE=cloudcli) a fenced code block whose info string is exactly widget renders in the chat either as a live sandboxed HTML widget — body HTML with inline style and script tags only, no external resources and no network — whose script may call live.subscribe('runner:*', fn) or live.subscribe('runner:<run_id>', fn) to have fn(payload) called with the retained value at once and again on every change, or, when the fence body is exactly the JSON {\"kind\":\"docspace\",\"pageId\":\"…\",\"blockId\":\"…\"}, as that DocSpace block embedded inline and editable in place, so for anything that should persist, be edited by the person reading it, or be read back on a later turn create a DocSpace block through the archpulse MCP (create_page or add_block), embed it that way, and read it back with get_page or query_database_rows, keep the raw HTML fence for one-off visuals, reach for either only when a live, editable or visual view is clearer than markdown, and never emit one anywhere CLAUDE_SURFACE is not cloudcli, because the fence does not exist there.";
 
-// The third widget body: any address, drawn in a frame (docs/architecture/07-live-widgets.md
+// The third widget body: any address, drawn in a frame (docs/architecture/MANUAL.md (07-live-widgets)
 // §"The embed kind"). Kept as its own sentence rather than folded into the run-on above, so the
 // two older kinds' bytes are untouched and this one can be dropped or reworded on its own.
 // `CLOUDCLI_PUBLIC_HOST` is the address a READER's browser reaches this box on (a LAN or VPN
@@ -39,7 +39,7 @@ const EMBED_HOST_HINT = PUBLIC_HOST === ''
 const EMBED_SIGNAL =
   'A third widget body embeds ANY page: a fence body that is the JSON {"kind":"embed","url":"https://…"} — with optional "title" (the card\'s heading) and "height" (pixels, default 420, clamped 120–2000) — draws that address in an iframe card, so a dashboard, a log viewer, a docs page, a map or any other service the operator runs can sit inside the reply instead of being linked to. The url must be an absolute http:// or https:// address and must not be this app\'s own origin. NEVER write localhost or 127.0.0.1 in an embed url: the frame is loaded by the READER\'s browser, which is usually a phone or a laptop on the LAN or a VPN, so loopback names their machine and not this box \u2014 ' + EMBED_HOST_HINT + '. The page is loaded as itself and speaks none of the widget protocol, so it cannot report its own height and nothing in the chat can tell a page that rendered from one that refused to be framed — many public sites (Google, most social sites) send X-Frame-Options and show blank, so prefer addresses known to allow embedding and remember the card always carries an Open link out to the real page. Every address you embed ALSO appears in the chat\'s Embed widget — a panel in the gutter beside the transcript that holds the live page at full height, follows the newest address you declare and opens itself when one arrives — so an embed is both a card in the reply and a page the reader can keep working against. Every embed card and every gutter widget wears a fullscreen switch in its header that hands it the whole viewport without reloading the frame, so a wrong height is never fatal.';
 
-// The markdown shapes (docs/architecture/08-rendered-shapes.md). Only the four conventions a model
+// The markdown shapes (docs/architecture/MANUAL.md (08-rendered-shapes)). Only the four conventions a model
 // would not write unprompted are named, because this text is paid for on every turn; the shapes
 // that fire on ordinary markdown get one clause saying they exist, and the trigger table stays in
 // `src/modules/chat/transcript/shapes/detect.ts`.

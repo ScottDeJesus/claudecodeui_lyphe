@@ -40,7 +40,7 @@ The clients are the only ports the LAN needs: `vite.config.js` proxies `/api`, `
 `/plugin-ws` to the API on loopback, so the API never faces the LAN. The app is reachable at
 `http://<this host>:5183` on the LAN and over Tailscale, and as the **CloudCLI** row of the
 application drawer this app serves — `apps.local.json`, git-ignored; the drawer's one
-documentation home is [`applications.md`](applications.md).
+documentation home is [`docs/MANUAL.md (applications)`](MANUAL.md).
 
 ## Rules that bite
 
@@ -118,7 +118,7 @@ documentation home is [`applications.md`](applications.md).
   so the file stays mode 600 and git-ignored, and a key that reaches a log or a transcript is
   rotated at the vendor rather than deleted from whatever recorded it. Who reads the key, and the
   boot-once mechanism that decides which copy of it wins, is
-  [`.env.example`](../.env.example) and [deepseek-balance.md](deepseek-balance.md).
+  [`.env.example`](../.env.example) and [docs/MANUAL.md (deepseek-balance)](MANUAL.md).
 - **ArchPulse's port 8005 must never be proxied through this app.** The chat can embed a live
   DocSpace block, and that iframe is the one frame here that carries `allow-same-origin` — it has
   to, or the block cannot write the reader's edit back through ArchPulse's own API. What keeps
@@ -131,7 +131,7 @@ documentation home is [`applications.md`](applications.md).
   documents the `VITE_DOCSPACE_EMBED_ORIGIN` override for an ArchPulse on another host, and a
   value that resolves back onto this app's own origin draws an error card instead of a frame. The
   invariant and the gate that enforces it are at
-  [architecture/07-live-widgets.md](architecture/07-live-widgets.md) §"The DocSpace kind".
+  [docs/architecture/MANUAL.md (07-live-widgets)](docs/architecture/MANUAL.md (07-live-widgets)) §"The DocSpace kind".
 - **A server heal no longer kills an in-flight Claude session, and the API that comes back
   re-adopts it.** A turn's CLI is now exec'd inside the `cloudcli-sessions` tmux server rather
   than as a child of the API, so `systemctl restart cloudcli-server-dev` tears down only the
@@ -148,7 +148,7 @@ documentation home is [`applications.md`](applications.md).
   API as every turn used to. Which of the two you get, and the `CLOUDCLI_SESSION_KEEPALIVE`
   gate that decides it — the same one variable also decides whether this boot pass re-adopts at
   all, though it sweeps dead files either way — is in
-  [`session-host/README.md`](../server/modules/providers/list/claude/session-host/README.md),
+  [`server/modules/providers/list/claude/session-host/MANUAL.md (README)`](../server/modules/providers/list/claude/session-host/MANUAL.md),
   the mechanism's one home. Either way the API canary counts any HTTP status as alive and
   needs three misses ten seconds apart before it acts — a stall under load must never read as
   death.
@@ -164,7 +164,7 @@ documentation home is [`applications.md`](applications.md).
   **One probe now reaches outside this app.** `phase-29.mjs` creates and deletes a real page in
   ArchPulse's DocSpace store on :8005, so the harness needs `archpulse.service` up and the state
   at risk is no longer only this app's — the check is in
-  [verification.md](verification.md) §"The dev server", the page's title fence and what an
+  [docs/MANUAL.md (verification)](MANUAL.md) §"The dev server", the page's title fence and what an
   ArchPulse restart mid-run does are in its §"What bites people".
 - **Never kill the client by pattern.** `pkill -f 'sleep infinity'` reaches every such process
   on the box, and this fork's chat-session server holds one on the private `-L cloudcli-sessions`
@@ -244,4 +244,4 @@ and the turn's own `complete` arrived once on the far side — then the host's t
 its `~/.cloudcli/sessions` files were gone. Background work started before the restart also
 delivered its notification and its second `result` afterwards, and a boot with two dead hosts
 on disk swept both and left nothing behind. Driven by `.verify/keepalive-cases-p4.mjs`, whose
-per-case contract is in [verification.md](verification.md) §"The keepalive cases".
+per-case contract is in [docs/MANUAL.md (verification)](MANUAL.md) §"The keepalive cases".

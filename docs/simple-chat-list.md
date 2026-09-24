@@ -28,7 +28,7 @@ not retroactively tag one it did not.
 `GET /api/providers/sessions/recent?simpleList=true` is the same recents query the project tree's
 own sidebar already calls, narrowed by one clause rather than answered by a second endpoint — the
 route table, its exact query shape and its response contract live in
-[server/modules/providers/README.md](../server/modules/providers/README.md), not here.
+[server/modules/providers/MANUAL.md (README)](../server/modules/providers/MANUAL.md), not here.
 
 ## The preference keys
 
@@ -61,7 +61,7 @@ decides only which row and which side of it. The server does the arithmetic: it 
 between the neighbours' ranks, and when no room is left between them it renumbers the whole tagged
 list instead, so two rows never share a rank. The route is `PUT
 /api/providers/sessions/:sessionId/simple-list-position`; its table and contract are at
-[server/modules/providers/README.md](../server/modules/providers/README.md).
+[server/modules/providers/MANUAL.md (README)](../server/modules/providers/MANUAL.md).
 
 ## Icons
 
@@ -87,7 +87,7 @@ sidebar mode, and writes only a row that is still unread. The rule is one SQL fr
 `last_read_at IS NULL OR last_read_at < last_completed_at` — evaluated in the recents page query,
 not in the browser. Every change broadcasts `session_upserted`, which is what reloads the list, and
 the dot is suppressed on the selected row, so the chat you have open never shows it. See
-[notifications.md](notifications.md) for the presence store and the freshness window it is read
+[docs/MANUAL.md (notifications)](MANUAL.md) for the presence store and the freshness window it is read
 through.
 
 ## What this never touches
@@ -98,7 +98,7 @@ transcript on disk. Archiving (the only thing Remove ever does) does not delete 
 it, and even that only removes the file, never edits its content. How a session's on-disk identity
 is minted, mapped and merged with the filesystem watcher's own view is a separate mechanism this
 feature does not change; see
-[docs/architecture/03-conversation-handoff.md](architecture/03-conversation-handoff.md).
+[docs/architecture/MANUAL.md (03-conversation-handoff)](docs/architecture/MANUAL.md (03-conversation-handoff)).
 
 ## Proving it
 
@@ -121,4 +121,4 @@ the chat, a new chat still lands on top after a drag, and the click a drag swall
 very next press on a row's "Chat options" trigger.
 `.verify/probe-sidebar-state-api.mjs` is the server half underneath both, with no browser at all:
 it reads the four state columns over HTTP and drives the read rule through a real `chat.presence`
-frame on a chat socket. See [verification.md](verification.md).
+frame on a chat socket. See [docs/MANUAL.md (verification)](MANUAL.md).

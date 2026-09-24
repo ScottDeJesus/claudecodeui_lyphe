@@ -3,7 +3,7 @@
 Six agreements the transcript, the composer and Settings all lean on. Break one and a screen says
 something untrue about who did what — which model answered, or who let a tool run. Each rule names
 the file that enforces it; that file's header carries the reasoning and this note does not repeat it.
-Proving any of it on the running app is [verification.md](verification.md).
+Proving any of it on the running app is [docs/MANUAL.md (verification)](MANUAL.md).
 
 ## 1. The model is recorded per turn, on every part of it
 
@@ -67,7 +67,7 @@ child's env carries `CLAUDE_SURFACE=cloudcli`, and its system prompt gains `SURF
 — one sentence naming the fence and the bus (`WIDGET_SIGNAL`), one naming the embed body and the
 fullscreen switch (`EMBED_SIGNAL`), then a short paragraph naming the
 four markdown conventions this surface draws as components (`MARKDOWN_SIGNAL`; what it names, and
-why only four, is [architecture/08-rendered-shapes.md](architecture/08-rendered-shapes.md)
+why only four, is [docs/architecture/MANUAL.md (08-rendered-shapes)](docs/architecture/MANUAL.md (08-rendered-shapes))
 §"The triggers"). Both come from `surface-signal.ts` and nowhere else — never `.env`,
 never a systemd unit, never `process.env` read at module load. A terminal launch of `claude` reads
 neither, so their absence is what tells a turn it is not talking to CloudCLI's chat; the runner's
@@ -94,7 +94,7 @@ must differ from this app's before any iframe is rendered. Everything else — a
 parse, one whose `kind` is a word the classifier does not know, one that merely contains the word —
 is HTML, so nothing that renders today can change shape. The full shape of the fence, all three
 sandboxes, the origin invariant and the bus it talks to is
-[architecture/07-live-widgets.md](architecture/07-live-widgets.md) §"The DocSpace kind" and
+[docs/architecture/MANUAL.md (07-live-widgets)](docs/architecture/MANUAL.md (07-live-widgets)) §"The DocSpace kind" and
 §"The embed kind".
 
 That second body shape — a fence whose content is the JSON naming a DocSpace block — renders
@@ -106,7 +106,7 @@ a login-free API, so a grant the HTML widget's `srcDoc` sandbox never may hold i
 precisely because the origin differs. The widget sentence (`WIDGET_SIGNAL` in `surface-signal.ts`)
 carries this in its own clause: anything that should persist, be edited by the reader, or be read back on a
 later turn is steered toward a DocSpace block instead of a one-off HTML fence. The full protocol
-both frames speak is still [architecture/07-live-widgets.md](architecture/07-live-widgets.md)
+both frames speak is still [docs/architecture/MANUAL.md (07-live-widgets)](docs/architecture/MANUAL.md (07-live-widgets))
 §"The DocSpace kind".
 
 A LIVE embed of any kind wears the same card header every other shape in the transcript wears:

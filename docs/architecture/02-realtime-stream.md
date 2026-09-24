@@ -2,9 +2,9 @@
 
 *One frame's journey from a provider CLI to a rendered row, and the buffer that keeps a
 fast reply from re-rendering the transcript on every token. The socket itself is
-[the websocket layer](./01-websocket-transport.md); which session id a frame carries is
-[conversation handoff](./03-conversation-handoff.md); how a tool frame becomes a card is
-[tool views](./06-tool-view.md).*
+[the websocket layer](docs/architecture/MANUAL.md (01-websocket-transport)); which session id a frame carries is
+[conversation handoff](docs/architecture/MANUAL.md (03-conversation-handoff)); how a tool frame becomes a card is
+[tool views](docs/architecture/MANUAL.md (06-tool-view)).*
 
 ## In one paragraph
 
@@ -38,7 +38,7 @@ it.
    reader outside the transcript, republished into the live bus by its own feed. Each RETURNs
    rather than breaking, to say so and to stay off the provider path below — no stream buffering,
    no store append, no UI side effect
-   ([01-websocket-transport.md](./01-websocket-transport.md) §"Fan-out: who receives what").
+   ([01-websocket-transport.md](docs/architecture/MANUAL.md (01-websocket-transport)) §"Fan-out: who receives what").
    **That `case` group names the lanes; it is not what stops them.** What stops them is the
    stamp: a row joins the transcript only if a numeric `seq` says the RUN wrote it, and no
    sessionless lane frame carries one (`writtenByRun` at `:253`). A lane that is not in the
@@ -75,7 +75,7 @@ it.
    keeps `realtimeMessages` and `serverMessages` in separate arrays and computes `merged`
    from them. `complete` triggers a REST refresh of the persisted tail; the live copy of
    the reply survives until the persisted copy demonstrably supersedes it. Details in
-   [the message store](./04-message-store-and-lazy-loading.md).
+   [the message store](docs/architecture/MANUAL.md (04-message-store-and-lazy-loading)).
 8. **The delta buffer belongs to the chat pane, not to a session.** There is one
    `accumulatedStreamRef` and one `streamTimerRef` for the whole `ChatInterface`. Two
    sessions streaming at once share them. This is a real limitation, not a subtlety —
@@ -167,7 +167,7 @@ Four things in that picture are easy to get backwards:
   installed CLI version itself (a process runs the build it was started with) retire the
   process — interrupt first, then end-of-input — and spawns a fresh one. The launch profile
   travels in the host meta, so a re-adopted process is diffed against what it was really
-  launched with; the version [comes from the host's own journal](../cli-version.md), because
+  launched with; the version [comes from the host's own journal](../MANUAL.md (cli-version)), because
   only that process can say what it is on. A turn already in flight is never retired for a
   version: it keeps the build it started on, and the banner above its transcript says so.
 - **A Claude run can outlive the API process too, and then `seq` restarts at 1.** The CLI
@@ -178,7 +178,7 @@ Four things in that picture are easy to get backwards:
   than replaying nothing. The check is one-sided on purpose: a cursor *below* the run's seq
   is left to the REST history refetch, which is what a reconnecting client does anyway. The
   mechanism behind the survival is
-  [`server/modules/providers/README.md`](../../server/modules/providers/README.md)
+  [`server/modules/providers/MANUAL.md (README)`](../../server/modules/providers/MANUAL.md)
   §"The exception: `list/claude/session-host/`".
 
 ## What each provider actually emits
@@ -360,7 +360,7 @@ Four surprises, all of them intended:
   reload is a navigation of a frame the reader can type into, so what a retraction discards
   there is an unsaved edit rather than a tick. In practice a reply is done writing a fence
   before a reader has reached it, and the streaming gate keeps the frame from mounting at
-  all until the fence is closed. See [live widgets](./07-live-widgets.md) §"The fence" and
+  all until the fence is closed. See [live widgets](docs/architecture/MANUAL.md (07-live-widgets)) §"The fence" and
   §"The DocSpace kind".
 - **The same component renders finished replies**, with `isStreaming: false` and no split.
   That is deliberate. `MessageComponent` used to swap `<StreamingMarkdown>` for
@@ -382,7 +382,7 @@ Four surprises, all of them intended:
   again on the next delta. Fences and inline marks cross the map rather than obey it —
   fences take the flag as a prop through `CodeBlock`, and file chips, colour swatches and
   keycaps draw on both halves. That, and the probes that hold each half, is
-  [rendered shapes](./08-rendered-shapes.md) §"Streaming".
+  [rendered shapes](docs/architecture/MANUAL.md (08-rendered-shapes)) §"Streaming".
 
 ## Run lifecycle and busy state
 
@@ -457,7 +457,7 @@ change, and do not assume the status text you see in the UI came from it.
 Claude is the only provider with interactive tool approvals. Asking a human is one function,
 `promptForToolDecision` in `claude-runtime.provider.js`: it emits `permission_request` with a
 `requestId`, raises the `permission.required` notification that can carry the question to a
-phone ([../notifications.md](../notifications.md) §"Answering from the phone"), and blocks
+phone ([docs/MANUAL.md (notifications)](../MANUAL.md) §"Answering from the phone"), and blocks
 until the client answers with `chat.permission-response`. When an answer arrives it emits
 `permission_resolved` with the same id; if the run ends or the request times out it emits
 `permission_cancelled` instead. The distinction matters because the answer itself travels only
@@ -552,7 +552,7 @@ question rendered twice in another.
 - **A streaming reply does not re-trigger auto-scroll.** The follow effect depends on
   `chatMessages.length`, and an in-place rewrite does not change it. Within one streamed
   block the browser pins the pane; the next row that arrives re-follows. See
-  [scrolling](./05-scrolling.md).
+  [scrolling](docs/architecture/MANUAL.md (05-scrolling)).
 - **The 100 ms flush publishes the whole reply, not the delta.** Anyone optimising this
   into an incremental append has to also handle the case where a flush is skipped, which
   is exactly what the current design makes impossible to get wrong.
@@ -602,7 +602,7 @@ question rendered twice in another.
 | The `status` branch | Both arms. The `token_budget` arm is scoped to the viewed session on purpose, and the other arm currently has no producer — a new producer will start writing status text into the activity map for the first time. |
 | Session-switch cleanup in `useChatSessionState` | `resetStreamingState` is the only thing that unwinds a shared buffer mid-stream. Removing that call re-introduces cross-session text bleed. |
 
-Related: [the websocket layer](./01-websocket-transport.md) for the transport and the replay
-contract, [the message store](./04-message-store-and-lazy-loading.md) for what happens to
-a row after `appendRealtime`, [tool views](./06-tool-view.md) for how a paired
-`tool_use` becomes a card, and [the index](./README.md) for the rest of the set.
+Related: [the websocket layer](docs/architecture/MANUAL.md (01-websocket-transport)) for the transport and the replay
+contract, [the message store](docs/architecture/MANUAL.md (04-message-store-and-lazy-loading)) for what happens to
+a row after `appendRealtime`, [tool views](docs/architecture/MANUAL.md (06-tool-view)) for how a paired
+`tool_use` becomes a card, and [the index](docs/architecture/MANUAL.md (README)) for the rest of the set.

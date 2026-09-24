@@ -11,8 +11,8 @@ result that arrives seconds later, deciding what to show in between, collapsing 
 same tool into one row, and nesting a running subagent's calls inside the row that spawned
 it.
 
-Read [the realtime stream](./02-realtime-stream.md) first for how the frames arrive, and
-[the message store](./04-message-store-and-lazy-loading.md) for what `merged` means.
+Read [the realtime stream](docs/architecture/MANUAL.md (02-realtime-stream)) first for how the frames arrive, and
+[the message store](docs/architecture/MANUAL.md (04-message-store-and-lazy-loading)) for what `merged` means.
 
 ## Mental model
 
@@ -262,7 +262,7 @@ The four phrases are the deny messages the Claude runtime returns in
 `claude-runtime.provider.js`. Three of them — timed out, cancelled, and the default
 `User denied tool use` — come from `promptForToolDecision`, the one function that asks a human,
 so they read the same whether `canUseTool` or the `PreToolUse` hook did the asking
-([02-realtime-stream.md](02-realtime-stream.md) §"Permission requests"). `Tool disallowed by
+([docs/architecture/MANUAL.md (02-realtime-stream)](MANUAL.md) §"Permission requests"). `Tool disallowed by
 settings` comes from `canUseTool`'s own pre-check, above the prompt. They are capitalized at the
 source, so the check lowercases, and it is a substring test rather than equality so it survives
 the SDK wrapping the message in error text. A deny carrying a different message does not match —
@@ -524,7 +524,7 @@ pushed as `soul_launch_state` — an id the lane does not answer for draws nothi
 
 The soul row's own contract — what a launch directory holds, how a soul's state and provider are
 decided, the six-hour lane window, and why a soul needs none of the four-hour "still believed
-running" discount an agent does — is [dispatch-souls.md](../dispatch-souls.md). Dismissals are shared:
+running" discount an agent does — is [docs/MANUAL.md (dispatch-souls)](../MANUAL.md). Dismissals are shared:
 one `localStorage` list for both kinds (`pinnedDismissals.ts`), because a pin's id is unique on its own
 and the reader's act is the same either way. The list is read through a module-scope store
 (`useDismissedPins()` / `dismissPin()`, over `useSyncExternalStore`) rather than a private `useState`,
@@ -570,12 +570,12 @@ and a launcher soul carries none of at all — through `useSubagentTranscript`
 the server reports the file still growing (`inFlight`), and stops re-reading once it is finished. An
 `Agent` row resolves through `GET
 /api/providers/sessions/:sessionId/subagents/:toolUseId/transcript`; a soul row through `GET
-/api/dispatch-souls/launches/:launchId/transcript` ([dispatch-souls.md](../dispatch-souls.md)
+/api/dispatch-souls/launches/:launchId/transcript` ([docs/MANUAL.md (dispatch-souls)](../MANUAL.md)
 §"The routes and the frame"); and the view's third target kind, a board's Metis, through `GET
 /api/kanban-metis/sessions/:sessionId/transcript` — opened from outside this module entirely, by
 the kanban module's `KanbanMetisConversation.tsx` (mounted beside the fleet list by
 `KanbanMetisPanel.tsx` once a row is opened) with `sessionId` null, since a board's Metis belongs to
-no chat ([kanban.md](../kanban.md) §"The pilot panel"). Only the newest 100 entries draw at first, with a "show earlier" step
+no chat ([docs/MANUAL.md (kanban)](../MANUAL.md) §"The pilot panel"). Only the newest 100 entries draw at first, with a "show earlier" step
 of 100 more, because a single entry can expand into a diff and mounting all 1000 the server may hold
 at once would be a thousand tool renderers the moment the row opens. The entries reuse the same
 drawing the panel uses: `tools/SubagentNote.tsx` for prose and reasoning, `ToolRenderer` in
@@ -771,7 +771,7 @@ which today is `DataTable`'s copy-as-CSV action and its sort headers, `DiffBlock
 `TabbedCode`'s tab strip. With no strip, an exported tab group draws every fence stacked, so the
 export keeps the languages the reader never clicked. `CodeFence` asks it too, about what it may
 MOUNT rather than draw: in an export a mermaid fence is its source, never `MermaidDiagram` (see
-[rendered shapes](./08-rendered-shapes.md) §"Collapse and export"). Keeping both in one module is
+[rendered shapes](docs/architecture/MANUAL.md (08-rendered-shapes)) §"Collapse and export"). Keeping both in one module is
 the point: a shape that remembers the rule for itself is a chance to ship one that exports empty,
 and the next shape gets the rule for free by calling whichever of the two fits. The `interactive`
 half is not cosmetic — an export inlines the app's stylesheets (`export/buildTranscriptHtml.tsx`),
@@ -887,7 +887,7 @@ memoized, and four with no other reason to know exports exist.
   `format: 'json'`, `OneLineDisplay`'s `resultId` prop — the anchor is built from `toolId`
   inside the component — `CollapsibleDisplay`'s `action` prop, and `PlanDisplay`'s `toolId`
   and `toolName` props. Do not copy them into a new config expecting behaviour.
-- **`src/modules/chat/tools/README.md` is a stale draft.** It describes a `components/`
+- **`src/modules/chat/tools/MANUAL.md (README)` is a stale draft.** It describes a `components/`
   directory that does not exist and a `success-message` result for TodoWrite that is now
   `hideOnSuccess`, and it predates `question-answer`, the `denied` status, subagents and
   permissions. Verify against the code, not against it.
@@ -898,7 +898,7 @@ memoized, and four with no other reason to know exports exist.
 | --- | --- |
 | `TOOL_CONFIGS` entry shape | `ToolRenderer`'s three `type` branches and its `contentType` switch; the `input` and `result` unions differ, so a field valid on one may not be on the other; `ToolGroupContainer` reads `label`, `colorScheme` and `contentType` off the same config |
 | `getToolConfig` fallback | `toolGrouping.ts` → `getToolInputPreview` calls it for the collapsed line, so an unmapped tool must still name what it did |
-| The soul-launch ownership rule (the receipt regex, the marker, the chain-segment test) | It is written TWICE and the two trees cannot import each other: `src/modules/chat/utils/soulLaunchAnchors.ts` and `server/modules/providers/services/session-soul-launches.service.ts`. Loosen one alone and one half pins souls the other will not. The line itself is the launcher's — `~/.claude/hooks/GOTCHAS.md` #36 |
+| The soul-launch ownership rule (the receipt regex, the marker, the chain-segment test) | It is written TWICE and the two trees cannot import each other: `src/modules/chat/utils/soulLaunchAnchors.ts` and `server/modules/providers/services/session-soul-launches.service.ts`. Loosen one alone and one half pins souls the other will not. The line itself is the launcher's — INV-36 |
 | Anything the pinned rows render | Both row components, not one: `PinnedAgentRow.tsx` and `SoulLaunchPinRow.tsx` are deliberately the same shape, and `usePinnedSubagentRows.ts` feeds TWO surfaces — the strip above the composer when the desktop chat gutters are not showing, and the gutter's Subagents widget (`SubagentWidgetBody.tsx`) while they are — so a change to the centred mark, the two-line layout or the status column that lands in only one component, or in only one surface, makes the same rows read as two different lists |
 | The click-to-open affordance (`onOpen`/`openLabel`) | Both row components again: their keyboard handling and their dismiss button's `stopPropagation()` must stay identical, since both surfaces (`SubagentWidgetBody.tsx` and `PinnedSubagents.tsx`) supply the props and a divergence breaks one kind of row on both |
 | `deriveToolStatus` | `ToolStatusBadge`'s `STATUS_CONFIG` needs a key for every `ToolStatus`; `BashCommandDisplay` and `OneLineDisplay` both special-case `running`; every caller filters out `completed` |

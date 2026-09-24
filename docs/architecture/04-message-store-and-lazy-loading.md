@@ -35,7 +35,7 @@ on a 29k-row session costs ~112 MB instead of ~1 GB.
 5. **Server history and live frames are different shapes of the same conversation.**
    `prepareTranscriptMessages` runs on REST reads only, so the transcript mid-run does not
    match the transcript after a refresh. Reconciliation, not equality, is the contract — see
-   [the realtime stream](./02-realtime-stream.md).
+   [the realtime stream](docs/architecture/MANUAL.md (02-realtime-stream)).
 6. **The render list is narrowed three times, and none of them is virtualization.**
    `visibleMessages` is a tail slice of `chatMessages` (100 rows by default); each surviving
    row mounts its content only near the viewport; and each *mounted* row still skips layout
@@ -123,7 +123,7 @@ renders.
 `idle` or `error` when it settles (also `idle` when `canRequest` refuses). Nothing else in the
 store touches it. `'streaming'` is declared in the `SessionStatus` union but no code path
 assigns it — streaming is visible through the `__streaming_<sessionId>` row instead, and busy
-state lives in the processing map described in [the realtime stream](./02-realtime-stream.md).
+state lives in the processing map described in [the realtime stream](docs/architecture/MANUAL.md (02-realtime-stream)).
 
 ### The merge
 
@@ -315,7 +315,7 @@ sequenceDiagram
 `captureScrollRestoreState` records the first `.chat-message` whose bottom is at or below the
 container top, plus its offset from the top. After the commit, the layout effect either
 re-pins that anchor (`anchor.isConnected`) or falls back to a `scrollHeight` delta. See
-[scrolling](./05-scrolling.md) for the full arbitration.
+[scrolling](docs/architecture/MANUAL.md (05-scrolling)) for the full arbitration.
 
 ### When the tail moves under you
 
@@ -385,7 +385,7 @@ Standalone `tool_result` rows are already gone — Claude and Codex drop them in
 `prepareTranscriptMessages` (which also unifies ask-tool calls, collapses consecutive checklist
 snapshots and caps tool output), Cursor filters `kind === 'tool_result'` itself, and OpenCode's
 normalizer never emits one. This does not hold for live frames — see
-[the realtime stream](./02-realtime-stream.md).
+[the realtime stream](docs/architecture/MANUAL.md (02-realtime-stream)).
 
 ---
 
@@ -580,7 +580,7 @@ of ~1 GB with seven thousand.
   would be one more thing to forget to call.
 - **The store keys sessions directly, with no alias table.** The app session id is allocated by
   `POST /api/providers/sessions` before the first send — see
-  [conversation handoff](./03-conversation-handoff.md) — so nothing downstream re-keys a slot.
+  [conversation handoff](docs/architecture/MANUAL.md (03-conversation-handoff)) — so nothing downstream re-keys a slot.
 - **A fold the reader set by hand cannot live inside the row.** The row's whole subtree
   unmounts once it leaves the 1200 px band, so `useState` holding an open-or-closed flag is
   forgotten the moment the reader scrolls past it and comes back — and the row returns shorter
@@ -589,7 +589,7 @@ of ~1 GB with seven thousand.
   `openedTurns` Set, keyed by the turn's anchor id; `transcript/shapes/collapseState.ts`'s
   Map, keyed by a hash of the block's own text rather than by a message id — one reply carries
   three different ids before it settles, synthetic then finalised then persisted ([the realtime
-  stream](./02-realtime-stream.md) §"Text streaming"), while the text the reader folded does not
+  stream](docs/architecture/MANUAL.md (02-realtime-stream)) §"Text streaming"), while the text the reader folded does not
   change at all; and `transcript/shapes/TabbedCode.tsx`'s `chosenTabs` Map, which remembers the
   tab a code group last showed under the same content-addressed key as its fold.
   All three are written only by a click, so they grow with human effort rather than with
@@ -614,10 +614,10 @@ of ~1 GB with seven thousand.
 | `computeMerged` / `dedupeAdjacentAssistantEchoes` | `sessionStoreTruncate.test.tsx` and `sessionMessageReconciliation.test.ts`; the edit/replacement ordering is asserted there. |
 | Any mutator | It must assign a **new** `serverMessages`/`realtimeMessages` array rather than mutating one in place, or `recomputeMergedIfNeeded` sees unchanged references and skips the recompute. |
 | `normalizedToChatMessages` | The `WeakMap` projection cache invalidation keys, and `useChatMessages.test.ts` which pins object reuse across prepends and streaming. |
-| `LazyMessageRow` / `useLazyRowObserver` | Search jumps, which address rows by `data-message-timestamp` on the permanent wrapper; scroll anchor restore, which selects `.chat-message` inside the *mounted* content ([scrolling](./05-scrolling.md)); and the three module-level stores that exist only because a row's subtree unmounts — `CollapsibleUserText`, `transcript/shapes/collapseState.ts` and `TabbedCode`'s `chosenTabs`. |
+| `LazyMessageRow` / `useLazyRowObserver` | Search jumps, which address rows by `data-message-timestamp` on the permanent wrapper; scroll anchor restore, which selects `.chat-message` inside the *mounted* content ([scrolling](docs/architecture/MANUAL.md (05-scrolling))); and the three module-level stores that exist only because a row's subtree unmounts — `CollapsibleUserText`, `transcript/shapes/collapseState.ts` and `TabbedCode`'s `chosenTabs`. |
 | `INITIAL_MOUNTED_TAIL_ROWS` | The initial scroll-to-bottom, which relies on the newest rows having real measured heights. |
 | The history cache's key or validity check | `sessions.service.test.ts` and the Cursor/OpenCode bypass — their history does not live in `jsonl_path`. |
-| `prepareTranscriptMessages` | The live-vs-history divergence documented in [the realtime stream](./02-realtime-stream.md) and the tool grouping in [the tool view](./06-tool-view.md). |
-| `truncateAt` or `replacesAnchorId` | `history_truncated` emission order in the gateway ([websocket transport](./01-websocket-transport.md)) and `removeOptimisticUserEchoes`. |
+| `prepareTranscriptMessages` | The live-vs-history divergence documented in [the realtime stream](docs/architecture/MANUAL.md (02-realtime-stream)) and the tool grouping in [the tool view](docs/architecture/MANUAL.md (06-tool-view)). |
+| `truncateAt` or `replacesAnchorId` | `history_truncated` emission order in the gateway ([websocket transport](docs/architecture/MANUAL.md (01-websocket-transport))) and `removeOptimisticUserEchoes`. |
 | `visibleMessageCount` or who writes it | All four writers: `INITIAL_VISIBLE_MESSAGES` on session change, `+SESSION_MESSAGES_PAGE_SIZE` on prepend, `Infinity` on "Load all", `Math.max` with `resolveSearchWindowSize` on a search jump, plus `loadEarlierMessages` stepping 100. A shrink anywhere can scroll the transcript out from under the user. |
 | `messagesRepresentSamePersistedRow` | Every other helper in `sessionMessagePagination.ts` — all overlap detection funnels through it, so loosening it silently glues unrelated pages together and tightening it turns every refresh into a full bridge walk. |

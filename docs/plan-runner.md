@@ -61,7 +61,7 @@ this server runs, and `runner-watcher.service.ts` is now a thin adapter over it 
 lane's `snapshot` and its `runner_state` frame and nothing else. The reasoning above, the
 broadcast-after-send dedup order, and why a failing tick never takes the interval down with it live
 there, in one copy. The siblings are the launcher-souls lane
-([dispatch-souls.md](dispatch-souls.md)), which reads `~/.claude/state/dispatch-souls/` on the same
+([docs/MANUAL.md (dispatch-souls)](MANUAL.md)), which reads `~/.claude/state/dispatch-souls/` on the same
 cadence, a board's own Metis sessions (`kanban-metis/kanban-metis.module.ts`, the
 `kanban_metis_state` frame), and this module's own arc deck lane (`arc-lane.ts`, the `arc_state`
 frame, reading `~/.claude/state/arcs/`) — a different root and a different frame each time, the same loop.
@@ -118,7 +118,7 @@ is HELD rather than clobbered, so a second copy of a plan is never lost to a nam
 
 `plan-cost.service.ts` answers what a whole PLAN cost — the reading behind the card drawer's cost line,
 handed to the board as `kanbanReadings.planCost` and served by `GET /api/kanban/cards/:cardId/plan-cost`
-([kanban.md](kanban.md) §"The routes"). It is a READ of books that already exist, and it keeps no books of
+([docs/MANUAL.md (kanban)](MANUAL.md) §"The routes"). It is a READ of books that already exist, and it keeps no books of
 its own: a second ledger would be a second answer to "what did this cost", and two answers drift.
 
 **Every row it sums is ALREADY PRICED.** A `claude -p` child reports its own bill, and a ledger row was
@@ -162,7 +162,7 @@ only one either is asked to touch.** `readFlagFile`/`writeFlagFile` in the same 
 path and answer the question above for ANY flag file; `readDeepseekFlashSwitch`/
 `writeDeepseekFlashSwitch` are the two calls above them, fixed to this switch's own path. The
 generalisation exists for a per-board flag a Kanban board carries as its own DeepSeek switch,
-reached through the same barrel from `server/modules/settings/index.ts` ([kanban.md](kanban.md)
+reached through the same barrel from `server/modules/settings/index.ts` ([docs/MANUAL.md (kanban)](MANUAL.md)
 §"The panel") — a board writes its OWN file rather than this one, because two boards on one host
 must run different models and a switch that is one file the whole box shares cannot say that.
 `server/modules/kanban-metis/metis-env.service.ts`'s `writeBoardFlag` is that second caller: it
@@ -206,7 +206,7 @@ reads that variable **at call time** — so every plan-runner that child starts,
 inside one of its runs, asks the board's file; this host-wide one is consulted only when the
 variable is unset. The board side of that rule — what writes the per-board file, and what a board's
 switch means for the sessions it launches — is stated once, in
-[kanban.md](kanban.md) §"The two switches".
+[docs/MANUAL.md (kanban)](MANUAL.md) §"The two switches".
 
 **The write is a rename, and each of its three parts answers a measured failure.** A plain
 `writeFile` is a truncate followed by a write, and the runner reads this file from another process —
@@ -233,14 +233,14 @@ class here, `utf-8-sig` there. Change either and change the other.
 re-read at every builder spawn, so a flip here reaches the next phase with nothing restarted on
 either side; a phase already in flight keeps the provider its builder opened. The whole rule, its
 fallbacks and its cost accounting: `~/.claude/hooks/plan_runner/deepseek.py`, surfaced in
-`~/.claude/hooks/README.md` §Runner with its invariants at `~/.claude/hooks/GOTCHAS.md` #34.
+MAN-838, with its invariants at INV-34.
 
 The same switch also steers a hand-launched soul through `plan-runner soul`, and THAT is
 where the operator sees it take effect: each such soul draws a pin in the chat it was launched from,
-wearing the mark of the endpoint that was actually billed ([dispatch-souls.md](dispatch-souls.md)).
+wearing the mark of the endpoint that was actually billed ([docs/MANUAL.md (dispatch-souls)](MANUAL.md)).
 So the switch has three surfaces on this box, and only two of them touch DeepSeek — the switch's own
 controls, which write the flag (here), the account readout that asks the vendor what is left
-([deepseek-balance.md](deepseek-balance.md)), and the pin, which asks nobody and paints what a
+([docs/MANUAL.md (deepseek-balance)](MANUAL.md)), and the pin, which asks nobody and paints what a
 finished soul's own receipt says it ran on.
 
 **This LANE never talks to DeepSeek, and owns the switch alone.** Nothing under `/api/plan-runner`
@@ -248,7 +248,7 @@ loads `DEEPSEEK_API_KEY`, sends it or logs it. Two programs on this box spend th
 runner reads it straight out of `.env` at each soul spawn, so a runner restarted from cron still
 finds it; and ONE module on this server — `server/modules/deepseek/`, behind
 `GET /api/deepseek/balance` — reads it per request to report the money left on that account under
-the sidebar's account row ([deepseek-balance.md](deepseek-balance.md)). The two are siblings and
+the sidebar's account row ([docs/MANUAL.md (deepseek-balance)](MANUAL.md)). The two are siblings and
 neither is a route into the other: this lane still reads run files and shells out, and the balance
 route knows nothing about runs. Where the key lives and who reads it is declared once, in
 `.env.example`.
@@ -296,7 +296,7 @@ never.
 **What the switch DOES is the runner's rule and lives there, not in this repository.** The flag's
 whole grammar, the optional lane ceiling, and what makes two phases independent enough to run inside
 it, are `~/.claude/hooks/plan_runner/swarm.py` and `independence.py`, surfaced in
-`~/.claude/hooks/README.md` at its `swarm <plan>` verb entry. What a run walking on this switch looks
+`~/.claude/hooks/MANUAL.md` at its `swarm <plan>` verb entry. What a run walking on this switch looks
 like once it is live is §"The runner card" below, the lane block a card grows once `progress.json`
 carries more than one — led by the same swarm mark this row wears.
 
@@ -655,7 +655,7 @@ already un-parked.
 ## Pushes on an ending
 
 When a run ends, the lane says so once, through the same notification orchestrator every chat run
-uses ([notifications.md](notifications.md)), so web push, the desktop app and the ntfy phone push
+uses ([docs/MANUAL.md (notifications)](MANUAL.md)), so web push, the desktop app and the ntfy phone push
 all hear it under each user's own switches. `runner-endings.service.ts` decides;
 `plan-runner.module.ts` hands it the watcher's frame, so an ending is read off the exact picture the
 tabs receive, and only when that picture changed.
@@ -702,7 +702,7 @@ already on disk are history.
 **A watchdog restart is a new ending.** `runner_watchdog.py` restarts a run whose every remaining
 block is transient (`crash`, `timeout`, `budget`, …), or whose run still owes an unblock outing for
 a spec-bound one — the watchdog's `_owed` arm, which turns a spec-bound block from a wall into a
-restart while a door is still open (`~/.claude/hooks/GOTCHAS.md` #41); if the restart blocks again,
+restart while a door is still open (INV-41); if the restart blocks again,
 the run ends again with a later `ended_at`, and that is another push. The watchdog's own cap on
 restarts that ship nothing bounds how many.
 
@@ -739,7 +739,7 @@ The frame goes out over `connectedClients` — every open `/ws` socket — and n
 third-party plugin frontends that have no business seeing it (the reasoning at
 `taskmaster.routes.ts:30-50`). It is `kind`-keyed and declared in `GatewayEventKind`, unlike Task
 Master's `type`-keyed frames, so the protocol tables in
-[architecture/01-websocket-transport.md](architecture/01-websocket-transport.md) stay honest.
+[docs/architecture/MANUAL.md (01-websocket-transport)](docs/architecture/MANUAL.md (01-websocket-transport)) stay honest.
 
 `useChatRealtimeHandlers.ts` carries `case 'runner_state': return;`, and it must RETURN rather than
 break: without the case the frame falls through the switch's `default`, inherits the viewed
@@ -779,7 +779,7 @@ than a failure — the next frame fills it — and is logged, not surfaced.
 
 The bus itself — the topic allowlist, the retained values, the synchronous replay, and why it knows
 no producer — is documented on
-[architecture/07-live-widgets.md](architecture/07-live-widgets.md). This lane was simply its first
+[docs/architecture/MANUAL.md (07-live-widgets)](docs/architecture/MANUAL.md (07-live-widgets)). This lane was simply its first
 publisher. **Three more have arrived and all three kept the shape**: `ArcFeed.tsx` publishes `arc:*`
 beside it in this same module (§"The arc deck" below), `SoulLaunchFeed.tsx` in
 `src/modules/dispatch-souls/` publishes `souls:*` the same way, and `UniverseFeed.tsx` in
@@ -907,7 +907,7 @@ because that mirror has not been widened to carry `lanes` yet — read both ther
 per hook instance and none at all for `null`, so a five-phase card holds two timers — its header,
 and the single phase actually running. It is SHARED, at `src/shared/hooks/useElapsed.ts`: it moved
 out of this module when the chat's pinned soul row became its second consumer
-([dispatch-souls.md](dispatch-souls.md)), and a clock this lane changes now changes that one too. It counts from `started_at` and `stage_since`, never from
+([docs/MANUAL.md (dispatch-souls)](MANUAL.md)), and a clock this lane changes now changes that one too. It counts from `started_at` and `stage_since`, never from
 `heartbeat_at`, which is a liveness beat rather than a start. The words come from
 `claudeStatus.elapsed.seconds` / `minutesSeconds` / `hoursMinutes` in the `chat` namespace — the
 same three keys the composer's own clock reads (`src/modules/chat/composer/ActivityIndicator.tsx`).
@@ -971,7 +971,7 @@ The card NEVER computes DeepSeek's windows; until the runner answers, the button
 frame carries `start_at`, the header's note leads with `starts <time>` (the DeepSeek-peak sentence stays
 beside it when both apply; "queued — not started" gives way to the time) and the button becomes Cancel,
 which relays `{when:'none'}`. The runner-watchdog's two-minute tick presses Start when the time comes
-(`plan-runner due` — `hooks/README.md` §Runner), so the note names the operator's time and the press lands
+(`plan-runner due` — MAN-838), so the note names the operator's time and the press lands
 within one tick of it. Nothing optimistic; a refusal is the runner's sentence in a `warn` toast under
 `runner.schedule.refused`. Handles: `data-runner-schedule="<start_at epoch|empty>"` on the group,
 `data-runner-schedule-set` on `Start at …`, `data-runner-schedule-cancel` on Cancel. Proof:
@@ -1200,7 +1200,7 @@ whole.
 ## Proving it
 
 `node .verify/phase-23.mjs`, fetch- and socket-driven against the running dev server — no browser;
-see [verification.md](verification.md). Twelve gates: the mount's auth on a read and a write, the
+see [docs/MANUAL.md (verification)](MANUAL.md). Twelve gates: the mount's auth on a read and a write, the
 live list, a fixture run carried whole and addressable, a stage change arriving unasked on an open
 socket, paused beating stale, a lapsed heartbeat, the runner's own refusal as a 409 with no stack, a
 malformed id refused at the route, an unknown id answered in the runner's words, a receipt taking a
@@ -1210,11 +1210,11 @@ run off the lane, and nothing left behind.
 ENDED with its outcome word and its count, Stop gone and Dismiss offered; a `budget` ending in the
 warn tone with Resume beside Dismiss; Dismiss taking the card and the count and HOLDING across a
 reload, because the dismissal rides the synced preferences; a receipt a day old not listed at all; a
-live fixture untouched by any of it. See [verification.md](verification.md).
+live fixture untouched by any of it. See [docs/MANUAL.md (verification)](MANUAL.md).
 
 `node .verify/phase-24.mjs` proves the client half in Chromium, reading the far end of the chain:
 a stage written to disk arriving inside a sandboxed widget's own callback, through the feed, the
-bus and the widget bridge. Eleven gates; see [verification.md](verification.md).
+bus and the widget bridge. Eleven gates; see [docs/MANUAL.md (verification)](MANUAL.md).
 
 `node .verify/phase-25.mjs` proves the ruling in Chromium, at 390px, and it proves an absence the
 only way an absence can be proved: a real fixture run is put on the lane and the server is watched
@@ -1222,7 +1222,7 @@ until it lists it, and only THEN is the chat view read — held open for five se
 frame travels on the watcher's own 2 s poll and a single early sample would find an empty view and
 call it a ruling upheld. No card, no pinned band, and nothing carrying the fixture's id anywhere in
 chat; the transcript measured filling its root exactly, with nothing above it but the CLI-version
-banner. Seven gates and one shot; see [verification.md](verification.md). The card's own visual gates
+banner. Seven gates and one shot; see [docs/MANUAL.md (verification)](MANUAL.md). The card's own visual gates
 belong to the surface that renders it — the Runner tab, and `phase-26.mjs`.
 
 `node .verify/phase-26.mjs` proves the tab itself in Chromium. ABSENCE IS A `[NOTE]` THERE, NEVER A
@@ -1232,7 +1232,7 @@ THE LANE'S ABSOLUTE TOTAL either, for the same reason turned around — the oper
 and go inside the probe's window. The fixture's arrival is the one count delta; every other reading
 about it is scoped to its own card by `data-run-id`; and a gate that must know whether anything is
 running reads the lane over the API rather than the tab's count. Seventeen gates and three shots;
-see [verification.md](verification.md).
+see [docs/MANUAL.md (verification)](MANUAL.md).
 
 The operator's own runs are read by every gate and NEVER named in a request — the plan being
 executed while the probe runs is one of them, and a verb sent to it would stop the run that is

@@ -18,7 +18,7 @@
 > When there's no claimable work she runs the **quiescence checkpoint** (no build
 > live on the board + uncommitted changes exist → `Skill(git)` commits + pushes them on
 > `main`), files her report, and ENDS THE TURN — the driver spawns a fresh Metis when new
-> work appears. Full docs: `docs/kanban.md`.
+> work appears. Full docs: `docs/MANUAL.md (kanban)`.
 
 # Metis — The Steward
 
@@ -102,7 +102,7 @@ second door. Her session reaches the board through the **`kanban-pm` MCP — 25 
 surface** — injected fresh at every launch by the driver (`--mcp-config` + `--strict-mcp-config`),
 which is what makes it the session's ONLY MCP: no user-scope servers,
 nothing else registered. In a session the tools surface as `mcp__kanban-pm__<name>`; reference them here
-by plain name. **The FULL catalog (every param + semantics) lives in `docs/kanban.md`; the table
+by plain name. **The FULL catalog (every param + semantics) lives in `docs/MANUAL.md (kanban)`; the table
 below is the WRITE-VERB SUBSET the core steps call by name** — the rest (`list_features`,
 `list_features_all`, `get_learned_selections`, `answer_design_question`, `resolve_issue`,
 `archive_feature`, `approve_feature`) are read/operator-side and documented there.
@@ -572,7 +572,7 @@ building that card — pick ANOTHER build-ready feature. For the ONE feature thi
    `[[steps]]`/`[[verify]]` checks → a Prometheus doc sweep), each soul a `claude -p --agent
    <shim>` child; this session follows the run to its receipt. It runs natively because a
    Metis session is a main loop. `/execute` launches a plan already in format v2 only —
-   writing or converting one is `/plan`'s door (`~/.claude/hooks/README.md` §Runner).
+   writing or converting one is `/plan`'s door (MAN-838).
    **If the runner itself refuses the plan at `plan-runner start` with exit 5 — the INTENT
    LOCK is not CONFIRMED — stop there: `file_issue` on the card (which reopens it to To do),
    and take the next one (ABSOLUTE RULE #16).** The pipeline runs **BUILD + VERIFY only — it

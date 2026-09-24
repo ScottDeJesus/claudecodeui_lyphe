@@ -8,7 +8,7 @@ back no worse than the recorded baseline. This fork does not verify by unit test
 
 It runs as two systemd units, not in your shell — `cloudcli-server-dev.service` (the API under
 the handover supervisor, :3011 loopback) and `cloudcli-client-dev.service` (Vite, :5183 on every
-interface); see [hosting.md](hosting.md). Check before you touch anything:
+interface); see [docs/MANUAL.md (hosting)](MANUAL.md). Check before you touch anything:
 
 ```bash
 curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:5183/   # 200 = healthy, leave it alone
@@ -44,7 +44,7 @@ the new child carries the new value. More than one parser reads this file and th
 while the readers that go to the file directly — `server/modules/deepseek/deepseek-key.ts` and the
 plan runner's own — keep the LAST and take the quotes off, as systemd's `EnvironmentFile=` does. So
 a value that behaves differently in two places is a parser difference before it is a bug
-([deepseek-balance.md](deepseek-balance.md) §"The rules that bite").
+([docs/MANUAL.md (deepseek-balance)](MANUAL.md) §"The rules that bite").
 
 **And never print `.env` to a terminal.** It now holds a live credential — `DEEPSEEK_API_KEY`, the
 only one in the file — and `cat`, `grep`, `sed -n` and a diff all write it into whatever is
@@ -191,12 +191,12 @@ instead. Its
 badges are not read off that transcript — a stored conversation says a tool RAN, never that a person
 was asked, so "Waiting for you" and "Allowed by you" can never appear in one. The phase drives
 fixtures through the real `useToolPermissionState` and `deriveToolOutcome` instead (phase 2's
-technique) and photographs those. Its contracts are at [chat-contracts.md](chat-contracts.md).
+technique) and photographs those. Its contracts are at [docs/MANUAL.md (chat-contracts)](MANUAL.md).
 
 Phase 7 opens no browser at all: the files server is a set of HTTP contracts, so `phase-7.mjs`
 signs in through the real login route and drives them with `fetch`. It touches no page and no
 dev-user preference — safe to run beside a browser probe. Its contract is at
-[files-api.md](files-api.md).
+[docs/MANUAL.md (files-api)](MANUAL.md).
 
 Phase 8 is back in the browser, and its hardest reading is a negative: the file manager may not draw
 an image's `1440 × 900` before the browser has measured it, so `phase-8.mjs` samples the pane every
@@ -204,7 +204,7 @@ few milliseconds from the click onward and fails if any frame carried a `×` too
 the DOM back against the API's own bodies — an entry the listing reports with `bytes: null` must
 read `—` on screen, never `0 B` — and it writes: the same file uploaded twice lands as `x (1).txt`,
 both removed through the tree's own menu, `git status` read after rather than assumed. It spends
-no Claude turn — its chat card is on disk. Its contract is at [file-manager.md](file-manager.md).
+no Claude turn — its chat card is on disk. Its contract is at [docs/MANUAL.md (file-manager)](MANUAL.md).
 
 Phase 9 asks Vite what tsc cannot: `phase-9.mjs` imports `markdown-preview`'s barrel and
 `PrdEditorBody.tsx` through the running dev server, so a specifier that typechecks against the
@@ -236,7 +236,7 @@ this fork with its dirty working tree, `.claude` genuinely ahead of its upstream
 directory holding no repository, and the stale `mission-control` whose directory is gone.
 Committing or cleaning this tree changes what it measures. Run it solo like every browser phase —
 it ends in a second, dark session and drives the app's own theme switch back before closing. Its
-contract is at [git-panel.md](git-panel.md).
+contract is at [docs/MANUAL.md (git-panel)](MANUAL.md).
 
 Phase 11 presses a button wired to the operator's own `/git`, so its first job is making a press
 free. Every press but one happens behind a socket seal — a patched `WebSocket` installed in the
@@ -272,12 +272,12 @@ real `/git` was said somewhere. The shots are `11-git-idle` (light and dark), `-
 `-running-read-done`, `-pushed`, `-banner-ahead`, `-banner-not-committed`,
 `-banner-connection-lost`, `-adopted-second-window`, `-adopted-after-silence`,
 `-dismiss-held-by-the-server` and `-refused-checkpoint-elsewhere`. Its contract is at
-[git-panel.md](git-panel.md).
+[docs/MANUAL.md (git-panel)](MANUAL.md).
 
 Phase 12 opens no browser either, and it no longer runs green: it was written against the proxy this
 lane has since replaced, so `phase-12.mjs` still names that proxy's retired URL prefix and imports the
 server module it lived in, both deleted with it, and it needs re-pointing at the accounts lane's own routes (`/api/accounts`, `/api/usage`,
-`/api/accounts/switch`, `/api/accounts/capture` — [accounts.md](accounts.md)) before it measures
+`/api/accounts/switch`, `/api/accounts/capture` — [docs/MANUAL.md (accounts)](MANUAL.md)) before it measures
 anything. As written, the lane is four HTTP contracts, so it signs in through the real login route
 and drives them with `fetch`. What the live
 picture cannot show — the null discipline, a rolled percent, a vendor `severity`, a lane that cannot
@@ -293,7 +293,7 @@ the memory service's runtime import of `readObjectRecord` from `@/shared/utils.j
 file instead. Nothing under `runTsx` here reaches the memory mapper, so no assertion in this file
 would catch that — deleting the env leaves all 40 green — which is the reason the line is commented
 where it sits rather than left to look like decoration. Its contract is at
-[accounts.md](accounts.md).
+[docs/MANUAL.md (accounts)](MANUAL.md).
 
 Phase 13 is back in the browser, and it splits its evidence in two rather than choosing between
 them. It no longer runs green either: `phase-13.mjs` reads and replays that same retired prefix's
@@ -314,7 +314,7 @@ it was. Two of its gates measure a door rather than the room behind it — a pro
 exactly as `ChatInterface`'s abort listener is, asked what it sees while the panel is open and
 again while it is closed; and the unit trap driven both ways round, since a seconds-shaped expiry
 must land in 1970 and a millisecond one must not land in the year 58,000. 88 gates over a dark pass
-and a light one, and it spends no Claude turn. Its contract is at [accounts.md](accounts.md).
+and a light one, and it spends no Claude turn. Its contract is at [docs/MANUAL.md (accounts)](MANUAL.md).
 
 Phase 14 stays out of the browser too: the CLI-version report is one HTTP contract over a service
 whose failure paths have to be injected, so `phase-14.mjs` drives the route with `fetch` and builds
@@ -322,7 +322,7 @@ the service under `tsx` around a binary that is not there, one that answers nons
 moves by hand — the cache window's far edge is measured rather than assumed. It spends one real Haiku
 turn, a `sleep 20` wide enough to ask the route mid-run, and spends it once: the observation is kept
 in `.verify/artifacts/` and read back on every later run, so re-measuring means deleting that file
-and paying a turn for it. Its contract is at [cli-version.md](cli-version.md).
+and paying a turn for it. Its contract is at [docs/MANUAL.md (cli-version)](MANUAL.md).
 
 Phase 15 is the client half of that report, and it spends **zero** Claude turns — the plan's own
 verification wanted two more plus a CLI shim, a `.env` edit and a server restart, and the six above
@@ -355,7 +355,7 @@ light one; the dark pass exists for the banner's paint and stops after it. It cr
 no `.env`, touches no `server/` file, restarts no pane and starts no conversation — and the route is
 re-read at the end to show the server saw no run start. Shots are `15-baseline-footer-light`,
 `15-stale-chip-light`, `15-banner-light`, `15-banner-dark` and `15-resumed-light`. Its contract is
-at [cli-version.md](cli-version.md).
+at [docs/MANUAL.md (cli-version)](MANUAL.md).
 
 Phase 17 is the flat list's own proof, and it also spends **zero** Claude turns. Two real
 conversations are created — a real `POST /api/providers/sessions`, a real row tagged
@@ -373,7 +373,7 @@ carrying `simpleList: true` for the saved project for new chats, the row that ap
 chat and its project, the sealed send leaving nothing but the frame itself on the wire, a rename
 round-tripping through a real `PUT`, opening two different rows and the Files tab reading each
 row's own project, an idle Remove archiving without ever opening the stop dialog, and toggling off
-handing the tree back. Its contract is at [simple-chat-list.md](simple-chat-list.md).
+handing the tree back. Its contract is at [docs/MANUAL.md (simple-chat-list)](MANUAL.md).
 
 Phase 18 is the flat list's stop-and-remove path and its mobile width, and it too spends **zero**
 Claude turns. Over the same sealed socket Phase 17 seals, two things are replayed rather than run
@@ -392,7 +392,7 @@ sidebar the way a thumb would, and reads the live DOM rather than the source: th
 and the row's own link (not the row `div`, which the fix never had to touch) both measure at least
 44px tall and stay inside the viewport, in both themes. Shots are `18-simple-stop-dialog-light`,
 `18-simple-390-light` and `18-simple-390-dark`. Its contract is at
-[simple-chat-list.md](simple-chat-list.md).
+[docs/MANUAL.md (simple-chat-list)](MANUAL.md).
 
 Three probes sit under phases 17 and 18 without being phases themselves, and all three spend
 **zero** Claude turns for the same reason: the one run each starts is a CURSOR session, whose CLI
@@ -407,7 +407,7 @@ against a dot. `.verify/probe-simple-icons-unread.mjs` ends `SIMPLE-ICONS-UNREAD
 over `[PASS] C1` … `[PASS] C7`, dragging a row with `page.mouse` on desktop and with CDP
 `Input.dispatchTouchEvent` on a 390 px phone rather than any synthetic `PointerEvent`. None of the
 three is in `all.mjs`, which collects `phase-<n>.mjs` alone, so each is run by hand like every
-other `probe-*.mjs`; their contract is at [simple-chat-list.md](simple-chat-list.md).
+other `probe-*.mjs`; their contract is at [docs/MANUAL.md (simple-chat-list)](MANUAL.md).
 
 Phase 19 is the memory lane — memory intake — and it opens no browser either: four
 more HTTP contracts with nothing visual about them, driven with `fetch` behind a token from the real
@@ -433,7 +433,7 @@ count moves with the queue rather than staying pinned. Like phase 12, the down p
 against a closed port and never by stopping the operator's own server — which, with nothing pending ever
 written to, is what makes this one safe to run while the operator is in the app: it toggles no
 preference, moves no card and opens no browser. Its contract is at
-[memory-intake.md](memory-intake.md).
+[docs/MANUAL.md (memory-intake)](MANUAL.md).
 
 Phase 20 is that lane's screen — the Memory tab — and it is back in Chromium, and like Phase 19 it
 no longer runs green: its `page.route` globs and its whole-card read still name the retired proxy's
@@ -462,7 +462,7 @@ whichever mode ran last — every browser probe's cost here, see *Hosted instanc
 of it narrowly is that it reviews no card, toggles no preference of its own, and leaves the pending
 queue exactly as it found it. Shots are `20-memory-light`, `20-memory-expanded-light`,
 `20-memory-empty-light`, `20-memory-390-light` and `20-memory-dark`. Its contract is at
-[memory-intake.md](memory-intake.md).
+[docs/MANUAL.md (memory-intake)](MANUAL.md).
 
 Phase 21 is the surface signal, and it is the one phase in this whole plan that spends a Claude
 turn — once, on haiku, through the real composer a person uses. What `phase-21.mjs` proves is not
@@ -553,7 +553,7 @@ preference and puts the previous value straight back, which is the same preferen
 already writes through the app's real Dark Mode switch, and no other preference is touched. Like
 every browser probe here it ends in `ensureTheme` twice and leaves the dev account on
 whichever mode ran last. Shots are `22-widget-light`, `22-widget-dark` and `22-widget-390-light`. Its
-contract is at [architecture/07-live-widgets.md](architecture/07-live-widgets.md).
+contract is at [docs/architecture/MANUAL.md (07-live-widgets)](docs/architecture/MANUAL.md (07-live-widgets)).
 
 Phase 23 is the plan-runner lane, and it is back to fetch and a socket — no browser, because nothing
 in it is visual. It signs in the way `phase-7.mjs` does and holds the token for every read and every
@@ -583,7 +583,7 @@ before anything is spawned; an unknown id answered in the runner's own words; a 
 run off both the list and the by-id read; and nothing left behind. The operator's own runs are read
 by every gate and NEVER named in a request — the plan being executed while the probe runs is one of
 them, it shows up in the `[NOTE]` line that lists what the list carried, and a verb sent to it would
-stop the run that is running the probe. Its contract is at [plan-runner.md](plan-runner.md).
+stop the run that is running the probe. Its contract is at [docs/MANUAL.md (plan-runner)](MANUAL.md).
 
 Phase 24 is the live bus, and it is the first proof that reads the far end of the chain rather than
 any point along it. It is the gallery technique again — nothing in the app mounts a widget, so
@@ -706,7 +706,7 @@ tab-drops-off-the-bar readings only apply when nothing else is running, and say 
 when the operator's own runs are still on the lane. Shots are `26-runner-tab-light`,
 `26-runner-tab-dark` and `26-runner-tab-390-light`. Fixtures are removed in an outermost `finally`,
 each guarded separately so one failure cannot strand another. Its contract is at
-[plan-runner.md](plan-runner.md).
+[docs/MANUAL.md (plan-runner)](MANUAL.md).
 
 Phase 27 is the ended card, in the browser, and it is the one probe here that writes the dev
 account's synced preferences: dismissing a run is a MERGED write to the `planRunner` blob, and the
@@ -758,7 +758,7 @@ the iframe with an error card, so every gate touching the iframe runs inside a f
 window — which is why gate 8 remounts the gallery before it flips. Gate 8 also writes the `theme`
 preference and puts it straight back; no other preference is touched. Shots are `28-docspace-light`,
 `28-docspace-dark` and `28-docspace-390-light`. Its contract is at
-[architecture/07-live-widgets.md](architecture/07-live-widgets.md) §"The DocSpace kind".
+[docs/architecture/MANUAL.md (07-live-widgets)](docs/architecture/MANUAL.md (07-live-widgets)) §"The DocSpace kind".
 
 Phase 29 is the same block read from both ends at once, and it is the only probe here that writes
 into the REAL DocSpace store. Where phase 28 required nothing of ArchPulse, this one stands a
@@ -790,8 +790,8 @@ exceptions (9). It sends no Claude turn. Its fixture page is titled
 OUTERMOST `finally` by the id the probe minted and no other — DocSpace holds the operator's real
 pages, so the title prefix is the fence at both ends and a cleanup that fails reddens the run.
 Shots are `29-docspace-light`, `29-docspace-dark` and `29-docspace-390-light`. Its two contracts
-are [architecture/07-live-widgets.md](architecture/07-live-widgets.md) §"The DocSpace kind" for
-this half and ArchPulse's own `README.md` §"Embedding one block" for the other.
+are [docs/architecture/MANUAL.md (07-live-widgets)](docs/architecture/MANUAL.md (07-live-widgets)) §"The DocSpace kind" for
+this half and ArchPulse's own MAN-238 for the other.
 
 Keepalive survival is the one proof here that is not a phase and is not in `all.mjs`, because what
 is under test is the API's own death. `.verify/keepalive-turn.mjs` is the client every case
@@ -936,7 +936,7 @@ blanked" cannot see a redundant GET. **The viewport**: the target row must be in
 1440, 768 and 390 — not merely inside its pane, since below `md` the panes stack and a row revealed
 in a pane under the fold is revealed to nobody — and at 1440 the directory listing is gated to prove
 it did NOT move. It spends no Claude turn and writes nothing on the account or the server. Its
-contracts are [files-api.md](files-api.md) and [file-manager.md](file-manager.md).
+contracts are [docs/MANUAL.md (files-api)](MANUAL.md) and [docs/MANUAL.md (file-manager)](MANUAL.md).
 
 **`probe-shapes-detect.mjs` proves every markdown-shape trigger fires on what it is meant to fire
 on and — the half that decides whether the feature is safe — refuses the near misses.** A shape
@@ -1085,7 +1085,7 @@ column really called `1` the same accessible name in one header row.
 `TranscriptRenderContext.Provider value={{ isExporting: true }}` — the state
 `export/TranscriptExportDocument.tsx` renders the transcript in — and requires every shape, every
 row, every header word and the bars to be present while ZERO copy, sort or toggle controls are drawn;
-see [06-tool-view.md](architecture/06-tool-view.md) §"Rendering into an exported document" for why a
+see [06-tool-view.md](docs/architecture/MANUAL.md (06-tool-view)) §"Rendering into an exported document" for why a
 control drawn there would look alive and do nothing. It renders live rather than through
 `renderToStaticMarkup`, which is the honest measurement for what is being asked: the flag decides
 whether a control is *drawn*, and one never drawn cannot be serialised either. That mount is spelled
@@ -1506,7 +1506,7 @@ things. Each is listed with what its red line means:
 export. That component reads `useTheme()`, and the export mounts no `ThemeProvider`, so mounting it
 there throws and nothing downloads. The fence keeps the same frame with the source inside it, so the
 export counts the same kinds the screen does (see
-[rendered shapes](architecture/08-rendered-shapes.md) §"Collapse and export").
+[rendered shapes](docs/architecture/MANUAL.md (08-rendered-shapes)) §"Collapse and export").
 
 It spends no Claude turn. The seal swallows `chat.send`, `chat.edit-send`, `chat.abort` and
 `chat.subscribe`, and the run ends by proving the seal still held and that the page never tried to
@@ -1620,7 +1620,7 @@ CRLF file and one whose last line carries no terminator, the refusals it can sta
 revision, a binary file, a non-UTF-8 line, a line past 256 KiB, an edit past the end of the file, a
 newline inside a replacement line, and both directions out of the project — an in-project symlink
 writing its target and staying a link, and the equality of the `preview` and `edit-window` line
-models; its contracts are [files-api.md](files-api.md).
+models; its contracts are [docs/MANUAL.md (files-api)](MANUAL.md).
 `node .verify/probe-files-editor.mjs` (`EDITOR OK`) opens a 200,000-line file in the real editor,
 scrolls far enough to force loads and evictions, edits two lines far apart, saves with Mod-s and
 reads exactly those two edits back off disk, then walks the conflict banner and the unchanged file
@@ -1709,7 +1709,7 @@ Four things to know before running one:
   FINISHED") for that reason.
 - **Each case creates and deletes its own probe session** (D-12) however it ends, so a sweep
   leaves the sessions list as it found it. `probe-*` files left in `~/.cloudcli/sessions` mean an
-  interrupted run — see [hosting.md](hosting.md) §"Runbook".
+  interrupted run — see [docs/MANUAL.md (hosting)](MANUAL.md) §"Runbook".
 - **Case A hands the API over by nudging a file**, appending a newline to
   `server/modules/providers/list/claude/session-host/index.ts` and restoring it. Any file under
   `server/` now triggers a boot — the supervisor watches the tree, not an import graph — so the
@@ -1719,8 +1719,8 @@ Four things to know before running one:
 Its siblings — the driver they all spawn, the `turn|abort|env-off|unit-down` cases and the
 host-only one — share the same discipline, and which script drives what is in §"The browser
 harness" above, under *Keepalive survival*. What the mechanism itself is, and what the boot pass
-does, is in [hosting.md](hosting.md) §"Rules that bite" and
-[`session-host/README.md`](../server/modules/providers/list/claude/session-host/README.md).
+does, is in [docs/MANUAL.md (hosting)](MANUAL.md) §"Rules that bite" and
+[`server/modules/providers/list/claude/session-host/MANUAL.md (README)`](../server/modules/providers/list/claude/session-host/MANUAL.md).
 
 ## The handover cases
 
@@ -1778,13 +1778,13 @@ it touches `server/index.ts` and prints `HANDOVER old=<pid> new=<pid> seconds=<n
 What the mechanism itself is — the state machine, every log line, the two environment bits and the
 failure table — is in
 [`deploy/dev-supervisor/README.md`](../deploy/dev-supervisor/README.md), and the rule it puts on a
-person editing `server/` is in [hosting.md](hosting.md) §"Rules that bite".
+person editing `server/` is in [docs/MANUAL.md (hosting)](MANUAL.md) §"Rules that bite".
 
 ## The ntfy probes
 
 The ntfy phone-push channel is proven the way a phone sees it: the real server publishes to a real
 topic on `ntfy.sh`, and the probe reads back what landed there. What the channel does, and why, is
-in [notifications.md](notifications.md); this section is how to prove it. Like the cases above,
+in [docs/MANUAL.md (notifications)](MANUAL.md); this section is how to prove it. Like the cases above,
 the probes are **not part of `all.mjs`**.
 
 Everything goes through `.verify/lib/ntfy.mjs`. It signs in as the dev account through the real
@@ -1829,7 +1829,7 @@ node .verify/ntfy/question-probe.mjs
 It is the end-to-end proof that a question reaches a phone and the phone's answer reaches the
 model, and it spends **two real Claude turns**. It runs the same script twice, once with
 `permissionMode: 'bypassPermissions'` and once with `default`, because those are the two doors
-into `promptForToolDecision` ([architecture/02-realtime-stream.md](architecture/02-realtime-stream.md)
+into `promptForToolDecision` ([docs/architecture/MANUAL.md (02-realtime-stream)](docs/architecture/MANUAL.md (02-realtime-stream))
 §"Permission requests"): in the bypassing mode the `PreToolUse` hook is the only way to a human,
 in `default` `canUseTool` asks and the hook must stand aside. Each run creates a Claude session
 in `/tmp/cloudcli-ntfy-probe`, asks the model for one `AskUserQuestion` with two options, waits
@@ -1840,7 +1840,7 @@ that the signed token needs no CloudCLI session. Then it waits for `permission_r
 turn's `complete`, counts the `permission_request` frames for that session (two would mean the
 hook and `canUseTool` both asked) and the pushes opening it (a second, titled "Claude needs you",
 is the CLI's own `Notification` hook announcing the same prompt — see
-[architecture/02-realtime-stream.md](architecture/02-realtime-stream.md) §"Permission requests"),
+[docs/architecture/MANUAL.md (02-realtime-stream)](docs/architecture/MANUAL.md (02-realtime-stream)) §"Permission requests"),
 and reads the model's last words for the answer the phone sent. It passes on exactly:
 
 ```
@@ -1886,7 +1886,7 @@ node_modules/.bin/tsx --tsconfig server/tsconfig.json .verify/ntfy/signals-probe
 ```
 
 Nothing is mocked but the stream. It drives the real `detectRuntimeSignals`
-(`claude-runtime-signals.ts`, described in [notifications.md](notifications.md) §"Where the
+(`claude-runtime-signals.ts`, described in [docs/MANUAL.md (notifications)](MANUAL.md) §"Where the
 Claude runtime's error and limit signals come from") with one real `SignalState` and the
 SDK-shaped messages a run would hand it: a usage window climbing through its warning steps,
 hitting its limit, resetting, going into overage and running out of credits; a retried request
@@ -1927,7 +1927,7 @@ and leaves nothing behind but the secret row. Only two of its four route calls c
 counter anything — the flipped signature and the swapped decision. The two that carry a genuine
 signature, the unknown request and the expired payload, *clear* this client's record instead, so
 the probe can neither lock itself out nor stand between a phone and its own button. The rule
-behind that is in [notifications.md](notifications.md) §"Answering from the phone".
+behind that is in [docs/MANUAL.md (notifications)](MANUAL.md) §"Answering from the phone".
 
 One audit probe, under `tsx` for the same reason — the whole tap-to-answer surface, attacked:
 
@@ -2034,7 +2034,7 @@ Eight things to know before running one:
 | **The Shell tab prints `bash: claude: command not found`** | The PTY spawns `bash -c "claude …"` — a bare `PATH` lookup — and the server process on this host carries no `~/.npm-global/bin`, which is where the CLI is. `.env`'s `CLAUDE_CLI_PATH` does not reach it: that is read by the SDK providers through `server/shared/claude-cli-path.ts`, never by the PTY. Nor does upstream's `prioritizeUserNpmGlobalBin`, which only re-*orders* entries already on `PATH` and hands it back untouched when none of its candidates are there — `npm_config_prefix` being set is not enough. An environment fact rather than a fork defect, and the fix belongs at deploy time: whatever runs the server must have the CLI's directory on its own `PATH`. |
 | **`uiPreferences` is one stored key, not six** | The preference store keeps a row per name, and all six workspace booleans live inside the single `uiPreferences` value. A `PATCH /api/user/preferences` carrying `{"uiPreferences":{"hideShellTab":false}}` therefore *replaces* the blob and silently drops the other five. Click the switch, or send the whole object back. A flat key is its own row and patches safely alone — which is why `phase-4.mjs` patches `tasksEnabled` directly and clicks for the rest. |
 | **The Tasks tab is absent** | It is preference-gated and TaskMaster is not installed here, so its absence is recorded as a note rather than asserted as a pass — except in `phase-4.mjs`, which asserts the biconditional instead: the tab is on the bar exactly when TaskMaster is installed. A tab that can never appear would also leave the board itself unmeasured, so `phase-16.mjs` opens the tab when it is there and otherwise mounts the app's own `TaskBoardContent` and `TaskEmptyState` from the running dev server — phase 2's technique, and it says in a `[NOTE]` which of the two it read. |
-| **The Memory tab is on the bar only while something is waiting** | It is gated on the board's own pending queue rather than on a preference, so a host with an empty queue has no Memory tab and no *Go to Memory* row in the palette — an absence, not a fault. `phase-20.mjs` falls back to a synthetic two-row queue answered inside the page when the live count is 0, and says so in a `[NOTE]`. It also STAYS on the strip at a count of zero while it is the selected tab, deliberately — the Runner tab above is the second tab written that way, and both are read by the same gate. Its contract is at [memory-intake.md](memory-intake.md). |
+| **The Memory tab is on the bar only while something is waiting** | It is gated on the board's own pending queue rather than on a preference, so a host with an empty queue has no Memory tab and no *Go to Memory* row in the palette — an absence, not a fault. `phase-20.mjs` falls back to a synthetic two-row queue answered inside the page when the live count is 0, and says so in a `[NOTE]`. It also STAYS on the strip at a count of zero while it is the selected tab, deliberately — the Runner tab above is the second tab written that way, and both are read by the same gate. Its contract is at [docs/MANUAL.md (memory-intake)](MANUAL.md). |
 | **The Memory panel is driven by its English strings** | `phase-20.mjs` finds the two verbs by the words `file it` and `discard`, the empty state by `All filed`, and the global-blast mark by the substring `global`. All four live under `memory.*` in `en/common.json` (English only; the other locales fall back to `en`). Re-word one and the phase stops finding a control rather than reporting one wrong — re-point it in the same change, the way `phase-4.mjs` is re-pointed for Settings. |
 | **The runner card is driven by its English strings** | The card reads every word it draws from `runner.*` in `en/common.json` — the state badge (`LIVE` / `PAUSED` / `STALE`), the phase states, the meter's label, the phase count, the two verbs and both toasts — English only; the other locales fall back to `en`. The elapsed clocks are the exception and are NOT the card's to re-word alone: their three keys are `claudeStatus.elapsed.*` in `en/chat.json`, shared with the composer's own clock, which is why there is no private formatter in `useElapsed`. A probe that drives the card finds its controls by those strings, so re-word one and the phase stops finding a control rather than reporting one wrong — re-point it in the same change, the way `phase-4.mjs` is re-pointed for Settings. `phase-25.mjs` reads NONE of them: nothing in the chat view draws the card, and its gates are an absence and a measured height. `phase-26.mjs`, the Runner tab's probe, is where these words are read. |
 | **There is no logout control** | Nothing in `src/` consumes `AuthContext`'s `logout`, so the harness removes the `auth-token` key the app itself wrote and reloads. No token is forged and no route is bypassed. |
@@ -2057,17 +2057,17 @@ Eight things to know before running one:
 | **`phase-23.mjs` notes that the socket was reopened** | The API restarted mid-probe — a save under `server/` under `tsx watch`, or the dev supervisor handing over — and the probe's chat socket healed through it rather than failing the frame gate on a closed one. A `[NOTE]`, never a failure: the gates after it are worth as much as on a run that carried no such line. The reopen contract is in the phase 23 entry of §"The browser harness". |
 | **The surface probe reads a process that only lives for one turn** | `phase-21.mjs` polls `/proc/<pid>/environ` of the SDK child spawned for its one Claude turn, and that child exists only while the turn is in flight — it is gone by the time a reply is on screen. The poll has to start before the prompt is sent and keep running through it; a reading taken after the reply arrives finds no such pid and proves nothing. |
 | **Three sidebar readings are only as good as this host's data** | "↳ Show N older conversations" is *asserted*, and needs a project whose first page of sessions is not its whole history — a host without one reports a failure where there is an absence. The other two can only be noted: `messageCount` is `0` on every session server-side, so the "N messages" segment never renders, and no plugin is installed here — the registry reads `~/.claude-code-ui/plugins`, not this repo's `plugins/`, and it is empty — so the plugin tabs draw nothing to read. |
-| **Every signed-in page spends a real DeepSeek call, and no `page.route` can reach it** | `AccountFooterRow` mounts in the sidebar on every probe that signs in, and `useDeepseekBalance` reads on mount, every 180 s, and on each panel open — so each run makes the SERVER call `api.deepseek.com` with the host's own key. It is a read that moves nothing and costs no tokens, but it is a third-party origin that the browser-context stubs above do not and cannot cover: the page only ever sees the same-origin `/api/deepseek/balance`. A probe that needs the figure to be a known value — or needs the vendor left alone — fulfils **that path**, never the vendor's. Its contract is at [deepseek-balance.md](deepseek-balance.md). |
-| **Nothing in `all.mjs` measures the DeepSeek balance** | It is the one surface here with no `phase-<n>.mjs`: `phase-13.mjs` predates it and asserts nothing about it, so the figure could vanish from the row and the panel with the standing gate still green — and the shots `13-footer` and `13-popover` would carry the change without a gate reading it. The procedure that does prove it, and the vendor-body table that seeds the missing script, are [deepseek-balance.md](deepseek-balance.md) §"Proving it". |
-| **Nothing in `all.mjs` measures the soul pin either** | The second such surface: the launcher-soul row among the chat's pinned rows was proven once by hand, in headless Chromium against the live client and a REAL `plan-runner soul` launch, and no phase holds it. A probe cannot fake it cheaply, which is why — the row is a JOIN, so it needs BOTH a transcript carrying a `SOUL LAUNCHED` receipt inside a `Bash` **result** whose command segment opens with `plan-runner soul`, AND a matching directory under `~/.claude/state/dispatch-souls/`. `DISPATCH_SOULS_STATE_DIR` looks like the way out and is not: the server reads it once at composition, so pointing it at a fixture tree means restarting the API. Writing a fixture launch dir under the REAL root is the workable path, with phase-23/26's discipline — one clearly-prefixed name, removed in a `finally`, and the launcher's own 14-day sweep behind it. The row carries `data-testid="pinned-soul-row"` with `data-status`, `data-provider` and `data-launch-id`; the hand procedure is [dispatch-souls.md](dispatch-souls.md) §"Proving it". |
-| **Nothing in `all.mjs` measures the DeepSeek Flash switch either** | Two client surfaces read and write it — the Settings row (`RunnerModelContent.tsx`) and the composer's own chip (`ComposerDeepSeekSwitch.tsx`) — sharing one coordinator, `useDeepSeekFlashSwitch`, and no `phase-<n>.mjs` drives either. Proven by hand instead, in headless Chromium against the running dev server signed in as the operator's own account, at viewport widths from 320px to 430px: both surfaces' filled/outlined/unknown positions, the composer chip standing down where its row has no room (with and without the voice button present), and a flip made on one surface reaching the other while both are mounted. Its contract is at [plan-runner.md](plan-runner.md) §"The DeepSeek switch". |
-| **Nor the swarm switch beside it** | One client surface, `RunnerModelContent.tsx`'s second row beneath the DeepSeek one, reads and writes it through its own coordinator, `useSwarmSwitch` — no `phase-<n>.mjs` drives it. Proven by hand instead, against the running dev server signed in as the operator's own account, by two probes. [`probe-swarm-ceiling.mjs`](../.verify/probe-swarm-ceiling.mjs) PRESSES the ceiling control — `−` from `Unlimited` to the first count, `+` up with no upper bound, the row's own `Unlimited` action back to no ceiling, and the same presses with the switch OFF — with every `/api/settings/swarm` request intercepted and answered inside the probe, so the PUT goes nowhere near the operator's flag file and the assertion is on the BODY the page sent (that body's own bytes are read back through the real writer and the real `swarm.read()` separately, which is what the probe's printout names). [`probe-swarm-mark.mjs`](../.verify/probe-swarm-mark.mjs) is the reading probe and covers the mark alone: the swarm mark on both surfaces it appears on (the settings row, and a swarmed run's card beside its lane strip), the two `<svg>` contents compared byte for byte so a second glyph is a FAIL, and the mark's contrast against its own card measured to the 3:1 non-text floor in both themes. Its contract is at [plan-runner.md](plan-runner.md) §"The swarm switch". |
+| **Every signed-in page spends a real DeepSeek call, and no `page.route` can reach it** | `AccountFooterRow` mounts in the sidebar on every probe that signs in, and `useDeepseekBalance` reads on mount, every 180 s, and on each panel open — so each run makes the SERVER call `api.deepseek.com` with the host's own key. It is a read that moves nothing and costs no tokens, but it is a third-party origin that the browser-context stubs above do not and cannot cover: the page only ever sees the same-origin `/api/deepseek/balance`. A probe that needs the figure to be a known value — or needs the vendor left alone — fulfils **that path**, never the vendor's. Its contract is at [docs/MANUAL.md (deepseek-balance)](MANUAL.md). |
+| **Nothing in `all.mjs` measures the DeepSeek balance** | It is the one surface here with no `phase-<n>.mjs`: `phase-13.mjs` predates it and asserts nothing about it, so the figure could vanish from the row and the panel with the standing gate still green — and the shots `13-footer` and `13-popover` would carry the change without a gate reading it. The procedure that does prove it, and the vendor-body table that seeds the missing script, are [docs/MANUAL.md (deepseek-balance)](MANUAL.md) §"Proving it". |
+| **Nothing in `all.mjs` measures the soul pin either** | The second such surface: the launcher-soul row among the chat's pinned rows was proven once by hand, in headless Chromium against the live client and a REAL `plan-runner soul` launch, and no phase holds it. A probe cannot fake it cheaply, which is why — the row is a JOIN, so it needs BOTH a transcript carrying a `SOUL LAUNCHED` receipt inside a `Bash` **result** whose command segment opens with `plan-runner soul`, AND a matching directory under `~/.claude/state/dispatch-souls/`. `DISPATCH_SOULS_STATE_DIR` looks like the way out and is not: the server reads it once at composition, so pointing it at a fixture tree means restarting the API. Writing a fixture launch dir under the REAL root is the workable path, with phase-23/26's discipline — one clearly-prefixed name, removed in a `finally`, and the launcher's own 14-day sweep behind it. The row carries `data-testid="pinned-soul-row"` with `data-status`, `data-provider` and `data-launch-id`; the hand procedure is [docs/MANUAL.md (dispatch-souls)](MANUAL.md) §"Proving it". |
+| **Nothing in `all.mjs` measures the DeepSeek Flash switch either** | Two client surfaces read and write it — the Settings row (`RunnerModelContent.tsx`) and the composer's own chip (`ComposerDeepSeekSwitch.tsx`) — sharing one coordinator, `useDeepSeekFlashSwitch`, and no `phase-<n>.mjs` drives either. Proven by hand instead, in headless Chromium against the running dev server signed in as the operator's own account, at viewport widths from 320px to 430px: both surfaces' filled/outlined/unknown positions, the composer chip standing down where its row has no room (with and without the voice button present), and a flip made on one surface reaching the other while both are mounted. Its contract is at [docs/MANUAL.md (plan-runner)](MANUAL.md) §"The DeepSeek switch". |
+| **Nor the swarm switch beside it** | One client surface, `RunnerModelContent.tsx`'s second row beneath the DeepSeek one, reads and writes it through its own coordinator, `useSwarmSwitch` — no `phase-<n>.mjs` drives it. Proven by hand instead, against the running dev server signed in as the operator's own account, by two probes. [`probe-swarm-ceiling.mjs`](../.verify/probe-swarm-ceiling.mjs) PRESSES the ceiling control — `−` from `Unlimited` to the first count, `+` up with no upper bound, the row's own `Unlimited` action back to no ceiling, and the same presses with the switch OFF — with every `/api/settings/swarm` request intercepted and answered inside the probe, so the PUT goes nowhere near the operator's flag file and the assertion is on the BODY the page sent (that body's own bytes are read back through the real writer and the real `swarm.read()` separately, which is what the probe's printout names). [`probe-swarm-mark.mjs`](../.verify/probe-swarm-mark.mjs) is the reading probe and covers the mark alone: the swarm mark on both surfaces it appears on (the settings row, and a swarmed run's card beside its lane strip), the two `<svg>` contents compared byte for byte so a second glyph is a FAIL, and the mark's contrast against its own card measured to the 3:1 non-text floor in both themes. Its contract is at [docs/MANUAL.md (plan-runner)](MANUAL.md) §"The swarm switch". |
 
 ## Hosted instance
 
 Since 2026-09-06 the dev server the probes drive is a pair of systemd units, not a tmux
 session — `cloudcli-server-dev.service` (:3011 loopback) and `cloudcli-client-dev.service`
-(:5183 on every interface) — see [hosting.md](hosting.md). The ports are unchanged, so every
+(:5183 on every interface) — see [docs/MANUAL.md (hosting)](MANUAL.md). The ports are unchanged, so every
 `phase-*.mjs` runs as before. Two consequences: the app is now the operator's daily instance,
 so a probe run mutates a live session's state (theme, preferences, the login modal, the sealed
 `/git` press) — **run the suite only when nobody is in the app**, and always solo; and a server

@@ -12,7 +12,7 @@ browser web push, the desktop app, and **ntfy** — a phone push through an
 it needs the ntfy app subscribed to your topic.
 
 This page is the one home for the notification system's documentation. How to prove a change to
-it on this box is in [verification.md](verification.md) §"The ntfy probes".
+it on this box is in [docs/MANUAL.md (verification)](MANUAL.md) §"The ntfy probes".
 
 ## Quickstart: your phone, in five minutes
 
@@ -22,7 +22,7 @@ it on this box is in [verification.md](verification.md) §"The ntfy probes".
 2. Give CloudCLI the same topic in **Settings → Notifications → Phone push (ntfy)**: type the
    topic, check the CloudCLI URL the card prefills from the address you are on — it has to be
    the address the *phone* can reach, this host's Tailscale address on port 5183 (see
-   [hosting.md](hosting.md) §"What runs"), not `localhost` — and press Save. Then press **Send
+   [docs/MANUAL.md (hosting)](MANUAL.md) §"What runs"), not `localhost` — and press Save. Then press **Send
    test**; a "CloudCLI test" push on the phone means it works. The card shows the topic back
    only masked, and its token field is blank for "keep the stored one" — typing in it replaces
    the token, emptying it after typing clears it.
@@ -89,7 +89,7 @@ The events raised today:
 | `api.error` | `error` | The Claude runtime, when the assistant reports a request it could not make — after the SDK has spent its retries |
 | `login.expired` | `error` | The Claude runtime, when the credentials rather than the request are the problem |
 | `session.stuck` | `error` | The stall watchdog, when a run still in flight has emitted nothing for the stall threshold — no runtime raises it |
-| `runner.finished` | `stop` | The plan-runner lane, when a plan run ends with every phase shipped — see [plan-runner.md](plan-runner.md) §"Pushes on an ending" |
+| `runner.finished` | `stop` | The plan-runner lane, when a plan run ends with every phase shipped — see [docs/MANUAL.md (plan-runner)](MANUAL.md) §"Pushes on an ending" |
 | `runner.blocked` | `error` | The plan-runner lane, when a plan run ends with phases blocked or left: `all-blocked`, `budget`, `flag-off`, `unreadable`, or a `complete` that left phases |
 | `limit.reached` · `limit.reset` · `limit.warning` · `limit.overage` · `limit.out_of_credits` | `limit` | The Claude runtime, reading the SDK's `rate_limit_event` |
 | `push.enabled` | `info` | The settings service, when a browser saves a push subscription |
@@ -228,8 +228,8 @@ push a watching laptop does not.
 The same store now answers a second, user-agnostic question too — is *any* tab watching this
 session right now, whoever it belongs to — through the sibling `isSessionOnScreen(sessionId)`.
 It is how the sidebar decides not to raise an unread dot for a run that finished while its own
-chat was already open; see [server/modules/providers/README.md](../server/modules/providers/README.md)
-and [server/modules/websocket/README.md](../server/modules/websocket/README.md).
+chat was already open; see [server/modules/providers/MANUAL.md (README)](../server/modules/providers/MANUAL.md)
+and [server/modules/websocket/MANUAL.md (README)](../server/modules/websocket/MANUAL.md).
 
 **Bursts.** Eight codes can arrive in bursts: `api.error`, `run.failed`, `session.stuck`,
 `limit.warning`, `limit.reached`, `limit.overage`, `agent.notification` and `run.stopped`. The
@@ -244,7 +244,7 @@ memory, so a restart forgets an open one.
 
 Questions and plan approvals raise `permission.required` in **every** permission mode, the
 bypassing ones included — see
-[architecture/02-realtime-stream.md](architecture/02-realtime-stream.md) §"Permission requests"
+[docs/architecture/MANUAL.md (02-realtime-stream)](docs/architecture/MANUAL.md (02-realtime-stream)) §"Permission requests"
 for the two callers that ask. That is what makes an unattended run answerable from a phone rather
 than silently auto-answered.
 

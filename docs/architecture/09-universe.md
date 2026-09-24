@@ -9,8 +9,8 @@ resolve onto map stars and reach the canvas over one websocket frame kind, while
 frame kind and over REST. Nothing on the sky is invented — an edit flares its star, an execution sends a comet
 along edges the graph really has, and a quiet estate is a dark sky. **The map's schema has one home**, the
 module docstring of `scripts/universe/build.py` (lines 1-95, the code that writes it); this document points at
-it rather than restating it. See [07-live-widgets.md](./07-live-widgets.md) for the bus a digest rides, and
-[02-realtime-stream.md](./02-realtime-stream.md) for the transport.
+it rather than restating it. See [07-live-widgets.md](docs/architecture/MANUAL.md (07-live-widgets)) for the bus a digest rides, and
+[02-realtime-stream.md](docs/architecture/MANUAL.md (02-realtime-stream)) for the transport.
 
 ## Mental model
 

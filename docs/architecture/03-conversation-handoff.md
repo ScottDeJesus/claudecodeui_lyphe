@@ -11,8 +11,8 @@ So "the handoff" is not about ids at all. It is about ownership, and a conversat
 hands in four places: a draft becomes a persisted row, a live run's frames become a
 transcript on disk, the filesystem watcher's provisional sidebar row is merged into the app
 row, and an edit moves the conversation onto a different provider transcript. The transport
-underneath is [the websocket layer](./01-websocket-transport.md); how frames become
-rendered messages is [the realtime stream](./02-realtime-stream.md).
+underneath is [the websocket layer](docs/architecture/MANUAL.md (01-websocket-transport)); how frames become
+rendered messages is [the realtime stream](docs/architecture/MANUAL.md (02-realtime-stream)).
 
 ## Mental model
 
@@ -37,7 +37,7 @@ rendered messages is [the realtime stream](./02-realtime-stream.md).
    running*. `runDetachedChatTurn` starts a run with no socket at all.
    A run also carries `cliVersion`: the CLI version its own process announced in the SDK's
    init message, stamped at the top of the runtime's message loop on every turn, resumed
-   ones included, and served by `GET /api/cli-version` ([cli-version.md](../cli-version.md)).
+   ones included, and served by `GET /api/cli-version` ([docs/MANUAL.md (cli-version)](../MANUAL.md)).
 5. **The persisted transcript wins; live rows are an overlay.** Every `complete` for the
    viewed session schedules a bounded REST tail refresh, and the overlay is pruned against
    whatever comes back. Predict from this: any live row that is also on disk disappears
@@ -133,8 +133,8 @@ Going the other way — a provider or disk-discovered id in, the app id out — 
 and returns the input unchanged rather than `null` when no row carries it at all. It exists for
 callers outside the sessions service that hold a provider-spelled id and must show it beside an app
 session without ever letting a provider id itself reach the browser: the plan-runner lane's
-`launched_by_session` ([plan-runner.md](../plan-runner.md) §files) and the memory lane's `sessionId`
-([memory-intake.md](../memory-intake.md) §"Where the shapes live").
+`launched_by_session` ([docs/MANUAL.md (plan-runner)](../MANUAL.md) §files) and the memory lane's `sessionId`
+([docs/MANUAL.md (memory-intake)](../MANUAL.md) §"Where the shapes live").
 
 ### What `session_created` used to do
 
@@ -212,7 +212,7 @@ Three details worth pinning:
   `recordProviderSessionId`. The reducer matches it to the optimistic row by alias id,
   updates in place, and refuses to blank a title it already has.
 - **This describes the project tree.** The flat simple chat list is a second front door onto
-  the same `POST /api/providers/sessions` (see [simple-chat-list.md](../simple-chat-list.md))
+  the same `POST /api/providers/sessions` (see [docs/MANUAL.md (simple-chat-list)](../MANUAL.md))
   and has no optimistic row at all: `useSimpleChatList` only reloads once the server's own
   `session_upserted` reaches it, debounced 500 ms.
 
@@ -233,7 +233,7 @@ holds a provider-native id.
 | Re-render | `notify(sessionId)` bumps the tick only when the written session is the active one, so A's background frames cost no renders |
 | Live subscription | The `chat.subscribe` effect in `useChatSessionState.ts` fires for B with B's `lastSeq`. A is never unsubscribed — there is no `chat.unsubscribe` frame, and the only server-side audience state is each run's connection set |
 | History | If B's slot has a `fetchedAt` and the session key matches, nothing is refetched; only `isStale` (`STALE_THRESHOLD_MS = 30_000`) may trigger a bounded tail refresh. Otherwise `fetchFromServer` loads the newest `SESSION_MESSAGES_PAGE_SIZE = 20` rows |
-| Scroll and pagination | Reset in the same load effect and by the scroll effects; see [scrolling](./05-scrolling.md) |
+| Scroll and pagination | Reset in the same load effect and by the scroll effects; see [scrolling](docs/architecture/MANUAL.md (05-scrolling)) |
 | Streaming buffer | `resetStreamingState()` clears `streamTimerRef` and `accumulatedStreamRef`. These are per-`ChatInterface`, not per-slot |
 
 A background run therefore keeps accumulating. Frames for A arrive on the same socket,
@@ -339,7 +339,7 @@ session, at most one trailing request, and a session that cannot refresh right n
 hidden, or no longer the viewed session) stays marked dirty until `flushPending` runs on
 activation. The fetch itself is `refreshLatestSlotFromServer`, which pulls the newest 20 rows
 and stitches them onto the cached suffix, bridging with extra requests for turns bigger than
-one page. See [the message store](./04-message-store-and-lazy-loading.md).
+one page. See [the message store](docs/architecture/MANUAL.md (04-message-store-and-lazy-loading)).
 
 ## Editing an already-sent message
 
@@ -464,7 +464,7 @@ How rows are claimed:
   resolves under `~/.claude/kanban-metis/<boardId>/` is refused before any row is created — it
   belongs to a Metis session the Kanban board's own driver launched and reads by session id
   directly, never through this app's session list. See
-  [providers/README.md](../../server/modules/providers/README.md)'s Claude scan-roots row.
+  [server/modules/providers/MANUAL.md (README)](../../server/modules/providers/MANUAL.md)'s Claude scan-roots row.
 
 `session-synchronizer.service.ts` adds two guarantees beyond indexing. Concurrent callers
 share one scan (opening the UI fires `/api/projects` and `/api/projects/archived` at once),
@@ -521,7 +521,7 @@ transcript — only a new process, which stamps its own `cliVersion` at the top 
 loop. It waits for the `complete` rather than for the busy map because the map is rewritten
 every 5 s from the server's own list, and because a send made while the flag is up is not a
 send at all: `handleSubmit` persists it as a queued draft for the server's 30 s dispatcher to
-pick up. The client half is at [cli-version.md](../cli-version.md).
+pick up. The client half is at [docs/MANUAL.md (cli-version)](../MANUAL.md).
 
 ## Gotchas and why the code looks like this
 
@@ -557,5 +557,5 @@ pick up. The client half is at [cli-version.md](../cli-version.md).
 | `handleChatEditSend` | Both provider shapes — `resolveEditAnchor` for Claude, `rewindSession` for Codex — and that a refused run never rewinds |
 | `session-upsert-broadcast.service.ts` | The sidebar reducer's alias dedupe and empty-summary guard in `useProjectsState.ts`. It is the only builder; keep it that way |
 | The busy map's shape | `useSessionIdSet`'s membership-key memo, which every sidebar mark reads its set through (sidebar re-render cost), and the 5 s running-sessions reconciliation |
-| `useSessionStore` slot fields | [the message store doc](./04-message-store-and-lazy-loading.md), `recomputeMergedIfNeeded`'s reference-equality cache, and the pagination helpers |
+| `useSessionStore` slot fields | [the message store doc](docs/architecture/MANUAL.md (04-message-store-and-lazy-loading)), `recomputeMergedIfNeeded`'s reference-equality cache, and the pagination helpers |
 | Anything that would make a session id mutable | Nothing should need this. A mutable id breaks slots, `lastSeqRef`, the busy map, the run registry key and the URL at once |

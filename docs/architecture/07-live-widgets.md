@@ -21,8 +21,8 @@ are never this app's — and `classifyWidgetBody` is the one place the three are
 one of them is drawn inside the transcript's ordinary shape card, which carries a fullscreen
 switch that hands the frame the whole viewport without reloading it.
 
-Read [the realtime stream](./02-realtime-stream.md) for how a reply arrives, and
-[tool views](./06-tool-view.md) for the other way a block of model output becomes UI.
+Read [the realtime stream](docs/architecture/MANUAL.md (02-realtime-stream)) for how a reply arrives, and
+[tool views](docs/architecture/MANUAL.md (06-tool-view)) for the other way a block of model output becomes UI.
 
 ## Mental model
 
@@ -350,7 +350,7 @@ silence.
 SANDBOX token.** A canvas block's own Full Screen control calls the browser's Fullscreen API from
 inside this document; without the grant the call is refused and `useElementFullscreen` falls back
 to its CSS overlay instead, same as any other host that withholds it
-(`~/.claude/ArchPulse/README.md` §"Embedding one block"). Gate 1 of
+(MAN-238). Gate 1 of
 `.verify/probe-docspace-canvas.mjs` reads `allow` off the rendered element alongside the three
 sandbox tokens, so a change that drops either reddens the same gate.
 
@@ -413,10 +413,10 @@ transcript here, edits it from inside the frame, and watches that edit arrive in
 showing the same block in ArchPulse's own studio — the round trip, rather than either end of it.
 It is the one probe in this repo that needs `archpulse.service` up; the gates it reads, the
 title-prefixed fixture it creates and deletes, and what an ArchPulse restart mid-run looks like are
-in [verification.md](../verification.md) §"The browser harness" and §"What bites people". The other
+in [docs/MANUAL.md (verification)](../MANUAL.md) §"The browser harness" and §"What bites people". The other
 half of this contract — the embed route, the block types that behave differently there, the
 `resize` height being the body's border box rather than the document's `scrollHeight` — is
-`~/.claude/ArchPulse/README.md` §"Embedding one block", which points back here for this half.
+MAN-238, which points back here for this half.
 
 ## The embed kind
 
@@ -465,7 +465,7 @@ video's own control keeps working — a different mechanism from the card's swit
 touches the frame. The same grant reaches a whole ArchPulse page framed here: its canvas blocks
 open in **Read**, pan locked, and the `fullscreen` grant is what lets one of their Full Screen
 controls call the real API rather than fall back to the CSS overlay (§"The DocSpace kind";
-`~/.claude/ArchPulse/README.md` §"Embedding one block" for the block).
+MAN-238 for the block).
 
 **The height is DECLARED, not reported, and it has to be.** A page that never heard of this app
 will never post `resize`, so `useWidgetHost`'s protocol has nothing to say here and the frame would
@@ -606,7 +606,7 @@ gutters' threshold. The switch is a second control, so it
 is a second button beside the header's toggle rather than inside it — a button within a button is
 invalid markup — and the header row therefore holds every control at once: the toggle, the frame's
 switch, and one node the widget itself supplies through `headerAction` (the Subagents widget's
-"Clear completed" is the only one; [06-tool-view.md](06-tool-view.md) §Subagents). Each is a sibling
+"Clear completed" is the only one; [docs/architecture/MANUAL.md (06-tool-view)](MANUAL.md) §Subagents). Each is a sibling
 of the toggle, so a press meant for one of them folds nothing and drags nothing.
 
 A retraction is the one thing that ends fullscreen without the reader: a fence that flashes back to
@@ -619,17 +619,17 @@ same restart the widget itself suffers there, and curing it is `StreamingMarkdow
 publishes synchronously to whoever subscribed. `useWidgetBridge` is the widget module's door onto
 it; `useLiveTopic` is the door for an ordinary React component, and the Runner tab is its first
 caller in the app — the panel and the tab's own gate both read `runner:*` through `useRunnerRuns`
-([plan-runner.md](../plan-runner.md) §"The Runner tab"), never through a fetch of their own.
+([docs/MANUAL.md (plan-runner)](../MANUAL.md) §"The Runner tab"), never through a fetch of their own.
 
 **The bus knows no producer.** It imports no transport, calls no endpoint and names no frame kind.
 What fills it is a FEED — a headless component owned by the module whose data it carries, which
 subscribes to whatever it likes and calls `publish`. The first is `RunnerFeed` in
-`src/modules/plan-runner/`, documented in [plan-runner.md](../plan-runner.md) under *Consumers*.
+`src/modules/plan-runner/`, documented in [docs/MANUAL.md (plan-runner)](../MANUAL.md) under *Consumers*.
 Three more have followed and all three kept the shape: `ArcFeed`, beside `RunnerFeed` in that same
-module, publishes the arc deck's own `arc:*` ([plan-runner.md](../plan-runner.md) §"The arc deck");
-`SoulLaunchFeed` in `src/modules/dispatch-souls/` ([dispatch-souls.md](../dispatch-souls.md)); and
+module, publishes the arc deck's own `arc:*` ([docs/MANUAL.md (plan-runner)](../MANUAL.md) §"The arc deck");
+`SoulLaunchFeed` in `src/modules/dispatch-souls/` ([docs/MANUAL.md (dispatch-souls)](../MANUAL.md)); and
 `UniverseFeed` in `src/modules/universe/`, which publishes a once-a-second digest rather than the raw
-activity stream ([plan-runner.md](../plan-runner.md) §"The feed"). A further lane (git delegation,
+activity stream ([docs/MANUAL.md (plan-runner)](../MANUAL.md) §"The feed"). A further lane (git delegation,
 Task Master) lands the same way — a sibling `*Feed.tsx`, usually in ITS own module, though `ArcFeed`
 is the exception: the arc deck reads the runner's own state directory rather than owning one of its
 own, so its feed never became a second job for `RunnerFeed`. Every feed lands as a component, never
@@ -708,7 +708,7 @@ listeners in the bus for every later publish to walk.
   `ThemeProvider`.** That is why `WidgetFrame` keeps every context read inside `WidgetFrameLive`,
   behind the mount gate, rather than following mermaid's shape exactly. The transcript export
   never mounts `MermaidDiagram`: `CodeFence` draws a mermaid fence's source there instead (see
-  [rendered shapes](./08-rendered-shapes.md) §"Collapse and export").
+  [rendered shapes](docs/architecture/MANUAL.md (08-rendered-shapes)) §"Collapse and export").
 
 ## If you change this, check that
 
