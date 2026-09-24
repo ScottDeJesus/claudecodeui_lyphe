@@ -1,7 +1,10 @@
 import { memo, type KeyboardEvent } from 'react';
+import type { TFunction } from 'i18next';
 import { X } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 import { useElapsed } from '@/shared/hooks/useElapsed';
+import { spendText } from '@/modules/plan-runner';
 import { LLMProviderLogo } from '@/shared/ui';
 import type { SoulLaunchSnapshot } from '@/shared/types';
 import { soulName } from '@/modules/chat/subagents/subagentRow';
@@ -38,15 +41,18 @@ type SoulLaunchPinRowProps = {
 };
 
 /**
- * What the founding cost reads as. Two decimals, the runner card's own spelling (`RunCard.tsx`),
- * so the strip and the Runner tab quote the same figure the same way; the exact charge is on the
- * tooltip for the reader who wants it.
+ * What the founding cost reads as, through the one spelling of it (`plan-runner/spend.ts`): the
+ * PAID figure labelled by the vendor that billed it (`$0.41 DeepSeek`), its tokens beside it, and
+ * NOTHING at all for a soul that rode the operator's Claude subscription — a soul's work on the
+ * subscription is counted in tokens in and out, so a `$0.00` here would be a price that does not
+ * exist. `''` while the launch is still out, which is what the caller draws nothing for.
  */
-function costLabel(costUsd: number | null): string {
-  return costUsd === null ? '' : `$${costUsd.toFixed(2)}`;
+function costLabel(launch: SoulLaunchSnapshot, t: TFunction): string {
+  return spendText(t, launch.cost_usd, launch.tokens_in, launch.tokens_out, launch.tokens);
 }
 
 export const SoulLaunchPinRow = memo(({ launch, onDismiss, onOpen, openLabel }: SoulLaunchPinRowProps) => {
+  const { t } = useTranslation();
   const running = launch.state === 'running';
   // `null` for a finished launch: the hook then holds NO interval at all, so a strip of a dozen
   // ended souls costs nothing per second rather than a dozen timers.
@@ -54,7 +60,11 @@ export const SoulLaunchPinRow = memo(({ launch, onDismiss, onOpen, openLabel }: 
   const finishTime = formatSubagentFinishTime(
     launch.ended_at === null ? null : new Date(launch.ended_at * 1000).toISOString(),
   );
-  const cost = costLabel(launch.cost_usd);
+  const cost = costLabel(launch, t);
+  // The exact books on the tooltip for the reader who wants them: the same figure the row shows,
+  // and how long the soul took. The tokens are IN the figure now, so they are not repeated here.
+  const duration = launch.duration_s === null ? '' : `${Math.round(launch.duration_s)}s`;
+  const detail = [cost, duration].filter(Boolean).join(' · ');
 
   // The row is a button, mouse and keyboard both. A key pressed on the dismiss X inside it bubbles
   // here too; only a key on the row itself opens it, so Enter on the X still dismisses.
@@ -143,11 +153,7 @@ export const SoulLaunchPinRow = memo(({ launch, onDismiss, onOpen, openLabel }: 
             {cost && (
               <span
                 className="ml-auto flex-shrink-0 tabular-nums"
-                title={
-                  launch.cost_usd === null
-                    ? ''
-                    : `${cost} — ${launch.tokens ?? 0} tokens, ${Math.round(launch.duration_s ?? 0)}s`
-                }
+                title={detail}
                 data-testid="pinned-soul-cost"
               >
                 {cost}
@@ -159,7 +165,7 @@ export const SoulLaunchPinRow = memo(({ launch, onDismiss, onOpen, openLabel }: 
           * reader would otherwise have to open the launch directory to learn. */}
         {launch.blocked && (
           <div className="text-[10px] text-amber-700 dark:text-amber-400">
-            DeepSeek refused or never answered — nothing ran on Claude
+            {t('runner.soulBlocked')}
           </div>
         )}
       </div>

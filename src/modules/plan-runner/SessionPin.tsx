@@ -10,7 +10,7 @@ import { Badge } from '@/shared/ui';
  * carries the glance and the badge carries the words. The tone is `info` — which run is the open
  * chat's is news about which ROW this is, never a verdict on the run itself.
  *
- * It stands on its own here because the plan-runner module draws it in two places now: above a run
+ * It stands on its own here because it is drawn in two places now: above a run or a v3 plan
  * in the chat gutter's Runner widget (`RunnerWidgetBody`) and on the plan card of an arc that holds
  * a run this chat launched (`ArcCard`). The memory gutter's own pin (`MemoryWidgetBody`, another
  * module) is still a separate copy, below design doctrine §2's promote-on-the-third rule.

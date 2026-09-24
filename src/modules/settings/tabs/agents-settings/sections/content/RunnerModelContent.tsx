@@ -8,6 +8,7 @@ import { Button, LLMProviderLogo, Stepper } from '@/shared/ui';
 import SettingsRow from '@/modules/settings/SettingsRow';
 import SettingsToggle from '@/modules/settings/SettingsToggle';
 import RunnerHealModelRow from '@/modules/settings/tabs/agents-settings/sections/content/RunnerHealModelRow';
+import RunnerParkAtPeakRow from '@/modules/settings/tabs/agents-settings/sections/content/RunnerParkAtPeakRow';
 
 /**
  * The first stop below `Unlimited` on the ceiling stepper: the smallest ceiling that is a swarm at
@@ -222,6 +223,8 @@ export default function RunnerModelContent() {
           </div>
         )}
       </SettingsRow>
+
+      <RunnerParkAtPeakRow />
 
       {/* THE MASTER OF THE HEAL REFLEX — the one switch on this card that STOPS work rather than
           starting it, and the answer to "theyre running crazy, theres suppose to be a toggle for it

@@ -20,10 +20,19 @@ import { readUserPreference, subscribeToUserPreferences, writeUserPreference } f
  *
  * The write is MERGED into the `planRunner` blob (MAN-498 — a replaced blob
  * drops whatever else lives under the key), capped so the list cannot grow without bound, and
- * pruned to runs still on the lane plus the one being added: a run the lane no longer carries can
+ * pruned WITHIN THE ENDING'S OWN ID-SPACE: an entry the lane handed in can no longer carry will
  * never match anything again, so keeping it would only push a live entry off the cap. The lane
  * handed in is the WHOLE lane, dismissed runs included — pruning against the visible list would
  * drop every earlier dismissal the moment a second was made.
+ *
+ * TWO ID-SPACES, ONE LIST. The runner's run ids are one space and the dispatcher's v3 plans the
+ * other: a plan dismisses into this same list under `v3:<plan name>` (src/modules/dispatcher).
+ * A dismiss site sees one lane or both — the Runner tab's two lists hold both and hand in both,
+ * while an arc card is drawn by the run lane alone — so the prune is scoped to the space its ending
+ * belongs to, and an entry in the other space is left standing. It has to be scoped here: scoping it
+ * at the call sites means an arc card reaching for the plan lane, and the two modules would import
+ * each other. Without the scope, a dismissal made where only one lane is visible dropped the other
+ * lane's entries, and every plan the operator had waved away came back to their screen.
  *
  * `useDismissedEndings` hands React a STABLE array: `useSyncExternalStore` compares snapshots by
  * identity, and a getter that filtered afresh on every call would report a change on every render
@@ -39,6 +48,23 @@ const KEY = 'planRunner' as const;
 
 /** The most endings kept. A day's worth of runs on one box is a handful; a hundred is a bug's worth. */
 const CAP = 100;
+
+/**
+ * The dispatcher lane's own id form for a plan's ending: `v3:<plan name>`. It lives here, in the
+ * store the form is stored in, rather than beside the hook that writes it — the prefix is half of
+ * this list's own address space (`spaceOf`), and a second spelling of it in the plan lane is how the
+ * two lanes would drift apart again.
+ */
+export const DISPATCHER_ENDING_PREFIX = 'v3:';
+
+/**
+ * Which id-space an ending's id belongs to. A run id is minted by the runner from the plan's file
+ * name and a stamp; a plan's ending is the dispatcher's `v3:<name>` (a plan name is a slug, so no
+ * run id can wear that prefix).
+ */
+function spaceOf(id: string): 'dispatcher' | 'runner' {
+  return id.startsWith(DISPATCHER_ENDING_PREFIX) ? 'dispatcher' : 'runner';
+}
 
 const EMPTY: readonly DismissedEnding[] = Object.freeze([]);
 
@@ -79,13 +105,17 @@ export function isDismissed(run: RunnerRunSnapshot, dismissed: readonly Dismisse
 }
 
 /**
- * Dismisses one ending. `onLane` is every run id the lane currently carries — dismissed or not —
- * so the stored list is pruned of runs that will never match again before the new one is appended.
+ * Dismisses one ending. `onLane` is every id the lane the CALLER can see currently carries —
+ * dismissed or not — so the stored list is pruned of what that lane will never match again before
+ * the new one is appended. The prune stops at the ending's own id-space (`spaceOf`): an entry of the
+ * other lane is kept, because the lane handed in cannot speak for it.
  */
 export function dismissRun(ending: DismissedEnding, onLane: readonly string[]): void {
   const keep = new Set(onLane);
+  const space = spaceOf(ending.run_id);
   const next = [
-    ...readDismissedEndings().filter((held) => held.run_id !== ending.run_id && keep.has(held.run_id)),
+    ...readDismissedEndings().filter((held) =>
+      held.run_id !== ending.run_id && (spaceOf(held.run_id) !== space || keep.has(held.run_id))),
     ending,
   ].slice(-CAP);
   // `dismissedRunIds` was this list's first, id-keyed shape; it is dropped rather than carried.

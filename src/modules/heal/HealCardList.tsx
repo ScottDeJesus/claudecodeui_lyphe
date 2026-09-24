@@ -9,10 +9,10 @@ import {
   fileName,
   statusTone,
   statusWord,
-  usd,
 } from '@/modules/heal/healState';
 import { bookedBy } from '@/modules/heal/healTypes';
 import type { HealCard, HealQueueItem } from '@/modules/heal/healTypes';
+import { spendText } from '@/modules/plan-runner';
 import { Badge, Button, Card, CardContent, CardFooter, CardHeader, CardTitle, Chip, EmptyState } from '@/shared/ui';
 
 /** How many claimed shapes a card NAMES before the rest are counted. A card is a summary and one heal
@@ -128,7 +128,7 @@ function costTitle(heal: HealCard, t: ReturnType<typeof useTranslation>['t']): s
   if (booked === 'chain-total') {
     return t('heal.cards.costTitleOld', { defaultValue: 'Booked before 2026-09-23, when a heal booked its chain’s WHOLE bill: the Claude stages in this number were your subscription, not DeepSeek — though the daily cap counts them as DeepSeek all the same' });
   }
-  return t('heal.cards.costTitle', { defaultValue: 'DeepSeek’s share of this heal — what the daily cap counts, never the chain’s whole bill' });
+  return t('heal.cards.costTitle', { defaultValue: 'DeepSeek’s share of this heal — what the daily cap counts, never the chain’s whole bill. The tokens beside it are the whole chain’s, Claude stages included.' });
 }
 
 function HealCardView({ heal, onOpenChain }: { heal: HealCard; onOpenChain: (heal: HealCard) => void }) {
@@ -169,8 +169,12 @@ function HealCardView({ heal, onOpenChain }: { heal: HealCard; onOpenChain: (hea
               the daily cap counts, and not the chain's own total (a stage that rode Claude is the
               operator's subscription). WHICH OF THOSE THIS NUMBER IS DEPENDS ON WHEN THE HEAL ENDED,
               and the title says whose it is — the rows already on screen were booked before the recipe
-              changed and carry their chains' whole bills. */}
-          <span className="ml-auto font-mono text-muted-foreground" title={costTitle(heal, t)}>{usd(heal.cost_usd)}</span>
+              changed and carry their chains' whole bills. A heal that rode Claude alone bills 0 there,
+              and the cell then reads its TOKENS instead of a `$0.00` (`spendText`, the one spelling the
+              run cards use) — an empty cell when the worker recorded neither. */}
+          <span className="ml-auto font-mono text-muted-foreground" title={costTitle(heal, t)}>
+            {spendText(t, heal.cost_usd, heal.tokens_in, heal.tokens_out, heal.tokens)}
+          </span>
         </div>
         <div className="flex min-w-0 flex-wrap items-center gap-1.5 text-xs">
           <span className="text-muted-foreground">{t('heal.cards.shapes', { defaultValue: 'Shapes claimed:' })}</span>

@@ -46,8 +46,17 @@ export type RunnerEndingMeta = {
    * STOPPED and resumed keeps its original start, so a pause counts and a park does not.
    */
   durationMs: number;
-  /** The plan's spend over every run of it — the counter the operator asked never to reset. */
+  /**
+   * The plan's PAID spend over every run of it (`plan_total_usd`: its runs' build share plus the
+   * ledger's planning/review/scouts rows) — the counter the operator asked never to reset, and 0
+   * on a plan that rode the operator's Claude subscription, whose `tokens*` below are then the
+   * whole of what it spent. The copy draws `$` only when this is > 0.
+   */
   costUsd: number;
+  /** The same plan's tokens, all of them, and the split beside it — what the copy says instead of `$0.00`. */
+  tokens: number;
+  tokensIn: number;
+  tokensOut: number;
 };
 
 export type RunnerEnding = {
@@ -123,7 +132,12 @@ function endingOf(run: RunnerRunSnapshot & { ended_at: number }): RunnerEnding {
       blockCause: blocked[0]?.cause || null,
       doorsSpent: run.doors_spent,
       durationMs: Math.max(0, (run.ended_at - run.started_at) * 1000),
-      costUsd: run.plan_cost_usd,
+      // The PLAN's total, not this run's build share: the copy reads "on this plan", and the plan's
+      // other runs and the planner's own outing are part of what it spent (`withPlanTotals`).
+      costUsd: run.plan_total_usd,
+      tokens: run.plan_tokens,
+      tokensIn: run.plan_tokens_in,
+      tokensOut: run.plan_tokens_out,
     },
   };
 }

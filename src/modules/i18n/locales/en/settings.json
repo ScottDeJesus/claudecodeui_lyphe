@@ -401,6 +401,11 @@
       "descriptionDeepseek": "Pinned to DeepSeek Flash. These heals count against the daily cap on the Heal tab, and park until midnight once it is reached. It steers the heal reflex’s souls only: the chat composer’s Flash switch is a different file and never moves with it. Press the chip to send them to Claude instead.",
       "descriptionUnknown": "Which model this heal’s souls run on could not be read — the reflex’s summary is not in hand. Press Try again to ask for it."
     },
+    "runnerParkAtPeak": {
+      "label": "Park new plans at DeepSeek peak hours",
+      "description": "An Accept during DeepSeek’s peak window (01:00–04:00 and 06:00–10:00 UTC, weekdays) queues the plan and starts it when the window lifts. Off: Accept walks now.",
+      "unreadable": "The switch could not be read from the server, so its position is unknown — this is not the same as off. It is retried whenever this page regains focus."
+    },
     "jev": {
       "master": {
         "label": "Jev semantic judgment",

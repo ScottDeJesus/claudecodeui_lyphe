@@ -1,6 +1,6 @@
 import type { DispatcherEvent, DispatcherPhase, DispatcherPlan, DispatcherStage } from '@/shared/types.js';
 
-import { each, field, isCount, isCountOrNull, isFlag, isRecord, isText, isTextOrNull, names, need, oneOf } from './dispatcher-state.transport.js';
+import { each, countSince, field, isCount, isCountOrNull, isFlag, isRecord, isText, isTextOrNull, names, need, oneOf } from './dispatcher-state.transport.js';
 
 /**
  * One plan of the dispatcher's document, read field by field into the types the card draws.
@@ -67,6 +67,12 @@ function stageOf(raw: unknown): DispatcherStage {
     output_path: need(field(stage, 'output_path'), isTextOrNull, 'stage.output_path'),
     verdict: need(field(stage, 'verdict'), isTextOrNull, 'stage.verdict'),
     cost_usd: need(field(stage, 'cost_usd'), isCount, 'stage.cost_usd'),
+    // The stage's tokens, read at the dispatcher's own report time off the launch's `result.json`
+    // (`report._usage_of` — the store holds no token column and is not getting one). Absent from a
+    // build older than the fields, which is what `countSince` is for.
+    tokens: countSince(field(stage, 'tokens'), 'stage.tokens'),
+    tokens_in: countSince(field(stage, 'tokens_in'), 'stage.tokens_in'),
+    tokens_out: countSince(field(stage, 'tokens_out'), 'stage.tokens_out'),
   };
 }
 
@@ -89,6 +95,9 @@ function phaseOf(raw: unknown): DispatcherPhase {
     busy: need(field(phase, 'busy'), isFlag, 'phase.busy'),
     rounds: need(field(phase, 'rounds'), isCount, 'phase.rounds'),
     cost_usd: need(field(phase, 'cost_usd'), isCount, 'phase.cost_usd'),
+    tokens: countSince(field(phase, 'tokens'), 'phase.tokens'),
+    tokens_in: countSince(field(phase, 'tokens_in'), 'phase.tokens_in'),
+    tokens_out: countSince(field(phase, 'tokens_out'), 'phase.tokens_out'),
     start_here: names(field(phase, 'start_here'), 'phase.start_here'),
     stages: each(field(phase, 'stages'), 'phase.stages', stageOf),
   };
@@ -129,6 +138,12 @@ export function planOf(raw: unknown): DocumentPlan {
     waits_on: names(field(plan, 'waits_on'), 'plan.waits_on'),
     schedule: scheduleOf(field(plan, 'schedule')),
     cost_usd: need(field(plan, 'cost_usd'), isCount, 'plan.cost_usd'),
+    // PAID dollars at `cost_usd`; the plan's tokens beside it, summed by `report.plan_dict` off the
+    // phases' launches. A plan that rode the operator's Claude subscription is 0.00 there and these
+    // three are the whole of what it spent — which is what the card draws instead of a `$`.
+    tokens: countSince(field(plan, 'tokens'), 'plan.tokens'),
+    tokens_in: countSince(field(plan, 'tokens_in'), 'plan.tokens_in'),
+    tokens_out: countSince(field(plan, 'tokens_out'), 'plan.tokens_out'),
     rounds: need(field(plan, 'rounds'), isCount, 'plan.rounds'),
     phases: each(field(plan, 'phases'), 'plan.phases', phaseOf),
     events: each(field(plan, 'events'), 'plan.events', eventOf),

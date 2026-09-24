@@ -140,13 +140,21 @@ function readCached(filePath: string, parse: (raw: string) => unknown): unknown 
  * kind's source and `tally` already folds them. Operator, 2026-09-12: "add the planning and
  * architecture into the plan cost as well … I'd like to see totals" — a "$93 run" had cost a third
  * of the weekly budget once the planner, his scouts and the review were counted.
+ *
+ * `planning`/`review`/`scouts` are PAID dollars (Claude rows price at 0 — `costs.PRICES` holds
+ * vendor models only), and `tokens`/`tokensIn`/`tokensOut` are the same rows' whole cost: a planner
+ * or a review that rode the operator's subscription is counted here alone (operator rule,
+ * 2026-09-24).
  */
-export type PlanLedger = { planning: number; review: number; scouts: number; tokens: number };
+export type PlanLedger = {
+  planning: number; review: number; scouts: number;
+  tokens: number; tokensIn: number; tokensOut: number;
+};
 
 const PLAN_COST_DIR = path.join(os.homedir(), '.claude', 'state', 'plan_costs');
 
 export function readPlanLedger(planPath: string): PlanLedger {
-  const out: PlanLedger = { planning: 0, review: 0, scouts: 0, tokens: 0 };
+  const out: PlanLedger = { planning: 0, review: 0, scouts: 0, tokens: 0, tokensIn: 0, tokensOut: 0 };
   const base = path.basename(planPath);
   // `costs.slug` + `costs._path`: the `.md` off, then only [A-Za-z0-9._-], at most 120 chars.
   const slug = (base.toLowerCase().endsWith('.md') ? base.slice(0, -3) : base).replace(/[^A-Za-z0-9._-]/g, '').slice(0, 120);
@@ -156,14 +164,65 @@ export function readPlanLedger(planPath: string): PlanLedger {
   for (const row of rows) {
     if (row === null || typeof row !== 'object') continue;
     const kind = (row as Record<string, unknown>).kind;
-    const cost = Number((row as Record<string, unknown>).cost_usd);
     if (kind !== 'planning' && kind !== 'review' && kind !== 'scouts') continue;
-    if (Number.isFinite(cost) && cost > 0) out[kind] += cost;
+    const cost = rowPaidUsd(row as Record<string, unknown>);
+    if (cost > 0) out[kind] += cost;
     // Every token billed on the outing (in + out + cache read + cache write) — the "⛁ tok" unit.
     const tokens = Number((row as Record<string, unknown>).tokens);
     if (Number.isFinite(tokens) && tokens > 0) out.tokens += tokens;
+    // The same tally split, when the row carries it (`costs.record_subagent`): `in` is what the
+    // outing READ (input + cache read + cache write), `out` what it wrote. A row written before
+    // the split shipped contributes its total alone — the sum is never wrong, only less detailed.
+    for (const [key, into] of [['tokens_in', 'tokensIn'], ['tokens_out', 'tokensOut']] as const) {
+      const part = Number((row as Record<string, unknown>)[key]);
+      if (Number.isFinite(part) && part > 0) out[into] += part;
+    }
   }
   return out;
+}
+
+/** The vendor prefix a card is billed for — `costs.PAID_MODELS`' models, which are DeepSeek's. */
+const PAID_MODEL_PREFIX = 'deepseek';
+
+/** The keys of a record field that may be a name→count map, `[]` for anything else. */
+function mapKeys(value: unknown): string[] {
+  return value !== null && typeof value === 'object' && !Array.isArray(value)
+    ? Object.keys(value as Record<string, unknown>)
+    : [];
+}
+
+/**
+ * One ledger ROW's paid dollars — `costs.row_paid_usd`, ported, and the same answer it gives.
+ *
+ * A row's models NAME what billed it, so where they do the answer is derived rather than trusted:
+ * a row whose every model is Claude reads 0 whatever dollar figure it stored. That is what makes an
+ * OLD row honest without a backfill — the `planning`/`review` rows written before the operator's
+ * 2026-09-24 ruling carry a Claude outing's dollars in `cost_usd`, and the row's own `by_model` keys
+ * (or a scout wave's `models` counts) are what say so. A row that names no model at all is the one
+ * shape with nothing to go on, and it keeps its stored figure: this is a reader, not a re-pricer.
+ */
+export function rowPaidUsd(row: Record<string, unknown>): number {
+  const named = [...mapKeys(row.by_model), ...mapKeys(row.models)].map((word) => word.toLowerCase());
+  if (named.length > 0 && !named.some((word) => word.startsWith(PAID_MODEL_PREFIX))) return 0;
+  const cost = Number(row.cost_usd);
+  return Number.isFinite(cost) && cost > 0 ? cost : 0;
+}
+
+/**
+ * Whether a RECEIPT says every phase of its run rode the operator's Claude subscription —
+ * `costs._scan_runs`' own test, ported: a `providers` map that is present and names no vendor.
+ *
+ * A run's stored `cost_usd` was booked by the runner as it walked, so an OLD receipt's figure is
+ * the CLI's own self-report and counts the subscription as money. Where the map is there, the
+ * record says so itself and the figure reads 0; a receipt with no map, or one naming a vendor, keeps
+ * what it stored — this lane never re-prices.
+ */
+export function receiptRidesClaude(receipt: unknown): boolean {
+  const providers = (receipt as Record<string, unknown> | null)?.providers;
+  const words = providers !== null && typeof providers === 'object' && !Array.isArray(providers)
+    ? Object.values(providers as Record<string, unknown>).map((word) => String(word ?? ''))
+    : [];
+  return words.length > 0 && words.every((word) => word === '' || word === 'claude');
 }
 
 /** A JSON array, or `null` for anything else. */

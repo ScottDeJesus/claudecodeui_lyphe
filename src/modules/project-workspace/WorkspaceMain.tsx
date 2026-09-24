@@ -11,7 +11,7 @@ import { BrowserUsePanel } from '@/modules/browser-use';
 import { usePaletteOpsRegister } from '@/modules/command-palette';
 import { KanbanPanel } from '@/modules/kanban';
 import { MemoryIntakePanel } from '@/modules/memory-intake';
-import { RunnerPanel } from '@/modules/plan-runner';
+import { RunnerPanel } from '@/modules/runner-tab';
 import { HealPanel } from '@/modules/heal';
 import { ApiPanel } from '@/modules/api-tab';
 import { TaskMasterPanel, useTaskMasterProjectSync } from '@/modules/task-master';

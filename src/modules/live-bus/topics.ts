@@ -30,6 +30,11 @@ export const LIVE_TOPIC_ALLOWLIST: readonly RegExp[] = [
   // reader is the pin above the composer, which wants the whole picture, and a topic nothing
   // subscribes to is a topic with no way to tell it has gone stale.
   /^souls:\*$/,
+  // Every plan the dispatcher lane can see, as one array — the v3 plan cards' whole picture. The
+  // plan-runner's sibling lane, and a single-array topic for the same reason `arc:*` is: the
+  // dispatcher has one picture of the whole store, and a topic nothing subscribes to is a topic
+  // with no way to tell it has gone stale.
+  /^dispatcher:all$/,
   // The estate's activity as one DIGEST — how many edits and executions the last window carried and
   // when the newest one landed. A digest and never the raw rows: the estate's stream is coalesced
   // and flushed up to ten times a second, and this bus retains one value per topic and compares
@@ -50,6 +55,12 @@ export function isAllowedTopic(topic: unknown): topic is string {
 export const RUNNER_ALL_TOPIC = 'runner:*';
 /** The topic carrying every arc the runner is walking — the deck's one array. One spelling, so the deck's feed and its reader cannot drift. */
 export const ARC_ALL_TOPIC = 'arc:*';
+
+/**
+ * The topic carrying every v3 plan on the dispatcher's lane — the whole picture, as one array.
+ * Published by `DispatcherFeed`, read by the plan cards and by whatever counts them.
+ */
+export const DISPATCHER_ALL_TOPIC = 'dispatcher:all';
 
 /** The topic carrying every launcher soul the lane can see, running and recently ended alike. */
 export const SOULS_ALL_TOPIC = 'souls:*';

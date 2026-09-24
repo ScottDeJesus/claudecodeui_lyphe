@@ -1,3 +1,5 @@
+import { humanizeTokens } from '@/shared/utils.js';
+
 /**
  * The wording of every notification CloudCLI sends.
  *
@@ -109,6 +111,27 @@ function resetsAtText(resetsAt: unknown, rateLimitType: unknown): string {
   const today = date.toDateString() === new Date().toDateString();
   const weekly = typeof rateLimitType === 'string' && WEEK_WINDOWS.has(rateLimitType);
   return weekly || !today ? `${date.toLocaleDateString('en-US', { weekday: 'short' })} ${time}` : time;
+}
+
+/**
+ * What a plan cost, in the one sentence every spending push uses.
+ *
+ * PAID DOLLARS ONLY, LABELLED BY THE VENDOR THAT BILLED THEM: `$6.29 DeepSeek on this plan`. Claude
+ * work is counted in tokens in and out and never in dollars (operator rule, 2026-09-24 — the
+ * subscription is not a bill), so a plan that rode it has no `$` figure at all and this says its
+ * TOKENS instead: `216M in · 4M out on this plan`. `$0.00` is the one thing it must never say.
+ *
+ * `null` when neither figure was recorded — a plan with nothing to report says nothing, which is
+ * why the callers put this in a list they filter.
+ */
+function spendText(meta: Record<string, unknown>, suffix = ''): string | null {
+  const cost = readNumber(meta.costUsd);
+  if (cost !== null && cost > 0) return `$${cost.toFixed(2)} DeepSeek${suffix}`;
+  const read = readNumber(meta.tokensIn) ?? 0;
+  const written = readNumber(meta.tokensOut) ?? 0;
+  if (read + written > 0) return `${humanizeTokens(read)} in · ${humanizeTokens(written)} out${suffix}`;
+  const total = readNumber(meta.tokens) ?? 0;
+  return total > 0 ? `${humanizeTokens(total)} tokens${suffix}` : null;
 }
 
 /** `45s`, `3m 12s`, `1h 5m` — the precision a person reads at a glance. */
@@ -289,7 +312,6 @@ const COPY_BY_CODE = new Map<string, CodeCopy>([
   ['limit.out_of_credits', () => ({ headline: 'Out of credits', body: 'Overage is disabled: out of credits' })],
   ['runner.finished', ({ meta }) => {
     const durationMs = readNumber(meta.durationMs);
-    const cost = readNumber(meta.costUsd);
     return {
       headline: 'Plan finished',
       body: [
@@ -297,7 +319,7 @@ const COPY_BY_CODE = new Map<string, CodeCopy>([
         // "since start" is the WALK: a parked run is stamped by its Start press,
         // while a stopped-then-resumed one keeps its first start.
         durationMs && durationMs > 0 ? `${humanDuration(durationMs)} since start` : null,
-        cost === null ? null : `$${cost.toFixed(2)} on this plan`,
+        spendText(meta, ' on this plan'),
       ].filter((part): part is string => part !== null).join(' · '),
     };
   }],
@@ -360,12 +382,11 @@ const COPY_BY_CODE = new Map<string, CodeCopy>([
    * least obvious part: the plan is not retried by anything, it is resumed.
    */
   ['dispatcher.finished', ({ meta }) => {
-    const cost = readNumber(meta.costUsd);
     return {
       headline: 'Plan finished',
       body: [
         dispatcherPhaseText(meta),
-        cost === null ? null : `$${cost.toFixed(2)}`,
+        spendText(meta),
       ].filter((part): part is string => part !== null).join(' · '),
     };
   }],

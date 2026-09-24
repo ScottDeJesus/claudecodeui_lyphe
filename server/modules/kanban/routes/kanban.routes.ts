@@ -13,7 +13,6 @@ import { createAttachmentRoutes } from './attachment.routes.js';
 import { createBoardRoutes } from './board.routes.js';
 import type { KanbanMemoryPendingReader } from './board.routes.js';
 import * as cardRoutes from './card.routes.js';
-import type { KanbanPlanCostReader } from './card.routes.js';
 import * as detailRoutes from './detail.routes.js';
 import { createLearningRoutes } from './learning.routes.js';
 
@@ -32,12 +31,10 @@ export type KanbanServices = {
   attachments: KanbanAttachmentsService;
   leases: KanbanLeasesService;
   lessons: KanbanLessonsService;
-  // The two READINGS the board cannot take for itself, handed in by the composition root rather
-  // than imported: a card's plan cost lives in the plan-runner's ledgers and the estate's pending
-  // memories live in the memory-intake lane's table, and this module imports neither. Each route
-  // factory declares the one it uses (`board.routes.ts`, `card.routes.ts`); they ride here
+  // The one READING the board cannot take for itself, handed in by the composition root rather
+  // than imported: the estate's pending memories live in the memory-intake lane's table, and this
+  // module does not import it. `board.routes.ts` declares the shape it uses; it rides here
   // because this bag is what the module hands every factory.
-  planCost: KanbanPlanCostReader;
   memoryPending: KanbanMemoryPendingReader;
 };
 

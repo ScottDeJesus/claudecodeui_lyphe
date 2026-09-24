@@ -2206,7 +2206,7 @@ what a launch MEANS.
 | File | What this lane takes from it |
 |---|---|
 | `spec.json` | `started_at`, `role`, `agent`, `brief_path`, and `provider` — the switch's reading at launch time. **No spec, or no `started_at`, and the directory is not a launch**: it draws nothing rather than a phantom. |
-| `result.json` | Its ABSENCE is how "still out" is spelled. Present: `status`, `ended_at`, `duration_s`, `cost_usd`, `tokens`, `cause`, `provider`, `provider_blocked` — and `session_id`, the Claude session the transcript read follows, once the soul has ended. |
+| `result.json` | Its ABSENCE is how "still out" is spelled. Present: `status`, `ended_at`, `duration_s`, `cost_usd` (PAID dollars — read as 0 where `provider` names Claude, `receiptCostUsd`, INV-4299), `tokens`, `tokens_in`, `tokens_out` (null on a receipt written before the split), `cause`, `provider`, `provider_blocked` — and `session_id`, the Claude session the transcript read follows, once the soul has ended. |
 | `child.log` | The transcript read ONLY: its first `session_id`, when `result.json` has none yet, is handed to the providers module (`readClaudeTranscriptBySessionId`), which `GET /api/dispatch-souls/launches/:launchId/transcript` serves to the chat's Subagents widget. Nothing else in it is parsed. |
 | `launcher.pid` / `child.pid` | Liveness, proved through `/proc/<pid>/cmdline` against a needle (`soul-run`, `claude`) — a pid is reused, so the number alone proves nothing. |
 | `brief.md` (via `spec.json`'s `brief_path`) | ONE line: the task, for the pin's second row. |
@@ -2343,7 +2343,7 @@ viewed session's id, and is appended to the open transcript as a message row.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts
 
-## MAN-534 — The mechanism it shares with the plan runner, the arc deck and a board's Metis
+## MAN-534 — The mechanism it shares with the other state lanes
 section: dispatch-souls/011 The mechanism it shares with the plan runner, the arc deck and a board's Metis
 
 The poll itself is not this lane's. `server/shared/polled-lane.service.ts` (`createPolledLane`) is
@@ -2465,7 +2465,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/architecture/MANUAL.md, /ho
 ## MAN-1498 — The v3 dispatcher lane
 section: dispatcher/000
 
-The fourth polled lane on this server, mounted beside the plan-runner's: seven routes under
+The fifth polled lane on this server, mounted beside the plan-runner's: eight routes under
 `/api/dispatcher`, behind `authenticateToken` in `server/index.ts`, wired in `dispatcher.module.ts`,
 plus one websocket frame pushed to every open `/ws` socket whenever the picture changes — `kind:
 'dispatcher_state'` — and one notification for each plan ending.
@@ -2534,11 +2534,95 @@ announces nothing; every later observation announces the events past the mark ol
 the mark after each push, so a throw leaves the rest due. `meta` carries the plan's name with its
 `.v3`, `phases`/`done`, `costUsd`, the event's phase KEY or `null` (INV-183) and the event's own
 `detail`; `key` is `<name>:<event id>` and `dedupeKey` is `dispatcher:<userId>:<key>` — every active
-user is told, and one user's failure costs only that user's push (the run lane's rule at
-`plan-runner.module.ts:225`, mirrored). The wording of those three codes, and the two ntfy branches
+user is told, and one user's failure costs only that user's push (the run lane's rule in
+`plan-runner.module.ts`'s `createRunnerEndingsNotifier` wiring, mirrored). The wording of those three codes, and the two ntfy branches
 they join, live in `notification-copy.service.ts` and `ntfy-channel.service.ts` beside the runner's.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/
+
+## MAN-1557 — The v3 plan card
+section: dispatcher/010 The v3 plan card
+
+`PlanCard` draws one v3 plan the dispatcher carries — `RunCard`'s own composition over the dispatcher's
+document (operator, 2026-09-24: "it can be identical to our existing cards, it'll just have a dispatch v1
+pill label on it"). Nothing on it is invented. It is drawn in the Runner tab's list (open) and in the chat
+gutter's Runner widget (folded, the open chat's plans first with `SessionPin`), both in
+`src/modules/runner-tab` (§"The Runner tab" of the plan-runner section).
+
+**The frame.** `Card` with `data-dispatcher-card`, `data-plan-name` and `data-plan-status` on the ROOT (a
+probe scopes every reading and every press to ONE plan — the live plan walking beside it must never be
+pressed); `CardTitle` mono = `plan.v3`; the goal's FIRST non-empty line, clamped to three lines; then the
+PILL — a static `Chip size="sm"` reading `dispatcher.pill` (`dispatch v1`), wrapped in a
+`span[data-dispatcher-pill]` because the house `Chip` forwards no data attributes — then `PlanStatusBadge`
+and `PlanClock`. Body `PlanFace`, footer `PlanControls`. Props `{ plan, defaultOpen, onDismiss? }`.
+
+**The status words.** `dispatcher.status.*` — `LIVE`, `PAUSED`, `QUEUED`, `SCHEDULED`, `PARKED`, `IDLE`,
+`COMPLETE` — toned by `planStatusTone` (`live`, `complete` positive; the rest neutral: every other status
+is one the operator chose or is waiting on). `PlanClock`: live → elapsed since the newest `launched` /
+`relaunched` event; complete → `ended <elapsed> ago` off `completed_at`, re-read once a minute; scheduled
+→ `starts <time>` (`runner.schedule.starts`, `scheduleClock` of the armed hour); queued, paused, parked
+and idle → nothing.
+
+**The face.** A `Meter` (accent) of done phases over all (`phaseProgress`), its sub-line `<spend> ·
+<rounds> rounds · <route.word>`, `<spend>` being `spendText` (`src/modules/plan-runner/spend.ts`, INV-4299): `$0.41 DeepSeek` only where a paying API billed the plan, then its tokens (`1.2M in · 48k out`) — a Claude plan shows tokens and no `$`, never `$0.00`; — the route is the BOX's posture (`deepseek route, swarm on — all at
+once`), and it explains a plan sitting still under `one at a time`. A `Collapsible` (`defaultOpen`) of
+`PlanPhaseRow`s: glyph (`PHASE_GLYPH` ✅ ▶ ·), position, title, a word — `running` (info) only while the
+phase is `running` AND `busy`; `running` and not busy is a walk that ended and is not yet settled, drawn
+`settling` in neutral; `done`; `not started` — then `n rounds · <spend>` (the phase's own, the same rule; a phase not yet walked has none and the field is dropped) and the assignee in mono; folded
+beneath, one line per stage: launch time, name, soul, verdict, the stage's `<spend>`.
+
+**The event feed.** A second `Collapsible`, folded, headed `dispatcher.events` (`45 events`): the LAST 30
+events newest first, one mono line each — the ISO's time part (`clockOf`, `18:28:17Z`: the `Z` stays, the
+store's clock is UTC), `kind`, the phase key, `detail`. It is where a relaunch, a settle or a held take-up
+is read in the dispatcher's own words. Handle: `data-dispatcher-events` on the group,
+`data-dispatcher-event=<kind>` on each line.
+
+**The controls by status.** `live` → Stop; `paused` → Resume; `queued` → Start (it IS `resume`) and
+`ScheduleControl` scope `plan` (`Start at …`, a one-shot systemd timer that sends Resume at that hour;
+title `dispatcher.scheduleTitle`); `scheduled` → Start and Cancel (the control with `startAt =
+epochOf(schedule.start_at)`); `parked` → Unpark; `idle` in state `designed` or `questions` → Park (the way
+out of the designed Stop hold); `complete` → Dismiss when the list offers one; any other `idle` →
+nothing. No model control: the route is the box's switch, never a plan's. Every verb goes through
+`useDispatcherVerbs(name, resumeWord)` under one `busy`; a refusal toasts the dispatcher's own first
+line. Handles: `data-dispatcher-stop|resume|start|park|unpark|dismiss`, `data-dispatcher-schedule`
+(`-set`, `-cancel`). The button words Stop, Resume, Start, Dismiss are `runner.*`; Park and Unpark are
+`dispatcher.park` / `dispatcher.unpark`.
+
+**The dismissal ids.** A complete plan is dismissed into the SAME per-user list as the runs
+(`dismissedRuns.ts`, `planRunner` preference key): id `DISPATCHER_ENDING_PREFIX` + name (`v3:<name>`),
+ending `epochOf(completed_at)`. `dismissRun` prunes the stored list only WITHIN the ending's own id-space
+(`spaceOf`: a `v3:` id is the plan lane's, any other id the run lane's) and leaves the other space's
+entries standing, so a dismiss site hands in the lane it can see and nothing more: the plan card passes
+`carriedNames`, a run card `carriedIds`. `carriedNames` is the UNFILTERED lane (dismissed plans included),
+or the prune would drop every earlier dismissal. The prefix is exported by the store through the
+`plan-runner` barrel and read by `useDispatcherPlans`; a further lane that dismisses into this list adds
+its prefix to `spaceOf`, one function. A plan that completes again has a new `completed_at`
+and returns as a new card.
+
+**The feed.** `DispatcherFeed` (mounted in `App` directly inside `RunnerFeed`) is the only client code that
+names the `dispatcher_state` frame. Two ways in: the push (every frame, authoritative) and a seed from
+`GET /api/dispatcher/plans` on mount and on each `websocket_reconnected`, which never overwrites a reading
+newer than itself (`held.at >= at`). A frame or body missing `plans`, `route`, `daemon` or a string
+`offpeak_at` is dropped, never half-published. The bus topic is `dispatcher:all` (`DISPATCHER_ALL_TOPIC`),
+one payload `{ plans, route, daemon, offpeak_at }` (`DispatcherLanePicture`) with the frame's `at` as its
+clock; no per-plan topic exists. `home` and `generated_at` are left out on purpose: `generated_at` is
+restamped every poll, so republishing the frame whole wakes every reader twice a second (2026-09-24: the four
+keys byte-identical across two reads 4 s apart, zero publishes). `useDispatcherPlans` reads that topic —
+`{ plans, count, route, daemon, offpeakAt, carriedNames }` — and every piece of the card reads the hook or
+`dispatcherState.ts`. The document's times are ISO-8601 UTC strings end to end: the server converts
+nothing, and `epochOf` (`Date.parse / 1000`) is the ONE edge where a string becomes the card's seconds.
+
+**The verbs' door.** `api.dispatcher` (`src/shared/api.ts`): `plans()`, `plan(name)`, `offpeak()`,
+`stop|resume|park|unpark(name)`, `schedule(name, when)` over `/api/dispatcher/plans…`. The verbs return the
+raw `Response`: a refusal is a RESULT on a 409 with the dispatcher's line on `stdout`, which
+`useDispatcherVerbs` reads before `stderr`. `api.dispatcher` never throws on `!response.ok`.
+
+Every string the card draws — a goal, a title, a verdict, an event detail, the dispatcher's stdout —
+reaches the DOM as a text node. Proven on the live dev app 2026-09-24: `dispatcher-ready.v3` drawn LIVE
+with its fourteen phases and 45 events; `card-probe.v3` pressed Park (toast `PARKED card-probe.v3`),
+Unpark (`UNPARKED card-probe.v3 — designed`) and Park again, and left parked.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/plan-runner/dismissedRuns.ts
 
 ## MAN-539 — The file manager
 section: file-manager/000
@@ -3739,7 +3823,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/MANUAL.md, /home/lyphe/.cla
 section: kanban/006 The routes
 
 `server/modules/kanban/routes/` is a PACKAGE, not one file: `board.routes.ts` (9 routes),
-`card.routes.ts` (10), `detail.routes.ts` (14), `learning.routes.ts` (5,
+`card.routes.ts` (9), `detail.routes.ts` (14), `learning.routes.ts` (5,
 §"The lessons lane") and `attachment.routes.ts` (3, below), each exporting a
 `create<X>Routes(services): Router` factory; and `kanban.routes.ts`, the FACTORY that builds one
 `express.Router()` and `use`s the five onto it. The package is INTERNAL — nothing outside
@@ -3770,7 +3854,6 @@ GET    /api/kanban/events?boardId=&cardId=&limit=                      -> { even
 GET    /api/kanban/boards/:boardId/cards?status=todo,questions&limit=&cursor= -> { cards, nextCursor }
 POST   /api/kanban/boards/:boardId/cards        { title, priority?, status?, description? } -> { card }
 GET    /api/kanban/cards/:cardId                                       -> { card }
-GET    /api/kanban/cards/:cardId/plan-cost                             -> { planCost }
 PATCH  /api/kanban/cards/:cardId                { title?, priority?, description?, body?, plan?, closingRemarks? } -> { card }
 POST   /api/kanban/cards/:cardId/move           { status, afterId?, beforeId? } -> { card }
 POST   /api/kanban/cards/:cardId/archive        -> { card }
@@ -4590,7 +4673,7 @@ read whole and then filed or discarded by a person. It is not scoped to the sele
 the queue is the whole estate's, so the same list shows under whichever project is open.
 `src/modules/memory-intake/` is one provider (`context/MemoryIntakeContext`), two bodies that read
 it — the Memory tab's pane (`MemoryIntakePanel`) and the desktop chat gutter's own body
-(`MemoryWidgetBody`; its sibling for runs is `RunnerWidgetBody` in `src/modules/plan-runner`,
+(`MemoryWidgetBody`; its sibling for runs and v3 plans is `RunnerWidgetBody` in `src/modules/runner-tab`,
 MAN-641) — two rows (`MemoryCandidateRow` for a pending
 candidate, the read-only `MemoryApprovedRow` for one already filed) and two hooks: `useMemoryReview`,
 the write lifecycle both bodies share, and `useApprovedMemories`, which reads the filed list beside
@@ -5029,6 +5112,8 @@ The events raised today:
 | `runner.finished` | `stop` | The plan-runner lane, when a plan run ends with every phase shipped — see [docs/MANUAL.md (plan-runner)](MANUAL.md) §"Pushes on an ending" |
 | `runner.blocked` | `error` | The plan-runner lane, when a plan run ends with phases blocked or left: `all-blocked`, `budget`, `flag-off`, `unreadable`, or a `complete` that left phases |
 | `runner.arc_stuck` | `error` | The plan-runner lane's arc deck, when a PRESS on a card is REFUSED — by the start ladder for a card with no run, or by the `resume` of a run that was created parked — and nothing moves that card until its plan is cured — once per distinct refusal, the refusal being the episode the runner stamps on the card (`docs/MANUAL.md` §"Pushes on an ending") |
+| `dispatcher.finished` · `dispatcher.paused` | `stop` | The v3 dispatcher lane, when a plan ends `complete` or is `paused` — see MAN-1498 |
+| `dispatcher.relaunched` | `error` | The v3 dispatcher lane, when a phase the walk had left standing is taken up again — see MAN-1498 |
 | `limit.reached` · `limit.reset` · `limit.warning` · `limit.overage` · `limit.out_of_credits` | `limit` | The Claude runtime, reading the SDK's `rate_limit_event` |
 | `push.enabled` | `info` | The settings service, when a browser saves a push subscription |
 
@@ -5137,9 +5222,10 @@ section: notifications/004 The ntfy channel/007 What gets pushed, and how loud
 
 | Event | ntfy priority | Tag (ntfy draws it as an emoji) |
 | --- | --- | --- |
-| `runner.finished` | 3 | `white_check_mark` |
+| `runner.finished`, `dispatcher.finished` | 3 | `white_check_mark` |
 | `runner.blocked` | 4 | `warning` |
 | `runner.arc_stuck` | 4 | `warning` |
+| `dispatcher.relaunched` | 4 | `warning` |
 | `action_required` | 4 (high) | `question` |
 | `error` | 4 | `rotating_light` |
 | `limit.reached`, `limit.out_of_credits` | 4 | `no_entry` |
@@ -5185,9 +5271,9 @@ since its title names the window (`ntfy-flood-control.service.ts`). The first pu
 are counted instead of sent. If the minute ends with repeats counted, one summary follows —
 `<latest title> ×<total>` / `<repeats> more in the last minute` — at priority 3 with the `bell`
 tag, whatever the originals' priority, and only if ntfy is still on. The windows live in server
-memory, so a restart forgets an open one. `runner.blocked` and `runner.arc_stuck` are NOT among
-them: each is already once per episode by the runner's own key, and a window that swallowed a SECOND,
-different refusal inside the same minute would break that promise.
+memory, so a restart forgets an open one. `runner.blocked`, `runner.arc_stuck` and `dispatcher.relaunched` are NOT among
+them: each is already once per episode by its lane's own key (the runner's episode key, the dispatcher's event id), and a window that swallowed a SECOND,
+different episode inside the same minute would break that promise.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/MANUAL.md, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/websocket/MANUAL.md
 
@@ -5356,13 +5442,13 @@ also exported from the module's `index.ts` for any caller that has to show an ev
   arrives as `rateLimitType: 'seven_day_overage_included'` (the Claude CLI's own label table names
   it "Fable limit"); a window the table does not know reads "Usage". An
   unknown code reads "CloudCLI" / "You have a new notification".
+- The v3 dispatcher's three endings are worded off the `meta` its lane fills (MAN-1498), with progress counted over ALL of a plan's phases (`done`/`phases`) so the push agrees with the plan's card: `dispatcher.finished` reads `Plan finished`, body `<done>/<phases> phases · <spend>`; `dispatcher.paused` reads `Plan paused`, body `<done>/<phases> phases · Resume from the Runner tab`; `dispatcher.relaunched` reads `Phase relaunched`, body `Phase <key> was taken up again · <detail>`.
+- `<spend>` is `spendText(meta)`, the SAME rule the Runner tab draws: the dollars ONLY where a paying API billed them — `$0.41 DeepSeek` — and the TOKENS otherwise, `1.2M in · 48k out` (the total alone, `1.2M tokens`, on a record written before the split). A plan that rode the operator's Claude subscription says its tokens and no `$` at all, never `$0.00` (operator rule, 2026-09-24). `runner.finished` reads the same phrase, suffixed ` on this plan`; the lanes fill `costUsd`/`tokensIn`/`tokensOut` in their ending `meta` (`runner-endings.service.ts`, `dispatcher-endings.service.ts`) and a meta that recorded none drops the phrase entirely rather than printing a zero.
 - The body is cut at 1,000 characters: web push refuses a payload over about 4 KB, and the
   orchestrator settles that refusal silently.
 - A tool approval's body is the thing being approved: the Bash command, the path for a file tool,
   otherwise the tool input as JSON (cut at 300 characters). A question lists its options numbered
   from 1 in their own order. A plan ready for approval carries its first 600 characters.
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/services/notification-copy.service.ts
 
 ## MAN-623 — Gotchas
 section: notifications/013 Gotchas
@@ -5432,12 +5518,12 @@ and starting a run needs a plan and an intent lock, which is `/execute`'s act an
 **Two files under `~/.claude/state/` ARE written from this server, and neither is this lane's or a
 run's** (§"The DeepSeek switch" and §"The swarm switch" below).
 
-**Beside it, the v3 dispatcher's lane.** `server/index.ts` mounts a fourth polled lane at
+**Beside it, the v3 dispatcher's lane.** `server/index.ts` mounts a fifth polled lane at
 `/api/dispatcher` in the same three lines this one is mounted in — `createDispatcherModule()`, the
 `authenticateToken` mount, and its `start()`/`stop()` beside this lane's. It is the same shape over a
 different owner: the dispatcher's own `status --json` document, its five verbs, and the push each
 plan ending earns. What it is lives in its own manual, "The v3 dispatcher lane"
-(`server/modules/dispatcher/`): the poll and its frame, the seven routes, the status codes, and the
+(`server/modules/dispatcher/`): the poll and its frame, the eight routes, the status codes, and the
 endings with their watermark.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts
@@ -5459,7 +5545,7 @@ is not a directory is skipped. Four files per run are this lane's:
 | `receipt.json` | Its PRESENCE is the whole signal: the run is over. A resume renames it, so a continued run returns. |
 | `runner.log` | One appended line per lane event — the CHANGED phase's own line, in the ◆ shape with a local ISO timestamp in front — and only when that line moves. |
 
-A fifth file lives OUTSIDE the run directory and belongs to the PLAN, not the run: `~/.claude/state/plan_costs/<slug>.json`, the hooks tree's plan-cost ledger (`hooks/plan_runner/costs.py`; `plan-runner cost <plan>` prints it). It books what no receipt ever carried — the planner (Odysseus), the reviewer (Eupalinos) and every scout wave — and `readPlanLedger` folds those three kinds into the snapshot as `plan_planning_usd`, `plan_review_usd`, `plan_scouts_usd`; `plan_total_usd` is their sum plus the build spend the receipts already tallied over every run of the plan; `plan_tokens` is the same fold in tokens (the ledger's `tokens` per entry plus `run.json`'s `tokens` over every run), printed on the card as `⛁ 94.9M tok`. The card leads with that total the moment anything outside the run was spent (operator, 2026-09-12: "I'd like to see totals"). Absent ledger, unreadable ledger, a `build` row in it: all read as zero here, never as an error.
+A fifth file lives OUTSIDE the run directory and belongs to the PLAN, not the run: `~/.claude/state/plan_costs/<slug>.json`, the hooks tree's plan-cost ledger (`hooks/plan_runner/costs.py`; `plan-runner cost <plan>` prints it). It books what no receipt ever carried — the planner (Odysseus), the reviewer (Eupalinos) and every scout wave — and `readPlanLedger` folds those three kinds into the snapshot as `plan_planning_usd`, `plan_review_usd`, `plan_scouts_usd`; `plan_total_usd` is their sum plus the build spend the receipts already tallied over every run of the plan, in PAID dollars only — a ledger row whose models name nothing but Claude (`rowPaidUsd`) and a receipt whose `providers` map names no vendor (`receiptRidesClaude`) read 0 (INV-4299); `plan_tokens` is the same fold in tokens, `plan_tokens_in`/`plan_tokens_out` its split (the ledger's `tokens`/`tokens_in`/`tokens_out` per entry plus `run.json`'s over every run), drawn by `usageText` as `1.2M in · 48k out`, or `⛁ 94.9M tok` where only the total was recorded. The card leads with that total the moment anything outside the run was spent (operator, 2026-09-12: "I'd like to see totals"). Absent ledger, unreadable ledger, a `build` row in it: all read as zero here, never as an error.
 
 A run directory holds more than those four, and the rest are ignored on purpose rather than missed.
 `progress.txt` is the same ◆ line plus one row per phase, rendered for a human reading it in a
@@ -5491,8 +5577,10 @@ broadcast-after-send dedup order, and why a failing tick never takes the interva
 there, in one copy. The siblings are the launcher-souls lane
 ([docs/MANUAL.md (dispatch-souls)](MANUAL.md)), which reads `~/.claude/state/dispatch-souls/` on the same
 cadence, a board's own Metis sessions (`kanban-metis/kanban-metis.module.ts`, the
-`kanban_metis_state` frame), and this module's own arc deck lane (`arc-lane.ts`, the `arc_state`
-frame, reading `~/.claude/state/arcs/`) — a different root and a different frame each time, the same loop.
+`kanban_metis_state` frame), the v3 dispatcher's plans (`dispatcher/dispatcher-watcher.service.ts`, the
+`dispatcher_state` frame, reading the dispatcher's `status --json` document), and this module's own
+arc deck lane (`arc-lane.ts`, the `arc_state` frame, reading `~/.claude/state/arcs/`) — a different
+root and a different frame each time, the same loop.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/MANUAL.md, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/polled-lane.service.ts
 
@@ -5546,44 +5634,6 @@ is HELD rather than clobbered, so a second copy of a plan is never lost to a nam
 (`apply: false`) writes nothing at all, not even the destination directory.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/hooks/auto_execute_plan.py
-
-## MAN-627 — The plan-cost read
-section: plan-runner/003 The plan-cost read
-
-`plan-cost.service.ts` answers what a whole PLAN cost — the reading behind the card drawer's cost line,
-handed to the board as `kanbanReadings.planCost` and served by `GET /api/kanban/cards/:cardId/plan-cost`
-([docs/MANUAL.md (kanban)](MANUAL.md) §"The routes"). It is a READ of books that already exist, and it keeps no books of
-its own: a second ledger would be a second answer to "what did this cost", and two answers drift.
-
-**Every row it sums is ALREADY PRICED.** A `claude -p` child reports its own bill, and a ledger row was
-priced from its transcript when its outing stopped — so nothing here prices a token and nothing here writes
-a ledger. Three sources make one number:
-
-- `planning` · `review` · `scouts` — the plan's own ledger's sums
-  (`~/.claude/state/plan_costs/<slug>.json`, `readPlanLedger`), the live truth while the file is there,
-  read on every call.
-- `build` — every matching run's own `cost_usd`, summed: a receipted run from its `receipt.json`, a live run
-  (no receipt yet) from its `progress.json`.
-- the NEWEST matching receipt's own `plan_cost` — the runner's precomputed whole-plan reading, taken at
-  close by the same code, and the only copy that survives the ledger's pruning. It is read as a FLOOR under
-  all four kinds: a run directory that has left the state root, a pruned ledger, a run scanned while its own
-  file is mid-rewrite — each of those would silently shrink a sum, and the receipt still holds what was
-  spent. Spend only grows, so of two readings of one quantity the larger is the later, and a floor can never
-  double-count: it either agrees with the sum or replaces a reading that has lost ground.
-
-**A plan is its PATH, and matching a run to a plan is the one place a bare string comparison is WRONG.** A
-card stores `~/.claude/plans/foo.md`; a receipt stores whatever absolute path the runner was launched with,
-and `~` expanded after a `realpath` resolves under the CALLER's cwd — a different answer per process. So the
-home is expanded FIRST and resolved second, and both sides of the comparison go through that one door
-(`_plan_key`).
-
-**The result is cached per plan for 20 seconds** (`COST_TTL_MS`, the same TTL the hooks tree's
-`plan_costs.py` uses): opening a drawer must not walk two hundred run directories on every click, and a
-reading twenty seconds stale on a surface that reports dollars is not a lie. The reading never throws — a
-plan with nothing behind it answers `null`, which is what the route hands the drawer, so a card whose plan
-was never run reads "no cost yet" rather than `$0.00`.
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/MANUAL.md
 
 ## MAN-628 — The DeepSeek switch
 section: plan-runner/004 The DeepSeek switch
@@ -5978,7 +6028,7 @@ same resolution (`costs.py`, the gate's `scripts/quiet_checkpoint_runs.py`, `scr
 locks move TOGETHER: a root that moved one and not the other would read the other tree's locks, which is why the gate refuses to
 resolve them separately too.
 **This lane does not follow yet.** `runner-state.transport.ts`'s `LOCK_DIR` is still the literal
-`~/.claude/state/runner/locks`, while `plan-runner.module.ts:157` and `plan-cost.service.ts:76` read the runs from
+`~/.claude/state/runner/locks`, while `plan-runner.module.ts:194` is the ONE reader that takes the runs from
 `$PLAN_RUNNER_STATE_DIR`. In the default configuration both name the same directory and nothing is wrong; under a moved env every
 lock lookup misses, every run drops to the progress-file fallback, and every healthy long phase reads *stale* — silently, and
 only under the configuration meant to be the safe one. Deriving the lock directory from the same root this lane already resolves
@@ -6320,7 +6370,8 @@ shell, the plan's file name and its H1. The run's own display is four pieces: `R
 `RunClock` (`RunFace.tsx`, the card's header), `RunFace` (`RunFace.tsx`, the body) and `RunControls`
 (`RunControls.tsx`, the footer). `ArcCard` draws the same pieces for the run its plan card owns, so one
 run reads one way in a run list and inside an arc. The runner card has two homes —
-the Runner tab (`RunnerPanel`), and the desktop chat gutter's Runner widget (`RunnerWidgetBody`),
+the Runner tab (`RunnerPanel`), and the desktop chat gutter's Runner widget (`RunnerWidgetBody`) —
+both in `src/modules/runner-tab`, the host above this lane and the dispatcher's (§"The Runner tab") —
 which sits beside the transcript and never over it. The arc deck has the same two homes, drawn
 above the runs in each (§"The arc deck" → "The gallery"), and the widget's badge counts both: the
 runs plus the arcs not yet complete. The widget's empty state shows only when there is neither a
@@ -6461,8 +6512,9 @@ carries the outcome word (`COMPLETE` in the positive tone only when nothing is l
 once a minute, not once a second — and its strip lights no active stage. Dismissal is
 `dismissRun` in `modules/plan-runner/dismissedRuns.ts`, and it is of one ENDING: `{run_id, ended_at}`
 joins `dismissedEndings` under the `planRunner` key of the server-synced user preferences — a MERGED
-write, capped at 100 and pruned against the WHOLE lane — so a run dismissed on the phone is gone on
-the desktop on its next load (the store hydrates on sign-in, not by push). `useRunnerRuns` drops a
+write, capped at 100 and pruned against the lane the caller hands in, WITHIN the ending's own id-space (a
+`v3:<name>` id is the plan lane's, any other the run lane's; the other space's entries stand) — so a run
+dismissed on the phone is gone on the desktop on its next load (the store hydrates on sign-in, not by push). `useRunnerRuns` drops a
 dismissed ending from both the list and the count; a dismissed run that resumes is back while it
 moves, and back as a new card if it ends again. **No dialog guards Stop** —
 it is a pause, reversible by the button that replaces it, and a dialog in front of a reversible act
@@ -6503,25 +6555,43 @@ within one tick of it. Nothing optimistic; a refusal is the runner's sentence in
 `data-runner-schedule-set` on `Start at …`, `data-runner-schedule-cancel` on Cancel. Proof:
 `.verify/probe-runner-schedule.mjs`.
 
+**The v3 plan card — the same card with a `dispatch v1` pill.** The dispatcher's plans are drawn in the
+same two homes by `PlanCard` (`src/modules/dispatcher/`, §"The v3 plan card" of the dispatcher section):
+`RunCard`'s composition over the dispatcher's document — the name is `<plan>.v3`, the goal's first line
+the clamped description, and a static `Chip` reading `dispatch v1` sits before the status word so the
+two engines' cards tell apart at a glance in one list. Its verbs are chosen by the plan's status the way
+this footer's are chosen by the run's state: `live` → Stop, `paused` → Resume, `queued` → Start and
+`ScheduleControl` (scope `plan`), `scheduled` → Start and Cancel, `parked` → Unpark, `idle` in
+`designed`/`questions` → Park, `complete` → Dismiss. It carries NO model control — the route is the
+box's switch, shown on its meter's sub-line — and `ScheduleControl`'s `plan` scope adds only a handle
+prefix (`data-dispatcher-schedule`) and a title (`dispatcher.scheduleTitle`); the button text and
+`useOffpeak` are this lane's, because `dispatcher offpeak` prints the same hour.
+
 Its strings live under `runner.*` in `src/modules/i18n/locales/en/common.json`, English only; every
 other locale falls back.
 
 The tab that mounts it is the next section.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/MANUAL.md, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/ChatInterface.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/composer/ActivityIndicator.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/plan-runner/RunCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/plan-runner/RunControls.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/plan-runner/RunFace.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/plan-runner/RunnerWidgetBody.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useElapsed.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/utils.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-runner-model-pin.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-runner-schedule.mjs
+governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/MANUAL.md, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/ChatInterface.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/composer/ActivityIndicator.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/plan-runner/RunCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/plan-runner/RunControls.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/plan-runner/RunFace.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/plan-runner/ScheduleControl.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/runner-tab/RunnerWidgetBody.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useElapsed.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/utils.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-runner-model-pin.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-runner-schedule.mjs
 
 ## MAN-642 — The Runner tab
 section: plan-runner/015 Consumers/018 The Runner tab
 
 `RunnerPanel` is where every run on the lane is drawn — one of `RunCard`'s two callers now that the
-desktop chat gutter's Runner widget is the other (§"The runner card"). It reads `useRunnerRuns`, `useArcs`
+desktop chat gutter's Runner widget is the other (§"The runner card") — and every v3 plan the
+dispatcher carries, as a `PlanCard` in the SAME list. Both lists live in `src/modules/runner-tab`, a
+host module above the two lanes: `plan-runner` and `dispatcher` each import only their own and the
+shared layers, the dispatcher's card reuses this lane's `ScheduleControl`, `scheduleClock` and
+dismissal store through the `plan-runner` barrel, and a list inside either lane would make the two
+import each other (`import/no-cycle`). It reads `useRunnerRuns`, `useDispatcherPlans`, `useArcs`
 (whether the gallery above the runs has anything to draw) and `useArcRunIds` (which runs that gallery
 already draws) and nothing else — no fetch on mount, no state of its own — so selecting the tab paints on the FIRST
 render with whatever the bus was already holding rather than blanking until the runner next moves.
 
 **The gate rule is the memory tab's, and the Runner tab is the second tab to take it.**
 `useWorkspaceTabGates` computes
-`shouldShowRunnerTab: runnerCount > 0 || arcCount > 0 || activeTab === 'runner'` beside the memory
+`shouldShowRunnerTab: runnerCount > 0 || arcCount > 0 || activeTab === 'runner'` — where
+`runnerCount` is runs PLUS v3 plans (`useDispatcherPlans().count`) — beside the memory
 line — `arcCount` is the arc deck's own count (§"The arc deck" below), off the same bus the runs come
 from, because the deck's gallery lives in this same tab's pane — and that ONE reading is what the
 three call sites share — `WorkspaceMain`, `ProjectSidebarRegion` and `ProjectCommandPalette` each
@@ -6542,23 +6612,33 @@ pill at all: `Tabs` renders that pill for word tabs only, and marks an icon tab 
 `.vv-tabs__dot` while carrying the count in words in the tab's `title` (`Runner (2)`). Anything
 reading this strip's count reads the title.
 
-**The panel.** A header carrying `runner.title` and the count, then one `<RunCard defaultOpen />`
+**The panel.** A header carrying `runner.title` and the count — runs plus plans — then one
+`<PlanCard defaultOpen />` per v3 plan, ordered by the dispatcher's `byUrgencyThenNewest` (live,
+scheduled, queued, paused, parked, idle, complete; newest `updated_at` first inside each) and drawn
+ABOVE the runs and below the arc gallery, then one `<RunCard defaultOpen />`
 per run no arc card owns — `defaultOpen` is the one variance the card offers, and the tab is what wants it: a person
 who navigated here has already asked for the runs. Order is live → stale → paused, newest first
 inside each: live because something is happening to it, stale because a lapsed heartbeat is the one
 state that may want a hand, paused last because a parked run is parked on purpose. Paused runs ARE
 counted and ARE listed — that is the whole reason the lane carries them where the statusline drops
 them. The count and the panel cannot disagree: both read `count` off the same hook, and a run an arc
-card owns still counts — it is on this screen, inside its card. `EmptyState`
-(`runner.empty`) shows only when the count is zero AND `useArcs()`'s own `arcs` array is empty too
+card owns still counts — it is on this screen, inside its card. Every dismiss in the panel passes its OWN lane's
+carried ids — `carriedIds` for a run, `carriedNames` for a plan — and `dismissRun` prunes within the ending's
+id-space, so the other lane's dismissals stand; a plan's ending is
+`{ run_id: 'v3:<name>', ended_at: epochOf(completed_at) }`. `EmptyState`
+(`runner.empty`) shows only when the count (runs plus plans) is zero AND `useArcs()`'s own `arcs` array is empty too
 — not `arcCount` (§"The arc deck" below) — reachable precisely because the tab is sticky. `ArcGallery`
 mounts above the run list in the same scroll when an arc exists (§"The arc deck" below).
+
+**The gutter.** `RunnerWidgetBody` draws the same plan cards FOLDED above the runs: the open chat's
+plans first (`session_app_id === sessionId`, with `SessionPin`), the rest behind, then the runs by the
+same rule. The widget's badge in `ChatGutterLayout` counts runs, plans and unfinished arcs.
 
 **The palette.** `CommandPalette`'s `NAV_TABS` carries a `Go to Runner` row, and the Navigate group
 filters that static list through `visibleTabs` — which `ProjectCommandPalette` builds from the same
 gate. The row therefore appears exactly when the tab does, and never while the gate is off.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/plan-runner/RunnerPanel.tsx
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/hooks/useWorkspaceTabGates.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/runner-tab/RunnerPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/runner-tab/RunnerWidgetBody.tsx
 
 ## MAN-643 — The arc deck
 section: plan-runner/015 Consumers/019 The arc deck
@@ -6912,10 +6992,21 @@ answers only what an Accept does at the moment it is pressed; it starts nothing 
 
 **The client.** `src/shared/hooks/useParkAtPeakSwitch.ts` is the one reader and writer in `src/`
 (`enabled: boolean | null`, `unreadable`, `saving`, `setEnabled`, `refresh`) over
-`api.settings.parkAtPeakSwitch()` / `saveParkAtPeakSwitch({ enabled })` (`src/shared/api.ts`); no
-component composes it yet. `enabled: null` means no read has succeeded yet and `unreadable` marks a
+`api.settings.parkAtPeakSwitch()` / `saveParkAtPeakSwitch({ enabled })` (`src/shared/api.ts`), composed
+by the settings row below. `enabled: null` means no read has succeeded yet and `unreadable` marks a
 read that came back with nothing — neither is OFF, because a row drawing off for a switch that is on
 would promise an Accept that walks inside the peak.
+
+**The row.** `src/modules/settings/tabs/agents-settings/sections/content/RunnerParkAtPeakRow.tsx`, its own
+file as `RunnerHealModelRow.tsx` is, drawn by `RunnerModelContent.tsx` directly below the swarm row
+(Settings → Agents → Claude → Account, the plan-runner card). It wears lucide's `Moon` (`flex-none`, so it
+keeps its 16px at 360px), a `SettingsToggle` over `useParkAtPeakSwitch`, and two sentences under
+`agents.runnerParkAtPeak` in `settings.json` (`en`, and `fr` — the operator's language):
+label "Park new plans at DeepSeek peak hours"; description "An Accept during DeepSeek's peak window
+(01:00–04:00 and 06:00–10:00 UTC, weekdays) queues the plan and starts it when the window lifts. Off:
+Accept walks now." With no position the row says so in words — Loading while the read is out, the
+`unreadable` sentence the DeepSeek row carries once it failed — and the control slot holds Try again in
+place of the toggle.
 
 **THE KICK. Every switch write on this server ends with `dispatcher kick`.** `setDeepseekFlash`,
 `setSwarm` and `setParkAtPeak` each hand the flip to the dispatcher once the file has settled
@@ -6926,7 +7017,7 @@ journal per flip (`dispatcher kick: woke daemon`); a kick that could not be run,
 bound, is swallowed and said once per distinct message, because a toggle must answer with the position
 on disk whatever the dispatcher is doing.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/settings/dispatcher-kick.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/settings/park-at-peak-switch.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/settings/settings.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/settings/settings.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useParkAtPeakSwitch.ts, /home/lyphe/.claude/state/park_at_peak.flag
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/settings/dispatcher-kick.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/settings/park-at-peak-switch.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/settings/settings.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/settings/settings.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/agents-settings/sections/content/RunnerParkAtPeakRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useParkAtPeakSwitch.ts, /home/lyphe/.claude/state/park_at_peak.flag
 
 ## MAN-645 — The Schedules tab
 section: schedules/000
@@ -9563,5 +9654,8 @@ key for key. The emitted document is the source of the shape.
 - `offpeak_at` is a `string`, never null: `plan_runner.when.stamp` answers the literal `none` when
   the clock cannot.
 - `DispatcherVerb` is five of the CLI's own verbs: `stop`, `resume`, `schedule`, `park`, `unpark`.
+- `DispatcherLanePicture` is declared in `src/shared/types.ts` ONLY, beside the block: the frame's `plans`,
+  `route`, `daemon`, `offpeak_at` without `home`, `generated_at` or `at` — what the client's feed retains on
+  `dispatcher:all`.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts

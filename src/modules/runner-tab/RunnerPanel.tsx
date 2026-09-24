@@ -2,13 +2,8 @@ import { ActivityIcon } from 'lucide-react';
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { ArcGallery } from '@/modules/plan-runner/ArcGallery';
-import { dismissRun } from '@/modules/plan-runner/dismissedRuns';
-import { useArcs } from '@/modules/plan-runner/hooks/useArcs';
-import { useArcRunIds } from '@/modules/plan-runner/hooks/useArcRunIds';
-import { useRunnerRuns } from '@/modules/plan-runner/hooks/useRunnerRuns';
-import { RunCard } from '@/modules/plan-runner/RunCard';
-import { byUrgencyThenNewest } from '@/modules/plan-runner/runState';
+import { byUrgencyThenNewest as planUrgency, epochOf, PlanCard, useDispatcherPlans } from '@/modules/dispatcher';
+import { ArcGallery, byUrgencyThenNewest, dismissRun, RunCard, useArcRunIds, useArcs, useRunnerRuns } from '@/modules/plan-runner';
 import { Badge, EmptyState, ScrollArea } from '@/shared/ui';
 
 /**
@@ -40,6 +35,13 @@ import { Badge, EmptyState, ScrollArea } from '@/shared/ui';
  * a run's card carries `data-runner-card`: a probe scopes every reading to THIS pane, so a card the
  * operator's own run puts on screen at the same moment is never mistaken for the one under test.
  *
+ * THE v3 PLANS JOIN THE SAME LIST. The dispatcher's plans (`useDispatcherPlans`) are drawn as
+ * `PlanCard`s — the run card's composition with a `dispatch v1` pill — ABOVE the runs and below the
+ * arc gallery, in their own urgency order; the header's count and the EmptyState read runs AND
+ * plans. A dismissal passes ITS OWN lane's carried ids — `carriedIds` for a run, `carriedNames` (the
+ * plans' `v3:<name>`) for a plan: `dismissRun` prunes only within the ending's own id-space, so the
+ * other lane's dismissals stand whichever card is pressed (`dismissedRuns.ts`).
+ *
  * The EmptyState is reachable and is not dead code: the tab is STICKY, so a person standing here
  * when the last run ends keeps the tab and meets this instead of the tab vanishing under them. It
  * shows only when there is neither a run NOR an arc: an arc whose next card has no run yet is still
@@ -47,7 +49,10 @@ import { Badge, EmptyState, ScrollArea } from '@/shared/ui';
  */
 export function RunnerPanel() {
   const { t } = useTranslation();
-  const { runs, count, carriedIds } = useRunnerRuns();
+  const { runs, count: runCount, carriedIds } = useRunnerRuns();
+  const { plans, count: planCount, carriedNames } = useDispatcherPlans();
+  const count = runCount + planCount;
+  const orderedPlans = useMemo(() => [...plans].sort(planUrgency), [plans]);
   const { arcs } = useArcs();
   const arcRunIds = useArcRunIds();
 
@@ -80,6 +85,18 @@ export function RunnerPanel() {
               field of empty surface. What lets a title wrap at 390px is `w-full break-words` on the
               card's own heading (`RunCard`), not anything here. */}
           <ul className="mx-auto flex w-full min-w-0 max-w-2xl flex-col gap-3 px-4 py-5">
+            {orderedPlans.map((plan) => {
+              const endedAt = plan.status === 'complete' ? epochOf(plan.completed_at) : null;
+              return (
+                <li key={`v3:${plan.name}`} className="min-w-0">
+                  <PlanCard
+                    plan={plan}
+                    defaultOpen
+                    onDismiss={endedAt !== null ? () => dismissRun({ run_id: `v3:${plan.name}`, ended_at: endedAt }, carriedNames) : undefined}
+                  />
+                </li>
+              );
+            })}
             {ordered.map((run) => (
               <li key={run.run_id} className="min-w-0">
                 <RunCard

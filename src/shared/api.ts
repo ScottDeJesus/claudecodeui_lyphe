@@ -770,6 +770,31 @@ export const api = {
     arcSchedule: (arc: string, when: string) => post(`/api/plan-runner/arcs/${encodeURIComponent(arc)}/schedule`, { when }),
   },
 
+  // The dispatcher lane (docs/MANUAL.md (dispatcher)): the v3 plans in the dispatcher's own store, and the
+  // five verbs the plan cards press. It sits beside `planRunner` because it is that lane's sibling —
+  // the picture is `dispatcher status --json` relayed whole, and the verbs are relayed to the
+  // dispatcher's own binary by argv, never by a shell.
+  //
+  // The verbs are read from the RAW response for exactly the reason `planRunner`'s are, with one
+  // difference worth naming: the dispatcher prints its refusals on STDOUT (`REFUSED schedule
+  // <name>.v3: is live — stop it first`, exit 2), not on stderr, so a 409 body carries the verdict
+  // in `stdout` and the reader looks there first. Its successes are on stdout too (`UNSCHEDULED
+  // <name>.v3`), so the answer is the same field either way.
+  dispatcher: {
+    plans: () => get('/api/dispatcher/plans'),
+    plan: (name: string) => get(`/api/dispatcher/plans/${encodeURIComponent(name)}`),
+    stop: (name: string) => post(`/api/dispatcher/plans/${encodeURIComponent(name)}/stop`, {}),
+    resume: (name: string) => post(`/api/dispatcher/plans/${encodeURIComponent(name)}/resume`, {}),
+    park: (name: string) => post(`/api/dispatcher/plans/${encodeURIComponent(name)}/park`, {}),
+    unpark: (name: string) => post(`/api/dispatcher/plans/${encodeURIComponent(name)}/unpark`, {}),
+    // A plan's Start at a time — `offpeak`, an ISO instant with a zone, or `none` to cancel — the
+    // same three shapes the runner's schedule takes (`readRunnerScheduleWhen` on the server).
+    schedule: (name: string, when: string) => post(`/api/dispatcher/plans/${encodeURIComponent(name)}/schedule`, { when }),
+    // The dispatcher's next DeepSeek off-peak moment (`{ at }`, epoch seconds, or null) — the same
+    // hour `planRunner.offpeak` answers, relayed from the dispatcher's own binary.
+    offpeak: () => get('/api/dispatcher/plans/offpeak'),
+  },
+
   // The heal reflex, the runner's twin lane: the worker's own summary (the tab's whole poll),
   // one kind's rows WHEN the operator opens that kind — never inside the poll — and the two hands
   // that change something, a cycle's Start/Stop and the ignore table. Its switches ride under
@@ -811,10 +836,8 @@ export const api = {
       patch(`/api/kanban/boards/${encodeURIComponent(id)}`, body),
     selectBoard: (id: string) => post(`/api/kanban/boards/${encodeURIComponent(id)}/select`, {}),
     lanes: (id: string) => get(`/api/kanban/boards/${encodeURIComponent(id)}/lanes`),
-    // The header's six registers in one request — four of this board, two of the whole estate —
-    // and one card's plan cost, which is `null` for a card whose plan column is empty.
+    // The header's six registers in one request — four of this board, two of the whole estate.
     vitals: (id: string) => get(`/api/kanban/boards/${encodeURIComponent(id)}/vitals`),
-    cardPlanCost: (id: string) => get(`/api/kanban/cards/${encodeURIComponent(id)}/plan-cost`),
 
     // The lessons lane's REVIEW surface (docs/MANUAL.md (memory-intake); the store itself is
     // docs/MANUAL.md (kanban)'s). Every call here is a person's: STAGING a lesson is the agent's, over MCP,

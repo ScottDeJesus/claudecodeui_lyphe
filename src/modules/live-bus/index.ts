@@ -3,4 +3,4 @@
 // with, and the topic vocabulary every one of them asks rather than re-deciding.
 export { LiveBusProvider, useLiveBus } from '@/modules/live-bus/context/LiveBusContext';
 export { useLiveTopic } from '@/modules/live-bus/hooks/useLiveTopic';
-export { isAllowedTopic, ARC_ALL_TOPIC, RUNNER_ALL_TOPIC, runnerTopic, SOULS_ALL_TOPIC, UNIVERSE_ALL_TOPIC } from '@/modules/live-bus/topics';
+export { isAllowedTopic, ARC_ALL_TOPIC, DISPATCHER_ALL_TOPIC, RUNNER_ALL_TOPIC, runnerTopic, SOULS_ALL_TOPIC, UNIVERSE_ALL_TOPIC } from '@/modules/live-bus/topics';

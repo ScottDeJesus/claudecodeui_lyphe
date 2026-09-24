@@ -128,6 +128,20 @@ export function each<T>(value: unknown, where: string, read: (entry: unknown) =>
   return need(value, isList, where).map(read);
 }
 
+/**
+ * A count that a build OLDER than the field did not write, read as 0 — and refused by name when the
+ * key is there but is not a count.
+ *
+ * This is the one tolerant read here, and the tolerance is exact: `undefined` is an absent KEY, which
+ * is a different build of the dispatcher talking and not a torn or corrupted one — refusing a whole
+ * plan because a field was invented after that build shipped would blank the operator's screen for a
+ * reason that is not the reader's to punish. A key that IS there and is malformed is still refused,
+ * which is the case this vocabulary exists for.
+ */
+export function countSince(value: unknown, where: string): number {
+  return value === undefined ? 0 : need(value, isCount, where);
+}
+
 /** A list of names — a plan's waits, a phase's `start_here`. */
 export function names(value: unknown, where: string): string[] {
   return each(value, where, (entry) => need(entry, isText, where));

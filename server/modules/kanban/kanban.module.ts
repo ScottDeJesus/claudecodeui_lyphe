@@ -9,21 +9,18 @@ import { kanbanLessonsService } from './kanban-lessons.service.js';
 import { kanbanQuestionsService } from './kanban-questions.service.js';
 import { startLessonSpillSweep } from './kanban-spill.service.js';
 import type { KanbanMemoryPendingReader } from './routes/board.routes.js';
-import type { KanbanPlanCostReader } from './routes/card.routes.js';
 import { createKanbanRouter } from './routes/kanban.routes.js';
 
 /**
- * The two readings the board takes from outside itself, and the ONLY way they reach it.
+ * The one reading the board takes from outside itself, and the ONLY way it reaches the board.
  *
- * Both are functions rather than values: `planCost` is asked per plan path when a drawer opens, and
- * `memoryPending` is asked at the request that needs the number, so neither is a constant captured
- * at boot. The composition root (`server/index.ts`) builds them from the `plan-runner` and
- * `memory-intake` barrels — that is where the plan says the ONE cross-module import sits — and
- * nothing below this constructor reaches for a sibling module, which is what lets a route be built
- * against a scratch root without a board knowing who answers.
+ * It is a function rather than a value: `memoryPending` is asked at the request that needs the
+ * number, so it is not a constant captured at boot. The composition root (`server/index.ts`)
+ * builds it from the `memory-intake` barrel — that is where the plan says the ONE cross-module
+ * import sits — and nothing below this constructor reaches for a sibling module, which is what
+ * lets a route be built against a scratch root without a board knowing who answers.
  */
 export type KanbanModuleDependencies = {
-  planCost: KanbanPlanCostReader;
   memoryPending: KanbanMemoryPendingReader;
 };
 
@@ -52,7 +49,6 @@ export function createKanbanModule(dependencies: KanbanModuleDependencies): Rout
     attachments: kanbanAttachmentsService,
     leases: kanbanLeasesService,
     lessons: kanbanLessonsService,
-    planCost: dependencies.planCost,
     memoryPending: dependencies.memoryPending,
   });
 }

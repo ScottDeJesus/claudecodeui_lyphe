@@ -633,6 +633,7 @@ flowchart TD
     SET --> E3["taskmaster frames"]
     SET --> E4["runner_state"]
     SET --> E10["arc_state"]
+    SET --> E11["dispatcher_state"]
     SET --> E6["soul_launch_state"]
     SET --> E7["universe_map"]
     SET --> E8["universe_activity"]
@@ -644,14 +645,15 @@ flowchart TD
   end
 ```
 
-There are eight broadcasters over that set: `loading_progress`, `session_upserted`, the Task Master
-frames, and FIVE STATE LANES — the plan-runner watcher (`server/modules/plan-runner/`) over the
+There are nine broadcasters over that set: `loading_progress`, `session_upserted`, the Task Master
+frames, and SIX STATE LANES — the plan-runner watcher (`server/modules/plan-runner/`) over the
 runner's state directory, the plan-runner's own arc deck lane
 (`server/modules/plan-runner/arc-lane.ts`) over `~/.claude/state/arcs/`, the launcher-souls lane
 (`server/modules/dispatch-souls/`) over `~/.claude/state/dispatch-souls/`, a board's own Metis
-sessions (`server/modules/kanban-metis/`) over `~/.claude/state/kanban-metis/`, and the universe lane
+sessions (`server/modules/kanban-metis/`) over `~/.claude/state/kanban-metis/`, the v3 dispatcher's plans
+(`server/modules/dispatcher/`) over its `status --json` document, and the universe lane
 (`server/modules/universe/`), which watches the registered repos' `.git` HEADs and reads two live
-feeds of the estate, the systemd journal and the Claude transcripts. The first four poll every two
+feeds of the estate, the systemd journal and the Claude transcripts. The first five poll every two
 seconds and put a frame on the wire only when the picture actually changed — a live→stale flip
 included, since that is a change in the snapshot like any other. The dedup records a picture as
 sent only AFTER the send returns, so a broadcast that throws part-way is re-sent on the next tick
@@ -665,8 +667,9 @@ supplies only its own `snapshot` and `frame`. The universe lane is the one broad
 and `universe_activity`, and the reason differs for each.
 
 `universe_map` is the HEAD watcher. Reconciling a HEAD change means shelling a crawler child and
-awaiting it, and `createPolledLane`'s contract is a `snapshot()` that is cheap and never throws — a
-snapshot that can launch a subprocess would fire on a cadence nobody chose and let crawls stack. So
+awaiting it, and `createPolledLane`'s contract is a `snapshot()` that is cheap — the dispatcher lane's subprocess
+read is ~170 ms, and a tick that finds it still out is skipped — and a snapshot that launched a
+crawler would fire on a cadence nobody chose and let crawls stack. So
 `universe.module.ts` writes its own thirty-second interval, reads every registered repo's `.git/HEAD`
 directly off disk (never a `git rev-parse` subprocess), and broadcasts only when a rebuilt map
 actually lands.
@@ -683,7 +686,7 @@ than a picture of state that persists between ticks, so there is nothing cheap o
 against a previous snapshot — an empty window is silence, not an unchanged picture, and a lane that sent
 it anyway would be ten frames a second saying nothing.
 
-Reasoning that belongs to polling-rather-than-watching for the other four lanes lives at
+Reasoning that belongs to polling-rather-than-watching for the five polled lanes lives at
 `polled-lane.service.ts`, not in any lane. The launcher lane's own half — what it reads off a launch
 directory, how it classifies a soul and which provider its pin paints — is
 [docs/MANUAL.md (dispatch-souls)](../MANUAL.md). A board's own Metis lane has no write-up of its own yet.
@@ -4430,7 +4433,7 @@ section: 07-live-widgets/002 The pieces
 | `src/modules/widgets/docspaceOrigin.ts` | `DOCSPACE_EMBED_DEFAULT_PORT`, `resolveDocSpaceOrigin`, `docspaceEmbedUrl`, `docspaceStudioUrl`, and `isForeignOrigin` — the gate on `allow-same-origin` |
 | `src/modules/widgets/DocSpaceFrame.tsx` | `DOCSPACE_SANDBOX`, `DOCSPACE_READY_TIMEOUT_MS` and `DocSpaceFrame` — the second frame: a `src` on ArchPulse's origin, the latched theme, the ready timer, and the `framed` prop that drops its own border where a card already draws one |
 | `src/modules/widgets/WidgetErrorCard.tsx` | `WidgetErrorCard` — the two-sentence card shown where a widget was asked for and cannot be drawn |
-| `src/modules/live-bus/topics.ts` | `LIVE_TOPIC_ALLOWLIST`, `isAllowedTopic`, `RUNNER_ALL_TOPIC`, `SOULS_ALL_TOPIC`, `UNIVERSE_ALL_TOPIC`, `runnerTopic` — the whole vocabulary |
+| `src/modules/live-bus/topics.ts` | `LIVE_TOPIC_ALLOWLIST`, `isAllowedTopic`, `RUNNER_ALL_TOPIC`, `ARC_ALL_TOPIC`, `DISPATCHER_ALL_TOPIC`, `SOULS_ALL_TOPIC`, `UNIVERSE_ALL_TOPIC`, `runnerTopic` — the whole vocabulary |
 | `src/modules/live-bus/context/LiveBusContext.tsx` | `LiveBusProvider` and `useLiveBus` — the retained values, the listener registry, `publish`/`subscribe`/`get` |
 | `src/modules/live-bus/hooks/useLiveTopic.ts` | `useLiveTopic` — the module's ONE render trigger, for a React component reading a topic |
 | `src/modules/live-bus/index.ts` | The barrel. The provider, the bus hook, `useLiveTopic`, and the vocabulary |

@@ -86,6 +86,27 @@ function providerOf(spec: unknown, result: unknown, ended: boolean): 'deepseek' 
 }
 
 /**
+ * The receipt's PAID dollars: its own `cost_usd`, and 0 where the receipt NAMES the operator's
+ * Claude subscription.
+ *
+ * A receipt's `cost_usd` is the CLI's self-report of what the outing cost, and on a subscription
+ * that self-report is not money — the launcher prices such a child at 0 now
+ * (`plan_runner/costs.py:result_cost` returns the PAID share alone) and records its TOKENS instead.
+ * Receipts written before that rule carry the figure anyway — one on disk today says
+ * `provider: claude`, `cost_usd: 5.467351`, `tokens_in: 12386281` — so the word the receipt itself
+ * carries is what settles an old one: named Claude, the dollars are suppressed outright rather than
+ * shown as `$0.00`, and the tokens beside it are the whole of the spend.
+ *
+ * A receipt that names NOTHING is the stub the launcher or the reaper writes for a wrapper that was
+ * killed outright; it says nothing about the endpoint, so it overrules nothing it stored.
+ */
+function receiptCostUsd(result: unknown, ended: boolean): number | null {
+  if (!ended) return null;
+  if (readString(field(result, 'provider')) === 'claude') return 0;
+  return readNumberOrNull(field(result, 'cost_usd'));
+}
+
+/**
  * One launch directory's snapshot, or `null` when this lane does not carry that launch.
  *
  * A launch is carried while it is OUT, and for {@link DEFAULT_ENDED_KEEP_S} after its receipt.
@@ -141,9 +162,19 @@ export function classifyLaunch(
     ended_at: endedAt,
     // The receipt's own figures, and NOTHING while it is out: a live soul's spend is not knowable
     // from this side, and a zero would read as "free" rather than as "not yet".
+    //
+    // `cost_usd` is PAID dollars: a soul on the operator's Claude subscription recorded 0 there
+    // (`plan_runner/costs.py:result_cost`), and a pre-rule receipt that stored dollars reads 0 too
+    // where the receipt NAMES Claude (`receiptCostUsd`) — the tokens beside it are the whole of what
+    // it spent, and the pin draws no `$` at all rather than `$0.00`.
+    // `tokens_in`/`tokens_out` are `null` on a receipt written before the split shipped, which is
+    // what tells the pin to say the total alone (`usageText`, `src/modules/plan-runner/spend.ts`)
+    // rather than `0 in · 0 out`.
     duration_s: ended ? readNumberOrNull(field(result, 'duration_s')) : null,
-    cost_usd: ended ? readNumberOrNull(field(result, 'cost_usd')) : null,
+    cost_usd: receiptCostUsd(result, ended),
     tokens: ended ? readNumberOrNull(field(result, 'tokens')) : null,
+    tokens_in: ended ? readNumberOrNull(field(result, 'tokens_in')) : null,
+    tokens_out: ended ? readNumberOrNull(field(result, 'tokens_out')) : null,
   };
 }
 

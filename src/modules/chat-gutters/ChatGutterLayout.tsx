@@ -14,8 +14,10 @@ import {
 import { GUTTER_SIDES, useGutterPlacements, widgetsOn } from '@/modules/chat-gutters/hooks/useGutterPlacements';
 import { GutterColumn } from '@/modules/chat-gutters/GutterColumn';
 import { GutterWidgetFrame } from '@/modules/chat-gutters/GutterWidgetFrame';
+import { useDispatcherPlans } from '@/modules/dispatcher';
 import { MemoryWidgetBody, useMemoryIntake } from '@/modules/memory-intake';
-import { RunnerWidgetBody, useArcs, useRunnerRuns } from '@/modules/plan-runner';
+import { useArcs, useRunnerRuns } from '@/modules/plan-runner';
+import { RunnerWidgetBody } from '@/modules/runner-tab';
 import type { GutterSide, GutterWidgetId } from '@/shared/types';
 import { otherOverlayHoldsEscape } from '@/shared/ui/overlayEscape';
 import { cn } from '@/shared/utils';
@@ -80,10 +82,12 @@ export function ChatGutterLayout({
   const { t } = useTranslation();
   const { placements, moveWidget, toggleWidget } = useGutterPlacements(sessionId);
   const { count: runCount } = useRunnerRuns();
-  // The Runner widget draws the arc deck above its runs, so its badge counts both: every run the
-  // lane carries, plus the arcs still walking — the same unfinished-arc count that holds the tab open.
+  // The Runner widget draws the arc deck and the dispatcher's v3 plans above its runs, so its badge
+  // counts all three: every run the lane carries, every plan card, plus the arcs still walking — the
+  // same unfinished-arc count that holds the tab open.
   const { count: arcCount } = useArcs();
-  const runnerCount = runCount + arcCount;
+  const { count: planCount } = useDispatcherPlans();
+  const runnerCount = runCount + planCount + arcCount;
   const { pendingCount } = useMemoryIntake();
   const subagentCount = useSubagentWidgetCount(sessionId);
   const { count: embedCount, newest: newestEmbed, known: embedsKnown } = useEmbedWidgetState(sessionId);

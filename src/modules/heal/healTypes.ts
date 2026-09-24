@@ -102,6 +102,18 @@ export type HealCard = {
    * `bookedBy` rather than the date, so no reader re-derives which of the two this is.
    */
   cost_usd: number;
+  /**
+   * The chain's tokens beside the dollars, and the same reading the run cards use: `tokens_in` is
+   * what its souls READ (input + cache read + cache write), `tokens_out` what they wrote, and
+   * `tokens` the total as the chain recorded it. The dollar figure above is a PAYING API's share
+   * alone, so a heal that rode the operator's Claude subscription bills 0 there and these are the
+   * whole of what it spent — which is why the card draws them when there is no `$` to draw
+   * (operator rule, 2026-09-24). `undefined` from a worker build older than the keys, which reads
+   * as "not recorded" and never as zero.
+   */
+  tokens?: number;
+  tokens_in?: number;
+  tokens_out?: number;
   chain_id: string | null;
 };
 

@@ -6,6 +6,7 @@ import { useRateChangeTick } from '@/shared/hooks/useRateChangeTick';
 import { PhaseRow } from '@/modules/plan-runner/PhaseRow';
 import { PipelineStrip } from '@/modules/plan-runner/PipelineStrip';
 import { RepairBanner } from '@/modules/plan-runner/RepairBanner';
+import { paidText, planKindsText, planPaidText, usageText } from '@/modules/plan-runner/spend';
 import {
   PHASE_GLYPH,
   phaseProgress,
@@ -43,13 +44,6 @@ import type { RunnerRunSnapshot } from '@/shared/types';
  * runner's own stderr are all free text written by a program this app does not control, so none
  * of it is ever handed to a raw-HTML sink or run through a markdown renderer.
  */
-
-/** Byte-for-byte `hooks/plan_runner/costs.py`'s `humanize`: "94.9M", "1M", "12.5k". */
-function humanizeTokens(n: number): string {
-  if (n < 1000) return String(n);
-  if (n < 999_950) return `${(n / 1e3).toFixed(1).replace(/\.0$/, '')}k`;   // the same cut
-  return `${(n / 1e6).toFixed(1).replace(/\.0$/, '')}M`;
-}
 
 /**
  * Where a QUEUED run is waiting until, in the reader's own clock: `10:00 AM`.
@@ -174,13 +168,24 @@ export function RunFace({ run, defaultOpen }: RunFaceProps) {
   const alongside = waveCompanions(run);   // the plan's shared waves, whatever the switch reads
   const anyBlocked = run.phases.some((phase) => phase.state === 'blocked');
   const currentPhaseId = run.position?.phase_id ?? null;
+  // What this run's plan has spent, in the two figures the operator reads (see `spend.ts`): the
+  // plan's PAID dollars, where each kind of them went, and the tokens either way. A plan that rode
+  // Claude has no `$` in it at all — its whole reading is the token figure.
   const outside = run.plan_planning_usd + run.plan_review_usd + run.plan_scouts_usd;
-  const tokens = run.plan_tokens > 0 ? ` · ${t('runner.tokens', { n: humanizeTokens(run.plan_tokens) })}` : '';
-  const spend = (run.plan_runs > 1 || outside > 0
-    ? `${t('runner.planTotal', { total: run.plan_total_usd.toFixed(2) })} · ${t('runner.planSplit', {
-        planning: run.plan_planning_usd.toFixed(2), review: run.plan_review_usd.toFixed(2),
-        scouts: run.plan_scouts_usd.toFixed(2), build: run.plan_cost_usd.toFixed(2), count: run.plan_runs })} · ${t('runner.thisRun', { used: run.spawns, max: run.max_spawns })}`
-    : `${t('runner.spawns', { used: run.spawns, max: run.max_spawns })} · $${run.cost_usd.toFixed(2)}`) + tokens;
+  const across = run.plan_runs > 1 || outside > 0;
+  const counters = across
+    ? t('runner.thisRun', { used: run.spawns, max: run.max_spawns })
+    : t('runner.spawns', { used: run.spawns, max: run.max_spawns });
+  const paidPlan = across
+    ? [planPaidText(t, run.plan_total_usd), planKindsText(t, [
+        { kind: 'planning', usd: run.plan_planning_usd },
+        { kind: 'review', usd: run.plan_review_usd },
+        { kind: 'scouts', usd: run.plan_scouts_usd },
+        { kind: 'build', usd: run.plan_cost_usd },
+      ], run.plan_runs)].filter(Boolean).join(' · ')
+    : paidText(t, run.cost_usd);
+  const usage = usageText(t, run.plan_tokens_in, run.plan_tokens_out, run.plan_tokens);
+  const spend = [counters, paidPlan, usage].filter(Boolean).join(' · ');
 
   return (
     <div className="flex min-w-0 flex-col gap-3">

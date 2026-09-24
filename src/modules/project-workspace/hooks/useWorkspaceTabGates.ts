@@ -1,4 +1,5 @@
 import { useBrowserUseEnabled } from '@/modules/browser-use';
+import { useDispatcherPlans } from '@/modules/dispatcher';
 import { useHeal } from '@/modules/heal';
 import { useMemoryIntake } from '@/modules/memory-intake';
 import { useArcs, useRunnerRuns } from '@/modules/plan-runner';
@@ -69,7 +70,10 @@ export function useWorkspaceTabGates(activeTab: AppTab): WorkspaceTabGates {
   const { tasksEnabled, isTaskMasterInstalled } = useTasksSettings();
   const browserUseEnabled = useBrowserUseEnabled();
   const { pendingCount } = useMemoryIntake();
-  const { count: runnerCount } = useRunnerRuns();
+  const { count: runCount } = useRunnerRuns();
+  // The dispatcher's v3 plans are cards in the same Runner list, so they count and gate with the runs.
+  const { count: planCount } = useDispatcherPlans();
+  const runnerCount = runCount + planCount;
   // The deck's own count, off the same bus the runs come from: an arc the runner has not finished
   // keeps the Runner tab on the bar by itself, because the gallery lives in that tab's pane.
   const { count: arcCount } = useArcs();

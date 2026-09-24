@@ -2,15 +2,9 @@ import { ActivityIcon } from 'lucide-react';
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { ArcGallery } from '@/modules/plan-runner/ArcGallery';
-import { dismissRun } from '@/modules/plan-runner/dismissedRuns';
-import { useArcs } from '@/modules/plan-runner/hooks/useArcs';
-import { useArcRunIds } from '@/modules/plan-runner/hooks/useArcRunIds';
-import { useRunnerRuns } from '@/modules/plan-runner/hooks/useRunnerRuns';
-import { RunCard } from '@/modules/plan-runner/RunCard';
-import { SessionPin } from '@/modules/plan-runner/SessionPin';
-import { byUrgencyThenNewest } from '@/modules/plan-runner/runState';
-import type { RunnerRunSnapshot } from '@/shared/types';
+import { byUrgencyThenNewest as planUrgency, epochOf, PlanCard, useDispatcherPlans } from '@/modules/dispatcher';
+import { ArcGallery, byUrgencyThenNewest, dismissRun, RunCard, SessionPin, useArcRunIds, useArcs, useRunnerRuns } from '@/modules/plan-runner';
+import type { DispatcherPlan, RunnerRunSnapshot } from '@/shared/types';
 import { EmptyState } from '@/shared/ui';
 
 /**
@@ -41,6 +35,10 @@ import { EmptyState } from '@/shared/ui';
  * speak of runs that are on screen, inside a deck. The pin travels to the deck for the same reason:
  * a run this chat launched that is drawn in an arc card wears its pin THERE, on the card.
  *
+ * THE v3 PLANS RIDE ABOVE THE RUNS, FOLDED, by the same rule: the open chat's plans first
+ * (`session_app_id`, resolved to an app session id by the server, with the pin), the rest behind.
+ * Every dismiss here passes its own lane's carried ids, the tab's rule (`RunnerPanel`).
+ *
  * IT READS THE BUS AND DRAWS NO FRAME. `useRunnerRuns` and `useArcs` hand it the retained lanes, so
  * it paints on its first render and owns no state of its own; the chrome, the slots and the
  * scrolling belong to `src/modules/chat-gutters`.
@@ -50,6 +48,12 @@ import { EmptyState } from '@/shared/ui';
 export function RunnerWidgetBody({ sessionId }: { sessionId: string | null }) {
   const { t } = useTranslation();
   const { runs, carriedIds } = useRunnerRuns();
+  const { plans, carriedNames } = useDispatcherPlans();
+  const orderedPlans = useMemo(() => {
+    const ordered = [...plans].sort(planUrgency);
+    const isMine = (plan: DispatcherPlan) => sessionId !== null && plan.session_app_id === sessionId;
+    return [...ordered.filter(isMine), ...ordered.filter((plan) => !isMine(plan))];
+  }, [plans, sessionId]);
   const { arcs } = useArcs();
   const arcRunIds = useArcRunIds();
 
@@ -65,13 +69,29 @@ export function RunnerWidgetBody({ sessionId }: { sessionId: string | null }) {
 
   // The empty state speaks of the LANE, not of this list: a run an arc card draws is on this very
   // screen, and saying "nothing" over it would be the widget's one lie.
-  if (runs.length === 0 && arcs.length === 0) {
+  if (runs.length === 0 && plans.length === 0 && arcs.length === 0) {
     return <EmptyState icon={ActivityIcon} title={t('runner.empty')} />;
   }
 
   return (
     <div className="flex min-w-0 flex-col gap-4">
       <ArcGallery home="gutter" pinnedSessionId={sessionId} />
+      {orderedPlans.length > 0 && (
+        <ul className="flex min-w-0 flex-col gap-3">
+          {orderedPlans.map((plan) => {
+            const isMine = sessionId !== null && plan.session_app_id === sessionId;
+            const endedAt = plan.status === 'complete' ? epochOf(plan.completed_at) : null;
+            return (
+              <li key={`v3:${plan.name}`} data-testid="runner-widget-plan" data-plan-name={plan.name}
+                data-pinned={String(isMine)} className="flex min-w-0 flex-col gap-1">
+                {isMine && <SessionPin />}
+                <PlanCard plan={plan} defaultOpen={false}
+                  onDismiss={endedAt !== null ? () => dismissRun({ run_id: `v3:${plan.name}`, ended_at: endedAt }, carriedNames) : undefined} />
+              </li>
+            );
+          })}
+        </ul>
+      )}
       {listed.length > 0 && (
         <ul className="flex min-w-0 flex-col gap-3">
           {[...mine, ...rest].map((run) => {
@@ -90,7 +110,7 @@ export function RunnerWidgetBody({ sessionId }: { sessionId: string | null }) {
                   defaultOpen={false}
                   // Dismiss is offered exactly where the tab offers it: an ended run whose ending is on
                   // the card. `carriedIds` is the unfiltered lane, because that is what a dismissal
-                  // prunes the stored list against.
+                  // prunes the stored list against, within the run id-space.
                   onDismiss={
                     run.state === 'ended' && run.ended_at !== null
                       ? () => dismissRun({ run_id: run.run_id, ended_at: run.ended_at as number }, carriedIds)

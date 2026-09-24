@@ -61,7 +61,7 @@ import { createMemoryIntakeModule, listMemoryCandidates } from './modules/memory
 import { createDispatchSoulsModule } from './modules/dispatch-souls/index.js';
 import { createHealModule } from './modules/heal/index.js';
 import { createJevModule } from './modules/jev/index.js';
-import { createPlanRunnerModule, planCostFor } from './modules/plan-runner/index.js';
+import { createPlanRunnerModule } from './modules/plan-runner/index.js';
 import { createDispatcherModule } from './modules/dispatcher/index.js';
 import { createUniverseModule } from './modules/universe/index.js';
 import { fileTreeRoutes } from './modules/file-tree/index.js';
@@ -210,10 +210,9 @@ app.use('/api/accounts', authenticateToken);
 app.use('/api/usage', authenticateToken);
 app.use('/api', createAccountsModule());
 
-// The two readings the board cannot take for itself, built HERE because this is the one place that
-// may reach across modules. The plan-runner owns what a plan cost — it reads the ledgers on disk —
-// and the memory-intake lane owns how many candidates are waiting on a person; neither module
-// imports the other, and the board imports neither of them.
+// The one reading the board cannot take for itself, built HERE because this is the one place that
+// may reach across modules: the memory-intake lane owns how many candidates are waiting on a
+// person, the board does not import the lane, and the lane knows nothing of a board.
 //
 // `memoryPending` is a REGISTER, not a page, so it asks the lane's read for no ceiling at all: the
 // lane's list verb defaults to 100 rows, and a count taken off that page silently stops at 100 —
@@ -223,7 +222,7 @@ app.use('/api', createAccountsModule());
 // shape, and a count verb of its own belongs in the lane's module, which this phase does not own.
 const memoryPending = (): number =>
   listMemoryCandidates({ status: 'pending', limit: Number.MAX_SAFE_INTEGER }).length;
-const kanbanReadings = { planCost: planCostFor, memoryPending };
+const kanbanReadings = { memoryPending };
 
 // The Kanban board (protected). The guard rides the MOUNT rather than each route, so no file in
 // the module imports `authenticateToken` and a sibling route package cannot forget it.

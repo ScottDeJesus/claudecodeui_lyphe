@@ -11,6 +11,7 @@ import { MemoryIntakeProvider } from '@/modules/memory-intake';
 import { HealProvider } from '@/modules/heal';
 import { LiveBusProvider } from '@/modules/live-bus';
 import { ArcFeed, RunnerFeed } from '@/modules/plan-runner';
+import { DispatcherFeed } from '@/modules/dispatcher';
 import { SoulLaunchFeed } from '@/modules/dispatch-souls';
 import { UniverseFeed } from '@/modules/universe';
 import { WebSocketProvider } from '@/shared/context/WebSocketContext';
@@ -136,6 +137,11 @@ export default function App() {
                       WebSocketProvider above, because the feed subscribes to the one socket. */}
                   <LiveBusProvider>
                     <RunnerFeed>
+                      {/* The dispatcher's lane beside the runner's: the v3 plan cards' whole picture,
+                          kept by a feed in its own module. It reads a store of its own (the
+                          dispatcher's), which is exactly why it is a second feed and not a second job
+                          for RunnerFeed. */}
+                      <DispatcherFeed>
                       {/* Nested rather than chained because a feed is a wrapper, not a sibling: each
                           one subscribes to the one socket and renders what it wraps, so the innermost
                           thing here is still the router. One feed per lane, in the lane's own module. */}
@@ -165,6 +171,7 @@ export default function App() {
                       </UniverseFeed>
                       </SoulLaunchFeed>
                       </ArcFeed>
+                      </DispatcherFeed>
                     </RunnerFeed>
                   </LiveBusProvider>
                 </ProtectedRoute>

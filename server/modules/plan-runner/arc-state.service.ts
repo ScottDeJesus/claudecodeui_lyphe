@@ -107,7 +107,6 @@ function readCard(raw: unknown, index: number): ArcCardSnapshot {
     state: CARD_STATES.includes(state) ? state : 'unminted',
     run_status: readString(field(raw, 'run_status')) || null,
     ended_at: readNumberOrNull(field(raw, 'ended_at')),
-    cost_usd: readNumber(field(raw, 'cost_usd'), 0),
     spawns: readNumber(field(raw, 'spawns'), 0),
     phases: readPhases(field(raw, 'phases')),
     refusal: readRefusal(field(raw, 'refusal')),

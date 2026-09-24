@@ -27,8 +27,16 @@ export type DispatcherEndingMeta = {
   /** How many phases the plan has, and how many of them are `done`. */
   phases: number;
   done: number;
-  /** The plan's spend over every run of it — the counter the operator asked never to reset. */
+  /**
+   * The plan's PAID spend over every stage of it (`plan.cost_usd`) — the counter the operator asked
+   * never to reset, and 0 on a plan walked on the operator's Claude subscription, whose `tokens*`
+   * below are then the whole of what it spent. The copy draws `$` only when this is > 0.
+   */
   costUsd: number;
+  /** The same plan's tokens, all of them, and the split beside it — what the copy says instead of `$0.00`. */
+  tokens: number;
+  tokensIn: number;
+  tokensOut: number;
   /** The phase the event names, by its KEY, or `null` for a plan-level event (INV-183). */
   phase: string | null;
   /** The event's own sentence — for a relaunch, what was taken up again and by whom. `''` when it carries none. */
@@ -87,6 +95,9 @@ function endingOf(plan: DispatcherPlan, event: DispatcherEvent, code: Dispatcher
       phases: plan.phases.length,
       done: plan.phases.filter((phase) => phase.status === 'done').length,
       costUsd: plan.cost_usd,
+      tokens: plan.tokens,
+      tokensIn: plan.tokens_in,
+      tokensOut: plan.tokens_out,
       phase: event.phase,
       detail: event.detail ?? '',
     },

@@ -1505,3 +1505,22 @@ export function readRunnerScheduleWhen(value: unknown): string | null {
 export function runnerScheduleWhenError(): string {
   return 'when must be offpeak, none, or an ISO-8601 timestamp with a zone';
 }
+
+
+// ---------------------------
+//----------------- RUNNER TOKEN FIGURES ------------
+
+/**
+ * A token count as a person reads it: `94.9M`, `1M`, `12.5k`, `412`.
+ *
+ * The server's twin of `src/modules/plan-runner/spend.ts:humanizeTokens`, and both are byte-for-byte
+ * `hooks/plan_runner/costs.py`'s `humanize` — the same cut at 999,950 and the same trailing-zero trim,
+ * so a card and the push it earns cannot round the same figure two ways. Duplicated rather than
+ * imported because the two builds each resolve `@/shared` to their OWN tree (`server/shared` here,
+ * `src/shared` in the client); the pair is checked by eye, as the type mirrors are.
+ */
+export function humanizeTokens(n: number): string {
+  if (n < 1000) return String(n);
+  if (n < 999_950) return `${(n / 1e3).toFixed(1).replace(/\.0$/, '')}k`;   // the same cut
+  return `${(n / 1e6).toFixed(1).replace(/\.0$/, '')}M`;
+}

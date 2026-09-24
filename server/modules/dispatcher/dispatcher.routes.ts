@@ -43,7 +43,7 @@ function statusForVerb(result: DispatcherVerbResult): number {
 }
 
 /**
- * The dispatcher lane's seven routes. Auth is the mount's `authenticateToken`, in `server/index.ts`.
+ * The dispatcher lane's eight routes. Auth is the mount's `authenticateToken`, in `server/index.ts`.
  *
  * These handlers validate and translate, and do nothing else: nothing is read here, no process is
  * started here, and no route names a path from the request — the binary and the store are the

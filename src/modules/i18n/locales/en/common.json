@@ -762,8 +762,6 @@
     "waveAlongside": "runs alongside {{phases}}",
     "wavePhase": "Phase {{phase}}",
     "spawns": "spawns {{used}}/{{max}}",
-    "planSpend_one": "{{spawns}} spawns · ${{cost}} across {{count}} run",
-    "planSpend": "{{spawns}} spawns · ${{cost}} across {{count}} runs",
     "thisRun": "this run {{used}}/{{max}}",
     "more": "+{{count}} more in Runner",
     "stop": "Stop",
@@ -808,10 +806,19 @@
       "unknown": "ENDED",
       "incomplete": "INCOMPLETE"
     },
-    "planTotal": "plan ${{total}}",
-    "planSplit_one": "planning ${{planning}} · review ${{review}} · scouts ${{scouts}} · build ${{build}} in {{count}} run",
-    "planSplit": "planning ${{planning}} · review ${{review}} · scouts ${{scouts}} · build ${{build}} in {{count}} runs",
+    "planTotal": "plan ${{usd}} {{vendor}}",
+    "planKinds_one": "{{kinds}} in {{count}} run",
+    "planKinds": "{{kinds}} in {{count}} runs",
+    "paid": "${{usd}} {{vendor}}",
+    "usage": "{{in}} in · {{out}} out",
+    "kind": {
+      "planning": "planning ${{usd}}",
+      "review": "review ${{usd}}",
+      "scouts": "scouts ${{usd}}",
+      "build": "build ${{usd}}"
+    },
     "tokens": "⛁ {{n}} tok",
+    "soulBlocked": "DeepSeek refused or never answered — nothing ran on Claude",
     "repair": {
       "repairing": "Repairing Phase {{phase}}",
       "fixed": "Repair finished — Phase {{phase}} unblocked, running again",
@@ -883,6 +890,34 @@
       "cancelTitle": "Cancel the scheduled start; nothing starts until Start is pressed",
       "refused": "Schedule"
     }
+  },
+  "dispatcher": {
+    "pill": "dispatch v1",
+    "status": {
+      "live": "LIVE",
+      "paused": "PAUSED",
+      "queued": "QUEUED",
+      "scheduled": "SCHEDULED",
+      "parked": "PARKED",
+      "idle": "IDLE",
+      "complete": "COMPLETE"
+    },
+    "phase": {
+      "running": "running",
+      "done": "done",
+      "notStarted": "not started"
+    },
+    "settling": "settling",
+    "events_one": "{{count}} event",
+    "events": "{{count}} events",
+    "phaseCount_one": "{{count}} phase",
+    "phaseCount": "{{count}} phases",
+    "rounds_one": "{{count}} round",
+    "rounds": "{{count}} rounds",
+    "noStages": "No stage has launched for this phase yet.",
+    "scheduleTitle": "Start this plan when DeepSeek’s daily peak lifts — a one-shot timer sends Resume at that hour",
+    "park": "Park",
+    "unpark": "Unpark"
   },
   "navigation": {
     "settings": "Settings",

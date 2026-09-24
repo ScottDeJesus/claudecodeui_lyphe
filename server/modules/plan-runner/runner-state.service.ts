@@ -19,6 +19,7 @@ import {
   readRunLockBeat,
   readStringOrNull,
   readPlanLedger,
+  receiptRidesClaude,
   type PlanLedger,
   type RunnerRunFiles,
 } from './runner-state.transport.js';
@@ -92,6 +93,22 @@ function readBlockedCauses(receipt: unknown): Record<string, string> {
 /** A record's field, without asserting the record is one. */
 function field(record: unknown, name: string): unknown {
   return record !== null && typeof record === 'object' ? (record as Record<string, unknown>)[name] : undefined;
+}
+
+/**
+ * A run's PAID dollars: `progress.json`'s `cost_usd`, and 0 where the run's receipt says the whole
+ * run rode the operator's Claude subscription.
+ *
+ * The runner books `cost_usd` as it walks, and a Claude child's self-reported cost is not money —
+ * the harness prices such a child at 0 (`plan_runner/costs.py:result_cost` returns the PAID share
+ * alone) and records its TOKENS instead. A run stamped before that rule keeps the dollars it wrote,
+ * so the receipt is what settles an old one: its `providers` map names the vendor each phase ran
+ * on, and a map that names no vendor is a subscription ride — the very test the harness's own
+ * ledger scan makes (`costs._scan_runs`). A receipt with no map, or one naming a vendor, keeps what
+ * it stored: this lane reads history, it never re-prices it.
+ */
+function paidRunCost(progress: unknown, receipt: unknown): number {
+  return receiptRidesClaude(receipt) ? 0 : Math.max(0, readNumber(field(progress, 'cost_usd'), 0));
 }
 
 /**
@@ -329,6 +346,10 @@ export function classifyRun(
   const ending = files.hasReceipt ? readEnding(files.receipt, writtenBeat) : null;
   if (ending !== null && now - ending.at >= endedKeepS) return null;
 
+  // The run's PAID dollars, read once and carried by all four cost fields below: 0 for a run whose
+  // own receipt says it rode Claude (`paidRunCost`), whatever figure a pre-rule record stored.
+  const paidCostUsd = paidRunCost(progress, files.receipt);
+
   // The lock's beat when one names a MOVING run, the progress file's own otherwise. An ended run
   // is never aged, so its lock is never asked for — which is what lets the transport's lock cache
   // stop stat'ing a finished run's entry the moment its receipt lands.
@@ -390,18 +411,28 @@ export function classifyRun(
     phases: Array.isArray(phases) ? phases.map(readPhaseRow) : [],
     spawns: readNumber(field(progress, 'spawns'), 0),
     max_spawns: readNumber(field(progress, 'max_spawns'), 0),
-    cost_usd: readNumber(field(progress, 'cost_usd'), 0),
+    // PAID dollars only: a child on the operator's Claude subscription contributed 0 to this sum on
+    // the runner's side (`plan_runner/costs.py:result_cost`), so a pure-Claude run reads 0 here and
+    // its tokens below are the whole of what it spent. The card draws `$` only when this is > 0.
+    cost_usd: paidCostUsd,
     // Just this run; `snapshotRuns` folds in the plan's other runs (`withPlanTotals`).
     plan_runs: 1,
     plan_spawns: readNumber(field(progress, 'spawns'), 0),
-    plan_cost_usd: readNumber(field(progress, 'cost_usd'), 0),
+    plan_cost_usd: paidCostUsd,
     // The ledger's kinds land in `withPlanTotals`; alone, a run's plan total is its own cost.
     plan_planning_usd: 0,
     plan_review_usd: 0,
     plan_scouts_usd: 0,
-    plan_total_usd: readNumber(field(progress, 'cost_usd'), 0),
+    plan_total_usd: paidCostUsd,
     tokens: readNumber(field(progress, 'tokens'), 0),
     plan_tokens: readNumber(field(progress, 'tokens'), 0),
+    // The same tally SPLIT (`plan_runner/state.py:RunState.tokens_in`/`tokens_out`), so the card can
+    // draw `1.2M in · 48k out` rather than one number. Absent on a run older than the split: the
+    // total stands alone and the card says only that (never `0 in · 0 out` beside a real total).
+    tokens_in: readNumber(field(progress, 'tokens_in'), 0),
+    tokens_out: readNumber(field(progress, 'tokens_out'), 0),
+    plan_tokens_in: readNumber(field(progress, 'tokens_in'), 0),
+    plan_tokens_out: readNumber(field(progress, 'tokens_out'), 0),
     line: readString(field(progress, 'line')),
     timeline: parseTimeline(files.logLines),
   };
@@ -446,7 +477,7 @@ export function snapshotRuns(
   for (const dir of listRunDirs(stateDir)) {
     try {
       const files = readRunFiles(dir);
-      tally(books, files.run);
+      tally(books, files.run, files.receipt);
       const snapshot = classifyRun(files, now, staleAfterS, readRunLockBeat, endedKeepS);
       if (snapshot !== null) runs.push(snapshot);
     } catch (error) {
@@ -463,7 +494,7 @@ export function snapshotRuns(
 }
 
 /** One plan's spend, summed over the `run.json` of every run of it. */
-type PlanBooks = { runs: number; spawns: number; cost: number; tokens: number };
+type PlanBooks = { runs: number; spawns: number; cost: number; tokens: number; tokensIn: number; tokensOut: number };
 
 /** One plan's ledger, read once per sweep however many of its runs are on the lane. */
 const ledgers = new Map<string, PlanLedger>();
@@ -485,16 +516,21 @@ function ledgerFor(planPath: string): PlanLedger {
  * A plan is its PATH. A moved plan starts a new total, and a new plan written at a retired one's
  * path inherits its history. A dry run spawns nothing and is not a run. A count that is not a
  * finite, non-negative number adds nothing rather than poisoning the sum.
+ *
+ * The dollars are the PAID ones (`paidRunCost`), so the receipt comes along: a run whose own
+ * receipt says it rode Claude adds 0 to this plan however many dollars its record stored.
  */
-function tally(books: Map<string, PlanBooks>, run: unknown): void {
+function tally(books: Map<string, PlanBooks>, run: unknown, receipt: unknown): void {
   const planPath = readStringOrNull(field(run, 'plan_path'));
   if (planPath === null || field(run, 'status') === 'dry-run') return;
-  const held = books.get(planPath) ?? { runs: 0, spawns: 0, cost: 0, tokens: 0 };
+  const held = books.get(planPath) ?? { runs: 0, spawns: 0, cost: 0, tokens: 0, tokensIn: 0, tokensOut: 0 };
   books.set(planPath, {
     runs: held.runs + 1,
     spawns: held.spawns + Math.max(0, readNumber(field(run, 'spawns'), 0)),
-    cost: held.cost + Math.max(0, readNumber(field(run, 'cost_usd'), 0)),
+    cost: held.cost + paidRunCost(run, receipt),
     tokens: held.tokens + Math.max(0, readNumber(field(run, 'tokens'), 0)),
+    tokensIn: held.tokensIn + Math.max(0, readNumber(field(run, 'tokens_in'), 0)),
+    tokensOut: held.tokensOut + Math.max(0, readNumber(field(run, 'tokens_out'), 0)),
   });
 }
 
@@ -512,6 +548,11 @@ function withPlanTotals(run: RunnerRunSnapshot, books: Map<string, PlanBooks>): 
     plan_scouts_usd: ledger.scouts,
     plan_total_usd: build + outside,
     plan_tokens: (plan === undefined ? run.tokens : plan.tokens) + ledger.tokens,
+    // The split rides the same fold as the total, `in` also carrying the planner's and his scouts'
+    // rows (the ledger's own `tokensIn`); a plan whose runs all predate the split reads `0 in ·
+    // 0 out` against a real total, which is what tells the card to say the total alone.
+    plan_tokens_in: (plan === undefined ? run.tokens_in : plan.tokensIn) + ledger.tokensIn,
+    plan_tokens_out: (plan === undefined ? run.tokens_out : plan.tokensOut) + ledger.tokensOut,
   };
 }
 
