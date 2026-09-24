@@ -34,10 +34,10 @@ export type RunnerEndingMeta = {
   blockCause: string | null;
   /**
    * The receipt's own sentence over a phase the run walked out on (`closing.doors_spent`): the phase,
-   * its cause, and the replan/unblocks/in-run cure the run spent on that block — `''` when it carries
-   * no such ⛔. It rides the meta because the push must say what the walk already tried: a bare
-   * "Phase 4: verify" reads as "re-author the spec", while a deferred phase is waiting on the heal
-   * item the ending just filed.
+   * its cause, and the replan/unblocks the run spent on that block — `''` when it carries no such
+   * ⛔. It rides the meta because the push must say what the walk already tried: a bare "Phase 4:
+   * verify" reads as "re-author the spec", while a phase whose ladder was spent already has its heal
+   * item filed.
    */
   doorsSpent: string;
   /**

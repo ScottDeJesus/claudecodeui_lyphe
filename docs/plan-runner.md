@@ -829,17 +829,16 @@ where a paused run can wait.
 run and phase states, `Meter` for shipped-of-total with spawns and spend beneath it, `Chip` +
 `Shimmer` for the stage strip (`PipelineStrip`), `Collapsible` + `CollapsibleTrigger` +
 `CollapsibleContent` twice — once around the phase list, once inside each `PhaseRow` around its
-timeline — `Banner` + `Spinner` for the repair strip (`RepairBanner`: the unblock outing on a
-blocked phase, or the heal the drain works beside the walk (`by`; the ending that filed the item
-launches the drain), read off
-`progress.json.repair` — repairing with its step and clock while its process lives (the run's for an
-unblock, the drain's pid for a heal), paused while it waits — a queued heal no drain is working names
-its gate off the item's `waiting_on` (`heal-running` → `runner.repair.waitsHeal`, `heals-off` →
-`waitsOff`; any other word is a child the drain could not
-start, `waitsHeld` with the fault; no word → `pausedHeal`, "the next drain takes it up"; the words are
-`hooks/plan_runner/heal_live.py`'s and `heal_drain._held`'s, carried through `readRepair` unchanged) —
-then the ending: unblocked and running
-again, cured with the phase still standing (`resumed` false), or still blocked with the reason)
+timeline — `Banner` + `Spinner` for the repair strip (`RepairBanner`: the replan or unblock outing on a
+blocked phase, or the heal item a spent ladder filed (`by`), read off `progress.json.repair` —
+repairing with its step and clock while its process lives (the run's for a replan or an unblock, the
+drain's pid for a heal — the drain is the heal side's own process, launched by the watchdog's
+`heal-due` beat, never by the run), paused while a replan or unblock waits out a rate limit with the
+run, and a heal item no drain is working REPORTED as filed (`runner.repair.filedHeal`, "heal item
+filed — the heal cycle takes it up"): a run reports what to heal and never waits on a heal (operator
+ruling 2026-09-24), so the card never says a run or its heal is waiting on anything — then the
+ending: unblocked and running again, healed with the phase still standing (`resumed` false), or
+still blocked with the reason)
 — and `Button` for the one verb. Every string reaches the DOM as a text node: a plan
 title, a phase title, a stage word and the runner's own stderr are all free text written by a
 program this app does not control, so none of it is ever handed to a raw-HTML sink or rendered as
@@ -1135,30 +1134,32 @@ position). `cardDraggable(arc, card)` is true only for a
 line of BOTH ends of a move, plus the deck's bounds and `from !== to` — what keeps the deck from
 offering a drop the runner's own `arcs.reorder` would only refuse (§"The drag" below).
 `cardTone(state)` maps a card's state to a `Badge` tone and is never `danger`: a `stalled` card is
-one the runner is already pressing again the moment a cure lands, not a fault. `arcProgress(arc)`
+one the runner presses again the moment its spec moves, not a fault. `arcProgress(arc)`
 counts complete CARDS against the total — not
 `useArcs()`'s `count`, which is unfinished ARCS across the whole deck. `current` and `last_started`
 are always read off the snapshot, never recomputed from the card states — the runner's own
 decisions, and a card walked out of order (`--now`) would disagree with a client that tried to
 guess them.
 
-**The stalled card.** A run never parks on a ⛔ (runner ruling 2026-09-11), so a receipt reads
-`complete` while phases stand blocked. `arcs.card_state` calls a card `complete` only when
+**The stalled card.** A run never parks on a ⛔ (runner ruling 2026-09-11): it walks past it and ends
+`blocked` (or `all-blocked`) with the phase in its `blocked` map. `arcs.card_state` calls a card `complete` only when
 `arc_stalled.landed(receipt)` — `status == "complete"` with empty `blocked` and `skipped_unchanged`;
 any other card whose newest run has a receipt is `stalled`. The runner writes `run_status` on the entry (the receipt's word
-plus what it left: `complete — 8 blocked`); the server copies it and the face draws the count
+plus what it left: `blocked — 8 blocked`); the server copies it and the face draws the count
 (§"The face").
 
-`stalled` is not a resting state: the arc's tick presses the card again once a cure lands, once per
-cure (the card's `repress_key` in `arc.json`), and the arc never advances past an unfinished card
-(runner ruling 2026-09-23: "plans must be completed, no waiting on heals"). The key is read over the
-phases the card still OWES — the plan's unshipped ones, not the receipt's books alone, since a run
-can end non-`complete` with empty books (`unreadable`, `flag-off`, `rate-limited`). A cure is:
+`stalled` is not a resting state: the arc's tick presses the card again the moment the plan's SPEC
+moves, once per spec change (the card's `repress_key` in `arc.json`), and the arc never advances past
+an unfinished card. The key is the plan's spec and nothing else — never the heal queue (runner ruling
+2026-09-24: "runs should only report what to heal, never wait on a heal"); the operator's Start on the
+card is the other door. It is read over the phases the card still OWES — the plan's unshipped ones,
+not the receipt's books alone, since a run can end non-`complete` with empty books (`unreadable`,
+`flag-off`, `rate-limited`) — and it moves when:
 
 - an owed phase's `spec_sha` moved
-- an owed phase's ⚒ outcome word moved
-- a heal item for the card's plan closed `healed`
 - a plan the runner names no phase in: its bytes changed
+
+The tick's line for a held card REPORTS: `stalled <n> — <k> phases to heal, items filed: <m>`.
 
 The deck draws; the runner presses.
 

@@ -306,9 +306,9 @@ const COPY_BY_CODE = new Map<string, CodeCopy>([
     return {
       headline: lookup(RUNNER_STOP_HEADLINES, meta.outcome) ?? 'Plan stopped',
       // WHAT THE RUN ALREADY TRIED, when it tried the ladder — the receipt's own `doors_spent`
-      // (`closing.doors_spent`): the phase, the cause, and the replan/unblocks/in-run cure it spent
-      // on that block. A bare ⛔ reads as "re-author the spec"; a phase the cure could not clear is
-      // waiting on a heal item that is already filed, and the operator is owed that difference.
+      // (`closing.doors_spent`): the phase, the cause, and the replan/unblocks it spent on that
+      // block. A bare ⛔ reads as "re-author the spec"; a phase whose ladder was spent has a heal
+      // item already filed for it, and the operator is owed that difference.
       body: doors ? `${said}\n${doors}` : said,
     };
   }],

@@ -205,24 +205,17 @@ function pidAlive(pid: number): boolean {
  * The fix-it session on a blocked phase, or `null` when the run never sent one. An unknown state
  * word is `null` too: a card must never say "repairing" over something it cannot read.
  *
- * A `heal` repair is worked by the heal drain, which the walk's own ending launches beside the walk
- * (`heal_live`), so the run's own liveness says nothing about it: `live` is read off the drain's pid,
- * which the stamp carries. When that drain is NOT alive, `waiting_on` names the gate holding the
- * item -- another heal is out, heals are off -- so the card says why. A word that is not one of those
- * two gates is a child the drain could not start, named by its fault (`heal_drain._held`).
- *
- * A `cure` repair is the walk's OWN work: `cure.at_block` launches the Asclepius chain that cures
- * the block's CLASS and HOLDS the phase's lane on it until the chain ends, so the run's liveness is
- * the repair's, exactly as it is for an unblock outing -- and, for the same reason, there is no pid
- * of its own to read.
+ * A `heal` repair is the item a run FILED when a block's ⚒ ladder was spent; the run never presses or
+ * waits on it (a run reports what to heal, operator ruling 2026-09-24), and the heal side's own clock
+ * drains it. So the run's own liveness says nothing about it: `live` is read off the drain's pid, which
+ * the stamp carries, and a heal no drain is working reads as filed — never as waiting on anything.
  */
 function readRepair(raw: unknown): RunnerRepair | null {
   if (raw === null || typeof raw !== 'object') return null;
   const state = readString(field(raw, 'state')) as RunnerRepair['state'];
   if (!REPAIR_STATES.includes(state)) return null;
   const named = readString(field(raw, 'by'));
-  const by: RunnerRepair['by'] = named === 'heal' || named === 'replan' || named === 'cure'
-    ? named : 'unblock';
+  const by: RunnerRepair['by'] = named === 'heal' || named === 'replan' ? named : 'unblock';
   const pid = readNumberOrNull(field(raw, 'pid'));
   return {
     phase_id: readString(field(raw, 'phase_id')),
@@ -239,11 +232,6 @@ function readRepair(raw: unknown): RunnerRepair | null {
     since: readNumberOrNull(field(raw, 'since')),
     ended_at: readNumberOrNull(field(raw, 'ended_at')),
     reason: readString(field(raw, 'reason')),
-    // The runner's own word, carried through UNCHANGED: the card renders `heal_live`'s two gate
-    // words, and any other word — a child the drain could not start writes the fault's own
-    // (`heal_drain._held`) — through the paused strip's `waitsHeld`. A word this card does not know
-    // reads as the generic sentence rather than as a claim.
-    waiting_on: readString(field(raw, 'waiting_on')),
   };
 }
 

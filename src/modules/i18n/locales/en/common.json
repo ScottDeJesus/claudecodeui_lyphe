@@ -824,23 +824,18 @@
         "unblock-fix": "applying the review's fixes",
         "guard": "checking nothing it may not touch moved",
         "stamp": "recording the result",
-        "heal": "a heal session is curing the cause",
+        "heal": "a heal session is working on the cause",
         "heal-review": "Athena is reviewing the heal",
         "heal-fix": "applying the review's fixes",
         "close": "merging the plan repair",
         "measuring": "re-running the phase's checks for fresh evidence",
-        "replanning": "Odysseus is rewriting the phase",
-        "curing": "an Asclepius chain is curing the cause's class"
+        "replanning": "Odysseus is rewriting the phase"
       },
       "paused": "Repair of Phase {{phase}} paused — it resumes with the run",
-      "pausedHeal": "Heal of Phase {{phase}} is queued — the next drain takes it up",
-      "waitsHeal": "Heal of Phase {{phase}} waits: another heal is running",
-      "waitsOff": "Heal of Phase {{phase}} waits: heals are off",
+      "filedHeal": "Phase {{phase}}: heal item filed — the heal cycle takes it up",
       "ended": "finished {{elapsed}} ago",
       "replanning": "Replanning Phase {{phase}}",
-      "curing": "Repairing Phase {{phase}} — by cure",
-      "pausedReplan": "Replan of Phase {{phase}} paused — it resumes with the run",
-      "waitsHeld": "Heal of Phase {{phase}} waits: a child could not be started — {{why}}"
+      "pausedReplan": "Replan of Phase {{phase}} paused — it resumes with the run"
     },
     "arcs": "Arcs",
     "arcCards": "{{done}} of {{total}} done",

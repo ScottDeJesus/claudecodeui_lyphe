@@ -13,24 +13,19 @@ import type { RunnerRepair } from '@/shared/types';
  * `progress.json.repair`:
  *
  *   · REPAIRING — a spinner, the phase, which step the session is on, and how long it has run.
- *     Four sessions answer a ⛔, in order, and the strip names whichever is working: the REPLAN
+ *     Three sessions answer a ⛔, in order, and the strip names whichever is working: the REPLAN
  *     (`by: 'replan'` — first re-running the phase's checks, then Odysseus rewriting the phase),
- *     the fix-it UNBLOCK outing, the class CURE the walk itself holds (`by: 'cure'` — an Asclepius
- *     chain launched by `cure.py` and waited on in the walk, `hooks/plan_runner/cure.py`), and the
- *     HEAL behind a failed outing. The first step of the first two can take minutes, and it used to
- *     leave the card reading `shiplog` with nothing said.
- *     Only while its process is alive: the run's own for an unblock outing and for a cure (the walk
- *     HOLDS the lane on the chain), the heal drain's for a
- *     heal (`repair.live` — the drain is a process of its own, launched BESIDE the walk by the
- *     ending that filed the item). A pending repair outlives its
- *     process (a park keeps it for the resume, a crash strands it), and a spinner over one nobody
- *     is walking would say work is happening.
+ *     the fix-it UNBLOCK outing, and the HEAL a spent ladder filed. The first step of the first two
+ *     can take minutes, and it used to leave the card reading `shiplog` with nothing said.
+ *     Only while its process is alive: the run's own for an unblock outing, the heal drain's for a
+ *     heal (`repair.live` — the drain is the heal side's own process, launched by the watchdog's
+ *     `heal-due` beat, never by the run). A pending repair outlives its process (a park keeps it for
+ *     the resume, a crash strands it), and a spinner over one nobody is walking would say work is
+ *     happening.
  *   · PAUSED — the run parked on a rate limit mid-repair and the repair resumes with it; or a heal
- *     no drain is working, and then the strip says WHY off the item's own `waiting_on`: another heal
- *     is running, or heals are off — and a word that is neither is a child the drain could not
- *     start, shown with its own fault. No gate named means nothing holds it and the next drain
- *     takes it up. The day's cap was a third word here and it is GONE: a live run's cure weighs no
- *     vendor park (`heal_live.gate`), so no item can wait on it any more.
+ *     item no drain is working yet, and then the strip REPORTS it as filed. A run never waits on a
+ *     heal (operator ruling 2026-09-24: "runs should only report what to heal, never wait on a
+ *     heal"), so no sentence here says the run, or its heal, is waiting on anything.
  *   · FIXED — finished. `resumed` picks the words: the phase walks again, or (a heal that cured the
  *     cause without re-arming the phase) the cause is cured and the phase still stands.
  *   · FAILED — finished without clearing it, with the runner's one-line reason.
@@ -54,8 +49,8 @@ export function RepairBanner({ repair, runLive }: { repair: RunnerRepair; runLiv
           <div className="flex min-w-0 items-center gap-2">
             <Spinner size={14} />
             <span className="min-w-0 text-sm">
-              <strong>{t(repair.by === 'replan' ? 'runner.repair.replanning'
-                : repair.by === 'cure' ? 'runner.repair.curing' : 'runner.repair.repairing', { phase: repair.phase_id })}</strong>
+              <strong>{t(repair.by === 'replan' ? 'runner.repair.replanning' : 'runner.repair.repairing',
+                { phase: repair.phase_id })}</strong>
               <span className="text-muted-foreground">
                 {` · ${t(`runner.repair.step.${repair.step}`, { defaultValue: repair.step })}${attempt}${elapsed ? ` · ${elapsed}` : ''}`}
               </span>
@@ -67,20 +62,8 @@ export function RepairBanner({ repair, runLive }: { repair: RunnerRepair; runLiv
   }
 
   if (paused) {
-    // WHY a queued heal is not being worked. The runner stamps the gate holding the item
-    // (`heal_live.WAIT_*`), and the card says that gate's own sentence: another drain is out, or
-    // heals are off. NO word at all — the drain parked or died — is the next drain's to take up, and
-    // a word that is no gate is a fault the drain could not start a child past.
-    const waits = repair.waiting_on === 'heal-running'
-      ? t('runner.repair.waitsHeal', { phase: repair.phase_id })
-      : repair.waiting_on === 'heals-off' ? t('runner.repair.waitsOff', { phase: repair.phase_id })
-        : repair.waiting_on
-          // A HELD item (`heal_drain._held`): a child could not be started at all and the runner
-          // wrote the fault's own word on the item — `OSError: …`, `FlashOnly: …`. The generic
-          // "the next drain takes it up" would hide a fault that repeats, so the word is shown.
-          ? t('runner.repair.waitsHeld', { phase: repair.phase_id, why: repair.waiting_on })
-          : t('runner.repair.pausedHeal', { phase: repair.phase_id });
-    const said = repair.by === 'heal' ? waits
+    // A heal item nobody is working yet is REPORTED as filed — the run filed it and walked on.
+    const said = repair.by === 'heal' ? t('runner.repair.filedHeal', { phase: repair.phase_id })
       : t(repair.by === 'replan' ? 'runner.repair.pausedReplan' : 'runner.repair.paused',
           { phase: repair.phase_id });
     return (

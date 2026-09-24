@@ -850,7 +850,7 @@ pick, how do I add one:
   app beside itself is not what "Open in dual screen" says. A kebab left open takes the next Escape itself, and the sheet
   goes on the press after it — the shared overlay-Escape contract every portalled `ActionMenu`
   carries (`src/shared/ui/overlayEscape.ts`, documented in
-  [`verve/README.md`](../src/shared/ui/verve/README.md) §"The overlay half"). Removing an app that
+  [`src/shared/ui/verve/MANUAL.md (README)`](../src/shared/ui/verve/MANUAL.md) §"The overlay half"). Removing an app that
   is UP takes its pane down first, in the render the press was made in, so a refusal then names it
   in the banner: the reader's screen changed for a removal that did not happen, and the notice has
   to say so. A row naming this app (§"The self-origin rule") carries only Open in a new tab and
@@ -876,7 +876,7 @@ Every word the switcher draws comes from the `applications` block of
 of its own — the block is where these keys belong — and a key missing from a non-English locale
 falls back to English without a word, which is what makes a skipped translation easy to miss.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/overlayEscape.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/overlayEscape.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/verve/MANUAL.md
 
 ## MAN-488 — The panes, and the layer
 section: applications/010 The panes, and the layer
@@ -1054,7 +1054,9 @@ section: chat-contracts/000
 Six agreements the transcript, the composer and Settings all lean on. Break one and a screen says
 something untrue about who did what — which model answered, or who let a tool run. Each rule names
 the file that enforces it; that file's header carries the reasoning and this note does not repeat it.
-Proving any of it on the running app is [verification.md](verification.md).
+Proving any of it on the running app is [docs/MANUAL.md (verification)](MANUAL.md).
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/MANUAL.md
 
 ## MAN-494 — 1. The model is recorded per turn, on every part of it
 section: chat-contracts/001 1. The model is recorded per turn, on every part of it
@@ -1127,7 +1129,7 @@ child's env carries `CLAUDE_SURFACE=cloudcli`, and its system prompt gains `SURF
 — one sentence naming the fence and the bus (`WIDGET_SIGNAL`), one naming the embed body and the
 fullscreen switch (`EMBED_SIGNAL`), then a short paragraph naming the
 four markdown conventions this surface draws as components (`MARKDOWN_SIGNAL`; what it names, and
-why only four, is [architecture/08-rendered-shapes.md](architecture/08-rendered-shapes.md)
+why only four, is [docs/architecture/MANUAL.md (08-rendered-shapes)](docs/architecture/MANUAL.md (08-rendered-shapes))
 §"The triggers"). Both come from `surface-signal.ts` and nowhere else — never `.env`,
 never a systemd unit, never `process.env` read at module load. A terminal launch of `claude` reads
 neither, so their absence is what tells a turn it is not talking to CloudCLI's chat; the runner's
@@ -1154,7 +1156,7 @@ must differ from this app's before any iframe is rendered. Everything else — a
 parse, one whose `kind` is a word the classifier does not know, one that merely contains the word —
 is HTML, so nothing that renders today can change shape. The full shape of the fence, all three
 sandboxes, the origin invariant and the bus it talks to is
-[architecture/07-live-widgets.md](architecture/07-live-widgets.md) §"The DocSpace kind" and
+[docs/architecture/MANUAL.md (07-live-widgets)](docs/architecture/MANUAL.md (07-live-widgets)) §"The DocSpace kind" and
 §"The embed kind".
 
 That second body shape — a fence whose content is the JSON naming a DocSpace block — renders
@@ -1166,7 +1168,7 @@ a login-free API, so a grant the HTML widget's `srcDoc` sandbox never may hold i
 precisely because the origin differs. The widget sentence (`WIDGET_SIGNAL` in `surface-signal.ts`)
 carries this in its own clause: anything that should persist, be edited by the reader, or be read back on a
 later turn is steered toward a DocSpace block instead of a one-off HTML fence. The full protocol
-both frames speak is still [architecture/07-live-widgets.md](architecture/07-live-widgets.md)
+both frames speak is still [docs/architecture/MANUAL.md (07-live-widgets)](docs/architecture/MANUAL.md (07-live-widgets))
 §"The DocSpace kind".
 
 A LIVE embed of any kind wears the same card header every other shape in the transcript wears:
@@ -1181,6 +1183,8 @@ keep the raw source they have always had, with no header and no card over it. Th
 is a FUNCTION passed in rather than a wrapper drawn around `WidgetFrame` — it is applied from
 behind that component's mount and streaming gates, which is the only place that knows whether a
 live frame exists at all.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/architecture/MANUAL.md
 
 ## MAN-501 — The CLI version report
 section: cli-version/000
@@ -2027,10 +2031,12 @@ section: design-login/003 Rules
    new command to a pty already running the old one.
 5. The description says read AND write: the CLI's own panel and the minted URL both carry both scopes.
 6. The pty slot is keyed by a digest of the whole command
-   ([architecture/01-websocket-transport.md](architecture/01-websocket-transport.md) §"The `/shell`
+   ([docs/architecture/MANUAL.md (01-websocket-transport)](docs/architecture/MANUAL.md (01-websocket-transport)) §"The `/shell`
    socket"), so each row reattaches only to a pty running its own command.
 7. A parked design pty lives `PTY_SESSION_TIMEOUT` (30 min). Another `Authenticate` press reattaches
    to the pending authorization; it does not mint a second.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/architecture/MANUAL.md
 
 ## MAN-1365 — Proving it
 section: design-login/004 Proving it
@@ -2085,7 +2091,7 @@ row itself belongs to the chat module — derived by
 `src/modules/chat/hooks/usePinnedSubagentRows.ts` and drawn by
 `src/modules/chat/transcript/PinnedSubagents.tsx` (the same row, in the gutter, by
 `src/modules/chat/subagents/SubagentWidgetBody.tsx`),
-[architecture/06-tool-view.md](architecture/06-tool-view.md) §Subagents; this lane is the half of
+[docs/architecture/MANUAL.md (06-tool-view)](docs/architecture/MANUAL.md (06-tool-view)) §Subagents; this lane is the half of
 the row that knows whether the soul is still alive.
 
 The launcher is a separate program — `~/.claude/hooks/plan_runner/solo/`, reached as
@@ -2094,7 +2100,7 @@ The launcher is a separate program — `~/.claude/hooks/plan_runner/solo/`, reac
 byte under that root: a launch needs a brief, a shim and a role gate, which is a conductor's act and
 not a button's.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/usePinnedSubagentRows.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/subagents/SubagentWidgetBody.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/PinnedSubagents.tsx
+governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/architecture/MANUAL.md, /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/usePinnedSubagentRows.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/subagents/SubagentWidgetBody.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/PinnedSubagents.tsx
 
 ## MAN-524 — What a pin is, and why it takes two halves
 section: dispatch-souls/001 What a pin is, and why it takes two halves
@@ -2210,7 +2216,7 @@ what a launch MEANS.
 `provider` and `status`, `spec.json`'s `provider`, and the directory layout are all read from here,
 by a program in another repository, on a two-second poll. Reword the receipt line and every soul
 unpins; rename a field and the pin paints the wrong vendor. The estate carries the same rule from
-its own side: `~/.claude/hooks/GOTCHAS.md` #36, surfaced in `~/.claude/hooks/README.md` §Runner.
+its own side: INV-36, surfaced in MAN-838.
 
 **Every timestamp in a launch directory is epoch SECONDS**, because the launcher's Python wrote them
 with `time.time()`. Only the frame's own `at` is milliseconds. Read one as the other and every launch
@@ -2276,9 +2282,11 @@ file while the soul is still out. Neither is sufficient alone; without the log a
 a healthy DeepSeek pin for hours.
 
 This is the third surface on this box where a reader meets DeepSeek, and the only one that spends no
-key: the switch's controls write the flag ([plan-runner.md](plan-runner.md) §"The DeepSeek switch"),
-the account readout asks the vendor ([deepseek-balance.md](deepseek-balance.md)), and the pin simply
+key: the switch's controls write the flag ([docs/MANUAL.md (plan-runner)](MANUAL.md) §"The DeepSeek switch"),
+the account readout asks the vendor ([docs/MANUAL.md (deepseek-balance)](MANUAL.md)), and the pin simply
 paints the mark of the endpoint that was billed.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/MANUAL.md
 
 ## MAN-532 — The windows
 section: dispatch-souls/009 The windows
@@ -2330,7 +2338,7 @@ which would also deliver it to `/shell`, `/plugin-ws` and `/desktop-notification
 parsed and dropped, and on `/plugin-ws` handed to third-party plugin frontends that have no business
 seeing it. `useChatRealtimeHandlers` carries `case 'soul_launch_state': return;` in the shared
 box-wide `case` group beside `runner_state`, `universe_map` and `universe_activity`
-(`docs/architecture/01-websocket-transport.md` §"Fan-out: who receives what"), and it must RETURN
+(MAN-315), and it must RETURN
 rather than break: without the case the frame falls through the switch's `default`, inherits the
 viewed session's id, and is appended to the open transcript as a message row.
 
@@ -2364,7 +2372,7 @@ section: dispatch-souls/012 The client
 |---|---|
 | `src/modules/dispatch-souls/SoulLaunchFeed.tsx` | The lane's one door into the live bus, and the ONLY place in the client that names the `soul_launch_state` frame. Headless: it renders its children unchanged. `App` mounts it inside `LiveBusProvider`, inside the auth gate, below `WebSocketProvider` — nested inside `RunnerFeed`, because a feed is a wrapper and not a sibling. |
 | `hooks/useSoulLaunches.ts` | The read side: the retained `souls:*` topic as a `Map` keyed by launch id. A map rather than the array because the reader asks one lookup per anchored id. `undefined` (nothing retained) and `[]` (the lane is empty) collapse to an empty map — to a screen they are the same instruction. |
-| `src/modules/chat/transcript/SoulLaunchPinRow.tsx` | One soul's row, drawn to be indistinguishable in SHAPE from the agent rows beside it. Its mark is `LLMProviderLogo` on the launch's provider — the DeepSeek whale, or Claude's mascot — centred beside its two lines, as an `Agent` subagent's row carries its own provider's mark. The row is also a button: an `onOpen` prop, given by both the strip (in a dialog) and the gutter's Subagents widget (in place), opens this soul's transcript live through the second route above ([architecture/06-tool-view.md](architecture/06-tool-view.md) §Subagents). |
+| `src/modules/chat/transcript/SoulLaunchPinRow.tsx` | One soul's row, drawn to be indistinguishable in SHAPE from the agent rows beside it. Its mark is `LLMProviderLogo` on the launch's provider — the DeepSeek whale, or Claude's mascot — centred beside its two lines, as an `Agent` subagent's row carries its own provider's mark. The row is also a button: an `onOpen` prop, given by both the strip (in a dialog) and the gutter's Subagents widget (in place), opens this soul's transcript live through the second route above ([docs/architecture/MANUAL.md (06-tool-view)](docs/architecture/MANUAL.md (06-tool-view)) §Subagents). |
 
 The row lives in the CHAT module, not in `dispatch-souls/`: the pinned rows it lands among are the chat's, and
 a lane must not reach back into it.
@@ -2383,7 +2391,7 @@ read fills it, and re-fills it on `websocket_reconnected`, since frames missed d
 never re-sent. A seed never overwrites a reading NEWER than itself — a request in flight while a
 frame arrives would otherwise land after it and put the older picture back on screen.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/SoulLaunchPinRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatch-souls/SoulLaunchFeed.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/live-bus/topics.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useElapsed.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/architecture/MANUAL.md, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/SoulLaunchPinRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatch-souls/SoulLaunchFeed.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/live-bus/topics.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useElapsed.ts
 
 ## MAN-536 — Known residuals
 section: dispatch-souls/013 Known residuals
@@ -2397,8 +2405,10 @@ section: dispatch-souls/013 Known residuals
   moment the next row crosses its own window; a backgrounded tab is throttled, so a row can outstay
   its two hours until the tab is looked at again. Without the timer at all a finished row sat there
   until an unrelated repaint, up to four hours past its window — this is the smaller of the two.
-- **Nothing in `all.mjs` measures the pin.** See [verification.md](verification.md) §"What bites
+- **Nothing in `all.mjs` measures the pin.** See [docs/MANUAL.md (verification)](MANUAL.md) §"What bites
   people".
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/MANUAL.md
 
 ## MAN-537 — Proving it
 section: dispatch-souls/014 Proving it
@@ -2427,20 +2437,20 @@ governs: /home/lyphe/.claude/state/deepseek_flash.flag
 ## MAN-538 — Cross-references
 section: dispatch-souls/015 Cross-references
 
-- [architecture/06-tool-view.md](architecture/06-tool-view.md) §Subagents — the pinned rows themselves,
+- [docs/architecture/MANUAL.md (06-tool-view)](docs/architecture/MANUAL.md (06-tool-view)) §Subagents — the pinned rows themselves,
   and the `Agent`-tool pin this one sits beside.
-- [architecture/01-websocket-transport.md](architecture/01-websocket-transport.md) — the frame tables
+- [docs/architecture/MANUAL.md (01-websocket-transport)](docs/architecture/MANUAL.md (01-websocket-transport)) — the frame tables
   and the broadcaster set.
-- [plan-runner.md](plan-runner.md) — the sibling lane, the shared feed pattern, and the DeepSeek
+- [docs/MANUAL.md (plan-runner)](MANUAL.md) — the sibling lane, the shared feed pattern, and the DeepSeek
   switch this lane paints the result of.
-- [deepseek-balance.md](deepseek-balance.md) — the account those souls spend.
-- `~/.claude/hooks/README.md` §Runner (`soul`) and `~/.claude/hooks/GOTCHAS.md` #35, #36 — the
+- [docs/MANUAL.md (deepseek-balance)](MANUAL.md) — the account those souls spend.
+- MAN-838(`soul`) and INV-35, INV-36 — the
   launcher's own side, and the contract this lane binds it to.
 - `~/.claude/skills/heal/sections/deepseek.md` (the DeepSeek-door procedure, attached to
   `/heal`'s own `Skill` call by `~/.claude/hooks/skill_router.py` when the switch reads
   `on`) — the door for ONE hand-launched soul.
 
-governs: /home/lyphe/.claude/hooks/skill_router.py, /home/lyphe/.claude/skills/heal/sections/deepseek.md
+governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/architecture/MANUAL.md, /home/lyphe/.claude/claudecodeui_lyphe/docs/MANUAL.md, /home/lyphe/.claude/hooks/skill_router.py, /home/lyphe/.claude/skills/heal/sections/deepseek.md
 
 ## MAN-539 — The file manager
 section: file-manager/000
@@ -2450,7 +2460,9 @@ document preview, or the editor. `src/modules/file-manager/` is `DirectoryListin
 `FileBreadcrumb` and `PreviewPane` under the one `FileManager` its barrel exports, with
 `useFileManagerState` holding where it is and `useEditGuard` settling what an open does to an
 unsaved session. The server half — the routes, the refusal table, the no-overwrite rule — is
-[files-api.md](files-api.md).
+[docs/MANUAL.md (files-api)](MANUAL.md).
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/MANUAL.md
 
 ## MAN-540 — The rules that bite
 section: file-manager/001 The rules that bite
@@ -2478,7 +2490,7 @@ section: file-manager/001 The rules that bite
    so that one arm alone can carry a `:line`. The chat's markdown links and file chips are that
    arm's callers, and both hand over the line the reference names, as read by `parseFileRef` in
    `src/modules/chat/transcript/shapes/detect.ts` — whose grammar, and the two policies it is read
-   under, is [architecture/08-rendered-shapes.md](architecture/08-rendered-shapes.md)
+   under, is [docs/architecture/MANUAL.md (08-rendered-shapes)](docs/architecture/MANUAL.md (08-rendered-shapes))
    §"The triggers".
 
 3. **State is keyed by project AND directory, and both halves are load-bearing.** A read is shown
@@ -2522,7 +2534,7 @@ section: file-manager/001 The rules that bite
    or invented number is the common case — so where the file's length is known the ask is clamped to
    the LAST line, that line is marked, and the footer names both numbers. The verdict is read off
    `totalLines` and never off a short window: the server also cuts a window on its character budget
-   (see [files-api.md](files-api.md) §"The rules that bite", on a preview bounded in bytes), so
+   (see [docs/MANUAL.md (files-api)](MANUAL.md) §"The rules that bite", on a preview bounded in bytes), so
    "shorter than asked for" is not "past the end". Re-asking for a window already on screen
    re-scrolls to it without a second read.
 
@@ -2544,7 +2556,7 @@ section: file-manager/001 The rules that bite
    of the view are dropped once they are clean, and the touched lines are never evicted at all, so a
    200,000-line file is a few hundred lines in memory and never the file. The gutter numbers the
    FILE's lines, not the document's. A save is the touched line range alone, addressed by the
-   revision the window was read from ([files-api.md](files-api.md) §"The rules that bite", rules 9
+   revision the window was read from ([docs/MANUAL.md (files-api)](MANUAL.md) §"The rules that bite", rules 9
    and 10); Mod-s and the toolbar's Save both send it, and a second press joins the write already in
    flight rather than repeating it. A write from anywhere else — or a window answered from a
    different revision while the document is dirty — stops the fetching and draws the conflict
@@ -2572,7 +2584,7 @@ section: file-manager/001 The rules that bite
     module's registry (`documentKindFor`, `textRenderingFor`, `documentCapFor`) what a file is, and
     render what `choosePreviewBody` answered (rule 5).
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/shapes/detect.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/document-preview/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/file-editor/utils/windowPolicy.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/file-manager/utils/previewBody.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/utils.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/architecture/MANUAL.md, /home/lyphe/.claude/claudecodeui_lyphe/docs/MANUAL.md, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/shapes/detect.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/document-preview/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/file-editor/utils/windowPolicy.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/file-manager/utils/previewBody.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/utils.ts
 
 ## MAN-541 — Proving it
 section: file-manager/002 Proving it
@@ -2589,9 +2601,9 @@ banner, the open-while-dirty dialog, a tab switch that keeps the unsaved session
 writes nothing. The document previews and the pane's routing (rules 5 and 10) are proven by
 `node .verify/probe-files-previews.mjs` (`PREVIEWS OK`), which also holds the negative that matters
 for the bundle: no preview library is fetched until a file of its kind opens. See
-[verification.md](verification.md).
+[docs/MANUAL.md (verification)](MANUAL.md).
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-8.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-files-editor.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-files-previews.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-inline.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-lineopen.mjs
+governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/MANUAL.md, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-8.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-files-editor.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-files-previews.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-inline.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-lineopen.mjs
 
 ## MAN-542 — The files API
 section: files-api/000
@@ -3057,9 +3069,9 @@ The clients are the only ports the LAN needs: `vite.config.js` proxies `/api`, `
 `/plugin-ws` to the API on loopback, so the API never faces the LAN. The app is reachable at
 `http://<this host>:5183` on the LAN and over Tailscale, and as the **CloudCLI** row of the
 application drawer this app serves — `apps.local.json`, git-ignored; the drawer's one
-documentation home is [`applications.md`](applications.md).
+documentation home is [`docs/MANUAL.md (applications)`](MANUAL.md).
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/deploy/dev-supervisor/supervisor.mjs, /home/lyphe/.claude/claudecodeui_lyphe/deploy/systemd/install.sh, /home/lyphe/.claude/claudecodeui_lyphe/scripts/prod-client-build.sh, /home/lyphe/.claude/claudecodeui_lyphe/vite-plugins/compressResponses.js, /home/lyphe/.claude/claudecodeui_lyphe/vite-plugins/precompressedAssets.js
+governs: /home/lyphe/.claude/claudecodeui_lyphe/deploy/dev-supervisor/supervisor.mjs, /home/lyphe/.claude/claudecodeui_lyphe/deploy/systemd/install.sh, /home/lyphe/.claude/claudecodeui_lyphe/docs/MANUAL.md, /home/lyphe/.claude/claudecodeui_lyphe/scripts/prod-client-build.sh, /home/lyphe/.claude/claudecodeui_lyphe/vite-plugins/compressResponses.js, /home/lyphe/.claude/claudecodeui_lyphe/vite-plugins/precompressedAssets.js
 
 ## MAN-555 — Rules that bite
 section: hosting/002 Rules that bite
@@ -3104,7 +3116,7 @@ section: hosting/002 Rules that bite
   event is one line — `[supervisor] boot failed — previous server kept: <first error line>` — with
   the next save booting again. The retired process still takes its WebSocket connections with it,
   so the browser drops and reconnects in about 3 s — onto a port that is already answering — and
-  the git-delegation run store re-subscribes on `websocket_reconnected` (see `git-panel.md`). The
+  the git-delegation run store re-subscribes on `websocket_reconnected` (see `docs/MANUAL.md (git-panel)`). The
   state machine, every log line, the two environment bits and the failure table are in
   [`deploy/dev-supervisor/README.md`](../deploy/dev-supervisor/README.md), the mechanism's one
   home. What the same handover costs a Claude turn already in flight is its own rule below.
@@ -3138,7 +3150,7 @@ section: hosting/002 Rules that bite
   so the file stays mode 600 and git-ignored, and a key that reaches a log or a transcript is
   rotated at the vendor rather than deleted from whatever recorded it. Who reads the key, and the
   boot-once mechanism that decides which copy of it wins, is
-  [`.env.example`](../.env.example) and [deepseek-balance.md](deepseek-balance.md).
+  [`.env.example`](../.env.example) and [docs/MANUAL.md (deepseek-balance)](MANUAL.md).
 - **ArchPulse's port 8005 must never be proxied through this app.** The chat can embed a live
   DocSpace block, and that iframe is the one frame here that carries `allow-same-origin` — it has
   to, or the block cannot write the reader's edit back through ArchPulse's own API. What keeps
@@ -3151,7 +3163,7 @@ section: hosting/002 Rules that bite
   documents the `VITE_DOCSPACE_EMBED_ORIGIN` override for an ArchPulse on another host, and a
   value that resolves back onto this app's own origin draws an error card instead of a frame. The
   invariant and the gate that enforces it are at
-  [architecture/07-live-widgets.md](architecture/07-live-widgets.md) §"The DocSpace kind".
+  [docs/architecture/MANUAL.md (07-live-widgets)](docs/architecture/MANUAL.md (07-live-widgets)) §"The DocSpace kind".
 - **A server heal no longer kills an in-flight Claude session, and the API that comes back
   re-adopts it.** A turn's CLI is now exec'd inside the `cloudcli-sessions` tmux server rather
   than as a child of the API, so `systemctl restart cloudcli-server-dev` tears down only the
@@ -3168,7 +3180,7 @@ section: hosting/002 Rules that bite
   API as every turn used to. Which of the two you get, and the `CLOUDCLI_SESSION_KEEPALIVE`
   gate that decides it — the same one variable also decides whether this boot pass re-adopts at
   all, though it sweeps dead files either way — is in
-  [`session-host/README.md`](../server/modules/providers/list/claude/session-host/README.md),
+  [`server/modules/providers/list/claude/session-host/MANUAL.md (README)`](../server/modules/providers/list/claude/session-host/MANUAL.md),
   the mechanism's one home. Either way the API canary counts any HTTP status as alive and
   needs three misses ten seconds apart before it acts — a stall under load must never read as
   death.
@@ -3184,7 +3196,7 @@ section: hosting/002 Rules that bite
   **One probe now reaches outside this app.** `phase-29.mjs` creates and deletes a real page in
   ArchPulse's DocSpace store on :8005, so the harness needs `archpulse.service` up and the state
   at risk is no longer only this app's — the check is in
-  [verification.md](verification.md) §"The dev server", the page's title fence and what an
+  [docs/MANUAL.md (verification)](MANUAL.md) §"The dev server", the page's title fence and what an
   ArchPulse restart mid-run does are in its §"What bites people".
 - **Never kill the client by pattern.** `pkill -f 'sleep infinity'` reaches every such process
   on the box, and this fork's chat-session server holds one on the private `-L cloudcli-sessions`
@@ -3200,7 +3212,7 @@ section: hosting/002 Rules that bite
   on this host 2026-09-08. Nothing watches this fork's keepalive — `cloudcli-dev-watchdog.sh`
   does not know it — so it stays silently dead until a human restarts it.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/deploy/dev-supervisor/README.md, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/child-env.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/authToken.ts, /home/lyphe/.claude/claudecodeui_lyphe/vite-plugins/compressResponses.js, /home/lyphe/.claude/claudecodeui_lyphe/vite-plugins/keepPageOnReconnect.js
+governs: /home/lyphe/.claude/claudecodeui_lyphe/deploy/dev-supervisor/README.md, /home/lyphe/.claude/claudecodeui_lyphe/docs/architecture/MANUAL.md, /home/lyphe/.claude/claudecodeui_lyphe/docs/MANUAL.md, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/session-host/MANUAL.md, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/child-env.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/authToken.ts, /home/lyphe/.claude/claudecodeui_lyphe/vite-plugins/compressResponses.js, /home/lyphe/.claude/claudecodeui_lyphe/vite-plugins/keepPageOnReconnect.js
 
 ## MAN-558 — Runbook
 section: hosting/003 Runbook
@@ -3267,9 +3279,9 @@ and the turn's own `complete` arrived once on the far side — then the host's t
 its `~/.cloudcli/sessions` files were gone. Background work started before the restart also
 delivered its notification and its second `result` afterwards, and a boot with two dead hosts
 on disk swept both and left nothing behind. Driven by `.verify/keepalive-cases-p4.mjs`, whose
-per-case contract is in [verification.md](verification.md) §"The keepalive cases".
+per-case contract is in [docs/MANUAL.md (verification)](MANUAL.md) §"The keepalive cases".
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/deploy/systemd/install.sh, /home/lyphe/.claude/claudecodeui_lyphe/scripts/prod-client-build.sh, /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/keepalive-cases-p4.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/keepalive-host-case.mjs
+governs: /home/lyphe/.claude/claudecodeui_lyphe/deploy/systemd/install.sh, /home/lyphe/.claude/claudecodeui_lyphe/docs/MANUAL.md, /home/lyphe/.claude/claudecodeui_lyphe/scripts/prod-client-build.sh, /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/keepalive-cases-p4.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/keepalive-host-case.mjs
 
 ## MAN-559 — The Kanban board
 section: kanban/000
@@ -3506,7 +3518,7 @@ case, not a special one.
 itself: the module barrel (`server/modules/kanban/index.ts`) exports it on its own name for one
 caller — the plan-runner module's plans-archive sweep, composed once in `server/index.ts` and
 called afresh on every pass, never captured, so a lease taken after that module was built still
-stops the plan it is on from moving (see [plan-runner.md](plan-runner.md)). It answers every plan
+stops the plan it is on from moving (see [docs/MANUAL.md (plan-runner)](MANUAL.md)). It answers every plan
 path a live, non-archived card's plan or build lease is holding, fresh by the same staleness
 window above, and names no card: an empty list is the ordinary answer on a quiet board.
 
@@ -3589,7 +3601,7 @@ refused claim records nothing.
 `kanban-lessons.service.ts` — `stageLesson`, `listLessons`, `getLesson`, `reviewLesson`,
 `approvedIndex`, §"The lessons lane".
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/assets/services/image-assets.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/kanban/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/utils.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/MANUAL.md, /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/assets/services/image-assets.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/kanban/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/utils.ts
 
 ## MAN-587 — The routes
 section: kanban/006 The routes
@@ -3766,7 +3778,7 @@ there, and switching it back on shows the same data.
 **A second board column, `deepseekFlash`, round-trips beside `autonomy`.** It reached
 `kanban_boards` in the same phase as `claimableCount` (§"The services") — the board's own
 DeepSeek Flash switch, mirroring the host-wide flag file the plan runner polls
-([plan-runner.md](plan-runner.md) §"The DeepSeek switch") but scoped to one board. The header row
+([docs/MANUAL.md (plan-runner)](MANUAL.md) §"The DeepSeek switch") but scoped to one board. The header row
 now draws it too, beside Autonomy: a second `Switch` wearing the DeepSeek mark
 (`LLMProviderLogo`) rather than a colour of its own, with a `Tooltip` naming what the switch
 moves. That composition is now WIRED, not a scaffold: `useKanbanBoards` reads `deepseekFlash`
@@ -3821,7 +3833,7 @@ statement, every one of them excluding archived cards:
 - `memoryPendingEstate` — handed IN by the composition root rather than computed here, because the
   rows behind it are `memory_candidates` and this module never imports `memory-intake`: the board
   cannot see that lane's table, and a count it computed for itself would be the board reading a
-  sibling's rows sideways (§[memory-intake.md](memory-intake.md)).
+  sibling's rows sideways (§[docs/MANUAL.md (memory-intake)](MANUAL.md)).
 
 Every estate-wide key carries the word ESTATE in its name, so no caller can read a number taken across
 the whole install as one board's own. The read is read-only — no transaction, no audit row, no frame —
@@ -3847,7 +3859,7 @@ instead, in the shape `<title> moved to <lane>, position <n> of <total>`. Only t
 the lane the card left and the lane it landed in, and a toast leaves — and a thing that leaves
 cannot announce.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/kanban/utils/lanePolicy.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/MANUAL.md, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/kanban/utils/lanePolicy.ts
 
 ## MAN-590 — The lessons lane
 section: kanban/009 The lessons lane
@@ -3887,7 +3899,7 @@ ahead of the credential check, the way the guard's other refusals are (§"The ka
 and reading the corpus are exactly what a build is for.
 
 **Reviewed from the Memory tab, not from the board.** The two review routes' one caller in this app
-is `LessonReviewList` ([memory-intake.md](memory-intake.md) §"Beneath the queue, the lessons") — a
+is `LessonReviewList` ([docs/MANUAL.md (memory-intake)](MANUAL.md) §"Beneath the queue, the lessons") — a
 section of the Memory tab rather than a control on the board itself, the same estate-not-board
 placement above. It reads the staged list at the route's own ceiling through `useLessonReview` and
 calls the two review verbs through the same hook.
@@ -3895,6 +3907,8 @@ calls the two review verbs through the same hook.
 **Reachable from a tool call, as of Phase 7.** The MCP surface's `stage_lesson`, `list_lessons` and
 `get_lesson` are real tools now (§"The kanban-pm MCP surface") — `kanban-pm-tools-lessons.ts` is
 the wiring from a Metis's own tool call to the store and HTTP doors this lane built.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/MANUAL.md
 
 ## MAN-591 — The driver
 section: kanban/010 The driver
@@ -3987,7 +4001,7 @@ by `CLOUDCLI_RATE_LIMIT_PATH` (`{ last_rate_limit_at, reset_at }`, epoch seconds
 **The state frame.** `kanban_metis_state` (`{ kind, sessions: KanbanMetisSession[], at }`) is
 broadcast to every open `/ws` socket on the shared polled-lane cadence (2 s, `createPolledLane`) —
 the same loop the plan-runner and launcher-souls lanes run
-([plan-runner.md](plan-runner.md) §"What the runner writes, and where"). The panel seeds from
+([docs/MANUAL.md (plan-runner)](MANUAL.md) §"What the runner writes, and where"). The panel seeds from
 `GET /sessions` for the case a frame cannot cover: a page mounting while nothing is moving. A
 session record carries `sessionId`, `boardId`, `boardName`, `provider` (`'deepseek' | 'claude'`),
 `model`, `owner`, `launchedBy` (`'operator' | 'driver'`), `state` (`'running' | 'completed' |
@@ -3995,7 +4009,7 @@ session record carries `sessionId`, `boardId`, `boardName`, `provider` (`'deepse
 `exitCode`; the type lives in `server/shared/types.ts` beside `SoulLaunchSnapshot` and is mirrored
 into `src/shared/types.ts`.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/kanban/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/kanban-types.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/hooks/notify_api_error.sh
+governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/MANUAL.md, /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/kanban/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/kanban-types.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/hooks/notify_api_error.sh
 
 ## MAN-592 — The token watcher
 section: kanban/011 The token watcher
@@ -4282,12 +4296,12 @@ repository does not own and has no forward encoder for. The `null` reaches both 
 exists, which is why the panel reads her transcript by the session id the board minted, through the
 route above and the `scanProjectsRoot` fallback behind it. The providers module's own scan-roots
 table records the same refusal from the read side:
-[server/modules/providers/README.md](../server/modules/providers/README.md).
+[server/modules/providers/MANUAL.md (README)](../server/modules/providers/MANUAL.md).
 
 **The hooks seam.** One module, `~/.claude/hooks/kanban_metis.py`, holds the predicate and never
 raises: `SESSION_ROOT`, `board_id(payload_or_cwd)` (the leaf under that root, else `None`) and
 `is_board_session(payload_or_cwd)`. One consumer, one early return, and the same predicate is
-stated from the hooks' own side in `~/.claude/hooks/README.md` §"Metis-session scoping":
+stated from the hooks' own side in MAN-753:
 
 - `metis_session.maybe_stamp` gains a FOURTH create trigger: any event whose payload `cwd` is a
   board session stamps the Metis-presence marker, without a typed `/pm` — the board-issued identity
@@ -4300,10 +4314,10 @@ stated from the hooks' own side in `~/.claude/hooks/README.md` §"Metis-session 
 they do for an operator's session: **G1** lints the same `pm-*.plan.md` plans `/execute`
 would mis-handle, **G2** blocks a git write while a build marker is live — though the plan-path
 cleanup retired that marker's only producer, so it is OFF for every session today, board Metis
-included (`hooks/GOTCHAS.md` #29) — **G5** sends a decision to `post_design_questions` instead of a
+included (INV-29) — **G5** sends a decision to `post_design_questions` instead of a
 terminal prompt nobody is watching, and **G10** blocks destructive SQL from an unattended session.
 
-governs: /home/lyphe/.claude/hooks/kanban_metis.py
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/MANUAL.md, /home/lyphe/.claude/hooks/kanban_metis.py
 
 ## MAN-597 — The pilot panel
 section: kanban/016 The pilot panel
@@ -4344,7 +4358,7 @@ never hidden by the one just opened. `KanbanMetisConversation` draws no header o
 `SubagentTranscriptView`'s own sticky row (Back, a label built from the session's model and state off
 the same four keys `KanbanMetisRow`'s state table holds, and a "Live" badge while it runs) is the
 only one, reached the same way the old panel body reached it — `sessionId={null}`,
-`target={{ kind: 'metis', id }}` ([06-tool-view.md](architecture/06-tool-view.md) §"Click to read,
+`target={{ kind: 'metis', id }}` ([06-tool-view.md](docs/architecture/MANUAL.md (06-tool-view)) §"Click to read,
 live"). An unlisted session — reaped, or dropped by a seed — is named by its session id alone, and
 the composer is still offered; the server, not this record, is the gate on whether the child is in
 fact still running. Beneath the transcript sits a composer built from `PromptInput`'s primitives
@@ -4369,7 +4383,7 @@ of its own to draw a sentence. `SubagentTranscriptTarget` still carries the thir
 `useSubagentTranscript` and `SubagentTranscriptView` stay reused rather than copied, and
 `api.subagentTranscripts.metis` remains the one call behind it.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/architecture/MANUAL.md, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts
 
 ## MAN-598 — The two switches
 section: kanban/017 The two switches
@@ -4390,10 +4404,10 @@ consulted for them.** The seam is `flag_path()` in `~/.claude/hooks/plan_runner/
 reads `PLAN_RUNNER_DEEPSEEK_FLAG_PATH` **at call time** and falls back to the host-wide path only
 when it is unset — so the two switches never mix, and a flip of the host-wide flag cannot move a
 board's sessions. The host-wide file, its own reader and writer, and the client surfaces that draw
-it are [plan-runner.md](plan-runner.md) §"The DeepSeek switch"; the board side of the rule is stated
+it are [docs/MANUAL.md (plan-runner)](MANUAL.md) §"The DeepSeek switch"; the board side of the rule is stated
 here and nowhere else.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/settings/index.ts, /home/lyphe/.claude/hooks/plan_runner/deepseek.py, /home/lyphe/.claude/state/deepseek_flash.flag
+governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/MANUAL.md, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/settings/index.ts, /home/lyphe/.claude/hooks/plan_runner/deepseek.py, /home/lyphe/.claude/state/deepseek_flash.flag
 
 ## MAN-599 — Proving it
 section: kanban/018 Proving it
@@ -4798,7 +4812,9 @@ browser web push, the desktop app, and **ntfy** — a phone push through an
 it needs the ntfy app subscribed to your topic.
 
 This page is the one home for the notification system's documentation. How to prove a change to
-it on this box is in [verification.md](verification.md) §"The ntfy probes".
+it on this box is in [docs/MANUAL.md (verification)](MANUAL.md) §"The ntfy probes".
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/MANUAL.md
 
 ## MAN-612 — Quickstart: your phone, in five minutes
 section: notifications/001 Quickstart: your phone, in five minutes
@@ -4809,7 +4825,7 @@ section: notifications/001 Quickstart: your phone, in five minutes
 2. Give CloudCLI the same topic in **Settings → Notifications → Phone push (ntfy)**: type the
    topic, check the CloudCLI URL the card prefills from the address you are on — it has to be
    the address the *phone* can reach, this host's Tailscale address on port 5183 (see
-   [hosting.md](hosting.md) §"What runs"), not `localhost` — and press Save. Then press **Send
+   [docs/MANUAL.md (hosting)](MANUAL.md) §"What runs"), not `localhost` — and press Save. Then press **Send
    test**; a "CloudCLI test" push on the phone means it works. The card shows the topic back
    only masked, and its token field is blank for "keep the stored one" — typing in it replaces
    the token, emptying it after typing clears it.
@@ -4832,6 +4848,8 @@ section: notifications/001 Quickstart: your phone, in five minutes
    ```
 
    `{"ok":true,"status":200,"error":null}` and a "CloudCLI test" push on the phone mean it works.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/MANUAL.md
 
 ## MAN-613 — How an event travels
 section: notifications/002 How an event travels
@@ -4877,7 +4895,7 @@ The events raised today:
 | `api.error` | `error` | The Claude runtime, when the assistant reports a request it could not make — after the SDK has spent its retries |
 | `login.expired` | `error` | The Claude runtime, when the credentials rather than the request are the problem |
 | `session.stuck` | `error` | The stall watchdog, when a run still in flight has emitted nothing for the stall threshold — no runtime raises it |
-| `runner.finished` | `stop` | The plan-runner lane, when a plan run ends with every phase shipped — see [plan-runner.md](plan-runner.md) §"Pushes on an ending" |
+| `runner.finished` | `stop` | The plan-runner lane, when a plan run ends with every phase shipped — see [docs/MANUAL.md (plan-runner)](MANUAL.md) §"Pushes on an ending" |
 | `runner.blocked` | `error` | The plan-runner lane, when a plan run ends with phases blocked or left: `all-blocked`, `budget`, `flag-off`, `unreadable`, or a `complete` that left phases |
 | `limit.reached` · `limit.reset` · `limit.warning` · `limit.overage` · `limit.out_of_credits` | `limit` | The Claude runtime, reading the SDK's `rate_limit_event` |
 | `push.enabled` | `info` | The settings service, when a browser saves a push subscription |
@@ -4899,7 +4917,7 @@ push — a second push needs events to resume and then stop again. Two runs are 
 run whose session has a tool approval still pending (that silence is the run waiting for you, and
 the approval push already went out), and a run that has ended.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/services/notification-orchestrator.service.js
+governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/MANUAL.md, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/services/notification-orchestrator.service.js
 
 ## MAN-614 — Where the Claude runtime's error and limit signals come from
 section: notifications/002 How an event travels/003 Where the Claude runtime's error and limit signals come from
@@ -5024,8 +5042,8 @@ push a watching laptop does not.
 The same store now answers a second, user-agnostic question too — is *any* tab watching this
 session right now, whoever it belongs to — through the sibling `isSessionOnScreen(sessionId)`.
 It is how the sidebar decides not to raise an unread dot for a run that finished while its own
-chat was already open; see [server/modules/providers/README.md](../server/modules/providers/README.md)
-and [server/modules/websocket/README.md](../server/modules/websocket/README.md).
+chat was already open; see [server/modules/providers/MANUAL.md (README)](../server/modules/providers/MANUAL.md)
+and [server/modules/websocket/MANUAL.md (README)](../server/modules/websocket/MANUAL.md).
 
 **Bursts.** Eight codes can arrive in bursts: `api.error`, `run.failed`, `session.stuck`,
 `limit.warning`, `limit.reached`, `limit.overage`, `agent.notification` and `run.stopped`. The
@@ -5036,12 +5054,14 @@ are counted instead of sent. If the minute ends with repeats counted, one summar
 tag, whatever the originals' priority, and only if ntfy is still on. The windows live in server
 memory, so a restart forgets an open one.
 
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/MANUAL.md, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/websocket/MANUAL.md
+
 ## MAN-618 — Answering from the phone
 section: notifications/004 The ntfy channel/008 Answering from the phone
 
 Questions and plan approvals raise `permission.required` in **every** permission mode, the
 bypassing ones included — see
-[architecture/02-realtime-stream.md](architecture/02-realtime-stream.md) §"Permission requests"
+[docs/architecture/MANUAL.md (02-realtime-stream)](docs/architecture/MANUAL.md (02-realtime-stream)) §"Permission requests"
 for the two callers that ask. That is what makes an unattended run answerable from a phone rather
 than silently auto-answered.
 
@@ -5109,7 +5129,7 @@ which would sell an unlimited budget for the price of rotating it. So all caller
 That is safe precisely because of the rule above, and it is why the checks in `.verify/ntfy` hand
 the budget back (one signed token) instead of trying to claim an address of their own.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/architecture/MANUAL.md, /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts
 
 ## MAN-619 — One question, one push
 section: notifications/004 The ntfy channel/009 One question, one push
@@ -5326,12 +5346,12 @@ this server runs, and `runner-watcher.service.ts` is now a thin adapter over it 
 lane's `snapshot` and its `runner_state` frame and nothing else. The reasoning above, the
 broadcast-after-send dedup order, and why a failing tick never takes the interval down with it live
 there, in one copy. The siblings are the launcher-souls lane
-([dispatch-souls.md](dispatch-souls.md)), which reads `~/.claude/state/dispatch-souls/` on the same
+([docs/MANUAL.md (dispatch-souls)](MANUAL.md)), which reads `~/.claude/state/dispatch-souls/` on the same
 cadence, a board's own Metis sessions (`kanban-metis/kanban-metis.module.ts`, the
 `kanban_metis_state` frame), and this module's own arc deck lane (`arc-lane.ts`, the `arc_state`
 frame, reading `~/.claude/state/arcs/`) — a different root and a different frame each time, the same loop.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/shared/polled-lane.service.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/MANUAL.md, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/polled-lane.service.ts
 
 ## MAN-626 — The plan-archive sweep
 section: plan-runner/002 The plan-archive sweep
@@ -5389,7 +5409,7 @@ section: plan-runner/003 The plan-cost read
 
 `plan-cost.service.ts` answers what a whole PLAN cost — the reading behind the card drawer's cost line,
 handed to the board as `kanbanReadings.planCost` and served by `GET /api/kanban/cards/:cardId/plan-cost`
-([kanban.md](kanban.md) §"The routes"). It is a READ of books that already exist, and it keeps no books of
+([docs/MANUAL.md (kanban)](MANUAL.md) §"The routes"). It is a READ of books that already exist, and it keeps no books of
 its own: a second ledger would be a second answer to "what did this cost", and two answers drift.
 
 **Every row it sums is ALREADY PRICED.** A `claude -p` child reports its own bill, and a ledger row was
@@ -5420,6 +5440,8 @@ reading twenty seconds stale on a surface that reports dollars is not a lie. The
 plan with nothing behind it answers `null`, which is what the route hands the drawer, so a card whose plan
 was never run reads "no cost yet" rather than `$0.00`.
 
+governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/MANUAL.md
+
 ## MAN-628 — The DeepSeek switch — the first of three state files this server writes
 section: plan-runner/004 The DeepSeek switch — the first of three state files this server writes
 
@@ -5434,7 +5456,7 @@ only one either is asked to touch.** `readFlagFile`/`writeFlagFile` in the same 
 path and answer the question above for ANY flag file; `readDeepseekFlashSwitch`/
 `writeDeepseekFlashSwitch` are the two calls above them, fixed to this switch's own path. The
 generalisation exists for a per-board flag a Kanban board carries as its own DeepSeek switch,
-reached through the same barrel from `server/modules/settings/index.ts` ([kanban.md](kanban.md)
+reached through the same barrel from `server/modules/settings/index.ts` ([docs/MANUAL.md (kanban)](MANUAL.md)
 §"The panel") — a board writes its OWN file rather than this one, because two boards on one host
 must run different models and a switch that is one file the whole box shares cannot say that.
 `server/modules/kanban-metis/metis-env.service.ts`'s `writeBoardFlag` is that second caller: it
@@ -5478,7 +5500,7 @@ reads that variable **at call time** — so every plan-runner that child starts,
 inside one of its runs, asks the board's file; this host-wide one is consulted only when the
 variable is unset. The board side of that rule — what writes the per-board file, and what a board's
 switch means for the sessions it launches — is stated once, in
-[kanban.md](kanban.md) §"The two switches".
+[docs/MANUAL.md (kanban)](MANUAL.md) §"The two switches".
 
 **The write is a rename, and each of its three parts answers a measured failure.** A plain
 `writeFile` is a truncate followed by a write, and the runner reads this file from another process —
@@ -5505,14 +5527,14 @@ class here, `utf-8-sig` there. Change either and change the other.
 re-read at every builder spawn, so a flip here reaches the next phase with nothing restarted on
 either side; a phase already in flight keeps the provider its builder opened. The whole rule, its
 fallbacks and its cost accounting: `~/.claude/hooks/plan_runner/deepseek.py`, surfaced in
-`~/.claude/hooks/README.md` §Runner with its invariants at `~/.claude/hooks/GOTCHAS.md` #34.
+MAN-838, with its invariants at INV-34.
 
 The same switch also steers a hand-launched soul through `plan-runner soul`, and THAT is
 where the operator sees it take effect: each such soul draws a pin in the chat it was launched from,
-wearing the mark of the endpoint that was actually billed ([dispatch-souls.md](dispatch-souls.md)).
+wearing the mark of the endpoint that was actually billed ([docs/MANUAL.md (dispatch-souls)](MANUAL.md)).
 So the switch has three surfaces on this box, and only two of them touch DeepSeek — the switch's own
 controls, which write the flag (here), the account readout that asks the vendor what is left
-([deepseek-balance.md](deepseek-balance.md)), and the pin, which asks nobody and paints what a
+([docs/MANUAL.md (deepseek-balance)](MANUAL.md)), and the pin, which asks nobody and paints what a
 finished soul's own receipt says it ran on.
 
 **This LANE never talks to DeepSeek, and owns the switch alone.** Nothing under `/api/plan-runner`
@@ -5520,12 +5542,12 @@ loads `DEEPSEEK_API_KEY`, sends it or logs it. Two programs on this box spend th
 runner reads it straight out of `.env` at each soul spawn, so a runner restarted from cron still
 finds it; and ONE module on this server — `server/modules/deepseek/`, behind
 `GET /api/deepseek/balance` — reads it per request to report the money left on that account under
-the sidebar's account row ([deepseek-balance.md](deepseek-balance.md)). The two are siblings and
+the sidebar's account row ([docs/MANUAL.md (deepseek-balance)](MANUAL.md)). The two are siblings and
 neither is a route into the other: this lane still reads run files and shells out, and the balance
 route knows nothing about runs. Where the key lives and who reads it is declared once, in
 `.env.example`.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/kanban-metis/metis-env.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/settings/deepseek-flash-switch.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/settings/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useDeepSeekFlashSwitch.ts, /home/lyphe/.claude/hooks/plan_runner/deepseek.py, /home/lyphe/.claude/state/deepseek_flash.flag
+governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/MANUAL.md, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/kanban-metis/metis-env.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/settings/deepseek-flash-switch.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/settings/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useDeepSeekFlashSwitch.ts, /home/lyphe/.claude/hooks/plan_runner/deepseek.py, /home/lyphe/.claude/state/deepseek_flash.flag
 
 ## MAN-629 — The swarm switch — the second
 section: plan-runner/005 The swarm switch — the second
@@ -5571,7 +5593,7 @@ never.
 **What the switch DOES is the runner's rule and lives there, not in this repository.** The flag's
 whole grammar, the optional lane ceiling, and what makes two phases independent enough to run inside
 it, are `~/.claude/hooks/plan_runner/swarm.py` and `independence.py`, surfaced in
-`~/.claude/hooks/README.md` at its `swarm <plan>` verb entry. What a run walking on this switch looks
+`~/.claude/hooks/MANUAL.md` at its `swarm <plan>` verb entry. What a run walking on this switch looks
 like once it is live is §"The runner card" below, the lane block a card grows once `progress.json`
 carries more than one — led by the same swarm mark this row wears.
 
@@ -5589,7 +5611,7 @@ and its row carry `data-runner-wave="N"`, which `.verify/probe-phase-wave-mark.m
 the swarm verb on the live heal-reflex run. `progress.txt` adds the same ` · wave N` to the same
 rows.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/settings/swarm-switch.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useSwarmSwitch.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-phase-wave-mark.mjs, /home/lyphe/.claude/hooks/plan_runner/swarm.py, /home/lyphe/.claude/state/swarm.flag
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/settings/swarm-switch.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useSwarmSwitch.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-phase-wave-mark.mjs, /home/lyphe/.claude/hooks/MANUAL.md, /home/lyphe/.claude/hooks/plan_runner/swarm.py, /home/lyphe/.claude/state/swarm.flag
 
 ## MAN-630 — The heal reflex's switches — the third, and the one that stops work
 section: plan-runner/006 The heal reflex's switches — the third, and the one that stops work
@@ -5948,7 +5970,7 @@ already un-parked.
 section: plan-runner/013 Pushes on an ending
 
 When a run ends, the lane says so once, through the same notification orchestrator every chat run
-uses ([notifications.md](notifications.md)), so web push, the desktop app and the ntfy phone push
+uses ([docs/MANUAL.md (notifications)](MANUAL.md)), so web push, the desktop app and the ntfy phone push
 all hear it under each user's own switches. `runner-endings.service.ts` decides;
 `plan-runner.module.ts` hands it the watcher's frame, so an ending is read off the exact picture the
 tabs receive, and only when that picture changed.
@@ -5995,9 +6017,11 @@ already on disk are history.
 **A watchdog restart is a new ending.** `runner_watchdog.py` restarts a run whose every remaining
 block is transient (`crash`, `timeout`, `budget`, …), or whose run still owes an unblock outing for
 a spec-bound one — the watchdog's `_owed` arm, which turns a spec-bound block from a wall into a
-restart while a door is still open (`~/.claude/hooks/GOTCHAS.md` #41); if the restart blocks again,
+restart while a door is still open (INV-41); if the restart blocks again,
 the run ends again with a later `ended_at`, and that is another push. The watchdog's own cap on
 restarts that ship nothing bounds how many.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/MANUAL.md
 
 ## MAN-638 — The fixture
 section: plan-runner/014 The fixture
@@ -6036,12 +6060,14 @@ The frame goes out over `connectedClients` — every open `/ws` socket — and n
 third-party plugin frontends that have no business seeing it (the reasoning at
 `taskmaster.routes.ts:30-50`). It is `kind`-keyed and declared in `GatewayEventKind`, unlike Task
 Master's `type`-keyed frames, so the protocol tables in
-[architecture/01-websocket-transport.md](architecture/01-websocket-transport.md) stay honest.
+[docs/architecture/MANUAL.md (01-websocket-transport)](docs/architecture/MANUAL.md (01-websocket-transport)) stay honest.
 
 `useChatRealtimeHandlers.ts` carries `case 'runner_state': return;`, and it must RETURN rather than
 break: without the case the frame falls through the switch's `default`, inherits the viewed
 session's id and is appended to the open transcript as a message row. It is a box-wide picture, and
 no transcript owns it.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/architecture/MANUAL.md
 
 ## MAN-640 — The feed
 section: plan-runner/015 Consumers/016 The feed
@@ -6077,7 +6103,7 @@ than a failure — the next frame fills it — and is logged, not surfaced.
 
 The bus itself — the topic allowlist, the retained values, the synchronous replay, and why it knows
 no producer — is documented on
-[architecture/07-live-widgets.md](architecture/07-live-widgets.md). This lane was simply its first
+[docs/architecture/MANUAL.md (07-live-widgets)](docs/architecture/MANUAL.md (07-live-widgets)). This lane was simply its first
 publisher. **Three more have arrived and all three kept the shape**: `ArcFeed.tsx` publishes `arc:*`
 beside it in this same module (§"The arc deck" below), `SoulLaunchFeed.tsx` in
 `src/modules/dispatch-souls/` publishes `souls:*` the same way, and `UniverseFeed.tsx` in
@@ -6088,6 +6114,8 @@ stack is still the router. Every further lane arrives as one more `*Feed.tsx` an
 inside `live-bus/` — usually in its own module, though `ArcFeed.tsx` is the exception: the arc deck
 reads the runner's own state directory rather than owning one of its own, so its feed lives beside
 `RunnerFeed.tsx` instead.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/architecture/MANUAL.md
 
 ## MAN-641 — The runner card
 section: plan-runner/015 Consumers/017 The runner card
@@ -6128,17 +6156,16 @@ where a paused run can wait.
 run and phase states, `Meter` for shipped-of-total with spawns and spend beneath it, `Chip` +
 `Shimmer` for the stage strip (`PipelineStrip`), `Collapsible` + `CollapsibleTrigger` +
 `CollapsibleContent` twice — once around the phase list, once inside each `PhaseRow` around its
-timeline — `Banner` + `Spinner` for the repair strip (`RepairBanner`: the unblock outing on a
-blocked phase, or the heal the drain works beside the walk (`by`; the ending that filed the item
-launches the drain), read off
-`progress.json.repair` — repairing with its step and clock while its process lives (the run's for an
-unblock, the drain's pid for a heal), paused while it waits — a queued heal no drain is working names
-its gate off the item's `waiting_on` (`heal-running` → `runner.repair.waitsHeal`, `heals-off` →
-`waitsOff`; any other word is a child the drain could not
-start, `waitsHeld` with the fault; no word → `pausedHeal`, "the next drain takes it up"; the words are
-`hooks/plan_runner/heal_live.py`'s and `heal_drain._held`'s, carried through `readRepair` unchanged) —
-then the ending: unblocked and running
-again, cured with the phase still standing (`resumed` false), or still blocked with the reason)
+timeline — `Banner` + `Spinner` for the repair strip (`RepairBanner`: the replan or unblock outing on a
+blocked phase, or the heal item a spent ladder filed (`by`), read off `progress.json.repair` —
+repairing with its step and clock while its process lives (the run's for a replan or an unblock, the
+drain's pid for a heal — the drain is the heal side's own process, launched by the watchdog's
+`heal-due` beat, never by the run), paused while a replan or unblock waits out a rate limit with the
+run, and a heal item no drain is working REPORTED as filed (`runner.repair.filedHeal`, "heal item
+filed — the heal cycle takes it up"): a run reports what to heal and never waits on a heal (operator
+ruling 2026-09-24), so the card never says a run or its heal is waiting on anything — then the
+ending: unblocked and running again, healed with the phase still standing (`resumed` false), or
+still blocked with the reason)
 — and `Button` for the one verb. Every string reaches the DOM as a text node: a plan
 title, a phase title, a stage word and the runner's own stderr are all free text written by a
 program this app does not control, so none of it is ever handed to a raw-HTML sink or rendered as
@@ -6206,7 +6233,7 @@ because that mirror has not been widened to carry `lanes` yet — read both ther
 per hook instance and none at all for `null`, so a five-phase card holds two timers — its header,
 and the single phase actually running. It is SHARED, at `src/shared/hooks/useElapsed.ts`: it moved
 out of this module when the chat's pinned soul row became its second consumer
-([dispatch-souls.md](dispatch-souls.md)), and a clock this lane changes now changes that one too. It counts from `started_at` and `stage_since`, never from
+([docs/MANUAL.md (dispatch-souls)](MANUAL.md)), and a clock this lane changes now changes that one too. It counts from `started_at` and `stage_since`, never from
 `heartbeat_at`, which is a liveness beat rather than a start. The words come from
 `claudeStatus.elapsed.seconds` / `minutesSeconds` / `hoursMinutes` in the `chat` namespace — the
 same three keys the composer's own clock reads (`src/modules/chat/composer/ActivityIndicator.tsx`).
@@ -6270,7 +6297,7 @@ The card NEVER computes DeepSeek's windows; until the runner answers, the button
 frame carries `start_at`, the header's note leads with `starts <time>` (the DeepSeek-peak sentence stays
 beside it when both apply; "queued — not started" gives way to the time) and the button becomes Cancel,
 which relays `{when:'none'}`. The runner-watchdog's two-minute tick presses Start when the time comes
-(`plan-runner due` — `hooks/README.md` §Runner), so the note names the operator's time and the press lands
+(`plan-runner due` — MAN-838), so the note names the operator's time and the press lands
 within one tick of it. Nothing optimistic; a refusal is the runner's sentence in a `warn` toast under
 `runner.schedule.refused`. Handles: `data-runner-schedule="<start_at epoch|empty>"` on the group,
 `data-runner-schedule-set` on `Start at …`, `data-runner-schedule-cancel` on Cancel. Proof:
@@ -6281,7 +6308,7 @@ other locale falls back.
 
 The tab that mounts it is the next section.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/ChatInterface.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/composer/ActivityIndicator.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useElapsed.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/utils.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-runner-model-pin.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-runner-schedule.mjs
+governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/MANUAL.md, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/ChatInterface.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/composer/ActivityIndicator.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useElapsed.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/utils.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-runner-model-pin.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-runner-schedule.mjs
 
 ## MAN-642 — The Runner tab
 section: plan-runner/015 Consumers/018 The Runner tab
@@ -6438,30 +6465,32 @@ position). `cardDraggable(arc, card)` is true only for a
 line of BOTH ends of a move, plus the deck's bounds and `from !== to` — what keeps the deck from
 offering a drop the runner's own `arcs.reorder` would only refuse (§"The drag" below).
 `cardTone(state)` maps a card's state to a `Badge` tone and is never `danger`: a `stalled` card is
-one the runner is already pressing again the moment a cure lands, not a fault. `arcProgress(arc)`
+one the runner presses again the moment its spec moves, not a fault. `arcProgress(arc)`
 counts complete CARDS against the total — not
 `useArcs()`'s `count`, which is unfinished ARCS across the whole deck. `current` and `last_started`
 are always read off the snapshot, never recomputed from the card states — the runner's own
 decisions, and a card walked out of order (`--now`) would disagree with a client that tried to
 guess them.
 
-**The stalled card.** A run never parks on a ⛔ (runner ruling 2026-09-11), so a receipt reads
-`complete` while phases stand blocked. `arcs.card_state` calls a card `complete` only when
+**The stalled card.** A run never parks on a ⛔ (runner ruling 2026-09-11): it walks past it and ends
+`blocked` (or `all-blocked`) with the phase in its `blocked` map. `arcs.card_state` calls a card `complete` only when
 `arc_stalled.landed(receipt)` — `status == "complete"` with empty `blocked` and `skipped_unchanged`;
 any other card whose newest run has a receipt is `stalled`. The runner writes `run_status` on the entry (the receipt's word
-plus what it left: `complete — 8 blocked`); the server copies it and the face draws the count
+plus what it left: `blocked — 8 blocked`); the server copies it and the face draws the count
 (§"The face").
 
-`stalled` is not a resting state: the arc's tick presses the card again once a cure lands, once per
-cure (the card's `repress_key` in `arc.json`), and the arc never advances past an unfinished card
-(runner ruling 2026-09-23: "plans must be completed, no waiting on heals"). The key is read over the
-phases the card still OWES — the plan's unshipped ones, not the receipt's books alone, since a run
-can end non-`complete` with empty books (`unreadable`, `flag-off`, `rate-limited`). A cure is:
+`stalled` is not a resting state: the arc's tick presses the card again the moment the plan's SPEC
+moves, once per spec change (the card's `repress_key` in `arc.json`), and the arc never advances past
+an unfinished card. The key is the plan's spec and nothing else — never the heal queue (runner ruling
+2026-09-24: "runs should only report what to heal, never wait on a heal"); the operator's Start on the
+card is the other door. It is read over the phases the card still OWES — the plan's unshipped ones,
+not the receipt's books alone, since a run can end non-`complete` with empty books (`unreadable`,
+`flag-off`, `rate-limited`) — and it moves when:
 
 - an owed phase's `spec_sha` moved
-- an owed phase's ⚒ outcome word moved
-- a heal item for the card's plan closed `healed`
 - a plan the runner names no phase in: its bytes changed
+
+The tick's line for a held card REPORTS: `stalled <n> — <k> phases to heal, items filed: <m>`.
 
 The deck draws; the runner presses.
 
@@ -6506,7 +6535,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/ly
 section: plan-runner/020 Proving it
 
 `node .verify/phase-23.mjs`, fetch- and socket-driven against the running dev server — no browser;
-see [verification.md](verification.md). Twelve gates: the mount's auth on a read and a write, the
+see [docs/MANUAL.md (verification)](MANUAL.md). Twelve gates: the mount's auth on a read and a write, the
 live list, a fixture run carried whole and addressable, a stage change arriving unasked on an open
 socket, paused beating stale, a lapsed heartbeat, the runner's own refusal as a 409 with no stack, a
 malformed id refused at the route, an unknown id answered in the runner's words, a receipt taking a
@@ -6516,11 +6545,11 @@ run off the lane, and nothing left behind.
 ENDED with its outcome word and its count, Stop gone and Dismiss offered; a `budget` ending in the
 warn tone with Resume beside Dismiss; Dismiss taking the card and the count and HOLDING across a
 reload, because the dismissal rides the synced preferences; a receipt a day old not listed at all; a
-live fixture untouched by any of it. See [verification.md](verification.md).
+live fixture untouched by any of it. See [docs/MANUAL.md (verification)](MANUAL.md).
 
 `node .verify/phase-24.mjs` proves the client half in Chromium, reading the far end of the chain:
 a stage written to disk arriving inside a sandboxed widget's own callback, through the feed, the
-bus and the widget bridge. Eleven gates; see [verification.md](verification.md).
+bus and the widget bridge. Eleven gates; see [docs/MANUAL.md (verification)](MANUAL.md).
 
 `node .verify/phase-25.mjs` proves the ruling in Chromium, at 390px, and it proves an absence the
 only way an absence can be proved: a real fixture run is put on the lane and the server is watched
@@ -6528,7 +6557,7 @@ until it lists it, and only THEN is the chat view read — held open for five se
 frame travels on the watcher's own 2 s poll and a single early sample would find an empty view and
 call it a ruling upheld. No card, no pinned band, and nothing carrying the fixture's id anywhere in
 chat; the transcript measured filling its root exactly, with nothing above it but the CLI-version
-banner. Seven gates and one shot; see [verification.md](verification.md). The card's own visual gates
+banner. Seven gates and one shot; see [docs/MANUAL.md (verification)](MANUAL.md). The card's own visual gates
 belong to the surface that renders it — the Runner tab, and `phase-26.mjs`.
 
 `node .verify/phase-26.mjs` proves the tab itself in Chromium. ABSENCE IS A `[NOTE]` THERE, NEVER A
@@ -6538,7 +6567,7 @@ THE LANE'S ABSOLUTE TOTAL either, for the same reason turned around — the oper
 and go inside the probe's window. The fixture's arrival is the one count delta; every other reading
 about it is scoped to its own card by `data-run-id`; and a gate that must know whether anything is
 running reads the lane over the API rather than the tab's count. Seventeen gates and three shots;
-see [verification.md](verification.md).
+see [docs/MANUAL.md (verification)](MANUAL.md).
 
 The operator's own runs are read by every gate and NEVER named in a request — the plan being
 executed while the probe runs is one of them, and a verb sent to it would stop the run that is
@@ -6559,7 +6588,7 @@ The arc deck's own three probes, each printing exactly one final line:
   receipt=complete handover=<s>s pressed-by=<landing-door|watchdog> shots=2` — the live two-card arc
   under the real runner, driving `probe-arc-stack.mjs`.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-23.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-24.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-25.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-26.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-27.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-arc-deck.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-arc-fill.mjs, /home/lyphe/.claude/scripts/runner_fixtures/arc_proof.sh
+governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/MANUAL.md, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-23.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-24.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-25.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-26.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-27.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-arc-deck.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-arc-fill.mjs, /home/lyphe/.claude/scripts/runner_fixtures/arc_proof.sh
 
 ## MAN-645 — The Schedules tab
 section: schedules/000
@@ -6906,9 +6935,9 @@ not retroactively tag one it did not.
 `GET /api/providers/sessions/recent?simpleList=true` is the same recents query the project tree's
 own sidebar already calls, narrowed by one clause rather than answered by a second endpoint — the
 route table, its exact query shape and its response contract live in
-[server/modules/providers/README.md](../server/modules/providers/README.md), not here.
+[server/modules/providers/MANUAL.md (README)](../server/modules/providers/MANUAL.md), not here.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/MANUAL.md, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts
 
 ## MAN-663 — The preference keys
 section: simple-chat-list/002 The preference keys
@@ -6946,7 +6975,9 @@ decides only which row and which side of it. The server does the arithmetic: it 
 between the neighbours' ranks, and when no room is left between them it renumbers the whole tagged
 list instead, so two rows never share a rank. The route is `PUT
 /api/providers/sessions/:sessionId/simple-list-position`; its table and contract are at
-[server/modules/providers/README.md](../server/modules/providers/README.md).
+[server/modules/providers/MANUAL.md (README)](../server/modules/providers/MANUAL.md).
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/MANUAL.md
 
 ## MAN-666 — Icons
 section: simple-chat-list/005 Icons
@@ -6976,8 +7007,10 @@ sidebar mode, and writes only a row that is still unread. The rule is one SQL fr
 `last_read_at IS NULL OR last_read_at < last_completed_at` — evaluated in the recents page query,
 not in the browser. Every change broadcasts `session_upserted`, which is what reloads the list, and
 the dot is suppressed on the selected row, so the chat you have open never shows it. See
-[notifications.md](notifications.md) for the presence store and the freshness window it is read
+[docs/MANUAL.md (notifications)](MANUAL.md) for the presence store and the freshness window it is read
 through.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/MANUAL.md
 
 ## MAN-668 — What this never touches
 section: simple-chat-list/007 What this never touches
@@ -6988,7 +7021,9 @@ transcript on disk. Archiving (the only thing Remove ever does) does not delete 
 it, and even that only removes the file, never edits its content. How a session's on-disk identity
 is minted, mapped and merged with the filesystem watcher's own view is a separate mechanism this
 feature does not change; see
-[docs/architecture/03-conversation-handoff.md](architecture/03-conversation-handoff.md).
+[docs/architecture/MANUAL.md (03-conversation-handoff)](docs/architecture/MANUAL.md (03-conversation-handoff)).
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/architecture/MANUAL.md
 
 ## MAN-669 — Proving it
 section: simple-chat-list/008 Proving it
@@ -7012,9 +7047,9 @@ the chat, a new chat still lands on top after a drag, and the click a drag swall
 very next press on a row's "Chat options" trigger.
 `.verify/probe-sidebar-state-api.mjs` is the server half underneath both, with no browser at all:
 it reads the four state columns over HTTP and drives the read rule through a real `chat.presence`
-frame on a chat socket. See [verification.md](verification.md).
+frame on a chat socket. See [docs/MANUAL.md (verification)](MANUAL.md).
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-17.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-18.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-sidebar-state-api.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-simple-icons-unread.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-simple-reorder.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-simple-settings.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-simple-view.mjs
+governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/MANUAL.md, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-17.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-18.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-sidebar-state-api.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-simple-icons-unread.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-simple-reorder.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-simple-settings.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-simple-view.mjs
 
 ## MAN-670 — Verifying a change in this fork
 section: verification/000
@@ -7028,7 +7063,7 @@ section: verification/001 The dev server
 
 It runs as two systemd units, not in your shell — `cloudcli-server-dev.service` (the API under
 the handover supervisor, :3011 loopback) and `cloudcli-client-dev.service` (Vite, :5183 on every
-interface); see [hosting.md](hosting.md). Check before you touch anything:
+interface); see [docs/MANUAL.md (hosting)](MANUAL.md). Check before you touch anything:
 
 ```bash
 curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:5183/   # 200 = healthy, leave it alone
@@ -7064,7 +7099,7 @@ the new child carries the new value. More than one parser reads this file and th
 while the readers that go to the file directly — `server/modules/deepseek/deepseek-key.ts` and the
 plan runner's own — keep the LAST and take the quotes off, as systemd's `EnvironmentFile=` does. So
 a value that behaves differently in two places is a parser difference before it is a bug
-([deepseek-balance.md](deepseek-balance.md) §"The rules that bite").
+([docs/MANUAL.md (deepseek-balance)](MANUAL.md) §"The rules that bite").
 
 **And never print `.env` to a terminal.** It now holds a live credential — `DEEPSEEK_API_KEY`, the
 only one in the file — and `cat`, `grep`, `sed -n` and a diff all write it into whatever is
@@ -7091,7 +7126,7 @@ That line means the service is down, not that the embed regressed. Its entry in 
 harness" says what the gates are; §"What bites people" says what a restart *mid-run* looks like,
 which is a different and less obvious failure.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/load-env.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/deepseek/deepseek-key.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/all.mjs
+governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/MANUAL.md, /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/load-env.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/deepseek/deepseek-key.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/all.mjs
 
 ## MAN-672 — Mechanical checks
 section: verification/002 Mechanical checks
@@ -7220,12 +7255,12 @@ instead. Its
 badges are not read off that transcript — a stored conversation says a tool RAN, never that a person
 was asked, so "Waiting for you" and "Allowed by you" can never appear in one. The phase drives
 fixtures through the real `useToolPermissionState` and `deriveToolOutcome` instead (phase 2's
-technique) and photographs those. Its contracts are at [chat-contracts.md](chat-contracts.md).
+technique) and photographs those. Its contracts are at [docs/MANUAL.md (chat-contracts)](MANUAL.md).
 
 Phase 7 opens no browser at all: the files server is a set of HTTP contracts, so `phase-7.mjs`
 signs in through the real login route and drives them with `fetch`. It touches no page and no
 dev-user preference — safe to run beside a browser probe. Its contract is at
-[files-api.md](files-api.md).
+[docs/MANUAL.md (files-api)](MANUAL.md).
 
 Phase 8 is back in the browser, and its hardest reading is a negative: the file manager may not draw
 an image's `1440 × 900` before the browser has measured it, so `phase-8.mjs` samples the pane every
@@ -7233,7 +7268,7 @@ few milliseconds from the click onward and fails if any frame carried a `×` too
 the DOM back against the API's own bodies — an entry the listing reports with `bytes: null` must
 read `—` on screen, never `0 B` — and it writes: the same file uploaded twice lands as `x (1).txt`,
 both removed through the tree's own menu, `git status` read after rather than assumed. It spends
-no Claude turn — its chat card is on disk. Its contract is at [file-manager.md](file-manager.md).
+no Claude turn — its chat card is on disk. Its contract is at [docs/MANUAL.md (file-manager)](MANUAL.md).
 
 Phase 9 asks Vite what tsc cannot: `phase-9.mjs` imports `markdown-preview`'s barrel and
 `PrdEditorBody.tsx` through the running dev server, so a specifier that typechecks against the
@@ -7265,7 +7300,7 @@ this fork with its dirty working tree, `.claude` genuinely ahead of its upstream
 directory holding no repository, and the stale `mission-control` whose directory is gone.
 Committing or cleaning this tree changes what it measures. Run it solo like every browser phase —
 it ends in a second, dark session and drives the app's own theme switch back before closing. Its
-contract is at [git-panel.md](git-panel.md).
+contract is at [docs/MANUAL.md (git-panel)](MANUAL.md).
 
 Phase 11 presses a button wired to the operator's own `/git`, so its first job is making a press
 free. Every press but one happens behind a socket seal — a patched `WebSocket` installed in the
@@ -7301,12 +7336,12 @@ real `/git` was said somewhere. The shots are `11-git-idle` (light and dark), `-
 `-running-read-done`, `-pushed`, `-banner-ahead`, `-banner-not-committed`,
 `-banner-connection-lost`, `-adopted-second-window`, `-adopted-after-silence`,
 `-dismiss-held-by-the-server` and `-refused-checkpoint-elsewhere`. Its contract is at
-[git-panel.md](git-panel.md).
+[docs/MANUAL.md (git-panel)](MANUAL.md).
 
 Phase 12 opens no browser either, and it no longer runs green: it was written against the proxy this
 lane has since replaced, so `phase-12.mjs` still names that proxy's retired URL prefix and imports the
 server module it lived in, both deleted with it, and it needs re-pointing at the accounts lane's own routes (`/api/accounts`, `/api/usage`,
-`/api/accounts/switch`, `/api/accounts/capture` — [accounts.md](accounts.md)) before it measures
+`/api/accounts/switch`, `/api/accounts/capture` — [docs/MANUAL.md (accounts)](MANUAL.md)) before it measures
 anything. As written, the lane is four HTTP contracts, so it signs in through the real login route
 and drives them with `fetch`. What the live
 picture cannot show — the null discipline, a rolled percent, a vendor `severity`, a lane that cannot
@@ -7322,7 +7357,7 @@ the memory service's runtime import of `readObjectRecord` from `@/shared/utils.j
 file instead. Nothing under `runTsx` here reaches the memory mapper, so no assertion in this file
 would catch that — deleting the env leaves all 40 green — which is the reason the line is commented
 where it sits rather than left to look like decoration. Its contract is at
-[accounts.md](accounts.md).
+[docs/MANUAL.md (accounts)](MANUAL.md).
 
 Phase 13 is back in the browser, and it splits its evidence in two rather than choosing between
 them. It no longer runs green either: `phase-13.mjs` reads and replays that same retired prefix's
@@ -7343,7 +7378,7 @@ it was. Two of its gates measure a door rather than the room behind it — a pro
 exactly as `ChatInterface`'s abort listener is, asked what it sees while the panel is open and
 again while it is closed; and the unit trap driven both ways round, since a seconds-shaped expiry
 must land in 1970 and a millisecond one must not land in the year 58,000. 88 gates over a dark pass
-and a light one, and it spends no Claude turn. Its contract is at [accounts.md](accounts.md).
+and a light one, and it spends no Claude turn. Its contract is at [docs/MANUAL.md (accounts)](MANUAL.md).
 
 Phase 14 stays out of the browser too: the CLI-version report is one HTTP contract over a service
 whose failure paths have to be injected, so `phase-14.mjs` drives the route with `fetch` and builds
@@ -7351,7 +7386,7 @@ the service under `tsx` around a binary that is not there, one that answers nons
 moves by hand — the cache window's far edge is measured rather than assumed. It spends one real Haiku
 turn, a `sleep 20` wide enough to ask the route mid-run, and spends it once: the observation is kept
 in `.verify/artifacts/` and read back on every later run, so re-measuring means deleting that file
-and paying a turn for it. Its contract is at [cli-version.md](cli-version.md).
+and paying a turn for it. Its contract is at [docs/MANUAL.md (cli-version)](MANUAL.md).
 
 Phase 15 is the client half of that report, and it spends **zero** Claude turns — the plan's own
 verification wanted two more plus a CLI shim, a `.env` edit and a server restart, and the six above
@@ -7384,7 +7419,7 @@ light one; the dark pass exists for the banner's paint and stops after it. It cr
 no `.env`, touches no `server/` file, restarts no pane and starts no conversation — and the route is
 re-read at the end to show the server saw no run start. Shots are `15-baseline-footer-light`,
 `15-stale-chip-light`, `15-banner-light`, `15-banner-dark` and `15-resumed-light`. Its contract is
-at [cli-version.md](cli-version.md).
+at [docs/MANUAL.md (cli-version)](MANUAL.md).
 
 Phase 17 is the flat list's own proof, and it also spends **zero** Claude turns. Two real
 conversations are created — a real `POST /api/providers/sessions`, a real row tagged
@@ -7402,7 +7437,7 @@ carrying `simpleList: true` for the saved project for new chats, the row that ap
 chat and its project, the sealed send leaving nothing but the frame itself on the wire, a rename
 round-tripping through a real `PUT`, opening two different rows and the Files tab reading each
 row's own project, an idle Remove archiving without ever opening the stop dialog, and toggling off
-handing the tree back. Its contract is at [simple-chat-list.md](simple-chat-list.md).
+handing the tree back. Its contract is at [docs/MANUAL.md (simple-chat-list)](MANUAL.md).
 
 Phase 18 is the flat list's stop-and-remove path and its mobile width, and it too spends **zero**
 Claude turns. Over the same sealed socket Phase 17 seals, two things are replayed rather than run
@@ -7421,7 +7456,7 @@ sidebar the way a thumb would, and reads the live DOM rather than the source: th
 and the row's own link (not the row `div`, which the fix never had to touch) both measure at least
 44px tall and stay inside the viewport, in both themes. Shots are `18-simple-stop-dialog-light`,
 `18-simple-390-light` and `18-simple-390-dark`. Its contract is at
-[simple-chat-list.md](simple-chat-list.md).
+[docs/MANUAL.md (simple-chat-list)](MANUAL.md).
 
 Three probes sit under phases 17 and 18 without being phases themselves, and all three spend
 **zero** Claude turns for the same reason: the one run each starts is a CURSOR session, whose CLI
@@ -7436,7 +7471,7 @@ against a dot. `.verify/probe-simple-icons-unread.mjs` ends `SIMPLE-ICONS-UNREAD
 over `[PASS] C1` … `[PASS] C7`, dragging a row with `page.mouse` on desktop and with CDP
 `Input.dispatchTouchEvent` on a 390 px phone rather than any synthetic `PointerEvent`. None of the
 three is in `all.mjs`, which collects `phase-<n>.mjs` alone, so each is run by hand like every
-other `probe-*.mjs`; their contract is at [simple-chat-list.md](simple-chat-list.md).
+other `probe-*.mjs`; their contract is at [docs/MANUAL.md (simple-chat-list)](MANUAL.md).
 
 Phase 19 is the memory lane — memory intake — and it opens no browser either: four
 more HTTP contracts with nothing visual about them, driven with `fetch` behind a token from the real
@@ -7462,7 +7497,7 @@ count moves with the queue rather than staying pinned. Like phase 12, the down p
 against a closed port and never by stopping the operator's own server — which, with nothing pending ever
 written to, is what makes this one safe to run while the operator is in the app: it toggles no
 preference, moves no card and opens no browser. Its contract is at
-[memory-intake.md](memory-intake.md).
+[docs/MANUAL.md (memory-intake)](MANUAL.md).
 
 Phase 20 is that lane's screen — the Memory tab — and it is back in Chromium, and like Phase 19 it
 no longer runs green: its `page.route` globs and its whole-card read still name the retired proxy's
@@ -7491,7 +7526,7 @@ whichever mode ran last — every browser probe's cost here, see *Hosted instanc
 of it narrowly is that it reviews no card, toggles no preference of its own, and leaves the pending
 queue exactly as it found it. Shots are `20-memory-light`, `20-memory-expanded-light`,
 `20-memory-empty-light`, `20-memory-390-light` and `20-memory-dark`. Its contract is at
-[memory-intake.md](memory-intake.md).
+[docs/MANUAL.md (memory-intake)](MANUAL.md).
 
 Phase 21 is the surface signal, and it is the one phase in this whole plan that spends a Claude
 turn — once, on haiku, through the real composer a person uses. What `phase-21.mjs` proves is not
@@ -7582,7 +7617,7 @@ preference and puts the previous value straight back, which is the same preferen
 already writes through the app's real Dark Mode switch, and no other preference is touched. Like
 every browser probe here it ends in `ensureTheme` twice and leaves the dev account on
 whichever mode ran last. Shots are `22-widget-light`, `22-widget-dark` and `22-widget-390-light`. Its
-contract is at [architecture/07-live-widgets.md](architecture/07-live-widgets.md).
+contract is at [docs/architecture/MANUAL.md (07-live-widgets)](docs/architecture/MANUAL.md (07-live-widgets)).
 
 Phase 23 is the plan-runner lane, and it is back to fetch and a socket — no browser, because nothing
 in it is visual. It signs in the way `phase-7.mjs` does and holds the token for every read and every
@@ -7612,7 +7647,7 @@ before anything is spawned; an unknown id answered in the runner's own words; a 
 run off both the list and the by-id read; and nothing left behind. The operator's own runs are read
 by every gate and NEVER named in a request — the plan being executed while the probe runs is one of
 them, it shows up in the `[NOTE]` line that lists what the list carried, and a verb sent to it would
-stop the run that is running the probe. Its contract is at [plan-runner.md](plan-runner.md).
+stop the run that is running the probe. Its contract is at [docs/MANUAL.md (plan-runner)](MANUAL.md).
 
 Phase 24 is the live bus, and it is the first proof that reads the far end of the chain rather than
 any point along it. It is the gallery technique again — nothing in the app mounts a widget, so
@@ -7735,7 +7770,7 @@ tab-drops-off-the-bar readings only apply when nothing else is running, and say 
 when the operator's own runs are still on the lane. Shots are `26-runner-tab-light`,
 `26-runner-tab-dark` and `26-runner-tab-390-light`. Fixtures are removed in an outermost `finally`,
 each guarded separately so one failure cannot strand another. Its contract is at
-[plan-runner.md](plan-runner.md).
+[docs/MANUAL.md (plan-runner)](MANUAL.md).
 
 Phase 27 is the ended card, in the browser, and it is the one probe here that writes the dev
 account's synced preferences: dismissing a run is a MERGED write to the `planRunner` blob, and the
@@ -7787,7 +7822,7 @@ the iframe with an error card, so every gate touching the iframe runs inside a f
 window — which is why gate 8 remounts the gallery before it flips. Gate 8 also writes the `theme`
 preference and puts it straight back; no other preference is touched. Shots are `28-docspace-light`,
 `28-docspace-dark` and `28-docspace-390-light`. Its contract is at
-[architecture/07-live-widgets.md](architecture/07-live-widgets.md) §"The DocSpace kind".
+[docs/architecture/MANUAL.md (07-live-widgets)](docs/architecture/MANUAL.md (07-live-widgets)) §"The DocSpace kind".
 
 Phase 29 is the same block read from both ends at once, and it is the only probe here that writes
 into the REAL DocSpace store. Where phase 28 required nothing of ArchPulse, this one stands a
@@ -7819,8 +7854,8 @@ exceptions (9). It sends no Claude turn. Its fixture page is titled
 OUTERMOST `finally` by the id the probe minted and no other — DocSpace holds the operator's real
 pages, so the title prefix is the fence at both ends and a cleanup that fails reddens the run.
 Shots are `29-docspace-light`, `29-docspace-dark` and `29-docspace-390-light`. Its two contracts
-are [architecture/07-live-widgets.md](architecture/07-live-widgets.md) §"The DocSpace kind" for
-this half and ArchPulse's own `README.md` §"Embedding one block" for the other.
+are [docs/architecture/MANUAL.md (07-live-widgets)](docs/architecture/MANUAL.md (07-live-widgets)) §"The DocSpace kind" for
+this half and ArchPulse's own MAN-238 for the other.
 
 Keepalive survival is the one proof here that is not a phase and is not in `all.mjs`, because what
 is under test is the API's own death. `.verify/keepalive-turn.mjs` is the client every case
@@ -7965,7 +8000,7 @@ blanked" cannot see a redundant GET. **The viewport**: the target row must be in
 1440, 768 and 390 — not merely inside its pane, since below `md` the panes stack and a row revealed
 in a pane under the fold is revealed to nobody — and at 1440 the directory listing is gated to prove
 it did NOT move. It spends no Claude turn and writes nothing on the account or the server. Its
-contracts are [files-api.md](files-api.md) and [file-manager.md](file-manager.md).
+contracts are [docs/MANUAL.md (files-api)](MANUAL.md) and [docs/MANUAL.md (file-manager)](MANUAL.md).
 
 **`probe-shapes-detect.mjs` proves every markdown-shape trigger fires on what it is meant to fire
 on and — the half that decides whether the feature is safe — refuses the near misses.** A shape
@@ -8114,7 +8149,7 @@ column really called `1` the same accessible name in one header row.
 `TranscriptRenderContext.Provider value={{ isExporting: true }}` — the state
 `export/TranscriptExportDocument.tsx` renders the transcript in — and requires every shape, every
 row, every header word and the bars to be present while ZERO copy, sort or toggle controls are drawn;
-see [06-tool-view.md](architecture/06-tool-view.md) §"Rendering into an exported document" for why a
+see [06-tool-view.md](docs/architecture/MANUAL.md (06-tool-view)) §"Rendering into an exported document" for why a
 control drawn there would look alive and do nothing. It renders live rather than through
 `renderToStaticMarkup`, which is the honest measurement for what is being asked: the flag decides
 whether a control is *drawn*, and one never drawn cannot be serialised either. That mount is spelled
@@ -8535,7 +8570,7 @@ things. Each is listed with what its red line means:
 export. That component reads `useTheme()`, and the export mounts no `ThemeProvider`, so mounting it
 there throws and nothing downloads. The fence keeps the same frame with the source inside it, so the
 export counts the same kinds the screen does (see
-[rendered shapes](architecture/08-rendered-shapes.md) §"Collapse and export").
+[rendered shapes](docs/architecture/MANUAL.md (08-rendered-shapes)) §"Collapse and export").
 
 It spends no Claude turn. The seal swallows `chat.send`, `chat.edit-send`, `chat.abort` and
 `chat.subscribe`, and the run ends by proving the seal still held and that the page never tried to
@@ -8649,7 +8684,7 @@ CRLF file and one whose last line carries no terminator, the refusals it can sta
 revision, a binary file, a non-UTF-8 line, a line past 256 KiB, an edit past the end of the file, a
 newline inside a replacement line, and both directions out of the project — an in-project symlink
 writing its target and staying a link, and the equality of the `preview` and `edit-window` line
-models; its contracts are [files-api.md](files-api.md).
+models; its contracts are [docs/MANUAL.md (files-api)](MANUAL.md).
 `node .verify/probe-files-editor.mjs` (`EDITOR OK`) opens a 200,000-line file in the real editor,
 scrolls far enough to force loads and evictions, edits two lines far apart, saves with Mod-s and
 reads exactly those two edits back off disk, then walks the conflict banner and the unchanged file
@@ -8670,7 +8705,7 @@ makes their 390px pass land on the Files tab: at phone width the workspace tabs 
 sidebar drawer, so the app is standing on the tab from the first render instead of the pass opening
 the drawer to click it.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/deploy/dev-supervisor/README.md, /home/lyphe/.claude/claudecodeui_lyphe/node_modules/playwright/index.js, /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/supervised-boot.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/tsconfig.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/shapes/detect.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/shapes/InlineMarks.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/shapes/remarkShapeGroups.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/constants.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/all.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/artifacts/21-surface.json, /home/lyphe/.claude/claudecodeui_lyphe/.verify/artifacts/phase-11-press.json, /home/lyphe/.claude/claudecodeui_lyphe/.verify/artifacts/shapes-elements-baseline.html, /home/lyphe/.claude/claudecodeui_lyphe/.verify/artifacts/shapes-gallery-last-run.log, /home/lyphe/.claude/claudecodeui_lyphe/.verify/artifacts/verve-life-before/shapes-elements-baseline.html, /home/lyphe/.claude/claudecodeui_lyphe/.verify/artifacts/verve-life-retone.sed, /home/lyphe/.claude/claudecodeui_lyphe/.verify/handover/seam-probe.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/keepalive-cases-p3.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/keepalive-cases-p4.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/keepalive-host-case.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/keepalive-lib.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/keepalive-turn.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/color.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/console.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/runner-fixture.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/shapes-fixture.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/verve-life.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-32.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-33.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-34.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-files-api.py, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-files-editor.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-files-previews.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-markdown-cards.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-baseline.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-detect.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-fences.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-groups.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-inline.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-lists.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-prose.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-tables.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-sidebar-state-api.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-simple-icons-unread.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-simple-reorder.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/shots/cfep-editor-390-light.png, /home/lyphe/.claude/claudecodeui_lyphe/.verify/shots/cfep-preview-pdf-390-light.png, /home/lyphe/.claude/claudecodeui_lyphe/.verify/shots/phase-34-light.png, /home/lyphe/.claude/claudecodeui_lyphe/.verify/verve-life-compare.sh
+governs: /home/lyphe/.claude/claudecodeui_lyphe/deploy/dev-supervisor/README.md, /home/lyphe/.claude/claudecodeui_lyphe/docs/architecture/MANUAL.md, /home/lyphe/.claude/claudecodeui_lyphe/docs/MANUAL.md, /home/lyphe/.claude/claudecodeui_lyphe/node_modules/playwright/index.js, /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/supervised-boot.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/tsconfig.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/shapes/detect.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/shapes/InlineMarks.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/shapes/remarkShapeGroups.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/constants.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/all.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/artifacts/21-surface.json, /home/lyphe/.claude/claudecodeui_lyphe/.verify/artifacts/phase-11-press.json, /home/lyphe/.claude/claudecodeui_lyphe/.verify/artifacts/shapes-elements-baseline.html, /home/lyphe/.claude/claudecodeui_lyphe/.verify/artifacts/shapes-gallery-last-run.log, /home/lyphe/.claude/claudecodeui_lyphe/.verify/artifacts/verve-life-before/shapes-elements-baseline.html, /home/lyphe/.claude/claudecodeui_lyphe/.verify/artifacts/verve-life-retone.sed, /home/lyphe/.claude/claudecodeui_lyphe/.verify/handover/seam-probe.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/keepalive-cases-p3.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/keepalive-cases-p4.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/keepalive-host-case.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/keepalive-lib.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/keepalive-turn.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/color.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/console.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/runner-fixture.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/shapes-fixture.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/verve-life.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-32.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-33.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-34.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-files-api.py, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-files-editor.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-files-previews.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-markdown-cards.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-baseline.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-detect.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-fences.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-groups.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-inline.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-lists.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-prose.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-tables.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-sidebar-state-api.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-simple-icons-unread.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-simple-reorder.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/shots/cfep-editor-390-light.png, /home/lyphe/.claude/claudecodeui_lyphe/.verify/shots/cfep-preview-pdf-390-light.png, /home/lyphe/.claude/claudecodeui_lyphe/.verify/shots/phase-34-light.png, /home/lyphe/.claude/claudecodeui_lyphe/.verify/verve-life-compare.sh
 
 ## MAN-675 — Standing colour baselines
 section: verification/005 Standing colour baselines
@@ -8742,7 +8777,7 @@ Four things to know before running one:
   FINISHED") for that reason.
 - **Each case creates and deletes its own probe session** (D-12) however it ends, so a sweep
   leaves the sessions list as it found it. `probe-*` files left in `~/.cloudcli/sessions` mean an
-  interrupted run — see [hosting.md](hosting.md) §"Runbook".
+  interrupted run — see [docs/MANUAL.md (hosting)](MANUAL.md) §"Runbook".
 - **Case A hands the API over by nudging a file**, appending a newline to
   `server/modules/providers/list/claude/session-host/index.ts` and restoring it. Any file under
   `server/` now triggers a boot — the supervisor watches the tree, not an import graph — so the
@@ -8752,10 +8787,10 @@ Four things to know before running one:
 Its siblings — the driver they all spawn, the `turn|abort|env-off|unit-down` cases and the
 host-only one — share the same discipline, and which script drives what is in §"The browser
 harness" above, under *Keepalive survival*. What the mechanism itself is, and what the boot pass
-does, is in [hosting.md](hosting.md) §"Rules that bite" and
-[`session-host/README.md`](../server/modules/providers/list/claude/session-host/README.md).
+does, is in [docs/MANUAL.md (hosting)](MANUAL.md) §"Rules that bite" and
+[`server/modules/providers/list/claude/session-host/MANUAL.md (README)`](../server/modules/providers/list/claude/session-host/MANUAL.md).
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/session-host/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/chat-process-reuse.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/keepalive-cases-p4.mjs
+governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/MANUAL.md, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/session-host/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/session-host/MANUAL.md, /home/lyphe/.claude/claudecodeui_lyphe/.verify/chat-process-reuse.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/keepalive-cases-p4.mjs
 
 ## MAN-677 — The handover cases
 section: verification/007 The handover cases
@@ -8814,16 +8849,16 @@ it touches `server/index.ts` and prints `HANDOVER old=<pid> new=<pid> seconds=<n
 What the mechanism itself is — the state machine, every log line, the two environment bits and the
 failure table — is in
 [`deploy/dev-supervisor/README.md`](../deploy/dev-supervisor/README.md), and the rule it puts on a
-person editing `server/` is in [hosting.md](hosting.md) §"Rules that bite".
+person editing `server/` is in [docs/MANUAL.md (hosting)](MANUAL.md) §"Rules that bite".
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/deploy/dev-supervisor/README.md, /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/handover/handover-cases.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/handover/seam-probe.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/handover/smoke.sh
+governs: /home/lyphe/.claude/claudecodeui_lyphe/deploy/dev-supervisor/README.md, /home/lyphe/.claude/claudecodeui_lyphe/docs/MANUAL.md, /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/handover/handover-cases.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/handover/seam-probe.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/handover/smoke.sh
 
 ## MAN-678 — The ntfy probes
 section: verification/008 The ntfy probes
 
 The ntfy phone-push channel is proven the way a phone sees it: the real server publishes to a real
 topic on `ntfy.sh`, and the probe reads back what landed there. What the channel does, and why, is
-in [notifications.md](notifications.md); this section is how to prove it. Like the cases above,
+in [docs/MANUAL.md (notifications)](MANUAL.md); this section is how to prove it. Like the cases above,
 the probes are **not part of `all.mjs`**.
 
 Everything goes through `.verify/lib/ntfy.mjs`. It signs in as the dev account through the real
@@ -8868,7 +8903,7 @@ node .verify/ntfy/question-probe.mjs
 It is the end-to-end proof that a question reaches a phone and the phone's answer reaches the
 model, and it spends **two real Claude turns**. It runs the same script twice, once with
 `permissionMode: 'bypassPermissions'` and once with `default`, because those are the two doors
-into `promptForToolDecision` ([architecture/02-realtime-stream.md](architecture/02-realtime-stream.md)
+into `promptForToolDecision` ([docs/architecture/MANUAL.md (02-realtime-stream)](docs/architecture/MANUAL.md (02-realtime-stream))
 §"Permission requests"): in the bypassing mode the `PreToolUse` hook is the only way to a human,
 in `default` `canUseTool` asks and the hook must stand aside. Each run creates a Claude session
 in `/tmp/cloudcli-ntfy-probe`, asks the model for one `AskUserQuestion` with two options, waits
@@ -8879,7 +8914,7 @@ that the signed token needs no CloudCLI session. Then it waits for `permission_r
 turn's `complete`, counts the `permission_request` frames for that session (two would mean the
 hook and `canUseTool` both asked) and the pushes opening it (a second, titled "Claude needs you",
 is the CLI's own `Notification` hook announcing the same prompt — see
-[architecture/02-realtime-stream.md](architecture/02-realtime-stream.md) §"Permission requests"),
+[docs/architecture/MANUAL.md (02-realtime-stream)](docs/architecture/MANUAL.md (02-realtime-stream)) §"Permission requests"),
 and reads the model's last words for the answer the phone sent. It passes on exactly:
 
 ```
@@ -8925,7 +8960,7 @@ node_modules/.bin/tsx --tsconfig server/tsconfig.json .verify/ntfy/signals-probe
 ```
 
 Nothing is mocked but the stream. It drives the real `detectRuntimeSignals`
-(`claude-runtime-signals.ts`, described in [notifications.md](notifications.md) §"Where the
+(`claude-runtime-signals.ts`, described in [docs/MANUAL.md (notifications)](MANUAL.md) §"Where the
 Claude runtime's error and limit signals come from") with one real `SignalState` and the
 SDK-shaped messages a run would hand it: a usage window climbing through its warning steps,
 hitting its limit, resetting, going into overage and running out of credits; a retried request
@@ -8966,7 +9001,7 @@ and leaves nothing behind but the secret row. Only two of its four route calls c
 counter anything — the flipped signature and the swapped decision. The two that carry a genuine
 signature, the unknown request and the expired payload, *clear* this client's record instead, so
 the probe can neither lock itself out nor stand between a phone and its own button. The rule
-behind that is in [notifications.md](notifications.md) §"Answering from the phone".
+behind that is in [docs/MANUAL.md (notifications)](MANUAL.md) §"Answering from the phone".
 
 One audit probe, under `tsx` for the same reason — the whole tap-to-answer surface, attacked:
 
@@ -9056,7 +9091,7 @@ Eight things to know before running one:
   when the box has none (clearing it again), and reads `journalctl -u cloudcli-server-dev` back two
   hours, so the unit's log must be readable by whoever runs it.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/load-env.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/tsconfig.json, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/ntfy.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/ntfy/argus-probe.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/ntfy/question-probe.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/ntfy/run-failed-probe.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/ntfy/settings-probe.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/ntfy/signals-probe.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/ntfy/stall-probe.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/ntfy/token-probe.mjs
+governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/architecture/MANUAL.md, /home/lyphe/.claude/claudecodeui_lyphe/docs/MANUAL.md, /home/lyphe/.claude/claudecodeui_lyphe/server/load-env.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/tsconfig.json, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/ntfy.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/ntfy/argus-probe.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/ntfy/question-probe.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/ntfy/run-failed-probe.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/ntfy/settings-probe.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/ntfy/signals-probe.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/ntfy/stall-probe.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/ntfy/token-probe.mjs
 
 ## MAN-679 — What bites people
 section: verification/009 What bites people
@@ -9076,7 +9111,7 @@ section: verification/009 What bites people
 | **The Shell tab prints `bash: claude: command not found`** | The PTY spawns `bash -c "claude …"` — a bare `PATH` lookup — and the server process on this host carries no `~/.npm-global/bin`, which is where the CLI is. `.env`'s `CLAUDE_CLI_PATH` does not reach it: that is read by the SDK providers through `server/shared/claude-cli-path.ts`, never by the PTY. Nor does upstream's `prioritizeUserNpmGlobalBin`, which only re-*orders* entries already on `PATH` and hands it back untouched when none of its candidates are there — `npm_config_prefix` being set is not enough. An environment fact rather than a fork defect, and the fix belongs at deploy time: whatever runs the server must have the CLI's directory on its own `PATH`. |
 | **`uiPreferences` is one stored key, not six** | The preference store keeps a row per name, and all six workspace booleans live inside the single `uiPreferences` value. A `PATCH /api/user/preferences` carrying `{"uiPreferences":{"hideShellTab":false}}` therefore *replaces* the blob and silently drops the other five. Click the switch, or send the whole object back. A flat key is its own row and patches safely alone — which is why `phase-4.mjs` patches `tasksEnabled` directly and clicks for the rest. |
 | **The Tasks tab is absent** | It is preference-gated and TaskMaster is not installed here, so its absence is recorded as a note rather than asserted as a pass — except in `phase-4.mjs`, which asserts the biconditional instead: the tab is on the bar exactly when TaskMaster is installed. A tab that can never appear would also leave the board itself unmeasured, so `phase-16.mjs` opens the tab when it is there and otherwise mounts the app's own `TaskBoardContent` and `TaskEmptyState` from the running dev server — phase 2's technique, and it says in a `[NOTE]` which of the two it read. |
-| **The Memory tab is on the bar only while something is waiting** | It is gated on the board's own pending queue rather than on a preference, so a host with an empty queue has no Memory tab and no *Go to Memory* row in the palette — an absence, not a fault. `phase-20.mjs` falls back to a synthetic two-row queue answered inside the page when the live count is 0, and says so in a `[NOTE]`. It also STAYS on the strip at a count of zero while it is the selected tab, deliberately — the Runner tab above is the second tab written that way, and both are read by the same gate. Its contract is at [memory-intake.md](memory-intake.md). |
+| **The Memory tab is on the bar only while something is waiting** | It is gated on the board's own pending queue rather than on a preference, so a host with an empty queue has no Memory tab and no *Go to Memory* row in the palette — an absence, not a fault. `phase-20.mjs` falls back to a synthetic two-row queue answered inside the page when the live count is 0, and says so in a `[NOTE]`. It also STAYS on the strip at a count of zero while it is the selected tab, deliberately — the Runner tab above is the second tab written that way, and both are read by the same gate. Its contract is at [docs/MANUAL.md (memory-intake)](MANUAL.md). |
 | **The Memory panel is driven by its English strings** | `phase-20.mjs` finds the two verbs by the words `file it` and `discard`, the empty state by `All filed`, and the global-blast mark by the substring `global`. All four live under `memory.*` in `en/common.json` (English only; the other locales fall back to `en`). Re-word one and the phase stops finding a control rather than reporting one wrong — re-point it in the same change, the way `phase-4.mjs` is re-pointed for Settings. |
 | **The runner card is driven by its English strings** | The card reads every word it draws from `runner.*` in `en/common.json` — the state badge (`LIVE` / `PAUSED` / `STALE`), the phase states, the meter's label, the phase count, the two verbs and both toasts — English only; the other locales fall back to `en`. The elapsed clocks are the exception and are NOT the card's to re-word alone: their three keys are `claudeStatus.elapsed.*` in `en/chat.json`, shared with the composer's own clock, which is why there is no private formatter in `useElapsed`. A probe that drives the card finds its controls by those strings, so re-word one and the phase stops finding a control rather than reporting one wrong — re-point it in the same change, the way `phase-4.mjs` is re-pointed for Settings. `phase-25.mjs` reads NONE of them: nothing in the chat view draws the card, and its gates are an absence and a measured height. `phase-26.mjs`, the Runner tab's probe, is where these words are read. |
 | **There is no logout control** | Nothing in `src/` consumes `AuthContext`'s `logout`, so the harness removes the `auth-token` key the app itself wrote and reloads. No token is forged and no route is bypassed. |
@@ -9099,20 +9134,20 @@ section: verification/009 What bites people
 | **`phase-23.mjs` notes that the socket was reopened** | The API restarted mid-probe — a save under `server/` under `tsx watch`, or the dev supervisor handing over — and the probe's chat socket healed through it rather than failing the frame gate on a closed one. A `[NOTE]`, never a failure: the gates after it are worth as much as on a run that carried no such line. The reopen contract is in the phase 23 entry of §"The browser harness". |
 | **The surface probe reads a process that only lives for one turn** | `phase-21.mjs` polls `/proc/<pid>/environ` of the SDK child spawned for its one Claude turn, and that child exists only while the turn is in flight — it is gone by the time a reply is on screen. The poll has to start before the prompt is sent and keep running through it; a reading taken after the reply arrives finds no such pid and proves nothing. |
 | **Three sidebar readings are only as good as this host's data** | "↳ Show N older conversations" is *asserted*, and needs a project whose first page of sessions is not its whole history — a host without one reports a failure where there is an absence. The other two can only be noted: `messageCount` is `0` on every session server-side, so the "N messages" segment never renders, and no plugin is installed here — the registry reads `~/.claude-code-ui/plugins`, not this repo's `plugins/`, and it is empty — so the plugin tabs draw nothing to read. |
-| **Every signed-in page spends a real DeepSeek call, and no `page.route` can reach it** | `AccountFooterRow` mounts in the sidebar on every probe that signs in, and `useDeepseekBalance` reads on mount, every 180 s, and on each panel open — so each run makes the SERVER call `api.deepseek.com` with the host's own key. It is a read that moves nothing and costs no tokens, but it is a third-party origin that the browser-context stubs above do not and cannot cover: the page only ever sees the same-origin `/api/deepseek/balance`. A probe that needs the figure to be a known value — or needs the vendor left alone — fulfils **that path**, never the vendor's. Its contract is at [deepseek-balance.md](deepseek-balance.md). |
-| **Nothing in `all.mjs` measures the DeepSeek balance** | It is the one surface here with no `phase-<n>.mjs`: `phase-13.mjs` predates it and asserts nothing about it, so the figure could vanish from the row and the panel with the standing gate still green — and the shots `13-footer` and `13-popover` would carry the change without a gate reading it. The procedure that does prove it, and the vendor-body table that seeds the missing script, are [deepseek-balance.md](deepseek-balance.md) §"Proving it". |
-| **Nothing in `all.mjs` measures the soul pin either** | The second such surface: the launcher-soul row among the chat's pinned rows was proven once by hand, in headless Chromium against the live client and a REAL `plan-runner soul` launch, and no phase holds it. A probe cannot fake it cheaply, which is why — the row is a JOIN, so it needs BOTH a transcript carrying a `SOUL LAUNCHED` receipt inside a `Bash` **result** whose command segment opens with `plan-runner soul`, AND a matching directory under `~/.claude/state/dispatch-souls/`. `DISPATCH_SOULS_STATE_DIR` looks like the way out and is not: the server reads it once at composition, so pointing it at a fixture tree means restarting the API. Writing a fixture launch dir under the REAL root is the workable path, with phase-23/26's discipline — one clearly-prefixed name, removed in a `finally`, and the launcher's own 14-day sweep behind it. The row carries `data-testid="pinned-soul-row"` with `data-status`, `data-provider` and `data-launch-id`; the hand procedure is [dispatch-souls.md](dispatch-souls.md) §"Proving it". |
-| **Nothing in `all.mjs` measures the DeepSeek Flash switch either** | Two client surfaces read and write it — the Settings row (`RunnerModelContent.tsx`) and the composer's own chip (`ComposerDeepSeekSwitch.tsx`) — sharing one coordinator, `useDeepSeekFlashSwitch`, and no `phase-<n>.mjs` drives either. Proven by hand instead, in headless Chromium against the running dev server signed in as the operator's own account, at viewport widths from 320px to 430px: both surfaces' filled/outlined/unknown positions, the composer chip standing down where its row has no room (with and without the voice button present), and a flip made on one surface reaching the other while both are mounted. Its contract is at [plan-runner.md](plan-runner.md) §"The DeepSeek switch". |
-| **Nor the swarm switch beside it** | One client surface, `RunnerModelContent.tsx`'s second row beneath the DeepSeek one, reads and writes it through its own coordinator, `useSwarmSwitch` — no `phase-<n>.mjs` drives it. Proven by hand instead, against the running dev server signed in as the operator's own account, by two probes. [`probe-swarm-ceiling.mjs`](../.verify/probe-swarm-ceiling.mjs) PRESSES the ceiling control — `−` from `Unlimited` to the first count, `+` up with no upper bound, the row's own `Unlimited` action back to no ceiling, and the same presses with the switch OFF — with every `/api/settings/swarm` request intercepted and answered inside the probe, so the PUT goes nowhere near the operator's flag file and the assertion is on the BODY the page sent (that body's own bytes are read back through the real writer and the real `swarm.read()` separately, which is what the probe's printout names). [`probe-swarm-mark.mjs`](../.verify/probe-swarm-mark.mjs) is the reading probe and covers the mark alone: the swarm mark on both surfaces it appears on (the settings row, and a swarmed run's card beside its lane strip), the two `<svg>` contents compared byte for byte so a second glyph is a FAIL, and the mark's contrast against its own card measured to the 3:1 non-text floor in both themes. Its contract is at [plan-runner.md](plan-runner.md) §"The swarm switch". |
+| **Every signed-in page spends a real DeepSeek call, and no `page.route` can reach it** | `AccountFooterRow` mounts in the sidebar on every probe that signs in, and `useDeepseekBalance` reads on mount, every 180 s, and on each panel open — so each run makes the SERVER call `api.deepseek.com` with the host's own key. It is a read that moves nothing and costs no tokens, but it is a third-party origin that the browser-context stubs above do not and cannot cover: the page only ever sees the same-origin `/api/deepseek/balance`. A probe that needs the figure to be a known value — or needs the vendor left alone — fulfils **that path**, never the vendor's. Its contract is at [docs/MANUAL.md (deepseek-balance)](MANUAL.md). |
+| **Nothing in `all.mjs` measures the DeepSeek balance** | It is the one surface here with no `phase-<n>.mjs`: `phase-13.mjs` predates it and asserts nothing about it, so the figure could vanish from the row and the panel with the standing gate still green — and the shots `13-footer` and `13-popover` would carry the change without a gate reading it. The procedure that does prove it, and the vendor-body table that seeds the missing script, are [docs/MANUAL.md (deepseek-balance)](MANUAL.md) §"Proving it". |
+| **Nothing in `all.mjs` measures the soul pin either** | The second such surface: the launcher-soul row among the chat's pinned rows was proven once by hand, in headless Chromium against the live client and a REAL `plan-runner soul` launch, and no phase holds it. A probe cannot fake it cheaply, which is why — the row is a JOIN, so it needs BOTH a transcript carrying a `SOUL LAUNCHED` receipt inside a `Bash` **result** whose command segment opens with `plan-runner soul`, AND a matching directory under `~/.claude/state/dispatch-souls/`. `DISPATCH_SOULS_STATE_DIR` looks like the way out and is not: the server reads it once at composition, so pointing it at a fixture tree means restarting the API. Writing a fixture launch dir under the REAL root is the workable path, with phase-23/26's discipline — one clearly-prefixed name, removed in a `finally`, and the launcher's own 14-day sweep behind it. The row carries `data-testid="pinned-soul-row"` with `data-status`, `data-provider` and `data-launch-id`; the hand procedure is [docs/MANUAL.md (dispatch-souls)](MANUAL.md) §"Proving it". |
+| **Nothing in `all.mjs` measures the DeepSeek Flash switch either** | Two client surfaces read and write it — the Settings row (`RunnerModelContent.tsx`) and the composer's own chip (`ComposerDeepSeekSwitch.tsx`) — sharing one coordinator, `useDeepSeekFlashSwitch`, and no `phase-<n>.mjs` drives either. Proven by hand instead, in headless Chromium against the running dev server signed in as the operator's own account, at viewport widths from 320px to 430px: both surfaces' filled/outlined/unknown positions, the composer chip standing down where its row has no room (with and without the voice button present), and a flip made on one surface reaching the other while both are mounted. Its contract is at [docs/MANUAL.md (plan-runner)](MANUAL.md) §"The DeepSeek switch". |
+| **Nor the swarm switch beside it** | One client surface, `RunnerModelContent.tsx`'s second row beneath the DeepSeek one, reads and writes it through its own coordinator, `useSwarmSwitch` — no `phase-<n>.mjs` drives it. Proven by hand instead, against the running dev server signed in as the operator's own account, by two probes. [`probe-swarm-ceiling.mjs`](../.verify/probe-swarm-ceiling.mjs) PRESSES the ceiling control — `−` from `Unlimited` to the first count, `+` up with no upper bound, the row's own `Unlimited` action back to no ceiling, and the same presses with the switch OFF — with every `/api/settings/swarm` request intercepted and answered inside the probe, so the PUT goes nowhere near the operator's flag file and the assertion is on the BODY the page sent (that body's own bytes are read back through the real writer and the real `swarm.read()` separately, which is what the probe's printout names). [`probe-swarm-mark.mjs`](../.verify/probe-swarm-mark.mjs) is the reading probe and covers the mark alone: the swarm mark on both surfaces it appears on (the settings row, and a swarmed run's card beside its lane strip), the two `<svg>` contents compared byte for byte so a second glyph is a FAIL, and the mark's contrast against its own card measured to the 3:1 non-text floor in both themes. Its contract is at [docs/MANUAL.md (plan-runner)](MANUAL.md) §"The swarm switch". |
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/shared/claude-cli-path.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/main.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Collapsible.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/uiPreferences.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/console.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/shapes-fixture.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/ntfy/settings-probe.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-swarm-ceiling.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-swarm-mark.mjs
+governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/MANUAL.md, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/claude-cli-path.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/main.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Collapsible.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/uiPreferences.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/console.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/shapes-fixture.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/ntfy/settings-probe.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-swarm-ceiling.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-swarm-mark.mjs
 
 ## MAN-680 — Hosted instance
 section: verification/010 Hosted instance
 
 Since 2026-09-06 the dev server the probes drive is a pair of systemd units, not a tmux
 session — `cloudcli-server-dev.service` (:3011 loopback) and `cloudcli-client-dev.service`
-(:5183 on every interface) — see [hosting.md](hosting.md). The ports are unchanged, so every
+(:5183 on every interface) — see [docs/MANUAL.md (hosting)](MANUAL.md). The ports are unchanged, so every
 `phase-*.mjs` runs as before. Two consequences: the app is now the operator's daily instance,
 so a probe run mutates a live session's state (theme, preferences, the login modal, the sealed
 `/git` press) — **run the suite only when nobody is in the app**, and always solo; and a server
@@ -9120,3 +9155,5 @@ edit made while a probe is mid-flight hands the API over under it, which reads a
 re-run, never re-aim. The handover keeps `:3011` answered throughout, so what a probe sees is a
 dropped WebSocket rather than a refused request, but it is a transient either way — except in
 `phase-23.mjs`, whose socket reopens itself through the handover and says so in a `[NOTE]`.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/MANUAL.md
