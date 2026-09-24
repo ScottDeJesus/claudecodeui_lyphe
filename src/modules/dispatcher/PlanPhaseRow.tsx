@@ -45,7 +45,9 @@ export function PlanPhaseRow({ phase }: { phase: DispatcherPhase }) {
         <span className="min-w-0 flex-1 basis-40 break-words text-sm leading-snug">{phase.title}</span>
         <span className="flex min-w-0 max-w-full flex-wrap items-center gap-x-2 gap-y-1">
           <Badge as="span" tone={tone} className="min-w-0 break-words">{label}</Badge>
-          <span className="flex-none font-mono text-xs text-muted-foreground">
+          {/* Shrinkable, so a long split (`2.6M in · 24.2k out`) wraps at 390px instead of overrunning
+              the fold and being clipped by its `overflow: hidden`. */}
+          <span className="min-w-0 break-words font-mono text-xs text-muted-foreground">
             {books}
           </span>
           <span className="min-w-0 break-all font-mono text-xs text-muted-foreground">{phase.assignee}</span>
