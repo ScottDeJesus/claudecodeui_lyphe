@@ -66,8 +66,8 @@ type RunModelControlProps = {
 
 /**
  * The DeepSeek · Claude · Chat switch segmented control. Four homes, one shape: `RunCard`'s footer for
- * a run's own word, `ArcDeck`'s header for a runner arc's, `PlanControls` for a v3 plan's, and
- * `DispatchArcHeader` for a dispatch arc's — so one shape means one thing whatever it sits on.
+ * a run's own word, `ArcDeck`'s own row for a runner arc's, `PlanControls` for a v3 plan's, and
+ * `DispatchArcControls` for a dispatch arc's — so one shape means one thing whatever it sits on.
  *
  * NOTHING OPTIMISTIC. The pressed option is `value`, which is the record's own answer as the last frame
  * carried it; a press relays the word and the control re-draws when the next frame reads it back. A

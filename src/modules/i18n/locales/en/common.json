@@ -767,6 +767,8 @@
     "stop": "Stop",
     "resume": "Resume",
     "start": "Start",
+    "collapse": "Collapse",
+    "expand": "Expand",
     "queuedUntil": "DeepSeek peak until {{time}}",
     "queuedWindowClosed": "peak window closed at {{time}} — ready to start",
     "queuedManual": "queued — not started",
@@ -921,6 +923,7 @@
     "arcResumeTitle": "Resume every stopped plan of this arc when DeepSeek’s daily peak lifts — one timer per plan, each sending Resume at that hour",
     "park": "Park",
     "unpark": "Unpark",
+    "waitsOn": "waits on {{names}}",
     "arcStatus": {
       "designing": "designing",
       "judged": "judged",

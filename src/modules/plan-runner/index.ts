@@ -7,6 +7,12 @@ export { ArcFeed } from '@/modules/plan-runner/ArcFeed';
 // a host above both lanes, so neither lane imports the other.
 export { RunCard } from '@/modules/plan-runner/RunCard';
 export { ArcGallery } from '@/modules/plan-runner/ArcGallery';
+// The composition every arc on this screen is drawn with — a header, a fold, and one horizontal
+// strip of cards — and the item every card in such a strip sits in. Shared by the runner's arcs
+// (`ArcDeck`) and the dispatcher's (`DispatchArcDeck`): an arc of plans is one shape whichever lane's
+// plans hang off it (operator, 2026-09-25), and a lane that drew a second deck of its own is the
+// disagreement this file exists to prevent.
+export { DeckFrame, DeckItem } from '@/modules/plan-runner/DeckFrame';
 export { SessionPin } from '@/modules/plan-runner/SessionPin';
 export { useArcRunIds } from '@/modules/plan-runner/hooks/useArcRunIds';
 export { byUrgencyThenNewest } from '@/modules/plan-runner/runState';

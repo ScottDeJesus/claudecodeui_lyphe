@@ -334,6 +334,10 @@
   "shapes": {
     "diagramFailed": "無法繪製此圖表，已顯示其原始碼。"
   },
+  "runner": {
+    "collapse": "收合",
+    "expand": "展開"
+  },
   "gutters": {
     "runner": {
       "title": "執行"

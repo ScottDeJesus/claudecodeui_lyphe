@@ -336,6 +336,10 @@
   "shapes": {
     "diagramFailed": "Impossibile disegnare questo diagramma: ne viene mostrata la sorgente."
   },
+  "runner": {
+    "collapse": "Comprimi",
+    "expand": "Espandi"
+  },
   "gutters": {
     "runner": {
       "title": "Esecuzioni"

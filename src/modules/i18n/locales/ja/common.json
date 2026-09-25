@@ -334,6 +334,10 @@
   "shapes": {
     "diagramFailed": "この図を描画できませんでした。ソースを表示しています。"
   },
+  "runner": {
+    "collapse": "折りたたむ",
+    "expand": "展開"
+  },
   "gutters": {
     "runner": {
       "title": "実行"

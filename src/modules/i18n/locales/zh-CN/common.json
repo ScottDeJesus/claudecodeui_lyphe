@@ -334,6 +334,10 @@
   "shapes": {
     "diagramFailed": "无法绘制此图表，已显示其源代码。"
   },
+  "runner": {
+    "collapse": "收起",
+    "expand": "展开"
+  },
   "gutters": {
     "runner": {
       "title": "运行"

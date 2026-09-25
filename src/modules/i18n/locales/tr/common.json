@@ -335,6 +335,10 @@
   "shapes": {
     "diagramFailed": "Bu diyagram çizilemedi; kaynağı gösteriliyor."
   },
+  "runner": {
+    "collapse": "Daralt",
+    "expand": "Genişlet"
+  },
   "gutters": {
     "runner": {
       "title": "Çalıştırmalar"

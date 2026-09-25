@@ -41,8 +41,8 @@ const TITLE: Record<ScheduleScope, { start: string; resume?: string }> = {
 
 /**
  * `Start at 3:00 AM` — or `Resume at 3:00 AM`, or, once scheduled, `Cancel`. Used by `RunCard`'s queued footer,
- * `ArcDeck`'s header, `PlanControls` (the v3 plan card) and `DispatchArcHeader` (the dispatch arc):
- * the same control on all four, so one shape means one thing.
+ * `PlanControls` (the v3 plan card) and both decks' own row (`ArcDeck`'s for a runner arc, `DispatchArcControls`
+ * for a dispatch one): the same control on all four, so one shape means one thing.
  *
  * THE TIME IS THE RUNNER'S: `useOffpeak` relays `plan-runner offpeak` (the end of DeepSeek's last daily peak
  * window, derived from `deepseek.PEAK_UTC`), and this control only renders it in the reader's clock. Until the

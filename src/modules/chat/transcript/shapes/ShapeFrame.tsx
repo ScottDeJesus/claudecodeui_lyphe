@@ -4,7 +4,6 @@ import { useTranslation } from 'react-i18next';
 import {
   AppWindow,
   ChartColumn,
-  ChevronDownIcon,
   CircleCheckBig,
   Clock,
   CodeXml,
@@ -25,7 +24,7 @@ import {
 import type { LucideIcon } from 'lucide-react';
 
 import type { Tone } from '@/shared/types';
-import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/shared/ui';
+import { Collapsible, CollapsibleTrigger, CollapsibleContent, FoldChevron } from '@/shared/ui';
 import { OWNS_ESCAPE } from '@/shared/ui/overlayEscape';
 import { cn } from '@/shared/utils';
 import { ChipsSuppressedContext } from '@/modules/chat/transcript/shapes/chipContext';
@@ -159,6 +158,10 @@ function TitleSpan({ className, children }: { className: string; children: React
  * content-addressed fold memory through `useShapeCollapse`, the `actions` slot's placement, and the
  * header anatomy itself: icon, then title, sized in `em` so a frame follows the chat text size.
  *
+ * THE CHEVRON IS NOT THIS FILE'S. It is `FoldChevron` from `@/shared/ui`, the same sign the lane's
+ * run, plan and arc cards wear, so every fold in the app turns by one rule and looks the same doing
+ * it. An export draws no toggle here, and the glyph is only drawn inside the two arms below.
+ *
  * The tone sits on the HEADER ROW and never on the root, so a Badge or a Chip in the body keeps its
  * own tone instead of inheriting the frame's — which is the whole reason `data-tone` is written
  * there and nowhere else.
@@ -187,15 +190,7 @@ export function ShapeFrame({ kind, title, collapseKey, actions, children, classN
   const effectiveTone = tone ?? SHAPE_KINDS[kind].tone;
   const accent = effectiveTone === 'accent';
   const HeaderIcon = icon ?? SHAPE_KINDS[kind].icon;
-  const chevron = (
-    <ChevronDownIcon
-      aria-hidden="true"
-      className={cn(
-        'h-[1em] w-[1em] flex-shrink-0 transition-transform duration-200',
-        collapsed && '-rotate-90'
-      )}
-    />
-  );
+  const chevron = <FoldChevron collapsed={collapsed} />;
   // Sized in `em`, never px or rem: the icon, the chevron, the title and the body all follow the
   // chat text size the reader set, which is the one thing the prose around a frame already does.
   const iconGlyph = (

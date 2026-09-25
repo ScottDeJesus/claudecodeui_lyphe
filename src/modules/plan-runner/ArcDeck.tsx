@@ -1,19 +1,19 @@
-import { ChevronLeft, ChevronRight } from 'lucide-react';
 import type { DragEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { ArcCard, dragScopePosition } from '@/modules/plan-runner/ArcCard';
 import { ARC_CARD_DRAG_TYPE, arcProgress, deckLayers, reorderAllowed } from '@/modules/plan-runner/arcState';
+import { DeckFrame, DeckItem } from '@/modules/plan-runner/DeckFrame';
 import { useArcModel } from '@/modules/plan-runner/hooks/useArcModel';
 import { useArcStart } from '@/modules/plan-runner/hooks/useArcStart';
-import { useDeckStrip } from '@/modules/plan-runner/hooks/useDeckStrip';
 import { RunModelControl } from '@/modules/plan-runner/RunModelControl';
 import { scheduleClock } from '@/modules/plan-runner/runState';
 import { ScheduleControl } from '@/modules/plan-runner/ScheduleControl';
 import { api } from '@/shared/api';
-import { Badge, Button } from '@/shared/ui';
+import { runnerArcFoldKey } from '@/shared/hooks/useCardFold';
+import { Button } from '@/shared/ui';
 import type { ArcSnapshot, ArcVerbResult, Tone } from '@/shared/types';
-import { cn, effectiveModelWord } from '@/shared/utils';
+import { effectiveModelWord } from '@/shared/utils';
 
 type ArcStatus = ArcSnapshot['status'];
 
@@ -61,23 +61,17 @@ async function requestReorder(arcName: string, from: number, to: number): Promis
 }
 
 /**
- * ONE arc, drawn as a gallery: every card in ONE horizontal strip, in position order — the finished
- * ones on the left (dimmed), the live card, then the cards still to come. Past → present → future
- * reads left to right, which is the walk's own order, and each card still wears its layer (`done`
- * / `top` / `beneath`, from `deckLayers`) as the harness's handle.
+ * ONE arc of the RUNNER's lane, drawn as a gallery through the shared deck (`DeckFrame`): the arc's
+ * own header, and every card in one horizontal strip in position order — the finished ones on the
+ * left (dimmed), the live card, then the cards still to come.
  *
- * THE STRIP MOVES THREE WAYS: a swipe or a trackpad (CSS scroll snap, no script), the arrows at
- * either end of the nav row (one card each, disabled at their end), and Left/Right on the focused
- * strip. The live card is centred on mount and again whenever the runner moves `current`
- * (`useDeckStrip`). One card: no arrows, nothing to move to.
+ * THE SHAPE IS NOT THIS FILE'S. The chrome, the fold, the arrows, the strip and the snap are
+ * `DeckFrame`'s, drawn identically for the dispatcher's arcs — an arc of plans is one shape on both
+ * screens (operator, 2026-09-25). What is the runner's own, and what this file adds, is the lane's
+ * data and its writing hand: the STATUS words, the drag that reorders a card in the arc FILE, the
+ * model switch and Start.
  *
- * Every card is one fixed width (18rem, never wider than the strip) and the row stretches them to
- * one height, so the strip never jumps as it scrolls. `cardFillsStrip` is the gutter home's width
- * instead: every card exactly the strip's width, so one whole card is in view and the arrows and
- * the snap page one card at a time (`ArcGallery` says why). The drop target is the strip itself — the
- * whole list a dragged card can land in.
- *
- * AN ARC NOT YET STARTED offers its Start in the header — `arc start` now, or `Start at …` for the watchdog to
+ * AN ARC NOT YET STARTED offers its Start — `arc start` now, or `Start at …` for the watchdog to
  * press at DeepSeek's next off-peak moment (`ScheduleControl`), with `starts <time>` once scheduled.
  *
  * `pinnedSessionId` travels through to the cards untouched: the deck knows nothing about "mine", it
@@ -96,8 +90,6 @@ export function ArcDeck({ arc, cardFillsStrip = false, pinnedSessionId = null }:
   // The card the strip opens on: the live one, or — once every card is complete — the last.
   const liveIndex = cards.findIndex(({ layer }) => layer === 'top');
   const focusIndex = liveIndex === -1 ? cards.length - 1 : liveIndex;
-  const { stripRef, view, step, onScroll, onKeyDown } = useDeckStrip(Math.max(focusIndex, 0), cards.length);
-  const movable = cards.length > 1;
   // The arc's ONE model word — its cards get no control of their own (operator, 2026-09-22).
   const { setModel, busy: pinning } = useArcModel(arc.arc);
   // An arc no card of which has started offers its Start — now, or ahead of time through the watchdog.
@@ -145,92 +137,53 @@ export function ArcDeck({ arc, cardFillsStrip = false, pinnedSessionId = null }:
   };
 
   return (
-    <section
-      data-arc-deck={arc.arc}
-      data-arc-status={arc.status}
-      className="flex w-full min-w-0 flex-col gap-3 rounded-lg border border-border bg-muted/40 p-3"
+    <DeckFrame
+      rootAttributes={{ 'data-arc-deck': arc.arc }}
+      status={arc.status}
+      title={arc.title}
+      badge={status}
+      foldKey={runnerArcFoldKey(arc.arc)}
+      note={t('runner.arcCards', arcProgress(arc))}
+      stripLabel={t('runner.arcStrip', { title: arc.title })}
+      focusIndex={Math.max(focusIndex, 0)}
+      cardCount={cards.length}
+      drag={{ onDragOver: handleDragOver, onDrop: handleDrop }}
+      bodyTop={(
+        <div className="flex min-w-0 flex-col gap-1">
+          {/* Absent once the arc is complete: no card is left for the word to reach. A record with
+              no word — or a frame from an older server — reads DeepSeek. */}
+          {(arc.status !== 'complete' || unstarted) && (
+            <div className="flex min-w-0 flex-col gap-1">
+              {arc.status !== 'complete' && (
+                <RunModelControl scope="arc" value={effectiveModelWord(arc.model)} busy={pinning}
+                  onChoose={(choice) => void setModel(choice)} />
+              )}
+              {unstarted && (
+                <div className="flex min-w-0 flex-wrap items-center gap-2">
+                  <Button size="sm" disabled={starting} onClick={() => void start()} data-arc-start>
+                    {t('runner.start')}
+                  </Button>
+                  <ScheduleControl scope="arc" startAt={startAt} busy={starting} onSchedule={(when) => void schedule(when)} />
+                  {startAt !== null && (
+                    <span className="font-mono text-xs text-muted-foreground" data-arc-schedule-note>
+                      {t('runner.schedule.starts', { time: scheduleClock(startAt) })}
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
     >
-      <header className="flex min-w-0 flex-col gap-1">
-        <div className="flex min-w-0 items-start gap-2">
-          <h4 className="min-w-0 flex-1 break-words text-sm font-medium leading-snug">{arc.title}</h4>
-          <Badge tone={status.tone} className="shrink-0">
-            {t(status.key)}
-          </Badge>
-        </div>
-        {/* Absent once the arc is complete: no card is left for the word to reach. A record with no
-            word — or a frame from an older server — reads DeepSeek. */}
-        {arc.status !== 'complete' && (
-          <RunModelControl scope="arc" value={effectiveModelWord(arc.model)} busy={pinning}
-            onChoose={(choice) => void setModel(choice)} />
-        )}
-        {unstarted && (
-          <div className="flex min-w-0 flex-wrap items-center gap-2">
-            <Button size="sm" disabled={starting} onClick={() => void start()} data-arc-start>
-              {t('runner.start')}
-            </Button>
-            <ScheduleControl scope="arc" startAt={startAt} busy={starting} onSchedule={(when) => void schedule(when)} />
-            {startAt !== null && (
-              <span className="font-mono text-xs text-muted-foreground" data-arc-schedule-note>
-                {t('runner.schedule.starts', { time: scheduleClock(startAt) })}
-              </span>
-            )}
-          </div>
-        )}
-        <div className="flex min-w-0 items-center gap-2">
-          {movable && (
-            <Button
-              variant="outline"
-              size="icon"
-              className="h-8 w-8 shrink-0"
-              aria-label={t('runner.arcPrevious')}
-              disabled={view.atStart}
-              onClick={() => step(-1)}
-              data-arc-prev
-            >
-              <ChevronLeft aria-hidden="true" />
-            </Button>
-          )}
-          <p className="min-w-0 flex-1 text-center text-xs text-muted-foreground" data-arc-viewing>
-            {movable && `${t('runner.arcViewing', { n: view.index + 1, total: cards.length })} · `}
-            {t('runner.arcCards', arcProgress(arc))}
-          </p>
-          {movable && (
-            <Button
-              variant="outline"
-              size="icon"
-              className="h-8 w-8 shrink-0"
-              aria-label={t('runner.arcNextCard')}
-              disabled={view.atEnd}
-              onClick={() => step(1)}
-              data-arc-next
-            >
-              <ChevronRight aria-hidden="true" />
-            </Button>
-          )}
-        </div>
-      </header>
-
-      {/* `relative` makes the strip its cards' offset parent, which centring reads. `tabIndex` lets
-          the keyboard's Left/Right move it once focused. `overflow-y-hidden` beside `overflow-x-auto`:
-          alone, `overflow-x: auto` computes `overflow-y` to `auto`, and anything absolutely placed
-          below the row would turn the strip into a vertical scroller that eats the page's wheel. */}
-      <ol
-        ref={stripRef}
-        data-arc-strip
-        tabIndex={0}
-        aria-label={t('runner.arcStrip', { title: arc.title })}
-        className="scrollbar-hide relative flex min-w-0 snap-x snap-mandatory items-stretch gap-3 overflow-x-auto overflow-y-hidden rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-        onScroll={onScroll}
-        onKeyDown={onKeyDown}
-        onDragOver={handleDragOver}
-        onDrop={handleDrop}
-      >
-        {cards.map(({ card, layer }) => (
-          <li key={card.position} className={cn('flex-none snap-center', cardFillsStrip ? 'w-full' : 'w-72 max-w-full')}>
-            <ArcCard arc={arc} card={card} layer={layer} pinnedSessionId={pinnedSessionId} />
-          </li>
-        ))}
-      </ol>
-    </section>
+      {cards.map(({ card, layer }) => (
+        // The item carries the WIDTH alone: `data-arc-card` and its state stay on the card's own root,
+        // where every reading of a card has always taken them (`ArcCard`), so a strip does not answer
+        // twice for one card.
+        <DeckItem key={card.position} cardFillsStrip={cardFillsStrip}>
+          <ArcCard arc={arc} card={card} layer={layer} pinnedSessionId={pinnedSessionId} />
+        </DeckItem>
+      ))}
+    </DeckFrame>
   );
 }

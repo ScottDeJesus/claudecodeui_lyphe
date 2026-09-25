@@ -334,6 +334,10 @@
   "shapes": {
     "diagramFailed": "이 다이어그램을 그릴 수 없어 소스를 표시합니다."
   },
+  "runner": {
+    "collapse": "접기",
+    "expand": "펼치기"
+  },
   "gutters": {
     "runner": {
       "title": "실행"

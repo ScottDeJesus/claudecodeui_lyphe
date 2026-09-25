@@ -2577,9 +2577,10 @@ section: dispatcher/010 The v3 plan card
 
 `PlanCard` draws one v3 plan the dispatcher carries — `RunCard`'s own composition over the dispatcher's
 document (operator, 2026-09-24: "it can be identical to our existing cards, it'll just have a dispatch v1
-pill label on it"). Nothing on it is invented. It is drawn in the Runner tab's list and in the chat
-gutter's Runner widget (the open chat's plans first with `SessionPin`), both in
-`src/modules/runner-tab` (§"The Runner tab" of the plan-runner section), and its phases are SHOWN in both:
+pill label on it"). Nothing on it is invented. It is drawn in the Runner tab and in the chat gutter's Runner widget, both in
+`src/modules/runner-tab` (§"The Runner tab" of the plan-runner section): INSIDE the card of its own arc
+where the store gives it one (`DispatchArcDeck`, §"The arc's deck" below), and in the plain list — the
+open chat's plans first, with `SessionPin` — where it belongs to no arc. Its phases are SHOWN in both, and in the gutter:
 the card carries no `defaultOpen` at all, and the face below opens the list itself (operator, 2026-09-25:
 "dispatch v1 cards on the plan runner tab should always show phases like the normal runner cards").
 
@@ -2588,7 +2589,7 @@ probe scopes every reading and every press to ONE plan — the live plan walking
 pressed); `CardTitle` mono = `plan.v3`; the goal's FIRST non-empty line, clamped to three lines; then the
 PILL — a static `Chip size="sm"` reading `dispatcher.pill` (`dispatch v1`), wrapped in a
 `span[data-dispatcher-pill]` because the house `Chip` forwards no data attributes — then `PlanStatusBadge`
-and `PlanClock`. Body `PlanFace`, footer `PlanControls`. Props `{ plan, onDismiss? }` — NO `defaultOpen`, unlike `RunCard`.
+and `PlanClock`. Body `PlanFace`, footer `PlanControls`. Props `{ plan, waitsOn?, onDismiss? }` — NO `defaultOpen`, unlike `RunCard`.
 
 **The status words.** `dispatcher.status.*` — `LIVE`, `PAUSED`, `QUEUED`, `SCHEDULED`, `PARKED`, `IDLE`,
 `COMPLETE` — toned by `planStatusTone` (`live`, `complete` positive; the rest neutral: every other status
@@ -2654,31 +2655,85 @@ gives it, so the two cards' footers read alike. Handles: `data-plan-model` on th
 `data-plan-model-choice` on each option; the visible label and the three sentences are
 `dispatcher.model.planLabel` and `dispatcher.model.plan{Deepseek,Claude,Auto}Title`.
 
-**The arc header.** `DispatchArcHeaders` draws one `DispatchArcHeader` per arc the lane carries, with
-`data-dispatch-arcs` on the group and `home` (`tab`/`gutter`) written on it, so a reading is always
-taken from ONE home. ONE HOME FOR EACH ARC, HOWEVER MANY CARDS IT HAS: an arc's plans are drawn in the
-same urgency-ordered list as every other plan, so the header stands above the list rather than wedged
-between two cards and claiming a grouping the list does not have. It draws `<name>.arc`
-(`data-arc-door`), the arc's derived status as a `Badge` — `dispatcher.arcStatus.*`, `designing` and
-`live` info, `judged` neutral, `complete` positive, `empty` warn; the five words are
-`store.arc_word`'s and `dispatcher-arc.reader.ts` refuses any other BY NAME, so no default is
-invented here — and the plan count the store listed (`dispatcher.arcPlans`, `data-arc-plans`).
+**The arc's deck.** A dispatch arc is drawn as THE SAME DECK the runner's arcs are drawn as, over the
+dispatcher's own data: `DeckFrame` (`src/modules/plan-runner/DeckFrame.tsx`, §"The arc deck" of the
+plan-runner section) supplies the chrome, the fold, the arrows, the snap and the strip, and
+`DispatchArcDeck` (`src/modules/dispatcher/ArcDeck.tsx`) hands it this lane's word, its books and its cards
+(operator, 2026-09-25: "he did not do it properly it is not the same as the other arc card" — "we have an
+arc already, layouts should already be there" — "please tell him to do it like the other plans"). An arc
+of plans is ONE SHAPE, whichever lane's plans hang off it, and a lane that drew a second deck of its own
+would be the disagreement this arrangement exists to prevent.
+
+The deck's HEADER is the arc's own top: `<name>.arc` (`data-arc-door`), the arc's derived status as a
+`Badge` (`dispatcher.arcStatus.*`: `designing` and `live` info, `judged` neutral, `complete` positive,
+`empty` warn; the five words are `store.arc_word`'s and `dispatcher-arc.reader.ts` refuses any other BY
+NAME, so no default is invented here), the arc's own spend where it has one (`data-arc-spend`; the plan
+card's own rule — dollars OR tokens by who was used, nothing at all for a lane that has not spent), the
+goal, and the plan count the deck DREW (`data-arc-plans`; see the count below). Beneath the header the
+deck's BODY holds this lane's own first row — `DispatchArcControls`, the model switch and the verb row —
+and then `ol[data-arc-strip]`, ONE HORIZONTAL STRIP in which each plan of the arc is ONE ITEM
+(`li[data-dispatch-plan-row]` with `data-plan-name`, `data-pinned` and `data-arc-layer`, at `DeckItem`'s
+fixed card width) holding that plan's own `PlanCard`, WHOLE: its pill, its word, its phases, its controls
+and its Dismiss, exactly as a plan of no arc has them. The strip opens on the plan whose turn it is
+(`deckFocusIndex`: the first member that has not finished, or the last once all of them have) and carries
+the deck's two arrows and its `Card N of M` line, as the runner's does. `data-dispatch-arc`,
+`data-arc-name`, `data-arc-status` and `data-collapsed` sit on the DECK's root — `data-dispatch-arc` and
+`data-arc-name` are this lane's own handles (`data-arc-deck` is the runner lane's, and a probe counting the
+runner's decks must not count these), so a probe reads one arc's state and its plans' states from one
+element.
+
+**The caption counts what the deck HOLDS.** `arc.plans` is the arc file's names, and a plan whose ending
+the operator has DISMISSED is off the strip while still being named there: a caption reading "14 plans" over
+thirteen cards is the header lying about the deck under it, which is the one thing `RunnerPanel`'s own
+count refuses to do. So the note counts the group's surviving members — exactly what the strip drew.
+
+**The split is one pure function, and both homes read it.** `byArc(plans, arcs)` (`dispatcherState.ts`)
+returns `{ groups, rest }` — every arc the lane carries with its plans in the arc's own order, and the
+plans no arc holds. A member is ordered by the arc's list first and the lane's urgency second, so a plan
+the arc's file does not name is still drawn rather than dropped, and a plan whose `arc` names an arc the
+store no longer carries falls to `rest` with the arc-less ones. `RunnerPanel` and `RunnerWidgetBody` each
+call it once and neither has a grouping of its own. `DispatchArcDecks` draws the list: `data-dispatch-arcs`
+on the group, `home` (`tab`/`gutter`) written on it so a reading is always taken from ONE home, one deck
+per arc (the tab's centred `max-w-2xl` column, the gutter's flush width with each card taking the strip's
+whole width). An arc card is never empty — `useDispatcherPlans` drops an arc with no plan left on the lane — so
+`byArc` never draws a deck standing over nothing.
+
+**A plan's `waits_on` reads beside its name.** `waitsOnSiblings(plan, members)` keeps the store's entries
+that name a plan of THIS arc (`dispatcher.waitsOn`, `data-plan-waits-on`) — the store spells them with
+the `.v3` every dispatcher verb prints, and a plan's own name is dropped, so a plan never waits on itself.
+`PlanCard` takes the answer as `waitsOn` rather than reading the lane: a card that reached for the lane
+itself would be one bus subscription per card, and it cannot know which plans are its arc's without the
+group it was handed. A plan of no arc passes none and draws no line.
 
 **Its four controls are the plan card's own, applied to the whole arc.** Stop, Resume and
 `Resume at …` — the last two drawn only where `arc.stopped`, Stop only where `arc.walking`, and the
-whole row only when one of the two holds, so a header never offers a press the dispatcher would refuse
+whole row only when one of the two holds, so the deck never offers a press the dispatcher would refuse
 — plus `RunModelControl` scope `dispatch-arc` drawing the ARC'S OWN word (`arc.model`, never a plan's
 effective one), handles `data-dispatch-arc-model` / `data-dispatch-arc-model-choice`. The three verbs
 are `dispatcher stop|resume|schedule <arc>`, which the CLI resolves to the arc's own plans in ONE step
 (`arc_verbs.targets`: the arc's `live` plans for Stop, its STOPPED plans for Resume and for the hour —
 the very sets `arc.walking` / `arc.stopped` report), so the header and a terminal cannot disagree
-about what an arc's press reaches. THE CARD NEVER LOOPS OVER THE ARC'S PLANS ITSELF: it posts the arc's
-name and nothing else, and the arc's own hour reads back over the plans — `arc.schedule` is a stamp
+about what an arc's press reaches. THE CONTROLS NEVER LOOP OVER THE ARC'S PLANS THEMSELVES: they post the
+arc's name and nothing else, and the arc's own hour reads back over the plans — `arc.schedule` is a stamp
 only when every STOPPED plan of the arc carries the same one, which one press of this control always
 makes true — so an hour the header names is an hour the Cancel beside it clears. All four go through `useDispatcherVerbs(name, 'arc')` — ONE hook for both hands, the scope
 deciding which door a press is relayed through. Handles: `data-dispatch-arc-stop`, `data-dispatch-arc-resume`,
 `data-dispatcher-arc-schedule` (`-set`, `-cancel`, the armed hour as the group's value),
 `data-dispatch-arc-schedule-note`.
+
+**The fold takes the strip AND the verbs, and what it hides is inert.** The deck folds like a run card
+(`useCardFold`, key `darc:<arc name>` — the arc's own name, apart from the runner lane's `arc:` space):
+what stays is the header — which arc this is, its word, its books, and how many plans it holds — and what
+goes is the body row (`DispatchArcControls`: the model switch and Stop/Resume) together with the strip and
+its two arrows. The verbs ride `bodyTop` for the runner deck's own reason: they are VERBS, the same layer a
+run card's footer folds and a plan card's own controls fold, and keeping them in the header made a folded
+deck 164px against 86px — a "collapsed" row that had not collapsed (measured on the runner's deck,
+2026-09-25). The fold hides through the house's body slot (`CardFoldBody`, `inert` + `aria-hidden` while
+closed) and never a raw clip: the hidden body of a dispatch arc is every plan of the arc with its own verbs
+(188 focusable controls behind a 0px clip, measured 2026-09-25), and a fold is remembered per card, so it
+would survive reloads. The two standing verb probes below scope their controls under
+`[data-dispatch-arc][data-arc-name="…"]`, so they find them whatever fold the operator has stored for his
+own arcs.
 
 The model control IS THE ONE THAT OVERRIDES A PLAN'S OWN WORD: the dispatcher takes the word on the arc's
 row and hands it to EVERY plan of the arc in the same transaction (`store.set_arc_model`), which is
@@ -2687,17 +2742,20 @@ speaks for itself until the arc presses again. Nothing is optimistic on either s
 its plans both redraw from the next `dispatcher_state` frame. A refusal toasts the dispatcher's own
 first line, amber, exactly as a plan's does.
 
-The arcs come from `useDispatcherPlans`, and the header list is filtered there one step stricter than
-the lane's own: the server drops an arc with no plan left on the lane (`arcsOnLane`), and this drops
-an arc whose every remaining card the operator has DISMISSED — a header standing over nothing is the
-one shape no later frame would ever clear.
+The arcs come from `useDispatcherPlans`, and the list is filtered there one step stricter than the lane's
+own: the server drops an arc with no plan left on the lane (`arcsOnLane`), and this drops an arc whose
+every remaining card the operator has DISMISSED — a deck standing over nothing is the one shape no later
+frame would ever clear.
 
 **The dismissal ids.** A complete plan is dismissed into the SAME per-user list as the runs
 (`dismissedRuns.ts`, `planRunner` preference key): id `DISPATCHER_ENDING_PREFIX` + name (`v3:<name>`),
 ending `epochOf(completed_at)`. `dismissRun` prunes the stored list only WITHIN the ending's own id-space
 (`spaceOf`: a `v3:` id is the plan lane's, any other id the run lane's) and leaves the other space's
 entries standing, so a dismiss site hands in the lane it can see and nothing more: the plan card passes
-`carriedNames`, a run card `carriedIds`. `carriedNames` is the UNFILTERED lane (dismissed plans included),
+`carriedNames`, a run card `carriedIds`. `planDismissal(plan, carriedNames)` (`dispatcherState.ts`) is that
+rule written ONCE — `status === 'complete'` AND a dateable `completed_at`, the hook's own test — and both
+homes hand its answer down, so an arc's member and a plan of no arc are offered Dismiss by the same
+function. `carriedNames` is the UNFILTERED lane (dismissed plans included),
 or the prune would drop every earlier dismissal. The prefix is exported by the store through the
 `plan-runner` barrel and read by `useDispatcherPlans`; a further lane that dismisses into this list adds
 its prefix to `spaceOf`, one function. A plan that completes again has a new `completed_at`
@@ -2709,7 +2767,7 @@ names the `dispatcher_state` frame. Two ways in: the push (every frame, authorit
 newer than itself (`held.at >= at`). A frame or body missing `plans`, `route`, `daemon` or a string
 `offpeak_at` is dropped, never half-published; `arcs` is the ONE field read rather than demanded,
 because a frame from a server older than that key is still a whole picture of the plans — an absent
-list draws no arc headers instead of blanking every card the frame did carry, while a key that IS
+list draws no arc cards instead of blanking every card the frame did carry, while a key that IS
 there and is not a list is refused like every other field. The bus topic is `dispatcher:all`
 (`DISPATCHER_ALL_TOPIC`), one payload `{ plans, arcs, route, daemon, offpeak_at }`
 (`DispatcherLanePicture`) with the frame's `at` as its clock; no per-plan topic exists. `home` and `generated_at` are left out on purpose: `generated_at` is
@@ -2769,7 +2827,15 @@ dev client).
 - before side: `--url http://127.0.0.1:5185` over the previous build (`vite preview --outDir .prod-client/builds/<previous> --port 5185`) writes `artifacts/dispatch-card-phases-before.json`; the prod build timer keeps the current and previous bundle only.
 - 2026-09-25: before — tab 9/9 and 14/14 rows painted, gutter 0/9 and 0/14 (`closed`); after — 9/9 and 14/14 in both homes, exit 0.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/plan-runner/dismissedRuns.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dispatch-card-phases.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dispatch-model-word.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dispatch-resume-3am.mjs
+**An arc's plans nested inside the arc's deck — the standing proof.** `node .verify/probe-arc-nest.mjs [--url http://127.0.0.1:5183]` (tab at 1440, gutter at 1920, on the dev client).
+
+- it READS THE LIVE LANE AND NEVER WRITES TO IT: the expected split is computed in the probe from `GET /api/dispatcher/plans` and the operator's own preference blob (a dismissal is `{v3:<name>, completed_at}`, the hook's rule), so the assertion is against the store rather than a fixture — every plan of the lane must be drawn exactly once, inside its arc's deck if the store gives it one and outside every deck if it does not.
+- exit 0 = each arc deck holds exactly that arc's plans IN THE ARC'S OWN ORDER (urgency would put a `live` member first; the arc's file puts `restorly--kit` first whether anything walks or not), DRAWN AS THE DECK EVERY ARC IS DRAWN AS — the plans are the items of one horizontal strip (`ol[data-arc-strip]`: equal tops, left to right in the arc's own order), the header is the deck's own (`[data-arc-header]`, starting `<name>.arc`, carrying exactly one fold toggle) — each item holds a whole `[data-dispatcher-card]`, the caption counts the cards drawn, the `waits on …` line is drawn exactly where the store names a plan of the arc and nowhere else, Dismiss is offered exactly where the plan is complete and carries its ending, and the tab and the gutter return the SAME reading.
+- ONE DECK IS FOLDED AND OPENED AGAIN, per arc and per home: folded, the body slot carries `inert` and `aria-hidden="true"`, the browser REFUSES focus to the first control inside it, one Tab from the deck's own toggle never lands inside, the header stays and the strip's arrows go; unfolded, the body is back in the tab order — so the pass leaves the fold store as it found it. A deck found folded at the start is opened first and a `[NOTE]` printed (a fold is the operator's own press, kept in his preference blob), because only an open deck can be read or photographed.
+- shots: `shots/arc-nest-<port>-tab.png`, `-tab-tall.png` (one page sized to the lane, so a thirteen-plan deck is photographed whole), `-<arc>-card.png`, `-<arc>-head.png`, `-<arc>-tail.png`, and the gutter's own framed on the deck's top; reading in `artifacts/arc-nest.json`.
+- 2026-09-25 on 5183: the `restorly` deck is one strip of thirteen plan cards in the arc's own order under its own header (1841px — one card's height, captioned “13 plans”), the three plans of no arc (`athena-scenarios`, `dispatcher-refit`, `dispatcher-ready`) stand below it from 3123px, 16 of 16 plans drawn once; folded the deck is 124px (header 86px) and its 188 hidden controls refuse focus; exit 0 in both homes.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/plan-runner/dismissedRuns.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-arc-nest.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dispatch-card-phases.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dispatch-model-word.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dispatch-resume-3am.mjs
 
 ## MAN-539 — The file manager
 section: file-manager/000
@@ -6750,7 +6816,8 @@ section: plan-runner/015 Consumers/018 The Runner tab
 
 `RunnerPanel` is where every run on the lane is drawn — one of `RunCard`'s two callers now that the
 desktop chat gutter's Runner widget is the other (§"The runner card") — and every v3 plan the
-dispatcher carries, as a `PlanCard` in the SAME list. Both lists live in `src/modules/runner-tab`, a
+dispatcher carries: a plan of an arc is nested INSIDE that arc's own deck, and a plan of no arc is a
+`PlanCard` in the same list as the runs. Both lists live in `src/modules/runner-tab`, a
 host module above the two lanes: `plan-runner` and `dispatcher` each import only their own and the
 shared layers, the dispatcher's card reuses this lane's `ScheduleControl`, `scheduleClock` and
 dismissal store through the `plan-runner` barrel, and a list inside either lane would make the two
@@ -6783,29 +6850,41 @@ pill at all: `Tabs` renders that pill for word tabs only, and marks an icon tab 
 `.vv-tabs__dot` while carrying the count in words in the tab's `title` (`Runner (2)`). Anything
 reading this strip's count reads the title.
 
-**The panel.** A header carrying `runner.title` and the count — runs plus plans — then one
-`<PlanCard />` per v3 plan, ordered by the dispatcher's `byUrgencyThenNewest` (live,
-scheduled, queued, paused, parked, idle, complete; newest `updated_at` first inside each) and drawn
-ABOVE the runs and below the arc gallery — and below `<DispatchArcHeaders arcs>`, one header per v3 arc carrying the arc's own model word AND its three verb controls — Stop, Resume, Resume at 3:00 AM, drawn only where the arc is walking or stopped (MAN-1557 §"The arc header"), between the gallery and the plans — then one `<RunCard defaultOpen />`
-per run no arc card owns — `defaultOpen` is the one variance `RunCard` offers, and the tab is what wants it: a person
+**The panel.** A header carrying `runner.title` and the count — runs plus plans — then the v3 lane in TWO pieces, both below the arc gallery and above the runs
+and both read off ONE split (`byArc(plans, arcs)`, MAN-1557 §"The arc's deck"): one `<DispatchArcDecks />`
+per v3 arc — drawn as THE SAME DECK the runner's arcs are drawn as (`DeckFrame`, §"The arc deck"
+below), the arc's own header on top carrying its word, its books and its count, this lane's controls on
+the body's first row (the arc's model word, and Stop, Resume and Resume at 3:00 AM only where the arc is
+walking or stopped), and the arc's plans as the items of that deck's own horizontal strip in the arc's
+OWN order, each a whole `<PlanCard />` with its phases, controls and Dismiss — and then, in the list's own urgency order (live, scheduled, queued,
+paused, parked, idle, complete; newest `updated_at` first inside each), one `<PlanCard />` per plan NO arc
+holds. The plans of no arc are drawn exactly where they were drawn before the arcs claimed their own, so
+a lane with no arc reads as it always did — then one `<RunCard defaultOpen />`
+per run no arc deck owns — `defaultOpen` is the one variance `RunCard` offers, and the tab is what wants it: a person
 who navigated here has already asked for the runs. (A `PlanCard` is passed no such prop: a plan card's phases
 are shown in every home it has, so the tab and the gutter cannot disagree about what it shows.) Order is live → stale → paused, newest first
 inside each: live because something is happening to it, stale because a lapsed heartbeat is the one
 state that may want a hand, paused last because a parked run is parked on purpose. Paused runs ARE
 counted and ARE listed — that is the whole reason the lane carries them where the statusline drops
 them. The count and the panel cannot disagree: both read `count` off the same hook, and a run an arc
-card owns still counts — it is on this screen, inside its card. Every dismiss in the panel passes its OWN lane's
+deck owns still counts — it is on this screen, inside its card. Every dismiss in the panel passes its OWN lane's
 carried ids — `carriedIds` for a run, `carriedNames` for a plan — and `dismissRun` prunes within the ending's
-id-space, so the other lane's dismissals stand; a plan's ending is
-`{ run_id: 'v3:<name>', ended_at: epochOf(completed_at) }`. `EmptyState`
+id-space, so the other lane's dismissals stand; a plan's handler is built by
+`planDismissal(plan, carriedNames)` (`dispatcherState.ts`) — the rule once, handed to the card at either
+depth — and its ending is `{ run_id: 'v3:<name>', ended_at: epochOf(completed_at) }`. `EmptyState`
 (`runner.empty`) shows only when the count (runs plus plans) is zero AND `useArcs()`'s own `arcs` array is empty AND `useDispatcherPlans().arcs` is empty
 — not `arcCount` (§"The arc deck" below) — reachable precisely because the tab is sticky. `ArcGallery`
 mounts above the run list in the same scroll when an arc exists (§"The arc deck" below).
 
-**The gutter.** `RunnerWidgetBody` draws the same plan cards, their phases open, below the arc deck and
-above the runs, with `<DispatchArcHeaders home="gutter" />` between the deck and the plans: the open chat's plans first (`session_app_id === sessionId`, with `SessionPin`), the rest behind,
-then the runs by the same rule. A plan's row is `li[data-testid=runner-widget-plan]` carrying
-`data-plan-name` and `data-pinned` (`true` for the open chat's); a run's is `runner-widget-run`. The
+**The gutter.** `RunnerWidgetBody` draws the same split, below the arc deck and above the runs: one
+`<DispatchArcDecks home="gutter" />` per v3 arc — the SAME component the tab calls, so the two homes can
+never group differently (the gutter's flush width, each card taking the strip's whole width, its own pins
+on the rows) — and then the plans NO arc holds, the open chat's first (`session_app_id ===
+sessionId`, with `SessionPin`) and the rest behind; then the runs by the same rule. A plan of no arc keeps
+its row `li[data-testid=runner-widget-plan]` carrying `data-plan-name` and `data-pinned` (`true` for the
+open chat's); inside an arc, a plan's row is `li[data-dispatch-plan-row]` with the same two attributes and
+the pin on the ROW, so "this chat opened that plan" reads the same at either depth; a run's is
+`runner-widget-run`. The
 widget's `EmptyState` shows only when there is no run, no plan, no runner arc and no v3 arc. The widget's badge in
 `ChatGutterLayout` counts runs, plans and unfinished arcs.
 
@@ -6838,6 +6917,25 @@ own schedule: the server's snapshot drops a complete arc once its `ended_at` is 
 (§"How a run is classified"). The tab is shown while a run OR an arc that is not complete exists —
 `arcCount` is `useArcs()`'s unfinished-arc count (§"The Runner tab").
 
+**The deck is one composition, and the dispatcher's lane draws through it too.** `DeckFrame.tsx` owns
+the chrome every arc on this screen is drawn with — the root (`data-arc-status`, `data-collapsed`, and each
+lane's own handle through `rootAttributes`), the `Collapsible` whose trigger is the header's fold
+(`CardFoldToggle`, `data-card-fold`), the header (`data-arc-header`: the title row with the badge and the
+fold, an optional subtitle and an optional spend beside the title, then the nav row carrying
+`data-arc-prev` / `data-arc-next` / `data-arc-viewing`), the body slot (`CardFoldBody`, `data-arc-deck-body`)
+and the strip itself (`ol[data-arc-strip]`) — and each lane hands it its own data through those slots
+(`DeckItem` is the ONE width rule for a slot, so a deck cannot have items of two widths). `ArcDeck` draws
+the runner's arcs through it; a DISPATCH arc (`DispatchArcDeck`, in the dispatcher's own module) draws
+through the SAME frame (operator, 2026-09-25: "he did not do it properly it is not the same as the other
+arc card" — "we have an arc already, layouts should already be there" — "please tell him to do it like the
+other plans"), so the two lanes cannot disagree about the shape of an arc of plans — an arc of plans is one
+shape whichever lane's plans hang off it. The fold hides through `CardFoldBody`, never a raw clip: while a
+deck is closed, its body slot carries `inert` and `aria-hidden` and the browser REFUSES focus inside it,
+which on a dispatch arc is thirteen plans and 188 controls behind a 0px clip (measured 2026-09-25). A
+folded deck keeps its header — the name, the word, the spend, the count — and loses its whole body, verbs
+included: a lane's own row of controls rides `bodyTop`, the model switch and Start/Stop being VERBS, the
+same layer a run card's footer folds and a plan card's own controls fold.
+
 **The header.** The arc's title and its status badge, then — while the arc is not complete — the
 arc's ONE model word in the same `RunModelControl` the run card uses (`data-arc-model` on the group,
 `data-arc-model-choice` on each option), relayed through `useArcModel` to `POST /arcs/:arc/model`.
@@ -6856,9 +6954,9 @@ card (`arc.json:cards[].refusal`), and the header's badge reads the arc's own wo
 which the snapshot sorts FIRST — ahead of `walking`, `stalled`, `not-started` and `complete`
 (`arc-state.service.ts:STATUS_RANK`) — because an arc with a card it cannot start is not walking —
 WHICHEVER card carries it: a refused card `arc reorder` moved off `current` still puts `stuck` on
-the header, instead of a `walking` header contradicting the card under it. Then the nav row: the arrows and the viewing line.
+the header, instead of a `walking` header contradicting the card under it. The header itself is `DeckFrame`'s; what this lane adds is the row under it (`bodyTop`), which is where the model switch and Start sit and which the fold takes with the strip. Then the nav row: the arrows and the viewing line.
 
-**The strip.** `ArcDeck.tsx` (`data-arc-deck="<arc>"`, `data-arc-status`) draws every card in ONE
+**The strip.** `DeckFrame.tsx`, drawn by `ArcDeck.tsx` (`data-arc-deck="<arc>"` on the root) draws every card in ONE
 horizontal strip (`data-arc-strip`), in position order from `deckLayers`: the finished cards on the
 left, the live card, then the cards still to come — past → present → future, the walk's own order.
 Each card carries `data-arc-layer` (`done|top|beneath` — `top` is the live card; nothing is stacked,
@@ -6880,7 +6978,7 @@ else never moves the strip, a strip mounted while its tab is hidden is centred t
 width, and a width change keeps the card the reader was on centred. Centring scrolls the strip only,
 never the page.
 
-**The face.** `ArcCard.tsx` (`data-arc-card="<position>"`, `data-arc-card-state`) draws the card's
+**The face.** `ArcCard.tsx` (`data-arc-card="<position>"`, `data-arc-card-state`, both on the CARD's own root and never on the frame's item, where a probe has always read them) draws the card's
 number, title, state badge, charter and phases: the number is a `Chip` (`runner.arcCard`,
 `Card {{n}}`), the title sits in `[data-arc-card-title]`, the badge is toned by `cardTone`, and the
 charter is clamped to two lines. When this card's start was REFUSED, one line under the charter
@@ -7038,7 +7136,7 @@ card's own fallback rule (§"The runner card" above).
 the RAW response, like the two run verbs above: a 409 carries the runner's own refusal sentence
 whole.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/plan-runner/arc-state.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/plan-runner/ArcCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/plan-runner/ArcDeck.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/plan-runner/ArcGallery.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/plan-runner/arcState.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/plan-runner/hooks/useArcRunIds.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/plan-runner/SessionPin.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/plan-runner/arc-state.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/plan-runner/ArcCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/plan-runner/ArcDeck.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/plan-runner/ArcGallery.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/plan-runner/arcState.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/plan-runner/DeckFrame.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/plan-runner/hooks/useArcRunIds.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/plan-runner/SessionPin.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts
 
 ## MAN-644 — Proving it
 section: plan-runner/020 Proving it

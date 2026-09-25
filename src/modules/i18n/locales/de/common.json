@@ -305,6 +305,10 @@
   "shapes": {
     "diagramFailed": "Dieses Diagramm konnte nicht gezeichnet werden – der Quelltext wird angezeigt."
   },
+  "runner": {
+    "collapse": "Einklappen",
+    "expand": "Ausklappen"
+  },
   "gutters": {
     "runner": {
       "title": "Läufe"

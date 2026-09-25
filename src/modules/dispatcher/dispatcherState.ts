@@ -1,4 +1,5 @@
-import type { DispatcherPhase, DispatcherPlan, DispatcherPlanStatus, Tone } from '@/shared/types';
+import { DISPATCHER_ENDING_PREFIX, dismissRun } from '@/modules/plan-runner';
+import type { DispatcherArc, DispatcherPhase, DispatcherPlan, DispatcherPlanStatus, Tone } from '@/shared/types';
 
 /**
  * The pure vocabulary of a v3 plan, in one file with no React in it.
@@ -108,6 +109,129 @@ function touchedAt(plan: DispatcherPlan): number {
 /** Status first, then newest first inside each status. */
 export function byUrgencyThenNewest(a: DispatcherPlan, b: DispatcherPlan): number {
   return STATUS_ORDER[a.status] - STATUS_ORDER[b.status] || touchedAt(b) - touchedAt(a);
+}
+
+/** One arc of the lane with the plans of it, in the arc's own order (`DispatcherArc.plans`) — one card's worth. */
+export type DispatcherArcGroup = { arc: DispatcherArc; plans: DispatcherPlan[] };
+
+/** The lane, split: the arcs that hold plans, and the plans no arc holds. */
+export type DispatcherArcSplit = { groups: DispatcherArcGroup[]; rest: DispatcherPlan[] };
+
+/**
+ * The lane split by `plan.arc` — every arc with the plans of it in the ARC's order, and everything
+ * else in the urgency order a flat list has always used.
+ *
+ * ONE FUNCTION, TWO HOMES, AND NO THIRD READING. The Runner tab and the chat gutter's widget draw
+ * the same lane in the same column, and a home that grouped or ordered for itself is how the two
+ * would come to disagree about which card sits under which arc — so the split is here, a total
+ * function of the frame, and both homes read it.
+ *
+ * AN ARC'S OWN ORDER IS THE STORE'S, NOT URGENCY'S. `arc.plans` is the arc file's walk order
+ * (`store.arc_plans`, oldest first), and it is what the arc's deck draws: the reader is looking at a
+ * sequence of thirteen plans that depend on each other, and re-sorting that by status would put the
+ * live one at the top and undo the sequence the operator designed. A plan the arc's list does not
+ * name (a member that pre-dated its arc, or a frame an older server built) still belongs to its arc
+ * and is drawn after those, by urgency, so no plan is ever lost between the two orders.
+ *
+ * NOTHING IS DROPPED EITHER WAY, which is the property the whole screen rests on: every plan given
+ * comes back exactly once — under its arc when the lane carries that arc, in `rest` when it belongs
+ * to no arc or names one the lane does not carry (a frame whose arc list was refused, or an arc row
+ * the server dropped). A split that could lose a card would be a list that silently hides a plan.
+ */
+export function byArc(plans: DispatcherPlan[], arcs: DispatcherArc[]): DispatcherArcSplit {
+  const carried = new Set(arcs.map((arc) => arc.name));
+  const held = new Map<string, DispatcherPlan[]>();
+  const rest: DispatcherPlan[] = [];
+  for (const plan of plans) {
+    if (plan.arc === null || !carried.has(plan.arc)) {
+      rest.push(plan);
+      continue;
+    }
+    const bucket = held.get(plan.arc);
+    if (bucket === undefined) held.set(plan.arc, [plan]);
+    else bucket.push(plan);
+  }
+
+  const groups = arcs.map((arc) => {
+    const position = new Map(arc.plans.map((name, at) => [name, at]));
+    const mine = [...(held.get(arc.name) ?? [])].sort((a, b) =>
+      (position.get(a.name) ?? Number.MAX_SAFE_INTEGER) - (position.get(b.name) ?? Number.MAX_SAFE_INTEGER)
+      || byUrgencyThenNewest(a, b));
+    return { arc, plans: mine };
+  });
+
+  return { groups, rest: rest.sort(byUrgencyThenNewest) };
+}
+
+/** The layer a plan's card wears in the strip: the runner deck's own three words, over a plan's status. */
+export type DispatchDeckLayer = 'done' | 'top' | 'beneath';
+
+/**
+ * Which layer of the arc's strip a plan is on — `done` for one that has finished, `top` for the one
+ * being walked, `beneath` for everything else. Read by the card for the dimming a finished card wears
+ * and written on the row as the harness's handle, so a deck's strip reads the same in either lane
+ * (`ArcDeck`'s cards wear `ArcCardLayer` the same way).
+ */
+export function planLayer(plan: DispatcherPlan): DispatchDeckLayer {
+  if (plan.status === 'complete') return 'done';
+  return plan.status === 'live' ? 'top' : 'beneath';
+}
+
+/**
+ * The plan a dispatch arc's strip opens on: the FIRST plan of the arc that has not finished — the one
+ * the arc is walking, or is waiting on next — and the last when every plan of it is complete.
+ *
+ * Both orders are the ARC's (`arc.plans`), never urgency's: an arc is a sequence of plans that depend
+ * on each other, so "where this arc stands" is a position in that sequence and not the most urgent
+ * card in it. The runner's deck asks the same question of its own vocabulary (its live card, or the
+ * last once the arc is complete).
+ */
+export function deckFocusIndex(plans: readonly DispatcherPlan[]): number {
+  const next = plans.findIndex((plan) => plan.status !== 'complete');
+  return next === -1 ? plans.length - 1 : next;
+}
+
+/**
+ * The plan's `waits_on`, as far as the arc it belongs to can answer: the entries that name ANOTHER
+ * plan of the same arc, in the order the document wrote them, and nothing where none does.
+ *
+ * THE ENTRIES ARE NAMES, AND THEY ARE NOT ALWAYS THE BARE ONE. The store writes a plan's `waits_on`
+ * with the `.v3` its verbs and toasts print (`restorly--kit.v3`, `report.launched`'s spelling),
+ * while `arc.plans` and `plan.name` are bare — so an entry is matched against a member's name AND
+ * its `v3`, and the entry travels to the eye exactly as the document wrote it, which is the name the
+ * card it waits on wears.
+ *
+ * WHAT IS LEFT OUT IS THE POINT OF PASSING THE ARC IN: a wait on a plan OUTSIDE the arc, or on one
+ * this lane no longer carries, is not a fact this card can show — the card it names is not on the
+ * screen — and a `waits on` line naming a plan nobody can find reads as a broken link rather than as
+ * a wait. A plan waiting on itself is nonsense the store should never write and is dropped too.
+ */
+export function waitsOnSiblings(plan: DispatcherPlan, members: DispatcherPlan[]): string[] {
+  if (plan.waits_on.length === 0) return [];
+  const names = new Set<string>();
+  for (const member of members) {
+    names.add(member.name);
+    names.add(member.v3);
+  }
+  names.delete(plan.name);
+  names.delete(plan.v3);
+  return plan.waits_on.filter((name) => names.has(name));
+}
+
+/**
+ * The dismissal a complete plan's card offers, or `undefined` where it offers none — the ONE rule
+ * both homes and every nested list read, so three call sites cannot drift apart about when a Dismiss
+ * appears or what it prunes.
+ *
+ * `carriedNames` is the lane's UNFILTERED list of plan ids (`useDispatcherPlans`), because that is
+ * what a dismissal prunes the stored list against: pruning against the drawn cards would drop every
+ * earlier dismissal the moment a second one was made. A plan whose completion the document cannot
+ * date — the field null, or a stamp nothing can parse — has no ending to match and offers nothing.
+ */
+export function planDismissal(plan: DispatcherPlan, carriedNames: string[]): (() => void) | undefined {
+  const endedAt = epochOf(plan.completed_at);
+  if (plan.status !== 'complete' || endedAt === null) return undefined;
+  return () => dismissRun({ run_id: `${DISPATCHER_ENDING_PREFIX}${plan.name}`, ended_at: endedAt }, carriedNames);
 }
 
 /**

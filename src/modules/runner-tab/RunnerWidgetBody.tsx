@@ -2,8 +2,9 @@ import { ActivityIcon } from 'lucide-react';
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { byUrgencyThenNewest as planUrgency, DispatchArcHeaders, epochOf, PlanCard, useDispatcherPlans } from '@/modules/dispatcher';
+import { byArc, DispatchArcDecks, planDismissal, PlanCard, useDispatcherPlans } from '@/modules/dispatcher';
 import { ArcGallery, byUrgencyThenNewest, dismissRun, RunCard, SessionPin, useArcRunIds, useArcs, useRunnerRuns } from '@/modules/plan-runner';
+import { useLaneFoldPrune } from '@/modules/runner-tab/hooks/useLaneFoldPrune';
 import type { DispatcherPlan, RunnerRunSnapshot } from '@/shared/types';
 import { EmptyState } from '@/shared/ui';
 
@@ -17,18 +18,24 @@ import { EmptyState } from '@/shared/ui';
  * a title, a state, a meter — that costs the gutter one row until it is opened. `defaultOpen` is
  * `RunCard`'s one variance, and this is the slot the folded value exists for.
  *
- * A PLAN CARD IS NEVER FOLDED, HERE OR ANYWHERE (operator, 2026-09-25: "dispatch v1 cards on the
- * plan runner tab should always show phases like the normal runner cards"). `PlanCard` takes no
- * `defaultOpen` and `PlanFace` opens its phase list itself, so the two homes cannot disagree about
- * what a plan card shows; a plan's phases are the whole of what it has to say, where a run card
- * carries a meter, a pipeline strip and lanes beside its own.
+ * A PLAN CARD'S PHASE LIST IS NEVER FOLDED BY DEFAULT, HERE OR ANYWHERE (operator, 2026-09-25:
+ * "dispatch v1 cards on the plan runner tab should always show phases like the normal runner
+ * cards"). `PlanCard` takes no `defaultOpen` and `PlanFace` opens its phase list itself, so the two
+ * homes cannot disagree about what a plan card shows; a plan's phases are the whole of what it has
+ * to say, where a run card carries a meter, a pipeline strip and lanes beside its own. The card's
+ * own FOLD is a different layer and is the operator's to press, in either home (`CardFoldToggle`).
+ *
+ * THE FOLDS ARE THE TAB'S FOLDS, AND THIS BODY PRUNES THE SAME MEMORY. `useLaneFoldPrune` hands the
+ * fold store exactly what this widget draws, so a card folded here is folded on the tab and the
+ * folds of cards that have left the lane go with them — one memory, two homes.
  *
  * THIS CHAT'S RUNS LEAD, AND THE SORT INSIDE EACH GROUP IS THE LANE'S. `byUrgencyThenNewest` is
  * moved, not rewritten, from the tab's own panel, so the two homes can never disagree about which
  * run is urgent. A stable filter then lifts the runs whose `launched_by_session` equals the open
  * chat to the front — `null` on either side is not a match, since "no session launched it" is not
  * "this session launched it". The prop arrives already resolved to an APP session id by the server,
- * so a plain equality is the whole test.
+ * so a plain equality is the whole test. The plans no arc holds are lifted by the same rule, for the
+ * same reason.
  *
  * THE ARC DECK COMES FIRST, AS IT DOES ON THE TAB. `ArcGallery`'s gutter home — flush, one whole
  * card per view — sits above the runs, so an arc whose next card has no run yet is on screen beside
@@ -41,10 +48,15 @@ import { EmptyState } from '@/shared/ui';
  * speak of runs that are on screen, inside a deck. The pin travels to the deck for the same reason:
  * a run this chat launched that is drawn in an arc card wears its pin THERE, on the card.
  *
- * THE v3 PLANS RIDE ABOVE THE RUNS, with their phases open, by the same rule: the open chat's
- * plans first (`session_app_id`, resolved to an app session id by the server, with the pin), the
- * rest behind. Every dismiss here passes its own lane's carried ids, the tab's rule
- * (`RunnerPanel`).
+ * THE v3 PLANS RIDE ABOVE THE RUNS, with their phases open, and they arrive NESTED BY ARC — the one
+ * split both homes read (`byArc`, the tab's own rule): every arc of the lane is one DECK holding the
+ * plans of that arc in the arc's own strip, wearing this chat's pin on the plans it opened, and the
+ * plans no arc holds follow in the same lift the runs get — the open chat's first, the rest behind. A
+ * dismissal here passes its own lane's carried ids, the tab's rule (`RunnerPanel`).
+ *
+ * THE PIN IS ON THE ROW, WHEREVER THE NESTING PUT IT. A plan of this chat inside an arc deck wears
+ * `SessionPin` on ITS row (`data-dispatch-plan-row`) exactly as a plan of no arc wears it on the
+ * `runner-widget-plan` row below, so "this chat opened that plan" reads the same at either depth.
  *
  * IT READS THE BUS AND DRAWS NO FRAME. `useRunnerRuns` and `useArcs` hand it the retained lanes, so
  * it paints on its first render and owns no state of its own; the chrome, the slots and the
@@ -56,13 +68,18 @@ export function RunnerWidgetBody({ sessionId }: { sessionId: string | null }) {
   const { t } = useTranslation();
   const { runs, carriedIds } = useRunnerRuns();
   const { plans, arcs: dispatchArcs, carriedNames } = useDispatcherPlans();
-  const orderedPlans = useMemo(() => {
-    const ordered = [...plans].sort(planUrgency);
+  // The lane split once, by the one rule both homes read: the arcs holding the plans of them in the
+  // arcs' own order, and the plans no arc holds. Inside an arc the order is the ARC's — it is a
+  // sequence of plans that depend on each other, and the open chat's "mine first" lift below belongs
+  // to the list the operator's own plans sit in, not to a walk the store laid out.
+  const split = useMemo(() => byArc(plans, dispatchArcs), [plans, dispatchArcs]);
+  const loosePlans = useMemo(() => {
     const isMine = (plan: DispatcherPlan) => sessionId !== null && plan.session_app_id === sessionId;
-    return [...ordered.filter(isMine), ...ordered.filter((plan) => !isMine(plan))];
-  }, [plans, sessionId]);
+    return [...split.rest.filter(isMine), ...split.rest.filter((plan) => !isMine(plan))];
+  }, [split, sessionId]);
   const { arcs } = useArcs();
   const arcRunIds = useArcRunIds();
+  useLaneFoldPrune(runs, plans, arcs, dispatchArcs);
 
   // The lane, sorted once and split once. Both groups keep the urgency order a single stable
   // filter preserves, so "mine" is a lift rather than a second ordering to keep in step. The
@@ -85,21 +102,21 @@ export function RunnerWidgetBody({ sessionId }: { sessionId: string | null }) {
   return (
     <div className="flex min-w-0 flex-col gap-4">
       <ArcGallery home="gutter" pinnedSessionId={sessionId} />
-      {/* The dispatch arcs, above the v3 plans they speak for — the tab's own arrangement, in this
-          home's flush width (`home="gutter"`). Drawn even when no plan card is: the arc's own word is
-          pressable from here, and an arc whose cards are all dismissed has no list to sit above. */}
-      <DispatchArcHeaders arcs={dispatchArcs} home="gutter" />
-      {orderedPlans.length > 0 && (
+      {/* The dispatch arcs, above the plans no arc holds — the tab's own arrangement, in this
+          home's flush width (`home="gutter"`), each drawn as the SAME deck the runner's arcs are
+          drawn as: header, fold, arrows, and the plans of the arc in its own strip. A card all of
+          whose plans have been dismissed could not be here at all (`useDispatcherPlans` drops the
+          arc). */}
+      <DispatchArcDecks groups={split.groups} home="gutter" pinnedSessionId={sessionId} carriedNames={carriedNames} />
+      {loosePlans.length > 0 && (
         <ul className="flex min-w-0 flex-col gap-3">
-          {orderedPlans.map((plan) => {
+          {loosePlans.map((plan) => {
             const isMine = sessionId !== null && plan.session_app_id === sessionId;
-            const endedAt = plan.status === 'complete' ? epochOf(plan.completed_at) : null;
             return (
               <li key={`v3:${plan.name}`} data-testid="runner-widget-plan" data-plan-name={plan.name}
                 data-pinned={String(isMine)} className="flex min-w-0 flex-col gap-1">
                 {isMine && <SessionPin />}
-                <PlanCard plan={plan}
-                  onDismiss={endedAt !== null ? () => dismissRun({ run_id: `v3:${plan.name}`, ended_at: endedAt }, carriedNames) : undefined} />
+                <PlanCard plan={plan} onDismiss={planDismissal(plan, carriedNames)} />
               </li>
             );
           })}

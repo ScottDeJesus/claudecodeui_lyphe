@@ -35,8 +35,8 @@ export function useDispatcherPlans(): {
   /**
    * The arcs the lane carries — each with its own word, its derived status and the NAMES of its
    * plans. Every one of them has at least one plan still on the lane (the server drops the rest, so
-   * a header can never stand over nothing), and a plan of one names it in `plan.arc`: the two halves
-   * read the same document, and this is that join's other side.
+   * an arc's deck can never stand over nothing), and a plan of one names it in `plan.arc`: the two
+   * halves read the same document, and this is that join's other side.
    */
   arcs: DispatcherArc[];
   count: number;

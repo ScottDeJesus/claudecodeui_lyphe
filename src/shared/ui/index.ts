@@ -50,6 +50,11 @@ export { Badge } from '@/shared/ui/Badge';
 export { Banner } from '@/shared/ui/Banner';
 export { Button, buttonVariants } from '@/shared/ui/Button';
 export { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/shared/ui/Card';
+// The one fold a card's header can wear: the chevron glyph every foldable surface draws, the button
+// the four lane cards press, and the body slot that puts `inert` + `aria-hidden` on a folded card's
+// hidden content. The glyph is shared with the chat's shape cards on purpose — `ShapeFrame` draws it
+// too, so there is one sign and not two look-alikes.
+export { CardFoldBody, CardFoldToggle, FoldChevron } from '@/shared/ui/CardFold';
 export { Chip } from '@/shared/ui/Chip';
 export { ClaudeCodeMark } from '@/shared/ui/ClaudeCodeMark';
 export { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/shared/ui/Collapsible';
