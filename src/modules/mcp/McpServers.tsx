@@ -146,6 +146,14 @@ export default function McpServers({ selectedProvider, currentProjects }: McpSer
         <ActionMenu
           label="Add MCP Server"
           icon={Plus}
+          // In place, against the default. This panel renders inside Settings' own `fixed
+          // z-[9999]` layer, which sits in the ROOT stacking context — so a menu portalled to
+          // `<body>` at `z-[70]` is drawn UNDER the panel's content rather than over it, measured
+          // at 1280px in both themes (`.verify/export-menu-layer.mjs`, settings-mcp site, where
+          // every hit test at the menu's centre landed on `div.space-y-4`, the panel behind it).
+          // The trigger is the panel's first row and nothing here scrolls it near the panel's
+          // bottom edge, so the in-place menu has no ancestor to be clipped by.
+          portal={false}
           className="w-full sm:w-auto"
           triggerClassName={`w-full sm:w-auto ${MCP_PROVIDER_BUTTON_CLASSES[selectedProvider]}`}
           items={[

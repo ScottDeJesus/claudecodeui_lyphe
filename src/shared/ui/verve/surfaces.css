@@ -26,17 +26,19 @@
  * left/top change.
  *
  * `60` is measured rather than chosen (2026-09-16), against five neighbours:
- *   - the mobile sidebar drawer, `fixed inset-0 z-50`, IN THE SAME TREE (ProjectSidebarRegion.tsx:76).
+ *   - the mobile sidebar drawer, `fixed inset-0 z-50`, IN THE SAME TREE (ProjectSidebarRegion.tsx:86).
  *     The one it must beat: under that backdrop the FAB is dimmed, blurred and unclickable at the
  *     exact moment the reader is trying to leave a pane.
- *   - Dialog, z-50, portalled to <body> (Dialog.tsx:185,205): the drawer this FAB opens.
- *   - ActionMenu (ActionMenu.tsx:214), two branches on one line. Portalled it is `fixed z-[70]`: the
- *     menus inside that drawer, and 60 stays under them, so the order holds even for a FAB mounted
- *     outside the shell. In-tree, the default, it is `absolute z-50`, rendered by exactly two
- *     callers: ChatExportMenu.tsx:85, in the transcript, which a FAB the reader floated over it
- *     covers where the two overlap (accepted: the docked FAB sits in the rail, and a floated one is
- *     where the reader put it and moves in one drag); and McpServers.tsx:146, which renders inside
- *     Settings' own `fixed z-[9999]` layer (Settings.tsx:147) and so is above the FAB regardless.
+ *   - Dialog, z-50, portalled to <body> (Dialog.tsx:224,244): the drawer this FAB opens.
+ *   - ActionMenu (ActionMenu.tsx:307), two branches on one line, and the default moved to the
+ *     portalled one on 2026-09-25: `portal` is now ON unless a mount asks for `false`, and all but
+ *     one mount takes the default, so it is `fixed z-[70]` — the menus inside that drawer, and 60
+ *     stays under them, so the order holds even for a FAB mounted outside the shell. The in-place
+ *     branch, `absolute z-50`, has exactly one caller: McpServers.tsx:146, which renders inside
+ *     Settings' own `fixed z-[9999]` layer (Settings.tsx:153) and so is above the FAB regardless —
+ *     and would be UNDER that layer's content if it portalled, which is what measured it back into
+ *     the in-place branch (`.verify/export-menu-layer.mjs`, settings-mcp site: portalled, every hit
+ *     test at the menu's centre landed on `div.space-y-4`, the panel behind it).
  *   - the app's ceiling, z-[10000] (McpServerFormModal.tsx:107).
  *   - the toast stack, 10001 (`.vv-toast-stack` in feedback.css).
  * The number only competes inside the workspace shell. That container is `position: fixed`, which

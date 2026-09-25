@@ -255,15 +255,12 @@ export function AppDrawerRow({ app, position, onMove, onRemove, onOpenInDualScre
           </span>
         </button>
 
-        {/* Portalled: the list scrolls inside an overflow-hidden ScrollArea, which would clip an
-            in-place menu at the sheet's edge. Named by the app alone, and the trigger announces
-            itself as a menu. */}
+        {/* Named by the app alone, and the trigger announces itself as a menu. */}
         <ActionMenu
           label={app.name}
           items={items}
           icon={MoreHorizontal}
           iconOnly
-          portal
           variant="ghost"
           size="icon"
           triggerClassName="h-8 w-8 rounded-[9px] text-ink-faint hover:text-foreground"

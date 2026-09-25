@@ -2465,7 +2465,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/architecture/MANUAL.md, /ho
 ## MAN-1498 — The v3 dispatcher lane
 section: dispatcher/000
 
-The fifth polled lane on this server, mounted beside the plan-runner's: eight routes under
+The fifth polled lane on this server, mounted beside the plan-runner's: ten routes under
 `/api/dispatcher`, behind `authenticateToken` in `server/index.ts`, wired in `dispatcher.module.ts`,
 plus one websocket frame pushed to every open `/ws` socket whenever the picture changes — `kind:
 'dispatcher_state'` — and one notification for each plan ending.
@@ -2498,26 +2498,46 @@ wire, and that one is the first tick after a restart.
 `cwd` the home directory, `maxBuffer` 4 MiB (`dispatcher-state.transport.ts` — the document carries
 every plan's `goal` whole, so the run lane's 1 MiB is not headroom enough). The body is validated
 FIELD BY FIELD into the F1 types — `dispatcher-plan.reader.ts` reads one plan with its phases, stages
-and events; the transport file holds the vocabulary — and a field this build cannot read is refused BY
-NAME. That strictness is measured, not stylistic: the document is printed whole by a process that has
-already exited, so a body that does not match is a DIFFERENT BUILD of the dispatcher, never a torn
-write. This server's two acts on it, and the only two: each plan's `session` is resolved to an app
-session id (`sessionsDb.resolveAppSessionId`, the rule the run lane's `resolveLaunchingSessions`
-follows; `null` when the plan names none, and the document's own `session` travels beside it), and a
-plan whose `completed_at` is older than 24 h — the run lane's own `ENDED_KEEP_S` — is dropped.
+and events, `dispatcher-arc.reader.ts` reads one arc (its own words and status, its model word, and
+the NAMES of its plans, never resolved into plan rows: the store's report already made that join, and
+a second one would be a second answer); the transport file holds the vocabulary — and a field this
+build cannot read is refused BY NAME. That strictness is measured, not stylistic: the document is
+printed whole by a process that has already exited, so a body that does not match is a DIFFERENT BUILD
+of the dispatcher, never a torn write. This server's three acts on it, and the only three: each plan's
+`session` is resolved to an app session id (`sessionsDb.resolveAppSessionId`, the rule the run lane's
+`resolveLaunchingSessions` follows; `null` when the plan names none, and the document's own `session`
+travels beside it), a plan whose `completed_at` is older than 24 h — the run lane's own
+`ENDED_KEEP_S` — is dropped, and an ARC with no plan left on the lane after that filter is dropped
+with it (`arcsOnLane`): a header standing over nothing is the one shape no later frame would ever
+clear. An arc's plans live on the same urgency-ordered list as every other plan (the header is not a
+grouping), so the drop is asked against the names the LANE kept, and the client joins `plan.arc`
+against the same list from the other side.
 
-**The verbs.** `POST /plans/:name/stop|resume|park|unpark` (no body) and `POST /plans/:name/schedule
-{ when }`, where `when` is checked by `readRunnerScheduleWhen` — the same `offpeak|<iso with a
-zone>|none` grammar the run lane's card sends. `runDispatcherVerb` relays them as argv (`dispatcher
+**The verbs.** `POST /plans/:name/stop|resume|park|unpark` (no body), `POST /plans/:name/model
+{ model }` and `POST /plans/:name/schedule { when }`, where `when` is checked by
+`readRunnerScheduleWhen` — the same `offpeak|<iso with a zone>|none` grammar the run lane's card
+sends — and where `model` is checked by `readRunnerModelChoice`, the same closed three the run
+lane's own `POST /runs/:id/model` takes, so the argv word is always one this server wrote down. `runDispatcherVerb` relays them as argv (`dispatcher
 <verb> <name> [arg]`, `cwd` the home) and NEVER throws: a numeric exit is a verdict carried whole
 (`ok` is exit 0). **The dispatcher refuses on STDOUT** — `REFUSED <verb> <name>.v3: <reason>` exit 2,
-`no plan <bare>` exit 1 — so `stdout` is the field a reader reads first, and `stdout` is also where
+a not-found line exit 1 — `no plan <bare>`, or `no plan or arc <bare>` from `model`, the one
+verb an arc's name also reaches — so `stdout` is the field a reader reads first, and `stdout` is also where
 this lane's own sentence goes when the command never answered (`reason` is `timeout` or
 `spawn-failed`). Status: 200 the verb's own answer, 409 a refusal with the result whole (never a
 paraphrase of it), 504 `timeout`, 503 `spawn-failed`; 400 for a name that cannot be one, refused
 BEFORE any process starts. `PLAN_NAME` is the dispatcher's own name rule with its optional `.v3`
 suffix, and the name travels on exactly as the URL spelled it — both spellings are the dispatcher's
 door (INV-171), and normalizing one here would be a second copy of that rule.
+
+`POST /arcs/:name/model { model }` is the ONE route that names an arc rather than a plan, and it has
+its own fence for that reason: `ARC_NAME` is the same name class with the arc's adornment
+(`store_arcs.ARC_SUFFIX` — `.arc`), and NEITHER FENCE ACCEPTS THE OTHER'S SPELLING. It relays the
+same `model` verb — one verb serves both, resolved plan-first-then-arc by the dispatcher — and the
+name it forwards carries the arc's own door, so the resolution is never repeated here — and an unknown arc is refused by the VERB's own
+line, which names both doors (`no plan or arc <bare>`), never re-worded by this route. The dispatcher
+hands that word to EVERY plan of the arc (`store.set_arc_model`, the runner's own rule for its minted
+cards) and the next frame redraws the header and its plans together: nothing optimistic, and nothing
+copied by this server.
 
 Reads: `GET /plans` → `{ ...current(), at }`; `GET /plans/offpeak` → `{ at }`, epoch seconds or null,
 registered BEFORE `/plans/:name` and answered by `createOffpeakClock` reused as is (the dispatcher's
@@ -2545,16 +2565,18 @@ section: dispatcher/010 The v3 plan card
 
 `PlanCard` draws one v3 plan the dispatcher carries — `RunCard`'s own composition over the dispatcher's
 document (operator, 2026-09-24: "it can be identical to our existing cards, it'll just have a dispatch v1
-pill label on it"). Nothing on it is invented. It is drawn in the Runner tab's list (open) and in the chat
-gutter's Runner widget (folded, the open chat's plans first with `SessionPin`), both in
-`src/modules/runner-tab` (§"The Runner tab" of the plan-runner section).
+pill label on it"). Nothing on it is invented. It is drawn in the Runner tab's list and in the chat
+gutter's Runner widget (the open chat's plans first with `SessionPin`), both in
+`src/modules/runner-tab` (§"The Runner tab" of the plan-runner section), and its phases are SHOWN in both:
+the card carries no `defaultOpen` at all, and the face below opens the list itself (operator, 2026-09-25:
+"dispatch v1 cards on the plan runner tab should always show phases like the normal runner cards").
 
 **The frame.** `Card` with `data-dispatcher-card`, `data-plan-name` and `data-plan-status` on the ROOT (a
 probe scopes every reading and every press to ONE plan — the live plan walking beside it must never be
 pressed); `CardTitle` mono = `plan.v3`; the goal's FIRST non-empty line, clamped to three lines; then the
 PILL — a static `Chip size="sm"` reading `dispatcher.pill` (`dispatch v1`), wrapped in a
 `span[data-dispatcher-pill]` because the house `Chip` forwards no data attributes — then `PlanStatusBadge`
-and `PlanClock`. Body `PlanFace`, footer `PlanControls`. Props `{ plan, defaultOpen, onDismiss? }`.
+and `PlanClock`. Body `PlanFace`, footer `PlanControls`. Props `{ plan, onDismiss? }` — NO `defaultOpen`, unlike `RunCard`.
 
 **The status words.** `dispatcher.status.*` — `LIVE`, `PAUSED`, `QUEUED`, `SCHEDULED`, `PARKED`, `IDLE`,
 `COMPLETE` — toned by `planStatusTone` (`live`, `complete` positive; the rest neutral: every other status
@@ -2565,8 +2587,8 @@ and idle → nothing.
 
 **The face.** A `Meter` (accent) of done phases over all (`phaseProgress`), its sub-line `<spend> ·
 <rounds> rounds · <route.word>`, `<spend>` being `spendText` (`src/modules/plan-runner/spend.ts`, INV-4299), where A SPEND FIGURE IS DOLLARS **OR** TOKENS, BY WHO WAS USED: `$0.28 DeepSeek` for a plan a paying API billed and NO tokens, `1.2M in · 48k out` for one on the Claude subscription and no `$` at all (never `$0.00`), and both for an aggregate that used the two hands, its token half counting the plan's CLAUDE records ONLY; — the route is the BOX's posture (`deepseek route, swarm on — all at
-once`), and it explains a plan sitting still under `one at a time`. A `Collapsible` (`defaultOpen`) of
-`PlanPhaseRow`s: glyph (`PHASE_GLYPH` ✅ ▶ ·), position, title, a word — `running` (info) only while the
+once`), and it explains a plan sitting still under `one at a time`. A `Collapsible` that OPENS ITSELF (`defaultOpen`, stated here and not passed in, so no home can fold a
+plan's phases) of `PlanPhaseRow`s: glyph (`PHASE_GLYPH` ✅ ▶ ·), position, title, a word — `running` (info) only while the
 phase is `running` AND `busy`; `running` and not busy is a walk that ended and is not yet settled, drawn
 `settling` in neutral; `done`; `not started` — then `n rounds · <spend>` (the phase's own, the same rule; a phase not yet walked has none and the field is dropped) and the assignee in mono; folded
 beneath, one line per stage: launch time (`clockOf`), name, soul, verdict, the stage's `<spend>`; a phase
@@ -2585,11 +2607,48 @@ is read in the dispatcher's own words. Handle: `data-dispatcher-events` on the g
 title `dispatcher.scheduleTitle`); `scheduled` → Start and Cancel (the control with `startAt =
 epochOf(schedule.start_at)`); `parked` → Unpark; `idle` in state `designed` or `questions` → Park (the way
 out of the designed Stop hold); `complete` → Dismiss when the list offers one; any other `idle` →
-nothing. No model control: the route is the box's switch, never a plan's. Every verb goes through
+nothing. Every verb goes through
 `useDispatcherVerbs(name, resumeWord)` under one `busy`; a refusal toasts the dispatcher's own first
 line. Handles: `data-dispatcher-stop|resume|start|park|unpark|dismiss`, `data-dispatcher-schedule`
 (`-set`, `-cancel`). The button words Stop, Resume, Start, Dismiss are `runner.*`; Park and Unpark are
 `dispatcher.park` / `dispatcher.unpark`.
+
+**The word, and it is the plan's own.** `RunModelControl` scope `plan` rides the same footer, on
+every plan a press could still move — `movable`, the rule that hides it on a `complete` plan, the one
+status with no next phase for a word to reach — and it is NOT disabled by status, because
+`dispatcher model` is never refused for the state a plan is in: the word is read when a chain is
+LAUNCHED, so no status can be a reason to hide it. It draws the plan's EFFECTIVE word
+(`effectiveModelWord(plan.model)` — the frame's reading, so a word merely inherited from the arc is
+shown as the word this plan will really run on) and pressing one posts `/plans/:name/model` through
+`useDispatcherVerbs`' own `setModel`, in the `ml-auto` slot beside the verbs — the slot `RunControls`
+gives it, so the two cards' footers read alike. Handles: `data-plan-model` on the group,
+`data-plan-model-choice` on each option; the visible label and the three sentences are
+`dispatcher.model.planLabel` and `dispatcher.model.plan{Deepseek,Claude,Auto}Title`.
+
+**The arc header.** `DispatchArcHeaders` draws one `DispatchArcHeader` per arc the lane carries, with
+`data-dispatch-arcs` on the group and `home` (`tab`/`gutter`) written on it, so a reading is always
+taken from ONE home. ONE HOME FOR EACH ARC, HOWEVER MANY CARDS IT HAS: an arc's plans are drawn in the
+same urgency-ordered list as every other plan, so the header stands above the list rather than wedged
+between two cards and claiming a grouping the list does not have. It draws `<name>.arc`
+(`data-arc-door`), the arc's derived status as a `Badge` — `dispatcher.arcStatus.*`, `designing` and
+`live` info, `judged` neutral, `complete` positive, `empty` warn; the five words are
+`store.arc_word`'s and `dispatcher-arc.reader.ts` refuses any other BY NAME, so no default is
+invented here — and the plan count the store listed (`dispatcher.arcPlans`, `data-arc-plans`).
+
+Its control is `RunModelControl` scope `dispatch-arc`, drawing the ARC'S OWN word (`arc.model`, never
+a plan's effective one), handles `data-dispatch-arc-model` / `data-dispatch-arc-model-choice`; a press
+posts `/arcs/:name/model` through `useDispatcherArcModel`, relayed as `dispatcher model <arc> <word>`.
+IT IS THE ONE CONTROL THAT OVERRIDES A PLAN'S OWN WORD: the dispatcher takes the word on the arc's
+row and hands it to EVERY plan of the arc in the same transaction (`store.set_arc_model`), which is
+what makes the header the operator's answer to "all of it, from here on" — a plan pressed afterwards
+speaks for itself until the arc presses again. Nothing is optimistic on either side: the header and
+its plans both redraw from the next `dispatcher_state` frame. A refusal toasts the dispatcher's own
+first line, amber, exactly as a plan's does.
+
+The arcs come from `useDispatcherPlans`, and the header list is filtered there one step stricter than
+the lane's own: the server drops an arc with no plan left on the lane (`arcsOnLane`), and this drops
+an arc whose every remaining card the operator has DISMISSED — a header standing over nothing is the
+one shape no later frame would ever clear.
 
 **The dismissal ids.** A complete plan is dismissed into the SAME per-user list as the runs
 (`dismissedRuns.ts`, `planRunner` preference key): id `DISPATCHER_ENDING_PREFIX` + name (`v3:<name>`),
@@ -2606,17 +2665,21 @@ and returns as a new card.
 names the `dispatcher_state` frame. Two ways in: the push (every frame, authoritative) and a seed from
 `GET /api/dispatcher/plans` on mount and on each `websocket_reconnected`, which never overwrites a reading
 newer than itself (`held.at >= at`). A frame or body missing `plans`, `route`, `daemon` or a string
-`offpeak_at` is dropped, never half-published. The bus topic is `dispatcher:all` (`DISPATCHER_ALL_TOPIC`),
-one payload `{ plans, route, daemon, offpeak_at }` (`DispatcherLanePicture`) with the frame's `at` as its
-clock; no per-plan topic exists. `home` and `generated_at` are left out on purpose: `generated_at` is
+`offpeak_at` is dropped, never half-published; `arcs` is the ONE field read rather than demanded,
+because a frame from a server older than that key is still a whole picture of the plans — an absent
+list draws no arc headers instead of blanking every card the frame did carry, while a key that IS
+there and is not a list is refused like every other field. The bus topic is `dispatcher:all`
+(`DISPATCHER_ALL_TOPIC`), one payload `{ plans, arcs, route, daemon, offpeak_at }`
+(`DispatcherLanePicture`) with the frame's `at` as its clock; no per-plan topic exists. `home` and `generated_at` are left out on purpose: `generated_at` is
 restamped every poll, so republishing the frame whole wakes every reader twice a second (2026-09-24: the four
 keys byte-identical across two reads 4 s apart, zero publishes). `useDispatcherPlans` reads that topic —
-`{ plans, count, route, daemon, offpeakAt, carriedNames }` — and every piece of the card reads the hook or
-`dispatcherState.ts`. The document's times are ISO-8601 UTC strings end to end: the server converts
+`{ plans, arcs, count, route, daemon, offpeakAt, carriedNames }` — and every piece of the card reads the
+hook or `dispatcherState.ts`. The document's times are ISO-8601 UTC strings end to end: the server converts
 nothing, and `epochOf` (`Date.parse / 1000`) is the ONE edge where a string becomes the card's seconds.
 
 **The verbs' door.** `api.dispatcher` (`src/shared/api.ts`): `plans()`, `plan(name)`, `offpeak()`,
-`stop|resume|park|unpark(name)`, `schedule(name, when)` over `/api/dispatcher/plans…`. The verbs return the
+`stop|resume|park|unpark(name)`, `schedule(name, when)`, `model(name, choice)` over
+`/api/dispatcher/plans…` and `arcModel(name, choice)` over `/api/dispatcher/arcs/:name/model`. The verbs return the
 raw `Response`: a refusal is a RESULT on a 409 with the dispatcher's line on `stdout`, which
 `useDispatcherVerbs` reads before `stderr`. `api.dispatcher` never throws on `!response.ok`.
 
@@ -2625,7 +2688,21 @@ reaches the DOM as a text node. Proven on the live dev app 2026-09-24: `dispatch
 with its fourteen phases and 45 events; `card-probe.v3` pressed Park (toast `PARKED card-probe.v3`),
 Unpark (`UNPARKED card-probe.v3 — designed`) and Park again, and left parked.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/plan-runner/dismissedRuns.ts
+**The word — the standing proof.** `node .verify/probe-dispatch-model-word.mjs [--url http://127.0.0.1:5183]` (tab at 1440 and 390, on the dev client).
+
+- it loads its own arc `probe-dmw` with plans `probe-dmw--first` and `probe-dmw--second` into the LIVE store (`dispatcher load`), presses only those, and removes them after (`drop` for the plans, the store package for the arc row — no arc-drop verb exists); the operator's plans and arcs are counted and printed untouched.
+- exit 0 = a plan press moves that plan alone; an arc press moves both plans, including the one just pressed to a word of its own; every step is confirmed from the next frame and from `GET /api/dispatcher/plans`.
+- the house half of the same proof: `python3 ~/.claude/scripts/runner_fixtures/model_word.py` (MAN-5406).
+
+**Phases shown — the standing proof.** `node .verify/probe-dispatch-card-phases.mjs` (tab at 1440 and 390, gutter at 1920, on 5184 and 5183).
+
+- exit 0 = every `[data-dispatcher-card]` paints every `[data-dispatcher-phase]` row, over at least one card, both homes of a client drawing the same number of plan cards.
+- a home with no plan card is a `[NOTE]`; no plan card in any home FAILS; the gutter's run card painting 0 of N rows is a `[NOTE]`, its own variance.
+- it measures a clipped box, never `isVisible()` (INV-4354).
+- before side: `--url http://127.0.0.1:5185` over the previous build (`vite preview --outDir .prod-client/builds/<previous> --port 5185`) writes `artifacts/dispatch-card-phases-before.json`; the prod build timer keeps the current and previous bundle only.
+- 2026-09-25: before — tab 9/9 and 14/14 rows painted, gutter 0/9 and 0/14 (`closed`); after — 9/9 and 14/14 in both homes, exit 0.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/plan-runner/dismissedRuns.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dispatch-card-phases.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dispatch-model-word.mjs
 
 ## MAN-539 — The file manager
 section: file-manager/000
@@ -5524,9 +5601,9 @@ run's** (§"The DeepSeek switch" and §"The swarm switch" below).
 **Beside it, the v3 dispatcher's lane.** `server/index.ts` mounts a fifth polled lane at
 `/api/dispatcher` in the same three lines this one is mounted in — `createDispatcherModule()`, the
 `authenticateToken` mount, and its `start()`/`stop()` beside this lane's. It is the same shape over a
-different owner: the dispatcher's own `status --json` document, its five verbs, and the push each
+different owner: the dispatcher's own `status --json` document, its six verbs, and the push each
 plan ending earns. What it is lives in its own manual, "The v3 dispatcher lane"
-(`server/modules/dispatcher/`): the poll and its frame, the eight routes, the status codes, and the
+(`server/modules/dispatcher/`): the poll and its frame, the ten routes, the status codes, and the
 endings with their watermark.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts
@@ -6565,17 +6642,25 @@ the clamped description, and a static `Chip` reading `dispatch v1` sits before t
 two engines' cards tell apart at a glance in one list. Its verbs are chosen by the plan's status the way
 this footer's are chosen by the run's state: `live` → Stop, `paused` → Resume, `queued` → Start and
 `ScheduleControl` (scope `plan`), `scheduled` → Start and Cancel, `parked` → Unpark, `idle` in
-`designed`/`questions` → Park, `complete` → Dismiss. It carries NO model control — the route is the
-box's switch, shown on its meter's sub-line — and `ScheduleControl`'s `plan` scope adds only a handle
-prefix (`data-dispatcher-schedule`) and a title (`dispatcher.scheduleTitle`); the button text and
-`useOffpeak` are this lane's, because `dispatcher offpeak` prints the same hour.
+`designed`/`questions` → Park, `complete` → Dismiss. BESIDE THEM RIDES THE PLAN'S OWN WORD — the same
+`RunModelControl`, scope `plan`, drawing the plan's EFFECTIVE word (its own, else its arc's, else the
+runner's default) and relaying `dispatcher model <plan> <word>`, while THIS card's model control draws
+one run's word and relays `POST /runs/:id/model`: one control, two lanes, each with its own handle
+prefix and its own three sentences. The plan's is drawn on every plan a press could still move, on no
+status' authority — the word is read when a chain is launched — and the ARC headers above the list
+carry the arc's own, scope `dispatch-arc` (§"The arc header"). The meter's sub-line still shows the
+box's posture (`route.word`), which is what a plan on `auto` walks under; a plan with no word of its own runs on
+`deepseek`, the runner's default (MAN-5406).
+`ScheduleControl`'s `plan` scope adds only a handle prefix (`data-dispatcher-schedule`) and a title
+(`dispatcher.scheduleTitle`); the button text and `useOffpeak` are this lane's, because
+`dispatcher offpeak` prints the same hour.
 
 Its strings live under `runner.*`, and the v3 plan card's under `dispatcher.*`, in
 `src/modules/i18n/locales/en/common.json`, English only; every other locale falls back.
 
 The tab that mounts it is the next section.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/MANUAL.md, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/ChatInterface.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/composer/ActivityIndicator.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/plan-runner/RunCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/plan-runner/RunControls.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/plan-runner/RunFace.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/plan-runner/ScheduleControl.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/runner-tab/RunnerWidgetBody.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useElapsed.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/utils.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-runner-model-pin.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-runner-schedule.mjs
+governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/MANUAL.md, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/ChatInterface.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/composer/ActivityIndicator.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/plan-runner/RunCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/plan-runner/RunControls.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/plan-runner/RunFace.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/plan-runner/RunModelControl.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/plan-runner/ScheduleControl.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/runner-tab/RunnerWidgetBody.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useElapsed.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/utils.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-runner-model-pin.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-runner-schedule.mjs
 
 ## MAN-642 — The Runner tab
 section: plan-runner/015 Consumers/018 The Runner tab
@@ -6586,7 +6671,7 @@ dispatcher carries, as a `PlanCard` in the SAME list. Both lists live in `src/mo
 host module above the two lanes: `plan-runner` and `dispatcher` each import only their own and the
 shared layers, the dispatcher's card reuses this lane's `ScheduleControl`, `scheduleClock` and
 dismissal store through the `plan-runner` barrel, and a list inside either lane would make the two
-import each other (`import/no-cycle`). It reads `useRunnerRuns`, `useDispatcherPlans`, `useArcs`
+import each other (`import/no-cycle`). It reads `useRunnerRuns`, `useDispatcherPlans` (its `plans` and its `arcs`), `useArcs`
 (whether the gallery above the runs has anything to draw) and `useArcRunIds` (which runs that gallery
 already draws) and nothing else — no fetch on mount, no state of its own — so selecting the tab paints on the FIRST
 render with whatever the bus was already holding rather than blanking until the runner next moves.
@@ -6616,11 +6701,12 @@ pill at all: `Tabs` renders that pill for word tabs only, and marks an icon tab 
 reading this strip's count reads the title.
 
 **The panel.** A header carrying `runner.title` and the count — runs plus plans — then one
-`<PlanCard defaultOpen />` per v3 plan, ordered by the dispatcher's `byUrgencyThenNewest` (live,
+`<PlanCard />` per v3 plan, ordered by the dispatcher's `byUrgencyThenNewest` (live,
 scheduled, queued, paused, parked, idle, complete; newest `updated_at` first inside each) and drawn
-ABOVE the runs and below the arc gallery, then one `<RunCard defaultOpen />`
-per run no arc card owns — `defaultOpen` is the one variance the card offers, and the tab is what wants it: a person
-who navigated here has already asked for the runs. Order is live → stale → paused, newest first
+ABOVE the runs and below the arc gallery — and below `<DispatchArcHeaders arcs>`, one header per v3 arc with the arc's own model word (MAN-1557 §"The arc header"), between the gallery and the plans — then one `<RunCard defaultOpen />`
+per run no arc card owns — `defaultOpen` is the one variance `RunCard` offers, and the tab is what wants it: a person
+who navigated here has already asked for the runs. (A `PlanCard` is passed no such prop: a plan card's phases
+are shown in every home it has, so the tab and the gutter cannot disagree about what it shows.) Order is live → stale → paused, newest first
 inside each: live because something is happening to it, stale because a lapsed heartbeat is the one
 state that may want a hand, paused last because a parked run is parked on purpose. Paused runs ARE
 counted and ARE listed — that is the whole reason the lane carries them where the statusline drops
@@ -6629,15 +6715,15 @@ card owns still counts — it is on this screen, inside its card. Every dismiss 
 carried ids — `carriedIds` for a run, `carriedNames` for a plan — and `dismissRun` prunes within the ending's
 id-space, so the other lane's dismissals stand; a plan's ending is
 `{ run_id: 'v3:<name>', ended_at: epochOf(completed_at) }`. `EmptyState`
-(`runner.empty`) shows only when the count (runs plus plans) is zero AND `useArcs()`'s own `arcs` array is empty too
+(`runner.empty`) shows only when the count (runs plus plans) is zero AND `useArcs()`'s own `arcs` array is empty AND `useDispatcherPlans().arcs` is empty
 — not `arcCount` (§"The arc deck" below) — reachable precisely because the tab is sticky. `ArcGallery`
 mounts above the run list in the same scroll when an arc exists (§"The arc deck" below).
 
-**The gutter.** `RunnerWidgetBody` draws the same plan cards FOLDED below the arc deck and above the
-runs: the open chat's plans first (`session_app_id === sessionId`, with `SessionPin`), the rest behind,
+**The gutter.** `RunnerWidgetBody` draws the same plan cards, their phases open, below the arc deck and
+above the runs, with `<DispatchArcHeaders home="gutter" />` between the deck and the plans: the open chat's plans first (`session_app_id === sessionId`, with `SessionPin`), the rest behind,
 then the runs by the same rule. A plan's row is `li[data-testid=runner-widget-plan]` carrying
 `data-plan-name` and `data-pinned` (`true` for the open chat's); a run's is `runner-widget-run`. The
-widget's `EmptyState` shows only when there is no run, no plan and no arc. The widget's badge in
+widget's `EmptyState` shows only when there is no run, no plan, no runner arc and no v3 arc. The widget's badge in
 `ChatGutterLayout` counts runs, plans and unfinished arcs.
 
 **The palette.** `CommandPalette`'s `NAV_TABS` carries a `Go to Runner` row, and the Navigate group
@@ -6993,8 +7079,11 @@ READ BACK off the file, never with the input.
 **What the switch decides.** On, an Accept inside DeepSeek's peak window (`plan_runner.deepseek.PEAK_UTC`
 read on the UTC clock — 01:00–04:00 and 06:00–10:00, weekdays only) does not walk the plan: it is
 approved PAUSED and armed on a one-shot systemd calendar unit for the instant the current window ends.
-Off — or on the Claude route, where the peak has no price — Accept walks then and there. The switch
-answers only what an Accept does at the moment it is pressed; it starts nothing by itself.
+Off — or for a plan whose route is Claude, where the peak has no price — Accept walks then and there.
+THE ROUTE IS EACH PLAN'S OWN, read off its model word (`schedule.holds_for`, MAN-5406): one Accept naming a plan
+pinned to `claude` and one pinned to `deepseek` walks the first and parks the second, whatever the chat's switch
+reads; `auto` asks the box's switches. The switch answers only what an Accept does at the moment it is pressed;
+it starts nothing by itself.
 
 **The client.** `src/shared/hooks/useParkAtPeakSwitch.ts` is the one reader and writer in `src/`
 (`enabled: boolean | null`, `unreadable`, `saving`, `setEnabled`, `refresh`) over
@@ -9637,10 +9726,10 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/AppDraw
 ## MAN-1495 — The dispatcher types — the store's document, mirrored in two files
 
 `DispatcherStage`, `DispatcherPhase`, `DispatcherEvent`, `DispatcherPlanStatus`, `DispatcherPlan`,
-`DispatcherRoute`, `DispatcherDaemon`, `DispatcherStateEvent`, `DispatcherVerb` and
-`DispatcherVerbResult` are declared in the `DISPATCHER v3` block of `src/shared/types.ts` and
-`server/shared/types.ts` — ONE TEXT IN BOTH FILES, so the copies cannot drift; a change belongs in
-both at once. Field detail lives there, not here.
+`DispatcherArc`, `DispatcherArcStatus`, `DispatcherRoute`, `DispatcherDaemon`, `DispatcherStateEvent`,
+`DispatcherVerb` and `DispatcherVerbResult` are declared in the `DISPATCHER v3` block of
+`src/shared/types.ts` and `server/shared/types.ts` — ONE TEXT IN BOTH FILES, so the copies cannot
+drift; a change belongs in both at once. Field detail lives there, not here.
 
 They mirror `hooks/dispatcher/report.py::snapshot` — what `dispatcher status --json [NAME]` prints —
 key for key. The emitted document is the source of the shape.
@@ -9659,9 +9748,25 @@ key for key. The emitted document is the source of the shape.
   `running`, `done`.
 - `offpeak_at` is a `string`, never null: `plan_runner.when.stamp` answers the literal `none` when
   the clock cannot.
-- `DispatcherVerb` is five of the CLI's own verbs: `stop`, `resume`, `schedule`, `park`, `unpark`.
-- `DispatcherLanePicture` is declared in `src/shared/types.ts` ONLY, beside the block: the frame's `plans`,
-  `route`, `daemon`, `offpeak_at` without `home`, `generated_at` or `at` — what the client's feed retains on
-  `dispatcher:all`.
+- `DispatcherVerb` is six of the CLI's own verbs: `stop`, `resume`, `schedule`, `park`, `unpark`,
+  `model` (the plan's own DeepSeek / Claude word — one verb serving a plan and an arc, resolved
+  plan-first-then-arc, `hooks/dispatcher/cmd/model.py`).
+- `DispatcherPlan.model` is the plan's EFFECTIVE model word — its own, else its arc's, else the runner's
+  default, resolved by the document (`hooks/dispatcher/model.py::of`) — and `DispatcherArc.model` is the ARC's
+  OWN (MAN-5406, INV-4355): both are `RunnerModelChoice | null`, one of `deepseek` | `claude` | `auto`.
+  The document never prints `null` for either — a plan's is the effective word, an arc's is its own word or
+  the runner's default `deepseek` (`report_arcs.arc_dict`) — so `null` arises only against a dispatcher build
+  older than the field, and the card reads it as the runner's default (`effectiveModelWord`). Both readers (`dispatcher-plan.reader.ts`, `dispatcher-arc.reader.ts`)
+  refuse any other word BY NAME (`modelSince`).
+- `DispatcherArc` is the store's `arcs` row as `report_arcs.arc_dict` prints it: `name`, `goal`,
+  `architecture`, `delivers`, `model`, the derived `status` (`DispatcherArcStatus` — the five words of
+  `store_arcs.arc_word`: `empty`, `judged`, `complete`, `live`, `designing`), `plans` (NAMES, in the
+  arc file's order) and the arc's own `created_at`, `completed_at`, `cost_usd`, `tokens`, `tokens_in`,
+  `tokens_out`. An arc has no phases, no events and no armed hour; a plan carries no `plans`.
+- `DispatcherPlan.arc` is the arc's bare name or `null` — the join a card makes against
+  `DispatcherArc.plans`, read from the other side.
+- `DispatcherLanePicture` is declared in `src/shared/types.ts` ONLY, beside the block: the frame's
+  `plans`, `arcs`, `route`, `daemon`, `offpeak_at` without `home`, `generated_at` or `at` — what the
+  client's feed retains on `dispatcher:all`.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts

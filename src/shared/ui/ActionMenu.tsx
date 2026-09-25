@@ -35,6 +35,25 @@ type ActionMenuProps = {
   menuClassName?: string;
   disabled?: boolean;
   iconOnly?: boolean;
+  /**
+   * Render the menu into a portal on `document.body` instead of in place beside its trigger.
+   *
+   * ON by default, because in place is not a neutral choice: the menu is clipped by the first
+   * ancestor with `overflow: hidden` and painted inside the first ancestor that makes a stacking
+   * context, whether or not the caller knows one is there. Measured on the live app before this
+   * default changed: the transcript's Download menu was cut off at the composer form's bottom
+   * edge on desktop and drawn UNDER the transcript on a phone, where the header's
+   * `backdrop-filter` scopes the menu's `z-50` to the header's own layer
+   * (`.verify/export-menu-layer.mjs`). Seven of the nine call sites had already passed the flag by
+   * hand for the same reason, and the two that had not were that bug and the case below; the
+   * default is what makes the knowledge unnecessary everywhere else.
+   *
+   * Pass `false` in the two cases the default cannot serve, both measured rather than assumed:
+   * when the menu must scroll with its trigger rather than the viewport (the portal path closes
+   * on the first scroll), and when the trigger sits inside an overlay whose own layer outranks
+   * the portal's `z-[70]` — a menu portalled out of Settings' `fixed z-[9999]` panel is drawn
+   * under that panel's content, which is why `McpServers` asks for the in-place menu.
+   */
   portal?: boolean;
   header?: React.ReactNode;
   onOpenChange?: (open: boolean) => void;
@@ -54,7 +73,7 @@ export function ActionMenu({
   menuClassName,
   disabled,
   iconOnly = false,
-  portal = false,
+  portal = true,
   header,
   onOpenChange,
 }: ActionMenuProps) {
@@ -160,6 +179,54 @@ export function ActionMenu({
     item.onSelect();
   };
 
+  /**
+   * Places the portalled menu against its trigger from the box the menu ACTUALLY has.
+   *
+   * The flip used to be decided from a hand-written height estimate (58px an item, 40px without a
+   * description) and then positioned from that same estimate. Measured on the composer at
+   * 1280×900: the estimate said 238px where the menu measures 261 — one description wraps at the
+   * pinned 260px width — so a menu placed "above" still covered the trigger's top 17px, and the
+   * item hanging over it was the last one. A click aimed at Download, or at the model or permission
+   * control beside it, started a JSON export instead; the button could not even close its own menu,
+   * because the click landed inside the menu. Re-run against `.verify/export-menu-layer.mjs`.
+   *
+   * Re-running this is safe: what it returns depends on the trigger's box, the menu's own box and
+   * the viewport, never on where the menu currently sits, so it cannot feed on its own output.
+   */
+  const placePortalledMenu = React.useCallback(() => {
+    const trigger = triggerRef.current?.getBoundingClientRect();
+    const menu = menuRef.current;
+    if (!trigger || !menu) {
+      return null;
+    }
+    // Size, from the LAYOUT box rather than from `getBoundingClientRect`: the menu enters on
+    // `vv-pop` (`translateY(24px) scale(.96)` → `none`, tokens.css), and `animation-fill-mode:
+    // both` puts that start state on the element in the very frame this runs in — so the rect here
+    // is 0.96 of the truth and 24px below it. Measured at the composer: 250×251 on this line
+    // against the 260×261 the menu settles at, which left the last item over the trigger's top 4px
+    // even after the estimate above was gone. `offsetWidth`/`offsetHeight` are the layout box, and
+    // a transform — including one on an ancestor — never touches them; no ancestor of a portalled
+    // menu has a transform that could, since the portal mounts on `body`.
+    const width = menu.offsetWidth;
+    const height = menu.offsetHeight;
+    const gap = 6;
+    const margin = 8;
+    // `align` is a horizontal anchor, so the portal path clamps the same two edges the in-place
+    // `right-0` / `left-0` do. No mount passes `align` today — `right` is what every caller wants —
+    // so this is a guard rather than a cure: without it a portalled menu would answer a future
+    // `left` with a right-aligned box and never say so.
+    const anchor = align === 'left' ? trigger.left : trigger.right - width;
+    return {
+      // Below when the whole menu fits there, above when it does not. A menu too tall for either
+      // side keeps its bottom inside the viewport instead: overlapping the trigger is survivable,
+      // running off the screen is not.
+      top: trigger.bottom + gap + height <= window.innerHeight - margin
+        ? trigger.bottom + gap
+        : Math.max(margin, Math.min(trigger.top - gap - height, window.innerHeight - margin - height)),
+      left: Math.max(margin, Math.min(anchor, window.innerWidth - width - margin)),
+    };
+  }, [align]);
+
   const toggleMenu = () => {
     if (isOpen) {
       setMenuOpen(false);
@@ -169,22 +236,44 @@ export function ActionMenu({
     if (portal && triggerRef.current) {
       const rect = triggerRef.current.getBoundingClientRect();
       const menuWidth = 260;
-      const estimatedHeight = (header ? 52 : 0)
-        + items.reduce((height, item) => height + (item.description ? 58 : 40) + (item.showDividerBefore ? 9 : 0), 12);
+      // First paint only, below the trigger: the menu has to exist before it can be measured, and
+      // the layout effect below replaces these numbers with the real box before anything is drawn.
+      const anchor = align === 'left' ? rect.left : rect.right - menuWidth;
       setPortalPosition({
-        top: rect.bottom + 6 + estimatedHeight <= window.innerHeight - 8
-          ? rect.bottom + 6
-          : Math.max(8, rect.top - estimatedHeight - 6),
-        left: Math.max(8, Math.min(rect.right - menuWidth, window.innerWidth - menuWidth - 8)),
+        top: rect.bottom + 6,
+        left: Math.max(8, Math.min(anchor, window.innerWidth - menuWidth - 8)),
       });
     }
     setMenuOpen(true);
   };
 
-  // The non-portal menu is absolutely positioned against its trigger, so `right-0` walks it off
-  // the LEFT edge whenever the trigger sits near it — measured on a 390px phone, the transcript's
-  // export menu opened from x=75 and ran to -185. The portal branch above already clamps; this
-  // gives the same guarantee to the branch that cannot, as a constant horizontal nudge.
+  // The real placement, and a layout effect because it belongs to the paint that shows the menu:
+  // the estimate is on screen for no frame at all, the browser paints the measured position or
+  // nothing. It runs once per open — the menu's layout box does not change while it is open, and a
+  // viewport resize closes the menu (`closeOnViewportChange` above) rather than re-placing it.
+  React.useLayoutEffect(() => {
+    if (!isOpen || !portal) {
+      return;
+    }
+    const next = placePortalledMenu();
+    // The position is a measurement of a box that does not exist until the menu has committed, so
+    // it cannot be derived during render, and there is no earlier event to set it from: the click
+    // that opens the menu happens before the menu exists. A layout effect is the only place the
+    // real box can be read, and the update is a no-op when the estimate was already right.
+    if (next) {
+      // eslint-disable-next-line react/set-state-in-effect -- measurement after commit, by design
+      setPortalPosition((current) => (
+        current && current.top === next.top && current.left === next.left ? current : next
+      ));
+    }
+  }, [isOpen, portal, placePortalledMenu]);
+
+  // `portal={false}` renders the menu in place, absolutely positioned against its trigger, so
+  // `right-0` walks it off the LEFT edge whenever the trigger sits near it — measured on a 390px
+  // phone, the transcript's export menu opened from x=75 and ran to -185. The portal branch above
+  // already clamps; this gives the same guarantee to the in-place branch that cannot, as a
+  // constant horizontal nudge. That branch has one caller — `McpServers`, on the note above its
+  // trigger — and is kept for it and for a menu that must scroll with its trigger.
   //
   // A constant is enough and a re-measure is not: the shift corrects a HORIZONTAL overflow, and
   // vertical scrolling moves the menu with its trigger without changing that. Measuring with the

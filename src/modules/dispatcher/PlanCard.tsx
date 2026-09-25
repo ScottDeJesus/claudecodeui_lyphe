@@ -20,15 +20,20 @@ import type { DispatcherPlan } from '@/shared/types';
  * handles, on the ROOT so a probe scopes every reading and every press to ONE plan — the live
  * plan walking beside a probe must never be pressed.
  *
- * Used by `RunnerPanel` (every card open) and `RunnerWidgetBody` (every card folded).
+ * NO `defaultOpen`, UNLIKE `RunCard`: a plan card's phases are shown wherever it is drawn. The
+ * gutter and the tab are two homes for one card, and a prop one of them could pass `false` is a prop
+ * that lets them disagree about what the card shows — and they did: measured on the bundle this
+ * change landed on top of, the tab painted 9/9 and 14/14 phase rows while the gutter painted 0/9 and
+ * 0/14 with the list `closed`. `PlanFace` therefore states the open list itself, so the disagreement
+ * is unreachable rather than merely unwatched.
+ *
+ * Used by `RunnerPanel`, above the runs of the tab, and by `RunnerWidgetBody` in the chat gutter.
  */
 export function PlanCard({
   plan,
-  defaultOpen,
   onDismiss,
 }: {
   plan: DispatcherPlan;
-  defaultOpen: boolean;
   onDismiss?: () => void;
 }) {
   const { t } = useTranslation();
@@ -51,7 +56,7 @@ export function PlanCard({
       </CardHeader>
 
       <CardContent className="p-3 pt-0">
-        <PlanFace plan={plan} defaultOpen={defaultOpen} />
+        <PlanFace plan={plan} />
       </CardContent>
 
       <CardFooter className="p-3 pt-0">

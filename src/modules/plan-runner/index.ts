@@ -21,6 +21,13 @@ export { humanizeTokens, paidText, planKindsText, planPaidText, spendText, usage
 export type { PlanKindSpend } from '@/modules/plan-runner/spend';
 // `Start at …` / `Cancel`, for the run card, the arc deck and the dispatcher's plan card (scope `plan`).
 export { ScheduleControl } from '@/modules/plan-runner/ScheduleControl';
+// The DeepSeek · Claude · Chat switch, exported for the same reason and by the same rule: it has FOUR
+// homes and two of them are the dispatcher's — a v3 plan card's footer (scope `plan`) and a dispatch
+// arc's header (scope `dispatch-arc`) — so the control lives with the runner, which owns the words and
+// the one decision behind them, and the dispatcher's cards draw it through this barrel rather than
+// growing a second segmented control that could disagree about what `auto` means.
+export { RunModelControl } from '@/modules/plan-runner/RunModelControl';
+export type { ModelScope } from '@/modules/plan-runner/RunModelControl';
 // The lane's read side, for a consumer that needs the runs rather than a card of one. The Runner
 // tab's panel reads it for the list; `useWorkspaceTabGates` reads it for the count that gates the tab.
 export { useRunnerRuns } from '@/modules/plan-runner/hooks/useRunnerRuns';

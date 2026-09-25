@@ -114,7 +114,6 @@ export function AppDrawerDivider({ title, startEditing, position, onRename, onMo
             items={items}
             icon={MoreHorizontal}
             iconOnly
-            portal
             variant="ghost"
             size="icon"
             triggerClassName="h-8 w-8 rounded-[9px] text-ink-faint hover:text-foreground"

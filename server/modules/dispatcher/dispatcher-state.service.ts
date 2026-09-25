@@ -1,6 +1,7 @@
 import { sessionsDb } from '@/modules/database/index.js';
-import type { DispatcherDaemon, DispatcherPlan, DispatcherRoute } from '@/shared/types.js';
+import type { DispatcherArc, DispatcherDaemon, DispatcherPlan, DispatcherRoute } from '@/shared/types.js';
 
+import { arcsOf } from './dispatcher-arc.reader.js';
 import { planOf, type DocumentPlan } from './dispatcher-plan.reader.js';
 import { each, field, isCountOrNull, isFlag, isRecord, isText, isTextOrNull, need, oneOf, readDispatcherDocument } from './dispatcher-state.transport.js';
 
@@ -12,7 +13,7 @@ import { each, field, isCountOrNull, isFlag, isRecord, isText, isTextOrNull, nee
  * run lane — which reads a directory of small files and classifies them here — this lane has nothing
  * of its own to derive: `report.py::snapshot` derived the route, the daemon, each plan's word, its
  * phases and their stages at the instant it ran, and nothing of it is stored (INV-172). The server
- * carries that document with exactly two acts of its own, both named in {@link readDispatcherState}.
+ * carries that document with exactly three acts of its own, all named in {@link readDispatcherState}.
  *
  * A BODY THAT DOES NOT READ IS NOT A PICTURE, and the strictness is measured rather than stylistic:
  * those run files are written by a process that may be killed mid-write (`state_lock.atomic_write`'s
@@ -38,8 +39,9 @@ const PROVIDERS: readonly DispatcherRoute['provider'][] = ['claude', 'deepseek']
 /**
  * The picture this lane polls: the document's own keys and nothing of the frame's.
  *
- * `report.py::snapshot`'s answer, with one key added per plan (`session_app_id`) and one subtraction
- * (a plan completed more than `ENDED_KEEP_S` ago is dropped). `offpeak_at` is the next DeepSeek
+ * `report.py::snapshot`'s answer, with one key added per plan (`session_app_id`) and two
+ * subtractions (a plan completed more than `ENDED_KEEP_S` ago is dropped, and an arc with no plan
+ * left on the lane is dropped with it). `offpeak_at` is the next DeepSeek
  * off-peak moment as an ISO stamp — always a string, the literal `none` when that clock cannot
  * answer — and `home` is the store's own root, which is what makes the daemon and the plans on
  * screen knowably one home's.
@@ -50,6 +52,7 @@ const PROVIDERS: readonly DispatcherRoute['provider'][] = ['claude', 'deepseek']
  */
 export type DispatcherPicture = {
   plans: DispatcherPlan[];
+  arcs: DispatcherArc[];
   route: DispatcherRoute;
   daemon: DispatcherDaemon;
   offpeak_at: string;
@@ -102,6 +105,10 @@ function pictureOf(body: unknown): DocumentPicture {
   const document = need(body, isRecord, 'document');
   return {
     plans: each(field(document, 'plans'), 'plans', planOf),
+    // Every arc of the store, dropped from the picture only when it would have no card left to head
+    // (`arcsOnLane`, below). Read here with the rest of the document so a malformed arc is refused at
+    // the same moment a malformed plan is, and never in the middle of a render.
+    arcs: arcsOf(field(document, 'arcs')),
     route: routeOf(field(document, 'route')),
     daemon: daemonOf(field(document, 'daemon')),
     offpeak_at: need(field(document, 'offpeak_at'), isText, 'offpeak_at'),
@@ -132,15 +139,33 @@ function withAppSession(plan: DocumentPlan): DispatcherPlan {
 }
 
 /**
+ * The arcs worth carrying: the ones with at least one plan STILL ON THE LANE.
+ *
+ * An arc header is drawn over its plans, and the plan filter above drops the ones that ended long
+ * ago — so an arc every one of whose plans has been dropped would leave a header standing over
+ * nothing, forever, since nothing about it changes. This server's third act on the document, and the
+ * same act the plan filter makes: a thing with no card left is not a thing to draw.
+ *
+ * It is asked against the names the LANE kept, never against the arc's own list, so the two halves
+ * of the picture cannot disagree about what is on screen — the join `plan.arc` makes on the client
+ * is the same one, read from the other side.
+ */
+function arcsOnLane(arcs: DispatcherArc[], plans: DispatcherPlan[]): DispatcherArc[] {
+  const carried = new Set(plans.map((plan) => plan.name));
+  return arcs.filter((arc) => arc.plans.some((name) => carried.has(name)));
+}
+
+/**
  * One read of the dispatcher's document, as the picture this lane serves.
  *
  * Called every two seconds by the watcher and, through it, by `GET /plans`. It THROWS on anything it
  * cannot read — this file's head says why that is the honest answer — and the lane keeps the last
  * good picture when it does.
  *
- * This server's two acts on the document, and the only two: a plan completed more than
- * `ENDED_KEEP_S` ago is dropped, and each remaining plan's `session` is resolved to an app id. Every
- * other key travels exactly as `report.py` printed it.
+ * This server's three acts on the document, and the only three: a plan completed more than
+ * `ENDED_KEEP_S` ago is dropped, each remaining plan's `session` is resolved to an app id, and an arc
+ * with no plan left on the lane is dropped with them. Every other key travels exactly as `report.py`
+ * printed it.
  */
 export async function readDispatcherState(dependencies: DispatcherStateDependencies): Promise<DispatcherPicture> {
   const document = pictureOf(await readDispatcherDocument(dependencies.bin, dependencies.timeoutMs, dependencies.env));
@@ -148,6 +173,7 @@ export async function readDispatcherState(dependencies: DispatcherStateDependenc
   const plans = document.plans.filter((plan) => isRecent(plan, nowS)).map(withAppSession);
   return {
     plans,
+    arcs: arcsOnLane(document.arcs, plans),
     route: document.route,
     daemon: document.daemon,
     offpeak_at: document.offpeak_at,

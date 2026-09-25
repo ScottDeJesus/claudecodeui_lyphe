@@ -15,3 +15,15 @@
 | `before` mode | Screenshots the current cards only; the old components no longer exist |
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/question-cards.mjs
+
+## INV-4354 — A folded Collapsible's rows still read as visible
+
+`isVisible()` and DOM node counts report the rows of a FOLDED `Collapsible` as visible.
+
+- why: `CollapsibleContent` (`src/shared/ui/Collapsible.tsx`) keeps its children mounted inside a `grid-rows-[0fr]` wrapper with `overflow-hidden`; each row keeps a non-empty bounding box.
+- measure a fold as a clip: walk each row's ancestors up to its own card, intersect every non-`visible` `overflow` box, count rows whose intersection is taller than 1px. `PAINTED_HEIGHT` in `.verify/probe-dispatch-card-phases.mjs` is the reading.
+- stop the walk at the card: the pane above it is a scroll area, and a scroll position is not a fold.
+- `data-state="open|closed"` on `CollapsibleContent` corroborates; it is never the verdict.
+- 2026-09-25: the gutter's plan cards read as visible by node count and `isVisible()` while painting 0 of 9 and 0 of 14 rows.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Collapsible.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dispatch-card-phases.mjs

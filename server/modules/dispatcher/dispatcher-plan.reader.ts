@@ -1,6 +1,6 @@
 import type { DispatcherEvent, DispatcherPhase, DispatcherPlan, DispatcherStage } from '@/shared/types.js';
 
-import { each, countSince, field, isCount, isCountOrNull, isFlag, isRecord, isText, isTextOrNull, names, need, oneOf } from './dispatcher-state.transport.js';
+import { each, countSince, field, isCount, isCountOrNull, isFlag, isRecord, isText, isTextOrNull, modelSince, names, need, oneOf, textSince } from './dispatcher-state.transport.js';
 
 /**
  * One plan of the dispatcher's document, read field by field into the types the card draws.
@@ -129,6 +129,15 @@ export function planOf(raw: unknown): DocumentPlan {
     delivers: need(field(plan, 'delivers'), isTextOrNull, 'plan.delivers'),
     session: need(field(plan, 'session'), isTextOrNull, 'plan.session'),
     author: need(field(plan, 'author'), isTextOrNull, 'plan.author'),
+    // The arc this plan belongs to, by NAME — the join a card makes against the document's own `arcs`
+    // list. Read tolerantly (`textSince`), because a dispatcher build older than the field writes no
+    // key at all and a plan of no arc writes `null`: both mean the same thing here, and neither is a
+    // reason to blank every card on the screen.
+    arc: textSince(field(plan, 'arc'), 'plan.arc'),
+    // The plan's EFFECTIVE model word — its own, else its arc's, else the runner's default. Never
+    // derived here: this is the document's own answer, and a second derivation would be a second
+    // answer (`dispatcher/model.py:model.of` is the only one).
+    model: modelSince(field(plan, 'model'), 'plan.model'),
     created_at: need(field(plan, 'created_at'), isText, 'plan.created_at'),
     updated_at: need(field(plan, 'updated_at'), isText, 'plan.updated_at'),
     completed_at: need(field(plan, 'completed_at'), isTextOrNull, 'plan.completed_at'),

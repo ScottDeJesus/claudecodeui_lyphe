@@ -5,8 +5,10 @@ import { promisify } from 'node:util';
 import type { DispatcherVerb, DispatcherVerbResult } from '@/shared/types.js';
 
 /**
- * Relaying the dispatcher's own five verbs: `stop`, `resume`, `schedule` (a queued plan's Start at a
- * time), `park` (a designed plan set aside) and `unpark` (handed back to be cut).
+ * Relaying the dispatcher's own six verbs: `stop`, `resume`, `schedule` (a queued plan's Start at a
+ * time), `park` (a designed plan set aside), `unpark` (handed back to be cut) and `model` (a plan's
+ * or an arc's own DeepSeek / Claude word — the one verb here that names an arc as readily as a plan,
+ * resolved by the dispatcher's own door and by nothing on this side).
  *
  * This server never touches a plan. It does not hold the dispatcher's lock, does not signal its
  * daemon and never writes the store (`hooks/dispatcher/store.py`, which no server writer may reach —
@@ -23,7 +25,9 @@ import type { DispatcherVerb, DispatcherVerbResult } from '@/shared/types.js';
  * Nothing here throws. A refusal is a RESULT — the operator needs the dispatcher's own sentence, not
  * a 500 — and the cases where the dispatcher never got to answer come back as a one-word `reason`.
  * THE DISPATCHER REFUSES ON STDOUT, unlike almost every command on this host: `REFUSED <verb>
- * <name>.v3: <reason>` with exit 2, and `no plan <bare>` with exit 1 (`hooks/dispatcher/cli.py`).
+ * <name>.v3: <reason>` with exit 2, and a not-found line with exit 1 — `no plan <bare>`, or
+ * `no plan or arc <bare>` from `model`, the one verb an arc's name also reaches
+ * (`hooks/dispatcher/cli.py`).
  * So `stdout` is the field a reader must look at FIRST, and a refusal travels whole in it, untouched
  * including any path or plan name the dispatcher chose to print. Never sanitize that field: it is
  * the answer.
@@ -72,8 +76,9 @@ function readExitCode(value: unknown): number | null {
 }
 
 /**
- * Runs one verb against one plan. `verbArgs` follow the plan's name — `schedule`'s hour, already
- * checked by the route against the shapes the dispatcher accepts; the other four take none.
+ * Runs one verb against one plan — or, for `model`, against a plan or an arc. `verbArgs` follow the
+ * name — `schedule`'s hour and `model`'s word, each already checked by the route against the shapes
+ * the dispatcher accepts; the other four take none.
  *
  * `cwd` is the home directory rather than this repository: the dispatcher resolves its own store from
  * `DISPATCHER_HOME`/`$HOME` (`hooks/dispatcher/store.py:home`), and a verb must never be interpreted
@@ -106,8 +111,9 @@ export async function runDispatcherVerb(
     const stderr = readOutput(failure.stderr);
 
     // A NUMERIC code means the dispatcher ran and decided: that is a verdict, and it travels whole.
-    // Exit 2 carries a refusal on stdout and exit 1 a `no plan` nobody can draw — both are the
-    // dispatcher's own words, and the route turns them into a status rather than an error.
+    // Exit 2 carries a refusal on stdout and exit 1 a not-found line nobody can draw (`no plan
+    // <bare>`, `no plan or arc <bare>` for `model`) — both are the dispatcher's own words, and the
+    // route turns them into a status rather than an error.
     const exit = readExitCode(failure.code);
     if (exit !== null) {
       return { ok: false, verb, plan, exit, stdout, stderr };

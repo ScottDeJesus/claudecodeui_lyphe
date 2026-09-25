@@ -2,6 +2,8 @@ import { execFile } from 'node:child_process';
 import os from 'node:os';
 import { promisify } from 'node:util';
 
+import type { RunnerModelChoice } from '@/shared/types.js';
+
 /**
  * The subprocess side of the dispatcher lane: one `dispatcher status --json`, and the JSON body it
  * printed — and nothing about what the body MEANS.
@@ -55,8 +57,9 @@ function firstLine(value: unknown): string {
 /**
  * What the dispatcher did instead of answering, in one sentence.
  *
- * The dispatcher's own words come first when it left any — a refusal on STDOUT (`no plan <bare>`,
- * exit 1), a traceback on stderr — because they name the cause better than an exit code does. The
+ * The dispatcher's own words come first when it left any — a refusal on STDOUT (a not-found line,
+ * exit 1: `no plan <bare>`, or `no plan or arc <bare>` from `model`), a traceback on stderr — because
+ * they name the cause better than an exit code does. The
  * ways it can fail without a code are the run lane's measured ways (`runner-verb.service.ts:130`:
  * our own ceiling and a kill from outside both arrive as a SIGNAL, a missing binary as a string
  * code), and they read differently on purpose: "was stopped" and "did not answer" are different
@@ -145,6 +148,35 @@ export function countSince(value: unknown, where: string): number {
 /** A list of names — a plan's waits, a phase's `start_here`. */
 export function names(value: unknown, where: string): string[] {
   return each(value, where, (entry) => need(entry, isText, where));
+}
+
+/**
+ * A text-or-null field a build OLDER than the field did not write, read as `null` — refused by name
+ * when the key IS there and is not text-or-null.
+ *
+ * `countSince`'s doctrine, applied to a string: absence is another build of the dispatcher talking,
+ * a malformed value is a build this lane cannot draw. It is what lets a field added after a build
+ * shipped (`plan.arc`) reach an older server's reader as "nothing to say" instead of blanking every
+ * plan on the operator's screen.
+ */
+export function textSince(value: unknown, where: string): string | null {
+  return value === undefined ? null : need(value, isTextOrNull, where);
+}
+
+/** The three words a model word may be (`hooks/plan_runner/run_model.py:WORDS`), the ONE list — `readRunnerModelChoice` checks a request against the same three. */
+export const MODEL_CHOICES: readonly RunnerModelChoice[] = ['deepseek', 'claude', 'auto'];
+
+/**
+ * A model word a build OLDER than the field did not write, read as `null`, and refused by name when
+ * the key is there and is not one of the three.
+ *
+ * `null` is the shape a record with no word already has downstream — `run.json:model` on a run born
+ * before the runner wrote its default reads the same way, and `effectiveModelWord` turns it into the
+ * runner's default (`deepseek`). So an older dispatcher's document draws the default its plans would
+ * really run under, rather than a lane that went stale for a field it never wrote.
+ */
+export function modelSince(value: unknown, where: string): RunnerModelChoice | null {
+  return value === undefined || value === null ? null : oneOf(value, MODEL_CHOICES, where);
 }
 
 /** One word out of a closed vocabulary — the document's status words and its two providers. */

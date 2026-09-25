@@ -917,7 +917,26 @@
     "noStages": "No stage has launched for this phase yet.",
     "scheduleTitle": "Start this plan when DeepSeek’s daily peak lifts — a one-shot timer sends Resume at that hour",
     "park": "Park",
-    "unpark": "Unpark"
+    "unpark": "Unpark",
+    "arcStatus": {
+      "designing": "designing",
+      "judged": "judged",
+      "live": "live",
+      "complete": "complete",
+      "empty": "empty"
+    },
+    "arcPlans_one": "{{count}} plan",
+    "arcPlans": "{{count}} plans",
+    "model": {
+      "planLabel": "Model for this plan’s builders",
+      "planDeepseekTitle": "Send this plan’s builders to DeepSeek Flash from its next phase, whatever the chat’s switch says. A phase already building keeps the model it started on.",
+      "planClaudeTitle": "Send this plan’s builders to Claude from its next phase, whatever the chat’s switch says. A phase already building keeps the model it started on.",
+      "planAutoTitle": "Follow the chat’s DeepSeek switch from this plan’s next phase, whatever its arc says.",
+      "arcLabel": "Model for every plan of this arc",
+      "arcDeepseekTitle": "Send every plan of this arc to DeepSeek Flash, from each one’s next phase — including a plan that had been given a word of its own.",
+      "arcClaudeTitle": "Send every plan of this arc to Claude, from each one’s next phase — including a plan that had been given a word of its own.",
+      "arcAutoTitle": "Give this arc’s word to every plan of it: follow the chat’s DeepSeek switch, whatever those plans were saying."
+    }
   },
   "navigation": {
     "settings": "Settings",

@@ -70,7 +70,7 @@ export function PlanClock({ plan }: { plan: DispatcherPlan }) {
  *
  * Used by `PlanCard`, inside its card's body.
  */
-export function PlanFace({ plan, defaultOpen }: { plan: DispatcherPlan; defaultOpen: boolean }) {
+export function PlanFace({ plan }: { plan: DispatcherPlan }) {
   const { t } = useTranslation();
   const { route } = useDispatcherPlans();
   const progress = phaseProgress(plan);
@@ -95,7 +95,15 @@ export function PlanFace({ plan, defaultOpen }: { plan: DispatcherPlan; defaultO
         sub={sub}
       />
 
-      <Collapsible defaultOpen={defaultOpen} className="min-w-0">
+      {/* THE PHASES ARE SHOWN, IN EVERY HOME (operator, 2026-09-25: "dispatch v1 cards on the plan
+          runner tab should always show phases like the normal runner cards"). There is no
+          `defaultOpen` to pass: the tab's dispatch cards start open and so do the gutter's, because
+          a home that could fold them could disagree with the other one, and the phases ARE this
+          card — a folded plan card leaves a title, a pill and a count with nothing under them. The
+          trigger stays, so a person may fold the list on purpose; the card never does it for them.
+          `RunCard` keeps its own variance: a run card carries a meter, a pipeline strip and lanes
+          beside its phases, so one part of it may be disclosure. */}
+      <Collapsible defaultOpen className="min-w-0">
         <CollapsibleTrigger className="rounded-lg px-2 py-1 text-left text-xs text-muted-foreground hover:bg-muted">
           {t('dispatcher.phaseCount', { count: plan.phases.length })}
         </CollapsibleTrigger>

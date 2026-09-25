@@ -1,7 +1,7 @@
 import express from 'express';
 
 import type { DispatcherVerb, DispatcherVerbResult, RunnerOffpeak } from '@/shared/types.js';
-import { readRunnerScheduleWhen, runnerScheduleWhenError } from '@/shared/utils.js';
+import { readRunnerModelChoice, readRunnerScheduleWhen, runnerModelChoiceError, runnerScheduleWhenError } from '@/shared/utils.js';
 
 import type { DispatcherPicture } from './dispatcher-state.service.js';
 
@@ -17,6 +17,16 @@ import type { DispatcherPicture } from './dispatcher-state.service.js';
  * refusing it here is what keeps any future caller of this router from having to remember that.
  */
 const PLAN_NAME = /^[a-z0-9][a-z0-9-]{0,99}(\.v3)?$/;
+
+/**
+ * What an ARC may be called in a URL: the same name class with the arc's own adornment
+ * (`store_arcs.ARC_SUFFIX` — `.arc`), which is the form `report_arcs.arc_line` prints and
+ * `store.arc` accepts.
+ *
+ * A SEPARATE FENCE FROM THE PLAN'S (`PLAN_NAME`), and the same fence in kind: this route answers
+ * `<name> | <name>.arc`, that one `<name> | <name>.v3`, and neither accepts the other's adornment.
+ */
+const ARC_NAME = /^[a-z0-9][a-z0-9-]{0,99}(\.arc)?$/;
 
 export type DispatcherRouterDependencies = {
   /** The watcher's last reading. Never a fresh read: the poll already owns the subprocess. */
@@ -43,12 +53,13 @@ function statusForVerb(result: DispatcherVerbResult): number {
 }
 
 /**
- * The dispatcher lane's eight routes. Auth is the mount's `authenticateToken`, in `server/index.ts`.
+ * The dispatcher lane's ten routes. Auth is the mount's `authenticateToken`, in `server/index.ts`.
  *
  * These handlers validate and translate, and do nothing else: nothing is read here, no process is
  * started here, and no route names a path from the request — the binary and the store are the
- * module's, fixed at composition, and a request can only ever choose a plan by name and a word from
- * the closed set of five verbs.
+ * module's, fixed at composition, and a request can only ever choose a plan or an arc by name, a
+ * word from the closed set of six verbs, and — where the verb takes one — a word from the three the
+ * runner spells.
  */
 export function createDispatcherRouter(dependencies: DispatcherRouterDependencies): express.Router {
   const router = express.Router();
@@ -94,6 +105,7 @@ export function createDispatcherRouter(dependencies: DispatcherRouterDependencie
   const relay = (
     verb: DispatcherVerb,
     readArgs: (body: unknown) => string[] | null = () => [],
+    badBody: string = runnerScheduleWhenError(),
   ): express.RequestHandler<{ name: string }> => async (request, response, next) => {
     const plan = request.params.name;
     if (!PLAN_NAME.test(plan)) {
@@ -102,7 +114,7 @@ export function createDispatcherRouter(dependencies: DispatcherRouterDependencie
     }
     const verbArgs = readArgs(request.body);
     if (verbArgs === null) {
-      response.status(400).json({ error: runnerScheduleWhenError() });
+      response.status(400).json({ error: badBody });
       return;
     }
 
@@ -116,10 +128,27 @@ export function createDispatcherRouter(dependencies: DispatcherRouterDependencie
     }
   };
 
+  /**
+   * A model word, out of the three the runner spells (`readRunnerModelChoice`), or `null`.
+   *
+   * The word is OURS ONCE IT IS HERE: it is mapped onto the runner's own constant by the shared
+   * reader, and only then does it become an argv word — so what reaches the dispatcher's command is
+   * a spelling this server wrote down, never a string a request chose.
+   */
+  const modelArgs = (body: unknown): string[] | null => {
+    const choice = readRunnerModelChoice((body as { model?: unknown } | undefined)?.model);
+    return choice === null ? null : [choice];
+  };
+
   router.post('/plans/:name/stop', relay('stop'));
   router.post('/plans/:name/resume', relay('resume'));
   router.post('/plans/:name/park', relay('park'));
   router.post('/plans/:name/unpark', relay('unpark'));
+  // A plan's own DeepSeek / Claude word (`dispatcher model <name> <word>`). RESTARTS NOTHING AND
+  // WAKES NOBODY: the word is read when a chain is launched (`phase_chain.launch_env`), so it takes
+  // the plan's NEXT phase and never disturbs a walk already out — which is why no plan's state is a
+  // reason to refuse this verb, and why the dispatcher's own answer is the whole verdict.
+  router.post('/plans/:name/model', relay('model', modelArgs, runnerModelChoiceError()));
   // A QUEUED plan's Start at a time, and the only verb here with an argument:
   // `dispatcher schedule <name> offpeak|<iso>|none`. The dispatcher refuses a plan that is live or
   // has never waited, and a time already past; that sentence is the 409's body, untouched.
@@ -127,6 +156,35 @@ export function createDispatcherRouter(dependencies: DispatcherRouterDependencie
     const when = readRunnerScheduleWhen((body as { when?: unknown } | undefined)?.when);
     return when === null ? null : [when];
   }));
+
+  /**
+   * An ARC's one word (`dispatcher model <arc> <word>`), the deck's control relayed.
+   *
+   * The dispatcher hands it to EVERY plan of the arc (`store.set_arc_model`, the runner's own rule
+   * for its minted cards) and the next frame redraws the arc's header and its plans together —
+   * nothing here is optimistic, and nothing is copied by this server. The plan-first-then-arc
+   * resolution the verb makes is deliberately not repeated: this route names an arc, so the name it
+   * forwards carries the arc's own door.
+   */
+  router.post('/arcs/:name/model', async (request, response, next) => {
+    const arc = request.params.name;
+    if (!ARC_NAME.test(arc)) {
+      response.status(400).json({ error: 'arc name is required' });
+      return;
+    }
+    const verbArgs = modelArgs(request.body);
+    if (verbArgs === null) {
+      response.status(400).json({ error: runnerModelChoiceError() });
+      return;
+    }
+
+    try {
+      const result = await dependencies.runVerb('model', arc, verbArgs);
+      response.status(statusForVerb(result)).json(result);
+    } catch (error) {
+      next(error); // one this lane has no word for: the app's error handler, as every route here
+    }
+  });
 
   return router;
 }

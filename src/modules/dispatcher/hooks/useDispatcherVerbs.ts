@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 
 import { api } from '@/shared/api';
 import { useToast } from '@/shared/context/ToastContext';
-import type { DispatcherVerb } from '@/shared/types';
+import type { DispatcherVerb, RunnerModelChoice } from '@/shared/types';
 
 /** The dispatcher's answer, as much of it as this hook reads. Both fields are free text it wrote. */
 type VerbBody = { stdout?: unknown; stderr?: unknown };
@@ -31,7 +31,7 @@ async function readBody(response: Response): Promise<VerbBody | null> {
 }
 
 /**
- * Stop, Resume, Schedule, Park and Unpark for one v3 plan, and what to say about each.
+ * Stop, Resume, Schedule, Park, Unpark and Model for one v3 plan, and what to say about each.
  *
  * NO CONFIRMATION DIALOG GUARDS STOP, for the run lane's reason: Stop is a PAUSE — a stopped plan
  * keeps its walk and `resume` picks it up — so the press is reversible by the button that replaces
@@ -57,6 +57,12 @@ async function readBody(response: Response): Promise<VerbBody | null> {
  * NOTHING OPTIMISTIC: the control re-draws from the next `dispatcher_state` frame, which is the
  * store read back — the armed hour, the pause flag and the state word are the dispatcher's, never
  * this hook's.
+ *
+ * `model` IS THE ONE VERB HERE THAT TOUCHES NO WALK AND WAKES NOBODY. A plan's word is read when a
+ * chain is LAUNCHED (`dispatcher/phase_chain.py:launch_env`), so a press takes the plan's next phase
+ * and never disturbs one already out — which is also why the dispatcher never refuses it for the
+ * state a plan is in, and why its answer is a sentence about the STORE (`MODEL <name>.v3 model=…`)
+ * rather than about a walk.
  */
 export function useDispatcherVerbs(name: string, resumeWord?: string): {
   stop(): Promise<void>;
@@ -64,6 +70,7 @@ export function useDispatcherVerbs(name: string, resumeWord?: string): {
   schedule(when: string): Promise<void>;
   park(): Promise<void>;
   unpark(): Promise<void>;
+  setModel(choice: RunnerModelChoice): Promise<void>;
   busy: DispatcherVerb | null;
 } {
   const { t } = useTranslation();
@@ -93,13 +100,15 @@ export function useDispatcherVerbs(name: string, resumeWord?: string): {
       if (verb === 'park') return t('dispatcher.park');
       if (verb === 'unpark') return t('dispatcher.unpark');
       if (verb === 'schedule') return t('runner.schedule.refused');
+      if (verb === 'model') return t('runner.model.refused');
       return resumeWord ?? t('runner.resume');
     },
     [resumeWord, t],
   );
 
+  /** Relay one verb. `arg` is the verb's own second word where it has one — `schedule`'s hour, `model`'s choice — and nothing for the four that take none. */
   const send = useCallback(
-    async (verb: DispatcherVerb, when?: string): Promise<void> => {
+    async (verb: DispatcherVerb, arg?: string): Promise<void> => {
       if (!mountedRef.current) return;
       setBusy(verb);
 
@@ -107,8 +116,9 @@ export function useDispatcherVerbs(name: string, resumeWord?: string): {
         const response = verb === 'stop' ? await api.dispatcher.stop(name)
           : verb === 'park' ? await api.dispatcher.park(name)
             : verb === 'unpark' ? await api.dispatcher.unpark(name)
-              : verb === 'schedule' ? await api.dispatcher.schedule(name, when ?? 'none')
-                : await api.dispatcher.resume(name);
+              : verb === 'schedule' ? await api.dispatcher.schedule(name, arg ?? 'none')
+                : verb === 'model' ? await api.dispatcher.model(name, (arg ?? 'deepseek') as RunnerModelChoice)
+                  : await api.dispatcher.resume(name);
         const body = await readBody(response);
         if (!mountedRef.current) return;
 
@@ -117,6 +127,9 @@ export function useDispatcherVerbs(name: string, resumeWord?: string): {
         const said = firstLine(body?.stdout) || firstLine(body?.stderr);
 
         if (response.ok) {
+          // The dispatcher's own sentence IS the answer, and every one of its verbs answers with one
+          // (`MODEL <name>.v3 model=claude`, `ARC MODEL arc=<name> model=claude — 2 plan(s) take it`).
+          // `word` is the fallback for a dispatcher build that answered with an empty body.
           toast({ tone: 'positive', title: said || word(verb) });
           return;
         }
@@ -139,6 +152,7 @@ export function useDispatcherVerbs(name: string, resumeWord?: string): {
   const schedule = useCallback((when: string) => send('schedule', when), [send]);
   const park = useCallback(() => send('park'), [send]);
   const unpark = useCallback(() => send('unpark'), [send]);
+  const setModel = useCallback((choice: RunnerModelChoice) => send('model', choice), [send]);
 
-  return { stop, resume, schedule, park, unpark, busy };
+  return { stop, resume, schedule, park, unpark, setModel, busy };
 }

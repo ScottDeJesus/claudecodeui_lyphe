@@ -4,7 +4,7 @@ import { epochOf } from '@/modules/dispatcher/dispatcherState';
 import { DISPATCHER_ALL_TOPIC, useLiveTopic } from '@/modules/live-bus';
 import { DISPATCHER_ENDING_PREFIX, useDismissedEndings } from '@/modules/plan-runner';
 import type { DismissedEnding } from '@/modules/plan-runner';
-import type { DispatcherDaemon, DispatcherLanePicture, DispatcherPlan, DispatcherRoute } from '@/shared/types';
+import type { DispatcherArc, DispatcherDaemon, DispatcherLanePicture, DispatcherPlan, DispatcherRoute } from '@/shared/types';
 
 /**
  * The lane's read side: every v3 plan the dispatcher's store holds, and this box's posture beside
@@ -32,6 +32,13 @@ import type { DispatcherDaemon, DispatcherLanePicture, DispatcherPlan, Dispatche
  */
 export function useDispatcherPlans(): {
   plans: DispatcherPlan[];
+  /**
+   * The arcs the lane carries — each with its own word, its derived status and the NAMES of its
+   * plans. Every one of them has at least one plan still on the lane (the server drops the rest, so
+   * a header can never stand over nothing), and a plan of one names it in `plan.arc`: the two halves
+   * read the same document, and this is that join's other side.
+   */
+  arcs: DispatcherArc[];
   count: number;
   route: DispatcherRoute | null;
   daemon: DispatcherDaemon | null;
@@ -53,8 +60,18 @@ export function useDispatcherPlans(): {
     // moment a second one was made — the dispatcher still holds those plans, so they would come
     // straight back as cards.
     const carriedNames = lane.map((plan) => `${DISPATCHER_ENDING_PREFIX}${plan.name}`);
+
+    // THE ARCS THE SCREEN ACTUALLY HAS CARDS FOR, which is one step stricter than the lane's own
+    // list: the server drops an arc with no plan left on the lane, and a DISMISSED plan is on the
+    // lane but not on the screen — so an arc whose every card the operator has waved away would
+    // otherwise leave a header standing over nothing, which no further frame would ever clear.
+    const drawn = new Set(plans.map((plan) => plan.name));
+    const arcs = (Array.isArray(picture?.arcs) ? picture.arcs : [])
+      .filter((arc) => arc.plans.some((name) => drawn.has(name)));
+
     return {
       plans,
+      arcs,
       count: plans.length,
       route: picture?.route ?? null,
       daemon: picture?.daemon ?? null,

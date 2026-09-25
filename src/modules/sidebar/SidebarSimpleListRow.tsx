@@ -203,7 +203,6 @@ export default function SidebarSimpleListRow({
             ariaLabel={`Chat options for ${row.sessionTitle}`}
             icon={MoreHorizontal}
             iconOnly
-            portal
             variant="ghost"
             size="icon"
             triggerClassName="h-7 w-7 flex-shrink-0 text-muted-foreground opacity-70 hover:bg-muted hover:opacity-100"

@@ -601,7 +601,6 @@ function SidebarSessionItem({
                 ariaLabel={`Session options for ${sessionView.sessionName}`}
                 icon={MoreHorizontal}
                 iconOnly
-                portal
                 variant="ghost"
                 size="icon"
                 onOpenChange={setOptionsOpen}

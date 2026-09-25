@@ -323,7 +323,6 @@ export function KanbanLane({
           items={menuItems}
           icon={MoreHorizontal}
           iconOnly
-          portal
           variant="ghost"
           size="icon"
           className="shrink-0"

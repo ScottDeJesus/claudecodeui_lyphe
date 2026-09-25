@@ -771,7 +771,7 @@ export const api = {
   },
 
   // The dispatcher lane (docs/MANUAL.md (dispatcher)): the v3 plans in the dispatcher's own store, and the
-  // five verbs the plan cards press. It sits beside `planRunner` because it is that lane's sibling —
+  // six verbs the plan cards and the arc header press. It sits beside `planRunner` because it is that lane's sibling —
   // the picture is `dispatcher status --json` relayed whole, and the verbs are relayed to the
   // dispatcher's own binary by argv, never by a shell.
   //
@@ -787,6 +787,14 @@ export const api = {
     resume: (name: string) => post(`/api/dispatcher/plans/${encodeURIComponent(name)}/resume`, {}),
     park: (name: string) => post(`/api/dispatcher/plans/${encodeURIComponent(name)}/park`, {}),
     unpark: (name: string) => post(`/api/dispatcher/plans/${encodeURIComponent(name)}/unpark`, {}),
+    // A v3 plan's own DeepSeek / Claude word (`dispatcher model <plan> <word>`). The plan card's
+    // control relays it; nothing is optimistic, and the next `dispatcher_state` frame reads the
+    // word back. Restarts nothing — the word is read when a chain is LAUNCHED.
+    model: (name: string, model: RunnerModelChoice) => post(`/api/dispatcher/plans/${encodeURIComponent(name)}/model`, { model }),
+    // The DISPATCH ARC header's one word (`dispatcher model <arc> <word>`), handed by the dispatcher
+    // to every plan of the arc (`store.set_arc_model`). A separate route from the plan's because an
+    // arc is addressed by its own door (`.arc`), never through a plan's.
+    arcModel: (name: string, model: RunnerModelChoice) => post(`/api/dispatcher/arcs/${encodeURIComponent(name)}/model`, { model }),
     // A plan's Start at a time — `offpeak`, an ISO instant with a zone, or `none` to cancel — the
     // same three shapes the runner's schedule takes (`readRunnerScheduleWhen` on the server).
     schedule: (name: string, when: string) => post(`/api/dispatcher/plans/${encodeURIComponent(name)}/schedule`, { when }),
