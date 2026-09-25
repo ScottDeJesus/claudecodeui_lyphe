@@ -12,12 +12,21 @@ import { effectiveModelWord } from '@/shared/utils';
  * where the dispatcher would take it, never drawn disabled where it would refuse.
  *
  * - `live` → Stop. A pause; Resume is its undo, so no dialog guards it.
- * - `paused` → Resume.
+ * - `paused` → Resume and `Resume at …`: a plan STOPPED mid-walk is the one an hour makes sense in
+ *   front of, because the timer's press is the very Resume the button beside it sends.
  * - `queued` → Start (it IS `resume`: the plan is approved and paused and has never walked) and
  *   `Start at …`, the same press made ahead of time as a one-shot systemd timer.
- * - `scheduled` → Start and Cancel (the schedule control, reading the armed hour).
+ * - `scheduled` → the same pair, reading the armed hour: `Resume`/`Start` and `Cancel` (the schedule
+ *   control). The hour itself is the card's own clock (`PlanFace.PlanClock`), said once.
  * - `parked` → Unpark. `idle` in `designed` or `questions` → Park, the way out of the Stop hold.
  * - `complete` → Dismiss, when the list that draws the card offers one.
+ *
+ * `paused` AND `scheduled` ARE BOTH THE STOPPED PLAN, and `launched` is what tells which word the
+ * hour wears. A plan that has WALKED and been stopped reads `paused` with no hour and `scheduled`
+ * with one; a plan still waiting at the gate reads `queued`, and `scheduled` once armed. The two are
+ * drawn differently on purpose — Resume at 3:00 AM against Start at 3:00 AM — because the dispatcher's
+ * Resume is a promise about a walk that is already out and its Start about one that never began, and
+ * the operator pressing either should read the same word on the button as the plan's own state.
  *
  * THE PLAN'S OWN MODEL WORD RIDES THE SAME FOOTER, on every plan a press could still move — a
  * COMPLETE plan has no next phase for the word to reach, which is `RunControls`' own rule. It is not
@@ -37,10 +46,17 @@ import { effectiveModelWord } from '@/shared/utils';
  */
 export function PlanControls({ plan, onDismiss }: { plan: DispatcherPlan; onDismiss?: () => void }) {
   const { t } = useTranslation();
-  const starts = plan.status === 'queued' || plan.status === 'scheduled';
-  const { stop, resume, schedule, park, unpark, setModel, busy } = useDispatcherVerbs(plan.name,
+  // A STOPPED plan is one that has walked: `report.launched` is that fact, and it is what tells the
+  // two `scheduled` plans apart — one waiting for the Start it was queued with, one waiting for the
+  // Resume that ends the stop. `paused` is stopped by definition (a paused plan that never walked
+  // reads `queued`).
+  const stops = plan.status === 'paused' || (plan.status === 'scheduled' && plan.launched);
+  const starts = plan.status === 'queued' || (plan.status === 'scheduled' && !plan.launched);
+  const { stop, resume, schedule, park, unpark, setModel, busy } = useDispatcherVerbs(plan.name, 'plan',
     starts ? t('runner.start') : t('runner.resume'));
   const held = busy !== null;
+  const armed = epochOf(plan.schedule?.start_at ?? null);
+  const word = starts ? t('runner.start') : t('runner.resume');
 
   let verbs: React.ReactNode = null;
   if (plan.status === 'live') {
@@ -49,16 +65,20 @@ export function PlanControls({ plan, onDismiss }: { plan: DispatcherPlan; onDism
         {t('runner.stop')}
       </Button>
     );
-  } else if (plan.status === 'paused') {
-    verbs = (
-      <Button size="sm" disabled={held} onClick={() => void resume()} data-dispatcher-resume>{t('runner.resume')}</Button>
-    );
-  } else if (starts) {
+  } else if (stops || starts) {
+    // ONE PAIR, TWO STATES: the plan is at the gate (`starts` — Start, and `Start at …`) or the plan
+    // is down mid-walk (`stops` — Resume, and `Resume at …`). The control is identical and only the
+    // word differs, which is the point: the dispatcher's `resume` verb is what either press runs, and
+    // the wording is what tells the operator whether he is beginning something or taking it back up.
+    // Once the hour IS set the pair becomes the press and its `Cancel`; where that hour is, the
+    // card's own clock already says (`PlanFace.PlanClock`), and a second copy beside the buttons
+    // would be the same fact twice on one card.
     verbs = (
       <>
-        <Button size="sm" disabled={held} onClick={() => void resume()} data-dispatcher-start>{t('runner.start')}</Button>
-        <ScheduleControl scope="plan" busy={held} onSchedule={(when) => void schedule(when)}
-          startAt={plan.status === 'scheduled' ? epochOf(plan.schedule?.start_at ?? null) : null} />
+        <Button size="sm" disabled={held} onClick={() => void resume()}
+          {...(stops ? { 'data-dispatcher-resume': '' } : { 'data-dispatcher-start': '' })}>{word}</Button>
+        <ScheduleControl scope="plan" verb={stops ? 'resume' : 'start'} busy={held}
+          onSchedule={(when) => void schedule(when)} startAt={armed} />
       </>
     );
   } else if (plan.status === 'parked') {

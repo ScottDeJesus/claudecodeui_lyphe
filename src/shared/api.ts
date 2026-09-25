@@ -791,10 +791,20 @@ export const api = {
     // control relays it; nothing is optimistic, and the next `dispatcher_state` frame reads the
     // word back. Restarts nothing — the word is read when a chain is LAUNCHED.
     model: (name: string, model: RunnerModelChoice) => post(`/api/dispatcher/plans/${encodeURIComponent(name)}/model`, { model }),
-    // The DISPATCH ARC header's one word (`dispatcher model <arc> <word>`), handed by the dispatcher
-    // to every plan of the arc (`store.set_arc_model`). A separate route from the plan's because an
-    // arc is addressed by its own door (`.arc`), never through a plan's.
+    // The DISPATCH ARC header's four presses (`dispatcher model|stop|resume|schedule <arc> …`), each
+    // relayed to the arc's own door. Separate routes from the plan's because an arc is addressed by
+    // its own door (`.arc`), never through a plan's.
+    //
+    // AN ARC HAS NO WALK OF ITS OWN: the dispatcher applies the PLAN verb to the arc's plans in one
+    // step — `stop` over the arc's walking plans, `resume` and `schedule` over its stopped ones — so
+    // the header's press and one typed at a terminal are the same verb on the same set of plans. A
+    // `/arcs/…` route for each is the whole reason the two surfaces cannot drift.
     arcModel: (name: string, model: RunnerModelChoice) => post(`/api/dispatcher/arcs/${encodeURIComponent(name)}/model`, { model }),
+    arcStop: (name: string) => post(`/api/dispatcher/arcs/${encodeURIComponent(name)}/stop`, {}),
+    arcResume: (name: string) => post(`/api/dispatcher/arcs/${encodeURIComponent(name)}/resume`, {}),
+    // The arc's Resume — or Start, for plans still at the gate — at a time: the same three shapes a
+    // plan's schedule takes, through the same server-side reader.
+    arcSchedule: (name: string, when: string) => post(`/api/dispatcher/arcs/${encodeURIComponent(name)}/schedule`, { when }),
     // A plan's Start at a time — `offpeak`, an ISO instant with a zone, or `none` to cancel — the
     // same three shapes the runner's schedule takes (`readRunnerScheduleWhen` on the server).
     schedule: (name: string, when: string) => post(`/api/dispatcher/plans/${encodeURIComponent(name)}/schedule`, { when }),

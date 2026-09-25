@@ -1,6 +1,6 @@
 import type { DispatcherEvent, DispatcherPhase, DispatcherPlan, DispatcherStage } from '@/shared/types.js';
 
-import { each, countSince, field, isCount, isCountOrNull, isFlag, isRecord, isText, isTextOrNull, modelSince, names, need, oneOf, textSince } from './dispatcher-state.transport.js';
+import { each, countSince, field, flagSince, isCount, isCountOrNull, isFlag, isRecord, isText, isTextOrNull, modelSince, names, need, oneOf, textSince } from './dispatcher-state.transport.js';
 
 /**
  * One plan of the dispatcher's document, read field by field into the types the card draws.
@@ -143,6 +143,12 @@ export function planOf(raw: unknown): DocumentPlan {
     completed_at: need(field(plan, 'completed_at'), isTextOrNull, 'plan.completed_at'),
     prompted_at: need(field(plan, 'prompted_at'), isTextOrNull, 'plan.prompted_at'),
     paused: need(field(plan, 'paused'), isFlag, 'plan.paused'),
+    // HAS A WALK EVER GONE OUT FOR THIS PLAN (`report.launched`, derived from the plan's own event
+    // rows, never stored). It is the one fact that tells a plan STOPPED MID-WALK from one still
+    // waiting at the gate — `paused` against `queued` in the status word, and the word on the card's
+    // own primary button, which is Resume for the first and Start for the second. Read tolerantly,
+    // so a dispatcher build older than the field draws its cards' gate verb rather than blank ones.
+    launched: flagSince(field(plan, 'launched'), 'plan.launched'),
     approved: approvedOf(field(plan, 'approved')),
     waits_on: names(field(plan, 'waits_on'), 'plan.waits_on'),
     schedule: scheduleOf(field(plan, 'schedule')),

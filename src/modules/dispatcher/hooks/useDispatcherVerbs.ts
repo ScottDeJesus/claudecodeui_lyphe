@@ -8,6 +8,9 @@ import type { DispatcherVerb, RunnerModelChoice } from '@/shared/types';
 /** The dispatcher's answer, as much of it as this hook reads. Both fields are free text it wrote. */
 type VerbBody = { stdout?: unknown; stderr?: unknown };
 
+/** The two doors a press can be relayed through: one v3 plan's, or one dispatch arc's. */
+export type DispatcherVerbScope = 'plan' | 'arc';
+
 /**
  * The dispatcher's own first sentence, or nothing. Blank lines are stepped over rather than
  * returned: a refusal that began with a newline would otherwise raise an empty toast.
@@ -30,8 +33,41 @@ async function readBody(response: Response): Promise<VerbBody | null> {
   }
 }
 
+/** What a plan card may press. */
+export type DispatcherPlanVerbs = {
+  stop(): Promise<void>;
+  resume(): Promise<void>;
+  schedule(when: string): Promise<void>;
+  park(): Promise<void>;
+  unpark(): Promise<void>;
+  setModel(choice: RunnerModelChoice): Promise<void>;
+  busy: DispatcherVerb | null;
+};
+
 /**
- * Stop, Resume, Schedule, Park, Unpark and Model for one v3 plan, and what to say about each.
+ * What an arc header may press — the four verbs the dispatcher's own arc door opens on. `park` and
+ * `unpark` are the plan card's own and no arc header draws them, so no arc callback exists for them
+ * rather than one that would have no route to reach.
+ */
+export type DispatcherArcVerbs = {
+  stop(): Promise<void>;
+  resume(): Promise<void>;
+  schedule(when: string): Promise<void>;
+  setModel(choice: RunnerModelChoice): Promise<void>;
+  busy: DispatcherVerb | null;
+};
+
+/**
+ * Stop, Resume, Schedule, Park, Unpark and Model for one v3 plan — or Stop, Resume, Schedule and
+ * Model for one dispatch ARC — and what to say about each.
+ *
+ * ONE HOOK, TWO DOORS, because the two are the same act on the same store through the same six verbs:
+ * `scope` decides which route a press is relayed through (`POST /api/dispatcher/plans/:name/…` or
+ * `POST /api/dispatcher/arcs/:name/…`) and how much of the surface it gets back, and nothing else.
+ * The arc arm is what the header's four controls press, and it is deliberately the same `stop`,
+ * `resume`, `schedule` and `model` a plan card presses: the dispatcher resolves an arc's name to the
+ * PLAN verb applied to its plans in one step, so the card and the terminal say the same thing because
+ * they say it with the same verb.
  *
  * NO CONFIRMATION DIALOG GUARDS STOP, for the run lane's reason: Stop is a PAUSE — a stopped plan
  * keeps its walk and `resume` picks it up — so the press is reversible by the button that replaces
@@ -51,28 +87,27 @@ async function readBody(response: Response): Promise<VerbBody | null> {
  * nothing (design doctrine :145).
  *
  * `resumeWord` IS THE WORD ON THE BUTTON THAT PRESSED IT, and a refusal answers in that word: a
- * queued or scheduled plan's button says Start, and a refusal headed "Resume" would name a verb the
- * operator never saw. It is `resume` that runs either way.
+ * queued or scheduled plan's button says Start, a stopped plan's says Resume, and a refusal headed
+ * with the other would name a verb the operator never saw. It is `resume` that runs either way.
  *
  * NOTHING OPTIMISTIC: the control re-draws from the next `dispatcher_state` frame, which is the
  * store read back — the armed hour, the pause flag and the state word are the dispatcher's, never
  * this hook's.
  *
  * `model` IS THE ONE VERB HERE THAT TOUCHES NO WALK AND WAKES NOBODY. A plan's word is read when a
- * chain is LAUNCHED (`dispatcher/phase_chain.py:launch_env`), so a press takes the plan's next phase
- * and never disturbs one already out — which is also why the dispatcher never refuses it for the
- * state a plan is in, and why its answer is a sentence about the STORE (`MODEL <name>.v3 model=…`)
+ * chain is LAUNCHED (`dispatcher/phase_chain.py:launch_env`), and an arc's is handed to every plan
+ * of it in one transaction (`store.set_arc_model`), so a press takes the NEXT phase and never
+ * disturbs one already out — which is also why the dispatcher never refuses it for the state a plan
+ * or an arc is in, and why its answer is a sentence about the STORE (`MODEL <name>.v3 model=…`)
  * rather than about a walk.
  */
-export function useDispatcherVerbs(name: string, resumeWord?: string): {
-  stop(): Promise<void>;
-  resume(): Promise<void>;
-  schedule(when: string): Promise<void>;
-  park(): Promise<void>;
-  unpark(): Promise<void>;
-  setModel(choice: RunnerModelChoice): Promise<void>;
-  busy: DispatcherVerb | null;
-} {
+export function useDispatcherVerbs(name: string, scope?: 'plan', resumeWord?: string): DispatcherPlanVerbs;
+export function useDispatcherVerbs(name: string, scope: 'arc', resumeWord?: string): DispatcherArcVerbs;
+export function useDispatcherVerbs(
+  name: string,
+  scope: DispatcherVerbScope = 'plan',
+  resumeWord?: string,
+): DispatcherPlanVerbs | DispatcherArcVerbs {
   const { t } = useTranslation();
   const toast = useToast();
 
@@ -106,19 +141,29 @@ export function useDispatcherVerbs(name: string, resumeWord?: string): {
     [resumeWord, t],
   );
 
-  /** Relay one verb. `arg` is the verb's own second word where it has one — `schedule`'s hour, `model`'s choice — and nothing for the four that take none. */
+  /**
+   * The word a SUCCESS is headed with when the dispatcher's body arrived empty. Every verb but
+   * `model` is headed by its own name either way (`Stop`, `Resume`, `Park`); a model press that
+   * worked is not headed "Model not set", which is what its refusal word says.
+   */
+  const doneWord = useCallback(
+    (verb: DispatcherVerb): string =>
+      verb === 'model' ? t('runner.toast.model') : word(verb),
+    [t, word],
+  );
+
+  /**
+   * Relay one press. `call` is the whole of what `scope` decides — which door of the API this verb
+   * goes through — written at each callback below rather than in a table, so the route a given
+   * button presses is readable at the button.
+   */
   const send = useCallback(
-    async (verb: DispatcherVerb, arg?: string): Promise<void> => {
+    async (verb: DispatcherVerb, call: () => Promise<Response>): Promise<void> => {
       if (!mountedRef.current) return;
       setBusy(verb);
 
       try {
-        const response = verb === 'stop' ? await api.dispatcher.stop(name)
-          : verb === 'park' ? await api.dispatcher.park(name)
-            : verb === 'unpark' ? await api.dispatcher.unpark(name)
-              : verb === 'schedule' ? await api.dispatcher.schedule(name, arg ?? 'none')
-                : verb === 'model' ? await api.dispatcher.model(name, (arg ?? 'deepseek') as RunnerModelChoice)
-                  : await api.dispatcher.resume(name);
+        const response = await call();
         const body = await readBody(response);
         if (!mountedRef.current) return;
 
@@ -128,9 +173,9 @@ export function useDispatcherVerbs(name: string, resumeWord?: string): {
 
         if (response.ok) {
           // The dispatcher's own sentence IS the answer, and every one of its verbs answers with one
-          // (`MODEL <name>.v3 model=claude`, `ARC MODEL arc=<name> model=claude — 2 plan(s) take it`).
-          // `word` is the fallback for a dispatcher build that answered with an empty body.
-          toast({ tone: 'positive', title: said || word(verb) });
+          // (`MODEL <name>.v3 model=claude`, `RESUMED dr-arc.arc — 2 plan(s)`). `doneWord` is the
+          // fallback for a dispatcher build that answered with an empty body.
+          toast({ tone: 'positive', title: said || doneWord(verb) });
           return;
         }
 
@@ -144,15 +189,34 @@ export function useDispatcherVerbs(name: string, resumeWord?: string): {
         if (mountedRef.current) setBusy(null);
       }
     },
-    [name, t, toast, word],
+    [doneWord, t, toast, word],
   );
 
-  const stop = useCallback(() => send('stop'), [send]);
-  const resume = useCallback(() => send('resume'), [send]);
-  const schedule = useCallback((when: string) => send('schedule', when), [send]);
-  const park = useCallback(() => send('park'), [send]);
-  const unpark = useCallback(() => send('unpark'), [send]);
-  const setModel = useCallback((choice: RunnerModelChoice) => send('model', choice), [send]);
+  const stop = useCallback(
+    () => send('stop', () => (scope === 'arc' ? api.dispatcher.arcStop(name) : api.dispatcher.stop(name))),
+    [name, scope, send],
+  );
+  const resume = useCallback(
+    () => send('resume', () => (scope === 'arc' ? api.dispatcher.arcResume(name) : api.dispatcher.resume(name))),
+    [name, scope, send],
+  );
+  const schedule = useCallback(
+    (when: string) => send('schedule', () => (scope === 'arc'
+      ? api.dispatcher.arcSchedule(name, when)
+      : api.dispatcher.schedule(name, when))),
+    [name, scope, send],
+  );
+  const setModel = useCallback(
+    (choice: RunnerModelChoice) => send('model', () => (scope === 'arc'
+      ? api.dispatcher.arcModel(name, choice)
+      : api.dispatcher.model(name, choice))),
+    [name, scope, send],
+  );
 
+  // The plan card's own two, which no arc header draws and no arc route exists for.
+  const park = useCallback(() => send('park', () => api.dispatcher.park(name)), [name, send]);
+  const unpark = useCallback(() => send('unpark', () => api.dispatcher.unpark(name)), [name, send]);
+
+  if (scope === 'arc') return { stop, resume, schedule, setModel, busy };
   return { stop, resume, schedule, park, unpark, setModel, busy };
 }

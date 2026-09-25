@@ -2465,7 +2465,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/architecture/MANUAL.md, /ho
 ## MAN-1498 — The v3 dispatcher lane
 section: dispatcher/000
 
-The fifth polled lane on this server, mounted beside the plan-runner's: ten routes under
+The fifth polled lane on this server, mounted beside the plan-runner's: thirteen routes under
 `/api/dispatcher`, behind `authenticateToken` in `server/index.ts`, wired in `dispatcher.module.ts`,
 plus one websocket frame pushed to every open `/ws` socket whenever the picture changes — `kind:
 'dispatcher_state'` — and one notification for each plan ending.
@@ -2498,10 +2498,15 @@ wire, and that one is the first tick after a restart.
 `cwd` the home directory, `maxBuffer` 4 MiB (`dispatcher-state.transport.ts` — the document carries
 every plan's `goal` whole, so the run lane's 1 MiB is not headroom enough). The body is validated
 FIELD BY FIELD into the F1 types — `dispatcher-plan.reader.ts` reads one plan with its phases, stages
-and events, `dispatcher-arc.reader.ts` reads one arc (its own words and status, its model word, and
-the NAMES of its plans, never resolved into plan rows: the store's report already made that join, and
-a second one would be a second answer); the transport file holds the vocabulary — and a field this
-build cannot read is refused BY NAME. That strictness is measured, not stylistic: the document is
+and events, and `launched`, the one fact its own card words its button off (Resume at 3:00 AM for a
+plan that has walked, Start at 3:00 AM for one that has not); `dispatcher-arc.reader.ts` reads one arc
+(its own words and status, its model word, the NAMES of its plans — never resolved into plan rows, the
+store's report already made that join and a second one would be a second answer — and the three
+readings the arc's header is drawn by: `walking`, `stopped`, `schedule`); the transport file holds the
+vocabulary — and a field this build cannot read is refused BY NAME. AN ABSENT KEY IS NOT A MALFORMED
+ONE: the values read through the transport's `…Since` readers (a count, a text, a flag) take the
+shape's own empty when the key is missing, so a frame from a dispatcher build that predates a field
+still loads and the control that field would draw is simply not offered. That strictness is measured, not stylistic: the document is
 printed whole by a process that has already exited, so a body that does not match is a DIFFERENT BUILD
 of the dispatcher, never a torn write. This server's three acts on it, and the only three: each plan's
 `session` is resolved to an app session id (`sessionsDb.resolveAppSessionId`, the rule the run lane's
@@ -2520,8 +2525,8 @@ sends — and where `model` is checked by `readRunnerModelChoice`, the same clos
 lane's own `POST /runs/:id/model` takes, so the argv word is always one this server wrote down. `runDispatcherVerb` relays them as argv (`dispatcher
 <verb> <name> [arg]`, `cwd` the home) and NEVER throws: a numeric exit is a verdict carried whole
 (`ok` is exit 0). **The dispatcher refuses on STDOUT** — `REFUSED <verb> <name>.v3: <reason>` exit 2,
-a not-found line exit 1 — `no plan <bare>`, or `no plan or arc <bare>` from `model`, the one
-verb an arc's name also reaches — so `stdout` is the field a reader reads first, and `stdout` is also where
+a not-found line exit 1 — `no plan <bare>`, or `no plan or arc <bare>` from any of the four verbs an
+arc's own name also reaches — so `stdout` is the field a reader reads first, and `stdout` is also where
 this lane's own sentence goes when the command never answered (`reason` is `timeout` or
 `spawn-failed`). Status: 200 the verb's own answer, 409 a refusal with the result whole (never a
 paraphrase of it), 504 `timeout`, 503 `spawn-failed`; 400 for a name that cannot be one, refused
@@ -2529,15 +2534,22 @@ BEFORE any process starts. `PLAN_NAME` is the dispatcher's own name rule with it
 suffix, and the name travels on exactly as the URL spelled it — both spellings are the dispatcher's
 door (INV-171), and normalizing one here would be a second copy of that rule.
 
-`POST /arcs/:name/model { model }` is the ONE route that names an arc rather than a plan, and it has
-its own fence for that reason: `ARC_NAME` is the same name class with the arc's adornment
-(`store_arcs.ARC_SUFFIX` — `.arc`), and NEITHER FENCE ACCEPTS THE OTHER'S SPELLING. It relays the
-same `model` verb — one verb serves both, resolved plan-first-then-arc by the dispatcher — and the
-name it forwards carries the arc's own door, so the resolution is never repeated here — and an unknown arc is refused by the VERB's own
-line, which names both doors (`no plan or arc <bare>`), never re-worded by this route. The dispatcher
-hands that word to EVERY plan of the arc (`store.set_arc_model`, the runner's own rule for its minted
-cards) and the next frame redraws the header and its plans together: nothing optimistic, and nothing
-copied by this server.
+**FOUR ROUTES NAME AN ARC**: `POST /arcs/:name/model { model }`, and `stop`, `resume` and
+`schedule { when }` beside it. One handler factory (`arcRelay`) makes them, because they differ in
+nothing but the verb they relay and how its argument is read — the three argument-free verbs take no
+body at all, and `schedule`'s `when` goes through the same `readRunnerScheduleWhen` grammar the
+plan's own route does, refused before any process starts. They have their own fence for a reason:
+`ARC_NAME` is the plan name class with the arc's adornment (`store_arcs.ARC_SUFFIX` — `.arc`), and
+NEITHER FENCE ACCEPTS THE OTHER'S SPELLING, which is the dispatcher's own door rule (INV-171) and not
+something this lane normalizes. THE CLI IS WHAT APPLIES AN ARC'S VERB TO ITS PLANS, in one
+transaction: this lane relays `<verb> <arc>` and never loops over the arc's plans itself — the arc's
+name is the whole argument, the dispatcher resolves it plan-first-then-arc (`arc_verbs`), and the
+terminal and the card therefore say the same thing because they say it with the same verb. An unknown
+arc is refused by the VERB's own line, which names both doors (`no plan or arc <bare>`), never
+re-worded by these routes. `model` hands its word to EVERY plan of the arc (`store.set_arc_model`, the
+runner's own rule for its minted cards); `stop`, `resume` and `schedule` reach the sets the header's
+own controls are drawn for (`report_arcs.walking` / `.stopped`), and the next frame redraws the header
+and its plans together: nothing optimistic, and nothing copied by this server.
 
 Reads: `GET /plans` → `{ ...current(), at }`; `GET /plans/offpeak` → `{ at }`, epoch seconds or null,
 registered BEFORE `/plans/:name` and answered by `createOffpeakClock` reused as is (the dispatcher's
@@ -2602,15 +2614,32 @@ store's clock is UTC), `kind`, the phase key, `detail`. It is where a relaunch, 
 is read in the dispatcher's own words. Handle: `data-dispatcher-events` on the group,
 `data-dispatcher-event=<kind>` on each line.
 
-**The controls by status.** `live` → Stop; `paused` → Resume; `queued` → Start (it IS `resume`) and
-`ScheduleControl` scope `plan` (`Start at …`, a one-shot systemd timer that sends Resume at that hour;
-title `dispatcher.scheduleTitle`); `scheduled` → Start and Cancel (the control with `startAt =
-epochOf(schedule.start_at)`); `parked` → Unpark; `idle` in state `designed` or `questions` → Park (the way
-out of the designed Stop hold); `complete` → Dismiss when the list offers one; any other `idle` →
-nothing. Every verb goes through
-`useDispatcherVerbs(name, resumeWord)` under one `busy`; a refusal toasts the dispatcher's own first
-line. Handles: `data-dispatcher-stop|resume|start|park|unpark|dismiss`, `data-dispatcher-schedule`
-(`-set`, `-cancel`). The button words Stop, Resume, Start, Dismiss are `runner.*`; Park and Unpark are
+**The controls by status.** `live` → Stop; `paused` → Resume AND `Resume at …`; `queued` → Start (it
+IS `resume`) AND `Start at …`; `scheduled` → the same pair, reading the armed hour (`startAt =
+epochOf(schedule.start_at)`); the hour itself is the card's own clock (`PlanClock`, `data-dispatcher-clock`)
+and is not said a second time beside the buttons; `parked` → Unpark; `idle` in state `designed` or
+`questions` → Park (the way out of the designed Stop hold); `complete` → Dismiss when the list offers
+one; any other `idle` → nothing.
+
+`paused` AND `scheduled` ARE BOTH THE STOPPED PLAN, and `launched` is what picks the WORD: a plan that
+has WALKED and been stopped reads `paused` with no hour and `scheduled` with one, and its button says
+**Resume**; a plan still waiting at the gate reads `queued` and its button says **Start**. The two
+statuses are folded into one pair of branches (`stops` / `starts`, off `launched`) because the
+dispatcher's verb is one — `resume` serves both presses — and only the word differs, which is the whole
+point: the operator reading `Resume at 3:00 AM` is being told the walk he already started will pick
+up, and one reading `Start at 3:00 AM` that nothing has begun (operator, 2026-09-25: "if a dispatch v1
+plan or arc is stopped, I should be able to resume and resume at 3am"). The word travels into the hook
+as `resumeWord`, so a refusal names the verb the operator actually saw. `ScheduleControl` scope `plan`
+carries the hour, with `verb` (`start` | `resume`) choosing the label and the title
+(`dispatcher.scheduleTitle` / `dispatcher.resumeTitle`) and nothing else — the timer runs `resume`
+either way.
+
+Every verb goes through `useDispatcherVerbs(name, 'plan', resumeWord)` under one `busy`; a refusal
+toasts the dispatcher's own first line, and a SUCCESS toasts the dispatcher's own sentence (the empty-
+body fallback is `runner.toast.model` for a model press, never its refusal word). Handles:
+`data-dispatcher-stop|resume|start|park|unpark|dismiss`, `data-dispatcher-schedule` (`-set`, `-cancel`,
+and the armed hour as the group's own attribute VALUE — `''` while unarmed).
+The button words Stop, Resume, Start, Dismiss are `runner.*`; Park and Unpark are
 `dispatcher.park` / `dispatcher.unpark`.
 
 **The word, and it is the plan's own.** `RunModelControl` scope `plan` rides the same footer, on
@@ -2635,10 +2664,23 @@ between two cards and claiming a grouping the list does not have. It draws `<nam
 `store.arc_word`'s and `dispatcher-arc.reader.ts` refuses any other BY NAME, so no default is
 invented here — and the plan count the store listed (`dispatcher.arcPlans`, `data-arc-plans`).
 
-Its control is `RunModelControl` scope `dispatch-arc`, drawing the ARC'S OWN word (`arc.model`, never
-a plan's effective one), handles `data-dispatch-arc-model` / `data-dispatch-arc-model-choice`; a press
-posts `/arcs/:name/model` through `useDispatcherArcModel`, relayed as `dispatcher model <arc> <word>`.
-IT IS THE ONE CONTROL THAT OVERRIDES A PLAN'S OWN WORD: the dispatcher takes the word on the arc's
+**Its four controls are the plan card's own, applied to the whole arc.** Stop, Resume and
+`Resume at …` — the last two drawn only where `arc.stopped`, Stop only where `arc.walking`, and the
+whole row only when one of the two holds, so a header never offers a press the dispatcher would refuse
+— plus `RunModelControl` scope `dispatch-arc` drawing the ARC'S OWN word (`arc.model`, never a plan's
+effective one), handles `data-dispatch-arc-model` / `data-dispatch-arc-model-choice`. The three verbs
+are `dispatcher stop|resume|schedule <arc>`, which the CLI resolves to the arc's own plans in ONE step
+(`arc_verbs.targets`: the arc's `live` plans for Stop, its STOPPED plans for Resume and for the hour —
+the very sets `arc.walking` / `arc.stopped` report), so the header and a terminal cannot disagree
+about what an arc's press reaches. THE CARD NEVER LOOPS OVER THE ARC'S PLANS ITSELF: it posts the arc's
+name and nothing else, and the arc's own hour reads back over the plans — `arc.schedule` is a stamp
+only when every STOPPED plan of the arc carries the same one, which one press of this control always
+makes true — so an hour the header names is an hour the Cancel beside it clears. All four go through `useDispatcherVerbs(name, 'arc')` — ONE hook for both hands, the scope
+deciding which door a press is relayed through. Handles: `data-dispatch-arc-stop`, `data-dispatch-arc-resume`,
+`data-dispatcher-arc-schedule` (`-set`, `-cancel`, the armed hour as the group's value),
+`data-dispatch-arc-schedule-note`.
+
+The model control IS THE ONE THAT OVERRIDES A PLAN'S OWN WORD: the dispatcher takes the word on the arc's
 row and hands it to EVERY plan of the arc in the same transaction (`store.set_arc_model`), which is
 what makes the header the operator's answer to "all of it, from here on" — a plan pressed afterwards
 speaks for itself until the arc presses again. Nothing is optimistic on either side: the header and
@@ -2679,7 +2721,9 @@ nothing, and `epochOf` (`Date.parse / 1000`) is the ONE edge where a string beco
 
 **The verbs' door.** `api.dispatcher` (`src/shared/api.ts`): `plans()`, `plan(name)`, `offpeak()`,
 `stop|resume|park|unpark(name)`, `schedule(name, when)`, `model(name, choice)` over
-`/api/dispatcher/plans…` and `arcModel(name, choice)` over `/api/dispatcher/arcs/:name/model`. The verbs return the
+`/api/dispatcher/plans…`, and `arcModel(name, choice)`, `arcStop(name)`, `arcResume(name)`,
+`arcSchedule(name, when)` over `/api/dispatcher/arcs/:name/…` — four routes, one per verb an arc's own
+name reaches (MAN-1498). The verbs return the
 raw `Response`: a refusal is a RESULT on a 409 with the dispatcher's line on `stdout`, which
 `useDispatcherVerbs` reads before `stderr`. `api.dispatcher` never throws on `!response.ok`.
 
@@ -2694,6 +2738,29 @@ Unpark (`UNPARKED card-probe.v3 — designed`) and Park again, and left parked.
 - exit 0 = a plan press moves that plan alone; an arc press moves both plans, including the one just pressed to a word of its own; every step is confirmed from the next frame and from `GET /api/dispatcher/plans`.
 - the house half of the same proof: `python3 ~/.claude/scripts/runner_fixtures/model_word.py` (MAN-5406).
 
+**Resume, and Resume at 3:00 AM, on a stopped plan and a stopped arc — the standing proof.**
+`node .verify/probe-dispatch-resume-3am.mjs [--url http://127.0.0.1:5183]` (tab at 1440 and 390, on the
+dev client).
+
+- it loads its own arc `probe-dr3` with plans `probe-dr3--first` and `probe-dr3--second` into the LIVE
+  store (`dispatcher load`), designs and plants one phase on each and approves both PAUSED carrying a
+  `launched` event — the store's own helpers, which is exactly what a real `dispatcher stop` leaves
+  behind — so both cards read a STOPPED plan and the arc reads `stopped`; it removes all of it after.
+- IT PRESSES ONLY THE SCHEDULE CONTROLS. The primary Resume/Start is READ and never pressed: that verb
+  unpauses a plan and kicks a real daemon, and a probe does not start a walk. Arming an hour kicks
+  nothing, and every arm it makes is cancelled before the pass ends and again in the cleanup.
+- it asserts the stopped card draws Resume and `Resume at …` (and NO Start), presses the control,
+  reads the armed hour back off the very next frame AND off the store (`schedule.start_at`), sees it
+  in the card's own clock (`data-dispatcher-clock`) beside the Cancel, then presses Cancel and sees
+  the hour leave the clock; then the same for the arc
+  header, whose press must arm BOTH plans to the arc's ONE stamp (`arcs[].schedule`) and whose Cancel
+  clears both.
+- exit 0 = a stopped plan and a stopped arc both offer Resume and Resume at 3:00 AM, a press moves the
+  store, and the store is left as it was found — no `probe-dr3` row and no hour armed.
+- the house half, on a scratch store: `python3 ~/.claude/scripts/runner_fixtures/dispatch_resume.py`
+  (MAN-5411), which also drives the timer's own press (`systemctl --user show … -p ExecStart`, then that
+  argv) rather than waiting for the hour.
+
 **Phases shown — the standing proof.** `node .verify/probe-dispatch-card-phases.mjs` (tab at 1440 and 390, gutter at 1920, on 5184 and 5183).
 
 - exit 0 = every `[data-dispatcher-card]` paints every `[data-dispatcher-phase]` row, over at least one card, both homes of a client drawing the same number of plan cards.
@@ -2702,7 +2769,7 @@ Unpark (`UNPARKED card-probe.v3 — designed`) and Park again, and left parked.
 - before side: `--url http://127.0.0.1:5185` over the previous build (`vite preview --outDir .prod-client/builds/<previous> --port 5185`) writes `artifacts/dispatch-card-phases-before.json`; the prod build timer keeps the current and previous bundle only.
 - 2026-09-25: before — tab 9/9 and 14/14 rows painted, gutter 0/9 and 0/14 (`closed`); after — 9/9 and 14/14 in both homes, exit 0.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/plan-runner/dismissedRuns.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dispatch-card-phases.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dispatch-model-word.mjs
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/plan-runner/dismissedRuns.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dispatch-card-phases.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dispatch-model-word.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dispatch-resume-3am.mjs
 
 ## MAN-539 — The file manager
 section: file-manager/000
@@ -5603,7 +5670,7 @@ run's** (§"The DeepSeek switch" and §"The swarm switch" below).
 `authenticateToken` mount, and its `start()`/`stop()` beside this lane's. It is the same shape over a
 different owner: the dispatcher's own `status --json` document, its six verbs, and the push each
 plan ending earns. What it is lives in its own manual, "The v3 dispatcher lane"
-(`server/modules/dispatcher/`): the poll and its frame, the ten routes, the status codes, and the
+(`server/modules/dispatcher/`): the poll and its frame, the thirteen routes, the status codes, and the
 endings with their watermark.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts
@@ -6635,14 +6702,27 @@ within one tick of it. Nothing optimistic; a refusal is the runner's sentence in
 `data-runner-schedule-set` on `Start at …`, `data-runner-schedule-cancel` on Cancel. Proof:
 `.verify/probe-runner-schedule.mjs`.
 
+ONE CONTROL, FOUR SCOPES. The same component is drawn on this card's footer (`run`), the arc deck's
+header (`arc`), the v3 plan card (`plan`) and the dispatch arc header (`dispatch-arc`), and a scope
+decides exactly two things: the handle prefix and the title. `verb` (`start` | `resume`, default
+`start`) is the third and last: WHICH PLAN VERB THE HOUR WILL SEND, and so what the button is called —
+`Start at …` against `Resume at …` (`runner.schedule.startAt` / `.resumeAt`). It changes the label and
+nothing else: the timer runs `resume` either way, because that word IS "start walking again", which is
+what a plan still at the gate needs too. On this lane the hour is the watchdog's press
+(`plan-runner due`); on the dispatcher's it is the plan's own one-shot systemd unit (INV-201) —
+`dispatcher offpeak` prints the same hour, so the button reads one clock whichever scope draws it.
+
 **The v3 plan card — the same card with a `dispatch v1` pill.** The dispatcher's plans are drawn in the
 same two homes by `PlanCard` (`src/modules/dispatcher/`, §"The v3 plan card" of the dispatcher section):
 `RunCard`'s composition over the dispatcher's document — the name is `<plan>.v3`, the goal's first line
 the clamped description, and a static `Chip` reading `dispatch v1` sits before the status word so the
 two engines' cards tell apart at a glance in one list. Its verbs are chosen by the plan's status the way
-this footer's are chosen by the run's state: `live` → Stop, `paused` → Resume, `queued` → Start and
-`ScheduleControl` (scope `plan`), `scheduled` → Start and Cancel, `parked` → Unpark, `idle` in
-`designed`/`questions` → Park, `complete` → Dismiss. BESIDE THEM RIDES THE PLAN'S OWN WORD — the same
+this footer's are chosen by the run's state: `live` → Stop; `paused` → **Resume** and
+`ScheduleControl` (scope `plan`, `verb="resume"`, so the button reads `Resume at 3:00 AM`); `queued` →
+Start and the same control with `verb="start"`; `scheduled` → that pair over the ARMED hour (Cancel in
+place of the press, and a note saying when) with the word — Resume or Start — picked by the plan's
+`launched` flag, the fact that tells a plan STOPPED mid-walk from one that never left the gate;
+`parked` → Unpark; `idle` in `designed`/`questions` → Park; `complete` → Dismiss. BESIDE THEM RIDES THE PLAN'S OWN WORD — the same
 `RunModelControl`, scope `plan`, drawing the plan's EFFECTIVE word (its own, else its arc's, else the
 runner's default) and relaying `dispatcher model <plan> <word>`, while THIS card's model control draws
 one run's word and relays `POST /runs/:id/model`: one control, two lanes, each with its own handle
@@ -6651,9 +6731,12 @@ status' authority — the word is read when a chain is launched — and the ARC 
 carry the arc's own, scope `dispatch-arc` (§"The arc header"). The meter's sub-line still shows the
 box's posture (`route.word`), which is what a plan on `auto` walks under; a plan with no word of its own runs on
 `deepseek`, the runner's default (MAN-5406).
-`ScheduleControl`'s `plan` scope adds only a handle prefix (`data-dispatcher-schedule`) and a title
-(`dispatcher.scheduleTitle`); the button text and `useOffpeak` are this lane's, because
-`dispatcher offpeak` prints the same hour.
+`ScheduleControl`'s `plan` scope adds only a handle prefix (`data-dispatcher-schedule`, and its
+`-set` / `-cancel` on the two presses) and a title the `verb` prop picks between —
+`dispatcher.scheduleTitle` for a plan at the gate, `dispatcher.resumeTitle` for one stopped mid-walk;
+`dispatch-arc` adds `data-dispatcher-arc-schedule` and the one title an arc's hour can mean
+(`dispatcher.arcResumeTitle`: every stopped plan of it, one timer each). The button text and
+`useOffpeak` are shared, because `dispatcher offpeak` prints the same hour.
 
 Its strings live under `runner.*`, and the v3 plan card's under `dispatcher.*`, in
 `src/modules/i18n/locales/en/common.json`, English only; every other locale falls back.
@@ -6703,7 +6786,7 @@ reading this strip's count reads the title.
 **The panel.** A header carrying `runner.title` and the count — runs plus plans — then one
 `<PlanCard />` per v3 plan, ordered by the dispatcher's `byUrgencyThenNewest` (live,
 scheduled, queued, paused, parked, idle, complete; newest `updated_at` first inside each) and drawn
-ABOVE the runs and below the arc gallery — and below `<DispatchArcHeaders arcs>`, one header per v3 arc with the arc's own model word (MAN-1557 §"The arc header"), between the gallery and the plans — then one `<RunCard defaultOpen />`
+ABOVE the runs and below the arc gallery — and below `<DispatchArcHeaders arcs>`, one header per v3 arc carrying the arc's own model word AND its three verb controls — Stop, Resume, Resume at 3:00 AM, drawn only where the arc is walking or stopped (MAN-1557 §"The arc header"), between the gallery and the plans — then one `<RunCard defaultOpen />`
 per run no arc card owns — `defaultOpen` is the one variance `RunCard` offers, and the tab is what wants it: a person
 who navigated here has already asked for the runs. (A `PlanCard` is passed no such prop: a plan card's phases
 are shown in every home it has, so the tab and the gutter cannot disagree about what it shows.) Order is live → stale → paused, newest first
@@ -9743,6 +9826,12 @@ key for key. The emitted document is the source of the shape.
   undesigned plan reads `"goal": null`.
 - `DispatcherPlan.state` is a `string`, the store's own word: `designing`, `designed`, `questions`,
   `loaded`, `parked`.
+- `DispatcherPlan.launched` is `boolean` — `report.launched(events)`, has a walk EVER been launched
+  for this plan — and it is the one fact that tells a plan STOPPED mid-walk from one still at the gate:
+  `status_word` words `paused` against `queued` by it, the card words its own button by it (Resume and
+  `Resume at …` for a plan that has walked, Start and `Start at …` for one that has not, MAN-1557), and
+  `DispatcherArc.stopped` is the same test over an arc's plans. Read through `flagSince`, so a frame
+  from a build older than the key reads `false`.
 - `DispatcherPlanStatus` is the seven words of `report.status_word`, in its precedence.
   `DispatcherPhase.status` is the three values of the store's `phases.status` column: `not started`,
   `running`, `done`.
@@ -9750,7 +9839,11 @@ key for key. The emitted document is the source of the shape.
   the clock cannot.
 - `DispatcherVerb` is six of the CLI's own verbs: `stop`, `resume`, `schedule`, `park`, `unpark`,
   `model` (the plan's own DeepSeek / Claude word — one verb serving a plan and an arc, resolved
-  plan-first-then-arc, `hooks/dispatcher/cmd/model.py`).
+  plan-first-then-arc, `hooks/dispatcher/cmd/model.py`). FOUR OF THEM — `stop`, `resume`, `schedule`,
+  `model` — take an ARC's name as readily as a plan's (`arc_verbs.py`, MAN-1465), which is why the
+  client's `api.dispatcher` posts all four to `/api/dispatcher/arcs/:name/…` beside the plan routes
+  (`arcStop`, `arcResume`, `arcSchedule` and `arcModel`) and why `DispatcherVerbResult`'s refusal is
+  worded for both. `park` and `unpark` name a plan only.
 - `DispatcherPlan.model` is the plan's EFFECTIVE model word — its own, else its arc's, else the runner's
   default, resolved by the document (`hooks/dispatcher/model.py::of`) — and `DispatcherArc.model` is the ARC's
   OWN (MAN-5406, INV-4355): both are `RunnerModelChoice | null`, one of `deepseek` | `claude` | `auto`.
@@ -9762,7 +9855,15 @@ key for key. The emitted document is the source of the shape.
   `architecture`, `delivers`, `model`, the derived `status` (`DispatcherArcStatus` — the five words of
   `store_arcs.arc_word`: `empty`, `judged`, `complete`, `live`, `designing`), `plans` (NAMES, in the
   arc file's order) and the arc's own `created_at`, `completed_at`, `cost_usd`, `tokens`, `tokens_in`,
-  `tokens_out`. An arc has no phases, no events and no armed hour; a plan carries no `plans`.
+  `tokens_out`, PLUS the three readings an arc's own controls are drawn by (`report_arcs.walking` /
+  `.stopped` / `.hour`, MAN-5220): `walking: boolean` (does the arc have a `live` plan — what its Stop
+  is drawn for), `stopped: boolean` (a `paused` plan, or a `scheduled` one that has walked — what its
+  Resume and its `Resume at 3:00 AM` are drawn for), and `schedule: string | null` (the ONE armed hour
+  every stopped plan of it is waiting for, `null` when they carry different ones or none). Those three
+  are the sets `dispatcher stop|resume|schedule <arc>` acts on, so the header's press and a terminal's
+  verb reach the same plans. An arc still has no phases and no events; a plan carries no `plans`.
+  `walking` and `stopped` are read through `flagSince` and `schedule` through `textSince`, so an older
+  frame reads false / null and the header simply offers no arc verbs rather than failing to load.
 - `DispatcherPlan.arc` is the arc's bare name or `null` — the join a card makes against
   `DispatcherArc.plans`, read from the other side.
 - `DispatcherLanePicture` is declared in `src/shared/types.ts` ONLY, beside the block: the frame's

@@ -58,7 +58,8 @@ function firstLine(value: unknown): string {
  * What the dispatcher did instead of answering, in one sentence.
  *
  * The dispatcher's own words come first when it left any — a refusal on STDOUT (a not-found line,
- * exit 1: `no plan <bare>`, or `no plan or arc <bare>` from `model`), a traceback on stderr — because
+ * exit 1: `no plan <bare>`, or `no plan or arc <bare>` from one of the four verbs an arc's own name
+ * also reaches), a traceback on stderr — because
  * they name the cause better than an exit code does. The
  * ways it can fail without a code are the run lane's measured ways (`runner-verb.service.ts:130`:
  * our own ceiling and a kill from outside both arrive as a SIGNAL, a missing binary as a string
@@ -161,6 +162,20 @@ export function names(value: unknown, where: string): string[] {
  */
 export function textSince(value: unknown, where: string): string | null {
   return value === undefined ? null : need(value, isTextOrNull, where);
+}
+
+/**
+ * A flag a build OLDER than the field did not write, read as `false` — refused by name when the key
+ * IS there and is not a flag.
+ *
+ * `countSince`'s doctrine, applied to the third shape a tolerated field can have. `false` is the
+ * honest reading of an absent key and not merely a convenient one: every flag read this way says
+ * something HAS happened (a walk has launched, an arc is walking), and a build that never wrote the
+ * key is a build under which nothing of the sort was ever recorded — so a card drawn from it offers
+ * the gate's verb rather than a stopped plan's, which is exactly what that build's plans are.
+ */
+export function flagSince(value: unknown, where: string): boolean {
+  return value === undefined ? false : need(value, isFlag, where);
 }
 
 /** The three words a model word may be (`hooks/plan_runner/run_model.py:WORDS`), the ONE list — `readRunnerModelChoice` checks a request against the same three. */

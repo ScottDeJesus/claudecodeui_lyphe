@@ -1,8 +1,9 @@
 import { useTranslation } from 'react-i18next';
 
-import { useDispatcherArcModel } from '@/modules/dispatcher/hooks/useDispatcherArcModel';
-import { RunModelControl } from '@/modules/plan-runner';
-import { Badge } from '@/shared/ui';
+import { epochOf, scheduleClock } from '@/modules/dispatcher/dispatcherState';
+import { useDispatcherVerbs } from '@/modules/dispatcher/hooks/useDispatcherVerbs';
+import { RunModelControl, ScheduleControl } from '@/modules/plan-runner';
+import { Badge, Button } from '@/shared/ui';
 import type { DispatcherArc, DispatcherArcStatus, Tone } from '@/shared/types';
 import { cn, effectiveModelWord } from '@/shared/utils';
 
@@ -26,8 +27,9 @@ const STATUS: Record<DispatcherArcStatus, { key: string; tone: Tone }> = {
 };
 
 /**
- * ONE dispatch arc, as a header over the plans of it — `<name>.arc`, its own word, its plan count,
- * and the DeepSeek · Claude · Chat switch for the arc's ONE model word.
+ * ONE dispatch arc, as a header over the plans of it — `<name>.arc`, its own word, its plan count, the
+ * DeepSeek · Claude · Chat switch for the arc's ONE model word, and the three verbs that move the
+ * plans under it: Stop, Resume, and Resume at 3:00 AM.
  *
  * THE SWITCH IS THE REASON THIS EXISTS. A plan card carries its own control, and a plan may say
  * anything it likes; the arc's word is the one that reaches EVERY plan of it, because
@@ -35,10 +37,19 @@ const STATUS: Record<DispatcherArcStatus, { key: string; tone: Tone }> = {
  * is the operator's answer to "all of it, from here on", and a plan that presses its own word
  * afterwards speaks for itself until the arc presses again.
  *
+ * THE THREE VERBS ARE THE PLAN CARD'S OWN, APPLIED TO THE WHOLE ARC, and the header draws each one
+ * exactly where the dispatcher's own arc door would take it — `arc.walking` for Stop, `arc.stopped`
+ * for Resume and for Resume at 3:00 AM, and never a control drawn greyed out where the verb would
+ * refuse. Stop is a PAUSE, so nothing guards it; Resume is its undo; the hour is the arm the timer
+ * waits on, and once one is set the header says WHEN — `arc.schedule`, the one stamp the press wrote
+ * on every STOPPED plan of the arc — beside the control that cancels it. The sets are the dispatcher's own
+ * (`report_arcs.walking` / `.stopped`), read off the same plan rows the cards below are drawn from,
+ * so a press here and the same verb at a terminal can never reach different plans.
+ *
  * NOTHING IS INVENTED AND NOTHING IS COUNTED HERE. The plan count is the names the store listed
- * (`store.arc_plans`'s order, which is the arc file's), and the control draws `arc.model` — the
- * ARC's own word, never a plan's effective one. A record with no word — or a frame from an older
- * server — reads the runner's default (`effectiveModelWord`), which is what its plans would run on.
+ * (`store.arc_plans`'s order, which is the arc file's); the switch draws `arc.model` — the ARC's own
+ * word, never a plan's effective one — and a record with no word, or a frame from an older server,
+ * reads the runner's default (`effectiveModelWord`), which is what its plans would run on.
  *
  * `data-dispatch-arc`, `data-arc-name` and `data-arc-status` are the browser harness's handles, on
  * the ROOT so a probe scopes every reading and every press to ONE arc — the operator's own arcs walk
@@ -48,8 +59,10 @@ const STATUS: Record<DispatcherArcStatus, { key: string; tone: Tone }> = {
  */
 export function DispatchArcHeader({ arc }: { arc: DispatcherArc }) {
   const { t } = useTranslation();
-  const { setModel, busy } = useDispatcherArcModel(arc.name);
+  const { stop, resume, schedule, setModel, busy } = useDispatcherVerbs(arc.name, 'arc');
   const status = STATUS[arc.status] ?? STATUS.designing;
+  const armed = epochOf(arc.schedule);
+  const held = busy !== null;
 
   return (
     <section
@@ -72,10 +85,39 @@ export function DispatchArcHeader({ arc }: { arc: DispatcherArc }) {
           {t('dispatcher.arcPlans', { count: arc.plans.length })}
         </p>
         <div className="ml-auto">
-          <RunModelControl scope="dispatch-arc" value={effectiveModelWord(arc.model)} busy={busy}
+          <RunModelControl scope="dispatch-arc" value={effectiveModelWord(arc.model)} busy={held}
             onChoose={(choice) => void setModel(choice)} />
         </div>
       </div>
+      {/* Only where a verb would be taken: an arc with nothing walking and nothing stopped draws no
+          row at all, so a header never offers a press the dispatcher would refuse. (An armed hour is
+          not a third case to test for: `arc.schedule` is read over the arc's stopped plans, so an
+          hour can only be named on an arc that is stopped.) */}
+      {(arc.walking || arc.stopped) && (
+        <div className="flex min-w-0 flex-wrap items-center gap-2">
+          {arc.walking && (
+            <Button variant="secondary" size="sm" disabled={held} onClick={() => void stop()}
+              data-dispatch-arc-stop>{t('runner.stop')}</Button>
+          )}
+          {arc.stopped && (
+            <>
+              <Button size="sm" disabled={held} onClick={() => void resume()}
+                data-dispatch-arc-resume>{t('runner.resume')}</Button>
+              <ScheduleControl scope="dispatch-arc" verb="resume" startAt={armed} busy={held}
+                onSchedule={(when) => void schedule(when)} />
+            </>
+          )}
+          {/* The hour a press armed, said in the operator's own clock: `report_arcs.hour` answers one
+              stamp only when a STOPPED plan of the arc is waiting for it — the same set the Cancel
+              beside it clears. So a named hour implies `arc.stopped`, which is what this span and
+              that Cancel both sit inside of: neither can be drawn without the other. */}
+          {armed !== null && (
+            <span className="font-mono text-xs text-muted-foreground" data-dispatch-arc-schedule-note>
+              {t('runner.schedule.starts', { time: scheduleClock(armed) })}
+            </span>
+          )}
+        </div>
+      )}
     </section>
   );
 }

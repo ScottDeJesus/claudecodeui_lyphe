@@ -1,6 +1,6 @@
 import type { DispatcherArc, DispatcherArcStatus } from '@/shared/types.js';
 
-import { countSince, each, field, isCount, isRecord, isText, isTextOrNull, modelSince, names, need, oneOf } from './dispatcher-state.transport.js';
+import { countSince, each, field, flagSince, isCount, isRecord, isText, isTextOrNull, modelSince, names, need, oneOf, textSince } from './dispatcher-state.transport.js';
 
 /**
  * One arc of the dispatcher's document, read field by field into the type the arc header draws.
@@ -35,6 +35,18 @@ export function arcOf(raw: unknown): DispatcherArc {
     // (`store.set_arc_model`). A build older than the field reads `null` — the runner's default.
     model: modelSince(field(arc, 'model'), 'arc.model'),
     status: oneOf(field(arc, 'status'), ARC_STATUSES, `status of ${name}`),
+    // THE ARC'S OWN VERBS, read off its plans' status words by `report_arcs` and drawn by the header
+    // here: `walking` is what Stop is drawn for and `stopped` what Resume and Resume at 3:00 AM are.
+    // Both are read tolerantly, so a dispatcher build older than the fields draws no control at all
+    // rather than a wrong one — which is what that build's arc really is: an arc this lane cannot
+    // move. Neither word is the arc's `status` (the module head says why: `designing` is true of a
+    // stopped arc and of one that never started, and the two draw different controls).
+    walking: flagSince(field(arc, 'walking'), `arc.walking of ${name}`),
+    stopped: flagSince(field(arc, 'stopped'), `arc.stopped of ${name}`),
+    // The ONE hour an arc's plans are armed for, or null (`report_arcs.hour`: the single distinct
+    // armed stamp, null when there is none or when its plans were armed apart). It is the stamp the
+    // header's Cancel is drawn over and the note beside it states — never computed here.
+    schedule: textSince(field(arc, 'schedule'), `arc.schedule of ${name}`),
     plans: names(field(arc, 'plans'), 'arc.plans'),
     created_at: need(field(arc, 'created_at'), isText, 'arc.created_at'),
     completed_at: need(field(arc, 'completed_at'), isTextOrNull, 'arc.completed_at'),

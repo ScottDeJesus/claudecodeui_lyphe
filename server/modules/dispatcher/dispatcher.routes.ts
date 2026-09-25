@@ -53,13 +53,20 @@ function statusForVerb(result: DispatcherVerbResult): number {
 }
 
 /**
- * The dispatcher lane's ten routes. Auth is the mount's `authenticateToken`, in `server/index.ts`.
+ * The dispatcher lane's thirteen routes: three reads of the plan list, six presses on a plan, four on
+ * an arc. Auth is the mount's `authenticateToken`, in `server/index.ts`.
  *
  * These handlers validate and translate, and do nothing else: nothing is read here, no process is
  * started here, and no route names a path from the request — the binary and the store are the
  * module's, fixed at composition, and a request can only ever choose a plan or an arc by name, a
  * word from the closed set of six verbs, and — where the verb takes one — a word from the three the
  * runner spells.
+ *
+ * FOUR OF THE SIX ARE RELAYED TWICE, once under `/plans/:name` and once under `/arcs/:name`, because
+ * the dispatcher's own doors open on both: `model`, `stop`, `resume` and `schedule` take an arc's
+ * name as readily as a plan's. The two spellings are two routes rather than one param because the
+ * NAME CLASSES differ (`PLAN_NAME` against `ARC_NAME` below) — a fence that would be lost the moment
+ * one route accepted either adornment.
  */
 export function createDispatcherRouter(dependencies: DispatcherRouterDependencies): express.Router {
   const router = express.Router();
@@ -158,33 +165,58 @@ export function createDispatcherRouter(dependencies: DispatcherRouterDependencie
   }));
 
   /**
-   * An ARC's one word (`dispatcher model <arc> <word>`), the deck's control relayed.
+   * The ARC's four verbs — `model`, `stop`, `resume`, `schedule` — relayed to the arc's own door.
    *
-   * The dispatcher hands it to EVERY plan of the arc (`store.set_arc_model`, the runner's own rule
-   * for its minted cards) and the next frame redraws the arc's header and its plans together —
-   * nothing here is optimistic, and nothing is copied by this server. The plan-first-then-arc
-   * resolution the verb makes is deliberately not repeated: this route names an arc, so the name it
-   * forwards carries the arc's own door.
+   * AN ARC IS ADDRESSED BY ITS OWN NAME, and the dispatcher is what resolves it. Each of these four
+   * verbs takes a plan's name OR an arc's and answers an arc's name with the PLAN verb applied to
+   * the arc's plans in one step (`hooks/dispatcher/arc_verbs.py` holds which plans and why) — so the
+   * plan-first-then-arc resolution is deliberately not repeated here: this route names an arc, the
+   * name it forwards carries the arc's own adornment, and the dispatcher decides the rest. Which is
+   * the whole point of routing it this way rather than looping over the arc's plans on this side: the
+   * terminal and the card say the same thing because they say it with the same verb.
+   *
+   * For `model` the dispatcher hands the word to EVERY plan of the arc (`store.set_arc_model`); for
+   * `stop` and `resume` it moves the arc's walking, or its stopped, plans in one transaction and one
+   * kick; for `schedule` it arms one hour for each of them (INV-201 knows no arc-level timer). The
+   * next frame redraws the arc's header and its plans together — nothing here is optimistic, and
+   * nothing is copied by this server.
+   *
+   * The same two fences as the plan routes, one name class over: the arc's own regex, and a verb word
+   * that is OURS — never the request's.
    */
-  router.post('/arcs/:name/model', async (request, response, next) => {
+  const arcRelay = (
+    verb: DispatcherVerb,
+    readArgs: (body: unknown) => string[] | null = () => [],
+    badBody: string = runnerScheduleWhenError(),
+  ): express.RequestHandler<{ name: string }> => async (request, response, next) => {
     const arc = request.params.name;
     if (!ARC_NAME.test(arc)) {
       response.status(400).json({ error: 'arc name is required' });
       return;
     }
-    const verbArgs = modelArgs(request.body);
+    const verbArgs = readArgs(request.body);
     if (verbArgs === null) {
-      response.status(400).json({ error: runnerModelChoiceError() });
+      response.status(400).json({ error: badBody });
       return;
     }
 
     try {
-      const result = await dependencies.runVerb('model', arc, verbArgs);
+      const result = await dependencies.runVerb(verb, arc, verbArgs);
       response.status(statusForVerb(result)).json(result);
     } catch (error) {
       next(error); // one this lane has no word for: the app's error handler, as every route here
     }
-  });
+  };
+
+  router.post('/arcs/:name/model', arcRelay('model', modelArgs, runnerModelChoiceError()));
+  router.post('/arcs/:name/stop', arcRelay('stop'));
+  router.post('/arcs/:name/resume', arcRelay('resume'));
+  // The arc's Resume at a time: the same three shapes a plan's schedule takes, through the same
+  // reader, so an operator who can name an hour for one plan can name it for a whole arc.
+  router.post('/arcs/:name/schedule', arcRelay('schedule', (body) => {
+    const when = readRunnerScheduleWhen((body as { when?: unknown } | undefined)?.when);
+    return when === null ? null : [when];
+  }));
 
   return router;
 }

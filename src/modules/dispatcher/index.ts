@@ -5,13 +5,11 @@ export { DispatcherFeed } from '@/modules/dispatcher/DispatcherFeed';
 // complete plans the operator has already dismissed. The Runner tab reads it for the card list and
 // for the count that gates the tab.
 export { useDispatcherPlans } from '@/modules/dispatcher/hooks/useDispatcherPlans';
-// The card's hand: the six verbs, relayed to the dispatcher's own binary and answered with its own
-// sentence. A card calls one of these and re-draws from the next frame; nothing is guessed here.
+// Both hands, one hook: the plan card's six verbs and the arc header's four — stop, resume, schedule
+// and the arc's model word — relayed to the dispatcher's own binary and answered with its own
+// sentence. `scope` is the whole of what differs: which door a press goes through. A caller presses
+// one and re-draws from the next frame; nothing is guessed here.
 export { useDispatcherVerbs } from '@/modules/dispatcher/hooks/useDispatcherVerbs';
-// The arc's hand: the one verb that names an arc — its DeepSeek / Claude word, which the dispatcher
-// hands to every plan of the arc. A separate hook from the card's because an arc has no verbs of its
-// own beyond this one, exactly as the runner lane keeps `useArcModel` apart from `useRunnerVerbs`.
-export { useDispatcherArcModel } from '@/modules/dispatcher/hooks/useDispatcherArcModel';
 // The pure vocabulary of a plan, so a card never re-derives a tone, a glyph, a progress count or
 // the order the cards sit in.
 export {

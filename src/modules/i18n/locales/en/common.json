@@ -883,6 +883,7 @@
     "schedule": {
       "label": "Scheduled start",
       "startAt": "Start at {{time}}",
+      "resumeAt": "Resume at {{time}}",
       "cancel": "Cancel",
       "starts": "starts {{time}}",
       "runTitle": "Start this run when DeepSeek’s daily peak lifts — the watchdog presses Start at that time, within two minutes",
@@ -916,6 +917,8 @@
     "rounds": "{{count}} rounds",
     "noStages": "No stage has launched for this phase yet.",
     "scheduleTitle": "Start this plan when DeepSeek’s daily peak lifts — a one-shot timer sends Resume at that hour",
+    "resumeTitle": "Resume this plan when DeepSeek’s daily peak lifts — a one-shot timer sends Resume at that hour",
+    "arcResumeTitle": "Resume every stopped plan of this arc when DeepSeek’s daily peak lifts — one timer per plan, each sending Resume at that hour",
     "park": "Park",
     "unpark": "Unpark",
     "arcStatus": {
