@@ -27,3 +27,39 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/question-cards.mjs
 - 2026-09-25: the gutter's plan cards read as visible by node count and `isVisible()` while painting 0 of 9 and 0 of 14 rows.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Collapsible.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dispatch-card-phases.mjs
+
+## INV-4356 — ActionMenu portals to body unless a mount passes portal={false}
+
+`ActionMenu` renders into a `document.body` portal (`fixed z-[70]`) unless a mount passes `portal={false}` (`absolute z-50`, in place).
+
+- why: in place, the menu is clipped by the first `overflow:hidden` ancestor and painted inside the first ancestor that makes a stacking context; a `backdrop-filter` header scopes the menu's `z-50` to its own layer, so the transcript paints over it.
+- opt-out mount: `src/modules/mcp/McpServers.tsx` only — Settings' `fixed z-[9999]` panel draws a `z-[70]` portalled menu UNDER its own content.
+- a new mount inside an overlay whose layer is above `70` passes `portal={false}`; so does a menu that must scroll with its trigger (the portal path closes on the first scroll).
+- portal rungs: above fullscreen-card (`45`), Dialog (`50`) and the FAB (`60`); under Settings (`9999`), modals (`10000`) and the toast stack (`10001`).
+- `align` is honoured on the portal path (both edges clamped); no mount passes it.
+- proof: `node .verify/export-menu-layer.mjs <label>` — 4 sites × dark/light, exit 0 on `ALL PASS`. 2026-09-25: 94 ok / 0 FAIL; 70 ok / 20 FAIL with the old default.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/mcp/McpServers.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/ActionMenu.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/export-menu-layer.mjs
+
+## INV-4357 — A rect read from an opening .vv-action-menu is 0.96 of its size and 24px low
+
+`getBoundingClientRect()` on a `.vv-action-menu` in the commit that opens it returns the animation's start frame, not the settled box.
+
+- why: `.vv-action-menu` enters on `animation: vv-pop 0.3s … both` (`feedback.css`); the start state `translateY(24px) scale(.96)` (`tokens.css`) is on the element in the frame a layout effect runs.
+- 2026-09-25, composer: rect `250×251` against the `260×261` layout box; a flip sized from it left the last item over the trigger's top 4px.
+- a `ResizeObserver` never fires for it: the layout box never changes, only the transform.
+- size and place from `offsetWidth` / `offsetHeight`, which no transform touches. `placePortalledMenu` in `src/shared/ui/ActionMenu.tsx` does, once per open, in a `useLayoutEffect`.
+- a viewport resize closes the menu (`closeOnViewportChange`), so nothing re-places it.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/ActionMenu.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/export-menu-layer.mjs
+
+## INV-4358 — A useLayoutEffect in the exported transcript tree warns on the server
+
+React's server renderer warns `useLayoutEffect does nothing on the server` when the hook is CALLED, whatever its body does.
+
+- why: the export document is built by `renderToStaticMarkup`; an `isExporting` early return inside the effect body leaves the warning, once per long turn (2026-09-25, verified).
+- cure: the measuring hook lives in `FoldMeasurement` (`src/modules/chat/transcript/CollapsibleUserText.tsx`), mounted as `{!isExporting && …}`; the export tree never renders it.
+- any component the export renders that needs a layout effect takes the same split: the hook in a child gated on `isExporting`.
+- `.verify/export-menu-layer.mjs` fails a site on any console error after its real download, so a returning warning fails the probe.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/CollapsibleUserText.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/export-menu-layer.mjs
