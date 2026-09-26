@@ -64,7 +64,7 @@ function stageTone(stage: HealCycle['stage']): Tone {
 
 const TIER_TONE: Record<HealCycleTier, Tone> = { regression: 'danger', frequent: 'info', 'one-off': 'neutral' };
 
-/** Landed is green only when the heal it names landed `done`; a blocked heal or a run given back is amber. */
+/** Landed is green only when the heal it names landed `done`; a heal the ledger reads as `gone`, stopped or failed is amber. */
 function itemTone(item: HealCycleItem): Tone {
   if (item.state === 'launched') return 'info';
   if (item.state === 'landed') return item.note === 'done' ? 'positive' : 'warn';
@@ -114,7 +114,7 @@ function CycleCard({ cycle }: { cycle: HealCycle }) {
             <Badge as="span" tone="neutral">{t('heal.cycles.ignored', { defaultValue: '{{count}} ignored', count: cycle.ignored })}</Badge>
             <Badge as="span" tone={cycle.healed > 0 ? 'positive' : 'neutral'}>{t('heal.cycles.healed', { defaultValue: '{{count}} healed', count: cycle.healed })}</Badge>
             {cycle.spent > 0 && (
-              <span className="font-mono text-muted-foreground" title={t('heal.cycles.spentTitle', { defaultValue: 'DeepSeek dollars this cycle spent' })}>{usd(cycle.spent)}</span>
+              <span className="font-mono text-muted-foreground" title={t('heal.cycles.spentTitle', { defaultValue: 'DeepSeek dollars this cycle spent — a heal that landed before 2026-09-23 booked its chain’s whole bill, Claude stages included, so a cycle spanning that date counts more than DeepSeek billed' })}>{usd(cycle.spent)}</span>
             )}
           </span>
         </CollapsibleTrigger>

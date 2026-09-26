@@ -33,7 +33,7 @@ export function HealCardList({ heals }: { heals: HealCard[] }) {
    * What a heal's chain can be opened BY. The record itself
    * (`state/dispatch-chains/chain-<slug>-<stamp>-<hex>/chain.json`) is not addressable from here: the
    * runner mints that trailing hex, no route in this app lists that store, and the Runner tab carries
-   * the runner's own runs (`state/runner`), which a heal's chain is not. The heal's OWN id is exact,
+   * the dispatcher's own plans, which a heal's chain is not. The heal's OWN id is exact,
    * and it names the brief the chain was handed — `state/heal_reflex/briefs/<heal id>.md`, written for
    * every heal whose chain started, and that is what a reader wants open: the friction that heal was
    * told to fix. The briefing is written before the launch and only a PROVED launch gets a

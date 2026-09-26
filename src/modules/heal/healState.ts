@@ -2,7 +2,7 @@ import type { HealCard, HealClass, HealKindRow, HealStatus } from '@/modules/hea
 import type { Tone } from '@/shared/types';
 
 /**
- * How the ledger's facts reach the eye — the same job `plan-runner/runState.ts` does for a run.
+ * How the ledger's facts reach the eye — the same job `dispatcher/dispatcherState.ts` does for a plan.
  *
  * Colour is language here, not decoration: red is a shape a heal claimed coming back, or a review
  * that blocks, amber is a heal that needs a hand or a cap being approached, green is a heal that

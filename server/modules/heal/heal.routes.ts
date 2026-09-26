@@ -30,7 +30,7 @@ function text(value: unknown): string | null {
 }
 
 /**
- * How a refused question becomes a status, in the shape of the plan-runner lane's `statusForVerb`.
+ * How a refused question becomes a status, in the shape of the dispatcher lane's `statusForVerb`.
  *
  * A refusal is not a server fault: the worker is a separate thing on this host, and each reason says
  * exactly which way it was separate. Turning one into a 200 with an empty body would replace the one
@@ -43,7 +43,7 @@ const STATUS_FOR_FAULT: Record<HealFault, number> = {
 
 /**
  * One answer, written: the value itself, or the worker's own sentence under the status its reason
- * earns. The sentence travels UNTOUCHED, the way a runner refusal does — it is the answer.
+ * earns. The sentence travels UNTOUCHED, the way a dispatcher refusal does — it is the answer.
  */
 function emit<T>(response: express.Response, answer: HealResult<T>): void {
   if (answer.ok) {
@@ -87,7 +87,7 @@ export function createHealRouter(
    * row — so a route keyed on the class would answer nothing for most of the ledger's life.
    *
    * A kind that is not a token names no kind, and gets the same answer an unknown one gets, without
-   * a lookup — exactly as the plan-runner lane answers a malformed run id.
+   * a lookup — exactly as the dispatcher lane's plan list answers a name it does not carry.
    */
   router.get('/kind/:kind', async (request, response, next) => {
     // `params` is the repeated-parameter dictionary, so a value here is a string OR an array of

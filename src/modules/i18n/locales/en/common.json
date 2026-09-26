@@ -784,7 +784,6 @@
       "stopping": "stopping — the runner was asked to park this run",
       "resumed": "resumed — the run is moving again",
       "model": "model set — the next phase goes where this says",
-      "scheduled": "scheduled — the watchdog presses Start at that time",
       "unscheduled": "scheduled start cancelled",
       "arcStarted": "arc started — card 1 is on its way"
     },
@@ -880,8 +879,6 @@
       "resumeAt": "Resume at {{time}}",
       "cancel": "Cancel",
       "starts": "starts {{time}}",
-      "runTitle": "Start this run when DeepSeek’s daily peak lifts — the watchdog presses Start at that time, within two minutes",
-      "arcTitle": "Start this arc when DeepSeek’s daily peak lifts — the watchdog presses Start at that time, within two minutes",
       "cancelTitle": "Cancel the scheduled start; nothing starts until Start is pressed",
       "refused": "Schedule"
     }

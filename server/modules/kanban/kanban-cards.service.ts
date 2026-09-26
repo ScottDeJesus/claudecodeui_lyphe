@@ -10,7 +10,6 @@ import {
 } from '@/modules/database/index.js';
 import {
   KANBAN_LANE_LIMIT_DEFAULT,
-  KANBAN_LEASE_STALE_SECONDS,
   KANBAN_SORT_ORDER_GAP,
   KANBAN_SORT_ORDER_MIN_GAP,
   KANBAN_STATUSES,

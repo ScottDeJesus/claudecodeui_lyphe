@@ -13,7 +13,7 @@ import type { DispatcherPicture } from './dispatcher-state.service.js';
 /**
  * What a plan may be called in a URL.
  *
- * The dispatcher's own name rule (`hooks/dispatcher/names.py:NAME_RE` — a bare, lowercase,
+ * The dispatcher's own name rule (`hooks/dispatcher/store.py:NAME_RE` — a bare, lowercase,
  * hyphenated name, minted by the board). It is written out rather than imported because the rule's
  * HOME is that module, on the other side of a process boundary; what this fence is for is narrower
  * and worth stating exactly: an argument that cannot be parsed as a plan name never reaches an argv

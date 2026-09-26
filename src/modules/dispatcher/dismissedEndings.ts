@@ -22,7 +22,7 @@ import { readUserPreference, subscribeToUserPreferences, writeUserPreference } f
  * never match anything again, and keeping it would only push a live entry off the cap. The lane handed
  * in is the WHOLE lane, dismissed plans included — pruning against the visible list would drop every
  * earlier dismissal the moment a second was made. A plan name is a slug alone
- * (`^[a-z0-9][a-z0-9-]{0,99}$`, `hooks/dispatcher/names.py`), so nothing else can be addressed here.
+ * (`^[a-z0-9][a-z0-9-]{0,99}$`, `hooks/dispatcher/store.py`), so nothing else can be addressed here.
  *
  * The write is MERGED into the `dispatcher` blob (MAN-498 — a replaced blob drops whatever else lives
  * under the key), and capped so the list cannot grow without bound.

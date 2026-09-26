@@ -2495,10 +2495,10 @@ export type UniverseDigest = { edits: number; execs: number; at: number };
  *  a place in it, and the rest close up or make room — there is no fixed number of berths. */
 export type GutterSide = 'left' | 'right';
 
-/** The widgets a chat gutter can hold: the plan-runner runs of the open session, the memory-intake
- *  rows proposed by it, the subagents that session has pinned, and the embed — a live page the chat
- *  named, or the reader typed in. These are the ids the DOM carries as `data-widget`, and the keys
- *  `useGutterPlacements` stores its records under. */
+/** The widgets a chat gutter can hold: the dispatcher's plan cards, the open chat's plans first, the
+ *  memory-intake rows the session proposed, the subagents it has pinned, and the embed — a live page
+ *  the chat named, or the reader typed in. These are the ids the DOM carries as `data-widget`, and
+ *  the keys `useGutterPlacements` stores its records under. */
 export type GutterWidgetId = 'runner' | 'memory' | 'subagents' | 'embed';
 
 /** One widget's place in its side's stack and whether it is expanded. `order` is the sort key within

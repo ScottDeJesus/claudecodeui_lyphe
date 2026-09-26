@@ -16,7 +16,7 @@ const execFileAsync = promisify(execFile);
  * reader per store, one transport, and the transport is a process this service does not look inside of.
  *
  * Nothing here throws. A refusal is a RESULT — the operator needs the worker's own sentence, not a
- * 500 — and the shapes below are the plan-runner lane's (`runner-verb.service.ts`), so the two relay
+ * 500 — and the shapes below are the dispatcher lane's (`dispatcher-verb.service.ts`), so the two relay
  * lanes in this server answer the same way. The argv array is the security boundary: no shell parses
  * any of this, so a pattern or a reason carrying a space, a semicolon or a quote is one argument the
  * worker rejects rather than a second command.
