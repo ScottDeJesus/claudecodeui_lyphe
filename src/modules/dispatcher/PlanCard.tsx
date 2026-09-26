@@ -16,7 +16,7 @@ import type { DispatcherPlan } from '@/shared/types';
  * (`PlannerBadge` is the second, and it is not a second card: a run has no designer out on it, and a
  * dispatch plan's outing is a fact about the plan the run card has nothing to say about.)
  *
- * `plan.v3` is the name (`<name>.v3`, what every dispatcher verb and toast prints); the goal's
+ * `plan.name` is the name (`restorly--kit`, what every dispatcher verb and toast prints); the goal's
  * FIRST line, clamped to three, is the description. The pill is a static span (`Chip` with no
  * press), wrapped so its handle rides a node the house pill does not have to forward.
  *
@@ -73,7 +73,7 @@ export function PlanCard({
               end, so a folded card keeps every mark that says WHICH plan this is. */}
           <div className="flex min-w-0 items-start gap-2">
             <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
-              <CardTitle className="w-full min-w-0 break-words font-mono text-sm leading-snug">{plan.v3}</CardTitle>
+              <CardTitle className="w-full min-w-0 break-words font-mono text-sm leading-snug">{plan.name}</CardTitle>
               {goal && (
                 <p className="line-clamp-3 w-full min-w-0 break-words text-xs leading-snug text-muted-foreground">{goal}</p>
               )}

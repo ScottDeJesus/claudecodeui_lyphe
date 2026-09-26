@@ -123,7 +123,7 @@ function isDismissedPlan(plan: DispatcherPlan, dismissed: readonly DismissedEndi
  * The outings whose `target` — and whose `plan` — name no plan and no arc this screen draws.
  *
  * THE ONE CASE IT EXISTS FOR IS AN ARC'S DESIGN BEFORE ITS ARC FILE LOADS. `dispatcher design
- * <arc>.v3 --arc` writes a planner row for a name the store holds no arc for yet: the arc's own file
+ * <arc> --arc` writes a planner row for a name the store holds no arc for yet: the arc's own file
  * is what opens the arc and the plans of it, and until that load lands, no card and no deck on the
  * screen answers to that name. The store's document is built for exactly this — the row is carried,
  * and it is the only thing that says the arc is being designed — so a client that drew only

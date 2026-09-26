@@ -777,9 +777,9 @@ export const api = {
   //
   // The verbs are read from the RAW response for exactly the reason `planRunner`'s are, with one
   // difference worth naming: the dispatcher prints its refusals on STDOUT (`REFUSED schedule
-  // <name>.v3: is live — stop it first`, exit 2), not on stderr, so a 409 body carries the verdict
+  // <name>: is live — stop it first`, exit 2), not on stderr, so a 409 body carries the verdict
   // in `stdout` and the reader looks there first. Its successes are on stdout too (`UNSCHEDULED
-  // <name>.v3`), so the answer is the same field either way.
+  // <name>`), so the answer is the same field either way.
   dispatcher: {
     plans: () => get('/api/dispatcher/plans'),
     plan: (name: string) => get(`/api/dispatcher/plans/${encodeURIComponent(name)}`),

@@ -75,8 +75,8 @@ export type DispatcherArcVerbs = {
  * not.
  *
  * THE DISPATCHER'S OWN SENTENCE IS THE ANSWER, ON BOTH PATHS. Unlike the runner, which refuses on
- * stderr, every dispatcher verb speaks on STDOUT — `UNSCHEDULED dispatcher-ready.v3` when it worked,
- * `REFUSED schedule dispatcher-ready.v3: is live — stop it first` when it did not — so `stdout` is
+ * stderr, every dispatcher verb speaks on STDOUT — `UNSCHEDULED dispatcher-ready` when it worked,
+ * `REFUSED schedule dispatcher-ready: is live — stop it first` when it did not — so `stdout` is
  * read FIRST and `stderr` only as the fallback. The lane carries that body whole on a 409 for the
  * same reason the run lane does: the dispatcher's refusal names the one rule the plan met, and a
  * generic "something went wrong" would throw away the only useful thing in the answer. 503 and 504
@@ -98,7 +98,7 @@ export type DispatcherArcVerbs = {
  * chain is LAUNCHED (`dispatcher/phase_chain.py:launch_env`), and an arc's is handed to every plan
  * of it in one transaction (`store.set_arc_model`), so a press takes the NEXT phase and never
  * disturbs one already out — which is also why the dispatcher never refuses it for the state a plan
- * or an arc is in, and why its answer is a sentence about the STORE (`MODEL <name>.v3 model=…`)
+ * or an arc is in, and why its answer is a sentence about the STORE (`MODEL <name> model=…`)
  * rather than about a walk.
  */
 export function useDispatcherVerbs(name: string, scope?: 'plan', resumeWord?: string): DispatcherPlanVerbs;
@@ -168,12 +168,12 @@ export function useDispatcherVerbs(
         if (!mountedRef.current) return;
 
         // Read before the status, because a 409 carries the very same shape — and because the
-        // dispatcher's successes are sentences too (`PARKED dispatcher-ready.v3`), not empty bodies.
+        // dispatcher's successes are sentences too (`PARKED dispatcher-ready`), not empty bodies.
         const said = firstLine(body?.stdout) || firstLine(body?.stderr);
 
         if (response.ok) {
           // The dispatcher's own sentence IS the answer, and every one of its verbs answers with one
-          // (`MODEL <name>.v3 model=claude`, `RESUMED dr-arc.arc — 2 plan(s)`). `doneWord` is the
+          // (`MODEL <name> model=claude`, `RESUMED dr-arc.arc — 2 plan(s)`). `doneWord` is the
           // fallback for a dispatcher build that answered with an empty body.
           toast({ tone: 'positive', title: said || doneWord(verb) });
           return;

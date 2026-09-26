@@ -210,11 +210,10 @@ export function deckFocusIndex(plans: readonly DispatcherPlan[]): number {
  * The plan's `waits_on`, as far as the arc it belongs to can answer: the entries that name ANOTHER
  * plan of the same arc, in the order the document wrote them, and nothing where none does.
  *
- * THE ENTRIES ARE NAMES, AND THEY ARE NOT ALWAYS THE BARE ONE. The store writes a plan's `waits_on`
- * with the `.v3` its verbs and toasts print (`restorly--kit.v3`, `report.launched`'s spelling),
- * while `arc.plans` and `plan.name` are bare — so an entry is matched against a member's name AND
- * its `v3`, and the entry travels to the eye exactly as the document wrote it, which is the name the
- * card it waits on wears.
+ * THE ENTRIES ARE BARE NAMES — the store holds a plan's `waits_on` as the names it was written
+ * with (`restorly--kit`, `report.launched`'s spelling), and the loader refuses an entry that is not
+ * another plan of the arc, so a match against a member's own `name` is the whole of it and the entry
+ * travels to the eye exactly as the document wrote it, which is the name the card it waits on wears.
  *
  * WHAT IS LEFT OUT IS THE POINT OF PASSING THE ARC IN: a wait on a plan OUTSIDE the arc, or on one
  * this lane no longer carries, is not a fact this card can show — the card it names is not on the
@@ -226,10 +225,8 @@ export function waitsOnSiblings(plan: DispatcherPlan, members: DispatcherPlan[])
   const names = new Set<string>();
   for (const member of members) {
     names.add(member.name);
-    names.add(member.v3);
   }
   names.delete(plan.name);
-  names.delete(plan.v3);
   return plan.waits_on.filter((name) => names.has(name));
 }
 

@@ -12,7 +12,7 @@ import { cn } from '@/shared/utils';
  *
  * A SOUL IS OUT ON THIS PLAN, and that is a fact no other mark on the card states: the plan's status
  * word says what the PLAN is (`designing`), while the outing is what is being done about it and by
- * whom. The line reads `Eupalinos v3 · designing · opus · 12m`.
+ * whom. The line reads `Eupalinos · designing · opus · 12m`.
  *
  * NOTHING HERE IS DERIVED. The soul and the model are the row's own words; the work word is the row's
  * `verb` and `state` read through the two tables below; the clock is `useElapsed`, the app's ONE
@@ -37,8 +37,8 @@ import { cn } from '@/shared/utils';
  * falls back to the id ITSELF (below), because a soul nobody has translated is still a soul to name.
  */
 const SOUL_KEYS: Record<string, string> = {
-  'eupalinos-v3': 'dispatcher.planner.soul.eupalinosV3',
-  'odysseus-v3': 'dispatcher.planner.soul.odysseusV3',
+  'eupalinos': 'dispatcher.planner.soul.eupalinos',
+  'odysseus': 'dispatcher.planner.soul.odysseus',
 };
 
 /**
@@ -111,7 +111,7 @@ export function PlannerBadge({ planner }: { planner: DispatcherPlanner }) {
 /**
  * The outings with no card and no deck to be drawn in, one badge each, in the lane's own order.
  *
- * AN ARC'S DESIGN BEFORE ITS ARC FILE LOADS IS THE CASE THIS EXISTS FOR: `dispatcher design <arc>.v3
+ * AN ARC'S DESIGN BEFORE ITS ARC FILE LOADS IS THE CASE THIS EXISTS FOR: `dispatcher design <arc>
  * --arc` writes a planner row for a name the store holds no arc for yet, and until the arc's own file
  * is loaded no plan and no arc on the screen answers to it. The row is the ONLY thing that says an arc
  * is being designed, so the tab and the gutter draw it above the decks rather than nowhere
