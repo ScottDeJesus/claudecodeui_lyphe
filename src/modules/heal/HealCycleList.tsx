@@ -24,8 +24,8 @@ import { cn } from '@/shared/utils';
  * says what became of it. `spent` is DeepSeek dollars and shows only
  * above zero: Claude is a subscription, and a dollar figure on a Claude cycle would be an invented cost.
  *
- * With no cycle yet the empty line carries the worker's own sentence on what comes next
- * (`cycle_state.text` — "Next cycle 10:00 UTC", "Schedule off").
+ * With no cycle yet the empty line carries the worker's own sentence on how one opens
+ * (`cycle_state.text` — "Run a cycle now opens one", "Schedule off").
  */
 export function HealCycleList({ cycles, cycleState }: { cycles: HealCycle[]; cycleState: HealCycleState }) {
   const { t } = useTranslation();
