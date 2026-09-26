@@ -20,8 +20,8 @@ import { cn } from '@/shared/utils';
  *
  * THE WORKLIST IS CHIRON'S ORDER AND THE WORKER'S RANK. Nothing here re-sorts: the payload's order is
  * the order drawn, and `item.label` is printed as the worker wrote it. Colour is the tier — red for a
- * regression (a shape came back), amber for a blocked run, blue for a frequent kind, grey for a
- * one-off — and the state chip says what became of it. `spent` is DeepSeek dollars and shows only
+ * regression (a shape came back), blue for a frequent kind, grey for a one-off — and the state chip
+ * says what became of it. `spent` is DeepSeek dollars and shows only
  * above zero: Claude is a subscription, and a dollar figure on a Claude cycle would be an invented cost.
  *
  * With no cycle yet the empty line carries the worker's own sentence on what comes next
