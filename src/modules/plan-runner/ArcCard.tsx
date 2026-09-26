@@ -144,8 +144,10 @@ export function dragScopePosition(types: readonly string[], arcName: string): nu
  * 38 refusals over 76 minutes under a header reading "Walking". The stamp, the `stuck` state and the gate's
  * own sentence are the RUNNER's (`hooks/plan_runner/arc_refused.py`), copied here whole.
  *
- * Every card fills its strip slot's height (`h-full`): the deck stretches its row to the tallest
- * card, so the strip does not jump as it scrolls.
+ * A CARD IS AS TALL AS ITS OWN CONTENT, and never as tall as its neighbour: no `h-full`, no stretch.
+ * The deck it sits in takes the height of the card the reader is on (`DeckFrame`'s measured strip), so
+ * a three-line card is three lines tall instead of wearing the empty space of a card carrying seventeen
+ * phase rows (measured on this very deck, 2026-09-25).
  *
  * The data attributes are the browser harness's handles: position, state, layer and the session pin
  * are read off the DOM to prove the strip draws the walk's order, each card's place in it, and —
@@ -227,7 +229,7 @@ export function ArcCard({ arc, card, layer, pinnedSessionId = null }: ArcCardPro
       onDragStart={handleDragStart}
       title={draggable ? t('runner.arcDragHint') : undefined}
       className={cn(
-        'flex h-full w-full min-w-0 flex-col gap-1.5 p-3',
+        'flex w-full min-w-0 flex-col gap-1.5 p-3',
         layer === 'top' && 'gap-2',
         layer === 'done' && 'opacity-60',
         draggable && 'cursor-grab active:cursor-grabbing'

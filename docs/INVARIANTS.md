@@ -63,3 +63,41 @@ React's server renderer warns `useLayoutEffect does nothing on the server` when 
 - `.verify/export-menu-layer.mjs` fails a site on any console error after its real download, so a returning warning fails the probe.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/CollapsibleUserText.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/export-menu-layer.mjs
+
+## INV-4405 — waitForLoadState('networkidle') resolves at once on a loaded document, so a navigation right after it aborts the mount burst
+
+`page.waitForLoadState('networkidle')` returns immediately for a document that already loaded, so a `goto` or a reload straight after it abandons the app's mount burst in flight.
+
+- symptom: console `Failed to fetch` from `useVersionCheck` and `useSidebarController` beside `net::ERR_ABORTED` on about 17 requests (`/health`, `/api/accounts`, `/api/usage`, the sidebar's archived sessions, the GitHub release). It appears with no card pressed.
+- why: the `networkidle` lifecycle event fired when the document first loaded; waiting on it again resolves instantly.
+- the burst arrives in WAVES, so one zero-in-flight sample reads quiet between two of them (the next wave's `/api/deepseek/balance` proved it).
+- the source is the entry path's desktop resize: a 390px document resized up mounts the sidebar, and the `goto` a moment later abandons its requests.
+- cure in `.verify/probe-card-fold.mjs`: `quiet` counts in-flight requests and requires the quiet to HOLD 600ms; `enterProject` drains before it navigates. With both, the fold passes log 0 console errors.
+- fallback gate: a console error passes only while every error is `Failed to fetch` AND the browser reported `net::ERR_ABORTED`; both counts are printed, and any other error fails.
+- 2026-09-25: the entry path alone, with no fold pressed, logged 4 of these errors.
+- other probes that navigate right after entry can carry `quiet` from this file; it is not yet in `.verify/lib/`.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-card-fold.mjs
+
+## INV-4406 — Two open documents overwrite each other's card folds: collapsedCards is written whole
+
+`writeFolds` and `pruneCardFolds` (`src/shared/hooks/useCardFold.ts`) read the localStorage mirror and PATCH the whole `planRunner.collapsedCards` list, so the last document to write wins.
+
+- measured 2026-09-25: with nothing of the probe running, the stored list toggled between `["darc:restorly"]` and `[]` at 16:18:45, 16:18:52, 16:19:54 and 16:20:02. A second open document was folding and unfolding the operator's own arc card.
+- effect on a probe: after a reload, 3 of 5 keys were missing while the card-side reading was still correct. A fold test run beside an open browser tab of the operator's can fail for this reason alone.
+- `dismissedRuns.ts` has the same shape, and `useCardFold.ts` copies it. The merge is per KEY of the blob, not per entry of the list.
+- not cured: merge-on-write, or a server-side merge, is a refactor. Read the failing key list before blaming the fold.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useCardFold.ts
+
+## INV-4410 — A console error is explained only by what the browser itself reported — a refusal's URL, or an abandonment
+
+A probe's console gate cannot judge a line by its words: `Failed to load resource: the server responded with a status of 403 ()` names no resource, so a tolerance written as a string match either swallows a missing chunk or fails on a call nobody in this house controls.
+
+- measured 2026-09-25, all six passes of `probe-deck-height.mjs` at every width and theme: `403 GET https://api.github.com/repos/siteboon/claudecodeui/releases/latest` — the app's own version check, refused from this host. Every probe here carries it, and it is no evidence about the page under test.
+- cure, in `.verify/probe-deck-height.mjs`: a `response` listener records every `status >= 400` as `{status, method, url}` AND its URL in a `Set`; a console line carries its origin (`ConsoleMessage.location().url`, appended as ` @ <url>`); a line whose origin is in that `Set` is EXPLAINED — that is the refusal the host gave it — and a `Failed to load resource` line whose URL is NOT in the set stays unexplained, because a missing chunk is not an update check.
+- the `Failed to fetch` case is the same principle from the browser's other side: the browser's own word for a request it abandoned, so the line is excused ONLY while the browser also reported one (`requestfailed` → `failed` non-empty) — never on the string alone, which would excuse a chunk the page needed and did not get.
+- the OK line names what was tolerated, by URL: `0 unexplained console error (10 network line(s): 1 abandoned, 10 refused — 403 GET https://api.github.com/...)`, so the tolerance is a reading a reviewer can check rather than a promise.
+- INV-4405's fallback gate (`every error is Failed to fetch` AND `net::ERR_ABORTED` reported) is the same principle; this one adds the refusal case beside the abandonment case. Both are stricter than a bare count of zero.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-deck-height.mjs

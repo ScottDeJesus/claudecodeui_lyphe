@@ -28,10 +28,12 @@ import { cn } from '@/shared/utils';
  * centres its LIVE card, the dispatcher the first plan of the arc that still has a walk in front of
  * it (`deckFocusIndex`). One card: no arrows, nothing to move to.
  *
- * Every card is one fixed width (18rem, never wider than the strip) and the row stretches them to one
- * height, so the strip never jumps as it scrolls. `DeckItem`'s `cardFillsStrip` is the gutter home's
- * width instead: every card exactly the strip's width, so one whole card is in view and the arrows and
- * the snap page one card at a time (`ArcGallery` says why).
+ * Every card is one fixed width (18rem, never wider than the strip) and as tall as its OWN content:
+ * the strip is a row of flex items and would wear the tallest card's height under every shorter one,
+ * so its height is set instead to the card the reader is on (`useDeckStrip` measures it) and the deck
+ * grows and shrinks as the strip is paged, swiped or keyed past. `DeckItem`'s `cardFillsStrip` is the
+ * gutter home's width instead: every card exactly the strip's width, so one whole card is in view and
+ * the arrows and the snap page one card at a time (`ArcGallery` says why).
  *
  * A FOLD LEAVES THE HEADER ROW, AND NOTHING ELSE. What stays is the arc's name, its word and how far
  * it has walked — so a reader who folded three decks away still knows which of them is stalled, which
@@ -107,7 +109,7 @@ export function DeckFrame({
 }) {
   const { t } = useTranslation();
   const { collapsed, toggle } = useCardFold(foldKey);
-  const { stripRef, view, step, onScroll, onKeyDown } = useDeckStrip(Math.max(focusIndex, 0), cardCount);
+  const { stripRef, view, step, onScroll, onKeyDown, stripHeight } = useDeckStrip(Math.max(focusIndex, 0), cardCount);
   const movable = cardCount > 1;
 
   return (
@@ -172,13 +174,34 @@ export function DeckFrame({
             {/* `relative` makes the strip its cards' offset parent, which centring reads. `tabIndex` lets
                 the keyboard's Left/Right move it once focused. `overflow-y-hidden` beside `overflow-x-auto`:
                 alone, `overflow-x: auto` computes `overflow-y` to `auto`, and anything absolutely placed
-                below the row would turn the strip into a vertical scroller that eats the page's wheel. */}
+                below the row would turn the strip into a vertical scroller that eats the page's wheel.
+                `overflow-y-hidden` keeps that wheel, but it does not stop the box being scrolled AS A BOX —
+                a focus move still shifted it, cutting the top of the reader's own card. `useDeckStrip`
+                pins the strip's vertical offset at 0 on every scroll, so neither can move it.
+
+                `items-start` BESIDE A MEASURED HEIGHT IS THE WHOLE CURE for the empty space: the row
+                stretches its items by default, so the tallest card of an arc used to write its height
+                under every shorter one (measured on the docstore deck, 2026-09-25: 260px of nothing
+                under a three-line card). With the cards at their own heights and the strip at the
+                reader's card's, the deck is exactly as tall as what it shows — and the cards it is not
+                showing keep their own heights, so paging to one grows the deck to it. The height is
+                animated on the fold's own curve so the growth is seen rather than jumped.
+
+                THE PRICE, MEASURED AND DELIBERATE: a card that is taller than the reader's and fully in
+                view beside it is cut at the strip's edge (2026-09-25: on the dispatch arc at 1440, a
+                1680px neighbour of a 1002px reader showed 288px of its own width and was cut by 678px).
+                The alternative — the strip wearing the tallest card IN VIEW — was rejected: it puts that
+                same 678px of nothing back under the card being read, which is the empty space this whole
+                change exists to remove. Only the shown card is ever whole, and a card is whole the moment
+                it is paged to. A second card's width on a wide screen, or a fade at the cut, would cure
+                it and both are design calls for the operator. */}
             <ol
               ref={stripRef}
               data-arc-strip
               tabIndex={0}
               aria-label={stripLabel}
-              className="scrollbar-hide relative flex min-w-0 snap-x snap-mandatory items-stretch gap-3 overflow-x-auto overflow-y-hidden rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              style={stripHeight === null ? undefined : { height: stripHeight }}
+              className="scrollbar-hide relative flex min-w-0 snap-x snap-mandatory items-start gap-3 overflow-x-auto overflow-y-hidden rounded-lg transition-[height] duration-200 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               onScroll={onScroll}
               onKeyDown={onKeyDown}
               onDragOver={drag?.onDragOver}

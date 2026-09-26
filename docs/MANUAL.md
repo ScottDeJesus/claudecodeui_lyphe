@@ -2584,12 +2584,14 @@ open chat's plans first, with `SessionPin` — where it belongs to no arc. Its p
 the card carries no `defaultOpen` at all, and the face below opens the list itself (operator, 2026-09-25:
 "dispatch v1 cards on the plan runner tab should always show phases like the normal runner cards").
 
-**The frame.** `Card` with `data-dispatcher-card`, `data-plan-name` and `data-plan-status` on the ROOT (a
+**The frame.** `Card` with `data-dispatcher-card`, `data-plan-name`, `data-plan-status` and `data-collapsed` on the ROOT (a
 probe scopes every reading and every press to ONE plan — the live plan walking beside it must never be
 pressed); `CardTitle` mono = `plan.v3`; the goal's FIRST non-empty line, clamped to three lines; then the
 PILL — a static `Chip size="sm"` reading `dispatcher.pill` (`dispatch v1`), wrapped in a
 `span[data-dispatcher-pill]` because the house `Chip` forwards no data attributes — then `PlanStatusBadge`
-and `PlanClock`. Body `PlanFace`, footer `PlanControls`. Props `{ plan, waitsOn?, onDismiss? }` — NO `defaultOpen`, unlike `RunCard`.
+and `PlanClock`. Body `PlanFace`, footer `PlanControls`, both inside one `CardFoldBody`. Props `{ plan, waitsOn?, onDismiss? }` — NO `defaultOpen`, unlike `RunCard`.
+
+**The card folds** like a run card (§"The card fold" of the plan-runner section): a `CardFoldToggle` at the header row's end, key `plan:<plan name>` — the plan's own name, not the ending `{v3:<name>, completed_at}` the dismissal list keys on, so a plan cut and walked again is still folded. Folded, the header keeps the title, the goal, the pill, the status, the clock and `waits on`; the face and the controls go, out of the tab order with them.
 
 **The status words.** `dispatcher.status.*` — `LIVE`, `PAUSED`, `QUEUED`, `SCHEDULED`, `PARKED`, `IDLE`,
 `COMPLETE` — toned by `planStatusTone` (`live`, `complete` positive; the rest neutral: every other status
@@ -6579,7 +6581,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/architecture/MANUAL.md
 section: plan-runner/015 Consumers/017 The runner card
 
 `RunCard` is the lane's first screen: one plan-runner run, whole. It is the FRAME only — the `Card`
-shell, the plan's file name and its H1. The run's own display is four pieces: `RunStateBadge` and
+shell, the plan's file name and its H1, and the card's own fold (§"The card fold"). The run's own display is four pieces: `RunStateBadge` and
 `RunClock` (`RunFace.tsx`, the card's header), `RunFace` (`RunFace.tsx`, the body) and `RunControls`
 (`RunControls.tsx`, the footer). `ArcCard` draws the same pieces for the run its plan card owns, so one
 run reads one way in a run list and inside an arc. The runner card has two homes —
@@ -6619,7 +6621,7 @@ where a paused run can wait.
 `Card` / `CardHeader` / `CardTitle` / `CardContent` / `CardFooter` for the shell, `Badge` for the
 run and phase states, `Meter` for shipped-of-total with spawns and spend beneath it, `Chip` +
 `Shimmer` for the stage strip (`PipelineStrip`), `Collapsible` + `CollapsibleTrigger` +
-`CollapsibleContent` twice — once around the phase list, once inside each `PhaseRow` around its
+`CollapsibleContent` three times — the card's own fold (`CardFoldToggle` + `CardFoldBody`), once around the phase list, once inside each `PhaseRow` around its
 timeline — `Banner` + `Spinner` for the repair strip (`RepairBanner`: the replan or unblock outing on a
 blocked phase, or the heal item a spent ladder filed (`by`), read off `progress.json.repair` —
 repairing with its step and clock while its process lives (the run's for a replan or an unblock, the
@@ -6643,6 +6645,14 @@ through the token blocks, so no file under `src/modules/plan-runner/` spells a c
 also carries a WORD (`LIVE`, `running`) and a GLYPH — `PHASE_GLYPH`, the runner's own five from
 `PLAN_FORMAT_V2.md` §8: ✅ shipped, ▶ running, ⛔ blocked, ≡ deferred, `·` pending — so the card is
 readable in a screenshot and by somebody who cannot tell the tones apart.
+
+**The card folds** (§"The card fold"). `RunCard` wraps its header and one `CardFoldBody` in a `Collapsible` driven by
+`useCardFold(runFoldKey(run.run_id))`; `data-collapsed` rides the root beside `data-runner-card`, `data-run-id` and
+`data-run-state`. Folded, the header keeps the plan file name, the H1, the state badge and the clock; the meter, the strip,
+the phases and the footer's verbs go, out of the tab order with them. A run with a blocked phase wears `⛔ blocked` in the
+FOLDED header only: open, the mark rides the phase list, and drawing it in both states would put it on the card twice. The fold
+is of the run and not of one ending, so a resumed run returns folded. `defaultOpen` is a different thing one level in — whether
+the PHASE LIST starts unfolded — and the fold does not touch it.
 
 A card is rendered with `key={run.run_id}`, which is load-bearing rather than a lint habit: the run
 in a given slot changes when one ends or a newer one starts, `defaultOpen` is read once by
@@ -6811,6 +6821,64 @@ The tab that mounts it is the next section.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/MANUAL.md, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/ChatInterface.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/composer/ActivityIndicator.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/plan-runner/RunCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/plan-runner/RunControls.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/plan-runner/RunFace.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/plan-runner/RunModelControl.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/plan-runner/ScheduleControl.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/runner-tab/RunnerWidgetBody.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useElapsed.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/utils.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-runner-model-pin.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-runner-schedule.mjs
 
+## MAN-5412 — The card fold
+section: plan-runner/015 Consumers/017 The runner card/017 The card fold
+
+The outer fold of a lane card: the header stays, the whole body goes. Four kinds fold: the run card (`RunCard`), the v3 plan card (`PlanCard`), the runner's arc deck and the dispatcher's arc deck (both drawn by `DeckFrame`). Inner disclosures (a run's phase list, a plan's event log) are separate and untouched.
+
+Operator, 2026-09-25: "please add a collapse button for plans and dispatchv1 plans and arcs that can collapse the runs inside the widget and run tab".
+
+## the sign, the button, the slot — `src/shared/ui/CardFold.tsx`
+
+| export | what it is |
+| --- | --- |
+| `FoldChevron` | the glyph alone; `aria-hidden`, sized in `em`, turns instead of swapping icons. `ShapeFrame` draws it too: one sign for every fold in the app |
+| `CardFoldToggle` | the header's button: `data-card-fold`, label `runner.collapse` / `runner.expand`, `aria-expanded` from the `Collapsible` around it. 40px target below `sm`, 28px from `sm` up. Drawn INSIDE a `Collapsible` |
+| `CardFoldBody` | the body slot: `CollapsibleContent` plus `inert` + `aria-hidden` while closed |
+
+Wiring on every card: `Collapsible open={!collapsed} onOpenChange={toggle}` around the header and a `CardFoldBody`; `data-collapsed="true|false"` on the ROOT.
+
+- `CardFoldBody`, never raw `CollapsibleContent`. why: a clip leaves folded verbs in the tab order and the a11y tree. 2026-09-25: 11 focusable controls in a 0px slot on a folded run card; 188 on a folded dispatch arc.
+- `inert` rides a typed spread with the value `''`. why: React 18's JSX types lack it; presence is the signal, `inert="false"` is still inert.
+- `CollapsibleContent` is a grid (`grid-rows-[0fr]` over `overflow-hidden`): spacing lives on a wrapper INSIDE the slot, never on the slot. why: a gap put on the slot silently goes.
+- The body stays mounted and animates; read a fold as a painted height (INV-4354).
+- The `runner.collapse` / `runner.expand` labels exist in all 11 locales.
+
+## per card
+
+| card | key | header keeps | body goes |
+| --- | --- | --- | --- |
+| `RunCard` | `run:<run_id>` | plan file name, H1, state badge, clock; a `⛔ blocked` badge drawn in the header WHILE FOLDED ONLY | meter, strip, lanes, phases, footer verbs |
+| `PlanCard` | `plan:<plan name>` | title, goal, `dispatch v1` pill, status, clock, `waits on` | face, controls |
+| runner arc deck | `arc:<arc name>` | see §"The arc deck" | see §"The arc deck" |
+| dispatch arc deck | `darc:<arc name>` | see §"The v3 plan card" → "The fold takes the strip AND the verbs" | same |
+
+A dispatch arc's body holds its plan cards, so a fold can hold a fold.
+
+## the store — `src/shared/hooks/useCardFold.ts`
+
+- `useCardFold(key)` → `{ collapsed, toggle }` over `useSyncExternalStore` on the preference mirror: first paint is already folded, and the tab and the gutter widget read one memory.
+- Storage: `planRunner.collapsedCards`, a string list in the server-synced user preferences, MERGED into the blob so `dismissedEndings` survives (MAN-498).
+- ABSENT MEANS EXPANDED. Nothing folds a card by itself; the list holds only folded cards.
+- Key builders `runFoldKey`, `planFoldKey`, `runnerArcFoldKey`, `dispatchArcFoldKey` are the only spelling of the prefixes. why: a run id and an arc name are free-form; a prefix cannot collide.
+- A fold belongs to the CARD, never to one ending. `plan-runner resume` reopens a run in place and a plan can be walked again, so the card returns still folded. This departs from `dismissedRuns.ts`, which keys on `{run_id, ended_at}`.
+- Cap 200, oldest dropped; a dropped entry shows an open card.
+- Prune: `useLaneFoldPrune(runs, plans, arcs, dispatchArcs)` (`src/modules/runner-tab/hooks/useLaneFoldPrune.ts`) is called by `RunnerPanel` and `RunnerWidgetBody` with the four DRAWN lists (a dismissed run or plan is not in them). `pruneCardFolds(live)` keeps a key in `live` and any key whose space (`run`, `plan`, `arc`, `darc`) the caller sees not at all, so an empty bus frame prunes nothing. It writes nothing when nothing drops.
+
+## proving it — `.verify/probe-card-fold.mjs`
+
+`node .verify/probe-card-fold.mjs [--url http://127.0.0.1:5183] [--only <substring of home-width-theme>]`
+
+- Six passes: tab 1440 and 390, gutter 1920, each light and dark.
+- Per card: pressing `[data-card-fold]` takes the body to 0px and keeps the header (same title, same height); `data-collapsed="true"`; `aria-expanded="false"`; the slot still holds its nodes; `inert` and `aria-hidden` present while closed and absent when open; a blocked run's folded header wears `⛔ blocked`; a reload keeps the fold; the gutter's context starts with EMPTY storage and still finds every card folded, so the store is the only carrier.
+- Cards: two fixture runs (one ended with blocked phases), the crafted fixture arc deck (`.verify/lib/arc-fixture.mjs`), one dispatch arc with one member plan loaded into the live store. All created before the walk, removed in `finally`.
+- No verb is pressed and no model is called. `planRunner` is read first and put back with `collapsedCards` removed or restored, so the dismissals survive.
+- The walk order is the nesting's: containers open first and fold last. why: a plan card pressed inside a folded dispatch arc runs 30s into `locator.click: Timeout`, `<div data-collapsed="true" data-dispatch-arc="true"> intercepts pointer events`.
+- Console gate: zero errors expected. It tolerates a `Failed to fetch` only while every error has that shape AND the browser reported `net::ERR_ABORTED`; it prints both counts and fails on anything else (a React error, a failed fold PATCH).
+- 2026-09-25: `[PASS]`, 6 passes, 5 card kinds, every folded slot body 0, `inert` true, `aria-hidden` true; folded header heights: run 101px, blocked run 101px, plan 78px, arc deck 49px, dispatch arc 69px; 0 console errors; 19 operator cards untouched; 24 screenshots.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/runner-tab/hooks/useLaneFoldPrune.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useCardFold.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/CardFold.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-card-fold.mjs
+
 ## MAN-642 — The Runner tab
 section: plan-runner/015 Consumers/018 The Runner tab
 
@@ -6825,6 +6893,7 @@ import each other (`import/no-cycle`). It reads `useRunnerRuns`, `useDispatcherP
 (whether the gallery above the runs has anything to draw) and `useArcRunIds` (which runs that gallery
 already draws) and nothing else — no fetch on mount, no state of its own — so selecting the tab paints on the FIRST
 render with whatever the bus was already holding rather than blanking until the runner next moves.
+Every card it draws folds (§"The card fold"), and it hands the four lists it drew to `useLaneFoldPrune`, so a card that leaves the lane takes its remembered fold with it.
 
 **The gate rule is the memory tab's, and the Runner tab is the second tab to take it.**
 `useWorkspaceTabGates` computes
@@ -6886,7 +6955,7 @@ open chat's); inside an arc, a plan's row is `li[data-dispatch-plan-row]` with t
 the pin on the ROW, so "this chat opened that plan" reads the same at either depth; a run's is
 `runner-widget-run`. The
 widget's `EmptyState` shows only when there is no run, no plan, no runner arc and no v3 arc. The widget's badge in
-`ChatGutterLayout` counts runs, plans and unfinished arcs.
+`ChatGutterLayout` counts runs, plans and unfinished arcs. It calls `useLaneFoldPrune` with the same four lists as the tab, and its cards fold on the same memory: a fold pressed in one home is folded in the other.
 
 **The palette.** `CommandPalette`'s `NAV_TABS` carries a `Go to Runner` row, and the Navigate group
 filters that static list through `visibleTabs` — which `ProjectCommandPalette` builds from the same
@@ -6934,7 +7003,7 @@ deck is closed, its body slot carries `inert` and `aria-hidden` and the browser 
 which on a dispatch arc is thirteen plans and 188 controls behind a 0px clip (measured 2026-09-25). A
 folded deck keeps its header — the name, the word, the spend, the count — and loses its whole body, verbs
 included: a lane's own row of controls rides `bodyTop`, the model switch and Start/Stop being VERBS, the
-same layer a run card's footer folds and a plan card's own controls fold.
+same layer a run card's footer folds and a plan card's own controls fold. Its memory is the card fold's (§"The card fold"): `useCardFold` with key `arc:<arc name>` for a runner arc and `darc:<arc name>` for a dispatch arc, so a fold survives a reload and is shared by the tab and the gutter.
 
 **The header.** The arc's title and its status badge, then — while the arc is not complete — the
 arc's ONE model word in the same `RunModelControl` the run card uses (`data-arc-model` on the group,
@@ -6963,11 +7032,25 @@ Each card carries `data-arc-layer` (`done|top|beneath` — `top` is the live car
 the word is the harness's handle); a `done` card wears `opacity-60` — the tone still says `complete`
 and the dimness says "behind you", so no sixth colour is invented for it. Every card on the tab is 18rem wide
 (never wider than the strip, so a phone shows one card with its neighbours peeking; the gutter's
-cards are the strip's own width, per "The gallery") and the row
-stretches every card to the tallest, so the strip never jumps as it scrolls. The strip moves three
+cards are the strip's own width, per "The gallery") and as tall as its OWN content — never
+as tall as its neighbour: the cards stand at the top of the row (`items-start`) and the
+STRIP'S OWN HEIGHT is the card the reader is on, measured in
+`useDeckStrip` and written on the strip as an inline height, so the deck grows and shrinks as
+it is paged, swiped or keyed past. Nothing on a card is fixed — no `h-full` on `ArcCard` —
+and a card taller than the one shown is clipped by the strip's `overflow-y-hidden`: the page keeps
+its wheel, and `useDeckStrip` pins the strip's own vertical offset at 0 wherever it reads a scroll,
+so the box's range cannot be reached by a focus move either (measured 2026-09-25: before the pin,
+one Tab from the focused strip took `scrollTop` to 16 and cut the shown card's top by the same).
+THE PRICE OF THE RULE is measured and deliberate: a card taller than the reader's that is fully in
+view beside it is cut at the strip's edge (2026-09-25, the dispatch deck at 1440 — a 1680px
+neighbour of a 1002px reader: its whole 288px width, cut by 678px). The alternative, the strip
+wearing the tallest card IN VIEW, was rejected for a measured reason — it puts that same 678px of
+nothing back under the card being read, which is the empty space this rule exists to remove. Operator, 2026-09-25: "plan/arc
+cards should not have so much empty space, it should be dynamically adjusting" — measured on
+the docstore deck the same day: a three-line card painted 398px with 260px of nothing beneath
+it, 140px after. The strip moves three
 ways: a swipe or a trackpad through CSS scroll snap (`snap-x snap-mandatory`, each card
-`snap-center`; the native scrollbar hidden by the app's `scrollbar-hide`; `overflow-y-hidden`, so
-the strip never becomes a vertical scroller that takes the page's wheel), the arrow buttons at both
+`snap-center`; the native scrollbar hidden by the app's `scrollbar-hide`; `overflow-y-hidden`, so the page keeps its wheel), the arrow buttons at both
 ends of the nav row (`data-arc-prev` / `data-arc-next`, one card each, disabled at their end), and
 Left/Right on the focused strip. The nav row reads "Card N of M · D of M done" — N is the card whose
 centre is nearest the strip's centre, or the end card once the strip is scrolled to that end. A
@@ -6976,7 +7059,9 @@ one-card deck shows no arrows. **The scroll-into-view rule** (`hooks/useDeckStri
 runner moves `arc.current` (smooth, so a hand-over is seen to happen); a poll that changes nothing
 else never moves the strip, a strip mounted while its tab is hidden is centred the moment it gets a
 width, and a width change keeps the card the reader was on centred. Centring scrolls the strip only,
-never the page.
+never the page. The same hook reads the deck's height off the card the reader is on
+(`stripHeight`), re-read on every scroll and whenever any card resizes, so a phase row landing is a
+deck that grows.
 
 **The face.** `ArcCard.tsx` (`data-arc-card="<position>"`, `data-arc-card-state`, both on the CARD's own root and never on the frame's item, where a probe has always read them) draws the card's
 number, title, state badge, charter and phases: the number is a `Chip` (`runner.arcCard`,
@@ -7003,7 +7088,8 @@ card whose run is on the lane does not draw this list: the run's own LIVE rows (
 on the card") carry the real state and stand in its place, so one plan's phases are never listed twice
 inside one card — until that run has composed any phases, when this list stands in. A plan not written yet (`[]`) draws
 one muted line, `runner.arcNoPhases` (`data-arc-no-phases`). Past eight rows the rest folds behind a
-`Collapsible` "+N more", so a long plan does not tower over its neighbours. It is not `PhaseRow`:
+`Collapsible` "+N more", so one long plan never draws every row it has — a cap that once bounded a
+height every card shared, and that bounds its own card's now that they stand at their own heights. It is not `PhaseRow`:
 that row discloses a run's timeline, which a card without a run does not have.
 
 **The feed.** `ArcFeed.tsx` is `RunnerFeed`'s twin and the only place in the client that names the
@@ -7136,7 +7222,7 @@ card's own fallback rule (§"The runner card" above).
 the RAW response, like the two run verbs above: a 409 carries the runner's own refusal sentence
 whole.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/plan-runner/arc-state.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/plan-runner/ArcCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/plan-runner/ArcDeck.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/plan-runner/ArcGallery.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/plan-runner/arcState.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/plan-runner/DeckFrame.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/plan-runner/hooks/useArcRunIds.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/plan-runner/SessionPin.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/plan-runner/arc-state.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/plan-runner/ArcCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/plan-runner/ArcDeck.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/plan-runner/ArcGallery.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/plan-runner/arcState.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/plan-runner/DeckFrame.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/plan-runner/hooks/useArcRunIds.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/plan-runner/hooks/useDeckStrip.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/plan-runner/SessionPin.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts
 
 ## MAN-644 — Proving it
 section: plan-runner/020 Proving it
@@ -7180,17 +7266,31 @@ The operator's own runs are read by every gate and NEVER named in a request — 
 executed while the probe runs is one of them, and a verb sent to it would stop the run that is
 running the probe.
 
-The arc deck's own six probes, each printing exactly one final line:
+The arc deck's own seven probes, each printing exactly one final line:
 
 - `node .verify/probe-arc-deck.mjs` → `ARC DECK PASS walks=4 gutter=2 reorder=ok shots=6` — the strip at a
   desktop and a phone viewport, light and dark: position order, layers, the live card scrolled into
   view, one right-arrow step, each card's phase rows (one list folded past eight; card 2's ten shipped
   and eight ⛔), the stalled card's `stalled` badge beside `10 of 18 · 8 blocked` and the landed card's
-  missing count line, one height, no vertical scroll in the strip (a wheel over it moves the page),
+  missing count line, the cards at their own heights, and a wheel over the strip moves the page while its `scrollTop` stays 0,
   the same deck in the chat gutter's Runner widget in both themes (`lib/arc-gutter-walk.mjs`; the
   widget's badge equals its listed rows + the runs drawn on arc cards + the unfinished decks — a complete deck
   is drawn, never counted), and a drag of card 4 onto card 3
   written into the arc file by the runner. Its six shots land in `.verify/artifacts/`.
+- `node .verify/probe-deck-height.mjs [--only tab-1440] [--url <client>]` → `DECK HEIGHT PASS — <n> check(s),
+  every card its own height, no dead space.` — the deck is as tall as the card it shows, on the operator's OWN
+  lane (no fixture written): the Runner tab at 1440×900 and 390×844 and the chat gutter's Runner widget at
+  1920×1080, each in light and dark (`--only` takes a substring of `<home>-<width>`). Asserted per pass: the
+  strip's inner height equals the shown item's box within 1px on the deck's shortest card and its tallest;
+  the shown card's box equals its content plus padding (a runner arc card, a dispatch arc's plan card, a plan
+  card outside every arc); paging shortest → tallest grows the deck and paging back returns the same number;
+  the strip's centring stays within 2px after every page; ArrowRight moves one card and a wheel settles on a
+  card; the fold closes to a 0px, `inert`, `aria-hidden` body and reopens to the same geometry in both homes;
+  every console error is explained by the URL of a refusal the browser reported or by an abandonment it
+  recorded (INV-4410). The before readings are the old rule (`align-items: stretch` on the strip,
+  `height: 100%` on the card) injected as a stylesheet into the live page and dropped again. The widget has no
+  390px home: the gutters need a 1500px chat region. The `planRunner` preference the fold writes is read first
+  and put back in a `finally`. Shots in `.verify/shots/deck-height-*.png`.
 - `node .verify/probe-arc-fill.mjs` → `ARC FILL PASS deck=fixture-arc reorder=ok shots=2` — a drop
   reordering a fixture deck through the runner.
 - `node .verify/probe-arc-run-merge.mjs [--before <client url>]` → `ARC RUN MERGE PASS walks=<n>
@@ -7233,7 +7333,7 @@ The arc deck's own six probes, each printing exactly one final line:
   receipt=complete handover=<s>s pressed-by=<landing-door|watchdog> shots=2` — the live two-card arc
   under the real runner, driving `probe-arc-stack.mjs`.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/MANUAL.md, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/arc-gutter-walk.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/arc-stuck-fixture.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/ntfy/arc-refused-probe.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-23.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-24.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-25.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-26.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-27.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-arc-deck.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-arc-fill.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-arc-run-merge.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-arc-stuck.mjs, /home/lyphe/.claude/scripts/runner_fixtures/arc_proof.sh, /home/lyphe/.claude/scripts/runner_fixtures/arc_refused.sh
+governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/MANUAL.md, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/arc-gutter-walk.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/arc-stuck-fixture.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/ntfy/arc-refused-probe.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-23.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-24.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-25.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-26.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-27.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-arc-deck.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-arc-fill.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-arc-run-merge.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-arc-stuck.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-deck-height.mjs, /home/lyphe/.claude/scripts/runner_fixtures/arc_proof.sh, /home/lyphe/.claude/scripts/runner_fixtures/arc_refused.sh
 
 ## MAN-1497 — The park-at-peak switch — the dispatcher's flag, and the kick after a flip
 section: plan-runner/021 The park-at-peak switch — the dispatcher's flag, and the kick after a flip
