@@ -876,7 +876,7 @@ Every word the switcher draws comes from the `applications` block of
 of its own — the block is where these keys belong — and a key missing from a non-English locale
 falls back to English without a word, which is what makes a skipped translation easy to miss.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/overlayEscape.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/verve/MANUAL.md
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/overlayEscape.ts
 
 ## MAN-488 — The panes, and the layer
 section: applications/010 The panes, and the layer
@@ -1056,8 +1056,6 @@ something untrue about who did what — which model answered, or who let a tool 
 the file that enforces it; that file's header carries the reasoning and this note does not repeat it.
 Proving any of it on the running app is [docs/MANUAL.md (verification)](MANUAL.md).
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/MANUAL.md
-
 ## MAN-494 — 1. The model is recorded per turn, on every part of it
 section: chat-contracts/001 1. The model is recorded per turn, on every part of it
 
@@ -1183,8 +1181,6 @@ keep the raw source they have always had, with no header and no card over it. Th
 is a FUNCTION passed in rather than a wrapper drawn around `WidgetFrame` — it is applied from
 behind that component's mount and streaming gates, which is the only place that knows whether a
 live frame exists at all.
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/architecture/MANUAL.md
 
 ## MAN-501 — The CLI version report
 section: cli-version/000
@@ -2035,8 +2031,6 @@ section: design-login/003 Rules
 7. A parked design pty lives `PTY_SESSION_TIMEOUT` (30 min). Another `Authenticate` press reattaches
    to the pending authorization; it does not mint a second.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/architecture/MANUAL.md
-
 ## MAN-1365 — Proving it
 section: design-login/004 Proving it
 
@@ -2099,7 +2093,7 @@ The launcher is a separate program — `~/.claude/hooks/plan_runner/solo/`, reac
 byte under that root: a launch needs a brief, a shim and a role gate, which is a conductor's act and
 not a button's.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/architecture/MANUAL.md, /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/usePinnedSubagentRows.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/subagents/SubagentWidgetBody.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/PinnedSubagents.tsx
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/usePinnedSubagentRows.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/subagents/SubagentWidgetBody.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/PinnedSubagents.tsx
 
 ## MAN-524 — What a pin is, and why it takes two halves
 section: dispatch-souls/001 What a pin is, and why it takes two halves
@@ -2285,8 +2279,6 @@ key: the switch's controls write the flag ([docs/MANUAL.md (plan-runner)](MANUAL
 the account readout asks the vendor ([docs/MANUAL.md (deepseek-balance)](MANUAL.md)), and the pin simply
 paints the mark of the endpoint that was billed.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/MANUAL.md
-
 ## MAN-532 — The windows
 section: dispatch-souls/009 The windows
 
@@ -2401,7 +2393,7 @@ read fills it, and re-fills it on `websocket_reconnected`, since frames missed d
 never re-sent. A seed never overwrites a reading NEWER than itself — a request in flight while a
 frame arrives would otherwise land after it and put the older picture back on screen.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/architecture/MANUAL.md, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/SoulLaunchPinRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatch-souls/SoulLaunchFeed.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/live-bus/topics.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useElapsed.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/SoulLaunchPinRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatch-souls/SoulLaunchFeed.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/live-bus/topics.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useElapsed.ts
 
 ## MAN-536 — Known residuals
 section: dispatch-souls/013 Known residuals
@@ -2417,8 +2409,6 @@ section: dispatch-souls/013 Known residuals
   until an unrelated repaint, up to four hours past its window — this is the smaller of the two.
 - **Nothing in `all.mjs` measures the pin.** See [docs/MANUAL.md (verification)](MANUAL.md) §"What bites
   people".
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/MANUAL.md
 
 ## MAN-537 — Proving it
 section: dispatch-souls/014 Proving it
@@ -2460,7 +2450,7 @@ section: dispatch-souls/015 Cross-references
   `/heal`'s own `Skill` call by `~/.claude/hooks/skill_router.py` when the switch reads
   `on`) — the door for ONE hand-launched soul.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/architecture/MANUAL.md, /home/lyphe/.claude/claudecodeui_lyphe/docs/MANUAL.md, /home/lyphe/.claude/hooks/skill_router.py, /home/lyphe/.claude/skills/heal/sections/deepseek.md
+governs: /home/lyphe/.claude/hooks/skill_router.py, /home/lyphe/.claude/skills/heal/sections/deepseek.md
 
 ## MAN-1498 — The v3 dispatcher lane
 section: dispatcher/000
@@ -2502,7 +2492,10 @@ and events, and `launched`, the one fact its own card words its button off (Resu
 plan that has walked, Start at 3:00 AM for one that has not); `dispatcher-arc.reader.ts` reads one arc
 (its own words and status, its model word, the NAMES of its plans — never resolved into plan rows, the
 store's report already made that join and a second one would be a second answer — and the three
-readings the arc's header is drawn by: `walking`, `stopped`, `schedule`); the transport file holds the
+readings the arc's header is drawn by: `walking`, `stopped`, `schedule`); `dispatcher-planner.reader.ts`
+reads one planner OUTING — the row the card's and the deck header's badge is drawn from, `plannerOf`, and
+the two TOLERANT reads `plannerSince` / `plannersOf` for `planner` and `planners`, because those are keys
+a dispatcher build older than them never wrote; the transport file holds the
 vocabulary — and a field this build cannot read is refused BY NAME. AN ABSENT KEY IS NOT A MALFORMED
 ONE: the values read through the transport's `…Since` readers (a count, a text, a flag) take the
 shape's own empty when the key is missing, so a frame from a dispatcher build that predates a field
@@ -2517,6 +2510,15 @@ with it (`arcsOnLane`): a header standing over nothing is the one shape no later
 clear. An arc's plans live on the same urgency-ordered list as every other plan (the header is not a
 grouping), so the drop is asked against the names the LANE kept, and the client joins `plan.arc`
 against the same list from the other side.
+
+**`planners` IS THE ONE LIST NONE OF THE THREE ACTS TOUCHES.** The document's planner outings travel
+whole, read straight off `document.planners` into the picture, because the row a reader most needs is the
+one the rest of the frame CANNOT explain: `dispatcher design <arc>.v3 --arc` writes an outing for a name
+the store holds no arc for yet, so an arc being designed is a row naming a plan and an arc no card and no
+deck on the lane answers to — and filtering it here would hide the only thing that says a soul is out on
+the arc the operator has just asked for. The outings a card and a deck DO answer to are the store's own
+pick, `report_planners.of_plan` / `of_arc`, read into `plan.planner` and `arc.planner`, so the badge and
+the store's text face can never name two different outings.
 
 **The verbs.** `POST /plans/:name/stop|resume|park|unpark` (no body), `POST /plans/:name/model
 { model }` and `POST /plans/:name/schedule { when }`, where `when` is checked by
@@ -2588,8 +2590,9 @@ the card carries no `defaultOpen` at all, and the face below opens the list itse
 probe scopes every reading and every press to ONE plan — the live plan walking beside it must never be
 pressed); `CardTitle` mono = `plan.v3`; the goal's FIRST non-empty line, clamped to three lines; then the
 PILL — a static `Chip size="sm"` reading `dispatcher.pill` (`dispatch v1`), wrapped in a
-`span[data-dispatcher-pill]` because the house `Chip` forwards no data attributes — then `PlanStatusBadge`
-and `PlanClock`. Body `PlanFace`, footer `PlanControls`, both inside one `CardFoldBody`. Props `{ plan, waitsOn?, onDismiss? }` — NO `defaultOpen`, unlike `RunCard`.
+`span[data-dispatcher-pill]` because the house `Chip` forwards no data attributes — then `PlanStatusBadge`,
+`PlanClock`, and — where the document gives the plan an outing — `PlannerBadge` (§"Who is out on this
+plan" below). Body `PlanFace`, footer `PlanControls`, both inside one `CardFoldBody`. Props `{ plan, waitsOn?, onDismiss? }` — NO `defaultOpen`, unlike `RunCard`.
 
 **The card folds** like a run card (§"The card fold" of the plan-runner section): a `CardFoldToggle` at the header row's end, key `plan:<plan name>` — the plan's own name, not the ending `{v3:<name>, completed_at}` the dismissal list keys on, so a plan cut and walked again is still folded. Folded, the header keeps the title, the goal, the pill, the status, the clock and `waits on`; the face and the controls go, out of the tab order with them.
 
@@ -2599,6 +2602,36 @@ is one the operator chose or is waiting on). `PlanClock`: live → elapsed since
 `relaunched` event; complete → `ended <elapsed> ago` off `completed_at`, re-read once a minute; scheduled
 → `starts <time>` (`runner.schedule.starts`, `scheduleClock` of the armed hour); queued, paused, parked
 and idle → nothing.
+
+**Who is out on this plan.** `PlannerBadge` (`PlannerBadge.tsx`) draws the plan's own outing — the
+document's `plan.planner`, which is `report_planners.of_plan`'s pick, its own newest live row else its
+arc's — as ONE line of the shared `Badge`, the shape `PlanStatusBadge` draws the plan's word in:
+`<soul> · <work> · <model> · <elapsed>`. The soul is named from the locale by the store's own id
+(`Eupalinos v3`, `Odysseus v3`) and falls back to the ID ITSELF for a soul this build has not heard of —
+a soul nobody has translated is still a soul to name. The lookup is an
+OWN-property one (`soulKeyOf`), read with the house's own `Object.prototype.hasOwnProperty.call` idiom,
+so an id that collides with a member `Object.prototype` carries — `constructor`, `toString`,
+`__proto__` — still falls back to itself instead of handing i18next an OBJECT to draw as
+`[object Object]`. The work is the row's `verb` and `state`:
+`queued` while it waits; while it is out, `designing` for a `design` AND a `tell` (a tell resumes the very
+session a design opened — the same outing continued, so a reader sees the same work being done),
+`judging` for a `judge`, `cutting` for a `cut`. The model is the row's own word (`opus`, `fable` — the
+grant the door booked). The elapsed is `useElapsed` from the stamp that state BEGAN, the store's own:
+`created_at` while queued, `launched_at` while out.
+
+AN ENDED OUTING DRAWS NO CLOCK, and says what became of it instead: `ended short: <outcome>`
+(`dispatcher.planner.endedShort`, `.endedShortCause` with the outcome), the store's OWN spelling of a
+stall — `report_planners.line` prints those words on the text face, so the card and `dispatcher status`
+say it once, the same way. Its tone is `plannerStatusTone`: `warn`, because an ending is the one state
+nobody asked for; `info` for a soul at work; `neutral` for one still queued. Every `ended` entry the
+document carries is one whose work is still SHORT of a plan (`report_planners`), so the word and the tone
+are one reading of one row and nothing here asks the store a second question. Handles: `data-planner-badge`,
+`data-planner-target`, `data-planner-soul`, `data-planner-state`.
+
+THE ARC DECK'S HEADER DRAWS THE SAME BADGE off `arc.planner` (§"The arc's deck"), and the outings that
+name NO plan and NO arc the lane draws — an arc's design before its arc file has loaded — are drawn by
+`LoosePlannerBadges` above the decks in both of this lane's homes (§"The Runner tab" of the plan-runner
+section). Strings: `dispatcher.planner.*` in `src/modules/i18n/locales/en/common.json`.
 
 **The face.** A `Meter` (accent) of done phases over all (`phaseProgress`), its sub-line `<spend> ·
 <rounds> rounds · <route.word>`, `<spend>` being `spendText` (`src/modules/plan-runner/spend.ts`, INV-4299), where A SPEND FIGURE IS DOLLARS **OR** TOKENS, BY WHO WAS USED: `$0.28 DeepSeek` for a plan a paying API billed and NO tokens, `1.2M in · 48k out` for one on the Claude subscription and no `$` at all (never `$0.00`), and both for an aggregate that used the two hands, its token half counting the plan's CLAUDE records ONLY; — the route is the BOX's posture (`deepseek route, swarm on — all at
@@ -2668,10 +2701,17 @@ would be the disagreement this arrangement exists to prevent.
 
 The deck's HEADER is the arc's own top: `<name>.arc` (`data-arc-door`), the arc's derived status as a
 `Badge` (`dispatcher.arcStatus.*`: `designing` and `live` info, `judged` neutral, `complete` positive,
-`empty` warn; the five words are `store.arc_word`'s and `dispatcher-arc.reader.ts` refuses any other BY
-NAME, so no default is invented here), the arc's own spend where it has one (`data-arc-spend`; the plan
+`empty` warn, and the three waiting words — `queued`, `paused`, `scheduled` —
+wearing the PLAN's own tone through `planStatusTone`, the very function the pill on the card under
+them is toned by, so a header cannot argue with its own strip; the eight words are
+`store.arc_word`'s and `dispatcher-arc.reader.ts` refuses any other BY
+NAME, so no default is invented here; standing proof MAN-5419), the arc's own spend where it has one (`data-arc-spend`; the plan
 card's own rule — dollars OR tokens by who was used, nothing at all for a lane that has not spent), the
-goal, and the plan count the deck DREW (`data-arc-plans`; see the count below). Beneath the header the
+ARC's own planner badge where the store gives it one (`arc.planner`, `report_planners.of_arc`; drawn by
+the same `PlannerBadge` on `DeckFrame`'s SUBTITLE slot — the full-width line under the title row, because
+the title row cannot wrap at 390px without crushing the arc's name; the runner lane passes no subtitle,
+so only this lane uses the slot), the goal, and the plan count the deck DREW (`data-arc-plans`; see the
+count below). Beneath the header the
 deck's BODY holds this lane's own first row — `DispatchArcControls`, the model switch and the verb row —
 and then `ol[data-arc-strip]`, ONE HORIZONTAL STRIP in which each plan of the arc is ONE ITEM
 (`li[data-dispatch-plan-row]` with `data-plan-name`, `data-pinned` and `data-arc-layer`, at `DeckItem`'s
@@ -2707,26 +2747,41 @@ the `.v3` every dispatcher verb prints, and a plan's own name is dropped, so a p
 itself would be one bus subscription per card, and it cannot know which plans are its arc's without the
 group it was handed. A plan of no arc passes none and draws no line.
 
-**Its four controls are the plan card's own, applied to the whole arc.** Stop, Resume and
-`Resume at …` — the last two drawn only where `arc.stopped`, Stop only where `arc.walking`, and the
-whole row only when one of the two holds, so the deck never offers a press the dispatcher would refuse
-— plus `RunModelControl` scope `dispatch-arc` drawing the ARC'S OWN word (`arc.model`, never a plan's
-effective one), handles `data-dispatch-arc-model` / `data-dispatch-arc-model-choice`. The three verbs
+**Its four controls are the plan card's own, applied to the whole arc.** Pause, Start and
+`Schedule start` — the last two drawn where `arc.stopped`, Pause where `arc.walking`, and the whole row
+only when one of the two holds, so the deck never offers a press the dispatcher would refuse — plus
+`RunModelControl` scope `dispatch-arc` drawing the ARC'S OWN word (`arc.model`, never a plan's
+effective one), handles `data-dispatch-arc-model` / `data-dispatch-arc-model-choice`. The words are the
+plan card's own wherever the act is the same (`dispatcher.arcPause` for the pause, `runner.start` for
+the Start, because an arc's Start unpauses its plans exactly as one plan's Start does) — and the hour's
+word is the one that is NOT a clock: `dispatcher.arcScheduleStart`, `Schedule start`, because the hour
+it arms is ONE hour over the plans of the arc that are not moving, so the press states what it does
+rather than naming a time half of them are not waiting for. WHICH ARCS DRAW THE ROW IS THE WHOLE OF THE
+OPERATOR'S QUESTION (2026-09-25: "Is it possible to inline a start button on the arc that controls all
+the plans? So start should start all plans, unless it has dependencies. Pause, and schedule start
+buttons please."): an arc whose plans were approved with Queue and never walked reads `stopped` — its
+plans are APPROVED, PAUSED AND UNFINISHED — and draws Start and `Schedule start`. The three verbs
 are `dispatcher stop|resume|schedule <arc>`, which the CLI resolves to the arc's own plans in ONE step
-(`arc_verbs.targets`: the arc's `live` plans for Stop, its STOPPED plans for Resume and for the hour —
-the very sets `arc.walking` / `arc.stopped` report), so the header and a terminal cannot disagree
-about what an arc's press reaches. THE CONTROLS NEVER LOOP OVER THE ARC'S PLANS THEMSELVES: they post the
+(`arc_verbs.targets`: the arc's `live` plans for Pause, its STOPPED ones — `queued` at the gate as
+readily as `paused` mid-walk — for Start and for the hour; the very sets `arc.walking` / `arc.stopped`
+report), so the header and a terminal cannot disagree
+about what an arc's press reaches. STARTING THE ARC WHOLE IS SAFE BECAUSE THE WAITS KEEP THE ORDER:
+`rule.eligible` takes up only a plan whose arc-mates it waits on are complete, so the arc's Start
+unpauses every plan of it and the first one walks while the rest wait their turn — "start all plans,
+unless it has dependencies", exactly as asked. THE CONTROLS NEVER LOOP OVER THE ARC'S PLANS THEMSELVES: they post the
 arc's name and nothing else, and the arc's own hour reads back over the plans — `arc.schedule` is a stamp
 only when every STOPPED plan of the arc carries the same one, which one press of this control always
-makes true — so an hour the header names is an hour the Cancel beside it clears. All four go through `useDispatcherVerbs(name, 'arc')` — ONE hook for both hands, the scope
-deciding which door a press is relayed through. Handles: `data-dispatch-arc-stop`, `data-dispatch-arc-resume`,
+makes true — so an hour the header names is an hour the Cancel beside it clears. All four go through `useDispatcherVerbs(arc.name, 'arc', t('runner.start'))` — ONE hook for both hands, the scope
+deciding which door a press is relayed through; the third argument is the word a refused press of Start is headed
+with (the drawn one, as `PlanControls` passes its own), while a refused Pause and a refused Schedule start are
+headed with the hook's own `word()`: `runner.stop` (`Stop`) and `runner.schedule.refused` (`Schedule`). Handles: `data-dispatch-arc-stop`, `data-dispatch-arc-resume`,
 `data-dispatcher-arc-schedule` (`-set`, `-cancel`, the armed hour as the group's value),
 `data-dispatch-arc-schedule-note`.
 
 **The fold takes the strip AND the verbs, and what it hides is inert.** The deck folds like a run card
 (`useCardFold`, key `darc:<arc name>` — the arc's own name, apart from the runner lane's `arc:` space):
 what stays is the header — which arc this is, its word, its books, and how many plans it holds — and what
-goes is the body row (`DispatchArcControls`: the model switch and Stop/Resume) together with the strip and
+goes is the body row (`DispatchArcControls`: the model switch and Pause/Start) together with the strip and
 its two arrows. The verbs ride `bodyTop` for the runner deck's own reason: they are VERBS, the same layer a
 run card's footer folds and a plan card's own controls fold, and keeping them in the header made a folded
 deck 164px against 86px — a "collapsed" row that had not collapsed (measured on the runner's deck,
@@ -2767,15 +2822,15 @@ and returns as a new card.
 names the `dispatcher_state` frame. Two ways in: the push (every frame, authoritative) and a seed from
 `GET /api/dispatcher/plans` on mount and on each `websocket_reconnected`, which never overwrites a reading
 newer than itself (`held.at >= at`). A frame or body missing `plans`, `route`, `daemon` or a string
-`offpeak_at` is dropped, never half-published; `arcs` is the ONE field read rather than demanded,
-because a frame from a server older than that key is still a whole picture of the plans — an absent
-list draws no arc cards instead of blanking every card the frame did carry, while a key that IS
+`offpeak_at` is dropped, never half-published; `arcs` and `planners` are the TWO fields read rather than demanded,
+because a frame from a server older than either key is still a whole picture of the plans — an absent
+list draws no arc cards, or no planner badges, instead of blanking every card the frame did carry, while a key that IS
 there and is not a list is refused like every other field. The bus topic is `dispatcher:all`
-(`DISPATCHER_ALL_TOPIC`), one payload `{ plans, arcs, route, daemon, offpeak_at }`
+(`DISPATCHER_ALL_TOPIC`), one payload `{ plans, arcs, planners, route, daemon, offpeak_at }`
 (`DispatcherLanePicture`) with the frame's `at` as its clock; no per-plan topic exists. `home` and `generated_at` are left out on purpose: `generated_at` is
 restamped every poll, so republishing the frame whole wakes every reader twice a second (2026-09-24: the four
 keys byte-identical across two reads 4 s apart, zero publishes). `useDispatcherPlans` reads that topic —
-`{ plans, arcs, count, route, daemon, offpeakAt, carriedNames }` — and every piece of the card reads the
+`{ plans, arcs, planners, loosePlanners, count, route, daemon, offpeakAt, carriedNames }` — and every piece of the card reads the
 hook or `dispatcherState.ts`. The document's times are ISO-8601 UTC strings end to end: the server converts
 nothing, and `epochOf` (`Date.parse / 1000`) is the ONE edge where a string becomes the card's seconds.
 
@@ -2798,9 +2853,9 @@ Unpark (`UNPARKED card-probe.v3 — designed`) and Park again, and left parked.
 - exit 0 = a plan press moves that plan alone; an arc press moves both plans, including the one just pressed to a word of its own; every step is confirmed from the next frame and from `GET /api/dispatcher/plans`.
 - the house half of the same proof: `python3 ~/.claude/scripts/runner_fixtures/model_word.py` (MAN-5406).
 
-**Resume, and Resume at 3:00 AM, on a stopped plan and a stopped arc — the standing proof.**
-`node .verify/probe-dispatch-resume-3am.mjs [--url http://127.0.0.1:5183]` (tab at 1440 and 390, on the
-dev client).
+**Resume, and Resume at 3:00 AM, on a stopped plan — Start and Schedule start on a stopped arc — the
+standing proof.** `node .verify/probe-dispatch-resume-3am.mjs [--url http://127.0.0.1:5183]` (tab at
+1440 and 390, on the dev client).
 
 - it loads its own arc `probe-dr3` with plans `probe-dr3--first` and `probe-dr3--second` into the LIVE
   store (`dispatcher load`), designs and plants one phase on each and approves both PAUSED carrying a
@@ -2813,13 +2868,40 @@ dev client).
   reads the armed hour back off the very next frame AND off the store (`schedule.start_at`), sees it
   in the card's own clock (`data-dispatcher-clock`) beside the Cancel, then presses Cancel and sees
   the hour leave the clock; then the same for the arc
-  header, whose press must arm BOTH plans to the arc's ONE stamp (`arcs[].schedule`) and whose Cancel
+  header, which reads Start and `Schedule start` rather than the plan's Resume and `Resume at …`, and
+  whose press must arm BOTH plans to the arc's ONE stamp (`arcs[].schedule`) and whose Cancel
   clears both.
-- exit 0 = a stopped plan and a stopped arc both offer Resume and Resume at 3:00 AM, a press moves the
-  store, and the store is left as it was found — no `probe-dr3` row and no hour armed.
+- exit 0 = a stopped plan offers Resume and Resume at 3:00 AM, a stopped arc offers Start and
+  `Schedule start`, a press moves the store, and the store is left as it was found — no `probe-dr3` row
+  and no hour armed.
 - the house half, on a scratch store: `python3 ~/.claude/scripts/runner_fixtures/dispatch_resume.py`
   (MAN-5411), which also drives the timer's own press (`systemctl --user show … -p ExecStart`, then that
   argv) rather than waiting for the hour.
+
+**An arc's own Start, Pause and Schedule start — the standing proof.**
+`node .verify/probe-dispatch-arc-start.mjs [--url http://127.0.0.1:5183]` (tab at 1440 and 390, both
+themes, on the dev client).
+
+- it loads its own arc `probe-arcstart` with plans `probe-arcstart--fence`, `--first` and `--second`
+  into the LIVE store, its two approved PAUSED with no `launched` event (the state Queue leaves) and
+  each waiting on the one before it, so the arc reads `stopped` over plans reading `queued`; it removes
+  all of it after (`drop` per plan, the store package for the arc row).
+- IT FENCES ITSELF AGAINST A WALK: `--first` waits on the never-approved `--fence` and `--second` on
+  `--first`, so `rule.eligible` answers False for every plan of the arc and the kick this probe's Start
+  sends has nothing of the probe's to take up — asserted through `rule.eligible_plans` BEFORE the first
+  press. The NOTE beside it prints how many plans the rule would take up anywhere in the store, so the
+  operator's own walk is visible in the log rather than assumed.
+- its first reading is taken with the frame's `arcs[].stopped` rewritten to `paused`-or-(`scheduled` and
+  `launched`) plus the lane's socket push dropped for that one page: the row draws NOTHING there, over plans
+  reading `queued`. That is the "before" picture — a rewritten document, not a reverted build.
+- it then asserts the real row draws Start and `Schedule start` and NO Pause, presses Start through the
+  row (the relay's own answer is recorded), reads BOTH plans' `paused` flags off the next frame and
+  off the store — unpaused, with the second still waiting its turn — presses Pause and reads both back
+  at the gate, presses `Schedule start` and reads one stamp on both plans, then Cancel.
+- every reading and every press is scoped under `[data-dispatch-arc][data-arc-name="probe-arcstart"]`,
+  the deck's own rule: the operator's arcs walk beside a probe's and are never pressed.
+- exit 0 = a queued arc's row draws Start, Pause and `Schedule start`, a press of each moves the store,
+  and the store is left as it was found.
 
 **Phases shown — the standing proof.** `node .verify/probe-dispatch-card-phases.mjs` (tab at 1440 and 390, gutter at 1920, on 5184 and 5183).
 
@@ -2837,7 +2919,16 @@ dev client).
 - shots: `shots/arc-nest-<port>-tab.png`, `-tab-tall.png` (one page sized to the lane, so a thirteen-plan deck is photographed whole), `-<arc>-card.png`, `-<arc>-head.png`, `-<arc>-tail.png`, and the gutter's own framed on the deck's top; reading in `artifacts/arc-nest.json`.
 - 2026-09-25 on 5183: the `restorly` deck is one strip of thirteen plan cards in the arc's own order under its own header (1841px — one card's height, captioned “13 plans”), the three plans of no arc (`athena-scenarios`, `dispatcher-refit`, `dispatcher-ready`) stand below it from 3123px, 16 of 16 plans drawn once; folded the deck is 124px (header 86px) and its 188 hidden controls refuse focus; exit 0 in both homes.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/plan-runner/dismissedRuns.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-arc-nest.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dispatch-card-phases.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dispatch-model-word.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dispatch-resume-3am.mjs
+**Who is out on this plan — the standing proof.** `node .verify/probe-planner-card.mjs [--url http://127.0.0.1:5183]` (the tab at 1440 and 390, on the dev client).
+
+- THE FIXTURE IS WRITTEN BY ONE `python3` RUN AND NOT BY THE PROBE: `.verify/probe-planner-card-write.py` opens `probe-planner-card` in the store's opening state (`designing`), queues an `eupalinos-v3` design for it and ends it — `probe: never launched` — inside ONE `with conn:`, so the daemon's planner sweep never observes the row reading `queued` and no Eupalinos child is ever launched to draw a badge. `report_planners` carries that ending because `planners.short_of` still names the plan, so the row rides `plan.planner` as a stalled one.
+- THE REACH IS `probe-dispatch-resume-3am.mjs`'S: the dev account signs in over the client's own `/api/auth/login`, the token is seeded before any app script runs, the project is entered and the Runner tab selected at DESKTOP width (below 768px the tab bar folds and the sidebar is gone), and only then is the viewport narrowed. The capture machinery is `ArchPulse/scripts/cdp_lib.mjs`.
+- exit 0 = the card's badge reads `Eupalinos v3 · ended short: probe: never launched · <model>` in the warning tone at BOTH widths, and the dispatcher's own `dispatcher drop probe-planner-card.v3` takes the card off the pane.
+- every reading is scoped to `[data-dispatcher-card][data-plan-name="probe-planner-card"]`; the other cards on the pane are counted and reported untouched.
+- shots: `shots/probe-planner-card-{desktop,mobile}-{before,after}.png`.
+- 2026-09-26 on 5183: 1440px and 390px both draw `Eupalinos v3 · ended short: probe: never launched · opus`, `data-tone=warn`, ink `rgb(138, 102, 32)` on `rgb(250, 241, 222)`; 18 other cards untouched; after the drop the card is gone at both widths (the tab's count 20 → 19) and no uncaught page error was raised.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/plan-runner/dismissedRuns.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-arc-nest.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dispatch-arc-start.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dispatch-card-phases.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dispatch-model-word.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dispatch-resume-3am.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-planner-card.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-planner-card-write.py
 
 ## MAN-539 — The file manager
 section: file-manager/000
@@ -2848,8 +2939,6 @@ document preview, or the editor. `src/modules/file-manager/` is `DirectoryListin
 `useFileManagerState` holding where it is and `useEditGuard` settling what an open does to an
 unsaved session. The server half — the routes, the refusal table, the no-overwrite rule — is
 [docs/MANUAL.md (files-api)](MANUAL.md).
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/MANUAL.md
 
 ## MAN-540 — The rules that bite
 section: file-manager/001 The rules that bite
@@ -2971,7 +3060,7 @@ section: file-manager/001 The rules that bite
     module's registry (`documentKindFor`, `textRenderingFor`, `documentCapFor`) what a file is, and
     render what `choosePreviewBody` answered (rule 5).
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/architecture/MANUAL.md, /home/lyphe/.claude/claudecodeui_lyphe/docs/MANUAL.md, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/shapes/detect.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/document-preview/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/file-editor/utils/windowPolicy.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/file-manager/utils/previewBody.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/utils.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/shapes/detect.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/document-preview/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/file-editor/utils/windowPolicy.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/file-manager/utils/previewBody.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/utils.ts
 
 ## MAN-541 — Proving it
 section: file-manager/002 Proving it
@@ -2990,7 +3079,7 @@ writes nothing. The document previews and the pane's routing (rules 5 and 10) ar
 for the bundle: no preview library is fetched until a file of its kind opens. See
 [docs/MANUAL.md (verification)](MANUAL.md).
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/MANUAL.md, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-8.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-files-editor.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-files-previews.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-inline.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-lineopen.mjs
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-8.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-files-editor.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-files-previews.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-inline.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-lineopen.mjs
 
 ## MAN-542 — The files API
 section: files-api/000
@@ -3502,7 +3591,7 @@ The clients are the only ports the LAN needs: `vite.config.js` proxies `/api`, `
 application drawer this app serves — `apps.local.json`, git-ignored; the drawer's one
 documentation home is [`docs/MANUAL.md (applications)`](MANUAL.md).
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/deploy/dev-supervisor/supervisor.mjs, /home/lyphe/.claude/claudecodeui_lyphe/deploy/systemd/install.sh, /home/lyphe/.claude/claudecodeui_lyphe/docs/MANUAL.md, /home/lyphe/.claude/claudecodeui_lyphe/scripts/prod-client-build.sh, /home/lyphe/.claude/claudecodeui_lyphe/vite-plugins/compressResponses.js, /home/lyphe/.claude/claudecodeui_lyphe/vite-plugins/precompressedAssets.js
+governs: /home/lyphe/.claude/claudecodeui_lyphe/deploy/dev-supervisor/supervisor.mjs, /home/lyphe/.claude/claudecodeui_lyphe/deploy/systemd/install.sh, /home/lyphe/.claude/claudecodeui_lyphe/scripts/prod-client-build.sh, /home/lyphe/.claude/claudecodeui_lyphe/vite-plugins/compressResponses.js, /home/lyphe/.claude/claudecodeui_lyphe/vite-plugins/precompressedAssets.js
 
 ## MAN-555 — Rules that bite
 section: hosting/002 Rules that bite
@@ -3643,7 +3732,7 @@ section: hosting/002 Rules that bite
   on this host 2026-09-08. Nothing watches this fork's keepalive — `cloudcli-dev-watchdog.sh`
   does not know it — so it stays silently dead until a human restarts it.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/deploy/dev-supervisor/README.md, /home/lyphe/.claude/claudecodeui_lyphe/docs/architecture/MANUAL.md, /home/lyphe/.claude/claudecodeui_lyphe/docs/MANUAL.md, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/session-host/MANUAL.md, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/child-env.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/authToken.ts, /home/lyphe/.claude/claudecodeui_lyphe/vite-plugins/compressResponses.js, /home/lyphe/.claude/claudecodeui_lyphe/vite-plugins/keepPageOnReconnect.js
+governs: /home/lyphe/.claude/claudecodeui_lyphe/deploy/dev-supervisor/README.md, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/child-env.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/authToken.ts, /home/lyphe/.claude/claudecodeui_lyphe/vite-plugins/compressResponses.js, /home/lyphe/.claude/claudecodeui_lyphe/vite-plugins/keepPageOnReconnect.js
 
 ## MAN-558 — Runbook
 section: hosting/003 Runbook
@@ -3712,7 +3801,7 @@ delivered its notification and its second `result` afterwards, and a boot with t
 on disk swept both and left nothing behind. Driven by `.verify/keepalive-cases-p4.mjs`, whose
 per-case contract is in [docs/MANUAL.md (verification)](MANUAL.md) §"The keepalive cases".
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/deploy/systemd/install.sh, /home/lyphe/.claude/claudecodeui_lyphe/docs/MANUAL.md, /home/lyphe/.claude/claudecodeui_lyphe/scripts/prod-client-build.sh, /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/keepalive-cases-p4.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/keepalive-host-case.mjs
+governs: /home/lyphe/.claude/claudecodeui_lyphe/deploy/systemd/install.sh, /home/lyphe/.claude/claudecodeui_lyphe/scripts/prod-client-build.sh, /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/keepalive-cases-p4.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/keepalive-host-case.mjs
 
 ## MAN-559 — The Kanban board
 section: kanban/000
@@ -4032,7 +4121,7 @@ refused claim records nothing.
 `kanban-lessons.service.ts` — `stageLesson`, `listLessons`, `getLesson`, `reviewLesson`,
 `approvedIndex`, §"The lessons lane".
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/MANUAL.md, /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/assets/services/image-assets.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/kanban/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/utils.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/assets/services/image-assets.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/kanban/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/utils.ts
 
 ## MAN-587 — The routes
 section: kanban/006 The routes
@@ -4289,7 +4378,7 @@ instead, in the shape `<title> moved to <lane>, position <n> of <total>`. Only t
 the lane the card left and the lane it landed in, and a toast leaves — and a thing that leaves
 cannot announce.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/MANUAL.md, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/kanban/utils/lanePolicy.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/kanban/utils/lanePolicy.ts
 
 ## MAN-590 — The lessons lane
 section: kanban/009 The lessons lane
@@ -4337,8 +4426,6 @@ calls the two review verbs through the same hook.
 **Reachable from a tool call, as of Phase 7.** The MCP surface's `stage_lesson`, `list_lessons` and
 `get_lesson` are real tools now (§"The kanban-pm MCP surface") — `kanban-pm-tools-lessons.ts` is
 the wiring from a Metis's own tool call to the store and HTTP doors this lane built.
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/MANUAL.md
 
 ## MAN-591 — The driver
 section: kanban/010 The driver
@@ -4439,7 +4526,7 @@ session record carries `sessionId`, `boardId`, `boardName`, `provider` (`'deepse
 `exitCode`; the type lives in `server/shared/types.ts` beside `SoulLaunchSnapshot` and is mirrored
 into `src/shared/types.ts`.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/MANUAL.md, /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/kanban/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/kanban-types.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/hooks/notify_api_error.sh
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/kanban/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/kanban-types.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/hooks/notify_api_error.sh
 
 ## MAN-592 — The token watcher
 section: kanban/011 The token watcher
@@ -4747,7 +4834,7 @@ cleanup retired that marker's only producer, so it is OFF for every session toda
 included (INV-29) — **G5** sends a decision to `post_design_questions` instead of a
 terminal prompt nobody is watching, and **G10** blocks destructive SQL from an unattended session.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/MANUAL.md, /home/lyphe/.claude/hooks/kanban_metis.py
+governs: /home/lyphe/.claude/hooks/kanban_metis.py
 
 ## MAN-597 — The pilot panel
 section: kanban/016 The pilot panel
@@ -4813,7 +4900,7 @@ of its own to draw a sentence. `SubagentTranscriptTarget` still carries the thir
 `useSubagentTranscript` and `SubagentTranscriptView` stay reused rather than copied, and
 `api.subagentTranscripts.metis` remains the one call behind it.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/architecture/MANUAL.md, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts
 
 ## MAN-598 — The two switches
 section: kanban/017 The two switches
@@ -4837,7 +4924,7 @@ board's sessions. The host-wide file, its own reader and writer, and the client 
 it are [docs/MANUAL.md (plan-runner)](MANUAL.md) §"The DeepSeek switch"; the board side of the rule is stated
 here and nowhere else.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/MANUAL.md, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/settings/index.ts, /home/lyphe/.claude/hooks/plan_runner/deepseek.py, /home/lyphe/.claude/state/deepseek_flash.flag
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/settings/index.ts, /home/lyphe/.claude/hooks/plan_runner/deepseek.py, /home/lyphe/.claude/state/deepseek_flash.flag
 
 ## MAN-599 — Proving it
 section: kanban/018 Proving it
@@ -5243,8 +5330,6 @@ it needs the ntfy app subscribed to your topic.
 This page is the one home for the notification system's documentation. How to prove a change to
 it on this box is in [docs/MANUAL.md (verification)](MANUAL.md) §"The ntfy probes".
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/MANUAL.md
-
 ## MAN-612 — Quickstart: your phone, in five minutes
 section: notifications/001 Quickstart: your phone, in five minutes
 
@@ -5277,8 +5362,6 @@ section: notifications/001 Quickstart: your phone, in five minutes
    ```
 
    `{"ok":true,"status":200,"error":null}` and a "CloudCLI test" push on the phone mean it works.
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/MANUAL.md
 
 ## MAN-613 — How an event travels
 section: notifications/002 How an event travels
@@ -5349,7 +5432,7 @@ push — a second push needs events to resume and then stop again. Two runs are 
 run whose session has a tool approval still pending (that silence is the run waiting for you, and
 the approval push already went out), and a run that has ended.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/MANUAL.md, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/services/notification-orchestrator.service.js
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/services/notification-orchestrator.service.js
 
 ## MAN-614 — Where the Claude runtime's error and limit signals come from
 section: notifications/002 How an event travels/003 Where the Claude runtime's error and limit signals come from
@@ -5490,8 +5573,6 @@ memory, so a restart forgets an open one. `runner.blocked`, `runner.arc_stuck` a
 them: each is already once per episode by its lane's own key (the runner's episode key, the dispatcher's event id), and a window that swallowed a SECOND,
 different episode inside the same minute would break that promise.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/MANUAL.md, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/websocket/MANUAL.md
-
 ## MAN-618 — Answering from the phone
 section: notifications/004 The ntfy channel/008 Answering from the phone
 
@@ -5565,7 +5646,7 @@ which would sell an unlimited budget for the price of rotating it. So all caller
 That is safe precisely because of the rule above, and it is why the checks in `.verify/ntfy` hand
 the budget back (one signed token) instead of trying to claim an address of their own.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/architecture/MANUAL.md, /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts
 
 ## MAN-619 — One question, one push
 section: notifications/004 The ntfy channel/009 One question, one push
@@ -5797,7 +5878,7 @@ cadence, a board's own Metis sessions (`kanban-metis/kanban-metis.module.ts`, th
 arc deck lane (`arc-lane.ts`, the `arc_state` frame, reading `~/.claude/state/arcs/`) — a different
 root and a different frame each time, the same loop.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/MANUAL.md, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/polled-lane.service.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/shared/polled-lane.service.ts
 
 ## MAN-626 — The plan-archive sweep
 section: plan-runner/002 The plan-archive sweep
@@ -5962,7 +6043,7 @@ neither is a route into the other: this lane still reads run files and shells ou
 route knows nothing about runs. Where the key lives and who reads it is declared once, in
 `.env.example`.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/MANUAL.md, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/kanban-metis/metis-env.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/settings/deepseek-flash-switch.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/settings/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useDeepSeekFlashSwitch.ts, /home/lyphe/.claude/hooks/plan_runner/deepseek.py, /home/lyphe/.claude/state/deepseek_flash.flag
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/kanban-metis/metis-env.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/settings/deepseek-flash-switch.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/settings/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useDeepSeekFlashSwitch.ts, /home/lyphe/.claude/hooks/plan_runner/deepseek.py, /home/lyphe/.claude/state/deepseek_flash.flag
 
 ## MAN-629 — The swarm switch — the second
 section: plan-runner/005 The swarm switch — the second
@@ -6028,7 +6109,7 @@ and its row carry `data-runner-wave="N"`, which `.verify/probe-phase-wave-mark.m
 the swarm verb on the live heal-reflex run. `progress.txt` adds the same ` · wave N` to the same
 rows.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/settings/swarm-switch.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useSwarmSwitch.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-phase-wave-mark.mjs, /home/lyphe/.claude/hooks/MANUAL.md, /home/lyphe/.claude/hooks/plan_runner/swarm.py, /home/lyphe/.claude/state/swarm.flag
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/settings/swarm-switch.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useSwarmSwitch.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-phase-wave-mark.mjs, /home/lyphe/.claude/hooks/plan_runner/swarm.py, /home/lyphe/.claude/state/swarm.flag
 
 ## MAN-630 — The heal reflex's switches — the third, and the one that stops work
 section: plan-runner/006 The heal reflex's switches — the third, and the one that stops work
@@ -6465,7 +6546,7 @@ anything`. ntfy takes it at priority 4 with the ⚠️ tag, as a blocked run doe
 NOT in `COLLAPSIBLE_CODES`: a window that swallowed a SECOND, different refusal inside the same minute
 would break the once-only promise the episode key keeps.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/MANUAL.md, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/plan-runner/arc-refusals.service.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/plan-runner/arc-refusals.service.ts
 
 ## MAN-638 — The fixture
 section: plan-runner/014 The fixture
@@ -6527,8 +6608,6 @@ break: without the case the frame falls through the switch's `default`, inherits
 session's id and is appended to the open transcript as a message row. It is a box-wide picture, and
 no transcript owns it.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/architecture/MANUAL.md
-
 ## MAN-640 — The feed
 section: plan-runner/015 Consumers/016 The feed
 
@@ -6574,8 +6653,6 @@ stack is still the router. Every further lane arrives as one more `*Feed.tsx` an
 inside `live-bus/` — usually in its own module, though `ArcFeed.tsx` is the exception: the arc deck
 reads the runner's own state directory rather than owning one of its own, so its feed lives beside
 `RunnerFeed.tsx` instead.
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/architecture/MANUAL.md
 
 ## MAN-641 — The runner card
 section: plan-runner/015 Consumers/017 The runner card
@@ -6780,9 +6857,11 @@ within one tick of it. Nothing optimistic; a refusal is the runner's sentence in
 
 ONE CONTROL, FOUR SCOPES. The same component is drawn on this card's footer (`run`), the arc deck's
 header (`arc`), the v3 plan card (`plan`) and the dispatch arc header (`dispatch-arc`), and a scope
-decides exactly two things: the handle prefix and the title. `verb` (`start` | `resume`, default
-`start`) is the third and last: WHICH PLAN VERB THE HOUR WILL SEND, and so what the button is called —
-`Start at …` against `Resume at …` (`runner.schedule.startAt` / `.resumeAt`). It changes the label and
+decides exactly three things: the handle prefix, the title and the button's word. `verb` (`start` | `resume`, default
+`start`) picks the word on the three scopes that state WHEN (`run`, `arc`, `plan`): WHICH PLAN VERB THE HOUR WILL SEND,
+and so what the button is called — `Start at …` against `Resume at …` (`runner.schedule.startAt` / `.resumeAt`).
+The `dispatch-arc` scope ignores it and always reads `Schedule start` (`dispatcher.arcScheduleStart`), because
+its one hour covers a plan at the gate and a plan stopped mid-walk alike. `verb` changes the label and
 nothing else: the timer runs `resume` either way, because that word IS "start walking again", which is
 what a plan still at the gate needs too. On this lane the hour is the watchdog's press
 (`plan-runner due`); on the dispatcher's it is the plan's own one-shot systemd unit (INV-201) —
@@ -6810,16 +6889,17 @@ box's posture (`route.word`), which is what a plan on `auto` walks under; a plan
 `ScheduleControl`'s `plan` scope adds only a handle prefix (`data-dispatcher-schedule`, and its
 `-set` / `-cancel` on the two presses) and a title the `verb` prop picks between —
 `dispatcher.scheduleTitle` for a plan at the gate, `dispatcher.resumeTitle` for one stopped mid-walk;
-`dispatch-arc` adds `data-dispatcher-arc-schedule` and the one title an arc's hour can mean
-(`dispatcher.arcResumeTitle`: every stopped plan of it, one timer each). The button text and
-`useOffpeak` are shared, because `dispatcher offpeak` prints the same hour.
+`dispatch-arc` adds `data-dispatcher-arc-schedule`, the word `Schedule start` and the one title an arc's hour can mean
+(`dispatcher.arcScheduleTitle`: every plan of it that is not moving, at the gate or stopped mid-walk, one timer
+each). The clock in the button text of the other three scopes and `useOffpeak` are shared, because
+`dispatcher offpeak` prints the same hour.
 
 Its strings live under `runner.*`, and the v3 plan card's under `dispatcher.*`, in
 `src/modules/i18n/locales/en/common.json`, English only; every other locale falls back.
 
 The tab that mounts it is the next section.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/MANUAL.md, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/ChatInterface.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/composer/ActivityIndicator.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/plan-runner/RunCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/plan-runner/RunControls.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/plan-runner/RunFace.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/plan-runner/RunModelControl.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/plan-runner/ScheduleControl.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/runner-tab/RunnerWidgetBody.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useElapsed.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/utils.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-runner-model-pin.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-runner-schedule.mjs
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/ChatInterface.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/composer/ActivityIndicator.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/plan-runner/RunCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/plan-runner/RunControls.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/plan-runner/RunFace.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/plan-runner/RunModelControl.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/plan-runner/ScheduleControl.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/runner-tab/RunnerWidgetBody.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useElapsed.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/utils.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-runner-model-pin.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-runner-schedule.mjs
 
 ## MAN-5412 — The card fold
 section: plan-runner/015 Consumers/017 The runner card/017 The card fold
@@ -6889,7 +6969,7 @@ dispatcher carries: a plan of an arc is nested INSIDE that arc's own deck, and a
 host module above the two lanes: `plan-runner` and `dispatcher` each import only their own and the
 shared layers, the dispatcher's card reuses this lane's `ScheduleControl`, `scheduleClock` and
 dismissal store through the `plan-runner` barrel, and a list inside either lane would make the two
-import each other (`import/no-cycle`). It reads `useRunnerRuns`, `useDispatcherPlans` (its `plans` and its `arcs`), `useArcs`
+import each other (`import/no-cycle`). It reads `useRunnerRuns`, `useDispatcherPlans` (its `plans`, its `arcs` and its `loosePlanners`), `useArcs`
 (whether the gallery above the runs has anything to draw) and `useArcRunIds` (which runs that gallery
 already draws) and nothing else — no fetch on mount, no state of its own — so selecting the tab paints on the FIRST
 render with whatever the bus was already holding rather than blanking until the runner next moves.
@@ -6920,7 +7000,9 @@ pill at all: `Tabs` renders that pill for word tabs only, and marks an icon tab 
 reading this strip's count reads the title.
 
 **The panel.** A header carrying `runner.title` and the count — runs plus plans — then the v3 lane in TWO pieces, both below the arc gallery and above the runs
-and both read off ONE split (`byArc(plans, arcs)`, MAN-1557 §"The arc's deck"): one `<DispatchArcDecks />`
+and both read off ONE split (`byArc(plans, arcs)`, MAN-1557 §"The arc's deck"): one `<LoosePlannerBadges />` — the planner outings with no card and no deck to ride
+(`useDispatcherPlans().loosePlanners`: an arc's design, written before the arc's own file has loaded) —
+above one `<DispatchArcDecks />`
 per v3 arc — drawn as THE SAME DECK the runner's arcs are drawn as (`DeckFrame`, §"The arc deck"
 below), the arc's own header on top carrying its word, its books and its count, this lane's controls on
 the body's first row (the arc's model word, and Stop, Resume and Resume at 3:00 AM only where the arc is
@@ -6941,11 +7023,13 @@ carried ids — `carriedIds` for a run, `carriedNames` for a plan — and `dismi
 id-space, so the other lane's dismissals stand; a plan's handler is built by
 `planDismissal(plan, carriedNames)` (`dispatcherState.ts`) — the rule once, handed to the card at either
 depth — and its ending is `{ run_id: 'v3:<name>', ended_at: epochOf(completed_at) }`. `EmptyState`
-(`runner.empty`) shows only when the count (runs plus plans) is zero AND `useArcs()`'s own `arcs` array is empty AND `useDispatcherPlans().arcs` is empty
+(`runner.empty`) shows only when the count (runs plus plans) is zero AND `useArcs()`'s own `arcs` array is empty AND `useDispatcherPlans().arcs` is empty AND no loose planner is out
+— a soul at work on the lane with no card of its own is still something on this screen, and "nothing here" over it would be the pane lying
 — not `arcCount` (§"The arc deck" below) — reachable precisely because the tab is sticky. `ArcGallery`
 mounts above the run list in the same scroll when an arc exists (§"The arc deck" below).
 
-**The gutter.** `RunnerWidgetBody` draws the same split, below the arc deck and above the runs: one
+**The gutter.** `RunnerWidgetBody` draws the same split, below the arc deck and above the runs: its own
+`<LoosePlannerBadges home="gutter" />` (the tab's own arrangement, flush), then one
 `<DispatchArcDecks home="gutter" />` per v3 arc — the SAME component the tab calls, so the two homes can
 never group differently (the gutter's flush width, each card taking the strip's whole width, its own pins
 on the rows) — and then the plans NO arc holds, the open chat's first (`session_app_id ===
@@ -6954,7 +7038,8 @@ its row `li[data-testid=runner-widget-plan]` carrying `data-plan-name` and `data
 open chat's); inside an arc, a plan's row is `li[data-dispatch-plan-row]` with the same two attributes and
 the pin on the ROW, so "this chat opened that plan" reads the same at either depth; a run's is
 `runner-widget-run`. The
-widget's `EmptyState` shows only when there is no run, no plan, no runner arc and no v3 arc. The widget's badge in
+widget's `EmptyState` shows only when there is no run, no plan, no runner arc, no v3 arc and no loose
+planner. The widget's badge in
 `ChatGutterLayout` counts runs, plans and unfinished arcs. It calls `useLaneFoldPrune` with the same four lists as the tab, and its cards fold on the same memory: a fold pressed in one home is folded in the other.
 
 **The palette.** `CommandPalette`'s `NAV_TABS` carries a `Go to Runner` row, and the Navigate group
@@ -7333,7 +7418,7 @@ The arc deck's own seven probes, each printing exactly one final line:
   receipt=complete handover=<s>s pressed-by=<landing-door|watchdog> shots=2` — the live two-card arc
   under the real runner, driving `probe-arc-stack.mjs`.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/MANUAL.md, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/arc-gutter-walk.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/arc-stuck-fixture.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/ntfy/arc-refused-probe.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-23.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-24.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-25.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-26.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-27.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-arc-deck.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-arc-fill.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-arc-run-merge.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-arc-stuck.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-deck-height.mjs, /home/lyphe/.claude/scripts/runner_fixtures/arc_proof.sh, /home/lyphe/.claude/scripts/runner_fixtures/arc_refused.sh
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/arc-gutter-walk.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/arc-stuck-fixture.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/ntfy/arc-refused-probe.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-23.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-24.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-25.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-26.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-27.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-arc-deck.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-arc-fill.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-arc-run-merge.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-arc-stuck.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-deck-height.mjs, /home/lyphe/.claude/scripts/runner_fixtures/arc_proof.sh, /home/lyphe/.claude/scripts/runner_fixtures/arc_refused.sh
 
 ## MAN-1497 — The park-at-peak switch — the dispatcher's flag, and the kick after a flip
 section: plan-runner/021 The park-at-peak switch — the dispatcher's flag, and the kick after a flip
@@ -7742,7 +7827,7 @@ own sidebar already calls, narrowed by one clause rather than answered by a seco
 route table, its exact query shape and its response contract live in
 [server/modules/providers/MANUAL.md (README)](../server/modules/providers/MANUAL.md), not here.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/MANUAL.md, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts
 
 ## MAN-663 — The preference keys
 section: simple-chat-list/002 The preference keys
@@ -7782,8 +7867,6 @@ list instead, so two rows never share a rank. The route is `PUT
 /api/providers/sessions/:sessionId/simple-list-position`; its table and contract are at
 [server/modules/providers/MANUAL.md (README)](../server/modules/providers/MANUAL.md).
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/MANUAL.md
-
 ## MAN-666 — Icons
 section: simple-chat-list/005 Icons
 
@@ -7815,8 +7898,6 @@ the dot is suppressed on the selected row, so the chat you have open never shows
 [docs/MANUAL.md (notifications)](MANUAL.md) for the presence store and the freshness window it is read
 through.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/MANUAL.md
-
 ## MAN-668 — What this never touches
 section: simple-chat-list/007 What this never touches
 
@@ -7827,8 +7908,6 @@ it, and even that only removes the file, never edits its content. How a session'
 is minted, mapped and merged with the filesystem watcher's own view is a separate mechanism this
 feature does not change; see
 [docs/architecture/MANUAL.md (03-conversation-handoff)](architecture/MANUAL.md).
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/architecture/MANUAL.md
 
 ## MAN-669 — Proving it
 section: simple-chat-list/008 Proving it
@@ -7854,7 +7933,7 @@ very next press on a row's "Chat options" trigger.
 it reads the four state columns over HTTP and drives the read rule through a real `chat.presence`
 frame on a chat socket. See [docs/MANUAL.md (verification)](MANUAL.md).
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/MANUAL.md, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-17.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-18.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-sidebar-state-api.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-simple-icons-unread.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-simple-reorder.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-simple-settings.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-simple-view.mjs
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-17.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-18.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-sidebar-state-api.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-simple-icons-unread.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-simple-reorder.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-simple-settings.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-simple-view.mjs
 
 ## MAN-670 — Verifying a change in this fork
 section: verification/000
@@ -7931,7 +8010,7 @@ That line means the service is down, not that the embed regressed. Its entry in 
 harness" says what the gates are; §"What bites people" says what a restart *mid-run* looks like,
 which is a different and less obvious failure.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/MANUAL.md, /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/load-env.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/deepseek/deepseek-key.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/all.mjs
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/load-env.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/deepseek/deepseek-key.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/all.mjs
 
 ## MAN-672 — Mechanical checks
 section: verification/002 Mechanical checks
@@ -9516,7 +9595,7 @@ makes their 390px pass land on the Files tab: at phone width the workspace tabs 
 sidebar drawer, so the app is standing on the tab from the first render instead of the pass opening
 the drawer to click it.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/deploy/dev-supervisor/README.md, /home/lyphe/.claude/claudecodeui_lyphe/docs/architecture/MANUAL.md, /home/lyphe/.claude/claudecodeui_lyphe/docs/MANUAL.md, /home/lyphe/.claude/claudecodeui_lyphe/node_modules/playwright/index.js, /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/supervised-boot.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/tsconfig.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/shapes/detect.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/shapes/InlineMarks.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/shapes/remarkShapeGroups.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/constants.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/all.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/artifacts/21-surface.json, /home/lyphe/.claude/claudecodeui_lyphe/.verify/artifacts/phase-11-press.json, /home/lyphe/.claude/claudecodeui_lyphe/.verify/artifacts/shapes-elements-baseline.html, /home/lyphe/.claude/claudecodeui_lyphe/.verify/artifacts/shapes-gallery-last-run.log, /home/lyphe/.claude/claudecodeui_lyphe/.verify/artifacts/verve-life-before/shapes-elements-baseline.html, /home/lyphe/.claude/claudecodeui_lyphe/.verify/artifacts/verve-life-retone.sed, /home/lyphe/.claude/claudecodeui_lyphe/.verify/handover/seam-probe.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/keepalive-cases-p3.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/keepalive-cases-p4.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/keepalive-host-case.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/keepalive-lib.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/keepalive-turn.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/color.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/console.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/runner-fixture.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/shapes-fixture.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/verve-life.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-32.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-33.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-34.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-files-api.py, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-files-editor.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-files-previews.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-markdown-cards.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-baseline.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-detect.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-fences.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-groups.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-inline.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-lists.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-prose.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-tables.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-sidebar-state-api.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-simple-icons-unread.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-simple-reorder.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/shots/cfep-editor-390-light.png, /home/lyphe/.claude/claudecodeui_lyphe/.verify/shots/cfep-preview-pdf-390-light.png, /home/lyphe/.claude/claudecodeui_lyphe/.verify/shots/phase-34-light.png, /home/lyphe/.claude/claudecodeui_lyphe/.verify/verve-life-compare.sh
+governs: /home/lyphe/.claude/claudecodeui_lyphe/deploy/dev-supervisor/README.md, /home/lyphe/.claude/claudecodeui_lyphe/node_modules/playwright/index.js, /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/supervised-boot.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/tsconfig.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/shapes/detect.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/shapes/InlineMarks.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/shapes/remarkShapeGroups.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/constants.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/all.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/artifacts/21-surface.json, /home/lyphe/.claude/claudecodeui_lyphe/.verify/artifacts/phase-11-press.json, /home/lyphe/.claude/claudecodeui_lyphe/.verify/artifacts/shapes-elements-baseline.html, /home/lyphe/.claude/claudecodeui_lyphe/.verify/artifacts/shapes-gallery-last-run.log, /home/lyphe/.claude/claudecodeui_lyphe/.verify/artifacts/verve-life-before/shapes-elements-baseline.html, /home/lyphe/.claude/claudecodeui_lyphe/.verify/artifacts/verve-life-retone.sed, /home/lyphe/.claude/claudecodeui_lyphe/.verify/handover/seam-probe.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/keepalive-cases-p3.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/keepalive-cases-p4.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/keepalive-host-case.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/keepalive-lib.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/keepalive-turn.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/color.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/console.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/runner-fixture.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/shapes-fixture.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/verve-life.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-32.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-33.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-34.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-files-api.py, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-files-editor.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-files-previews.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-markdown-cards.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-baseline.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-detect.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-fences.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-groups.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-inline.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-lists.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-prose.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-tables.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-sidebar-state-api.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-simple-icons-unread.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-simple-reorder.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/shots/cfep-editor-390-light.png, /home/lyphe/.claude/claudecodeui_lyphe/.verify/shots/cfep-preview-pdf-390-light.png, /home/lyphe/.claude/claudecodeui_lyphe/.verify/shots/phase-34-light.png, /home/lyphe/.claude/claudecodeui_lyphe/.verify/verve-life-compare.sh
 
 ## MAN-675 — Standing colour baselines
 section: verification/005 Standing colour baselines
@@ -9601,7 +9680,7 @@ harness" above, under *Keepalive survival*. What the mechanism itself is, and wh
 does, is in [docs/MANUAL.md (hosting)](MANUAL.md) §"Rules that bite" and
 [`server/modules/providers/list/claude/session-host/MANUAL.md (README)`](../server/modules/providers/list/claude/session-host/MANUAL.md).
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/MANUAL.md, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/session-host/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/session-host/MANUAL.md, /home/lyphe/.claude/claudecodeui_lyphe/.verify/chat-process-reuse.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/keepalive-cases-p4.mjs
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/session-host/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/chat-process-reuse.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/keepalive-cases-p4.mjs
 
 ## MAN-677 — The handover cases
 section: verification/007 The handover cases
@@ -9662,7 +9741,7 @@ failure table — is in
 [`deploy/dev-supervisor/README.md`](../deploy/dev-supervisor/README.md), and the rule it puts on a
 person editing `server/` is in [docs/MANUAL.md (hosting)](MANUAL.md) §"Rules that bite".
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/deploy/dev-supervisor/README.md, /home/lyphe/.claude/claudecodeui_lyphe/docs/MANUAL.md, /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/handover/handover-cases.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/handover/seam-probe.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/handover/smoke.sh
+governs: /home/lyphe/.claude/claudecodeui_lyphe/deploy/dev-supervisor/README.md, /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/handover/handover-cases.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/handover/seam-probe.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/handover/smoke.sh
 
 ## MAN-678 — The ntfy probes
 section: verification/008 The ntfy probes
@@ -9902,7 +9981,7 @@ Eight things to know before running one:
   when the box has none (clearing it again), and reads `journalctl -u cloudcli-server-dev` back two
   hours, so the unit's log must be readable by whoever runs it.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/architecture/MANUAL.md, /home/lyphe/.claude/claudecodeui_lyphe/docs/MANUAL.md, /home/lyphe/.claude/claudecodeui_lyphe/server/load-env.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/tsconfig.json, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/ntfy.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/ntfy/argus-probe.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/ntfy/question-probe.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/ntfy/run-failed-probe.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/ntfy/settings-probe.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/ntfy/signals-probe.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/ntfy/stall-probe.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/ntfy/token-probe.mjs
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/load-env.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/tsconfig.json, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/ntfy.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/ntfy/argus-probe.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/ntfy/question-probe.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/ntfy/run-failed-probe.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/ntfy/settings-probe.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/ntfy/signals-probe.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/ntfy/stall-probe.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/ntfy/token-probe.mjs
 
 ## MAN-679 — What bites people
 section: verification/009 What bites people
@@ -9951,7 +10030,7 @@ section: verification/009 What bites people
 | **Nothing in `all.mjs` measures the DeepSeek Flash switch either** | Two client surfaces read and write it — the Settings row (`RunnerModelContent.tsx`) and the composer's own chip (`ComposerDeepSeekSwitch.tsx`) — sharing one coordinator, `useDeepSeekFlashSwitch`, and no `phase-<n>.mjs` drives either. Proven by hand instead, in headless Chromium against the running dev server signed in as the operator's own account, at viewport widths from 320px to 430px: both surfaces' filled/outlined/unknown positions, the composer chip standing down where its row has no room (with and without the voice button present), and a flip made on one surface reaching the other while both are mounted. Its contract is at [docs/MANUAL.md (plan-runner)](MANUAL.md) §"The DeepSeek switch". |
 | **Nor the swarm switch beside it** | One client surface, `RunnerModelContent.tsx`'s second row beneath the DeepSeek one, reads and writes it through its own coordinator, `useSwarmSwitch` — no `phase-<n>.mjs` drives it. Proven by hand instead, against the running dev server signed in as the operator's own account, by two probes. [`probe-swarm-ceiling.mjs`](../.verify/probe-swarm-ceiling.mjs) PRESSES the ceiling control — `−` from `Unlimited` to the first count, `+` up with no upper bound, the row's own `Unlimited` action back to no ceiling, and the same presses with the switch OFF — with every `/api/settings/swarm` request intercepted and answered inside the probe, so the PUT goes nowhere near the operator's flag file and the assertion is on the BODY the page sent (that body's own bytes are read back through the real writer and the real `swarm.read()` separately, which is what the probe's printout names). [`probe-swarm-mark.mjs`](../.verify/probe-swarm-mark.mjs) is the reading probe and covers the mark alone: the swarm mark on both surfaces it appears on (the settings row, and a swarmed run's card beside its lane strip), the two `<svg>` contents compared byte for byte so a second glyph is a FAIL, and the mark's contrast against its own card measured to the 3:1 non-text floor in both themes. Its contract is at [docs/MANUAL.md (plan-runner)](MANUAL.md) §"The swarm switch". |
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/MANUAL.md, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/claude-cli-path.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/main.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Collapsible.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/uiPreferences.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/console.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/shapes-fixture.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/ntfy/settings-probe.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-swarm-ceiling.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-swarm-mark.mjs
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/shared/claude-cli-path.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/main.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Collapsible.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/uiPreferences.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/console.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/shapes-fixture.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/ntfy/settings-probe.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-swarm-ceiling.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-swarm-mark.mjs
 
 ## MAN-680 — Hosted instance
 section: verification/010 Hosted instance
@@ -9966,8 +10045,6 @@ edit made while a probe is mid-flight hands the API over under it, which reads a
 re-run, never re-aim. The handover keeps `:3011` answered throughout, so what a probe sees is a
 dropped WebSocket rather than a refused request, but it is a transient either way — except in
 `phase-23.mjs`, whose socket reopens itself through the handover and says so in a `[NOTE]`.
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/MANUAL.md
 
 ## MAN-1469 — The drawer's application row and divider — size, Escape claim, probes
 
@@ -10006,7 +10083,8 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/AppDraw
 
 ## MAN-1495 — The dispatcher types — the store's document, mirrored in two files
 
-`DispatcherStage`, `DispatcherPhase`, `DispatcherEvent`, `DispatcherPlanStatus`, `DispatcherPlan`,
+`DispatcherStage`, `DispatcherPhase`, `DispatcherEvent`, `DispatcherPlanner`, `DispatcherPlanStatus`,
+`DispatcherPlan`,
 `DispatcherArc`, `DispatcherArcStatus`, `DispatcherRoute`, `DispatcherDaemon`, `DispatcherStateEvent`,
 `DispatcherVerb` and `DispatcherVerbResult` are declared in the `DISPATCHER v3` block of
 `src/shared/types.ts` and `server/shared/types.ts` — ONE TEXT IN BOTH FILES, so the copies cannot
@@ -10027,9 +10105,9 @@ key for key. The emitted document is the source of the shape.
 - `DispatcherPlan.launched` is `boolean` — `report.launched(events)`, has a walk EVER been launched
   for this plan — and it is the one fact that tells a plan STOPPED mid-walk from one still at the gate:
   `status_word` words `paused` against `queued` by it, the card words its own button by it (Resume and
-  `Resume at …` for a plan that has walked, Start and `Start at …` for one that has not, MAN-1557), and
-  `DispatcherArc.stopped` is the same test over an arc's plans. Read through `flagSince`, so a frame
-  from a build older than the key reads `false`.
+  `Resume at …` for a plan that has walked, Start and `Start at …` for one that has not, MAN-1557). Read
+  through `flagSince`, so a frame from a build older than the key reads `false`. `DispatcherArc.stopped`
+  does NOT read it: an arc's STOPPED set holds a plan at the gate as readily as one stopped mid-walk (MAN-5220).
 - `DispatcherPlanStatus` is the seven words of `report.status_word`, in its precedence.
   `DispatcherPhase.status` is the three values of the store's `phases.status` column: `not started`,
   `running`, `done`.
@@ -10050,22 +10128,46 @@ key for key. The emitted document is the source of the shape.
   older than the field, and the card reads it as the runner's default (`effectiveModelWord`). Both readers (`dispatcher-plan.reader.ts`, `dispatcher-arc.reader.ts`)
   refuse any other word BY NAME (`modelSince`).
 - `DispatcherArc` is the store's `arcs` row as `report_arcs.arc_dict` prints it: `name`, `goal`,
-  `architecture`, `delivers`, `model`, the derived `status` (`DispatcherArcStatus` — the five words of
-  `store_arcs.arc_word`: `empty`, `judged`, `complete`, `live`, `designing`), `plans` (NAMES, in the
+  `architecture`, `delivers`, `model`, the derived `status` (`DispatcherArcStatus` — the eight words of
+  `store_arcs.arc_word`: `empty`, `judged`, `complete`, `live`, then its plans' own waiting word —
+  `scheduled`, `paused`, `queued` — else `designing`), `plans` (NAMES, in the
   arc file's order) and the arc's own `created_at`, `completed_at`, `cost_usd`, `tokens`, `tokens_in`,
   `tokens_out`, PLUS the three readings an arc's own controls are drawn by (`report_arcs.walking` /
-  `.stopped` / `.hour`, MAN-5220): `walking: boolean` (does the arc have a `live` plan — what its Stop
-  is drawn for), `stopped: boolean` (a `paused` plan, or a `scheduled` one that has walked — what its
-  Resume and its `Resume at 3:00 AM` are drawn for), and `schedule: string | null` (the ONE armed hour
+  `.stopped` / `.hour`, MAN-5220): `walking: boolean` (does the arc have a `live` plan — walking, or
+  approved and unpaused and waiting its turn — what its Pause is drawn for), `stopped: boolean` (a plan
+  reading `paused`, `queued` or `scheduled`: approved, paused and unfinished — what its Start and its
+  `Schedule start` are drawn for), and `schedule: string | null` (the ONE armed hour
   every stopped plan of it is waiting for, `null` when they carry different ones or none). Those three
   are the sets `dispatcher stop|resume|schedule <arc>` acts on, so the header's press and a terminal's
   verb reach the same plans. An arc still has no phases and no events; a plan carries no `plans`.
   `walking` and `stopped` are read through `flagSince` and `schedule` through `textSince`, so an older
   frame reads false / null and the header simply offers no arc verbs rather than failing to load.
+- `DispatcherPlanner` is ONE planner outing — the `planners` row `report_planners._entry` prints, and
+  the store's own words for it: `target` (the work it is FOR) and `plan` (the name it LANDS in, the two
+  differing for a judgment, whose `target` is the arc and whose `plan` is `<arc>--judgment`), `soul`
+  (`eupalinos-v3`, `odysseus-v3`), `verb` (the closed four: `design`, `judge`, `tell`, `cut`), `state`
+  (`queued`, `out`, `ended`), `stalled` (a row the document carries for a work still SHORT of a plan),
+  `model` (the granted word), the three stamps and `outcome` (`null` until it ends; a settled row always
+  carries one — `planners.settle` writes `no result`), plus `launch_id: string | null`. `verb` and `state`
+  are refused BY NAME (`dispatcher-planner.reader.ts`'s `oneOf`), as `DispatcherPlanStatus` is.
+  `tokens` and `cost_usd` are READ, NEVER STORED (INV-172): a planner rides the operator's Claude
+  subscription, so its dollars are 0.00 and its tokens are the figure — both off one read of the outing's
+  own `result.json`, exactly as a stage's are.
+- `DispatcherPlan.planner` and `DispatcherArc.planner` are `DispatcherPlanner | null` — the ONE outing that
+  plan or that arc reports, the store's own pick (`report_planners.of_plan` / `of_arc`): a plan's own
+  newest live row, else its arc's when it has none of its own, then the newest ending of either whose work
+  is still short of a plan; an arc's is the newest live row whose `target` IS the arc, else that ending. A
+  row naming one of an arc's plans is that PLAN's and never the arc's, so the header and the cards under it
+  never state one outing twice. Read through `plannerSince`, so a build older than the field reads `null`
+  and the card draws no badge.
+- `DispatcherStateEvent.planners` is the document's `planners` list whole, in the store's `id` order
+  (`plannersOf`): the souls out now, the work waiting behind them, and the endings whose work is still
+  unfinished. It is the reason an arc's design is visible BEFORE its arc file loads — the outing names a
+  name no plan and no arc on the lane answers to.
 - `DispatcherPlan.arc` is the arc's bare name or `null` — the join a card makes against
   `DispatcherArc.plans`, read from the other side.
 - `DispatcherLanePicture` is declared in `src/shared/types.ts` ONLY, beside the block: the frame's
-  `plans`, `arcs`, `route`, `daemon`, `offpeak_at` without `home`, `generated_at` or `at` — what the
-  client's feed retains on `dispatcher:all`.
+  `plans`, `arcs`, `planners`, `route`, `daemon`, `offpeak_at` without `home`, `generated_at` or `at` —
+  what the client's feed retains on `dispatcher:all`.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts

@@ -1,6 +1,7 @@
 import type { DispatcherArc, DispatcherArcStatus } from '@/shared/types.js';
 
 import { countSince, each, field, flagSince, isCount, isRecord, isText, isTextOrNull, modelSince, names, need, oneOf, textSince } from './dispatcher-state.transport.js';
+import { plannerSince } from './dispatcher-planner.reader.js';
 
 /**
  * One arc of the dispatcher's document, read field by field into the type the arc header draws.
@@ -18,8 +19,8 @@ import { countSince, each, field, flagSince, isCount, isRecord, isText, isTextOr
  * one would be a second answer.
  */
 
-/** The five words an arc's derived status may be (`store_arcs.arc_word`'s one precedence). Anything else is a build this lane cannot draw. */
-export const ARC_STATUSES: readonly DispatcherArcStatus[] = ['empty', 'judged', 'complete', 'live', 'designing'];
+/** The eight words an arc's derived status may be (`store_arcs.arc_word`'s one precedence). Anything else is a build this lane cannot draw. */
+export const ARC_STATUSES: readonly DispatcherArcStatus[] = ['empty', 'judged', 'complete', 'live', 'scheduled', 'paused', 'queued', 'designing'];
 
 /** One arc whole. Its `name` is read first, so every later refusal can name the arc it came from. */
 export function arcOf(raw: unknown): DispatcherArc {
@@ -36,11 +37,14 @@ export function arcOf(raw: unknown): DispatcherArc {
     model: modelSince(field(arc, 'model'), 'arc.model'),
     status: oneOf(field(arc, 'status'), ARC_STATUSES, `status of ${name}`),
     // THE ARC'S OWN VERBS, read off its plans' status words by `report_arcs` and drawn by the header
-    // here: `walking` is what Stop is drawn for and `stopped` what Resume and Resume at 3:00 AM are.
-    // Both are read tolerantly, so a dispatcher build older than the fields draws no control at all
-    // rather than a wrong one — which is what that build's arc really is: an arc this lane cannot
-    // move. Neither word is the arc's `status` (the module head says why: `designing` is true of a
-    // stopped arc and of one that never started, and the two draw different controls).
+    // here: `walking` is what Pause is drawn for and `stopped` what Start and Schedule start are —
+    // and `stopped` is every plan of the arc that is approved, paused and unfinished, so a whole arc
+    // the operator accepted with Queue draws a Start. Both are read tolerantly, so a dispatcher build
+    // older than the fields draws no control at all rather than a wrong one — which is what that
+    // build's arc really is: an arc this lane cannot move. Neither word is the arc's `status` (the
+    // module head says why: the two draw different controls, and the status does not tell them apart —
+    // an arc with one plan at the gate and one still unapproved reads `designing` and `stopped` at
+    // once, and a `designing` header draws no press while `stopped` is what Start is drawn for).
     walking: flagSince(field(arc, 'walking'), `arc.walking of ${name}`),
     stopped: flagSince(field(arc, 'stopped'), `arc.stopped of ${name}`),
     // The ONE hour an arc's plans are armed for, or null (`report_arcs.hour`: the single distinct
@@ -48,6 +52,10 @@ export function arcOf(raw: unknown): DispatcherArc {
     // header's Cancel is drawn over and the note beside it states — never computed here.
     schedule: textSince(field(arc, 'schedule'), `arc.schedule of ${name}`),
     plans: names(field(arc, 'plans'), 'arc.plans'),
+    // The one outing whose `target` IS this arc — its design, its cut, its judgment
+    // (`report_planners.of_arc`). A row naming one of the arc's plans is that PLAN's and rides
+    // `plan.planner` instead, so the header and the cards under it never state one outing twice.
+    planner: plannerSince(field(arc, 'planner'), `arc.planner of ${name}`),
     created_at: need(field(arc, 'created_at'), isText, 'arc.created_at'),
     completed_at: need(field(arc, 'completed_at'), isTextOrNull, 'arc.completed_at'),
     // The arc's books are its plans' sums, read by `report_arcs.arc_line` through the plan line's own

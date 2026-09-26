@@ -3,7 +3,7 @@ import { useEffect, type ReactNode } from 'react';
 import { DISPATCHER_ALL_TOPIC, useLiveBus } from '@/modules/live-bus';
 import { api } from '@/shared/api';
 import { useWebSocket } from '@/shared/context/WebSocketContext';
-import type { DispatcherArc, DispatcherDaemon, DispatcherLanePicture, DispatcherPlan, DispatcherRoute } from '@/shared/types';
+import type { DispatcherArc, DispatcherDaemon, DispatcherLanePicture, DispatcherPlan, DispatcherPlanner, DispatcherRoute } from '@/shared/types';
 
 /**
  * THIS IS THE DISPATCHER LANE'S DOOR INTO THE LIVE BUS, and it is the only place in the client that
@@ -31,8 +31,9 @@ import type { DispatcherArc, DispatcherDaemon, DispatcherLanePicture, Dispatcher
  * moving — `home`, and `generated_at`, restamped from the dispatcher's clock on every poll — plus
  * the frame's own `at`, which the bus carries as the value's clock. Republishing the frame whole
  * would make every poll a new reading by `JSON.stringify`, which is exactly how a lane wakes every
- * open screen twice a second with no news in it. So the payload is the six keys a reader draws
- * from, with the document's own spellings left alone.
+ * open screen twice a second with no news in it. So the payload is the seven keys a reader draws
+ * from — `plans`, `arcs`, `planners`, the route, the daemon and the next off-peak moment — with the
+ * document's own spellings left alone.
  *
  * TWO WAYS IN, AND THEY DO NOT FIGHT. The push is authoritative: every `dispatcher_state` frame is
  * republished. The REST seed exists for the gap the push cannot cover — the moment between mounting
@@ -109,28 +110,31 @@ export function DispatcherFeed({ children }: { children: ReactNode }) {
 }
 
 /**
- * The six keys the topic carries, out of a frame or a response body — or `null` when the value is
+ * The seven keys the topic carries, out of a frame or a response body — or `null` when the value is
  * not the whole picture. Checked one field at a time rather than cast, because the socket's event
  * type is deliberately loose (`ServerEvent`) and a payload this module publishes is read by every
  * card on the screen: a missing `route` would surface as a crash in a card instead of as a lane
  * that simply has not spoken yet.
  *
- * `arcs` IS THE ONE FIELD READ RATHER THAN DEMANDED. A frame from a server older than the key is
- * still a whole picture of the plans — the same reading a fresh page gets before the first frame
- * lands — so an absent list draws no arc headers instead of blanking every card the frame did carry.
- * A key that IS there and is not a list is still refused, like every other field here.
+ * `arcs` AND `planners` ARE THE TWO FIELDS READ RATHER THAN DEMANDED. A frame from a server older
+ * than either key is still a whole picture of the plans — the same reading a fresh page gets before
+ * the first frame lands — so an absent list draws no arc headers, or no badges, instead of blanking
+ * every card the frame did carry. A key that IS there and is not a list is still refused, like every
+ * other field here.
  */
 function asPicture(value: unknown): DispatcherLanePicture | null {
   if (value === null || typeof value !== 'object') return null;
   const held = value as Record<string, unknown>;
   if (!Array.isArray(held.plans)) return null;
   if (held.arcs !== undefined && !Array.isArray(held.arcs)) return null;
+  if (held.planners !== undefined && !Array.isArray(held.planners)) return null;
   if (held.route === null || typeof held.route !== 'object') return null;
   if (held.daemon === null || typeof held.daemon !== 'object') return null;
   if (typeof held.offpeak_at !== 'string') return null;
   return {
     plans: held.plans as DispatcherPlan[],
     arcs: (held.arcs ?? []) as DispatcherArc[],
+    planners: (held.planners ?? []) as DispatcherPlanner[],
     route: held.route as DispatcherRoute,
     daemon: held.daemon as DispatcherDaemon,
     offpeak_at: held.offpeak_at,

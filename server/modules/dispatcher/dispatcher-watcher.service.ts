@@ -36,7 +36,7 @@ export type DispatcherWatcher = PolledLane<DispatcherPicture>;
  * The picture `current()` answers with in the gap between the lane's construction and its first
  * landing: a few tens of milliseconds, and the length of a restart's handover.
  *
- * It is the shape's own empties — no plans, no arcs, no daemon, no hour — and the two route fields that
+ * It is the shape's own empties — no plans, no arcs, no planners, no daemon, no hour — and the two route fields that
  * cannot be empty are the CONSERVATIVE pair rather than a claim about this box: the Claude route is
  * the one-at-a-time route, and `word` is left blank rather than given a phrase this build would be
  * inventing (the phrase is `width.word`'s, in Python). Nothing draws any of it while `plans` is
@@ -46,6 +46,7 @@ export type DispatcherWatcher = PolledLane<DispatcherPicture>;
 const EMPTY_PICTURE: DispatcherPicture = {
   plans: [],
   arcs: [],
+  planners: [],
   route: {
     provider: 'claude',
     swarm: { enabled: false, lanes: null },

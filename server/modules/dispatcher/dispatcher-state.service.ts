@@ -1,8 +1,9 @@
 import { sessionsDb } from '@/modules/database/index.js';
-import type { DispatcherArc, DispatcherDaemon, DispatcherPlan, DispatcherRoute } from '@/shared/types.js';
+import type { DispatcherArc, DispatcherDaemon, DispatcherPlan, DispatcherPlanner, DispatcherRoute } from '@/shared/types.js';
 
 import { arcsOf } from './dispatcher-arc.reader.js';
 import { planOf, type DocumentPlan } from './dispatcher-plan.reader.js';
+import { plannersOf } from './dispatcher-planner.reader.js';
 import { each, field, isCountOrNull, isFlag, isRecord, isText, isTextOrNull, need, oneOf, readDispatcherDocument } from './dispatcher-state.transport.js';
 
 /**
@@ -46,6 +47,12 @@ const PROVIDERS: readonly DispatcherRoute['provider'][] = ['claude', 'deepseek']
  * answer — and `home` is the store's own root, which is what makes the daemon and the plans on
  * screen knowably one home's.
  *
+ * `planners` TRAVELS WHOLE, and is the one list the two subtractions are NOT applied to: an outing
+ * names the work it is FOR, and an arc's design is out while that arc's file has not loaded yet — no
+ * plan and no arc on this lane answers to its name at all. Dropping it with the plans it does not
+ * name would hide exactly the case the badge above the decks exists for, so the whole list goes on
+ * the wire and the client decides what has a home to be drawn in.
+ *
  * Consumed by `dispatcher-watcher.service.ts` (which wraps it as the `dispatcher_state` frame,
  * adding exactly `kind` and the frame's own `at`) and by `dispatcher.routes.ts` (`GET /plans`). The
  * client never sees this type: it sees the frame.
@@ -53,6 +60,7 @@ const PROVIDERS: readonly DispatcherRoute['provider'][] = ['claude', 'deepseek']
 export type DispatcherPicture = {
   plans: DispatcherPlan[];
   arcs: DispatcherArc[];
+  planners: DispatcherPlanner[];
   route: DispatcherRoute;
   daemon: DispatcherDaemon;
   offpeak_at: string;
@@ -109,6 +117,11 @@ function pictureOf(body: unknown): DocumentPicture {
     // (`arcsOnLane`, below). Read here with the rest of the document so a malformed arc is refused at
     // the same moment a malformed plan is, and never in the middle of a render.
     arcs: arcsOf(field(document, 'arcs')),
+    // Every planner outing of the store — the live rows and the stalled endings (the document's own
+    // list, `report_planners.entries`). Read here with the rest of the document so a malformed outing
+    // is refused at the same moment a malformed plan is, and never in the middle of a render. Absent
+    // from a dispatcher build older than the key, which reads as no badges anywhere (`plannersOf`).
+    planners: plannersOf(field(document, 'planners')),
     route: routeOf(field(document, 'route')),
     daemon: daemonOf(field(document, 'daemon')),
     offpeak_at: need(field(document, 'offpeak_at'), isText, 'offpeak_at'),
@@ -174,6 +187,7 @@ export async function readDispatcherState(dependencies: DispatcherStateDependenc
   return {
     plans,
     arcs: arcsOnLane(document.arcs, plans),
+    planners: document.planners,
     route: document.route,
     daemon: document.daemon,
     offpeak_at: document.offpeak_at,

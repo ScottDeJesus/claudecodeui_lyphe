@@ -918,9 +918,11 @@
     "rounds_one": "{{count}} round",
     "rounds": "{{count}} rounds",
     "noStages": "No stage has launched for this phase yet.",
+    "arcPause": "Pause",
+    "arcScheduleStart": "Schedule start",
     "scheduleTitle": "Start this plan when DeepSeek’s daily peak lifts — a one-shot timer sends Resume at that hour",
     "resumeTitle": "Resume this plan when DeepSeek’s daily peak lifts — a one-shot timer sends Resume at that hour",
-    "arcResumeTitle": "Resume every stopped plan of this arc when DeepSeek’s daily peak lifts — one timer per plan, each sending Resume at that hour",
+    "arcScheduleTitle": "Start every plan of this arc that is not moving when DeepSeek’s daily peak lifts — one timer per plan, at the gate or stopped mid-walk alike, each pressing Start at that hour",
     "park": "Park",
     "unpark": "Unpark",
     "waitsOn": "waits on {{names}}",
@@ -929,7 +931,22 @@
       "judged": "judged",
       "live": "live",
       "complete": "complete",
-      "empty": "empty"
+      "empty": "empty",
+      "queued": "queued",
+      "paused": "paused",
+      "scheduled": "scheduled"
+    },
+    "planner": {
+      "soul": {
+        "eupalinosV3": "Eupalinos v3",
+        "odysseusV3": "Odysseus v3"
+      },
+      "queued": "queued",
+      "designing": "designing",
+      "judging": "judging",
+      "cutting": "cutting",
+      "endedShort": "ended short",
+      "endedShortCause": "ended short: {{outcome}}"
     },
     "arcPlans_one": "{{count}} plan",
     "arcPlans": "{{count}} plans",

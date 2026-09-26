@@ -35,3 +35,7 @@ export { PlanCard } from '@/modules/dispatcher/PlanCard';
 // (`DeckFrame`), the arc's header over a strip of its plans — and the list of them for a caller that
 // has the lane's split in hand. Drawn by the Runner tab's two homes, above the plans no arc holds.
 export { DispatchArcDeck, DispatchArcDecks } from '@/modules/dispatcher/ArcDeck';
+// One planner outing as one line — who is out, on what model, for how long — and the row of them for
+// the outings no card and no deck can carry. Drawn by the plan card's and the arc deck's own headers
+// inside this module, and by the Runner tab's two homes above the arc decks for the rest.
+export { LoosePlannerBadges, PlannerBadge } from '@/modules/dispatcher/PlannerBadge';

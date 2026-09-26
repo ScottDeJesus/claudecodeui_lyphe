@@ -2,6 +2,7 @@ import { useTranslation } from 'react-i18next';
 
 import { PlanControls } from '@/modules/dispatcher/PlanControls';
 import { PlanClock, PlanFace, PlanStatusBadge } from '@/modules/dispatcher/PlanFace';
+import { PlannerBadge } from '@/modules/dispatcher/PlannerBadge';
 import { planFoldKey, useCardFold } from '@/shared/hooks/useCardFold';
 import { Card, CardContent, CardFoldBody, CardFoldToggle, CardFooter, CardHeader, CardTitle, Chip, Collapsible } from '@/shared/ui';
 import type { DispatcherPlan } from '@/shared/types';
@@ -12,6 +13,8 @@ import type { DispatcherPlan } from '@/shared/types';
  * just have a dispatch v1 pill label on it"). Nothing here is invented: the frame, the title, the
  * clamped description, the word, the clock, the meter, the phase rows and the verbs are the run
  * card's, and the PILL is the one thing that tells the two engines' cards apart in the same list.
+ * (`PlannerBadge` is the second, and it is not a second card: a run has no designer out on it, and a
+ * dispatch plan's outing is a fact about the plan the run card has nothing to say about.)
  *
  * `plan.v3` is the name (`<name>.v3`, what every dispatcher verb and toast prints); the goal's
  * FIRST line, clamped to three, is the description. The pill is a static span (`Chip` with no
@@ -79,6 +82,10 @@ export function PlanCard({
               </span>
               <PlanStatusBadge plan={plan} />
               <PlanClock plan={plan} />
+              {/* WHO IS OUT ON THIS PLAN, beside its own word and its own clock: the status word says
+                  what the PLAN is (`designing`), and this says who is doing something about it, on
+                  what model, for how long. It draws nothing at all on a plan no planner is on. */}
+              {plan.planner && <PlannerBadge planner={plan.planner} />}
               {/* What this plan waits on, of its own arc — beside its name and on the marks' own row,
                   because it is a fact about THIS plan and reads as one ("before this, that"). */}
               {waitsOn.length > 0 && (

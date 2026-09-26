@@ -85,7 +85,7 @@ export function DeckFrame({
   badge: { key: string; tone: Tone };
   /** The card's key in the shared fold store (`arc:<name>` / `darc:<name>`), so one home folds what the other folds. */
   foldKey: string;
-  /** A line of the arc's own prose, clamped, under the title row — the dispatcher's goal. */
+  /** The lane's own lines under the title row — the dispatcher's planner badge and the goal its designer wrote. */
   subtitle?: ReactNode;
   /** Drawn beside the title, past the badge: the dispatcher's spend figure. */
   titleTail?: ReactNode;

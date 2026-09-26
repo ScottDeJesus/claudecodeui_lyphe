@@ -176,10 +176,12 @@ export function createDispatcherRouter(dependencies: DispatcherRouterDependencie
    * terminal and the card say the same thing because they say it with the same verb.
    *
    * For `model` the dispatcher hands the word to EVERY plan of the arc (`store.set_arc_model`); for
-   * `stop` and `resume` it moves the arc's walking, or its stopped, plans in one transaction and one
-   * kick; for `schedule` it arms one hour for each of them (INV-201 knows no arc-level timer). The
-   * next frame redraws the arc's header and its plans together — nothing here is optimistic, and
-   * nothing is copied by this server.
+   * `stop` and `resume` it moves the arc's live, or its stopped, plans in one transaction and one
+   * kick — a stopped plan being any plan of the arc that is approved, paused and unfinished, whether
+   * it waits at the gate or was stopped mid-walk, which is what makes `resume <arc>` the arc's Start;
+   * for `schedule` it arms one hour for each of them (INV-201 knows no arc-level timer). The next
+   * frame redraws the arc's header and its plans together — nothing here is optimistic, and nothing
+   * is copied by this server.
    *
    * The same two fences as the plan routes, one name class over: the arc's own regex, and a verb word
    * that is OURS — never the request's.
@@ -211,8 +213,10 @@ export function createDispatcherRouter(dependencies: DispatcherRouterDependencie
   router.post('/arcs/:name/model', arcRelay('model', modelArgs, runnerModelChoiceError()));
   router.post('/arcs/:name/stop', arcRelay('stop'));
   router.post('/arcs/:name/resume', arcRelay('resume'));
-  // The arc's Resume at a time: the same three shapes a plan's schedule takes, through the same
-  // reader, so an operator who can name an hour for one plan can name it for a whole arc.
+  // The arc's Start at a time — the row's `Schedule start`: the same three shapes a plan's schedule
+  // takes, through the same reader, so an operator who can name an hour for one plan can name it for
+  // a whole arc. One timer per stopped plan, and a stopped plan is one at the gate as readily as one
+  // down mid-walk (`report_arcs.stopped`).
   router.post('/arcs/:name/schedule', arcRelay('schedule', (body) => {
     const when = readRunnerScheduleWhen((body as { when?: unknown } | undefined)?.when);
     return when === null ? null : [when];

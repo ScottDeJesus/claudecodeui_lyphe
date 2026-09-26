@@ -1,16 +1,17 @@
 import { useTranslation } from 'react-i18next';
 
 import { DispatchArcControls } from '@/modules/dispatcher/ArcControls';
-import { deckFocusIndex, planDismissal, planLayer, waitsOnSiblings } from '@/modules/dispatcher/dispatcherState';
+import { deckFocusIndex, planDismissal, planLayer, planStatusTone, waitsOnSiblings } from '@/modules/dispatcher/dispatcherState';
 import type { DispatcherArcGroup } from '@/modules/dispatcher/dispatcherState';
 import { PlanCard } from '@/modules/dispatcher/PlanCard';
+import { PlannerBadge } from '@/modules/dispatcher/PlannerBadge';
 import { DeckFrame, DeckItem, SessionPin, spendText } from '@/modules/plan-runner';
 import { dispatchArcFoldKey } from '@/shared/hooks/useCardFold';
 import type { DispatcherArcStatus, Tone } from '@/shared/types';
 import { cn } from '@/shared/utils';
 
 /**
- * The arc's own word and tone — `ArcDeck`'s table over the STORE's five words rather than the
+ * The arc's own word and tone — `ArcDeck`'s table over the STORE's eight words rather than the
  * runner's. The two lanes' arcs are different objects (a runner arc is a deck of minted card plans
  * on disk, a dispatch arc is a row in the store with plans hanging off it), so their status
  * vocabularies are different too, and each lane states its own rather than mapping one onto the
@@ -19,6 +20,12 @@ import { cn } from '@/shared/utils';
  * `judged` is neutral because a judgment is a fact and not a verdict; `empty` is warn because an arc
  * whose every plan was dropped is the one state an operator did not ask for, and it is the state
  * nothing else on the screen would show.
+ *
+ * THE THREE WAITING WORDS WEAR THE PLAN'S OWN TONE, through `planStatusTone` and not a colour of
+ * their own: `queued`, `paused` and `scheduled` are the plans' words too (`DispatcherPlanStatus`),
+ * read off the arc's plans and printed on the cards in the strip below — a `queued` arc over `queued`
+ * cards that were toned differently would be the header arguing with its own deck (`dispatcherState`
+ * states that rule once). Every other word here is the arc's alone.
  */
 const ARC_STATUS: Record<DispatcherArcStatus, { key: string; tone: Tone }> = {
   designing: { key: 'dispatcher.arcStatus.designing', tone: 'info' },
@@ -26,6 +33,9 @@ const ARC_STATUS: Record<DispatcherArcStatus, { key: string; tone: Tone }> = {
   live: { key: 'dispatcher.arcStatus.live', tone: 'info' },
   complete: { key: 'dispatcher.arcStatus.complete', tone: 'positive' },
   empty: { key: 'dispatcher.arcStatus.empty', tone: 'warn' },
+  queued: { key: 'dispatcher.arcStatus.queued', tone: planStatusTone('queued') },
+  paused: { key: 'dispatcher.arcStatus.paused', tone: planStatusTone('paused') },
+  scheduled: { key: 'dispatcher.arcStatus.scheduled', tone: planStatusTone('scheduled') },
 };
 
 /**
@@ -98,9 +108,18 @@ export function DispatchArcDeck({
       titleTail={spend
         ? <p data-arc-spend className="min-w-0 shrink-0 self-center font-mono text-xs text-muted-foreground">{spend}</p>
         : null}
-      subtitle={arc.goal
-        ? <p className="line-clamp-2 min-w-0 break-words text-xs leading-snug text-muted-foreground">{arc.goal}</p>
-        : null}
+      subtitle={arc.planner || arc.goal ? (
+        // THE ARC'S OWN LINE, under the row that says which arc this is: who is out on it, and the
+        // goal its designer wrote. The badge goes HERE rather than beside the status word — it is a
+        // long line, and the title row is a row of marks that cannot wrap at 390px without crushing
+        // the arc's name. It draws nothing on an arc no planner is on.
+        <>
+          {arc.planner && <PlannerBadge planner={arc.planner} />}
+          {arc.goal && (
+            <p className="line-clamp-2 min-w-0 break-words text-xs leading-snug text-muted-foreground">{arc.goal}</p>
+          )}
+        </>
+      ) : null}
       note={<span data-arc-plans>{t('dispatcher.arcPlans', { count: plans.length })}</span>}
       bodyTop={<DispatchArcControls arc={arc} />}
       stripLabel={t('runner.arcStrip', { title })}

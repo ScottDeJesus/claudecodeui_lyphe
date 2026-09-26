@@ -2,7 +2,7 @@ import { ActivityIcon } from 'lucide-react';
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { byArc, DispatchArcDecks, planDismissal, PlanCard, useDispatcherPlans } from '@/modules/dispatcher';
+import { byArc, DispatchArcDecks, LoosePlannerBadges, planDismissal, PlanCard, useDispatcherPlans } from '@/modules/dispatcher';
 import { ArcGallery, byUrgencyThenNewest, dismissRun, RunCard, useArcRunIds, useArcs, useRunnerRuns } from '@/modules/plan-runner';
 import { useLaneFoldPrune } from '@/modules/runner-tab/hooks/useLaneFoldPrune';
 import { Badge, EmptyState, ScrollArea } from '@/shared/ui';
@@ -66,7 +66,7 @@ import { Badge, EmptyState, ScrollArea } from '@/shared/ui';
 export function RunnerPanel() {
   const { t } = useTranslation();
   const { runs, count: runCount, carriedIds } = useRunnerRuns();
-  const { plans, arcs: dispatchArcs, count: planCount, carriedNames } = useDispatcherPlans();
+  const { plans, arcs: dispatchArcs, loosePlanners, count: planCount, carriedNames } = useDispatcherPlans();
   const count = runCount + planCount;
   const split = useMemo(() => byArc(plans, dispatchArcs), [plans, dispatchArcs]);
   const { arcs } = useArcs();
@@ -90,7 +90,10 @@ export function RunnerPanel() {
         {count > 0 && <Badge tone="neutral">{count}</Badge>}
       </div>
 
-      {count === 0 && arcs.length === 0 && dispatchArcs.length === 0 ? (
+      {/* A LOOSE PLANNER COUNTS AS A ROW of this pane, for the reason a dispatch arc does below: it is
+          something out on the lane with no card of its own, and "nothing here" over a soul at work
+          would be the pane's one lie. */}
+      {count === 0 && arcs.length === 0 && dispatchArcs.length === 0 && loosePlanners.length === 0 ? (
         <div className="flex flex-1 items-center justify-center p-4">
           <EmptyState icon={ActivityIcon} title={t('runner.empty')} />
         </div>
@@ -104,6 +107,10 @@ export function RunnerPanel() {
               the same deck — and the two are different objects with different words, which is why they
               are two components and not one list. Arcs first is this screen's own order, and the runner
               lane has kept it since its arcs landed. */}
+          {/* The outings no deck can carry — an arc's design, before the arc's own file has loaded —
+              stand above the decks rather than nowhere (`LoosePlannerBadges`). It draws nothing when
+              there are none, which is every ordinary lane. */}
+          <LoosePlannerBadges planners={loosePlanners} />
           <DispatchArcDecks groups={split.groups} carriedNames={carriedNames} />
           {/* A measured column, centred, the way the memory queue's is: these are short cards, and
               letting one run the full width of a desktop workspace strands a line of text in a

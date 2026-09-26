@@ -4,11 +4,11 @@ import { epochOf } from '@/modules/dispatcher/dispatcherState';
 import { DISPATCHER_ALL_TOPIC, useLiveTopic } from '@/modules/live-bus';
 import { DISPATCHER_ENDING_PREFIX, useDismissedEndings } from '@/modules/plan-runner';
 import type { DismissedEnding } from '@/modules/plan-runner';
-import type { DispatcherArc, DispatcherDaemon, DispatcherLanePicture, DispatcherPlan, DispatcherRoute } from '@/shared/types';
+import type { DispatcherArc, DispatcherDaemon, DispatcherLanePicture, DispatcherPlan, DispatcherPlanner, DispatcherRoute } from '@/shared/types';
 
 /**
- * The lane's read side: every v3 plan the dispatcher's store holds, and this box's posture beside
- * them.
+ * The lane's read side: every v3 plan the dispatcher's store holds, every planner outing of it and
+ * this box's posture beside them.
  *
  * IT READS THE BUS AND NEVER THE SOCKET OR THE API. `DispatcherFeed` is the only thing in the
  * client that names the `dispatcher_state` frame; everything downstream of it — this hook, the plan
@@ -42,6 +42,18 @@ export function useDispatcherPlans(): {
   count: number;
   route: DispatcherRoute | null;
   daemon: DispatcherDaemon | null;
+  /**
+   * Every planner outing the lane carries, in the store's own `id` order: the souls out now, the work
+   * waiting behind them, and the endings whose work is still unfinished (`DispatcherPlanner`). It is
+   * the store's own list, unfiltered — a plan card and a deck header read their own outing off
+   * `plan.planner` and `arc.planner`, which come out of this same list, so the three cannot disagree.
+   */
+  planners: DispatcherPlanner[];
+  /**
+   * The outings with NO card and NO deck to be drawn in — what the Runner tab's two homes draw as
+   * badges above the arc decks. Empty on an ordinary lane.
+   */
+  loosePlanners: DispatcherPlanner[];
   /** The dispatcher's next DeepSeek off-peak moment, epoch SECONDS, or `null` when the clock answered `none` or nothing is retained. */
   offpeakAt: number | null;
   /** Every plan the lane carries as a dismissal id, dismissed or not — what a dismissal prunes its stored list against. */
@@ -69,9 +81,16 @@ export function useDispatcherPlans(): {
     const arcs = (Array.isArray(picture?.arcs) ? picture.arcs : [])
       .filter((arc) => arc.plans.some((name) => drawn.has(name)));
 
+    const planners = Array.isArray(picture?.planners) ? picture.planners : [];
+
     return {
       plans,
       arcs,
+      planners,
+      // Asked of what this screen DRAWS, never of the frame's own lists: an arc every one of whose
+      // cards the operator has dismissed draws no deck for its outing's badge to ride, and the entry
+      // would otherwise be invisible on a lane that is still carrying it.
+      loosePlanners: plannersWithNoHome(planners, plans, arcs),
       count: plans.length,
       route: picture?.route ?? null,
       daemon: picture?.daemon ?? null,
@@ -98,4 +117,31 @@ function isDismissedPlan(plan: DispatcherPlan, dismissed: readonly DismissedEndi
   if (endedAt === null) return false;
   return dismissed.some((ending) =>
     ending.run_id === `${DISPATCHER_ENDING_PREFIX}${plan.name}` && ending.ended_at === endedAt);
+}
+
+/**
+ * The outings whose `target` — and whose `plan` — name no plan and no arc this screen draws.
+ *
+ * THE ONE CASE IT EXISTS FOR IS AN ARC'S DESIGN BEFORE ITS ARC FILE LOADS. `dispatcher design
+ * <arc>.v3 --arc` writes a planner row for a name the store holds no arc for yet: the arc's own file
+ * is what opens the arc and the plans of it, and until that load lands, no card and no deck on the
+ * screen answers to that name. The store's document is built for exactly this — the row is carried,
+ * and it is the only thing that says the arc is being designed — so a client that drew only
+ * `plan.planner` and `arc.planner` would show the operator nothing at all while a soul is out on the
+ * arc he has just asked for.
+ *
+ * BOTH NAMES ARE ASKED BECAUSE BOTH ARE SCOPES (`store_planners._subjects`): `target` is the work the
+ * outing is FOR and `plan` the name it LANDS in, which differ only for a judgment — an outing whose
+ * `target` is the arc and whose `plan` is `<arc>--judgment`. The store holds both BARE, so this
+ * compares the document's own bare names and never strips an adornment.
+ */
+function plannersWithNoHome(
+  planners: DispatcherPlanner[],
+  plans: DispatcherPlan[],
+  arcs: DispatcherArc[],
+): DispatcherPlanner[] {
+  const named = new Set<string>();
+  for (const plan of plans) named.add(plan.name);
+  for (const arc of arcs) named.add(arc.name);
+  return planners.filter((planner) => !named.has(planner.target) && !named.has(planner.plan));
 }

@@ -1,5 +1,5 @@
 import { DISPATCHER_ENDING_PREFIX, dismissRun } from '@/modules/plan-runner';
-import type { DispatcherArc, DispatcherPhase, DispatcherPlan, DispatcherPlanStatus, Tone } from '@/shared/types';
+import type { DispatcherArc, DispatcherPhase, DispatcherPlan, DispatcherPlanStatus, DispatcherPlanner, Tone } from '@/shared/types';
 
 /**
  * The pure vocabulary of a v3 plan, in one file with no React in it.
@@ -40,6 +40,21 @@ export function epochOf(iso: string | null): number | null {
  */
 export function planStatusTone(status: DispatcherPlanStatus): Tone {
   return status === 'live' || status === 'complete' ? 'positive' : 'neutral';
+}
+
+/**
+ * How a planner outing's state reaches the eye: `warn` for an ENDED one, `info` while a soul is out,
+ * `neutral` while nothing has started.
+ *
+ * A WARNING IS FOR THE ONE STATE NOBODY ASKED FOR, and an ended outing the document carries is
+ * exactly that: its work is still unfinished and the store is telling the operator a soul died before
+ * finishing it (`report_planners.entries` carries no ending that did what it was for). Amber over a
+ * queued outing would be the badge arguing with the operator's own press, and `out` is a soul at work
+ * — the same `info` a running phase wears.
+ */
+export function plannerStatusTone(state: DispatcherPlanner['state']): Tone {
+  if (state === 'ended') return 'warn';
+  return state === 'out' ? 'info' : 'neutral';
 }
 
 /**

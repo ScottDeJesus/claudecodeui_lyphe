@@ -11,10 +11,12 @@ import type { DispatcherVerb, DispatcherVerbResult } from '@/shared/types.js';
  *
  * FOUR OF THE SIX NAME AN ARC AS READILY AS A PLAN — `stop`, `resume`, `schedule` and `model`, each
  * resolved by the dispatcher's own door and by nothing on this side. An arc has no walk of its own:
- * `stop <arc>` is this same verb over the arc's WALKING plans and `resume <arc>` over its STOPPED
- * ones, in one transaction and one kick, and `schedule <arc>` arms the operator's one hour for each
- * of those stopped plans (INV-201 knows no arc-level timer). `park` and `unpark` are the plan card's
- * own and no arc header draws them.
+ * `stop <arc>` is this same verb over the arc's LIVE plans — what is walking and what is approved,
+ * unpaused and waiting its turn — and `resume <arc>` over its STOPPED ones, which is every plan of it
+ * that is approved, paused and unfinished: queued at the gate as much as stopped mid-walk. One
+ * transaction and one kick, and the order the plans then walk in is the daemon's own (`rule.eligible`
+ * keeps it). `schedule <arc>` arms the operator's one hour for each of those stopped plans (INV-201
+ * knows no arc-level timer). `park` and `unpark` are the plan card's own and no arc header draws them.
  *
  * This server never touches a plan. It does not hold the dispatcher's lock, does not signal its
  * daemon and never writes the store (`hooks/dispatcher/store.py`, which no server writer may reach —

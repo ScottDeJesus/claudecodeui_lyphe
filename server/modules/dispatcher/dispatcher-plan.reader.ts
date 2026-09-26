@@ -1,6 +1,7 @@
 import type { DispatcherEvent, DispatcherPhase, DispatcherPlan, DispatcherStage } from '@/shared/types.js';
 
 import { each, countSince, field, flagSince, isCount, isCountOrNull, isFlag, isRecord, isText, isTextOrNull, modelSince, names, need, oneOf, textSince } from './dispatcher-state.transport.js';
+import { plannerSince } from './dispatcher-planner.reader.js';
 
 /**
  * One plan of the dispatcher's document, read field by field into the types the card draws.
@@ -134,6 +135,12 @@ export function planOf(raw: unknown): DocumentPlan {
     // key at all and a plan of no arc writes `null`: both mean the same thing here, and neither is a
     // reason to blank every card on the screen.
     arc: textSince(field(plan, 'arc'), 'plan.arc'),
+    // The ONE planner outing this plan is owed — its own, else its arc's when it has none of its own
+    // (`report_planners.of_plan`: the plan's name is the first scope and the arc's the second). So a
+    // plan of an arc being designed whole reports the arc's design, and the deck's header reports the
+    // same row — one outing, two places it is true of. Read tolerantly (`plannerSince`), because a
+    // dispatcher build older than the field writes no key at all.
+    planner: plannerSince(field(plan, 'planner'), `plan.planner of ${name}`),
     // The plan's EFFECTIVE model word — its own, else its arc's, else the runner's default. Never
     // derived here: this is the document's own answer, and a second derivation would be a second
     // answer (`dispatcher/model.py:model.of` is the only one).

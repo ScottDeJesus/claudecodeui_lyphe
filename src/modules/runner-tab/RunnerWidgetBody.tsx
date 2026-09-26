@@ -2,7 +2,7 @@ import { ActivityIcon } from 'lucide-react';
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { byArc, DispatchArcDecks, planDismissal, PlanCard, useDispatcherPlans } from '@/modules/dispatcher';
+import { byArc, DispatchArcDecks, LoosePlannerBadges, planDismissal, PlanCard, useDispatcherPlans } from '@/modules/dispatcher';
 import { ArcGallery, byUrgencyThenNewest, dismissRun, RunCard, SessionPin, useArcRunIds, useArcs, useRunnerRuns } from '@/modules/plan-runner';
 import { useLaneFoldPrune } from '@/modules/runner-tab/hooks/useLaneFoldPrune';
 import type { DispatcherPlan, RunnerRunSnapshot } from '@/shared/types';
@@ -67,7 +67,7 @@ import { EmptyState } from '@/shared/ui';
 export function RunnerWidgetBody({ sessionId }: { sessionId: string | null }) {
   const { t } = useTranslation();
   const { runs, carriedIds } = useRunnerRuns();
-  const { plans, arcs: dispatchArcs, carriedNames } = useDispatcherPlans();
+  const { plans, arcs: dispatchArcs, loosePlanners, carriedNames } = useDispatcherPlans();
   // The lane split once, by the one rule both homes read: the arcs holding the plans of them in the
   // arcs' own order, and the plans no arc holds. Inside an arc the order is the ARC's — it is a
   // sequence of plans that depend on each other, and the open chat's "mine first" lift below belongs
@@ -94,14 +94,19 @@ export function RunnerWidgetBody({ sessionId }: { sessionId: string | null }) {
   // The empty state speaks of the LANE, not of this list: a run an arc card draws is on this very
   // screen, and saying "nothing" over it would be the widget's one lie. A DISPATCH arc counts with
   // the runner's, for that same reason: it is a row of this widget even when every card under it has
-  // been dismissed.
-  if (runs.length === 0 && plans.length === 0 && arcs.length === 0 && dispatchArcs.length === 0) {
+  // been dismissed. And so does a planner outing with no card at all — a soul out on an arc the
+  // store has no row for yet is on this lane even though nothing here can draw it a deck.
+  if (runs.length === 0 && plans.length === 0 && arcs.length === 0 && dispatchArcs.length === 0
+    && loosePlanners.length === 0) {
     return <EmptyState icon={ActivityIcon} title={t('runner.empty')} />;
   }
 
   return (
     <div className="flex min-w-0 flex-col gap-4">
       <ArcGallery home="gutter" pinnedSessionId={sessionId} />
+      {/* The outings with no deck to be drawn in, above the decks — the tab's own arrangement
+          (`LoosePlannerBadges`). It draws nothing when there are none. */}
+      <LoosePlannerBadges planners={loosePlanners} home="gutter" />
       {/* The dispatch arcs, above the plans no arc holds — the tab's own arrangement, in this
           home's flush width (`home="gutter"`), each drawn as the SAME deck the runner's arcs are
           drawn as: header, fold, arrows, and the plans of the arc in its own strip. A card all of
