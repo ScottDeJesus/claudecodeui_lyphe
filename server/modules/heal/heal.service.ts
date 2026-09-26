@@ -10,12 +10,10 @@ const execFileAsync = promisify(execFile);
  * Relaying the heal reflex's own worker.
  *
  * This server keeps no view of the reflex and owns none of its state. It never touches the ledger's
- * file, never lists the reflex's queue directory and never writes a friction row: it runs the
- * worker's own command and carries back what the worker said. The reflex's Python package is the one
- * reader of each of those stores, and the worker's `--status` payload already CONTAINS the runner's
- * heal queue — read there, in Python, through its own module — so the queue's item shape exists once
- * in this house rather than once per language. That is the whole design: one reader per store, one
- * transport, and the transport is a process this service does not look inside of.
+ * file and never writes a friction row: it runs the worker's own command and carries back what the
+ * worker said. The reflex's Python package is the one reader of each of those stores, so every shape
+ * the tab draws exists once in this house rather than once per language. That is the whole design: one
+ * reader per store, one transport, and the transport is a process this service does not look inside of.
  *
  * Nothing here throws. A refusal is a RESULT — the operator needs the worker's own sentence, not a
  * 500 — and the shapes below are the plan-runner lane's (`runner-verb.service.ts`), so the two relay
@@ -31,7 +29,7 @@ const execFileAsync = promisify(execFile);
  */
 const OUTPUT_MAX_BYTES = 4 * 1024 * 1024;
 
-/** Wall-clock ceiling for the summary. The worker opens its ledger, asks the queue and prints. */
+/** Wall-clock ceiling for the summary. The worker opens its ledger and prints. */
 const STATUS_TIMEOUT_MS = 20_000;
 
 /** Wall-clock ceiling for an ignore add. It inserts one row and sweeps the rows it matches. */
@@ -86,7 +84,7 @@ export type HealServiceDependencies = {
 };
 
 export type HealService = {
-  /** The whole summary the tab reads: counts, kind rows, heal cards, the ignore table, the queue. */
+  /** The whole summary the tab reads: counts, kind rows, heal cards, cycles, the ignore table. */
   summary(): Promise<HealResult<HealSummary>>;
   /** The rows filed under one door's word, newest first, as the worker's own kind door answers them. */
   kind(kind: string): Promise<HealResult<unknown>>;

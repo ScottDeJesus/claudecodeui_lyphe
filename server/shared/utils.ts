@@ -28,7 +28,7 @@ import type {
   ProviderCurrentActiveModel,
   ProviderModelsDefinition,
   ProviderSkillSource,
-  RunnerModelChoice,
+  DispatcherModelChoice,
   SubagentActivity,
   WorkspacePathValidationResult,
 } from '@/shared/types.js';
@@ -1454,66 +1454,69 @@ export function expandHome(value: string): string {
 }
 
 // ---------------------------
-//----------------- PLAN-RUNNER MODEL WORD UTILITIES ------------
+//----------------- DISPATCHER MODEL WORD UTILITIES ------------
 
 /**
- * The only words `plan-runner model` and `plan-runner arc model` accept (`hooks/plan_runner/run_model.py`), in
- * the order the controls draw them. The routes relay a member of THIS list, never the request's own string, so
- * the argv word a verb is spawned with is always ours.
+ * The only words the dispatcher's own `model` verb accepts (`hooks/plan_runner/run_model.py:WORDS`,
+ * unpacked by `hooks/dispatcher/model.py`) in the order the controls draw them. The routes relay a
+ * member of THIS list, never the request's own string, so the argv word a verb is spawned with is
+ * always ours.
  */
-const RUNNER_MODEL_CHOICES: readonly RunnerModelChoice[] = ['deepseek', 'claude', 'auto'];
+const DISPATCHER_MODEL_CHOICES: readonly DispatcherModelChoice[] = ['deepseek', 'claude', 'auto'];
 
 /**
- * A model word as one of `RUNNER_MODEL_CHOICES`, or `null` for anything else — a missing field, another casing,
- * a word with padding. Used by the run route (`POST /runs/:id/model`) and the arc route (`POST /arcs/:arc/model`)
- * to refuse a body with a 400 before anything is spawned, and by `runner-state.service.ts` / `arc-state.service.ts`
- * to carry a record's stored word into the snapshot (`null` for a record born before the runner wrote its default).
+ * A model word as one of `DISPATCHER_MODEL_CHOICES`, or `null` for anything else — a missing field, another
+ * casing, a word with padding. Used by the plan route (`POST /plans/:name/model`) and the arc route
+ * (`POST /arcs/:name/model`) to refuse a body with a 400 before anything is spawned, and by
+ * `dispatcher-state.transport.ts` (`modelSince`) to carry a document's stored word into the picture (`null` for
+ * a build older than the field, which the client reads as the store's default — `effectiveModelWord`).
  */
-export function readRunnerModelChoice(value: unknown): RunnerModelChoice | null {
-  return RUNNER_MODEL_CHOICES.find((choice) => choice === value) ?? null;
+export function readDispatcherModelChoice(value: unknown): DispatcherModelChoice | null {
+  return DISPATCHER_MODEL_CHOICES.find((choice) => choice === value) ?? null;
 }
 
-/** The 400 sentence both model routes answer with when `readRunnerModelChoice` finds no word. */
-export function runnerModelChoiceError(): string {
-  return `model must be one of ${RUNNER_MODEL_CHOICES.join(', ')}`;
+/** The 400 sentence both model routes answer with when `readDispatcherModelChoice` finds no word. */
+export function dispatcherModelChoiceError(): string {
+  return `model must be one of ${DISPATCHER_MODEL_CHOICES.join(', ')}`;
 }
 
 
 // ---------------------------
-//----------------- PLAN-RUNNER SCHEDULE WORD UTILITIES ------------
+//----------------- DISPATCHER SCHEDULE WORD UTILITIES ------------
 
 /**
  * A strict ISO-8601 instant WITH its zone: `2026-09-23T10:00:00Z`, `2026-09-23T03:00-07:00`, seconds and a
- * fraction optional. The zone is required because the runner refuses a naive time (it names no clock), and the
- * shape is anchored end to end so nothing but a timestamp can ride through to argv.
+ * fraction optional. The zone is required because the dispatcher refuses a naive time (it names no clock), and
+ * the shape is anchored end to end so nothing but a timestamp can ride through to argv.
  */
 const ISO_INSTANT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d{1,6})?)?(?:Z|[+-]\d{2}:\d{2})$/;
 
 /**
- * A request body's schedule word, or `null` for anything the runner's `schedule` verbs would not take:
- * `offpeak`, `none`, or an `ISO_INSTANT` that `Date.parse` also accepts. The runner stays the final judge — a
- * time already past is ITS refusal, carried back whole. Used by `POST /runs/:id/schedule` and `POST /arcs/:arc/schedule` to refuse a body with a 400 before
- * anything is spawned, so the argv word is always one of these shapes and never free text.
+ * A request body's schedule word, or `null` for anything the dispatcher's `schedule` verb would not take:
+ * `offpeak`, `none`, or an `ISO_INSTANT` that `Date.parse` also accepts. The dispatcher stays the final judge —
+ * a time already past is ITS refusal, carried back whole. Used by `POST /plans/:name/schedule` and
+ * `POST /arcs/:name/schedule` to refuse a body with a 400 before anything is spawned, so the argv word is
+ * always one of these shapes and never free text.
  */
-export function readRunnerScheduleWhen(value: unknown): string | null {
+export function readDispatcherScheduleWhen(value: unknown): string | null {
   if (value === 'offpeak' || value === 'none') return value;
   if (typeof value !== 'string' || !ISO_INSTANT.test(value)) return null;
   return Number.isFinite(Date.parse(value)) ? value : null;
 }
 
-/** The 400 sentence both schedule routes answer with when `readRunnerScheduleWhen` finds no word. */
-export function runnerScheduleWhenError(): string {
+/** The 400 sentence both schedule routes answer with when `readDispatcherScheduleWhen` finds no word. */
+export function dispatcherScheduleWhenError(): string {
   return 'when must be offpeak, none, or an ISO-8601 timestamp with a zone';
 }
 
 
 // ---------------------------
-//----------------- RUNNER TOKEN FIGURES ------------
+//----------------- TOKEN FIGURES ------------
 
 /**
  * A token count as a person reads it: `94.9M`, `1M`, `12.5k`, `412`.
  *
- * The server's twin of `src/modules/plan-runner/spend.ts:humanizeTokens`, and both are byte-for-byte
+ * The server's twin of `src/shared/spend.ts:humanizeTokens`, and both are byte-for-byte
  * `hooks/plan_runner/costs.py`'s `humanize` — the same cut at 999,950 and the same trailing-zero trim,
  * so a card and the push it earns cannot round the same figure two ways. Duplicated rather than
  * imported because the two builds each resolve `@/shared` to their OWN tree (`server/shared` here,

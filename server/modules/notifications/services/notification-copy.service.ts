@@ -212,29 +212,7 @@ function permissionCopy(meta: Record<string, unknown>): { headline: string; body
 }
 
 /**
- * A plan-runner ending that wants a hand, by the runner's own outcome word. `complete` here means
- * phases were left: a clean `complete` is `runner.finished`, never this code.
- */
-const RUNNER_STOP_HEADLINES: Record<string, string> = {
-  complete: 'Plan incomplete',
-  'all-blocked': 'Plan blocked',
-  budget: 'Plan out of budget',
-  'flag-off': 'Plan stopped: flag off',
-  // The runner's word for "the plan file could not be read" -- a park `resume` re-enters, and the
-  // one park nothing takes up on its own (`runner_watchdog._verdict` answers `done` over it), so the
-  // push is the operator's only notice and it has to name the fact rather than say "stopped".
-  unreadable: 'Plan unreadable',
-};
-
-/** `3 of 4 phases shipped`, or `No phases` for a plan that had none. */
-function runnerShippedText(meta: Record<string, unknown>): string {
-  const total = readNumber(meta.total) ?? 0;
-  if (total === 0) return 'No phases';
-  return `${readNumber(meta.shipped) ?? 0} of ${total} phase${total === 1 ? '' : 's'} shipped`;
-}
-
-/**
- * `3/7 phases` — the v3 dispatcher's own progress, counted over ALL of a plan's phases rather than
+ * `3/7 phases` — the dispatcher's own progress, counted over ALL of a plan's phases rather than
  * its shipped ones: its card's meter is `done` out of `phases`, so a push that counted anything else
  * would disagree with the screen it sends the operator to.
  */
@@ -310,71 +288,11 @@ const COPY_BY_CODE = new Map<string, CodeCopy>([
     body: 'You are now using overage',
   })],
   ['limit.out_of_credits', () => ({ headline: 'Out of credits', body: 'Overage is disabled: out of credits' })],
-  ['runner.finished', ({ meta }) => {
-    const durationMs = readNumber(meta.durationMs);
-    return {
-      headline: 'Plan finished',
-      body: [
-        runnerShippedText(meta),
-        // "since start" is the WALK: a parked run is stamped by its Start press,
-        // while a stopped-then-resumed one keeps its first start.
-        durationMs && durationMs > 0 ? `${humanDuration(durationMs)} since start` : null,
-        spendText(meta, ' on this plan'),
-      ].filter((part): part is string => part !== null).join(' · '),
-    };
-  }],
-  ['runner.blocked', ({ meta }) => {
-    const blocked = readNumber(meta.blocked) ?? 0;
-    const left = readNumber(meta.left) ?? 0;
-    const phase = readText(meta.blockedPhase);
-    const cause = readText(meta.blockCause);
-    const doors = readText(meta.doorsSpent);
-    const counts = [
-      runnerShippedText(meta),
-      blocked > 0 ? `${blocked} blocked` : null,
-      left > 0 ? `${left} left` : null,
-    ].filter((part): part is string => part !== null).join(' · ');
-    const said = phase && cause ? `${counts}\nPhase ${phase}: ${cause}` : counts;
-    return {
-      headline: lookup(RUNNER_STOP_HEADLINES, meta.outcome) ?? 'Plan stopped',
-      // WHAT THE RUN ALREADY TRIED, when it tried the ladder — the receipt's own `doors_spent`
-      // (`closing.doors_spent`): the phase, the cause, and the replan/unblocks it spent on that
-      // block. A bare ⛔ reads as "re-author the spec"; a phase whose ladder was spent has a heal
-      // item already filed for it, and the operator is owed that difference.
-      body: doors ? `${said}\n${doors}` : said,
-    };
-  }],
   /**
-   * An ARC CARD A PRESS REFUSED (`arc-refusals.service.ts`): nothing moves that card until its plan is
-   * cured — either no run exists for it, or the run that does is PARKED and no `resume` will take it —
-   * and the phone is where the operator
-   * finds out, since the deck's own tab is only read when they open it. `reason` is the refusing
-   * gate's own sentence, captured off its stderr by the runner, never this app's paraphrase of an
-   * exit code; the exit rides after it because a gate whose sentence is opaque ("not a v2 plan: …")
-   * is still identified by the door it came through. The remedy is named because it is the thing to
-   * do and the least obvious part of a refusal: cure the plan, and the runner starts the card by
-   * itself.
-   */
-  ['runner.arc_stuck', ({ meta }) => {
-    const position = readNumber(meta.position);
-    const card = readText(meta.cardTitle);
-    const reason = readText(meta.reason) ?? 'the start was refused';
-    const exit = readNumber(meta.exit);
-    return {
-      headline: position === null ? 'Arc card cannot start' : `Card ${position} cannot start`,
-      body: [
-        card,
-        exit === null ? reason : `${reason} (exit ${exit})`,
-        'Cure the plan — the runner retries the card every two minutes, so nobody has to press anything',
-      ].filter((part): part is string => part !== null).join('\n'),
-    };
-  }],
-  /**
-   * THE V3 DISPATCHER'S THREE ENDINGS (`dispatcher-endings.service.ts`), read off the same
-   * `events` table the plan's own card draws. They are the run lane's `runner.finished` /
-   * `runner.blocked` told by the other lane — a plan wraps up, a plan stops wanting a hand, a phase
-   * the walk had left standing is taken up again — so the wording stays as close to those as the
-   * facts allow: what is done out of how many, what it cost, and the one next move.
+   * THE DISPATCHER'S THREE ENDINGS (`dispatcher-endings.service.ts`), read off the same `events`
+   * table the plan's own card draws: a plan wraps up, a plan stops wanting a hand, a phase the walk
+   * had left standing is taken up again. What is done out of how many, what it cost, and the one
+   * next move.
    *
    * `dispatcher.paused` is the lane's stop-and-look: the dispatcher pauses a walk for its own
    * reasons (a spent ladder, a budget, the pause verb) and the phone is where the operator finds

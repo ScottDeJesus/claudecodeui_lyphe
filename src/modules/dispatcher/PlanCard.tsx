@@ -4,24 +4,21 @@ import { PlanControls } from '@/modules/dispatcher/PlanControls';
 import { PlanClock, PlanFace, PlanStatusBadge } from '@/modules/dispatcher/PlanFace';
 import { PlannerBadge } from '@/modules/dispatcher/PlannerBadge';
 import { planFoldKey, useCardFold } from '@/shared/hooks/useCardFold';
-import { Card, CardContent, CardFoldBody, CardFoldToggle, CardFooter, CardHeader, CardTitle, Chip, Collapsible } from '@/shared/ui';
+import { Card, CardContent, CardFoldBody, CardFoldToggle, CardFooter, CardHeader, CardTitle, Collapsible } from '@/shared/ui';
 import type { DispatcherPlan } from '@/shared/types';
 
 /**
- * One v3 plan the dispatcher is carrying, whole — `RunCard`'s own composition over the
- * dispatcher's document (operator, 2026-09-24: "it can be identical to our existing cards, it'll
- * just have a dispatch v1 pill label on it"). Nothing here is invented: the frame, the title, the
- * clamped description, the word, the clock, the meter, the phase rows and the verbs are the run
- * card's, and the PILL is the one thing that tells the two engines' cards apart in the same list.
- * (`PlannerBadge` is the second, and it is not a second card: a run has no designer out on it, and a
- * dispatch plan's outing is a fact about the plan the run card has nothing to say about.)
+ * One plan the dispatcher is carrying, whole — the card composition this screen has always drawn,
+ * over the dispatcher's document. Nothing here is invented: the frame, the title, the clamped
+ * description, the word, the clock, the meter, the phase rows and the verbs are the run card's.
+ * (`PlannerBadge` rides beside them, and it is not a second card: it says who is out on this plan,
+ * which the card's own word cannot.)
  *
  * `plan.name` is the name (`restorly--kit`, what every dispatcher verb and toast prints); the goal's
- * FIRST line, clamped to three, is the description. The pill is a static span (`Chip` with no
- * press), wrapped so its handle rides a node the house pill does not have to forward.
+ * FIRST line, clamped to three, is the description.
  *
- * IT FOLDS LIKE A RUN CARD, and its fold key is the plan's own NAME rather than the ending
- * `{v3:<name>, completed_at}` the dismissal list is keyed on: a fold is a way to get a card out of
+ * IT FOLDS, and its fold key is the plan's own NAME rather than the ending
+ * `{<name>, completed_at}` the dismissal list is keyed on: a fold is a way to get a card out of
  * sight for a while, and a plan cut and walked again is the same plan — the operator who folded it
  * should not have to fold it a second time. See `useCardFold`.
  *
@@ -29,12 +26,12 @@ import type { DispatcherPlan } from '@/shared/types';
  * harness's handles, on the ROOT so a probe scopes every reading and every press to ONE plan — the
  * live plan walking beside a probe must never be pressed.
  *
- * NO `defaultOpen`, UNLIKE `RunCard`: a plan card's phases are shown wherever it is drawn. The
- * gutter and the tab are two homes for one card, and a prop one of them could pass `false` is a prop
- * that lets them disagree about what the card shows — and they did: measured on the bundle this
- * change landed on top of, the tab painted 9/9 and 14/14 phase rows while the gutter painted 0/9 and
- * 0/14 with the list `closed`. `PlanFace` therefore states the open list itself, so the disagreement
- * is unreachable rather than merely unwatched.
+ * NO `defaultOpen`: a plan card's phases are shown wherever it is drawn. The gutter and the tab are
+ * two homes for one card, and a prop one of them could pass `false` is a prop that lets them disagree
+ * about what the card shows — and they did: measured on the bundle this change landed on top of, the
+ * tab painted 9/9 and 14/14 phase rows while the gutter painted 0/9 and 0/14 with the list `closed`.
+ * `PlanFace` therefore states the open list itself, so the disagreement is unreachable rather than
+ * merely unwatched.
  *
  * `waitsOn` IS THE ARC'S ANSWER, NOT THE CARD'S: the plan names of its own arc this plan waits on
  * (`waitsOnSiblings`), drawn beside its title row where every other mark of the plan sits, and
@@ -43,7 +40,7 @@ import type { DispatcherPlan } from '@/shared/types';
  * without the group it was handed. Both homes pass the same list through the same component
  * (`DispatchArcDeck`), so the two cannot disagree about it either.
  *
- * Used by `RunnerPanel`, above the runs of the tab, and by `RunnerWidgetBody` in the chat gutter.
+ * Used by `RunnerPanel`, above the plans no arc holds, and by `RunnerWidgetBody` in the chat gutter.
  */
 export function PlanCard({
   plan,
@@ -69,17 +66,14 @@ export function PlanCard({
     >
       <Collapsible open={!collapsed} onOpenChange={toggle}>
         <CardHeader className="gap-2 p-3 pb-2">
-          {/* The pill, the word and the clock ride the title's own row and the fold rides the row's
-              end, so a folded card keeps every mark that says WHICH plan this is. */}
+          {/* The word and the clock ride the title's own row and the fold rides the row's end, so a
+              folded card keeps every mark that says WHICH plan this is. */}
           <div className="flex min-w-0 items-start gap-2">
             <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
               <CardTitle className="w-full min-w-0 break-words font-mono text-sm leading-snug">{plan.name}</CardTitle>
               {goal && (
                 <p className="line-clamp-3 w-full min-w-0 break-words text-xs leading-snug text-muted-foreground">{goal}</p>
               )}
-              <span className="inline-flex flex-none" data-dispatcher-pill>
-                <Chip size="sm">{t('dispatcher.pill')}</Chip>
-              </span>
               <PlanStatusBadge plan={plan} />
               <PlanClock plan={plan} />
               {/* WHO IS OUT ON THIS PLAN, beside its own word and its own clock: the status word says

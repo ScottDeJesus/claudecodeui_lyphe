@@ -56,7 +56,7 @@
       "costTitleOld": "Booked before 2026-09-23, when a heal booked its chain’s WHOLE bill: the Claude stages in this number were your subscription, not DeepSeek — though the daily cap counts them as DeepSeek all the same",
       "costTitleUnbooked": "Nothing booked yet — a heal books its cost when it ends",
       "empty": {
-        "message": "A cycle fires them — nightly on the schedule, or Run a cycle now.",
+        "message": "A cycle fires them — Run a cycle now opens one over the live friction.",
         "title": "No heal has run yet"
       },
       "ended": "ended {{ago}}",
@@ -127,14 +127,6 @@
       "spendTitleReserved": "DeepSeek heal spend today: {{spent}} landed, {{reserved}} reserved for the heals still walking. The daily cap weighs both.",
       "spendTitleUnknown": "DeepSeek heal spend today against the daily cap. The worker named no reserved figure, so the heals still walking are not in this number."
     },
-    "queue": {
-      "empty": "The runner’s queue is empty.",
-      "next": "next: {{next}}",
-      "noNext": "no next step named",
-      "phase": "phase {{phase}}",
-      "readOnly": "read-only",
-      "title": "Runner heal queue — the second door"
-    },
     "reading": "Reading the friction ledger…",
     "settings": {
       "close": "Close heal settings",
@@ -162,7 +154,7 @@
       "ended": "ended {{ago}}",
       "gathered": "{{count}} gathered",
       "healed": "{{count}} healed",
-      "hint": "nightly or pressed — Chiron ranks, heals walk his list",
+      "hint": "a press opens one — Chiron ranks, heals walk his list",
       "ignored": "{{count}} ignored",
       "ignoredEntry": "ignored · {{count}} swept",
       "masterOff": "Heals are off — Settings → Agents",
@@ -895,7 +887,6 @@
     }
   },
   "dispatcher": {
-    "pill": "dispatch v1",
     "status": {
       "live": "LIVE",
       "paused": "PAUSED",
@@ -938,8 +929,8 @@
     },
     "planner": {
       "soul": {
-        "eupalinosV3": "Eupalinos v3",
-        "odysseusV3": "Odysseus v3"
+        "eupalinos": "Eupalinos",
+        "odysseus": "Odysseus"
       },
       "queued": "queued",
       "designing": "designing",

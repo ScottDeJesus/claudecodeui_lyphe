@@ -13,15 +13,15 @@ type StripView = { index: number; atStart: boolean; atEnd: boolean };
  * where it is that end's card: on a wide screen two cards share the view, and a strip scrolled all
  * the way over is "at the last card" even when the one before it is also in sight.
  *
- * THE LIVE CARD IS BROUGHT INTO VIEW, centred, on mount and whenever `focusIndex` changes — instant
- * the first time, so the deck opens already standing on it, and smooth after, so a hand-over from
- * one card to the next is seen to happen. A poll that changes nothing else never moves the strip,
- * so a reader who scrolled away is not yanked back every frame.
+ * THE CARD THE ARC IS ON IS BROUGHT INTO VIEW, centred, on mount and whenever `focusIndex` changes —
+ * instant the first time, so the deck opens already standing on it, and smooth after, so a movement
+ * from one card to the next is seen to happen. A poll that changes nothing else never moves the
+ * strip, so a reader who scrolled away is not yanked back every frame.
  *
  * IT ALSO OWNS THE STRIP'S HEIGHT, and that is the same fact the scroll position is: WHICH card the
  * reader is on. A row of flex items is as tall as its tallest item, so a strip left to itself wears
- * the tallest card's height under every shorter one — measured on the docstore deck in the Runner
- * widget, 2026-09-25: a three-line card painted 398px with 260px of nothing beneath it, because a
+ * the tallest card's height under every shorter one — measured on an arc deck in the Runner widget,
+ * 2026-09-25: a three-line card painted 398px with 260px of nothing beneath it, because a
  * later card of the same arc carries seventeen phase rows (operator, the same day: "plan/arc cards
  * should not have so much empty space, it should be dynamically adjusting"). So the height here is
  * the CARD THE READER IS ON, measured, and the deck grows and shrinks as the strip is paged, swiped
@@ -32,7 +32,7 @@ type StripView = { index: number; atStart: boolean; atEnd: boolean };
  * pinned at 0 (`measure`, where every scroll is read).
  *
  * The strip must be the offset parent of its items (`relative`): centring reads `offsetLeft`.
- * Used by `DeckFrame`, the one strip both lanes draw — the runner's arcs and the dispatcher's.
+ * Used by `DeckFrame`, the one strip every dispatch arc's deck draws.
  */
 export function useDeckStrip(focusIndex: number, cardCount: number) {
   const stripRef = useRef<HTMLOListElement>(null);

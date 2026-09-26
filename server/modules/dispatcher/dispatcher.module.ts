@@ -2,13 +2,13 @@ import type { Router } from 'express';
 
 import { appConfigDb, userDb } from '@/modules/database/index.js';
 import { createNotificationEvent, notifyUserIfEnabled } from '@/modules/notifications/index.js';
-import { createOffpeakClock } from '@/modules/plan-runner/index.js';
 import { WS_OPEN_STATE, connectedClients } from '@/modules/websocket/index.js';
 import type { DispatcherStateEvent, DispatcherVerb } from '@/shared/types.js';
 import { userFacingEnv } from '@/shared/child-env.js';
 import { expandHome } from '@/shared/utils.js';
 
 import { createDispatcherEndingsNotifier } from './dispatcher-endings.service.js';
+import { createOffpeakClock } from './dispatcher-offpeak.service.js';
 import type { DispatcherEnding } from './dispatcher-endings.service.js';
 import { createDispatcherRouter } from './dispatcher.routes.js';
 import { readDispatcherState } from './dispatcher-state.service.js';
@@ -16,7 +16,7 @@ import { runDispatcherVerb } from './dispatcher-verb.service.js';
 import { createDispatcherWatcher } from './dispatcher-watcher.service.js';
 
 /**
- * The v3 dispatcher lane: what plans this host holds, and the five words the operator may say to one
+ * The dispatcher lane: what plans this host holds, and the five words the operator may say to one
  * of them.
  *
  * The dispatcher is the plan store's OWN owner — a SQLite store under `~/.claude/state/dispatcher`,
@@ -54,8 +54,7 @@ const POLL_MS = 2000;
 
 /**
  * Wall-clock ceiling for one relayed verb. The verbs act on the store and may kick the daemon before
- * their process exits — seconds rather than milliseconds, and the same number the run lane's verbs
- * are given.
+ * their process exits — seconds rather than milliseconds.
  */
 const VERB_TIMEOUT_MS = 20000;
 
@@ -64,8 +63,7 @@ const ANNOUNCED_THROUGH_KEY = 'dispatcher_announced_through';
 
 /**
  * The orchestrator is JavaScript, so TypeScript reads `dedupeKey = null` as a parameter that accepts
- * only `null`. This alias states the contract it actually implements, the same way
- * `plan-runner.module.ts` does.
+ * only `null`. This alias states the contract it actually implements.
  */
 const buildEndingEvent = createNotificationEvent as (input: {
   provider: 'system';
@@ -171,8 +169,8 @@ export function createDispatcherModule(): DispatcherModule {
     current: () => watcher.current(),
     runVerb: (verb: DispatcherVerb, plan: string, verbArgs?: readonly string[]) =>
       runDispatcherVerb(verb, plan, { bin, timeoutMs: VERB_TIMEOUT_MS, env }, verbArgs),
-    // The dispatcher's own `offpeak` verb prints the runner's line byte for byte, so the card's
-    // `Start at …` button reads one clock whichever lane it belongs to.
+    // The dispatcher's own `offpeak` verb prints the hour, so the card's `Start at …` button shows the
+    // moment this box will really start a plan.
     offpeak: createOffpeakClock({ bin, timeoutMs: VERB_TIMEOUT_MS }),
   });
 

@@ -14,9 +14,9 @@
  * server's lanes, the whole array — which catches an entry appearing, an entry ending and a
  * heartbeat going stale with the same comparison.
  *
- * The lanes that use it are `plan-runner` (its runs, and the arc deck beside them), `dispatch-souls`
- * (its launcher souls), `kanban-metis` (its board sessions) and `dispatcher` (its plans). They
- * differ in what they read and in what they send, and in nothing below.
+ * The lanes that use it are `dispatch-souls` (its launcher souls), `kanban-metis` (its board
+ * sessions) and `dispatcher` (its plans). They differ in what they read and in what they send, and
+ * in nothing below.
  *
  * A PICTURE MAY TAKE ITS TIME TO ARRIVE. Most of those lanes answer from memory, but the dispatcher's
  * whole picture is one `dispatcher status --json` — a subprocess — so its `snapshot` answers a

@@ -2,14 +2,15 @@ import { useTranslation } from 'react-i18next';
 
 import { epochOf } from '@/modules/dispatcher/dispatcherState';
 import { useDispatcherVerbs } from '@/modules/dispatcher/hooks/useDispatcherVerbs';
-import { RunModelControl, ScheduleControl } from '@/modules/plan-runner';
+import { RunModelControl } from '@/modules/dispatcher/RunModelControl';
+import { ScheduleControl } from '@/modules/dispatcher/ScheduleControl';
 import { Button } from '@/shared/ui';
 import type { DispatcherPlan } from '@/shared/types';
 import { effectiveModelWord } from '@/shared/utils';
 
 /**
- * The verbs that apply to a v3 plan, chosen by its status — `RunControls`' rule: a verb is drawn
- * where the dispatcher would take it, never drawn disabled where it would refuse.
+ * The verbs that apply to a plan, chosen by its status: a verb is drawn where the dispatcher would
+ * take it, never drawn disabled where it would refuse.
  *
  * - `live` → Stop. A pause; Resume is its undo, so no dialog guards it.
  * - `paused` → Resume and `Resume at …`: a plan STOPPED mid-walk is the one an hour makes sense in
@@ -29,12 +30,12 @@ import { effectiveModelWord } from '@/shared/utils';
  * the operator pressing either should read the same word on the button as the plan's own state.
  *
  * THE PLAN'S OWN MODEL WORD RIDES THE SAME FOOTER, on every plan a press could still move — a
- * COMPLETE plan has no next phase for the word to reach, which is `RunControls`' own rule. It is not
+ * COMPLETE plan has no next phase for the word to reach. It is not
  * a verb chosen by status, so it is drawn beside them rather than among them: `dispatcher model` is
  * never refused for the state a plan is in (the word is read when a chain is LAUNCHED), so no status
  * can be a reason to hide it.
  *
- * The control draws the plan's EFFECTIVE word — its own, else its arc's, else the runner's default
+ * The control draws the plan's EFFECTIVE word — its own, else its arc's, else the configured default
  * (`dispatcher.model.of`) — so what it shows is what this plan's next chain is really launched with,
  * including a word it merely inherited from its arc. A plan that belongs to an arc keeps its own
  * control here: the arc header carries the ARC's word and hands it down, and this is where one plan
@@ -105,7 +106,7 @@ export function PlanControls({ plan, onDismiss }: { plan: DispatcherPlan; onDism
     <div className="flex w-full flex-wrap items-center gap-2">
       {verbs}
       {/* `ml-auto` puts the switch at the row's end when a verb shares the row, and at its start when
-          none does — the same slot `RunControls` gives it, so the two cards' footers read alike. */}
+          none does — the same slot the arc's own control row gives it, so the two read alike. */}
       {movable && (
         <div className="ml-auto">
           <RunModelControl scope="plan" value={effectiveModelWord(plan.model)} busy={held}

@@ -2,7 +2,7 @@ import { execFile } from 'node:child_process';
 import os from 'node:os';
 import { promisify } from 'node:util';
 
-import type { RunnerModelChoice } from '@/shared/types.js';
+import type { DispatcherModelChoice } from '@/shared/types.js';
 
 /**
  * The subprocess side of the dispatcher lane: one `dispatcher status --json`, and the JSON body it
@@ -10,8 +10,8 @@ import type { RunnerModelChoice } from '@/shared/types.js';
  *
  * The dispatcher is a command, not a directory: this lane has no files to stat and no receipt to
  * classify, only one process to run and one document to parse. That document is printed whole by a
- * process that then exits (`hooks/dispatcher/cmd/status.py`), so unlike the run lane's files — which
- * a live runner may be replacing at this instant — there is no torn read to be patient with.
+ * process that then exits (`hooks/dispatcher/cmd/status.py`), so there is no file a live writer may be
+ * replacing at this instant and no torn read to be patient with.
  *
  * The argv array is the whole command. No shell parses any of it, so nothing a plan is named could
  * become a second command; there is nothing here to quote.
@@ -27,9 +27,9 @@ const execFileAsync = promisify(execFile);
  * How much the document may weigh.
  *
  * A plan's `goal` is free text of any length and `report.py` carries it whole, so a store of a few
- * dozen plans runs to megabytes: the run lane's 1 MiB is not headroom enough here. Stated rather
- * than left to the default (`execFile`'s own is 1 MiB, and an overflow arrives as a string `code`,
- * never as a signal — the measured table is `runner-verb.service.ts:130`).
+ * dozen plans runs to megabytes: `execFile`'s own 1 MiB is not headroom enough here. Stated rather
+ * than left to the default, so a document this build cannot carry reads as one line in the journal
+ * instead of a truncated body.
  */
 const STATUS_MAX_BUFFER = 4 * 1024 * 1024;
 
@@ -60,11 +60,10 @@ function firstLine(value: unknown): string {
  * The dispatcher's own words come first when it left any — a refusal on STDOUT (a not-found line,
  * exit 1: `no plan <bare>`, or `no plan or arc <bare>` from one of the four verbs an arc's own name
  * also reaches), a traceback on stderr — because
- * they name the cause better than an exit code does. The
- * ways it can fail without a code are the run lane's measured ways (`runner-verb.service.ts:130`:
- * our own ceiling and a kill from outside both arrive as a SIGNAL, a missing binary as a string
- * code), and they read differently on purpose: "was stopped" and "did not answer" are different
- * facts, and neither claims the read changed anything.
+ * they name the cause better than an exit code does. The ways it can fail without a code read
+ * differently on purpose: a SIGNAL is our own ceiling or a kill from outside, a string `code` is a
+ * missing binary — "was stopped" and "did not answer" are different facts, and neither claims the
+ * read changed anything.
  */
 function describeFailure(error: unknown): string {
   const failure = error as { code?: unknown; stdout?: unknown; stderr?: unknown; signal?: unknown };
@@ -82,8 +81,7 @@ function describeFailure(error: unknown): string {
 // --------------------------- reading a field out of the body ---------------------------
 //
 // The vocabulary `dispatcher-state.service.ts` reads the document with. It lives here, beside the
-// body it was parsed from, for the run lane's own reason: `runner-state.transport.ts` owns
-// `readStringOrNull`, and the module that knows what the fields MEAN does not have to invent a
+// body it was parsed from, so the module that knows what the fields MEAN does not have to invent a
 // `typeof` test for each one. What is different here is the direction of a bad field — these REFUSE
 // it by name rather than coercing it to a default, because a body this lane cannot read is a
 // different build of the dispatcher and not a torn file (see the service's head).
@@ -178,19 +176,19 @@ export function flagSince(value: unknown, where: string): boolean {
   return value === undefined ? false : need(value, isFlag, where);
 }
 
-/** The three words a model word may be (`hooks/plan_runner/run_model.py:WORDS`), the ONE list — `readRunnerModelChoice` checks a request against the same three. */
-export const MODEL_CHOICES: readonly RunnerModelChoice[] = ['deepseek', 'claude', 'auto'];
+/** The three words a model word may be (`hooks/plan_runner/run_model.py:WORDS`), the ONE list — `readDispatcherModelChoice` checks a request against the same three. */
+export const MODEL_CHOICES: readonly DispatcherModelChoice[] = ['deepseek', 'claude', 'auto'];
 
 /**
  * A model word a build OLDER than the field did not write, read as `null`, and refused by name when
  * the key is there and is not one of the three.
  *
- * `null` is the shape a record with no word already has downstream — `run.json:model` on a run born
- * before the runner wrote its default reads the same way, and `effectiveModelWord` turns it into the
- * runner's default (`deepseek`). So an older dispatcher's document draws the default its plans would
- * really run under, rather than a lane that went stale for a field it never wrote.
+ * `null` is the shape a row with no word of its own already has downstream — a plan that carries none
+ * follows its arc, and `effectiveModelWord` turns the end of that chain into the store's default
+ * (`deepseek`). So an older dispatcher's document draws the default its plans would really run under,
+ * rather than a lane that went stale for a field it never wrote.
  */
-export function modelSince(value: unknown, where: string): RunnerModelChoice | null {
+export function modelSince(value: unknown, where: string): DispatcherModelChoice | null {
   return value === undefined || value === null ? null : oneOf(value, MODEL_CHOICES, where);
 }
 

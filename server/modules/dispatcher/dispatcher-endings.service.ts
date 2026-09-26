@@ -4,25 +4,24 @@ import type { DispatcherEvent, DispatcherPlan } from '@/shared/types.js';
  * Which dispatcher endings earn a notification, and the memory that makes each one push once.
  *
  * The dispatcher writes its endings into ONE log — the store's `events` table, whose ids come from a
- * single global sequence (`hooks/dispatcher/report.py`) — so three kinds of push can share a single
- * watermark, which the run lane's ending notifier needs three files and a receipt each to do. The
+ * single global sequence (`hooks/dispatcher/report.py`) — so three kinds of push share a single
+ * watermark. The
  * watermark is on the EVENT ID and not on a timestamp, for a reason that is concrete rather than
  * stylistic: the dispatcher's own events are stamped by the clock at whatever minute they happened,
  * and two events can share a second while a hand-edited or replayed row can carry an older stamp
  * than the one before it. An id is a total order the store itself guarantees.
  *
- * "Already announced" is held by the caller in durable storage rather than in this process, for the
- * run lane's own measured reason (`runner-endings.service.ts`): the dev server restarts on every
- * edit through a handover that runs the old and the new server side by side, so a set kept in memory
- * would re-announce the last day's endings on each boot, and one seeded silently at boot would lose
- * the ending that landed during the restart. Read again just before anything is sent, the mark also
+ * "Already announced" is held by the caller in durable storage rather than in this process, for a
+ * measured reason: the dev server restarts on every edit through a handover that runs the old and the
+ * new server side by side, so a set kept in memory would re-announce the last day's endings on each
+ * boot, and one seeded silently at boot would lose the ending that landed during the restart. Read again just before anything is sent, the mark also
  * keeps the two servers of a handover from pushing one ending twice.
  */
 
 export type DispatcherEndingCode = 'dispatcher.finished' | 'dispatcher.paused' | 'dispatcher.relaunched';
 
 export type DispatcherEndingMeta = {
-  /** The plan's name with its `.v3` suffix — what the notification's own header reads ("Plan finished · <name>.v3"). */
+  /** The plan's name — what the notification's own header reads ("Plan finished · <name>"). */
   sessionName: string;
   /** How many phases the plan has, and how many of them are `done`. */
   phases: number;
@@ -91,7 +90,7 @@ function endingOf(plan: DispatcherPlan, event: DispatcherEvent, code: Dispatcher
     eventId: event.id,
     code,
     meta: {
-      sessionName: plan.v3,
+      sessionName: plan.name,
       phases: plan.phases.length,
       done: plan.phases.filter((phase) => phase.status === 'done').length,
       costUsd: plan.cost_usd,
@@ -145,10 +144,8 @@ export function createDispatcherEndingsNotifier(
       if (knownMark === undefined) knownMark = dependencies.readMark();
       if (knownMark === null) {
         // First sight of the dispatcher's store on this database: the events already in it are
-        // HISTORY. The run lane writes "now" here because a run's endings are stamped with a clock
-        // it can be given; this lane writes the highest id the store already holds, which is the
-        // same act in this store's own currency — announce nothing that was already there, and
-        // leave everything written after this moment due.
+        // HISTORY. This lane writes the highest id the store already holds — announce nothing that
+        // was already there, and leave everything written after this moment due.
         const highest = highestEventId(plans);
         dependencies.writeMark(highest);
         knownMark = highest;

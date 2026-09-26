@@ -415,15 +415,13 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/deepseek/deepseek
 section: api-tab/003 The ledger — what a number is
 
 - Ledger file `~/.claude/state/deepseek_usage/ledger.sqlite` (override `DEEPSEEK_USAGE_DIR`, read at
-  call time). Transcript roots `~/.claude/projects` and `~/.claude/runner-sessions` (override
+  call time). Transcript root `~/.claude/projects` (override
   `DEEPSEEK_USAGE_ROOTS`), walked recursively for `*.jsonl`; one `flock` on `sync.lock` serializes a sync.
 - **No column holds a dollar figure.** A message row stores its five token columns and `peak` —
   whether its `ts` landed in a peak window (`deepseek.peak_until`). Dollars are computed at READ, so a
   corrected `costs.PRICES` tuple reprices the whole history on the next read instead of disagreeing
   with a stored figure.
-- Two feeders fill it: `scripts/runner_transcripts.py` hands a moved run's transcripts to
-  `deepseek_usage.sync` before `prune` deletes them (`run` feeds both roots on the hourly tick), and
-  CloudCLI's own server records a balance reading through `deepseek-usage balance-record`.
+- One feeder records balance readings: CloudCLI's own server, through `deepseek-usage balance-record`.
 
 ## MAN-473 — Outings and attribution — the rules live in `hooks/deepseek_usage/attribute.py`
 section: api-tab/004 Outings and attribution — the rules live in `hooks/deepseek_usage/attribute.py`
@@ -438,15 +436,13 @@ section: api-tab/004 Outings and attribution — the rules live in `hooks/deepse
   session that spent no DeepSeek has no outing to inherit, so the rules run against the parent's id,
   then the subagent's own cwd.
 - Four rules name an outing, and the FIRST that answers wins — `dispatch` (a
-  `state/dispatch-souls/*/result.json` naming the session), `runner` (a brief `label`, or the
-  `run.json` naming the session), `wave` (a scout wave the session id is booked against), `session`
+  `state/dispatch-souls/*/result.json` naming the session), `runner` (the brief's own `label` and
+  `RUN: <run id>`, read off the prompt text the ledger stored), `wave` (a scout wave the session id is booked against), `session`
   (the cwd slug; `probe` when the cwd is under `/tmp/`, else `chat`).
 - Rules 1–3 freeze the row at once; rule 4 waits 48 h of idle, so a dispatcher's `result.json` —
   written when its child ends — still claims its outing.
-- Scout waves are named from the `scouts` rows booked into `state/plan_costs/*.json`
-  (`hooks/plan_runner/costs.py` `record_wave`, the durable record), and from
-  `state/scout-waves/*/wave.json` for a wave whose plan has not launched yet. The wave id is the row's
-  `ref`; the reader is `hooks/deepseek_usage/records.py`.
+- Scout waves are named from `state/scout-waves/*/wave.json` alone. The wave id is its `id`; the
+  reader is `hooks/deepseek_usage/records.py`.
 
 ## MAN-474 — Pricing — per window, computed at read
 section: api-tab/005 Pricing — per window, computed at read
@@ -2708,8 +2704,11 @@ them is toned by, so a header cannot argue with its own strip; the eight words a
 NAME, so no default is invented here; standing proof MAN-5419), the arc's own spend where it has one (`data-arc-spend`; the plan
 card's own rule — dollars OR tokens by who was used, nothing at all for a lane that has not spent), the
 ARC's own planner badge where the store gives it one (`arc.planner`, `report_planners.of_arc`; drawn by
-the same `PlannerBadge` on `DeckFrame`'s SUBTITLE slot — the full-width line under the title row, because
-the title row cannot wrap at 390px without crushing the arc's name; the runner lane passes no subtitle,
+the same `PlannerBadge` on `DeckFrame`'s SUBTITLE slot — the full-width line under the title row, because of
+WIDTH and not because that row cannot wrap: the row WRAPS and its title is floored at its own longest
+word (`min-w-fit`, the wrap and the floor landing together 2026-09-25), so nothing would be crushed,
+but a planner badge is a LONG LINE among a row of marks and at 390px it would take a row the arc's
+own name and books are read on; the runner lane passes no subtitle,
 so only this lane uses the slot), the goal, and the plan count the deck DREW (`data-arc-plans`; see the
 count below). Beneath the header the
 deck's BODY holds this lane's own first row — `DispatchArcControls`, the model switch and the verb row —
@@ -4773,7 +4772,7 @@ section: kanban/014 The brief
 
 A Metis's system prompt is assembled at spawn from
 `server/modules/kanban-metis/brief/METIS.md` plus
-`server/modules/kanban-metis/brief/chapters/{autonomy-cadence,learning,mcp-fallback,parallelism,plan-template,recovery}.md`,
+`server/modules/kanban-metis/brief/chapters/{autonomy-cadence,learning,mcp-fallback,parallelism,recovery}.md`,
 resolved at runtime through `findApplicationRoot(getModuleDirectory(import.meta.url))` — so it reads
 from the source tree whether the server runs under `tsx` or from `dist-server`. The chapters are
 concatenated under their own headings into ONE string and handed over as a single
@@ -4827,11 +4826,8 @@ stated from the hooks' own side in MAN-753:
   short-circuit the guard ladder for every event of a board session and silence exactly the guards
   that are meant to apply to her.
 
-**What applies to a board Metis.** G1, G2, G5 and G10 are not board-coupled and do exactly what
-they do for an operator's session: **G1** lints the same `pm-*.plan.md` plans `/execute`
-would mis-handle, **G2** blocks a git write while a build marker is live — though the plan-path
-cleanup retired that marker's only producer, so it is OFF for every session today, board Metis
-included (INV-29) — **G5** sends a decision to `post_design_questions` instead of a
+**What applies to a board Metis.** G5 and G10 are not board-coupled and do exactly what
+they do for an operator's session: **G5** sends a decision to `post_design_questions` instead of a
 terminal prompt nobody is watching, and **G10** blocks destructive SQL from an unattended session.
 
 governs: /home/lyphe/.claude/hooks/kanban_metis.py
@@ -5828,8 +5824,8 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts
 section: plan-runner/001 What the runner writes, and where
 
 The root is `$PLAN_RUNNER_STATE_DIR` when set, else `~/.claude/state/runner` — the name the runner's own
-`hooks/plan_runner/state_lock.py` resolves at import, and with it `scripts/runner_watchdog.py`,
-`scripts/runner_statusline.py:205` and the quiet checkpoint's `scripts/quiet_checkpoint_runs.py`. Pointing one at a hermetic tree
+`hooks/plan_runner/state_lock.py` resolves at import, and with it `scripts/runner_watchdog.py` and
+`scripts/runner_statusline.py:205`. Pointing one at a hermetic tree
 therefore moves the runner's run directories AND the lock store under them, the terminal bar, the watchdog's ticks and this lane
 together. `locks/` is that store under whatever root is in play and is skipped when listing runs; anything that
 is not a directory is skipped. Four files per run are this lane's:
@@ -6320,9 +6316,8 @@ liveness the same way (`cmd/observe.py`, `_liveness`).
 
 That path is **absolute and follows the one state-root seam**. `state_lock.py:38-43` expands the state root at import — the root
 being `$PLAN_RUNNER_STATE_DIR` when set — and joins `locks` onto it, and every reader in `hooks/plan_runner/` goes through that
-same resolution (`costs.py`, the gate's `scripts/quiet_checkpoint_runs.py`, `scripts/runner_watchdog.py`). So the runs and the
-locks move TOGETHER: a root that moved one and not the other would read the other tree's locks, which is why the gate refuses to
-resolve them separately too.
+same resolution (`costs.py`, `scripts/runner_watchdog.py`). So the runs and the
+locks move TOGETHER: a root that moved one and not the other would read the other tree's locks.
 **This lane does not follow yet.** `runner-state.transport.ts`'s `LOCK_DIR` is still the literal
 `~/.claude/state/runner/locks`, while `plan-runner.module.ts:194` is the ONE reader that takes the runs from
 `$PLAN_RUNNER_STATE_DIR`. In the default configuration both name the same directory and nothing is wrong; under a moved env every
@@ -7075,7 +7070,9 @@ own schedule: the server's snapshot drops a complete arc once its `ended_at` is 
 the chrome every arc on this screen is drawn with — the root (`data-arc-status`, `data-collapsed`, and each
 lane's own handle through `rootAttributes`), the `Collapsible` whose trigger is the header's fold
 (`CardFoldToggle`, `data-card-fold`), the header (`data-arc-header`: the title row with the badge and the
-fold, an optional subtitle and an optional spend beside the title, then the nav row carrying
+fold — a WRAPPING row whose title is floored at its own longest word (`min-w-fit`, 2026-09-25), so an
+optional spend handed in through `titleTail` rides that row beside the title and drops to a line of
+its own where there is no room — an optional subtitle, then the nav row carrying
 `data-arc-prev` / `data-arc-next` / `data-arc-viewing`), the body slot (`CardFoldBody`, `data-arc-deck-body`)
 and the strip itself (`ol[data-arc-strip]`) — and each lane hands it its own data through those slots
 (`DeckItem` is the ONE width rule for a slot, so a deck cannot have items of two widths). `ArcDeck` draws

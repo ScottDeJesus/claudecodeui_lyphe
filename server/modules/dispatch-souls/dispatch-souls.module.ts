@@ -21,9 +21,9 @@ import { snapshotLaunches } from './soul-launch.service.js';
 const DEFAULT_STATE_DIR = '~/.claude/state/dispatch-souls';
 
 /**
- * How often the launch root is read. `plan-runner`'s own cadence, for its reason: fast enough
- * that a launch appearing or a receipt landing reaches the pin while the reader is still looking
- * at the chat, slow enough over a directory of a few dozen launches to be free.
+ * How often the launch root is read. Two seconds: fast enough that a launch appearing or a receipt
+ * landing reaches the pin while the reader is still looking at the chat, slow enough over a
+ * directory of a few dozen launches to be free.
  */
 const POLL_MS = 2000;
 

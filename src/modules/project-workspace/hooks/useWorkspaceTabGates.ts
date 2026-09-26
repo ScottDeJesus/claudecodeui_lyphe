@@ -2,7 +2,6 @@ import { useBrowserUseEnabled } from '@/modules/browser-use';
 import { useDispatcherPlans } from '@/modules/dispatcher';
 import { useHeal } from '@/modules/heal';
 import { useMemoryIntake } from '@/modules/memory-intake';
-import { useArcs, useRunnerRuns } from '@/modules/plan-runner';
 import { useTasksSettings } from '@/modules/task-master';
 import { useUiPreferences } from '@/shared/context/UiPreferencesContext';
 import type { AppTab } from '@/shared/types';
@@ -17,7 +16,7 @@ export type WorkspaceTabGates = {
   memoryPendingCount: number;
   /** True while the Runner tab belongs on the bar — the same sticky rule the Memory tab takes. */
   shouldShowRunnerTab: boolean;
-  /** How many runs the lane is carrying, for the tab's count pill. Paused runs are counted: they are still runs. */
+  /** How many plans the lane is carrying, for the tab's count pill. Paused and queued plans are counted: they are still plans. */
   runnerCount: number;
   /** True while the Heal tab belongs on the bar — the same sticky, data-gated rule the Memory and Runner tabs take. */
   shouldShowHealTab: boolean;
@@ -54,10 +53,9 @@ export type WorkspaceTabGates = {
  * tab a person is standing in it stays on the bar until they choose another one, so filing the
  * last pending memory empties the panel rather than taking the tab out from under them — and no
  * snap-back effect exists for it, because the gate itself never turns off mid-act. The Runner tab
- * is the SECOND DATA-gated, sticky tab and takes that rule whole: it appears while a run is in
- * motion OR an arc the runner is still walking is unfinished — the arc deck draws in that same
- * pane — it stays while it is the selected tab even once the last run ends and the last arc is
- * finished, and it has no snap-back effect either. The Heal tab is the THIRD and takes the same rule whole: it appears
+ * is the SECOND DATA-gated, sticky tab and takes that rule whole: it appears while the dispatcher's
+ * lane carries a plan, it stays while it is the selected tab even once the last plan is dismissed,
+ * and it has no snap-back effect either. The Heal tab is the THIRD and takes the same rule whole: it appears
  * while the ledger holds live friction and stays while it is the selected tab. The other three are
  * PREFERENCE-gated and keep their snap-backs in WorkspaceMain.
  *
@@ -70,13 +68,9 @@ export function useWorkspaceTabGates(activeTab: AppTab): WorkspaceTabGates {
   const { tasksEnabled, isTaskMasterInstalled } = useTasksSettings();
   const browserUseEnabled = useBrowserUseEnabled();
   const { pendingCount } = useMemoryIntake();
-  const { count: runCount } = useRunnerRuns();
-  // The dispatcher's v3 plans are cards in the same Runner list, so they count and gate with the runs.
-  const { count: planCount } = useDispatcherPlans();
-  const runnerCount = runCount + planCount;
-  // The deck's own count, off the same bus the runs come from: an arc the runner has not finished
-  // keeps the Runner tab on the bar by itself, because the gallery lives in that tab's pane.
-  const { count: arcCount } = useArcs();
+  // The dispatcher's plans ARE the Runner tab's list — the arcs' decks and the cards they hold — so
+  // this one count is the tab's pill and its gate at once.
+  const { count: runnerCount } = useDispatcherPlans();
   // The live count off the Heal tab's own context — the one poll of the ledger, read here in the
   // sidebar, the main region and the palette as well as in the panel. Zero until a read has landed
   // AND while one is failing, so the pill and the gate can never disagree; an unreadable ledger is
@@ -90,7 +84,7 @@ export function useWorkspaceTabGates(activeTab: AppTab): WorkspaceTabGates {
     shouldShowShellTab: !hideShellTab,
     shouldShowMemoryTab: pendingCount > 0 || activeTab === 'memory',
     memoryPendingCount: pendingCount,
-    shouldShowRunnerTab: runnerCount > 0 || arcCount > 0 || activeTab === 'runner',
+    shouldShowRunnerTab: runnerCount > 0 || activeTab === 'runner',
     runnerCount,
     shouldShowHealTab: healCount > 0 || activeTab === 'heal',
     healCount,

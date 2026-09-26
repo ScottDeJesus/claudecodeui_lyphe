@@ -106,7 +106,7 @@ export function removeOptimisticUserEchoes(
     // A row with no id is not an optimistic echo of anything — it passes through untouched, the
     // way a server row does. Reading `id.startsWith` off it would throw instead, and this merge
     // runs on the websocket listener's own thread of control: one unrecognised row would cost the
-    // whole conversation its liveness, which is exactly what it did when a box-wide `arc_state`
+    // whole conversation its liveness, which is exactly what it did when a box-wide `dispatcher_state`
     // frame was appended as a chat row and left the open transcript frozen until a reload.
     if (typeof message?.id !== 'string' || !message.id.startsWith('local_')) {
       return true;

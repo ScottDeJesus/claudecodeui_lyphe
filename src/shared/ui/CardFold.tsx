@@ -17,9 +17,9 @@ import { cn } from '@/shared/utils';
  * nothing to keep in sync. It is `aria-hidden` on purpose: it is a SIGN, and the accessible name
  * belongs to the button around it.
  *
- * `CardFoldToggle` is that button, for a card whose header is not itself the press — the run card,
- * the v3 plan card, an arc's deck and a dispatch arc's header each carry badges, clocks and verbs of
- * their own, so a header-wide button would swallow them. It must be drawn INSIDE a `Collapsible`,
+ * `CardFoldToggle` is that button, for a card whose header is not itself the press — the plan card
+ * and an arc's deck each carry badges, clocks and verbs of their own, so a header-wide button would
+ * swallow them. It must be drawn INSIDE a `Collapsible`,
  * which is where its open state comes from: `aria-expanded` is the primitive's own, and the chevron
  * reads the same context, so the sign and the attribute can never disagree.
  *
@@ -27,8 +27,7 @@ import { cn } from '@/shared/utils';
  * card's own tight 28px from there up — the desktop header is a row of 20px text and does not want a
  * 40px button in it. The glyph stays small either way; only the pressable box changes.
  *
- * Used by `RunCard`, `PlanCard` and `DeckFrame`, and — for the glyph alone — by
- * the chat's `ShapeFrame`.
+ * Used by `PlanCard` and `DeckFrame`, and — for the glyph alone — by the chat's `ShapeFrame`.
  */
 export function FoldChevron({ collapsed, className }: { collapsed: boolean; className?: string }) {
   return (
@@ -78,8 +77,8 @@ const INERT_WHILE_CLOSED = { inert: '', 'aria-hidden': true } as unknown as HTML
  * everywhere, and the animation is the point (INV-4354: a folded shape's boxes stay in the layout, so
  * `isVisible` lies and a painted height is the honest reading). What a clip does not do is take the
  * folded body out of the TAB ORDER or out of the ACCESSIBILITY TREE. On the chat's shapes that is
- * invisible prose; on a lane card it is the run's VERBS — and because a fold is remembered per card
- * id it survives reloads. Measured on a folded run card, 2026-09-25: 11 focusable controls inside a
+ * invisible prose; on a lane card it is the plan's VERBS — and because a fold is remembered per card
+ * id it survives reloads. Measured on a folded lane card, 2026-09-25: 11 focusable controls inside a
  * 0px-tall slot (`Resume`, `Dismiss`, the model switch, five phase rows), and the whole body still
  * read out in the aria snapshot. A keyboard reader met a card whose buttons could be tabbed to but
  * never seen.
@@ -94,7 +93,7 @@ const INERT_WHILE_CLOSED = { inert: '', 'aria-hidden': true } as unknown as HTML
  * verbatim, and `inert="false"` would be an inert element all the same, which is why the value is
  * `''` and not a boolean.
  *
- * Used by `RunCard`, `PlanCard` and `DeckFrame` — every card that folds.
+ * Used by `PlanCard` and `DeckFrame` — every card that folds.
  */
 export function CardFoldBody({ children, className }: { children: ReactNode; className?: string }) {
   const { open } = useCollapsible();

@@ -8,11 +8,10 @@ import { each, field, isCountOrNull, isFlag, isRecord, isText, isTextOrNull, nee
 
 /**
  * The dispatcher's one document, validated into the types the card draws (`server/shared/types.ts`,
- * the DISPATCHER v3 block) and published as this lane's picture.
+ * the DISPATCHER block) and published as this lane's picture.
  *
- * ONE READ, ONE PICTURE. The dispatcher keeps its plans in a SQLite store of its own, so unlike the
- * run lane — which reads a directory of small files and classifies them here — this lane has nothing
- * of its own to derive: `report.py::snapshot` derived the route, the daemon, each plan's word, its
+ * ONE READ, ONE PICTURE. The dispatcher keeps its plans in a SQLite store of its own, so this lane
+ * has nothing of its own to derive: `report.py::snapshot` derived the route, the daemon, each plan's word, its
  * phases and their stages at the instant it ran, and nothing of it is stored (INV-172). The server
  * carries that document with exactly three acts of its own, all named in {@link readDispatcherState}.
  *
@@ -27,10 +26,9 @@ import { each, field, isCountOrNull, isFlag, isRecord, isText, isTextOrNull, nee
  */
 
 /**
- * How long a completed plan stays on the lane, in seconds — the run lane's own number
- * (`plan-runner.module.ts:46`), so the two lanes never disagree about how long a finished thing is
- * shown before the tab leaves it alone. Past this the plan is dropped whether it was dismissed or
- * not: this lane is not an archive.
+ * How long a completed plan stays on the lane, in seconds — a day, the window the operator has to
+ * notice a plan finishing and dismiss it themselves. Past this the plan is dropped whether it was
+ * dismissed or not: this lane is not an archive.
  */
 const ENDED_KEEP_S = 24 * 60 * 60;
 
@@ -133,9 +131,9 @@ function pictureOf(body: unknown): DocumentPicture {
 /**
  * Whether a completed plan is still worth showing.
  *
- * A stamp that does not parse is KEPT rather than dropped: the conservative direction is the one the
- * run lane takes with a file it cannot classify, and a plan shown wrongly is a smaller fault than a
- * plan that silently vanished.
+ * A stamp that does not parse is KEPT rather than dropped: the conservative direction is the one this
+ * lane takes with anything it cannot read, and a plan shown wrongly is a smaller fault than a plan
+ * that silently vanished.
  */
 function isRecent(plan: DocumentPlan, nowS: number): boolean {
   if (plan.completed_at === null) return true;
@@ -143,7 +141,7 @@ function isRecent(plan: DocumentPlan, nowS: number): boolean {
   return !Number.isFinite(completedS) || completedS > nowS - ENDED_KEEP_S;
 }
 
-/** The plan's launching session as an app id — `null` when it names none, and resolved through the one rule the run lane uses (the raw uuid never crosses the wire). */
+/** The plan's launching session as an app id — `null` when it names none (the raw uuid never crosses the wire). */
 function withAppSession(plan: DocumentPlan): DispatcherPlan {
   return {
     ...plan,

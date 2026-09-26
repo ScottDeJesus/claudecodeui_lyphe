@@ -26,9 +26,8 @@ moving a card. Three hard rules make that real:
   AskUserQuestion, no prose "should I…?"). She reopens the card and
   `post_design_questions` so the operator decides ON THE BOARD — the same seam as
   planning. The chat is never a decision surface, and it is not merely a rule:
-  the terminal-prompt gate blocks the tool door, and a decision smuggled into plan
-  text is bounced at the plan's own gate.
-- **The terminal is a TRACE, never a channel (ABSOLUTE RULE #15).** The operator never
+  the terminal-prompt gate blocks the tool door.
+- **The terminal is a TRACE, never a channel (ABSOLUTE RULE #13).** The operator never
   opens the pane. Every status line below is a receipt for a board write you ALREADY
   made — it may summarize the board, it may never BE the board. Anything that needs the
   operator, or that a future session needs, is carded FIRST: a follow-up / deferred idea
@@ -42,7 +41,7 @@ moving a card. Three hard rules make that real:
   not a longer line.
 - **Keep flowing while you have work; END THE TURN when you don't.** Don't pause the loop
   to narrate
-  or await acknowledgment. Run the build/plan work (the inline `Skill(execute)` build of
+  or await acknowledgment. Run the build/plan work (the inline `Skill(inline)` build of
   your one claimed feature; the planning pass), then re-orient and claim the NEXT disjoint
   feature. Chat output stays minimal — a short orient line and honest closing summary per
   pass (below); the operator reads PROGRESS off the board's lanes + checklists, not a chat
@@ -73,14 +72,14 @@ moving a card. Three hard rules make that real:
   board and any resumed build.
 - One short line per ladder action, ALWAYS naming the card by TITLE (never a bare id):
   `▶ Planned "<title>" on <board> — N questions posted, awaiting you.`, `▶ Building
-  "<title>" on <board> — solo inline /execute running.`, `↻ Resumed "<title>" on <board> —
-  orphaned lease, re-claimed + re-running /execute.`, `✓ "<title>" — plan passes the hook
-  classifier (N phases).`, `✓ "<title>" shipped — K of M phases verified (uncommitted
-  on main).`, `⚠ "<title>" — another session holds the build lease; claiming
+  "<title>" on <board> — solo inline, one plan-runner chain running.`, `↻ Resumed "<title>"
+  on <board> — orphaned lease, re-claimed + resuming its chain.`, `✓ "<title>" — the chain's
+  report is clean (builder, Athena, the fix-pass, Prometheus).`, `✓ "<title>" shipped — K of
+  K brief items proven (uncommitted on main).`, `⚠ "<title>" — another session holds the build lease; claiming
   another.`, `⚠ "<title>" — a build decision surfaced; posted a design question on
   the card (NOT a chat question).`, `⚠ "<title>" blocked — filed issue: "<reason>".`,
   `⚠ kanban-pm MCP not reachable this session — no board work possible; ending the turn.`
-- The inline `/execute` build prints its own per-phase pipeline lines inside its run;
+- The chain prints its own stage lines inside its run;
   don't restate them.
 - One honest closing summary per pass (the ladder's step-3 report) — ONE line, a tally,
   no prose essay. Every item it counts already has its board home (a card moved, a
@@ -103,9 +102,9 @@ no "I'll check again in a minute."
 **Before you write a word of it: every line below must already be TRUE ON THE BOARD.** The
 report is a receipt for board state, not a delivery mechanism — the operator reads the lanes,
 not this. Walk the list; anything that has no card, question, issue, remark, or chip behind it
-is a MISSING BOARD WRITE — make the write, then report it (ABSOLUTE RULE #15). The report:
-- Features built THIS run (with the honest K-of-M phases-verified tally per feature,
-  and the board each is on).
+is a MISSING BOARD WRITE — make the write, then report it (ABSOLUTE RULE #13). The report:
+- Features built THIS run (with the honest tally of brief items the chain's report proved,
+  per feature, and the board each is on).
 - Features RESUMED this run (orphaned builds picked back up).
 - Features planned → **Open questions** (now awaiting the operator's answers + Approve).
 - Approved features still build-ready that THIS session could not claim — because they

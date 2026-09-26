@@ -197,7 +197,7 @@ export function classifyLaunch(
     // vendor billed the soul (`receiptTokens`). So a pin draws `$0.28 DeepSeek` with no tokens or
     // `1.2M in · 48k out` with no `$`, never both, and never `$0.00`.
     // `tokens_in`/`tokens_out` are `null` on a receipt written before the split shipped, which is
-    // what tells the pin to say the total alone (`usageText`, `src/modules/plan-runner/spend.ts`)
+    // what tells the pin to say the total alone (`usageText`, `src/shared/spend.ts`)
     // rather than `0 in · 0 out`.
     duration_s: ended ? readNumberOrNull(field(result, 'duration_s')) : null,
     cost_usd: receiptCostUsd(result, ended),

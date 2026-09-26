@@ -122,7 +122,6 @@ export function planOf(raw: unknown): DocumentPlan {
   const name = need(field(plan, 'name'), isText, 'plan.name');
   return {
     name,
-    v3: need(field(plan, 'v3'), isText, 'plan.v3'),
     state: need(field(plan, 'state'), isText, 'plan.state'),
     status: oneOf(field(plan, 'status'), PLAN_STATUSES, `status of ${name}`),
     repo: need(field(plan, 'repo'), isText, 'plan.repo'),
@@ -141,7 +140,7 @@ export function planOf(raw: unknown): DocumentPlan {
     // same row — one outing, two places it is true of. Read tolerantly (`plannerSince`), because a
     // dispatcher build older than the field writes no key at all.
     planner: plannerSince(field(plan, 'planner'), `plan.planner of ${name}`),
-    // The plan's EFFECTIVE model word — its own, else its arc's, else the runner's default. Never
+    // The plan's EFFECTIVE model word — its own, else its arc's, else the store's default. Never
     // derived here: this is the document's own answer, and a second derivation would be a second
     // answer (`dispatcher/model.py:model.of` is the only one).
     model: modelSince(field(plan, 'model'), 'plan.model'),

@@ -381,44 +381,5 @@ export const kanbanCardsService = {
   },
 };
 
-/**
- * Every plan path a live card's lease is holding, right now.
- *
- * The plan-archive sweep moves a finished plan out of the corpus, and the ONE thing that must stop
- * it is a build or a plan still running against that file: a card's lease can be fresh on a plan
- * nobody has touched for a week, so age alone does not cover it. This is the board answering what
- * its own leases hold, so that no other module has to read these rows sideways to find out.
- *
- * A lease is fresh by the SAME window a claim is granted by — `KANBAN_LEASE_STALE_SECONDS`, the one
- * home for the number, compared here the way `kanban-leases.db.ts` compares it for a claim — so a
- * card whose builder died does not hold a plan forever, and one whose builder is working does.
- * A stamp that will not parse is not fresh, which is the reading `readLeaseState` already gives it.
- *
- * The paths are returned as the card's `plan` column spells them (`~` and all): the caller is what
- * joins these to the corpus's own paths, and normalising here would put a second rule for "two
- * spellings of one path" in the board's hands.
- *
- * READ-ONLY, and it names no card: an empty list means no live lease holds any plan, which is the
- * ordinary answer on a quiet board rather than an error.
- */
-export function plansHeldByLease(): string[] {
-  const staleBefore = new Date(Date.now() - KANBAN_LEASE_STALE_SECONDS * 1000).toISOString();
-
-  const rows = getConnection()
-    .prepare(
-      `SELECT DISTINCT plan FROM kanban_cards
-       WHERE archived = 0
-         AND TRIM(COALESCE(plan, '')) != ''
-         AND (
-           (plan_lease_at IS NOT NULL AND julianday(plan_lease_at) >= julianday(?))
-           OR (build_lease_at IS NOT NULL AND julianday(build_lease_at) >= julianday(?))
-         )
-       ORDER BY plan ASC`
-    )
-    .all(staleBefore, staleBefore) as { plan: string }[];
-
-  return rows.map((row) => row.plan);
-}
-
 /** What `routes/card.routes.ts` takes hold of. */
 export type KanbanCardsService = typeof kanbanCardsService;

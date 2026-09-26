@@ -143,7 +143,7 @@ export function HealPanel() {
               <HealSection id="heal-heals" title={t('heal.cards.title', { defaultValue: 'Heals' })} count={state.summary.heals.length}>
                 <div className="flex min-w-0 flex-col gap-4">
                   <HealCycleList cycles={state.summary.cycles} cycleState={state.summary.cycle_state} />
-                  <HealCardList heals={state.summary.heals} queue={state.summary.queue} />
+                  <HealCardList heals={state.summary.heals} />
                 </div>
               </HealSection>
             </div>

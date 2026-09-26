@@ -37,7 +37,7 @@ export function HealCycleList({ cycles, cycleState }: { cycles: HealCycle[]; cyc
           {t('heal.cycles.title', { defaultValue: 'Cycles' })}
         </h4>
         {shown.length > 0 && <Badge as="span" tone="neutral">{shown.length}</Badge>}
-        <span className="text-xs text-muted-foreground">· {t('heal.cycles.hint', { defaultValue: 'nightly or pressed — Chiron ranks, heals walk his list' })}</span>
+        <span className="text-xs text-muted-foreground">· {t('heal.cycles.hint', { defaultValue: 'a press opens one — Chiron ranks, heals walk his list' })}</span>
       </div>
       {shown.length === 0 ? (
         <p className="text-xs text-muted-foreground" data-heal-cycles-empty>
@@ -62,7 +62,7 @@ function stageTone(stage: HealCycle['stage']): Tone {
   return 'info';
 }
 
-const TIER_TONE: Record<HealCycleTier, Tone> = { regression: 'danger', 'blocked-run': 'warn', frequent: 'info', 'one-off': 'neutral' };
+const TIER_TONE: Record<HealCycleTier, Tone> = { regression: 'danger', frequent: 'info', 'one-off': 'neutral' };
 
 /** Landed is green only when the heal it names landed `done`; a blocked heal or a run given back is amber. */
 function itemTone(item: HealCycleItem): Tone {

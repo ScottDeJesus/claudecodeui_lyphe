@@ -25,15 +25,15 @@ import type { DispatcherVerb, DispatcherVerbResult } from '@/shared/types.js';
  * all, and whether an hour can be armed for this one.
  *
  * The argv array is the security boundary. No shell parses any of this: the binary and its arguments
- * reach the kernel as separate strings, so a plan named `<name>.v3` is one argument the dispatcher
- * matches against its own name rule rather than a second command. The name is ALSO checked at the
+ * reach the kernel as separate strings, so a plan's name is one argument the dispatcher matches
+ * against its own name rule rather than a second command. The name is ALSO checked at the
  * route before it gets here (`dispatcher.routes.ts`), because two fences is what keeps the inner one
  * honest when a new caller appears.
  *
  * Nothing here throws. A refusal is a RESULT — the operator needs the dispatcher's own sentence, not
  * a 500 — and the cases where the dispatcher never got to answer come back as a one-word `reason`.
  * THE DISPATCHER REFUSES ON STDOUT, unlike almost every command on this host: `REFUSED <verb>
- * <name>.v3: <reason>` with exit 2, and a not-found line with exit 1 — `no plan <bare>` from a
+ * <name>: <reason>` with exit 2, and a not-found line with exit 1 — `no plan <bare>` from a
  * plan-only verb, or `no plan or arc <bare>` from one of the four an arc's name also reaches, whose
  * caller may have meant either kind (`hooks/dispatcher/cli.py`).
  * So `stdout` is the field a reader must look at FIRST, and a refusal travels whole in it, untouched
@@ -128,11 +128,10 @@ export async function runDispatcherVerb(
     }
 
     // Everything else is the dispatcher never answering, and `signal` is what separates the two
-    // kinds. The ways this arrives were MEASURED on this host for the run lane's identical call
-    // (`runner-verb.service.ts:130`): our own ceiling and a kill from outside both arrive as a
-    // SIGNAL with `code` null, a missing binary as the string `ENOENT`, an output overflow as the
-    // string `ERR_CHILD_PROCESS_STDIO_MAXBUFFER`. `killed` is the wrong test — it is false for the
-    // outside kill, which would then be reported as "could not be started" about a verb that ran.
+    // kinds. MEASURED on this host: our own ceiling and a kill from outside both arrive as a SIGNAL
+    // with `code` null, a missing binary as the string `ENOENT`, an output overflow as the string
+    // `ERR_CHILD_PROCESS_STDIO_MAXBUFFER`. `killed` is the wrong test — it is false for the outside
+    // kill, which would then be reported as "could not be started" about a verb that ran.
     //
     // Residue, named: an output overflow has no signal and so lands on `spawn-failed`, the one
     // string-code case where something DID start. The vocabulary is sealed at two and mirrored

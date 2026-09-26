@@ -4,7 +4,7 @@ import { X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 import { useElapsed } from '@/shared/hooks/useElapsed';
-import { spendText } from '@/modules/plan-runner';
+import { spendText } from '@/shared/spend';
 import { LLMProviderLogo } from '@/shared/ui';
 import type { SoulLaunchSnapshot } from '@/shared/types';
 import { soulName } from '@/modules/chat/subagents/subagentRow';
@@ -41,7 +41,7 @@ type SoulLaunchPinRowProps = {
 };
 
 /**
- * What the founding cost reads as, through the one spelling of it (`plan-runner/spend.ts`), and A
+ * What the founding cost reads as, through the one spelling of it (`spend.ts`), and A
  * SPEND FIGURE IS DOLLARS **OR** TOKENS, BY WHO WAS USED (operator rule, 2026-09-24): a soul
  * DeepSeek billed reads the PAID figure labelled by that vendor (`$0.28 DeepSeek`) and NO tokens,
  * and one that rode the operator's Claude subscription reads `1.2M in · 48k out` and no `$` at all.

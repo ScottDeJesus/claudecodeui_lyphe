@@ -57,28 +57,39 @@ Do this at the TOP of every orient (orient step 2), BEFORE claiming any new feat
        lease facts alone.
 3. **Resume an orphan:**
    a. **Reset its stale spinner — keep the bar honest.** If the card's checklist has
-      an item stuck `active` (the phase that was mid-build when the build died),
+      an item stuck `active` (the piece that was in flight when the build died),
       set it back to `pending` (`set_checklist_item(<that k-N>, 'pending')`) — an
       `active` spinner with no live builder is a lie. Items already `done` stay
-      `done` (those phases really shipped — recorded as `done` on the card's checklist).
+      `done` (the chain's report proved those — recorded as `done` on the card's checklist).
    b. **Reconstruct its footprint** by re-reading the `Footprint:` line from the
-      card's `plan` file on disk. Add it to the in-flight ledger NOW — so a resumed build
+      card's BRIEF (the attached path — `get_feature_plan(id)`). Add it to the in-flight
+      ledger NOW — so a resumed build
       never has its files double-claimed by a feature THIS session is about to claim.
-   c. **Re-claim it (atomic CAS) and build it SOLO INLINE** via `Skill(execute)` on its
-      `~/.claude/plans/pm-<slug>.plan.md`. First `set_status(id,'active')` to re-claim —
+   c. **Re-claim it (atomic CAS) and resume its BUILD** — the brief it was built from,
+      and the CHAIN that was walking it. First `set_status(id,'active')` to re-claim —
       this is the atomic compare-and-set: a stale/orphaned lease re-stamps to THIS
       session's owner, but if another session has SINCE picked it up (its lease went FRESH
       between your read and now), the CAS refuses — the answer comes back
       `buildLease: false` — in which case it is not yours to resume,
-      so skip it. Once claimed, the inline `/execute` is rerun-safe: it reads the **card's
-      BUILD CHECKLIST item states** (the build's progress + resume substrate, NOT the
-      `/execute` pipeline marker and NOT plan-file `✅ SHIPPED` ship-logs — those are the
-      legacy inline `/execute` flow's substrate; a Metis build writes neither), SKIPS every
-      `done` phase, and continues at the FIRST `pending` phase (idempotent — it never
-      re-ships). Before re-running `Skill(execute)`, read the first pending/active item's
-      `note` (the mid-phase breadcrumb from step c) to resume WITHIN that phase, not from its top.
-      Do NOT author a new plan or restart from Phase 1. **First reconcile the
-      operator's answers** (BUILD step 0) in case they answered while the build was orphaned.
+      so skip it. Once claimed, find the build's own record and continue THERE:
+      - **A chain exists for the slug** (its record is
+        `~/.claude/state/dispatch-chains/<chain-id>/chain.json`, and
+        `plan-runner chain --status <chain-id>` prints its stage table, plus `dead: <stage>`
+        if its walker is gone) → **resume that chain**
+        (`plan-runner chain --resume <chain-id>`, arming the same wait `/inline` names).
+        A resume re-runs the stage that failed and NEVER a stage that already passed, so
+        nothing is re-built and nothing is re-reviewed; a chain that stopped at a
+        `RULING NEEDED` digest is resumed with `--rulings <file>` (or with no rulings
+        file, which is the answer "take Athena's stated fix direction").
+      - **No chain record — the build died before the launch** → re-run BUILD step c:
+        `Skill(inline)` on the card's brief, one `plan-runner chain` launch.
+      Either way it is rerun-safe: the chain's own record says what passed, and the
+      card's checklist is a MIRROR of that record — never its replacement.
+      Do NOT re-brief the feature and do NOT restart it from the top.
+      **First reconcile the
+      operator's answers** (BUILD step 0) in case they answered while the build was orphaned —
+      an answer that changes scope is a re-brief BEFORE the resume, never a resume that
+      ignores it.
       (One feature per orient still holds — resuming an orphan IS this session's one build
       for the pass.)
 4. **Establish the disjoint-file ledger from ALL in-flight footprints (yours, other live
@@ -88,9 +99,9 @@ Do this at the TOP of every orient (orient step 2), BEFORE claiming any new feat
    on the same files. Nothing on this board checks that comparison for you; the discipline
    is yours.
 
-A guard the plan-file-missing case shares: if an orphan's `plan` file no longer
-exists on disk, do NOT silently drop it — `file_issue(id, 'plan file missing at
-<path> — re-plan needed')` (reopens it to To do) and name it in the report, exactly
+A guard the brief-missing case shares: if an orphan's BRIEF no longer
+exists at its attached path, do NOT silently drop it — `file_issue(id, 'brief missing at
+<path> — re-brief needed')` (reopens it to To do) and name it in the report, exactly
 as step a of the BUILD ladder does for a fresh build.
 
 ---
@@ -139,10 +150,10 @@ as step a of the BUILD ladder does for a fresh build.
   process, after any restart — so a crashed-then-restarted Metis picks her own work back
   up as **her own**, and the driver's re-adoption of a session is a continuation rather
   than a new claimant.
-- **The lease tracks THIS session's liveness** (its 10s heartbeat refresh). Because the
-  build runs INLINE, the session is alive for the whole build by construction — the
-  `Skill(execute)` call IS the session working — so the heartbeat keeps the lease fresh
-  throughout. If the session is KILLED mid-build (a crash, a usage-limit cutoff), the
+- **The lease tracks THIS session's liveness** (its 10s heartbeat refresh). The build runs
+  through this session, which stays the live owner for the whole of it — it ends the turn
+  only to be woken by the chain's report, and the MCP child's heartbeat keeps the lease
+  fresh throughout. If the session is KILLED mid-build (a crash, a usage-limit cutoff), the
   heartbeat stops, the lease goes stale (40s), and a later orient (this session restarted,
   or ANOTHER session) correctly reads it as ORPHANED → resumable. That is the intended
   recovery path. After the build completes, the session re-orients and claims the next
@@ -155,31 +166,36 @@ as step a of the BUILD ladder does for a fresh build.
 ## Idempotent / rerun-safe
 
 A Metis turn is safe to interrupt and re-run — including a usage-limit cutoff
-mid-build. Durable state lives in FOUR places and re-orienting reconciles from them:
+mid-build. Durable state lives in FIVE places and re-orienting reconciles from them:
 
 - **The build LEASE in the board's store** (the card's lease stamp + owner) +
   the **RESUME read** `list_active_builds` — these are how ANY session detects which
   `active` builds are orphaned (resumable) vs MINE-LIVE / FOREIGN-FRESH (leave alone).
   This is the durable, cross-session lock (atomic CAS) that survives a
   disconnect/rate-limit. See §"Resume on reconnect / rate-limit" + §"Lease lifecycle".
-- **The card's BUILD CHECKLIST in the board's store** — the per-phase progress + RESUME
-  substrate for a
-  Metis build. Metis marks each phase `active`→`done` as the inline build ships it
-  (chapter **parallelism.md**), so a resumed build reads the checklist's done/pending item states,
-  SKIPS every `done` phase, and continues at the FIRST `pending` one — no double-ship.
-  **Resuming an interrupted build is just re-claiming the feature (atomic CAS) and
-  re-running `Skill(execute)` on its plan** — do NOT author a
-  new plan or restart from Phase 1; the inline pipeline is rerun-safe and resumes at the
-  first pending phase. (A Metis build records progress on the CHECKLIST, not by writing
-  plan-file `✅ SHIPPED` ship-logs — so Metis never pre-stamps a ship-log and the plan's
-  ship-log guard is never tripped on the plan; the checklist is the honest progress mirror.)
+- **The CHAIN's own record on disk** — `~/.claude/state/dispatch-chains/<chain-id>/`
+  (`chain.json`, `builder-brief.md`, `report.md`, `ruling-needed.md`) — and it is the
+  RESUME SUBSTRATE for an interrupted build. `plan-runner chain --status <chain-id>` is the
+  stage table (and names a dead walker); `plan-runner chain --resume <chain-id>` re-runs the
+  stage that failed and never one that already passed. So resuming an interrupted build is
+  re-claiming the feature (atomic CAS) and resuming its chain — never re-briefing it,
+  never a fresh chain on a slug whose chain still holds it (a second chain on a live slug
+  is refused).
+- **The card's BUILD CHECKLIST in the board's store** — the progress MIRROR the operator
+  reads: Metis flips each item `active`→`done` as the chain's report proves it
+  (chapter **parallelism.md**). It is NOT the resume substrate (the chain's record is): a
+  `done` item is evidence already seen, never the place a resumed build reads its
+  instructions from.
 - **The card's lane in the board's store** — a card the operator moved (answered + approved, or
   reopened by a filed issue) is re-read fresh on EVERY orient. A feature
   whose operator files an issue MID-BUILD yanks back to **To do**; Metis notices the
   lane change on her next re-orient and stops greening that build rather than racing
-  the operator.
-- **The plan file on disk** — `attach_plan` is idempotent on path; re-attaching the
-  same plan just re-caches the body. A card already in **Open questions** is skipped
+  the operator. (The chain is NOT yanked — a chain already walking keeps its own record;
+  the card's lane governs whether the work greens.)
+- **The BRIEF on disk** — the card's attached brief path is the build's own input, and
+  BUILD step a guards it (a vanished brief is `file_issue`, never a silent skip).
+  `attach_plan` is idempotent on path; re-attaching the
+  same brief just re-caches its body. A card already in **Open questions** is skipped
   by the ladder's step (1) filter (it only walks `to_plan[]`), so re-orienting
   never re-posts questions on a card the operator is already answering.
 
@@ -192,12 +208,14 @@ planning ENDS, and a claim that outlived its planning would pin the card to an o
 walked away. The heartbeat re-stamps a plan lease through the same claim verb, every 10s,
 for the same reason the build lease is re-stamped there and not in the driver.
 
-**`/execute` stale-marker recovery — no longer a thing.** A Metis
-build runs `Skill(execute)` INLINE, so the `/execute` machinery is in play — but not a
-pipeline marker: that session-keyed marker family is retired and nothing in the house
-writes it, so there is no stale one to heal and no manual `rm` fallback to reach for.
-The hold that DOES survive a Metis build is the PENDING-plan one (`pending_execute_plan_<sid>.txt`),
-and its release is the run's own launch (the runner's `start` clears it for the session that
-started it); a stale one is reaped by the 48h sweep. A Metis build's
-OWN per-phase resume substrate is still the card's CHECKLIST (above). Everything else
-reconciles from the checklist + the card lanes + the lease.
+**Recovery is the CHAIN's record, never a marker file.** A Metis build is one
+`plan-runner chain`, and everything the walk needs to pick itself back up lives in that
+chain's own directory: the stage table says what passed, `report.md` says what the last
+landing proved, and `ruling-needed.md` says what is waiting on a ruling. There is no
+per-session marker to clear by hand before a build can start (nothing in this house writes
+one), and no fallback `rm` to reach for. A chain whose walker is gone is adopted by
+`plan-runner chain --status <chain-id>`, resumed by `--resume`, and never duplicated: a
+second chain on the same slug is refused while the first chain's soul is still running.
+If the chain record is gone entirely, that is a fresh launch from the brief (BUILD step c) —
+and the card's lane plus its closing remarks are all the operator needs to see where it
+stands.

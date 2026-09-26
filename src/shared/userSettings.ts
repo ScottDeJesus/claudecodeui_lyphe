@@ -32,8 +32,8 @@ export type UserPreferences = {
   themeFollowsSun: boolean;
   /** The transcript's reading size in px. See `useChatFontSize`. */
   chatFontSize: number;
-  /** The Runner tab's memory, a blob merged by its writers: `{ dismissedEndings: {run_id, ended_at}[] }`. See `modules/plan-runner/dismissedRuns.ts`. */
-  planRunner: unknown;
+  /** The Runner tab's memory, a blob merged by its two writers: `{ collapsedCards: string[], dismissedEndings: {run_id, ended_at}[] }`. See `modules/dispatcher/dismissedEndings.ts` and `shared/hooks/useCardFold.ts`. */
+  dispatcher: unknown;
   /** Composer toggle: every sent message rides under the `/plain` command. See `usePlainModePreference`. */
   plainMode: boolean;
   /** Where each chat-gutter widget sits and whether it is open, per chat, plus the fallback a chat
@@ -82,7 +82,7 @@ const LEGACY_STORAGE_KEYS: Record<UserPreferenceKey, string | null> = {
   themeFollowsSun: null,
   simpleChatProjectId: null,
   chatFontSize: null,
-  planRunner: null,
+  dispatcher: null,
   plainMode: null,
   chatGutters: null,
 };

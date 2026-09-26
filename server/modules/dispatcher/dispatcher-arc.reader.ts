@@ -33,7 +33,7 @@ export function arcOf(raw: unknown): DispatcherArc {
     delivers: need(field(arc, 'delivers'), isTextOrNull, 'arc.delivers'),
     // The ARC's OWN word, never one of its plans' effective one: this row is what the arc's control
     // draws and presses, and pressing it hands the word to every plan of the arc
-    // (`store.set_arc_model`). A build older than the field reads `null` — the runner's default.
+    // (`store.set_arc_model`). A build older than the field reads `null` — the store's default.
     model: modelSince(field(arc, 'model'), 'arc.model'),
     status: oneOf(field(arc, 'status'), ARC_STATUSES, `status of ${name}`),
     // THE ARC'S OWN VERBS, read off its plans' status words by `report_arcs` and drawn by the header

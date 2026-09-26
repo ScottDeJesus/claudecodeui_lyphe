@@ -1,14 +1,14 @@
 import type { TFunction } from 'i18next';
 
 /**
- * What a run — or a soul, or a plan — has SPENT, as every card in this app writes it.
+ * What a soul — or a plan — has SPENT, as every card in this app writes it.
  *
  * A SPEND FIGURE IS DOLLARS **OR** TOKENS, BY WHO WAS USED (operator rule, 2026-09-24). A `$` is a
  * PAYING API's bill, labelled by the vendor that charged it (`$0.28 DeepSeek`); tokens are the
  * operator's Claude subscription's own work, read as `1.2M in · 48k out`. A record has one or the
  * other, never both at once:
  *
- *   `$0.28 DeepSeek`                      a soul, stage or run DeepSeek billed — NO tokens
+ *   `$0.28 DeepSeek`                      a soul, stage or phase DeepSeek billed — NO tokens
  *   `10.3k in · 80 out`                   a record on the subscription — no `$`, never `$0.00`
  *   `$0.32 DeepSeek · 12.4M in · 80k out` an AGGREGATE that used both hands, its token half
  *                                         counting the CLAUDE records only, never a vendor's
@@ -18,19 +18,18 @@ import type { TFunction } from 'i18next';
  * DeepSeek's own words, which is why they are not shown beside its bill.
  *
  * THE HALF IS SETTLED UPSTREAM, NOT HERE. Every figure this module renders is already the right
- * half when it arrives: the server reads a run's, a plan's or a soul's CLAUDE half and zeroes a
- * vendor's tokens (`server/modules/plan-runner/runner-state.service.ts`,
- * `server/modules/dispatch-souls/soul-launch.service.ts`), and the CLI does the same in
+ * half when it arrives: the server reads a plan's or a soul's CLAUDE half and zeroes a vendor's
+ * tokens (`server/modules/dispatch-souls/soul-launch.service.ts`), and the CLI does the same in
  * `plan_runner/costs.py`. So this file needs no provider parameter — it formats, and the
  * either/or falls out of the two figures being one or the other.
  *
- * ONE SPELLING, FOUR SCREENS. The run card (`RunFace`), the dispatcher's plan card (`PlanFace`,
- * `PlanPhaseRow`) and the chat strip's launcher-soul pin (`SoulLaunchPinRow`) all draw the same
- * figure from a different record, and each of them feeding its own template literals is how one
- * app ends up saying `$0.41` on one screen and `0.41 USD` on the next. Every one of them comes
- * through here instead, and a change to the wording is a change to this file.
+ * ONE SPELLING, THREE SCREENS. The dispatcher's plan card (`PlanFace`, `PlanPhaseRow`), its arc
+ * deck's books (`DispatchArcDeck`) and the chat strip's launcher-soul pin (`SoulLaunchPinRow`) all
+ * draw the same figure from a different record, and each of them feeding its own template literals
+ * is how one app ends up saying `$0.41` on one screen and `0.41 USD` on the next. Every one of them
+ * comes through here instead, and a change to the wording is a change to this file.
  *
- * THE FIGURES ARE THE RUNNER'S OWN. `cost_usd` is PAID dollars by construction —
+ * THE FIGURES ARE THE WALK'S OWN. `cost_usd` is PAID dollars by construction —
  * `hooks/plan_runner/costs.py:result_cost` returns 0 for a child on the Claude subscription — and
  * the tokens are the CLAUDE half of the child's usage, split into what it READ (input + cache read
  * + cache write) and what it wrote. A record written before the split shipped carries the total

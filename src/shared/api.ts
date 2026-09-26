@@ -3,7 +3,7 @@ import {
   getStoredAuthToken,
   storeAuthToken,
 } from '@/shared/authToken';
-import type { DeepseekRange, FileLinePatch, JevRange, NtfySettingsInput, RunnerModelChoice, SubagentTranscriptResult } from '@/shared/types';
+import type { DeepseekRange, DispatcherModelChoice, FileLinePatch, JevRange, NtfySettingsInput, SubagentTranscriptResult } from '@/shared/types';
 import { IS_PLATFORM } from '@/shared/utils';
 import { readVoiceConfig, voiceConfigHeaders } from '@/shared/voiceConfig';
 
@@ -739,44 +739,12 @@ export const api = {
     reject: (id: string) => post(`/api/memory/${encodeURIComponent(id)}/reject`, {}),
   },
 
-  // The plan-runner lane (docs/MANUAL.md (plan-runner)). The server READS the runner's state directory —
-  // runs and arc decks alike — and relays a run's four verbs and an arc's reorder, model word, start
-  // and schedule to the runner's own binary; it never writes a state file and never starts a run
-  // from a plan. The reads are plain gets. The
-  // verbs are read from the RAW response, like `memory.approve` above and for the same reason: a
-  // 409 here carries the runner's own verdict — its refusal in its own `stderr`, with the run (or
-  // the arc) left exactly as it was — and putting it through `readApiJson` would turn that verdict
-  // into a thrown error the caller cannot show.
-  planRunner: {
-    runs: () => get('/api/plan-runner/runs'),
-    run: (id: string) => get(`/api/plan-runner/runs/${encodeURIComponent(id)}`),
-    stop: (id: string) => post(`/api/plan-runner/runs/${encodeURIComponent(id)}/stop`, {}),
-    resume: (id: string) => post(`/api/plan-runner/runs/${encodeURIComponent(id)}/resume`, {}),
-    // The run's own DeepSeek / Claude word (`auto` follows the chat's switch); restarts nothing.
-    model: (id: string, model: RunnerModelChoice) => post(`/api/plan-runner/runs/${encodeURIComponent(id)}/model`, { model }),
-    // A QUEUED run's Start at a time — `offpeak`, an ISO instant with a zone, or `none` to cancel — and the
-    // runner's next off-peak moment the `Start at …` button shows (`{ at }`, epoch seconds, or null).
-    schedule: (id: string, when: string) => post(`/api/plan-runner/runs/${encodeURIComponent(id)}/schedule`, { when }),
-    offpeak: () => get('/api/plan-runner/runs/offpeak'),
-    // The arc deck: every arc the runner is walking, and the verbs the deck owns — a drag that
-    // reorders the cards the runner has not started yet, and the arc's ONE model word, which every
-    // card it mints inherits. Both are read from the RAW response like the writes above: a 409
-    // carries the runner's own refusal sentence whole.
-    arcs: () => get('/api/plan-runner/arcs'),
-    arcReorder: (arc: string, from: number, to: number) => post(`/api/plan-runner/arcs/${encodeURIComponent(arc)}/reorder`, { from, to }),
-    arcModel: (arc: string, model: RunnerModelChoice) => post(`/api/plan-runner/arcs/${encodeURIComponent(arc)}/model`, { model }),
-    // The deck header's Start (`arc start`) and its `Start at …` / Cancel (`arc schedule`), raw like the rest.
-    arcStart: (arc: string) => post(`/api/plan-runner/arcs/${encodeURIComponent(arc)}/start`, {}),
-    arcSchedule: (arc: string, when: string) => post(`/api/plan-runner/arcs/${encodeURIComponent(arc)}/schedule`, { when }),
-  },
-
-  // The dispatcher lane (docs/MANUAL.md (dispatcher)): the v3 plans in the dispatcher's own store, and the
-  // six verbs the plan cards and the arc header press. It sits beside `planRunner` because it is that lane's sibling —
-  // the picture is `dispatcher status --json` relayed whole, and the verbs are relayed to the
-  // dispatcher's own binary by argv, never by a shell.
+  // The dispatcher lane (docs/MANUAL.md (dispatcher)): the plans in the dispatcher's own store, and the
+  // six verbs the plan cards and the arc header press. The picture is `dispatcher status --json`
+  // relayed whole, and the verbs are relayed to the dispatcher's own binary by argv, never by a shell.
   //
-  // The verbs are read from the RAW response for exactly the reason `planRunner`'s are, with one
-  // difference worth naming: the dispatcher prints its refusals on STDOUT (`REFUSED schedule
+  // The verbs are read from the RAW response for one reason worth naming: the dispatcher prints its
+  // refusals on STDOUT (`REFUSED schedule
   // <name>: is live — stop it first`, exit 2), not on stderr, so a 409 body carries the verdict
   // in `stdout` and the reader looks there first. Its successes are on stdout too (`UNSCHEDULED
   // <name>`), so the answer is the same field either way.
@@ -787,10 +755,10 @@ export const api = {
     resume: (name: string) => post(`/api/dispatcher/plans/${encodeURIComponent(name)}/resume`, {}),
     park: (name: string) => post(`/api/dispatcher/plans/${encodeURIComponent(name)}/park`, {}),
     unpark: (name: string) => post(`/api/dispatcher/plans/${encodeURIComponent(name)}/unpark`, {}),
-    // A v3 plan's own DeepSeek / Claude word (`dispatcher model <plan> <word>`). The plan card's
+    // A plan's own DeepSeek / Claude word (`dispatcher model <plan> <word>`). The plan card's
     // control relays it; nothing is optimistic, and the next `dispatcher_state` frame reads the
     // word back. Restarts nothing — the word is read when a chain is LAUNCHED.
-    model: (name: string, model: RunnerModelChoice) => post(`/api/dispatcher/plans/${encodeURIComponent(name)}/model`, { model }),
+    model: (name: string, model: DispatcherModelChoice) => post(`/api/dispatcher/plans/${encodeURIComponent(name)}/model`, { model }),
     // The DISPATCH ARC header's four presses (`dispatcher model|stop|resume|schedule <arc> …`), each
     // relayed to the arc's own door. Separate routes from the plan's because an arc is addressed by
     // its own door (`.arc`), never through a plan's.
@@ -799,17 +767,17 @@ export const api = {
     // step — `stop` over the arc's walking plans, `resume` and `schedule` over its stopped ones — so
     // the header's press and one typed at a terminal are the same verb on the same set of plans. A
     // `/arcs/…` route for each is the whole reason the two surfaces cannot drift.
-    arcModel: (name: string, model: RunnerModelChoice) => post(`/api/dispatcher/arcs/${encodeURIComponent(name)}/model`, { model }),
+    arcModel: (name: string, model: DispatcherModelChoice) => post(`/api/dispatcher/arcs/${encodeURIComponent(name)}/model`, { model }),
     arcStop: (name: string) => post(`/api/dispatcher/arcs/${encodeURIComponent(name)}/stop`, {}),
     arcResume: (name: string) => post(`/api/dispatcher/arcs/${encodeURIComponent(name)}/resume`, {}),
     // The arc's Resume — or Start, for plans still at the gate — at a time: the same three shapes a
     // plan's schedule takes, through the same server-side reader.
     arcSchedule: (name: string, when: string) => post(`/api/dispatcher/arcs/${encodeURIComponent(name)}/schedule`, { when }),
     // A plan's Start at a time — `offpeak`, an ISO instant with a zone, or `none` to cancel — the
-    // same three shapes the runner's schedule takes (`readRunnerScheduleWhen` on the server).
+    // same three shapes the arc's own schedule takes, through the same reader.
     schedule: (name: string, when: string) => post(`/api/dispatcher/plans/${encodeURIComponent(name)}/schedule`, { when }),
-    // The dispatcher's next DeepSeek off-peak moment (`{ at }`, epoch seconds, or null) — the same
-    // hour `planRunner.offpeak` answers, relayed from the dispatcher's own binary.
+    // The dispatcher's next DeepSeek off-peak moment (`{ at }`, epoch seconds, or null), relayed
+    // from the dispatcher's own binary.
     offpeak: () => get('/api/dispatcher/plans/offpeak'),
   },
 

@@ -1,8 +1,8 @@
-import { DISPATCHER_ENDING_PREFIX, dismissRun } from '@/modules/plan-runner';
+import { dismissEnding } from '@/modules/dispatcher/dismissedEndings';
 import type { DispatcherArc, DispatcherPhase, DispatcherPlan, DispatcherPlanStatus, DispatcherPlanner, Tone } from '@/shared/types';
 
 /**
- * The pure vocabulary of a v3 plan, in one file with no React in it.
+ * The pure vocabulary of a plan, in one file with no React in it.
  *
  * Everything here is a total function of a document the server already sent. Nothing polls, nothing
  * fetches and nothing remembers: a card that needs a fact about a plan asks one of these, so two
@@ -15,8 +15,19 @@ import type { DispatcherArc, DispatcherPhase, DispatcherPlan, DispatcherPlanStat
  * card from existing at all.
  */
 
-/** A scheduled moment's rendering is the runner lane's own (`scheduleClock`), never a second copy: one clock, two cards. */
-export { scheduleClock } from '@/modules/plan-runner';
+/**
+ * A scheduled moment in the reader's own clock: `3:00 AM` today, `Sep 23, 3:00 AM` any other day. The
+ * date rides whenever the moment is not today, because DeepSeek's off-peak lifts at 3 AM Pacific — past
+ * the operator's midnight — and a bare `3:00 AM` read in the evening names a time that has already
+ * passed. One clock, three call sites: a plan card's own clock (`PlanFace.PlanClock`), an arc's armed
+ * hour (`DispatchArcControls`) and `ScheduleControl`'s `Start at …` all name one moment one way.
+ */
+export function scheduleClock(epochSeconds: number, now: number = Date.now()): string {
+  const moment = new Date(epochSeconds * 1000);
+  const time: Intl.DateTimeFormatOptions = { hour: 'numeric', minute: '2-digit' };
+  if (moment.toDateString() === new Date(now).toDateString()) return moment.toLocaleTimeString([], time);
+  return moment.toLocaleString([], { month: 'short', day: 'numeric', ...time });
+}
 
 /**
  * One of the document's ISO stamps as epoch SECONDS, or `null` when there is nothing to convert —
@@ -36,7 +47,7 @@ export function epochOf(iso: string | null): number | null {
  * How a plan's word reaches the eye. `live` and `complete` are `positive`: one is walking, the other
  * finished — neither asks for anything. Everything else is `neutral`: `paused`, `queued`,
  * `scheduled`, `parked` and `idle` are all states the operator chose or is waiting on, and amber
- * over a plan they parked themselves would be the card arguing with them (the run lane's rule).
+ * over a plan they parked themselves would be the card arguing with them.
  */
 export function planStatusTone(status: DispatcherPlanStatus): Tone {
   return status === 'live' || status === 'complete' ? 'positive' : 'neutral';
@@ -96,7 +107,7 @@ export function phaseProgress(plan: DispatcherPlan): { done: number; total: numb
  * LIVE first because something is happening to it right now. SCHEDULED next because it is the one
  * plan that will move WITHOUT the operator — the hour is armed and a timer will press Start — so it
  * outranks the two parks below it (the document's own precedence, `DispatcherPlanStatus`). QUEUED
- * above PAUSED for the run lane's reason: a queued plan has not started at all and its Start is the
+ * above PAUSED because a queued plan has not started at all and its Start is the
  * card's whole point, while a paused one was stopped mid-walk and can wait. PARKED and IDLE follow:
  * both were set aside on purpose, and a list that raised the operator's own decision above a plan in
  * motion would be the app arguing with them. COMPLETE last of all — nothing more will happen to it;
@@ -178,14 +189,13 @@ export function byArc(plans: DispatcherPlan[], arcs: DispatcherArc[]): Dispatche
   return { groups, rest: rest.sort(byUrgencyThenNewest) };
 }
 
-/** The layer a plan's card wears in the strip: the runner deck's own three words, over a plan's status. */
+/** The layer a plan's card wears in the arc's strip: three words, over a plan's status. */
 export type DispatchDeckLayer = 'done' | 'top' | 'beneath';
 
 /**
  * Which layer of the arc's strip a plan is on — `done` for one that has finished, `top` for the one
  * being walked, `beneath` for everything else. Read by the card for the dimming a finished card wears
- * and written on the row as the harness's handle, so a deck's strip reads the same in either lane
- * (`ArcDeck`'s cards wear `ArcCardLayer` the same way).
+ * and written on the row as the harness's handle, so the strip can be read without measuring pixels.
  */
 export function planLayer(plan: DispatcherPlan): DispatchDeckLayer {
   if (plan.status === 'complete') return 'done';
@@ -198,8 +208,7 @@ export function planLayer(plan: DispatcherPlan): DispatchDeckLayer {
  *
  * Both orders are the ARC's (`arc.plans`), never urgency's: an arc is a sequence of plans that depend
  * on each other, so "where this arc stands" is a position in that sequence and not the most urgent
- * card in it. The runner's deck asks the same question of its own vocabulary (its live card, or the
- * last once the arc is complete).
+ * card in it. It is what the deck's strip opens on.
  */
 export function deckFocusIndex(plans: readonly DispatcherPlan[]): number {
   const next = plans.findIndex((plan) => plan.status !== 'complete');
@@ -235,7 +244,7 @@ export function waitsOnSiblings(plan: DispatcherPlan, members: DispatcherPlan[])
  * both homes and every nested list read, so three call sites cannot drift apart about when a Dismiss
  * appears or what it prunes.
  *
- * `carriedNames` is the lane's UNFILTERED list of plan ids (`useDispatcherPlans`), because that is
+ * `carriedNames` is the lane's UNFILTERED list of plan names (`useDispatcherPlans`), because that is
  * what a dismissal prunes the stored list against: pruning against the drawn cards would drop every
  * earlier dismissal the moment a second one was made. A plan whose completion the document cannot
  * date — the field null, or a stamp nothing can parse — has no ending to match and offers nothing.
@@ -243,7 +252,7 @@ export function waitsOnSiblings(plan: DispatcherPlan, members: DispatcherPlan[])
 export function planDismissal(plan: DispatcherPlan, carriedNames: string[]): (() => void) | undefined {
   const endedAt = epochOf(plan.completed_at);
   if (plan.status !== 'complete' || endedAt === null) return undefined;
-  return () => dismissRun({ run_id: `${DISPATCHER_ENDING_PREFIX}${plan.name}`, ended_at: endedAt }, carriedNames);
+  return () => dismissEnding({ run_id: plan.name, ended_at: endedAt }, carriedNames);
 }
 
 /**

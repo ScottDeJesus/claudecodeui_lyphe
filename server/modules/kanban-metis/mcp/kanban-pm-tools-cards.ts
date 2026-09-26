@@ -99,13 +99,16 @@ export function createCardTools(client: KanbanPmClient): ToolTable {
     {
       name: 'attach_plan',
       description:
-        "Attach a plan to a feature: set its plan file path and cache the plan's markdown body " +
+        "Attach a brief to a feature: set its brief file path and cache the brief's markdown body " +
         'on the card. Overwrites any body already there.',
       inputSchema: toolSchema(
         {
           id: CARD_ID_ARGUMENT,
-          path: { type: 'string', description: "The plan file path (e.g. 'plans/<name>.md')." },
-          body: { type: 'string', description: "The plan's markdown body, cached on the card." },
+          path: {
+            type: 'string',
+            description: "The brief file path (e.g. '~/.claude/plans/briefs/<slug>.brief.md').",
+          },
+          body: { type: 'string', description: "The brief's markdown body, cached on the card." },
         },
         ['id', 'path', 'body']
       ),

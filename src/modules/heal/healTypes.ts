@@ -166,17 +166,6 @@ export function hasPreChangeRows(
   );
 }
 
-/** The runner heal queue's own items — the second door, read here and never written. */
-export type HealQueueItem = {
-  id: string;
-  plan: string;
-  phase: string;
-  cause: string;
-  status: string;
-  next: string | null;
-  enqueued_at: number;
-};
-
 export type IgnoreRow = {
   id: number;
   tool: string;
@@ -189,21 +178,20 @@ export type IgnoreRow = {
 /** Where a cycle stands: Chiron judging, heals walking his list, the last ones finishing, or over. */
 export type HealCycleStage = 'judging' | 'healing' | 'closing' | 'done' | 'stopped';
 
-/** Why an item ranks where it does — a cause that came back, a run that cannot finish, a kind that keeps happening, or once. */
-export type HealCycleTier = 'regression' | 'blocked-run' | 'frequent' | 'one-off';
+/** Why an item ranks where it does — a cause that came back, a kind that keeps happening, or once. */
+export type HealCycleTier = 'regression' | 'frequent' | 'one-off';
 
 /** One line of a cycle's worklist, in the worker's rank, with Chiron's `why` and what became of it. */
 export type HealCycleItem = {
   rank: number;
-  /** `kind:<kind>` or `queue:<item id>`. */
+  /** `kind:<kind>`. */
   ref: string;
   tier: HealCycleTier;
-  /** The kind name, or `run ⛔ <plan basename> phase <phase>` — printed as the worker wrote it. */
+  /** The kind name, printed as the worker wrote it. */
   label: string;
   why: string;
   state: 'pending' | 'launched' | 'landed' | 'skipped' | 'dropped' | 'ignored';
   heal_id: string | null;
-  pid: number | null;
   note: string;
 };
 
@@ -293,7 +281,6 @@ export type HealSummary = {
   held: Record<HealKind, string>;
   kinds: HealKindRow[];
   heals: HealCard[];
-  queue: HealQueueItem[];
   ignore: IgnoreRow[];
   switches: HealSwitches;
   /** Up to ten, newest first. */

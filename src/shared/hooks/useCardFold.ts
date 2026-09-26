@@ -5,67 +5,48 @@ import { readUserPreference, subscribeToUserPreferences, writeUserPreference } f
 /**
  * Which CARDS the operator has folded shut, and the one way to change that.
  *
- * The outer fold of a lane card — the run card, the dispatcher's v3 plan card, a runner arc's deck
- * and the dispatcher's arc deck (the deck that holds an arc's plans). It is not the inner disclosure
- * those cards already have (a run's phase list, a plan's event log): those stay exactly as they
- * were, and this is the fold above them that hides the whole body.
+ * The outer fold of a lane card — the dispatcher's plan card and its arc deck (the deck that holds an
+ * arc's plans). It is not the inner disclosure those cards already have (a plan's phase list, its
+ * event log): those stay exactly as they were, and this is the fold above them that hides the whole
+ * body.
  *
  * ABSENT MEANS EXPANDED. Always. Nothing here ever folds a card on its own — the operator asked to
  * collapse things himself — so the stored list holds ONLY the cards currently folded and a key
  * missing from it is an open card. That is the same default `collapseState.ts` states for the chat's
  * shapes, and it is the one that fails safe: a lost entry shows more, never less.
  *
- * IT RIDES THE SERVER-BACKED PREFERENCES, under the runner's own `planRunner` blob and MERGED into
- * it (`dismissedRuns.ts` is the store this shape is copied from, and MAN-498 is why the write is a
- * merge: a replaced blob drops whatever else lives under the key). So a fold made in the Runner tab
- * is there in the chat gutter's Runner widget, a fold survives a reload, and a fold made on the
- * phone is there on the desktop at its next load. The mirror in localStorage is what makes the very
- * first paint already folded, with no flash of an open card.
+ * IT RIDES THE SERVER-BACKED PREFERENCES, under the `dispatcher` blob and MERGED into it
+ * (`dismissedEndings.ts` is the other writer of that blob, and MAN-498 is why the write is a merge: a
+ * replaced blob drops whatever else lives under the key). So a fold made in the Runner tab is there in
+ * the chat gutter's Runner widget, a fold survives a reload, and a fold made on the phone is there on
+ * the desktop at its next load. The mirror in localStorage is what makes the very first paint already
+ * folded, with no flash of an open card.
  *
- * THE KEY IS `space:id`, AND THE SPACE IS WHY. Four kinds of card fold and one list holds them all:
- * a run (`run:<run_id>`), a v3 plan (`plan:<plan name>`), a runner arc (`arc:<arc name>`) and a
- * dispatch arc (`darc:<arc name>` — the arc's deck, whose fold takes the strip and the verbs). A run id
- * and an arc name are both free-form strings the runner hands us, so a bare shared namespace could
- * collide; a prefix has nothing left to collide with. It
- * is also what the PRUNE reads, for the reason `dismissedRuns.ts` grew its own `spaceOf`: a surface
- * that can see one lane must not prune the other lane's entries.
+ * THE KEY IS `space:id`, AND THE SPACE IS WHY. Two kinds of card fold and one list holds them all: a
+ * plan (`plan:<plan name>`) and a dispatch arc (`darc:<arc name>` — the arc's deck, whose fold takes
+ * the strip and the verbs). The prefix is what the PRUNE reads: a surface that can see the plans but
+ * not the arcs must not prune the arcs' entries.
  *
- * A FOLD IS OF THE CARD, NEVER OF ONE ENDING, and that is where this DEPARTS from the dismissal
- * store on purpose. `dismissRun` keys on `{run_id, ended_at}` because a resumed run that ends again
- * is news; a fold carries no such news — `plan-runner resume` reopens a run IN PLACE under the same
- * id, and a plan walked again is still the same plan — so the reader who folded a card to get it out
- * of the way finds it still folded when it comes back. Keying on the ending would spring it open
- * every time the runner finished a phase.
+ * A FOLD IS OF THE CARD, NEVER OF ONE ENDING, and that is where this DEPARTS from the dismissal store
+ * on purpose. `dismissEnding` keys on `{run_id, ended_at}` because a plan that ends again is news; a
+ * fold carries no such news — a plan walked again is still the same plan — so the reader who folded a
+ * card to get it out of the way finds it still folded when it comes back. Keying on the ending would
+ * spring it open every time the dispatcher completed a phase.
  *
- * The key form lives HERE rather than beside each card, by the rule `DISPATCHER_ENDING_PREFIX`
- * states for its own list: the prefix is half of this list's address space, and four modules writing
- * their own spelling of it is how the spaces would drift apart.
+ * The key form lives HERE rather than beside each card: the prefix is half of this list's address
+ * space, and two modules writing their own spelling of it is how the spaces would drift apart.
  */
 
 export type CardFold = { collapsed: boolean; toggle: () => void };
 
-/** A run card's space: the runner's `run_id`, which survives an in-place resume. */
-const RUN_SPACE = 'run:' as const;
-/** A v3 plan card's space: the plan's name, which is what every dispatcher verb and toast prints. */
+/** A plan card's space: the plan's name, which is what every dispatcher verb and toast prints. */
 const PLAN_SPACE = 'plan:' as const;
-/** A runner arc's space: the arc's name — the runner's own directory name under `~/.claude/state/arcs`. */
-const RUNNER_ARC_SPACE = 'arc:' as const;
-/** A dispatch arc's space: the store's arc name. Apart from the runner's, since the two lanes' arcs are different objects that may share a name. */
+/** A dispatch arc's space: the store's arc name. */
 const DISPATCH_ARC_SPACE = 'darc:' as const;
 
-/** The fold key of a plan-runner run. */
-export function runFoldKey(runId: string): string {
-  return `${RUN_SPACE}${runId}`;
-}
-
-/** The fold key of a dispatcher v3 plan. */
+/** The fold key of a plan. */
 export function planFoldKey(planName: string): string {
   return `${PLAN_SPACE}${planName}`;
-}
-
-/** The fold key of one arc on the runner's lane. */
-export function runnerArcFoldKey(arcName: string): string {
-  return `${RUNNER_ARC_SPACE}${arcName}`;
 }
 
 /** The fold key of one arc on the dispatcher's lane. */
@@ -73,10 +54,10 @@ export function dispatchArcFoldKey(arcName: string): string {
   return `${DISPATCH_ARC_SPACE}${arcName}`;
 }
 
-/** The preference whose blob this list lives under — the runner's own, shared with the dismissals. */
-const KEY = 'planRunner' as const;
+/** The preference whose blob this list lives under — the dispatcher's own, shared with the dismissals. */
+const KEY = 'dispatcher' as const;
 
-type PlanRunnerPreference = Record<string, unknown> & { collapsedCards?: unknown };
+type DispatcherPreference = Record<string, unknown> & { collapsedCards?: unknown };
 
 /**
  * The most folds kept. A one-line cap on a list that only ever grows by a press, so no reader has to
@@ -87,9 +68,9 @@ const CAP = 200;
 
 const EMPTY: readonly string[] = Object.freeze([]);
 
-function readPreference(): PlanRunnerPreference {
+function readPreference(): DispatcherPreference {
   const value = readUserPreference<unknown>(KEY, null);
-  return value !== null && typeof value === 'object' && !Array.isArray(value) ? (value as PlanRunnerPreference) : {};
+  return value !== null && typeof value === 'object' && !Array.isArray(value) ? (value as DispatcherPreference) : {};
 }
 
 function isFoldKey(value: unknown): value is string {
@@ -116,7 +97,7 @@ function spaceOf(key: string): string {
 
 /**
  * The list, written back MERGED into the blob: `dismissedEndings` and anything else a later feature
- * parks under `planRunner` is carried through untouched, and the fold list is the only key replaced.
+ * parks under `dispatcher` is carried through untouched, and the fold list is the only key replaced.
  */
 function writeFolds(keys: readonly string[]): void {
   const { collapsedCards: _prior, ...rest } = readPreference();
@@ -139,8 +120,8 @@ export function setCardFold(key: string, collapsed: boolean): void {
  * makes this safe to call from a screen that only holds part of the lane:
  *
  * - a key in `live` is kept;
- * - a key whose SPACE the caller cannot see AT ALL is kept too, because a surface that drew no run
- *   card says nothing about runs — the tab and the gutter widget each hand in every list they hold,
+ * - a key whose SPACE the caller cannot see AT ALL is kept too, because a surface that drew no plan
+ *   card says nothing about plans — the tab and the gutter widget each hand in every list they hold,
  *   so this only ever shields a lane the caller genuinely cannot speak for, never one it drew empty.
  *
  * It follows that an empty `live` prunes nothing at all, which is the failure this could otherwise
@@ -169,7 +150,7 @@ export function pruneCardFolds(live: readonly string[]): void {
  * The toggle reads the STORE and not this render's `collapsed`, so two presses inside one frame
  * cannot both write `true`: the second sees what the first wrote.
  *
- * Used by `RunCard`, `PlanCard` and `DeckFrame` (the runner's and the dispatcher's arc decks) — every card that folds.
+ * Used by `PlanCard` and `DeckFrame` — every card that folds.
  */
 export function useCardFold(key: string): CardFold {
   const collapsed = useSyncExternalStore(subscribeToUserPreferences, readCollapsedCards, readCollapsedCards).includes(key);
@@ -181,7 +162,7 @@ export function useCardFold(key: string): CardFold {
 
 /**
  * Keeps the stored folds to the cards a lane still carries — the one call site is
- * `src/modules/runner-tab/hooks/useLaneFoldPrune.ts`, which assembles the four lists both of the
+ * `src/modules/runner-tab/hooks/useLaneFoldPrune.ts`, which assembles the two lists both of the
  * lane's homes already hold.
  *
  * The effect fires on the array's IDENTITY, which changes with every frame the bus hands out; a

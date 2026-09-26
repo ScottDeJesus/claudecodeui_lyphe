@@ -39,7 +39,7 @@ export function plannerOf(raw: unknown): DispatcherPlanner {
     // adornments): `target` is the work the outing is FOR, `plan` the name it lands in.
     plan: need(field(planner, 'plan'), isText, 'planner.plan'),
     // THE SOUL AND THE MODEL ARE FREE TEXT, unlike the verb and the state below, and the difference is
-    // deliberate: `eupalinos-v3` and the model word a launch was handed are NAMES to draw rather than
+    // deliberate: `eupalinos` and the model word a launch was handed are NAMES to draw rather than
     // words a card switches on, so a fourth soul or a model this build has never heard of is a badge
     // that says so — not a reason to blank every card on the lane.
     soul: need(field(planner, 'soul'), isText, 'planner.soul'),

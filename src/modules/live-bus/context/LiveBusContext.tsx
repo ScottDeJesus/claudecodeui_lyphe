@@ -37,7 +37,7 @@ function comparableJson(payload: unknown): string | null {
  * THE BUS KNOWS NO PRODUCER. It imports no transport, calls no endpoint and names no frame kind;
  * it retains, dispatches, and admits topics, and that is the whole of it. What fills it is a
  * FEED — a headless component owned by the module whose data it carries, which subscribes to
- * whatever it likes and calls `publish`. The first is `RunnerFeed` in `src/modules/plan-runner/`;
+ * whatever it likes and calls `publish`. The first is `DispatcherFeed` in `src/modules/dispatcher/`;
  * a second (git delegation, Task Master) is a sibling `*Feed.tsx` in its own module and never a
  * line in this directory. That is what keeps this file from growing a switch over frame kinds.
  *

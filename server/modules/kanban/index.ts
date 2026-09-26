@@ -16,10 +16,6 @@ export { kanbanBoardsService } from './kanban-boards.service.js';
 // (`kanban-metis/metis-telemetry.service.ts`) adds a tick's token delta to a card's four
 // `build_tokens_*` counters without a deep import into this module's files.
 export { kanbanCardsService } from './kanban-cards.service.js';
-// The board answering what its own leases hold — the plan paths the archive sweep must not move.
-// The sweep is the plan-runner's and the join is `server/index.ts`'s, so it is asked for here rather
-// than read out of these rows by a module the board cannot see.
-export { plansHeldByLease } from './kanban-cards.service.js';
 export { kanbanChecklistService } from './kanban-checklist.service.js';
 export { kanbanLeasesService } from './kanban-leases.service.js';
 // The lesson store's five verbs: the board's own read surface for what a build learned, and the

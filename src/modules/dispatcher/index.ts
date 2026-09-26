@@ -1,7 +1,7 @@
 // The dispatcher lane's door into the live bus. App mounts it once, inside LiveBusProvider and
-// directly inside RunnerFeed, beside every other lane's feed.
+// beside every other lane's feed.
 export { DispatcherFeed } from '@/modules/dispatcher/DispatcherFeed';
-// The lane's read side — every v3 plan the store holds, this box's posture beside them, and which
+// The lane's read side — every plan the store holds, this box's posture beside them, and which
 // complete plans the operator has already dismissed. The Runner tab reads it for the card list and
 // for the count that gates the tab.
 export { useDispatcherPlans } from '@/modules/dispatcher/hooks/useDispatcherPlans';
@@ -28,13 +28,14 @@ export {
   waitsOnSiblings,
 } from '@/modules/dispatcher/dispatcherState';
 export type { DispatchDeckLayer, DispatcherArcGroup, DispatcherArcSplit } from '@/modules/dispatcher/dispatcherState';
-// The v3 plan's card — the run card's composition with a `dispatch v1` pill — for the Runner tab's
-// two lists (src/modules/runner-tab), which draw it in the same list as the runs.
+// The plan's card — phases, verbs, the fold — and the arc's deck drawn as the screen draws it: the
+// arc's header over a strip of its plans. `DispatchArcDecks` is the strip of decks, given the split
+// that says which plans go under which arc. Drawn by both of the Runner tab's homes
+// (`src/modules/runner-tab`) and by the chat gutter's widget.
 export { PlanCard } from '@/modules/dispatcher/PlanCard';
-// One dispatch arc as the deck every arc on this screen is drawn as — the runner's own composition
-// (`DeckFrame`), the arc's header over a strip of its plans — and the list of them for a caller that
-// has the lane's split in hand. Drawn by the Runner tab's two homes, above the plans no arc holds.
 export { DispatchArcDeck, DispatchArcDecks } from '@/modules/dispatcher/ArcDeck';
+// The pin a plan wears when the open chat is the one that launched it, drawn by both homes.
+export { SessionPin } from '@/modules/dispatcher/SessionPin';
 // One planner outing as one line — who is out, on what model, for how long — and the row of them for
 // the outings no card and no deck can carry. Drawn by the plan card's and the arc deck's own headers
 // inside this module, and by the Runner tab's two homes above the arc decks for the rest.

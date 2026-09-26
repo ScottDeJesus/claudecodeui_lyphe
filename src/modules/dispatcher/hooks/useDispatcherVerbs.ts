@@ -3,12 +3,12 @@ import { useTranslation } from 'react-i18next';
 
 import { api } from '@/shared/api';
 import { useToast } from '@/shared/context/ToastContext';
-import type { DispatcherVerb, RunnerModelChoice } from '@/shared/types';
+import type { DispatcherModelChoice, DispatcherVerb } from '@/shared/types';
 
 /** The dispatcher's answer, as much of it as this hook reads. Both fields are free text it wrote. */
 type VerbBody = { stdout?: unknown; stderr?: unknown };
 
-/** The two doors a press can be relayed through: one v3 plan's, or one dispatch arc's. */
+/** The two doors a press can be relayed through: one plan's, or one dispatch arc's. */
 export type DispatcherVerbScope = 'plan' | 'arc';
 
 /**
@@ -40,7 +40,7 @@ export type DispatcherPlanVerbs = {
   schedule(when: string): Promise<void>;
   park(): Promise<void>;
   unpark(): Promise<void>;
-  setModel(choice: RunnerModelChoice): Promise<void>;
+  setModel(choice: DispatcherModelChoice): Promise<void>;
   busy: DispatcherVerb | null;
 };
 
@@ -53,12 +53,12 @@ export type DispatcherArcVerbs = {
   stop(): Promise<void>;
   resume(): Promise<void>;
   schedule(when: string): Promise<void>;
-  setModel(choice: RunnerModelChoice): Promise<void>;
+  setModel(choice: DispatcherModelChoice): Promise<void>;
   busy: DispatcherVerb | null;
 };
 
 /**
- * Stop, Resume, Schedule, Park, Unpark and Model for one v3 plan — or Stop, Resume, Schedule and
+ * Stop, Resume, Schedule, Park, Unpark and Model for one plan — or Stop, Resume, Schedule and
  * Model for one dispatch ARC — and what to say about each.
  *
  * ONE HOOK, TWO DOORS, because the two are the same act on the same store through the same six verbs:
@@ -69,17 +69,16 @@ export type DispatcherArcVerbs = {
  * PLAN verb applied to its plans in one step, so the card and the terminal say the same thing because
  * they say it with the same verb.
  *
- * NO CONFIRMATION DIALOG GUARDS STOP, for the run lane's reason: Stop is a PAUSE — a stopped plan
+ * NO CONFIRMATION DIALOG GUARDS STOP: Stop is a PAUSE — a stopped plan
  * keeps its walk and `resume` picks it up — so the press is reversible by the button that replaces
  * it, and a dialog in front of a reversible act is what trains a reader to dismiss the one that is
  * not.
  *
- * THE DISPATCHER'S OWN SENTENCE IS THE ANSWER, ON BOTH PATHS. Unlike the runner, which refuses on
- * stderr, every dispatcher verb speaks on STDOUT — `UNSCHEDULED dispatcher-ready` when it worked,
+ * THE DISPATCHER'S OWN SENTENCE IS THE ANSWER, ON BOTH PATHS. Every dispatcher verb speaks on STDOUT — `UNSCHEDULED dispatcher-ready` when it worked,
  * `REFUSED schedule dispatcher-ready: is live — stop it first` when it did not — so `stdout` is
- * read FIRST and `stderr` only as the fallback. The lane carries that body whole on a 409 for the
- * same reason the run lane does: the dispatcher's refusal names the one rule the plan met, and a
- * generic "something went wrong" would throw away the only useful thing in the answer. 503 and 504
+ * read FIRST and `stderr` only as the fallback. The lane carries that body whole on a 409: the
+ * dispatcher's refusal names the one rule the plan met, and a generic "something went wrong" would
+ * throw away the only useful thing in the answer. 503 and 504
  * are the two cases where the dispatcher never spoke and the server's own sentence stands in; they
  * travel the same field and need no branch here.
  *
@@ -207,7 +206,7 @@ export function useDispatcherVerbs(
     [name, scope, send],
   );
   const setModel = useCallback(
-    (choice: RunnerModelChoice) => send('model', () => (scope === 'arc'
+    (choice: DispatcherModelChoice) => send('model', () => (scope === 'arc'
       ? api.dispatcher.arcModel(name, choice)
       : api.dispatcher.model(name, choice))),
     [name, scope, send],

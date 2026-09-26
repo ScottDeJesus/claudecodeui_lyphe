@@ -3,14 +3,14 @@ import { useTranslation } from 'react-i18next';
 import { PlanPhaseRow } from '@/modules/dispatcher/PlanPhaseRow';
 import { clockOf, epochOf, phaseProgress, planStatusTone, scheduleClock } from '@/modules/dispatcher/dispatcherState';
 import { useDispatcherPlans } from '@/modules/dispatcher/hooks/useDispatcherPlans';
-import { spendText } from '@/modules/plan-runner';
 import { useElapsed } from '@/shared/hooks/useElapsed';
+import { spendText } from '@/shared/spend';
 import { Badge, Collapsible, CollapsibleContent, CollapsibleTrigger, Meter } from '@/shared/ui';
 import type { DispatcherPlan } from '@/shared/types';
 
 /**
- * A v3 plan as its card draws it, in pieces with no frame of their own — `RunFace`'s pieces over
- * the dispatcher's document. What moves the plan is next door (`PlanControls.tsx`).
+ * A plan as its card draws it, in pieces with no frame of their own — the card's face over the
+ * dispatcher's document. What moves the plan is next door (`PlanControls.tsx`).
  *
  * EVERY STRING REACHES THE DOM AS A TEXT NODE. A goal, a phase title, a verdict and an event's
  * detail are free text the dispatcher and its souls wrote; none of it meets a raw-HTML sink.
@@ -78,8 +78,8 @@ export function PlanFace({ plan }: { plan: DispatcherPlan }) {
   // its CLAUDE records' tokens — A SPEND FIGURE IS DOLLARS **OR** TOKENS, BY WHO WAS USED, so a
   // plan the vendor billed everywhere shows the `$` and no tokens, one walked on the operator's
   // Claude subscription shows the tokens and no `$` at all (never a `$0.00`), and a mixed one
-  // shows both, its token half counting the Claude stages only. `spend.ts` owns the rule, so this
-  // card, the run card and the soul pins cannot spell it three ways.
+  // shows both, its token half counting the Claude stages only. `src/shared/spend.ts` owns the rule,
+  // so this card, the arc's header and the chat's soul pins cannot spell it three ways.
   const spend = spendText(t, plan.cost_usd, plan.tokens_in, plan.tokens_out, plan.tokens);
   const sub = [spend, t('dispatcher.rounds', { count: plan.rounds }), route?.word ?? '']
     .filter(Boolean).join(' · ');
@@ -95,14 +95,12 @@ export function PlanFace({ plan }: { plan: DispatcherPlan }) {
         sub={sub}
       />
 
-      {/* THE PHASES ARE SHOWN, IN EVERY HOME (operator, 2026-09-25: "dispatch v1 cards on the plan
-          runner tab should always show phases like the normal runner cards"). There is no
-          `defaultOpen` to pass: the tab's dispatch cards start open and so do the gutter's, because
-          a home that could fold them could disagree with the other one, and the phases ARE this
-          card — a folded plan card leaves a title, a pill and a count with nothing under them. The
-          trigger stays, so a person may fold the list on purpose; the card never does it for them.
-          `RunCard` keeps its own variance: a run card carries a meter, a pipeline strip and lanes
-          beside its phases, so one part of it may be disclosure. */}
+      {/* THE PHASES ARE SHOWN, IN EVERY HOME (operator, 2026-09-25: "cards on the plan runner tab
+          should always show phases like the normal runner cards"). There is no
+          `defaultOpen` to pass: the tab's cards start open and so do the gutter's, because a home
+          that could fold them could disagree with the other one, and the phases ARE this card — a
+          folded plan card leaves a title and a count with nothing under them. The trigger stays, so
+          a person may fold the list on purpose; the card never does it for them. */}
       <Collapsible defaultOpen className="min-w-0">
         <CollapsibleTrigger className="rounded-lg px-2 py-1 text-left text-xs text-muted-foreground hover:bg-muted">
           {t('dispatcher.phaseCount', { count: plan.phases.length })}

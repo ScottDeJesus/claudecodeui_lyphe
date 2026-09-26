@@ -20,8 +20,7 @@ import type { DispatcherArc, DispatcherDaemon, DispatcherLanePicture, Dispatcher
  * it), inside the auth gate (its seed must never fire against the login screen) and below
  * `WebSocketProvider` (it subscribes to the one socket, and never opens a second).
  *
- * ONE TOPIC, BECAUSE ONE PICTURE. The run lane publishes a topic per run beside its whole array, so
- * that a widget can watch one thing; the dispatcher has no reader for a single plan — every card is
+ * ONE TOPIC, BECAUSE ONE PICTURE. The dispatcher has no reader for a single plan — every card is
  * drawn from the same census, which is also where the count and the route come from — so it
  * publishes the whole picture and nothing else. There is therefore no per-plan topic to RETIRE when
  * a plan is cut away: the picture simply stops carrying it, and no reader is holding a value that

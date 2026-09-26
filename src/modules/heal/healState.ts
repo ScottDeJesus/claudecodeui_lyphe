@@ -100,9 +100,3 @@ export function athenaTone(counts: HealCard['athena']): Tone {
   if (counts.high > 0) return 'warn';
   return 'positive';
 }
-
-/** The last path segment — `heal-reflex.plan.md` — or the whole string when it has no slash. */
-export function fileName(path: string): string {
-  const cut = path.lastIndexOf('/');
-  return cut === -1 ? path : path.slice(cut + 1);
-}

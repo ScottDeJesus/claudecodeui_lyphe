@@ -119,7 +119,8 @@ export function createDetailTools(client: KanbanPmClient): ToolTable {
     {
       name: 'set_checklist',
       description:
-        "Replace a feature's BUILD CHECKLIST with these items — one per plan phase, in order. " +
+        "Replace a feature's BUILD CHECKLIST with these items — one per piece of work the " +
+        'card\'s brief asks for, in order. ' +
         'Every item starts pending. This is the build-progress mirror the panel draws; only ' +
         'Metis writes it. Returns the minted items.',
       inputSchema: toolSchema(
@@ -128,7 +129,7 @@ export function createDetailTools(client: KanbanPmClient): ToolTable {
           items: {
             type: 'array',
             items: { type: 'string' },
-            description: 'One checklist line per plan phase, in plan order.',
+            description: 'One checklist line per piece of work in the brief, in order.',
           },
         },
         ['id', 'items']
@@ -137,9 +138,10 @@ export function createDetailTools(client: KanbanPmClient): ToolTable {
     {
       name: 'set_checklist_item',
       description:
-        "Advance ONE build-checklist item to a state: 'active' (the phase being built right now), " +
-        "'done' (the phase really shipped — never mark done a phase that did not), or 'pending'. " +
-        "'note' is an optional resume breadcrumb; omit it to leave the note untouched.",
+        "Advance ONE build-checklist item to a state: 'active' (the piece in flight right now), " +
+        "'done' (the piece really shipped — never mark done a piece the chain's report did not " +
+        "prove), or 'pending'. " +
+        "'note' is an optional breadcrumb for this item; omit it to leave the note untouched.",
       inputSchema: toolSchema(
         {
           itemId: { type: 'string', description: "The checklist item id (e.g. 'k-3')." },

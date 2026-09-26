@@ -1,7 +1,7 @@
 import { useTranslation } from 'react-i18next';
 
 import { clockOf, PHASE_GLYPH, phaseStatusTone } from '@/modules/dispatcher/dispatcherState';
-import { spendText } from '@/modules/plan-runner';
+import { spendText } from '@/shared/spend';
 import { Badge, Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/shared/ui';
 import type { DispatcherPhase } from '@/shared/types';
 
@@ -16,9 +16,9 @@ function phaseWord(phase: DispatcherPhase): { key: string; settling: boolean } {
 }
 
 /**
- * One phase of a v3 plan: `PhaseRow`'s shape over the dispatcher's document. The mark, the
- * position, the title and the word lead; the spend and the assignee follow; the stages the phase
- * walked fold away beneath, one line each.
+ * One phase of a plan, over the dispatcher's document. The mark, the position, the title and the
+ * word lead; the spend and the assignee follow; the stages the phase walked fold away beneath, one
+ * line each.
  *
  * EVERY STATE CARRIES A WORD AND A GLYPH, never colour alone (design doctrine :147-149), and every
  * string — the title, a soul's verdict — reaches the DOM as a text node: they are free text.

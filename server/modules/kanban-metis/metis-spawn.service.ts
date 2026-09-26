@@ -73,7 +73,6 @@ const BRIEF_CHAPTERS = [
   'learning',
   'mcp-fallback',
   'parallelism',
-  'plan-template',
   'recovery',
 ] as const;
 
@@ -155,7 +154,7 @@ function briefRoot(): string {
  * own file comes first because it is the one that describes the board she is working.
  *
  * The hash is over the COMPOSED string — the bytes the child actually received — and not over one
- * of the seven files: what a later reader wants to know is whether the prompt that built a session
+ * of the six files: what a later reader wants to know is whether the prompt that built a session
  * is the prompt on disk today, and a hash of the entry file alone would say nothing about a chapter
  * that had been rewritten under it.
  */

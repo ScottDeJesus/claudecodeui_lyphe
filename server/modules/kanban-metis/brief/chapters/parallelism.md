@@ -4,11 +4,11 @@
 > and how several sessions run concurrently WITHOUT colliding — the footprint-disjoint
 > discipline, the per-file concurrency arbiter, the concurrency dial, and the operational
 > guardrails for concurrent sessions. **Core routes here** from BUILD step c + ABSOLUTE
-> RULES #3/#11/#12 for the mechanism.
+> RULES #3/#9/#10 for the mechanism.
 >
 > **Two SAFETY rules that belong here stay in CORE as ABSOLUTE RULES — not restated
-> here:** #11 (never a single agent doing build + self-review + self-verify;
-> "self-review is NOT Athena") and #12 (every soul stage loads the COMPLETE `SKILL.md`
+> here:** #9 (never a single agent doing build + self-review + self-verify;
+> "self-review is NOT Athena") and #10 (every soul stage loads the COMPLETE `SKILL.md`
 > VERBATIM). This chapter is the mechanism; core states them as law.
 
 ## Parallelism — solo inline builds, sessions the board's driver runs (footprint-preferred)
@@ -38,25 +38,27 @@ card in front of you.
 **No more conductor, no more workflow.** The old model — *"ONE Metis is a SINGLE conductor
 that launches a build WORKFLOW running N feature pipelines at once under the slider"* — is
 **RETIRED**. Workflows were a workaround for a constraint that this model resolves
-differently. The constraint was real: **a subagent CANNOT invoke a Skill** (`Skill(execute)`
-is main-loop-only and runs *inline*, dispatching its souls as
-`Agent()` calls from the main loop). The OLD cure routed around it with a workflow engine so
+differently. The constraint was real: **a subagent CANNOT invoke a Skill** (`Skill(inline)`
+is main-loop-only and runs *inline*, walking the `plan-runner chain` out of the main loop).
+The OLD cure routed around it with a workflow engine so
 one main-loop could fan out N pipelines. The NEW cure is simpler: **parallelism comes from
-MULTIPLE main-loops (sessions), each doing inline `/execute` on its OWN one feature** — not
-one main-loop fanning out workflows. A Metis session IS a main loop, so `Skill(execute)`
+MULTIPLE main-loops (sessions), each building its OWN one feature through `Skill(inline)`** —
+not
+one main-loop fanning out workflows. A Metis session IS a main loop, so `Skill(inline)`
 runs natively in it; there is nothing to route around. (And the old failure that the
 workflow was guarding against — a soul-LESS solo agent doing a fake build — is NOT what
-happens here: `Skill(execute)` dispatches the REAL souls with real independent
-Athena and real-data verify, exactly as everywhere else. The forbidden anti-pattern is a
-single agent doing build + self-review + self-verify; an inline `/execute` is the OPPOSITE
+happens here: `Skill(inline)` launches the chain, which runs the REAL souls, a separate
+builder and an independent
+Athena with real-data verify, exactly as everywhere else. The forbidden anti-pattern is a
+single agent doing build + self-review + self-verify; an inline `/inline` is the OPPOSITE
 of that — it is the full multi-soul pipeline.)
 
-**How a session builds its ONE claimed feature.** Run `Skill(execute)` on the feature's
-`pm-<slug>.plan.md`. `/execute` hands the plan to the detached `plan-runner`, which walks it and
-puts EVERY UNSHIPPED phase through the same multi-stage pipeline every other build uses,
-iterating each unshipped phase:
+**How a session builds its ONE claimed feature.** Write the feature's BRIEF
+(`~/.claude/plans/briefs/<slug>.brief.md`, PLAN & QUESTION step 1) and run `Skill(inline)` on it.
+`/inline` fires ONE `plan-runner chain`, and the detached walker puts the work through the
+same multi-stage pipeline every other build uses:
 
-1. **Build** — a Heph-quality builder agent implements the phase.
+1. **Build** — a Heph-quality builder agent implements the brief.
 2. **Independent Athena** — a SEPARATE adversarial-review agent (NEVER the builder;
    **self-review is NOT Athena**) audits it for failure modes against real shapes.
 3. **One Heph fix-pass on her findings** — ONE review, ONE fix-pass, no re-review (operator
@@ -64,25 +66,24 @@ iterating each unshipped phase:
    The verify step below is what gates the fix.
 4. **Real-data / headless-Chromium verify** — run the thing against REAL backend data
    (curl / SQL probe / CLI run / DOM read), not a self-authored fixture (core §"Honest progress").
-5. **Checklist update (the per-phase board write)** — Metis marks the phase's checklist
-   item `done` over the MCP (`set_checklist_item`) ONLY on real verification evidence from
-   step 4. This is the build's honest progress + resume substrate. A Metis build records
-   progress on the card's CHECKLIST per phase, not by writing a plan-file `✅ SHIPPED`
-   ship-log (the checklist is the per-phase progress mirror instead).
+5. **Prometheus** — a doc sweep over what the change touched.
 
-Then, per feature, a final **Prometheus** doc sweep. **`/execute` self-enforces its
-completeness contract**: it walks EVERY UNSHIPPED phase of the feature's plan (the
-`### Phase N` headings the classifier sees, minus those whose checklist item already reads
-`done`), runs the per-phase pipeline (steps 1–5) for EACH, and the feature greens **ONLY
-when EVERY phase shipped with real verification evidence.** If ANY phase **cannot produce
-real evidence**, `file_issue` (honest) and do NOT green that phase OR the feature — never
-fake-green. This is the `/execute` completeness contract, so Metis has **no discretion to
-skip one** (the thing that failed before).
+Then the walker prints its own report, and **the chain's report IS the completeness
+record**: the feature greens ONLY when Athena's tally carries no standing BLOCKING/HIGH and
+the fix-pass closed what she found. The session reads that report — never the code — and
+mirrors it on the card's CHECKLIST (`set_checklist_item(<k-N>, 'active')` for the piece in
+flight, `'done'` the moment the report proves that piece with real evidence). An `open:`
+line is a BLOCKING/HIGH the fix-pass could not close: that is a RULING for the session
+(`plan-runner chain --resume <chain-id> --rulings <file>`), never a green. A landing that
+leaves the work unproven (`NOTHING CHANGED` / `BLOCKED`, or a piece the report does not
+prove) is `file_issue` + NO green — never fake-green; a `DEAD` walker is a `--resume` FIRST
+(core BUILD step e), and `file_issue` only when a resume cannot start. Because the report is the record,
+Metis has **no discretion to green a card the chain did not prove** (the thing that failed
+before).
 
-
-> (HOW each inline-build stage loads its soul — the COMPLETE `SKILL.md` VERBATIM,
-> never a paraphrase — is **ABSOLUTE RULE #12** in core. It rides this inline
-> pipeline for free, exactly as the runner's own stages already do.)
+> (HOW each chain stage loads its soul — the COMPLETE `SKILL.md` VERBATIM,
+> never a paraphrase — is **ABSOLUTE RULE #10** in core. The walker does that for every
+> stage it forks.)
 
 **One in-flight build per session; concurrency is more sessions the driver ran.** A solo
 session builds
@@ -92,17 +93,18 @@ what that board's own dial allowed, and there is nothing in the session that rea
 
 > (The **FORBIDDEN anti-pattern** — never a single do-it-all agent doing build +
 > self-review + self-verify; "self-review is NOT Athena" — is **ABSOLUTE RULE
-> #11** in core. The inline `/execute` pipeline is the OPPOSITE of that collapse.)
+> #9** in core. The inline chain is the OPPOSITE of that collapse.)
 
-**WHO writes the board, and WHEN — the session writes it inline.** Because the build runs
-INLINE in this session (not in a background workflow), this session writes the board
-per-phase AS it builds, over the `kanban-pm` MCP: `set_checklist_item(<k-N>,
-'active')` before a phase's stage, `set_checklist_item(<k-N>, 'done')` when that phase's verify
-stage produced REAL evidence, `file_issue(id, …)` if a stage cannot verify, and
-`set_status(id, 'done')` on full-feature completion. Green a phase ONLY on real ship
-evidence — never fake-green. The card's checklist is the per-phase progress mirror AND the
-resume substrate. There is no CONDUCTOR to reconcile against — the session that claimed the
-lease is the session that builds it and writes its board.
+**WHO writes the board, and WHEN — the session writes it inline.** The chain edits files;
+the SESSION owns the board, and writes it over the `kanban-pm` MCP as the chain's report
+proves each piece: `set_checklist_item(<k-N>,
+'active')` for the piece in flight, `set_checklist_item(<k-N>, 'done')` when the report
+proves that piece with REAL evidence, `file_issue(id, …)` if a landing leaves it unproven, and
+`set_status(id, 'done')` on the chain's clean report. Green a piece ONLY on real ship
+evidence — never fake-green. The card's checklist is the progress mirror; the CHAIN's own
+record (`~/.claude/state/dispatch-chains/<chain-id>/`) is the resume substrate. There is no
+CONDUCTOR to reconcile against — the session that claimed the
+lease is the session that briefs it, rules on it, and writes its board.
 
 Background souls DO report back, though, and that is not a hole in the model: a soul this
 session dispatched delivers its task-notification to THIS session, which is the same session
@@ -117,16 +119,17 @@ is gone. The parallel-safety mechanism is **disjoint-file claiming** — each se
 picks a feature whose files don't collide with any in-flight build, comparing the files
 they will touch:
 
-- **Every plan declares a `Footprint:` line** — the top-level file/dir paths that
+- **Every brief declares a `Footprint:` line** — the top-level file/dir paths that
   build will touch (e.g. `Footprint: core/foo/, api/foo.py, installation_guides/foo.sql`).
-  Metis authors it into every `pm-<slug>.plan.md` (chapter **plan-template.md**).
+  Metis writes it into the brief herself (PLAN & QUESTION step 1); it is what she records in her
+  in-flight ledger and what the card's drawer shows the operator.
 - **Pick a feature — PREFER footprint-disjoint (the PRE-CLAIM coordination).** Before
   claiming a feature to build, compare its footprint against EVERY in-flight build's
   (live AND resumed — the ledger you rebuilt on orient step 2, which spans builds in
   THIS session AND, via `list_active_builds`, builds owned by OTHER live sessions).
   **PREFER a disjoint feature.** An overlap is **PERMITTED** — the per-file
   arbiter serializes + merges same-file writes — so take the overlapping card and work the
-  disjoint regions of your footprint first, Reading the other build's plan before touching a
+  disjoint regions of your footprint first, Reading the other build's brief before touching a
   shared file.
   **Nothing on this board refuses the claim, checks the footprint, or warns you about a
   collision.** There is no mode to read, no hard lock to trip under any setting, no whisper, and
@@ -137,9 +140,8 @@ they will touch:
   refused — declare a real `Footprint:` anyway, because the ledger you and a sibling session
   both read is only as good as what it says.
   **Two things worth knowing even un-gated:** (1) an **EMPTY / uncertain footprint cannot be PROVEN disjoint**, so it protects nothing —
-  declare a real `Footprint:` (its authoring form, including the prefix rule below, is in
-  chapter **plan-template.md**); and (2) **a footprint path that is a PREFIX of another
-  plan's path — a parent directory CONTAINING the other's file — COUNTS AS AN OVERLAP**
+  declare a real `Footprint:` in the brief; and (2) **a footprint path that is a PREFIX of another
+  brief's path — a parent directory CONTAINING the other's file — COUNTS AS AN OVERLAP**
   (`Footprint: core/foo/` vs `Footprint: core/foo/bar.py` conflict, even though a naive
   string set-intersection misses it because the strings differ). When in doubt whether one
   path nests inside another, treat it as overlapping (the safe default).

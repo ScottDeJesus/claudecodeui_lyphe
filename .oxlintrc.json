@@ -106,6 +106,7 @@
           "src/shared/userSettings.ts",
           "src/shared/chatDrafts.ts",
           "src/shared/solarSchedule.ts",
+          "src/shared/spend.ts",
           "src/shared/deepseekPeakHours.ts",
           "src/shared/syntaxHighlighter.ts",
           "src/shared/kanban-types.ts",

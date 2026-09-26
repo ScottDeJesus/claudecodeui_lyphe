@@ -6,13 +6,12 @@ import {
   agoWord,
   athenaTone,
   byMotionThenNewest,
-  fileName,
   statusTone,
   statusWord,
 } from '@/modules/heal/healState';
 import { bookedBy } from '@/modules/heal/healTypes';
-import type { HealCard, HealQueueItem } from '@/modules/heal/healTypes';
-import { spendText } from '@/modules/plan-runner';
+import type { HealCard } from '@/modules/heal/healTypes';
+import { spendText } from '@/shared/spend';
 import { Badge, Button, Card, CardContent, CardFooter, CardHeader, CardTitle, Chip, EmptyState } from '@/shared/ui';
 
 /** How many claimed shapes a card NAMES before the rest are counted. A card is a summary and one heal
@@ -22,14 +21,12 @@ import { Badge, Button, Card, CardContent, CardFooter, CardHeader, CardTitle, Ch
 const SHAPE_CHIPS = 3;
 
 /**
- * Every heal the reflex has run, each as a whole card in the run card's shape, and beneath them the
- * runner heal queue's own items — THE SECOND DOOR, in a group of its own and read-only here: the
- * runner writes that queue and nothing on this tab may.
+ * Every heal the reflex has run, each as a whole card in the run card's shape.
  *
  * A running card leads. A PARKED card says why it is waiting and when it fires, in a banner above
  * its facts, so a heal that is standing still is never mistaken for one nobody started.
  */
-export function HealCardList({ heals, queue }: { heals: HealCard[]; queue: HealQueueItem[] }) {
+export function HealCardList({ heals }: { heals: HealCard[] }) {
   const { t } = useTranslation();
   const { openFileReference } = usePaletteOps();
   /**
@@ -55,7 +52,7 @@ export function HealCardList({ heals, queue }: { heals: HealCard[]; queue: HealQ
           <EmptyState
             icon={HeartPulseIcon}
             title={t('heal.cards.empty.title', { defaultValue: 'No heal has run yet' })}
-            message={t('heal.cards.empty.message', { defaultValue: 'A cycle fires them — nightly on the schedule, or Run a cycle now.' })}
+            message={t('heal.cards.empty.message', { defaultValue: 'A cycle fires them — Run a cycle now opens one over the live friction.' })}
           />
         </div>
       ) : (
@@ -67,38 +64,6 @@ export function HealCardList({ heals, queue }: { heals: HealCard[]; queue: HealQ
           ))}
         </ul>
       )}
-
-      {/* The runner's queue is a different door with a different owner, and the dashed frame and
-          the read-only mark say so before the reader looks for a verb that is not here. */}
-      <section aria-labelledby="heal-queue-title" className="flex min-w-0 flex-col gap-2 rounded-lg border border-dashed border-border p-3" data-heal-queue>
-        <div className="flex flex-wrap items-center gap-2">
-          <h3 id="heal-queue-title" className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            {t('heal.queue.title', { defaultValue: 'Runner heal queue — the second door' })}
-          </h3>
-          <Badge as="span" tone="neutral">{t('heal.queue.readOnly', { defaultValue: 'read-only' })}</Badge>
-        </div>
-        {queue.length === 0 ? (
-          <p className="text-xs text-muted-foreground">{t('heal.queue.empty', { defaultValue: 'The runner’s queue is empty.' })}</p>
-        ) : (
-          <ul className="flex flex-col divide-y divide-border">
-            {queue.map((item) => (
-              <li key={item.id} className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 py-2 text-xs" data-heal-queue-item={item.id}>
-                <span className="font-mono">{fileName(item.plan)}</span>
-                <span className="text-muted-foreground">{t('heal.queue.phase', { defaultValue: 'phase {{phase}}', phase: item.phase })}</span>
-                <Badge as="span" tone={item.status === 'queued' ? 'info' : 'neutral'}>{item.status}</Badge>
-                <span className="w-full min-w-0 break-words text-muted-foreground">{item.cause}</span>
-                <span className="text-muted-foreground">
-                  {item.next
-                    ? t('heal.queue.next', { defaultValue: 'next: {{next}}', next: item.next })
-                    : t('heal.queue.noNext', { defaultValue: 'no next step named' })}
-                  {' · '}
-                  {agoWord(item.enqueued_at)}
-                </span>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
     </div>
   );
 }
@@ -169,7 +134,7 @@ function HealCardView({ heal, onOpenChain }: { heal: HealCard; onOpenChain: (hea
               `cost_usd` is the DeepSeek share of what the chain spent — what the daily cap counts — and the
               `tokens*` beside it are the chain's CLAUDE half alone, so a heal that only ever paid the vendor
               draws its `$` and no tokens and one that rode the subscription draws its tokens and no `$`
-              (`spendText`, the one spelling the run cards use). WHICH NUMBER THE `$` IS depends on when the
+              (`spendText`, the one spelling every card uses). WHICH NUMBER THE `$` IS depends on when the
               heal ended — the title says whose it is, because the rows on screen from before the 2026-09-23
               recipe change carry their chains' whole bills. An empty cell when the worker recorded neither. */}
           <span className="ml-auto font-mono text-muted-foreground" title={costTitle(heal, t)}>

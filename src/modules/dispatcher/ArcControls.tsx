@@ -2,7 +2,8 @@ import { useTranslation } from 'react-i18next';
 
 import { epochOf, scheduleClock } from '@/modules/dispatcher/dispatcherState';
 import { useDispatcherVerbs } from '@/modules/dispatcher/hooks/useDispatcherVerbs';
-import { RunModelControl, ScheduleControl } from '@/modules/plan-runner';
+import { RunModelControl } from '@/modules/dispatcher/RunModelControl';
+import { ScheduleControl } from '@/modules/dispatcher/ScheduleControl';
 import { Button } from '@/shared/ui';
 import type { DispatcherArc } from '@/shared/types';
 import { effectiveModelWord } from '@/shared/utils';
@@ -12,11 +13,11 @@ import { effectiveModelWord } from '@/shared/utils';
  * Chat switch for the arc's ONE model word, and the three verbs that move the plans under it —
  * Start, Pause, and Schedule start.
  *
- * IT IS THE DECK'S `bodyTop`, WHICH IS WHERE THE RUNNER'S ARC PUTS ITS OWN VERBS. The fold takes
- * this whole row with the strip: the switch and Start/Pause are VERBS, the same layer a run card's
- * footer and a plan card's own controls fold away, so the two lanes' decks cannot disagree about what
- * "collapsed" hides (measured on the runner's deck, 2026-09-25: keeping the verbs in the header made
- * a folded deck 164px against 86px — a "collapsed" row that had not collapsed).
+ * IT IS THE DECK'S `bodyTop`, AND THE FOLD TAKES THIS WHOLE ROW WITH THE STRIP: the switch and
+ * Start/Pause are VERBS, the same layer a plan card's own controls fold away, so the deck cannot
+ * disagree with a card about what "collapsed" hides (measured on an arc deck, 2026-09-25: keeping the
+ * verbs in the header made a folded deck 164px against 86px — a "collapsed" row that had not
+ * collapsed).
  *
  * THE SWITCH IS THE REASON THIS EXISTS. A plan card carries its own control, and a plan may say
  * anything it likes; the arc's word is the one that reaches EVERY plan of it, because

@@ -2,20 +2,20 @@ import { useTranslation } from 'react-i18next';
 
 import { DispatchArcControls } from '@/modules/dispatcher/ArcControls';
 import { deckFocusIndex, planDismissal, planLayer, planStatusTone, waitsOnSiblings } from '@/modules/dispatcher/dispatcherState';
+import { DeckFrame, DeckItem } from '@/modules/dispatcher/DeckFrame';
 import type { DispatcherArcGroup } from '@/modules/dispatcher/dispatcherState';
 import { PlanCard } from '@/modules/dispatcher/PlanCard';
 import { PlannerBadge } from '@/modules/dispatcher/PlannerBadge';
-import { DeckFrame, DeckItem, SessionPin, spendText } from '@/modules/plan-runner';
+import { SessionPin } from '@/modules/dispatcher/SessionPin';
 import { dispatchArcFoldKey } from '@/shared/hooks/useCardFold';
+import { spendText } from '@/shared/spend';
 import type { DispatcherArcStatus, Tone } from '@/shared/types';
 import { cn } from '@/shared/utils';
 
 /**
- * The arc's own word and tone — `ArcDeck`'s table over the STORE's eight words rather than the
- * runner's. The two lanes' arcs are different objects (a runner arc is a deck of minted card plans
- * on disk, a dispatch arc is a row in the store with plans hanging off it), so their status
- * vocabularies are different too, and each lane states its own rather than mapping one onto the
- * other's shape. It lives here, beside the deck that wears it, exactly as the runner's does.
+ * The arc's own word and tone, over the STORE's eight words. A dispatch arc is a row in the store
+ * with plans hanging off it, so it states its vocabulary here rather than mapping it onto anything
+ * else's shape. It lives beside the deck that wears it.
  *
  * `judged` is neutral because a judgment is a fact and not a verdict; `empty` is warn because an arc
  * whose every plan was dropped is the one state an operator did not ask for, and it is the state
@@ -44,23 +44,21 @@ const ARC_STATUS: Record<DispatcherArcStatus, { key: string; tone: Tone }> = {
  * whole arc — and beneath it the plans of that arc in ONE horizontal strip, in the arc's own walk
  * order (`arc.plans`).
  *
- * THE SAME DECK AS THE RUNNER'S ARCS, AND THAT IS THE POINT (operator, 2026-09-25: "he did not do it
- * properly it is not the same as the other arc card" — "we have an arc already, layouts should
- * already be there" — "please tell him to do it like the other plans"). The chrome, the fold, the
- * arrows, the snap and the focused card are `DeckFrame`'s — the composition `ArcDeck` draws the
- * runner's arcs through — and nothing here invents a second layout: an arc of plans is one shape,
- * whichever lane's plans hang off it. What is the dispatcher's own, and what this file adds, is its
- * data (the store's status words, the arc's books) and its cards (`PlanCard`, whole: pill, word,
- * phases, controls and Dismiss, exactly as a plan of no arc has them).
+ * THE DECK IS THE OPERATOR'S OWN ARC CARD (operator, 2026-09-25: "we have an arc already, layouts
+ * should already be there" — "please tell him to do it like the other plans"). The chrome, the fold,
+ * the arrows, the snap and the focused card are `DeckFrame`'s, and nothing here invents a second
+ * layout: an arc of plans is one shape. What is the dispatcher's own, and what this file adds, is its
+ * data (the store's status words, the arc's books) and its cards (`PlanCard`, whole: word, phases,
+ * controls and Dismiss, exactly as a plan of no arc has them).
  *
- * THE FOLD TAKES THE STRIP AND THE CONTROLS, as it does on the runner's deck — the model switch and
+ * THE FOLD TAKES THE STRIP AND THE CONTROLS — the model switch and
  * Stop/Resume are VERBS, and the reader who folded a deck away asked for the row, not for a card that
  * has not collapsed. What stays is the header: which arc this is, its word, its books and how many
  * plans it holds, so a folded deck still says everything but the plans.
  *
  * A FOCUSED CARD IS THE PLAN WHOSE TURN IT IS (`deckFocusIndex`): the first plan of the arc that has
  * not finished, or the last once all of them have. The strip opens on it and returns to it when the
- * arc moves — the runner's deck opens on its live card by the same rule.
+ * arc moves.
  *
  * THE COUNT IS WHAT THE CARD HOLDS, NOT WHAT THE DOCUMENT LISTED. `arc.plans` is the arc file's
  * names, and a plan whose ending the operator has DISMISSED is gone from the strip while still being
@@ -83,11 +81,11 @@ export function DispatchArcDeck({
 }: {
   /** The arc and the plans of it, in the arc's own order — one `byArc` group. */
   group: DispatcherArcGroup;
-  /** The gutter home's width instead: one whole card per view, paged by the arrows (`ArcGallery` says why). */
+  /** The gutter home's width instead: one whole card per view, paged by the arrows (`DeckFrame`'s own). */
   cardFillsStrip?: boolean;
   /** The open chat's session id, in the gutter home; `null` in the tab, where there is no open chat and so no "mine". */
   pinnedSessionId?: string | null;
-  /** The lane's unfiltered plan ids, which is what a Dismiss prunes the stored list against (`planDismissal`). */
+  /** The lane's unfiltered plan names, which is what a Dismiss prunes the stored list against (`planDismissal`). */
   carriedNames: string[];
 }) {
   const { t } = useTranslation();
@@ -105,14 +103,21 @@ export function DispatchArcDeck({
       title={<span data-arc-door className="font-mono">{title}</span>}
       badge={ARC_STATUS[arc.status] ?? ARC_STATUS.designing}
       foldKey={dispatchArcFoldKey(arc.name)}
+      // The arc's books ride the title row's tail — the LAST thing on that row to keep a width, never
+      // the first to take one: `min-w-0` and no `shrink-0`, so a figure too wide for the row wraps by
+      // word rather than pushing the arc's name (or the card's own edge) out of the way. The frame
+      // floors and wraps the title itself; this line is the counterpart to that, stated where the
+      // figure is produced.
       titleTail={spend
-        ? <p data-arc-spend className="min-w-0 shrink-0 self-center font-mono text-xs text-muted-foreground">{spend}</p>
+        ? <p data-arc-spend className="min-w-0 self-center font-mono text-xs text-muted-foreground">{spend}</p>
         : null}
       subtitle={arc.planner || arc.goal ? (
         // THE ARC'S OWN LINE, under the row that says which arc this is: who is out on it, and the
-        // goal its designer wrote. The badge goes HERE rather than beside the status word — it is a
-        // long line, and the title row is a row of marks that cannot wrap at 390px without crushing
-        // the arc's name. It draws nothing on an arc no planner is on.
+        // goal its designer wrote. The badge goes HERE rather than beside the status word because of
+        // WIDTH, not because that row cannot wrap: a planner badge is a LONG LINE in a row of marks,
+        // and at 390px it would take a row the arc's own name and books are read on. `DeckFrame` wraps
+        // that row and floors the title, so nothing would be crushed — the cost is a row's height, and
+        // this line is where it is paid. It draws nothing on an arc no planner is on.
         <>
           {arc.planner && <PlannerBadge planner={arc.planner} />}
           {arc.goal && (
@@ -155,11 +160,10 @@ export function DispatchArcDeck({
  * ONE DECK FOR EACH ARC, IN EITHER HOME, and that is why this exists rather than a map at each call
  * site: the Runner tab and the chat gutter's Runner widget draw the same arcs from the same split
  * (`byArc`), and the two must agree about the width the column takes as much as about which plans sit
- * under which arc. `home` is the one variance — the run card's two, and `ArcGallery`'s own — the TAB
- * centring a measured `max-w-2xl` column with its own inset, the GUTTER flush, because the widget card
- * around it already owns the inset, and each card taking the strip's whole width there
- * (`cardFillsStrip`). It is written on the DOM (`data-dispatch-arcs`) so a reading is always taken
- * from ONE home.
+ * under which arc. `home` is the one variance — the TAB centring a measured `max-w-2xl` column with
+ * its own inset, the GUTTER flush, because the widget card around it already owns the inset, and each
+ * card taking the strip's whole width there (`cardFillsStrip`). It is written on the DOM
+ * (`data-dispatch-arcs`) so a reading is always taken from ONE home.
  *
  * NOTHING AT ZERO ARCS: an operator with none sees the pane exactly as it was before arcs existed.
  * Nothing here reads the lane either — the caller hands it the split it already has, so a caller that

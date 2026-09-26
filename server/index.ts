@@ -55,13 +55,12 @@ import { assetsRoutes } from './modules/assets/index.js';
 import { createAccountsModule } from './modules/accounts/index.js';
 import { createCliVersionModule } from './modules/cli-version/index.js';
 import { createDeepseekModule } from './modules/deepseek/index.js';
-import { createKanbanModule, plansHeldByLease } from './modules/kanban/index.js';
+import { createKanbanModule } from './modules/kanban/index.js';
 import { createKanbanMetisModule, kanbanMetisSecretGuard } from './modules/kanban-metis/index.js';
 import { createMemoryIntakeModule, listMemoryCandidates } from './modules/memory-intake/index.js';
 import { createDispatchSoulsModule } from './modules/dispatch-souls/index.js';
 import { createHealModule } from './modules/heal/index.js';
 import { createJevModule } from './modules/jev/index.js';
-import { createPlanRunnerModule } from './modules/plan-runner/index.js';
 import { createDispatcherModule } from './modules/dispatcher/index.js';
 import { createUniverseModule } from './modules/universe/index.js';
 import { fileTreeRoutes } from './modules/file-tree/index.js';
@@ -254,20 +253,10 @@ app.use('/api/cli-version', authenticateToken, createCliVersionModule());
 // the vendor directly with the key in this host's .env.
 app.use('/api/deepseek', authenticateToken, createDeepseekModule());
 
-// The plan runner's live runs, and the relay for its own stop/resume (protected).
-// Built once here rather than inline: the poll behind its websocket frame is started after
-// `listen` and stopped on shutdown, so the module has to be something both can name.
-//
-// Its plans-archive sweep moves finished plans out of the corpus, and the one thing that must stop
-// it is a card still building or planning against one — so the board answers which plans its leases
-// hold (`plansHeldByLease`) and this is the single place the two modules are joined. The arrow
-// points one way: the runner is handed a reading, and neither module imports the other.
-const planRunner = createPlanRunnerModule({ heldPlanPaths: plansHeldByLease });
-app.use('/api/plan-runner', authenticateToken, planRunner.router);
-
-// The v3 dispatcher's plans — the poll behind the `dispatcher_state` frame, and the relay for the
-// dispatcher's own stop/resume/park/unpark/schedule (protected). Built out here for the same reason
-// `planRunner` is: its poll starts after `listen` and stops on shutdown.
+// The dispatcher's plans — the poll behind the `dispatcher_state` frame, and the relay for the
+// dispatcher's own stop/resume/park/unpark/schedule (protected). Built once here rather than inline:
+// the poll behind its websocket frame is started after `listen` and stopped on shutdown, so the
+// module has to be something both can name.
 const dispatcher = createDispatcherModule();
 app.use('/api/dispatcher', authenticateToken, dispatcher.router);
 
@@ -284,7 +273,7 @@ app.use('/api/jev', authenticateToken, jev.router);
 
 // The launcher souls a session started by hand — the poll behind the `soul_launch_state` frame that
 // pins each one in its own chat's rows (protected). Built out here for the same
-// reason `planRunner` is: its poll starts after `listen` and stops on shutdown.
+// reason `dispatcher` is: its poll starts after `listen` and stops on shutdown.
 const dispatchSouls = createDispatchSoulsModule();
 app.use('/api/dispatch-souls', authenticateToken, dispatchSouls.router);
 
@@ -322,6 +311,16 @@ app.use('/api/schedules', authenticateToken, createSchedulesModule());
 app.use('/api/agent', agentRoutes);
 
 app.use('/api/voice', authenticateToken, voiceRoutes);
+
+// EVERY `/api` MOUNT IS ABOVE THIS LINE, so a request that reaches it named no lane at all: a route
+// that has gone, or one that never existed. The SPA fallback at the bottom of this file would answer
+// it with `index.html` and a 200, which reads to any caller as a route that exists and returned a
+// page — so the "old lane is gone" check curls a 200 and learns nothing. It is a 404, in the API's
+// own shape. Declared HERE, after the last mount and before the static files, because a prefix
+// mounted earlier would swallow the routes declared after it.
+app.use('/api', (_req, res) => {
+  res.status(404).json({ error: 'Not found', code: 'API_ROUTE_NOT_FOUND' });
+});
 
 // Serve public files (like api-docs.html)
 app.use(express.static(path.join(APP_ROOT, 'public')));
@@ -476,7 +475,7 @@ async function soleServerDuties() {
 
 // Stops the stall watchdog on shutdown. Assigned inside the `listen` callback that
 // starts it, named out here because the shutdown path below has to reach it — the
-// same reason `planRunner` is built at module scope.
+// same reason `dispatcher` is built at module scope.
 let stopRunStallWatchdog: (() => void) | null = null;
 
 // Initialize database and start server
@@ -524,11 +523,8 @@ async function startServer() {
             // Start watching the projects folder for changes
             await initializeSessionsWatcher();
 
-            // Start polling the plan runner's state directory. After `listen`, because the
-            // frames it broadcasts are for sockets this server is only now able to accept.
-            planRunner.start();
-
-            // The dispatcher's plans, read off its own command and broadcast the same way.
+            // The dispatcher's plans, read off its own command and broadcast after `listen`,
+            // because the frames are for sockets this server is only now able to accept.
             dispatcher.start();
 
             // The launcher souls, read off their own state root and broadcast the same way.
@@ -548,7 +544,6 @@ async function startServer() {
             // Stop accepting first: with reusePort the kernel would keep handing this exiting
             // process new connections. Never awaited — open WebSockets keep it from resolving.
             server.close();
-            planRunner.stop();
             dispatcher.stop();
             dispatchSouls.stop();
             universe.stop();

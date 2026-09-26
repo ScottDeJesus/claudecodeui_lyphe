@@ -132,8 +132,8 @@ function parsePlacements(raw: unknown): ChatGutterPlacements {
  * The read is memoised by the IDENTITY of the stored value, because `useSyncExternalStore`
  * compares snapshots by identity: a getter that parsed afresh on every call would report a change
  * on every render and loop. The store replaces that value only on a write or a hydrate, so the
- * parse is rebuilt exactly when the placements change — the shape `modules/plan-runner/
- * dismissedRuns.ts` uses for its own preference.
+ * parse is rebuilt exactly when the placements change — the shape `modules/dispatcher/
+ * dismissedEndings.ts` uses for its own preference.
  */
 /** How many chats keep an arrangement of their own before the least recently written is dropped. */
 const MAX_REMEMBERED_SESSIONS = 60;

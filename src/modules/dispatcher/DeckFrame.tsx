@@ -1,49 +1,39 @@
 import { ChevronLeft, ChevronRight } from 'lucide-react';
-import type { DragEvent, HTMLAttributes, ReactNode } from 'react';
+import type { HTMLAttributes, ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { useDeckStrip } from '@/modules/plan-runner/hooks/useDeckStrip';
+import { useDeckStrip } from '@/modules/dispatcher/hooks/useDeckStrip';
 import { useCardFold } from '@/shared/hooks/useCardFold';
 import type { Tone } from '@/shared/types';
 import { Badge, Button, CardFoldBody, CardFoldToggle, Collapsible } from '@/shared/ui';
 import { cn } from '@/shared/utils';
 
 /**
- * ONE arc, drawn as a gallery: a header that says which arc this is and how far it has walked, and
- * beneath it every card of the arc in ONE horizontal strip, in the arc's own order — past, present,
- * future reading left to right, which is the walk's own order.
- *
- * TWO LANES DRAW THROUGH THIS, AND THAT IS WHY IT EXISTS. The runner's arcs (`ArcDeck`, minted card
- * plans on disk) and the dispatcher's (`DispatchArcDeck`, a store row with plans hanging off it) are
- * different objects with different words — but an arc of plans is the same SHAPE on both screens:
- * a header, a strip of cards, the same chrome and the same fold. The operator, 2026-09-25: "he did
- * not do it properly it is not the same as the other arc card" — "we have an arc already, layouts
- * should already be there" — "please tell him to do it like the other plans". So the composition
- * lives HERE, once, and each lane hands it its own data through the slots below: a lane that drew a
- * second deck of its own would be the disagreement this file exists to prevent.
+ * ONE dispatch arc, drawn as a gallery: a header that says which arc this is and how far it has
+ * walked, and beneath it every card of the arc in ONE horizontal strip, in the arc's own order —
+ * past, present, future reading left to right, which is the walk's own order.
  *
  * THE STRIP MOVES THREE WAYS: a swipe or a trackpad (CSS scroll snap, no script), the arrows at
  * either end of the nav row (one card each, disabled at their end), and Left/Right on the focused
- * strip. The focused card is centred on mount and again whenever `focusIndex` changes — the runner
- * centres its LIVE card, the dispatcher the first plan of the arc that still has a walk in front of
- * it (`deckFocusIndex`). One card: no arrows, nothing to move to.
+ * strip. The focused card is centred on mount and again whenever `focusIndex` changes — the arc's
+ * first plan that still has a walk in front of it (`deckFocusIndex`). One card: no arrows, nothing to
+ * move to.
  *
  * Every card is one fixed width (18rem, never wider than the strip) and as tall as its OWN content:
  * the strip is a row of flex items and would wear the tallest card's height under every shorter one,
  * so its height is set instead to the card the reader is on (`useDeckStrip` measures it) and the deck
  * grows and shrinks as the strip is paged, swiped or keyed past. `DeckItem`'s `cardFillsStrip` is the
  * gutter home's width instead: every card exactly the strip's width, so one whole card is in view and
- * the arrows and the snap page one card at a time (`ArcGallery` says why).
+ * the arrows and the snap page one card at a time.
  *
  * A FOLD LEAVES THE HEADER ROW, AND NOTHING ELSE. What stays is the arc's name, its word and how far
  * it has walked — so a reader who folded three decks away still knows which of them is stalled, which
  * is complete and how far each has got. The STRIP goes, the two arrows go with it (they are the
- * strip's controls and there is nothing for them to move), and so does everything a lane put in
- * `bodyTop`: the model switch, Start, Stop, Resume — VERBS, the same layer a run card's footer folds
- * and a plan card's own controls fold, so the implements cannot disagree about what "collapsed"
- * means. Measured on the runner's deck, 2026-09-25: keeping Start and the model switch in the header
- * made a folded unstarted deck 164px against 86px for a started one — a "collapsed" row that had not
- * collapsed.
+ * strip's controls and there is nothing for them to move), and so does everything the lane put in
+ * `bodyTop`: the model switch, Start, Stop, Resume — VERBS, the same layer a plan card's own controls
+ * fold, so the implements cannot disagree about what "collapsed" means. Measured on an arc deck,
+ * 2026-09-25: keeping Start and the model switch in the header made a folded unstarted deck 164px
+ * against 86px for a started one — a "collapsed" row that had not collapsed.
  *
  * THE FOLD IS THE HOUSE'S OWN BODY SLOT, NEVER THE RAW CLIP (`CardFoldBody`, never
  * `CollapsibleContent`): a clip hides a body but leaves its controls in the tab order and in the
@@ -51,9 +41,10 @@ import { cn } from '@/shared/utils';
  * never on screen, and a fold is remembered per card so it survives reloads.
  *
  * `data-arc-strip`, `data-arc-viewing` and `data-collapsed` are the browser harness's handles, on the
- * nodes that carry them rather than on a lane's own wrapper, so the two lanes' strips read alike.
+ * nodes that carry them rather than on the caller's own wrapper, so a reading is always taken from the
+ * deck rather than from a lane's wrapper around it.
  *
- * Used by `ArcDeck` (the runner's arcs) and `DispatchArcDeck` (the dispatcher's).
+ * Used by `DispatchArcDeck` — the only arc deck there is.
  */
 export function DeckFrame({
   rootAttributes,
@@ -68,30 +59,25 @@ export function DeckFrame({
   stripLabel,
   focusIndex,
   cardCount,
-  drag,
   children,
 }: {
-  /**
-   * The lane's own handles on the deck's root — `data-arc-deck` for the runner's arcs,
-   * `data-dispatch-arc` and `data-arc-name` for the dispatcher's. Written here rather than by the
-   * lane so `data-collapsed` and the strip below it cannot end up on two different nodes.
-   */
+  /** The caller's own handles on the deck's root — `data-dispatch-arc` and `data-arc-name`. Written here rather than by the caller so `data-collapsed` and the strip below it cannot end up on two different nodes. */
   rootAttributes: Record<string, string>;
-  /** The arc's status, as the lane's own snapshot spells it — read back by a probe off the root. */
+  /** The arc's status, as the store's own snapshot spells it — read back by a probe off the root. */
   status: string;
-  /** The deck's own name, as its lane spells it: the runner's title, the dispatcher's `<name>.arc`. */
+  /** The deck's own name, as the lane spells it: the dispatcher's `<name>.arc`. */
   title: ReactNode;
   /** The word this arc wears and the tone it takes, from the lane's own table. */
   badge: { key: string; tone: Tone };
-  /** The card's key in the shared fold store (`arc:<name>` / `darc:<name>`), so one home folds what the other folds. */
+  /** The card's key in the shared fold store (`darc:<name>`), so one home folds what the other folds. */
   foldKey: string;
-  /** The lane's own lines under the title row — the dispatcher's planner badge and the goal its designer wrote. */
+  /** The lane's own lines under the title row — the planner badge and the goal the arc's designer wrote. */
   subtitle?: ReactNode;
-  /** Drawn beside the title, past the badge: the dispatcher's spend figure. */
+  /** Drawn beside the title, past the badge: the arc's spend figure. */
   titleTail?: ReactNode;
   /** The line between the arrows — how far the arc has walked. The "card N of M" of the strip is added here, when there is a strip to move. */
   note: ReactNode;
-  /** The lane's verbs and model switch: the body's first row, so the fold takes them with the strip. */
+  /** The arc's verbs and model switch: the body's first row, so the fold takes them with the strip. */
   bodyTop?: ReactNode;
   /** What a screen reader hears for the strip. */
   stripLabel: string;
@@ -99,11 +85,6 @@ export function DeckFrame({
   focusIndex: number;
   /** How many cards the strip holds — the arrows' own count. */
   cardCount: number;
-  /** The strip's drag handlers, for a lane whose cards can be reordered (`ArcDeck` alone). */
-  drag?: {
-    onDragOver: (event: DragEvent<HTMLOListElement>) => void;
-    onDrop: (event: DragEvent<HTMLOListElement>) => void;
-  };
   /** The strip's items — one `DeckItem` per card, in the arc's own order. */
   children: ReactNode;
 }) {
@@ -121,14 +102,43 @@ export function DeckFrame({
     >
       <Collapsible open={!collapsed} onOpenChange={toggle} className="flex w-full min-w-0 flex-col gap-3">
         <header data-arc-header className="flex min-w-0 flex-col gap-1">
-          {/* The row a reader keeps whatever he has folded away: WHICH arc this is. */}
-          <div className="flex min-w-0 items-start gap-2">
-            <h4 className="min-w-0 flex-1 break-words text-sm font-medium leading-snug">{title}</h4>
+          {/* The row a reader keeps whatever he has folded away: WHICH arc this is.
+
+              THE ROW WRAPS AND THE TITLE HAS A FLOOR, AND BOTH ARE NEEDED — each alone still crushes
+              the name. The lane's tail (the dispatcher's spend line), the status badge and the fold
+              toggle are all things that must not give, so the title is the only item left that CAN:
+              it carries `flex-1`, and `min-w-0` released it even from its own content, so a 101px
+              name in a 332px row beside a 245px spend line and a badge simply collapsed — one letter
+              per line in a zero-width box (measured 12 lines), with the row's last 23px (the fold's
+              own control) spilled past the card's right edge. That is the phone screenshot
+              (2026-09-25, `/tmp/chains/arc-header-phone.jpg`). `min-w-fit` is the floor that ends it:
+              never narrower than its own longest word, so the title reads on one line, or wraps BY
+              WORD — and it is the title's own floor, not a shrink, that then hands the spend line a
+              line of its own on a narrow screen. `flex-wrap` is the other half: a floor without a
+              wrap would push the badge and the toggle off the card instead of under it.
+
+              THE FLOOR HAS ONE BOUND, MEASURED RATHER THAN ASSUMED: `fit-content` is
+              `min(max-content, max(min-content, available))` — capped by the room the row can give —
+              and `break-words` (`overflow-wrap: break-word`) does NOT lower a word's intrinsic
+              min-content. So a title that is ONE token with no space and no hyphen anywhere in it,
+              wider than the row, neither wraps nor shrinks: the name leaves the card (measured at
+              390px with a 74-character token — one 622px line in a 332px row, 278px past the deck's
+              right edge, the page itself not scrolling because its ancestors clip it). No name the
+              corpus holds reaches that: its longest unbroken segment is 19 characters against a 242px
+              narrowest row. It is still strictly better than HEAD there, which crushed the same token
+              into a 25px column of 37 stacked letters — and the row's own `scrollWidth` against its
+              `clientWidth` is the reading that catches it, which `.verify/probe-arc-header-fit.mjs`
+              checks (its payloads are the lane's live arcs, so that edge is not among them).
+
+              THE FLOOR IS CONTENT-DRIVEN AND NOT A BREAKPOINT: these decks are drawn in the tab (a
+              `max-w-2xl` column) and in the chat gutter (~380px even on a 1440px screen), so `sm:`
+              would put one home's deck on the other home's branch. */}
+          <div className="flex min-w-0 flex-wrap items-start gap-x-2 gap-y-1">
+            <h4 className="min-w-fit flex-1 break-words text-sm font-medium leading-snug">{title}</h4>
             {titleTail}
             <Badge tone={badge.tone} className="shrink-0">{t(badge.key)}</Badge>
             <CardFoldToggle />
-          </div>
-          {subtitle}
+          </div>          {subtitle}
           <div className="flex min-w-0 items-center gap-2">
             {movable && !collapsed && (
               <Button
@@ -204,8 +214,6 @@ export function DeckFrame({
               className="scrollbar-hide relative flex min-w-0 snap-x snap-mandatory items-start gap-3 overflow-x-auto overflow-y-hidden rounded-lg transition-[height] duration-200 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               onScroll={onScroll}
               onKeyDown={onKeyDown}
-              onDragOver={drag?.onDragOver}
-              onDrop={drag?.onDrop}
             >
               {children}
             </ol>
@@ -218,8 +226,8 @@ export function DeckFrame({
 
 /**
  * One card's slot in the strip: the width every card takes, in ONE place, so a deck cannot have
- * items of two widths. The item's own handles (`data-arc-card`, `data-arc-layer`, a lane's own)
- * ride the same node through `attributes`.
+ * items of two widths. The item's own handles (`data-dispatch-plan-row`, `data-arc-layer`) ride the
+ * same node through `attributes`.
  */
 export function DeckItem({ cardFillsStrip = false, className, ...attributes }: { cardFillsStrip?: boolean } & HTMLAttributes<HTMLLIElement>) {
   return (

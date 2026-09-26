@@ -78,7 +78,7 @@ export function createHealRouter(
       }
     };
 
-  /** The whole summary the tab reads: counts, kind rows, heal cards, ignore table, queue. */
+  /** The whole summary the tab reads: counts, kind rows, heal cards, cycles, ignore table. */
   router.get('/summary', relay(() => dependencies.summary()));
 
   /**

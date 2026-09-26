@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 
 import { api } from '@/shared/api';
-import type { RunnerOffpeak } from '@/shared/types';
+import type { DispatcherOffpeak } from '@/shared/types';
 
 /**
  * ONE ask for the whole tab: every card and deck that mounts shares the answer, and it is dropped the moment
@@ -13,9 +13,9 @@ let sharedAt: number | null = null;
 function askOffpeak(): Promise<number | null> {
   if (shared && (sharedAt === null || sharedAt * 1000 > Date.now())) return shared;
   sharedAt = null;
-  shared = api.planRunner
+  shared = api.dispatcher
     .offpeak()
-    .then(async (response) => (response.ok ? ((await response.json()) as RunnerOffpeak).at : null))
+    .then(async (response) => (response.ok ? ((await response.json()) as DispatcherOffpeak).at : null))
     .then((at) => {
       if (typeof at !== 'number') shared = null;
       sharedAt = typeof at === 'number' ? at : null;
@@ -30,10 +30,11 @@ function askOffpeak(): Promise<number | null> {
 }
 
 /**
- * The runner's next DeepSeek off-peak moment, epoch SECONDS, or `null` until it answers (the `Start at …`
+ * The dispatcher's next DeepSeek off-peak moment, epoch SECONDS, or `null` until it answers (the `Start at …`
  * button waits for it rather than guessing). The card NEVER computes DeepSeek's clock: the moment is the
- * runner's own (`plan-runner offpeak`, relayed by `GET /runs/offpeak`). Re-asked when it passes, so a tab left
- * open across 3 AM offers the next day's time. Used by `ScheduleControl`, on the run card and the arc deck.
+ * dispatcher's own (`dispatcher offpeak`, relayed by `GET /api/dispatcher/plans/offpeak`). Re-asked when it
+ * passes, so a tab left open across 3 AM offers the next day's time. Used by `ScheduleControl`, on the plan
+ * card and the dispatch arc's header.
  */
 export function useOffpeak(): number | null {
   const [at, setAt] = useState<number | null>(sharedAt);

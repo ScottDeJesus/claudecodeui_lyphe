@@ -10,7 +10,6 @@ import { TaskMasterProvider,TasksSettingsProvider } from '@/modules/task-master'
 import { MemoryIntakeProvider } from '@/modules/memory-intake';
 import { HealProvider } from '@/modules/heal';
 import { LiveBusProvider } from '@/modules/live-bus';
-import { ArcFeed, RunnerFeed } from '@/modules/plan-runner';
 import { DispatcherFeed } from '@/modules/dispatcher';
 import { SoulLaunchFeed } from '@/modules/dispatch-souls';
 import { UniverseFeed } from '@/modules/universe';
@@ -136,43 +135,33 @@ export default function App() {
                       auth gate so the REST seed never fires against the login screen — and below
                       WebSocketProvider above, because the feed subscribes to the one socket. */}
                   <LiveBusProvider>
-                    <RunnerFeed>
-                      {/* The dispatcher's lane beside the runner's: the v3 plan cards' whole picture,
-                          kept by a feed in its own module. It reads a store of its own (the
-                          dispatcher's), which is exactly why it is a second feed and not a second job
-                          for RunnerFeed. */}
-                      <DispatcherFeed>
-                      {/* Nested rather than chained because a feed is a wrapper, not a sibling: each
-                          one subscribes to the one socket and renders what it wraps, so the innermost
-                          thing here is still the router. One feed per lane, in the lane's own module. */}
-                      <ArcFeed>
-                      {/* The arc deck's lane: the stack of plans the runner walks card after card.
-                          Its feed is nested here, directly inside RunnerFeed, because the deck reads
-                          the runner's own state directory — a second lane, never a second job for
-                          RunnerFeed. */}
-                      <SoulLaunchFeed>
-                      {/* The estate's lane: a digest of its activity, and the map fetch the fresh
-                          check needs. Its canvas reads the socket itself, inside the tab. */}
-                      <UniverseFeed>
-                      {/* Inside the auth gate, so the memory poll never fires against the login screen. */}
-                      <MemoryIntakeProvider>
-                        {/* Above the Router, so every route under it reads ONE 60-second poll of the
-                            reflex's summary — the workspace's own tab-gate hook included, which weighs
-                            the ledger's live count for the Heal tab's badge. */}
-                        <HealProvider>
-                        <Router basename={routerBasename}>
-                          <Routes>
-                            <Route path="/" element={<ProjectWorkspaceRoute />} />
-                            <Route path="/session/:sessionId" element={<ProjectWorkspaceRoute />} />
-                          </Routes>
-                        </Router>
-                        </HealProvider>
-                      </MemoryIntakeProvider>
-                      </UniverseFeed>
-                      </SoulLaunchFeed>
-                      </ArcFeed>
-                      </DispatcherFeed>
-                    </RunnerFeed>
+                    {/* The dispatcher's lane: the plan cards' whole picture, kept by a feed in its
+                        own module. */}
+                    <DispatcherFeed>
+                    {/* Nested rather than chained because a feed is a wrapper, not a sibling: each
+                        one subscribes to the one socket and renders what it wraps, so the innermost
+                        thing here is still the router. One feed per lane, in the lane's own module. */}
+                    <SoulLaunchFeed>
+                    {/* The estate's lane: a digest of its activity, and the map fetch the fresh
+                        check needs. Its canvas reads the socket itself, inside the tab. */}
+                    <UniverseFeed>
+                    {/* Inside the auth gate, so the memory poll never fires against the login screen. */}
+                    <MemoryIntakeProvider>
+                      {/* Above the Router, so every route under it reads ONE 60-second poll of the
+                          reflex's summary — the workspace's own tab-gate hook included, which weighs
+                          the ledger's live count for the Heal tab's badge. */}
+                      <HealProvider>
+                      <Router basename={routerBasename}>
+                        <Routes>
+                          <Route path="/" element={<ProjectWorkspaceRoute />} />
+                          <Route path="/session/:sessionId" element={<ProjectWorkspaceRoute />} />
+                        </Routes>
+                      </Router>
+                      </HealProvider>
+                    </MemoryIntakeProvider>
+                    </UniverseFeed>
+                    </SoulLaunchFeed>
+                    </DispatcherFeed>
                   </LiveBusProvider>
                 </ProtectedRoute>
                 </TaskMasterProvider>

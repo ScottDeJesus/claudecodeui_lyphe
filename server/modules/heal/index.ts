@@ -1,6 +1,6 @@
 // createHealModule: used by the server entrypoint to mount the authenticated heal lane at
-// `/api/heal` — the reflex's own summary (the runner's heal queue included), the rows under one
-// kind, the ignore table, and the doors to its cycle and ignore-add verbs.
+// `/api/heal` — the reflex's own summary, the rows under one kind, the ignore table, and the doors
+// to its cycle and ignore-add verbs.
 export { createHealModule } from './heal.module.js';
 
 // What the worker's own answers look like, named once so the lane's callers do not re-spell them:
