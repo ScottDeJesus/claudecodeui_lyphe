@@ -172,11 +172,11 @@
     },
     "schedule": {
       "hourDown": "One hour earlier",
-      "hourLabel": "Hour the nightly cycle opens, UTC",
+      "hourLabel": "Hour of the day’s slot, UTC",
       "hourUp": "One hour later",
       "label": "Nightly maintenance cycle",
-      "off": "Off: only Run a cycle now opens one. On, a cycle opens every day at the hour beside it, unless one is still open.",
-      "on": "Every day at {{slot}} a cycle opens on its own: Chiron ranks what hurt over the last two weeks, and heals walk his list one after another. It runs beside whatever else is walking. Takes effect at the next slot."
+      "off": "Off: only Run a cycle now opens one. On, a beat landing after the hour beside it opens one, unless one is still open.",
+      "on": "On: a beat landing after the day’s slot ({{slot}}) opens a cycle — Chiron ranks what hurt over the last two weeks, and heals walk his list one after another. Nothing fires that beat on a timer today, so Run a cycle now is what opens one. It runs beside whatever else is walking. Takes effect at the next slot."
     }
   },
   "jev": {

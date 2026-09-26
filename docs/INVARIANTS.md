@@ -81,14 +81,14 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-card-fold.mjs
 
 ## INV-4406 — Two open documents overwrite each other's card folds: collapsedCards is written whole
 
-`writeFolds` and `pruneCardFolds` (`src/shared/hooks/useCardFold.ts`) read the localStorage mirror and PATCH the whole `planRunner.collapsedCards` list, so the last document to write wins.
+`writeFolds` and `pruneCardFolds` (`src/shared/hooks/useCardFold.ts`) read the localStorage mirror and PATCH the whole `dispatcher.collapsedCards` list, so the last document to write wins.
 
 - measured 2026-09-25: with nothing of the probe running, the stored list toggled between `["darc:restorly"]` and `[]` at 16:18:45, 16:18:52, 16:19:54 and 16:20:02. A second open document was folding and unfolding the operator's own arc card.
 - effect on a probe: after a reload, 3 of 5 keys were missing while the card-side reading was still correct. A fold test run beside an open browser tab of the operator's can fail for this reason alone.
-- `dismissedRuns.ts` has the same shape, and `useCardFold.ts` copies it. The merge is per KEY of the blob, not per entry of the list.
+- `src/modules/dispatcher/dismissedEndings.ts` has the same shape, and `useCardFold.ts` copies it. The merge is per KEY of the blob, not per entry of the list.
 - not cured: merge-on-write, or a server-side merge, is a refactor. Read the failing key list before blaming the fold.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useCardFold.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/dismissedEndings.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useCardFold.ts
 
 ## INV-4410 — A console error is explained only by what the browser itself reported — a refusal's URL, or an abandonment
 
@@ -106,7 +106,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-deck-height.mjs
 
 **The arc header's title is floored and the row wraps — at no width does a card draw it one letter per line.**
 
-`DeckFrame`'s header row — the one holding the title, a lane's `titleTail`, the status badge and the fold toggle (`src/modules/plan-runner/DeckFrame.tsx`, `data-arc-header`) — is `flex min-w-0 flex-wrap items-start gap-x-2 gap-y-1`, and the title `h4` is `min-w-fit flex-1 break-words`.
+`DeckFrame`'s header row — the one holding the title, a lane's `titleTail`, the status badge and the fold toggle (`src/modules/dispatcher/DeckFrame.tsx`, `data-arc-header`) — is `flex min-w-0 flex-wrap items-start gap-x-2 gap-y-1`, and the title `h4` is `min-w-fit flex-1 break-words`.
 
 - `min-w-fit` (`min-width: fit-content`) IS THE FLOOR: the title is never narrower than its own longest word, so it reads on one line, or wraps BY WORD — never one character per line. Without it the title (`flex-1`, `min-w-0`) is the only item in the row that CAN give, because the tail, the badge and the fold toggle must not — and it gives all the way down.
 - THE FLOOR HAS ONE BOUND, MEASURED: `fit-content` is `min(max-content, max(min-content, available))` — capped by the room the row can give — and `break-words` (`overflow-wrap: break-word`) does NOT lower a word's intrinsic min-content. A title that is ONE token with no space and no hyphen in it, wider than the row, therefore neither wraps nor shrinks: the name leaves the card (measured 2026-09-25 at 390px with a 74-character token — one 622px line in a 332px row, the title 278px past the deck's right edge, the page itself not scrolling because its ancestors clip it). HEAD was worse there — the same token crushed into a 25px column of 37 stacked letters — and no live name reaches it: the corpus's longest unbroken segment is 19 characters against a 242px narrowest row. THE PROBE CANNOT SEE IT: `lines === 1` passes while the row's own `scrollWidth` against its `clientWidth` is the reading that fails, and every payload is the lane's live arcs.
@@ -116,8 +116,8 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-deck-height.mjs
 
 measured 2026-09-25. Operator, with a phone screenshot of the Runner widget: "This card is rendering funny on my phone" (`/tmp/chains/arc-header-phone.jpg`: `restorly.arc` one letter per line in a monospace column, `$0.32 DeepSeek · 2.6M in · 26k out` whole beside it, the status word and the fold chevron cut off past the card's edge).
 
-- CONTROL ON THE RUNNING BUILD (`--head-css` puts the row back to HEAD's three declarations in the page: row `nowrap`, title `min-width: 0`, tail `shrink-0`): at 390px the dispatch arc's title renders 12 lines in a 0px-wide box under a 101px word and the header overflows the card by 23px; at 320px, 12 lines and 93px of spill with FOUR items past the edge. The runner's deck (no tail) was squeezed the same way, more mildly: 186px of a 332px row at 390px (3 lines), 116px of 262px at 320px (5 lines).
-- AFTER: title 1 line in a 332px box at 390px and 262px at 320px, tail below the title at both, 0px of header overflow, no console errors — 42 readings held across 1440/390/320 × light/dark × both decks.
+- CONTROL ON THE RUNNING BUILD (`--head-css` puts the row back to HEAD's three declarations in the page: row `nowrap`, title `min-width: 0`, tail `shrink-0`): at 390px the dispatch arc's title renders 12 lines in a 0px-wide box under a 101px word and the header overflows the card by 23px; at 320px, 12 lines and 93px of spill with FOUR items past the edge.
+- AFTER: title 1 line in a 332px box at 390px and 262px at 320px, tail below the title at both, 0px of header overflow, no console errors — every reading held across 1440/390/320 × light/dark.
 
 ```probe
 node .verify/probe-arc-header-fit.mjs --tag after             # exit 0: every reading held, 0 failed
@@ -125,4 +125,16 @@ node .verify/probe-arc-header-fit.mjs --tag head --head-css   # the control, exp
 ```
 expect: on each deck the title's box is at least its longest word wide AND the header row's `scrollWidth` equals its `clientWidth` (the reading that catches the one-bound case above), at 1440, 390 and 320, dark and light; the tail is below the title or beside it with no overlap; 0 console errors of this app's. The `--head-css` pass rewrites three CSS declarations IN THE PAGE (never the source, never the store) and is expected to reproduce the crush — that is what makes those declarations, and not something else in the diff, the cause. The dev client must be up on 127.0.0.1:5183; the probe presses no control and writes nothing.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/ArcDeck.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/plan-runner/DeckFrame.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-arc-header-fit.mjs
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/ArcDeck.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/DeckFrame.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-arc-header-fit.mjs
+
+## INV-4481 — Probes written against the deleted plan-runner lane fail, and all.mjs is red
+
+`.verify` probes written against the deleted plan-runner lane fail, and `node .verify/all.mjs` runs `phase-23.mjs`..`phase-27.mjs` by glob, so the whole run is red.
+
+- what is gone: the `/api/plan-runner` routes (404 now, MAN-5437), the `runner_state` and `arc_state` frames, the `planRunner` preference (the folds and dismissals live under `dispatcher`), the run and arc cards (`data-runner-card`, `data-arc-card`), and the run and arc directories a fixture wrote into the old runner state tree.
+- find the probes that still name them: `grep -rlE 'api/plan-runner|runner_state|arc_state|planRunner' claudecodeui_lyphe/.verify --include=*.mjs`. 2026-09-26: `phase-23` to `phase-27`, `probe-arc-run-merge`, `probe-phase-wave-mark`, `probe-runner-model-pin`, `probe-runner-schedule`, `probe-side-widgets`, `probe-arc-nest-athena`, `probe-card-fold`, `probe-arc-fill`, `stale-chat/asclepius-stale-proof`. Their fixtures (`lib/runner-fixture.mjs`, `lib/arc-run-fixture.mjs`, `lib/arc-stuck-fixture.mjs`) write fake runs into a tree no server reads.
+- stale for a second reason: `probe-planner-card.mjs`, `probe-planner-card-write.py` and `probe-arc-nest-athena.mjs` still name plans with the retired name suffix (`grep -rl 'v3' claudecodeui_lyphe/.verify`), which the dispatcher refuses, and the planner soul under its retired id.
+- a red `all.mjs` is therefore not a regression in the change under test: read which phase failed.
+- retiring these files is the operator's call: they are the standing-gate record of past phases. `.verify/` is gitignored, so a `git clean -x` deletes it and no commit shows the change.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/all.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/arc-run-fixture.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/arc-stuck-fixture.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/runner-fixture.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-23.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-24.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-25.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-26.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-27.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-arc-fill.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-arc-nest-athena.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-arc-run-merge.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-card-fold.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-phase-wave-mark.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-planner-card.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-planner-card-write.py, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-runner-model-pin.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-runner-schedule.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-side-widgets.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/stale-chat/asclepius-stale-proof.mjs

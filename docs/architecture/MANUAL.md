@@ -190,8 +190,7 @@ immediately hand `subscribe` to the hook that does the real work:
 | `ChatInterface.tsx:72` | `useChatRealtimeHandlers` | every provider `kind`, `chat_subscribed`, `history_truncated`, `protocol_error`, `websocket_reconnected` | session store, processing state, pending permissions, token budget |
 | `ProjectWorkspaceRoute.tsx:32` | `useProjectsState` | `session_upserted`, `loading_progress`, `websocket_reconnected`, plus a sessionId-keyed "attention" marker for background sessions | project list, sidebar rows, session aliasing, selection |
 | `TaskMasterContext.tsx:102` | itself | `taskmaster-project-updated`, `taskmaster-tasks-updated` (`type`-keyed) | task board data |
-| `RunnerFeed.tsx` | itself | `runner_state`, `websocket_reconnected` | none of its own — it publishes the retained runner topics into the live bus |
-| `ArcFeed.tsx` | itself | `arc_state`, `websocket_reconnected` | none of its own — it publishes the retained `arc:*` topic into the live bus ([docs/MANUAL.md (plan-runner)](../MANUAL.md) §"The arc deck") |
+| `DispatcherFeed.tsx` | itself | `dispatcher_state`, `websocket_reconnected` | none of its own — it publishes the retained `dispatcher:all` topic into the live bus ([docs/MANUAL.md (dispatcher)](../MANUAL.md) §"The plan card") |
 | `SoulLaunchFeed.tsx` | itself | `soul_launch_state`, `websocket_reconnected` | none of its own — it publishes the retained `souls:*` topic into the live bus ([docs/MANUAL.md (dispatch-souls)](../MANUAL.md)) |
 | `UniverseFeed.tsx` | itself | `universe_activity`, `universe_map`, `websocket_reconnected` | none of its own — it publishes the retained `universe:*` digest into the live bus, and `useUniverseStream` reads the same frames for the tab's canvas (`src/modules/universe/`) |
 
@@ -309,8 +308,7 @@ in `server/shared/types.ts`.**
 `history_truncated`, `task_notification`.
 
 **`GatewayEventKind` (`server/shared/types.ts`) — produced by the gateway, no provider involved:**
-`chat_subscribed`, `session_upserted`, `loading_progress`, `runner_state`, `soul_launch_state`,
-`arc_state`, `kanban_metis_state`, `kanban_event`, `universe_activity`, `universe_map`, `protocol_error`.
+`chat_subscribed`, `session_upserted`, `loading_progress`, `soul_launch_state`, `kanban_metis_state`, `kanban_event`, `universe_activity`, `universe_map`, `protocol_error`.
 `kanban_metis_state` is `server/modules/kanban-metis`'s own frame — a board's live Metis
 sessions, pushed on change the same way `soul_launch_state` is (`kanban-metis.module.ts`'s
 polled lane) — and it has no row in the consumption table below for the same reason
@@ -345,9 +343,8 @@ Two kinds in those unions never appear where you would look for them:
 | `protocol_error` | `chat-websocket.service.ts:127` | Error row, spinner cleared |
 | `session_upserted` | `session-upsert-broadcast.service.ts:81-105` | `useProjectsState` — sidebar rows and alias folding |
 | `loading_progress` | `projects-with-sessions-fetch.service.ts:164-175` | `useProjectsState` — project scan progress (`:720-736`) |
-| `runner_state` | `plan-runner/runner-watcher.service.ts` | The plan runner's live runs, pushed on change. Not consumed by the chat handler, which returns early on it |
 | `soul_launch_state` | `dispatch-souls/dispatch-souls.module.ts` | The launcher souls a session started by hand, pushed on change. `SoulLaunchFeed` publishes it into the live bus; the chat handler returns early on it too, in the same `case` group |
-| `universe_map` | `universe/universe.module.ts` | The estate map was rebuilt because a tracked repo's `.git` HEAD moved; carries the `mapId` `GET /api/universe/map` now serves. Consumed by `useUniverseStream.ts:122` and `UniverseFeed.tsx:77`, which announce it through `setKnownMapId` and refetch on the strength of it; the announcement never redefines the gate, so the rows admitted below are still keyed to the map the client holds. Excused from the chat handler beside `runner_state`/`soul_launch_state` (`useChatRealtimeHandlers.ts:191-195`) |
+| `universe_map` | `universe/universe.module.ts` | The estate map was rebuilt because a tracked repo's `.git` HEAD moved; carries the `mapId` `GET /api/universe/map` now serves. Consumed by `useUniverseStream.ts:122` and `UniverseFeed.tsx:77`, which announce it through `setKnownMapId` and refetch on the strength of it; the announcement never redefines the gate, so the rows admitted below are still keyed to the map the client holds. Excused from the chat handler beside `soul_launch_state` (`useChatRealtimeHandlers.ts:191-195`) |
 | `universe_activity` | `universe/universe-activity.service.ts` | What the estate is doing now: the journald and transcript taps' rows, coalesced per node and sent at most ten times a second. Sent only when there is a row, so a quiet estate keeps silence on the wire. Consumed by `useUniverseStream.ts:126`, which keeps the canvas's ring of rows and the chrome's 1 Hz summary, and by `UniverseFeed.tsx:60-67`, which accumulates the same rows into the `universe:*` bus digest. Excused from the chat handler with `universe_map`, which it must be — at ten frames a second the fall-through would fill an open transcript with stray rows |
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts
@@ -627,8 +624,7 @@ flowchart TD
     SET --> E1["loading_progress"]
     SET --> E2["session_upserted"]
     SET --> E3["taskmaster frames"]
-    SET --> E4["runner_state"]
-    SET --> E10["arc_state"]
+    
     SET --> E11["dispatcher_state"]
     SET --> E6["soul_launch_state"]
     SET --> E7["universe_map"]
@@ -641,17 +637,9 @@ flowchart TD
   end
 ```
 
-There are nine broadcasters over that set: `loading_progress`, `session_upserted`, the Task Master
-frames, and SIX STATE LANES — the plan-runner watcher (`server/modules/plan-runner/`) over the
-runner's state directory, the plan-runner's own arc deck lane
-(`server/modules/plan-runner/arc-lane.ts`) over `~/.claude/state/arcs/`, the launcher-souls lane
-(`server/modules/dispatch-souls/`) over `~/.claude/state/dispatch-souls/`, a board's own Metis
-sessions (`server/modules/kanban-metis/`) over `~/.claude/state/kanban-metis/`, the v3 dispatcher's plans
-(`server/modules/dispatcher/`) over its `status --json` document, and the universe lane
+There are seven broadcasters over that set: `loading_progress`, `session_upserted`, the Task Master frames, and FOUR STATE LANES — the launcher-souls lane (`server/modules/dispatch-souls/`) over `~/.claude/state/dispatch-souls/`, a board's own Metis sessions (`server/modules/kanban-metis/`) over `~/.claude/state/kanban-metis/`, the dispatcher's plans (`server/modules/dispatcher/`) over its `status --json` document, and the universe lane
 (`server/modules/universe/`), which watches the registered repos' `.git` HEADs and reads two live
-feeds of the estate, the systemd journal and the Claude transcripts. The first five poll every two
-seconds and put a frame on the wire only when the picture actually changed — a live→stale flip
-included, since that is a change in the snapshot like any other. The dedup records a picture as
+feeds of the estate, the systemd journal and the Claude transcripts. The first three poll every two seconds and put a frame on the wire only when the picture actually changed. The dedup records a picture as
 sent only AFTER the send returns, so a broadcast that throws part-way is re-sent on the next tick
 instead of being suppressed as unchanged — the frame carries the whole picture, so a client
 receiving it twice receives it once. All of them reach `connectedClients` through the websocket
@@ -692,7 +680,7 @@ A socket joins `connectedClients` when `handleChatConnection` runs
 listener and nothing more; the run keeps going. Broadcast consumers filter by session id
 themselves, which is why the sidebar can react to sessions the user is not looking at.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/plan-runner/arc-lane.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/polled-lane.service.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/shared/polled-lane.service.ts
 
 ## MAN-316 — Heartbeat
 section: 01-websocket-transport/020 Heartbeat
@@ -860,8 +848,7 @@ it.
    touches a raw frame. It does not branch on provider, does not navigate, and does not
    translate session ids — the backend has already done all three. A frame with no `kind`
    is dropped on the first line, which is what makes Task Master's `type`-keyed
-   broadcasts invisible to chat. The box-wide lanes are the other case: `runner_state`,
-   `soul_launch_state`, `universe_map` and `universe_activity` HAVE a kind and carry no session
+   broadcasts invisible to chat. The box-wide lanes are the other case: `soul_launch_state`, `universe_map` and `universe_activity` HAVE a kind and carry no session
    id of their own, so they are returned early by name — one shared `case` group — the same way
    `session_upserted` and `loading_progress` are. Each is a picture of the whole box owned by a
    reader outside the transcript, republished into the live bus by its own feed. Each RETURNs
@@ -870,9 +857,7 @@ it.
    ([docs/architecture/MANUAL.md (01-websocket-transport)](MANUAL.md) §"Fan-out: who receives what").
    **That `case` group names the lanes; it is not what stops them.** What stops them is the
    stamp: a row joins the transcript only if a numeric `seq` says the RUN wrote it, and no
-   sessionless lane frame carries one (`writtenByRun` at `:253`). A lane that is not in the
-   group — `arc_state`, `kanban_event`, `kanban_metis_state` — is stopped by the stamp all the
-   same, which is the point: the group lagged the lanes it was meant to fence, and the frame
+   sessionless lane frame carries one (`writtenByRun` at `:253`). A lane that is not in the group — `dispatcher_state`, `kanban_event`, `kanban_metis_state` — is stopped by the stamp all the same, which is the point: the group lagged the lanes it was meant to fence, and the frame
    that slipped past it landed in the viewed transcript with no `id`, where the store's
    `removeOptimisticUserEchoes` read `id.startsWith` off `undefined` and threw inside the
    websocket listener — losing that frame and every frame after it, and freezing the open chat
@@ -1593,8 +1578,7 @@ Going the other way — a provider or disk-discovered id in, the app id out — 
 `superseded_provider_sessions` (so an id an edit moved on from still resolves), then a plain app id,
 and returns the input unchanged rather than `null` when no row carries it at all. It exists for
 callers outside the sessions service that hold a provider-spelled id and must show it beside an app
-session without ever letting a provider id itself reach the browser: the plan-runner lane's
-`launched_by_session` ([docs/MANUAL.md (plan-runner)](../MANUAL.md) §files) and the memory lane's `sessionId`
+session without ever letting a provider id itself reach the browser: the dispatcher lane's plan `session` (MAN-1498) and the memory lane's `sessionId`
 ([docs/MANUAL.md (memory-intake)](../MANUAL.md) §"Where the shapes live").
 
 ## MAN-340 — What `session_created` used to do
@@ -2819,11 +2803,7 @@ offset.
 **`flex-1` is the whole height rule: every `flex-none` sibling above the pane is height the
 conversation loses.** Exactly one thing stands there — the CLI-version banner
 ([docs/MANUAL.md (cli-version)](../MANUAL.md)) — and by operator ruling 2026-09-09 nothing else may,
-not a card, not a strip, not a chip. The plan-runner lane provoked it and keeps the reasoning
-([docs/MANUAL.md (plan-runner)](../MANUAL.md) §"The runner card"); what matters here is that the rule is
-MEASURED and not merely written down. `.verify/phase-25.mjs`
-reads the pane's height against its chat root, minus the composer below and the banner above, and
-fails a new region above the transcript whatever that region is named.
+not a card, not a strip, not a chip. The Runner widget provoked it and keeps the reasoning (MAN-642, "Nothing renders over the transcript"). No probe measures it: a region added above the pane shows only as a shorter transcript.
 
 Three row-level scrollers do exist — `BashCommandDisplay.tsx` (`max-h-80 overflow-auto`),
 `FileListContent.tsx` and `AskUserQuestionPanel.tsx` (`max-h-48 overflow-y-auto`). They are
@@ -4375,7 +4355,7 @@ section: 07-live-widgets/001 Mental model
    a prefix test. **The live bus** below says why the difference is not stylistic.
 9. **The bus knows no producer.** It retains values, dispatches them and admits topics — that is
    all it does. What fills it is a FEED, a headless component owned by the module whose data it
-   carries, and the first is `RunnerFeed` in `src/modules/plan-runner/`.
+   carries, and `DispatcherFeed` in `src/modules/dispatcher/` is one.
 10. **Three body shapes, one fence.** The info string says *widget*; the BODY says which kind. Raw
     HTML is the default and everything above describes it — an opaque-origin frame carrying a
     document this app composed inline. A body that parses as JSON naming a DocSpace block instead
@@ -4952,33 +4932,14 @@ section: 07-live-widgets/012 The live bus
 
 `LiveBusProvider` (mounted once by `App`) holds one retained value per topic and dispatches
 publishes synchronously to whoever subscribed. `useWidgetBridge` is the widget module's door onto
-it; `useLiveTopic` is the door for an ordinary React component, and the Runner tab is its first
-caller in the app — the panel and the tab's own gate both read `runner:*` through `useRunnerRuns`
-([docs/MANUAL.md (plan-runner)](../MANUAL.md) §"The Runner tab"), never through a fetch of their own.
+it; `useLiveTopic` is the door for an ordinary React component, and the Runner tab is a caller — the panel and the tab's own gate both read `dispatcher:all` through `useDispatcherPlans` ([docs/MANUAL.md (dispatcher)](../MANUAL.md) §"The Runner tab"), never through a fetch of their own.
 
 **The bus knows no producer.** It imports no transport, calls no endpoint and names no frame kind.
 What fills it is a FEED — a headless component owned by the module whose data it carries, which
-subscribes to whatever it likes and calls `publish`. The first is `RunnerFeed` in
-`src/modules/plan-runner/`, documented in [docs/MANUAL.md (plan-runner)](../MANUAL.md) under *Consumers*.
-Three more have followed and all three kept the shape: `ArcFeed`, beside `RunnerFeed` in that same
-module, publishes the arc deck's own `arc:*` ([docs/MANUAL.md (plan-runner)](../MANUAL.md) §"The arc deck");
-`SoulLaunchFeed` in `src/modules/dispatch-souls/` ([docs/MANUAL.md (dispatch-souls)](../MANUAL.md)); and
-`UniverseFeed` in `src/modules/universe/`, which publishes a once-a-second digest rather than the raw
-activity stream ([docs/MANUAL.md (plan-runner)](../MANUAL.md) §"The feed"). A further lane (git delegation,
-Task Master) lands the same way — a sibling `*Feed.tsx`, usually in ITS own module, though `ArcFeed`
-is the exception: the arc deck reads the runner's own state directory rather than owning one of its
-own, so its feed never became a second job for `RunnerFeed`. Every feed lands as a component, never
-as a line in `live-bus/`. That rule is what keeps this file from acquiring a switch over frame kinds
-it has no business knowing, and it is why the bus can be read without knowing anything about the
-runner.
+subscribes to whatever it likes and calls `publish`. There are three, and all three keep the shape: `DispatcherFeed` in `src/modules/dispatcher/`, publishing `dispatcher:all` ([docs/MANUAL.md (dispatcher)](../MANUAL.md) §"The plan card"); `SoulLaunchFeed` in `src/modules/dispatch-souls/` ([docs/MANUAL.md (dispatch-souls)](../MANUAL.md)); and `UniverseFeed` in `src/modules/universe/`, which publishes a once-a-second digest rather than the raw activity stream. A further lane (git delegation, Task Master) lands the same way — a sibling `*Feed.tsx` in ITS own module. Every feed lands as a component, never as a line in `live-bus/`. That rule is what keeps this file from acquiring a switch over frame kinds
+it has no business knowing, and it is why the bus can be read without knowing anything about the dispatcher.
 
-**The vocabulary is an allowlist, and the shapes are anchored.** `LIVE_TOPIC_ALLOWLIST` holds four
-patterns today — `runner:*` (every run as one array), `runner:<run_id>` with the route's own
-character class and its 120-character ceiling, `souls:*` (every launcher soul), and `universe:*`
-(the estate's activity as one digest, never its rows) — and `isAllowedTopic` is the single question
-every other file asks. A `startsWith('runner:')` test would admit `runner:../../etc/passwd`, a topic
-carrying a URL, and a topic 40 kB long, each of which reads as a runner topic to a prefix and as
-nonsense to everything downstream. Adding a lane means adding a pattern here and nowhere else.
+**The vocabulary is an allowlist, and the shapes are anchored.** `LIVE_TOPIC_ALLOWLIST` holds three patterns today — `dispatcher:all` (every plan the dispatcher carries, as one picture), `souls:*` (every launcher soul), and `universe:*` (the estate's activity as one digest, never its rows) — and `isAllowedTopic` is the single question every other file asks. A `startsWith('dispatcher:')` test would admit `dispatcher:all/../../etc/passwd`, a topic carrying a URL, and a topic 40 kB long, each of which reads as a dispatcher topic to a prefix and as nonsense to everything downstream. Adding a lane means adding a pattern here and nowhere else.
 
 **Retained, and replayed synchronously.** `subscribe(topic, listener)` on an allowed topic replays
 the retained value before it returns, so a subscriber never has to reason about whether it arrived
@@ -5003,8 +4964,7 @@ value became true rather than the last instant something confirmed it, which is 
 
 **The registry is refs, not React state**, for the reason the socket's own listener set is
 (`WebSocketContext.tsx`, quoted in `LiveBusContext.tsx`): two publishes in one tick would otherwise
-collapse into a single render carrying only the later one — which for a runner frame plus a
-retirement means the retirement lands and the picture explaining it does not. The one render
+collapse into a single render carrying only the later one — which for a frame plus a retirement means the retirement lands and the picture explaining it does not. The one render
 trigger in the module is `useLiveTopic`, which subscribes through `useSyncExternalStore`, the same
 idiom `useCliVersion` and the git-panel run store already use.
 
@@ -5068,7 +5028,7 @@ section: 07-live-widgets/014 If you change this, check that
 | `MAX_TOPICS_PER_FRAME` | The refusal is still an ANSWER, not a silence — gate 6 reads the reason out of the seventeenth topic's `onError` inside the frame |
 | `useWidgetBridge`'s cleanup | Gate 8 drops the WIDGETS while the bus and the feed stay mounted and publishing, and requires every subscription they held to have been released — counted at the bus through a wrapper over `subscribe`, which a leaked listener never calls back. Not console silence: a listener left behind posts into a dead `contentWindow`, and `postToFrame`'s `?.` makes that raise nothing at all |
 | `publish`'s equal-value skip | It must remain a COMPLETE no-op. Replace the retained entry on an equal reading and `useLiveTopic` re-renders forever, because its snapshot is compared by reference |
-| The feed's retirement or its seed guard | Gate 9 drives the REST seed into a fresh bus and gate 10 ends a run and requires it to leave `runner:*`. Both live in `RunnerFeed.tsx`, never in `live-bus/` |
+| The feed's seed guard | The REST seed never overwrites a reading newer than itself (`held.at >= at`). It lives in `DispatcherFeed.tsx`, never in `live-bus/` |
 | `DOCSPACE_SANDBOX` | It still carries EXACTLY `allow-scripts allow-same-origin allow-forms` and the frame still has no inline document. Gate 1 of `.verify/phase-28.mjs` compares the attribute with `===`, never `includes`, so a quietly added `allow-popups` or `allow-top-navigation` reddens it |
 | `DocSpaceFrame`'s `allow` attribute | It still reads `fullscreen` — a canvas block's own Full Screen control needs it to reach the real Fullscreen API rather than its CSS-overlay fallback. Gate 1 of `.verify/probe-docspace-canvas.mjs` checks it alongside `DOCSPACE_SANDBOX` on the same rendered iframe |
 | `isForeignOrigin` | It still compares ORIGINS (not hostnames — the two services differ only by port here), still treats an unparseable URL as not-foreign, and is still consulted BEFORE the iframe renders. It is the only thing standing between a same-origin `VITE_DOCSPACE_EMBED_ORIGIN` and `localStorage['auth-token']`; gate 2 of the probe asserts the rendered frame's origin is not the page's |
@@ -5986,8 +5946,7 @@ panel's four fetch states are a spinner, an empty state, an amber banner leaving
 itself (`UniversePanel.tsx:39-43,97-128`).
 
 **The chat reducer returns early on these frames**
-(`src/modules/chat/hooks/useChatRealtimeHandlers.ts:181-195`). Four kinds — `runner_state`, `soul_launch_state`,
-`universe_map` and `universe_activity` — carry no `sessionId`. The early return is a naming, not the fence: what
+(`src/modules/chat/hooks/useChatRealtimeHandlers.ts:181-195`). Three kinds — `soul_launch_state`, `universe_map` and `universe_activity` — carry no `sessionId`. The early return is a naming, not the fence: what
 actually keeps a frame out of the open transcript is that the append below admits a row only when it carries a
 run's numeric `seq` (`:253`), and no box-wide lane frame ever does. For this pair the second kind is still worth
 naming: it arrives up to ten times a second for as long as anything in the estate is busy.
@@ -6276,9 +6235,8 @@ section: README/003 The protocol, in two tables/004 Server → client: the `kind
 | `chat_subscribed` | gateway | Ack for `chat.subscribe`: authoritative processing state plus pending permissions. |
 | `session_upserted` | gateway | Sidebar delta. Owned by the projects state, not by chat. |
 | `loading_progress` | gateway | Project scan progress. |
-| `runner_state` | gateway | The plan runner's runs, pushed on change. |
 | `soul_launch_state` | gateway | The launcher souls a session started by hand, pushed on change. Feeds the soul pins in the strip above the composer when the desktop chat gutters are not showing, and in the gutter's Subagents widget while they are ([docs/MANUAL.md (dispatch-souls)](../MANUAL.md)). |
-| `universe_map` | gateway | The estate map was rebuilt because a tracked repo's HEAD moved; carries the `mapId` a client refetches `GET /api/universe/map` for. Excused from the chat reducer beside `runner_state`/`soul_launch_state`. |
+| `universe_map` | gateway | The estate map was rebuilt because a tracked repo's HEAD moved; carries the `mapId` a client refetches `GET /api/universe/map` for. Excused from the chat reducer beside `soul_launch_state`. |
 | `universe_activity` | gateway | Coalesced estate activity — journal lines and Claude transcript edits resolved onto map stars. At most ten frames a second, and none at all while the estate is quiet; carries the held `mapId`, a `rows` array and a `dropped` count. Excused from the chat reducer. See [docs/architecture/MANUAL.md (01-websocket-transport)](MANUAL.md) §"Fan-out: who receives what". |
 | `protocol_error` | gateway | The request was rejected or never started. No `complete` follows. |
 
