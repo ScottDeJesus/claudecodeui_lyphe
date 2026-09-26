@@ -94,7 +94,7 @@ section: README/001 The rules that keep it one source
    side of the swap, and the five named sizes it stands beside, is
    [docs/architecture/MANUAL.md (08-rendered-shapes)](../../../../docs/architecture/MANUAL.md) §"Header, type and motion".
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/architecture/MANUAL.md, /home/lyphe/.claude/claudecodeui_lyphe/src/main.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/shell/utils/terminalTheme.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/main.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/shell/utils/terminalTheme.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts
 
 ## MAN-740 — The library those tokens paint
 section: README/002 The library those tokens paint
@@ -219,5 +219,3 @@ section: README/006 Where the rest lives
 
 - How the numbers above are measured, and the baselines a change must not regress:
   [`docs/MANUAL.md (verification)`](../../../../docs/MANUAL.md)
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/MANUAL.md

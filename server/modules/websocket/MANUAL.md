@@ -35,7 +35,7 @@ Runs one chat turn with no socket attached. Two consumers: the scheduled-message
 6. `startRunStallWatchdog()`
 Starts the sweep that turns a silent run into one `session.stuck` notification, and returns the function that stops it. Called once by `server/index.ts` inside the `listen` callback and stopped on shutdown, for the same reason the plan runner is: the notification is about runs this process is only now able to host. It lives in this module because the registry it reads owns runs — no provider knows it exists. What counts as silence, and which runs are deliberately never announced, is [docs/MANUAL.md (notifications)](../../../docs/MANUAL.md) §"A silent run is noticed from outside".
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/MANUAL.md, /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/websocket/index.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/websocket/index.ts
 
 ## MAN-711 — Why Dependency Injection Is Used
 section: README/002 Why Dependency Injection Is Used
@@ -299,8 +299,6 @@ and `last_read_at` through the one unread expression
 (`SESSION_UNREAD_SQL`), never by re-deriving the comparison here.
 
 This design centralizes cross-module realtime fanout without requiring route-local references to WebSocket internals.
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/architecture/MANUAL.md
 
 ## MAN-724 — Writer Adapter (`WebSocketWriter`)
 section: README/015 Writer Adapter (`WebSocketWriter`)

@@ -206,8 +206,6 @@ Ownership is deliberately disjoint: the chat handler returns early on `session_u
 `loading_progress` (`useChatRealtimeHandlers.ts:175-178`), and returns immediately on any
 frame with no `kind` at all (`:96-98`), which is how the Task Master frames pass it by.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/MANUAL.md, /home/lyphe/.claude/MANUAL.md
-
 ## MAN-300 — The chat protocol going up
 section: 01-websocket-transport/007 The chat protocol going up
 
@@ -238,7 +236,7 @@ already watching goes unpushed
 ([docs/MANUAL.md (notifications)](../MANUAL.md) §"What gets pushed, and how loud", *Not while you are
 watching*).
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/MANUAL.md, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useSessionPresence.ts, /home/lyphe/.claude/MANUAL.md
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useSessionPresence.ts
 
 ## MAN-301 — The client is not trusted past the session id
 section: 01-websocket-transport/007 The chat protocol going up/008 The client is not trusted past the session id
@@ -551,8 +549,6 @@ the reconnecting client's remembered cursor a previous run's — see
 catches that one case on the way in: a requested `lastSeq` above the run's own `lastSeq` is
 treated as 0, so the new run replays from its start instead of replaying nothing.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/architecture/MANUAL.md
-
 ## MAN-314 — Connection lifecycle in the browser
 section: 01-websocket-transport/018 Connection lifecycle in the browser
 
@@ -696,7 +692,7 @@ A socket joins `connectedClients` when `handleChatConnection` runs
 listener and nothing more; the run keeps going. Broadcast consumers filter by session id
 themselves, which is why the sidebar can react to sessions the user is not looking at.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/MANUAL.md, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/plan-runner/arc-lane.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/polled-lane.service.ts, /home/lyphe/.claude/MANUAL.md
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/plan-runner/arc-lane.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/polled-lane.service.ts
 
 ## MAN-316 — Heartbeat
 section: 01-websocket-transport/020 Heartbeat
@@ -767,7 +763,7 @@ with 1008 (`:47-50`); the client then sends one `register` frame carrying `devic
 sends down that socket — the notification payload, and the web push and ntfy channels beside it —
 is in [docs/MANUAL.md (notifications)](../MANUAL.md).
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/MANUAL.md, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/services/desktop-notification-clients.service.ts, /home/lyphe/.claude/MANUAL.md
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/services/desktop-notification-clients.service.ts
 
 ## MAN-319 — Gotchas and why the code looks like this
 section: 01-websocket-transport/023 Gotchas and why the code looks like this
@@ -914,7 +910,7 @@ it.
    sessions streaming at once share them. This is a real limitation, not a subtlety —
    see Cross-session behaviour (MAN-333).
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/architecture/MANUAL.md, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useChatRealtimeHandlers.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useSessionProtection.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useChatRealtimeHandlers.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useSessionProtection.ts
 
 ## MAN-325 — The pieces
 section: 02-realtime-stream/003 The pieces
@@ -1019,8 +1015,6 @@ Four things in that picture are easy to get backwards:
   mechanism behind the survival is
   [`server/modules/providers/MANUAL.md (README)`](../../server/modules/providers/MANUAL.md)
   §"The exception: `list/claude/session-host/`".
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/MANUAL.md, /home/lyphe/.claude/MANUAL.md
 
 ## MAN-327 — What each provider actually emits
 section: 02-realtime-stream/005 What each provider actually emits
@@ -1354,8 +1348,6 @@ kinds are among the five that are never persisted as rows. The rules:
   transition from "no actionable requests" to "some".
 - `complete` empties the list for the viewed session.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/MANUAL.md, /home/lyphe/.claude/MANUAL.md
-
 ## MAN-333 — Cross-session behaviour
 section: 02-realtime-stream/011 Cross-session behaviour
 
@@ -1519,8 +1511,6 @@ section: 03-conversation-handoff/001 Mental model
    carries that `transcriptAnchorId`, so a client that has not paged back far enough is
    corrected by the REST refresh instead.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/MANUAL.md, /home/lyphe/.claude/MANUAL.md
-
 ## MAN-338 — The pieces
 section: 03-conversation-handoff/002 The pieces
 
@@ -1606,8 +1596,6 @@ callers outside the sessions service that hold a provider-spelled id and must sh
 session without ever letting a provider id itself reach the browser: the plan-runner lane's
 `launched_by_session` ([docs/MANUAL.md (plan-runner)](../MANUAL.md) §files) and the memory lane's `sessionId`
 ([docs/MANUAL.md (memory-intake)](../MANUAL.md) §"Where the shapes live").
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/MANUAL.md, /home/lyphe/.claude/MANUAL.md
 
 ## MAN-340 — What `session_created` used to do
 section: 03-conversation-handoff/003 The two ids and where they meet/004 What `session_created` used to do
@@ -1700,8 +1688,6 @@ calls `onSessionEstablished` (which registers the optimistic row) and then
 `navigate('/session/:id')`. The only other navigate in this area is the alias fix-up
 described under transcripts on disk (MAN-348), and it fires only when the URL
 holds a provider-native id.
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/MANUAL.md, /home/lyphe/.claude/MANUAL.md
 
 ## MAN-343 — Switching sessions in the UI
 section: 03-conversation-handoff/007 Switching sessions in the UI
@@ -1969,8 +1955,6 @@ The sidebar's `session_upserted` reducer in `useProjectsState.ts` then does five
    not processing; otherwise marks the row for attention.
 5. Navigates to `/session/:appId` when the URL still holds the provider-native alias.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/MANUAL.md
-
 ## MAN-349 — Forking and resuming
 section: 03-conversation-handoff/013 Forking and resuming
 
@@ -2011,8 +1995,6 @@ loop. It waits for the `complete` rather than for the busy map because the map i
 every 5 s from the server's own list, and because a send made while the flag is up is not a
 send at all: `handleSubmit` persists it as a queued draft for the server's 30 s dispatcher to
 pick up. The client half is at [docs/MANUAL.md (cli-version)](../MANUAL.md).
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/MANUAL.md, /home/lyphe/.claude/MANUAL.md
 
 ## MAN-350 — Gotchas and why the code looks like this
 section: 03-conversation-handoff/014 Gotchas and why the code looks like this
@@ -2818,8 +2800,6 @@ reveals a targeted line by writing two NAMED scrollers of its own rather than re
 `scrollIntoView` — the same discipline this page holds the transcript to, argued out for that pane
 in [the file manager](../MANUAL.md) §"The rules that bite".
 
-governs: /home/lyphe/.claude/MANUAL.md
-
 ## MAN-375 — The single scroll container
 section: 05-scrolling/005 The single scroll container
 
@@ -2863,7 +2843,7 @@ into their calls, and the "load earlier" link is hidden while more pages exist �
 transcript is often **not scrollable at all and never emits `scroll`**. Wheel and touch are
 then the only way for the user to reach the top pager or the "load all" overlay.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/MANUAL.md, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/ScrollArea.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-25.mjs, /home/lyphe/.claude/MANUAL.md
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/ScrollArea.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-25.mjs
 
 ## MAN-376 — Staying at the bottom
 section: 05-scrolling/006 Staying at the bottom
@@ -3675,8 +3655,6 @@ suppresses the pill; `PlanDisplay` shimmers its title while `mode === 'input' &&
 !toolResult`. Nothing times a call out: a `tool_use` whose result never arrives stays
 `Running` until a REST history refresh re-pairs it from the transcript file.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/architecture/MANUAL.md
-
 ## MAN-401 — Pairing a call with its result
 section: 06-tool-view/009 Pairing a call with its result
 
@@ -4033,7 +4011,7 @@ newest row folded into that container, so a growing timeline invalidates the cac
 
 `src/modules/chat/tests/liveSubagentGrouping.test.ts` pins all four behaviours.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/MANUAL.md, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/session-agents.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/session-subagent-runs.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/usePinnedSubagentRows.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/subagents/subagentSource.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/subagents/SubagentWidgetBody.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/utils/soulLaunchAnchors.ts, /home/lyphe/.claude/MANUAL.md
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/session-agents.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/session-subagent-runs.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/usePinnedSubagentRows.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/subagents/subagentSource.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/subagents/SubagentWidgetBody.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/utils/soulLaunchAnchors.ts
 
 ## MAN-405 — Errors
 section: 06-tool-view/013 Errors
@@ -4314,7 +4292,7 @@ section: 06-tool-view/017 Gotchas and why the code looks like this
   `hideOnSuccess`, and it predates `question-answer`, the `denied` status, subagents and
   permissions. Verify against the code, not against it.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/shared/message-unification.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/usePinnedSubagentRows.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/tools/MANUAL.md
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/shared/message-unification.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/usePinnedSubagentRows.ts
 
 ## MAN-410 — If you change this, check that
 section: 06-tool-view/018 If you change this, check that
@@ -4439,7 +4417,7 @@ section: 07-live-widgets/002 The pieces
 | `src/modules/live-bus/index.ts` | The barrel. The provider, the bus hook, `useLiveTopic`, and the vocabulary |
 | `src/modules/chat/transcript/shapes/code/index.tsx` | `CodeBlock` — the `code` override's routing decision, and the widget branch inside it, which hands `EmbedFrame` down as `WidgetFrame`'s `frame` |
 | `src/modules/chat/transcript/shapes/code/EmbedFrame.tsx` | `EmbedFrame` — the card a LIVE embed wears: the one `ShapeFrame` header every shape draws (flush), the way out (`Open in ArchPulse` for a block, `Open page` for an embed), and the fullscreen switch. It imports nothing from this module |
-| `src/modules/chat/transcript/shapes/ShapeFrame.tsx` | The card itself, and its `fullscreen` prop — the fixed panel at `z-[45]`, the flex chain that lets a frame fill it, the forced-open fold and the `data-owns-escape` claim |
+| `src/modules/chat/transcript/shapes/ShapeFrame.tsx` | The card itself, and its `fullscreen` prop — the fixed panel at `z-[45]`, the flex chain that lets a frame fill it, the forced-open fold, the `data-owns-escape` claim, and the fold's chevron — the shared `FoldChevron` from `@/shared/ui` that the runner lane's cards wear too, not a glyph of its own |
 | `src/modules/chat/transcript/shapes/markdownStreaming.ts` | `MarkdownStreamingContext`, in its own module. `CodeBlock` is the last consumer left in the tree |
 | `src/modules/chat/transcript/Markdown.tsx` | Provides that context around its `ReactMarkdown`, and names `CodeBlock` as the `code` override in both component maps |
 | `src/modules/chat/transcript/StreamingMarkdown.tsx` | Marks the pending half streaming; the settled half is untouched |
@@ -4770,7 +4748,7 @@ half of this contract — the embed route, the block types that behave different
 `resize` height being the body's border box rather than the document's `scrollHeight` — is
 MAN-238, which points back here for this half.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/MANUAL.md, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/authToken.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-29.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-docspace-canvas.mjs, /home/lyphe/.claude/MANUAL.md
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/authToken.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-29.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-docspace-canvas.mjs
 
 ## MAN-420 — The embed kind
 section: 07-live-widgets/009 The embed kind
@@ -4969,8 +4947,6 @@ A retraction is the one thing that ends fullscreen without the reader: a fence t
 the streaming half unmounts `WidgetFrame` entirely, and the card comes back as a card. That is the
 same restart the widget itself suffers there, and curing it is `StreamingMarkdown`'s shape to change.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/architecture/MANUAL.md
-
 ## MAN-423 — The live bus
 section: 07-live-widgets/012 The live bus
 
@@ -5040,8 +5016,6 @@ at }`, and drops every subscription it holds when the frame unmounts. That sweep
 nothing inside a widget hears about being unmounted, so it can never send the `unsubscribe` that
 would clean up after it, and without the sweep every widget ever rendered in a session leaves its
 listeners in the bus for every later publish to walk.
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/MANUAL.md, /home/lyphe/.claude/MANUAL.md
 
 ## MAN-424 — Gotchas
 section: 07-live-widgets/013 Gotchas
@@ -5279,7 +5253,7 @@ section: 08-rendered-shapes/002 The pieces
 What each probe asserts, and which of its gates redden on which defect, is
 [docs/MANUAL.md (verification)](../MANUAL.md) §"The browser harness".
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/MANUAL.md, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/surface-signal.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/command-palette/context/PaletteOpsContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/markdown-preview/MermaidDiagram.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/constants.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/artifacts/shapes-elements-baseline.html, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/mountReact.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/shapes-fixture.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-32.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-33.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-34.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-markdown-cards.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-baseline.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-detect.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-fences.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-groups.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-inline.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-lineopen.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-lists.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-prose.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-tables.mjs, /home/lyphe/.claude/MANUAL.md
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/surface-signal.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/command-palette/context/PaletteOpsContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/markdown-preview/MermaidDiagram.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/constants.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/artifacts/shapes-elements-baseline.html, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/mountReact.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/shapes-fixture.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-32.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-33.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-34.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-markdown-cards.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-baseline.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-detect.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-fences.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-groups.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-inline.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-lineopen.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-lists.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-prose.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-tables.mjs
 
 ## MAN-429 — The triggers
 section: 08-rendered-shapes/003 The triggers
@@ -5387,8 +5361,6 @@ and only on this surface" for where it is set, and why only there). Its
 fence, the `VERDICT:` line with its counts, `path/to/file.ext:line`, and `mermaid` — and says in one
 clause that ordinary markdown already renders richly. It is paid for on every turn, so the trigger
 table stays here and in `detect.ts`, never in the prompt.
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/MANUAL.md, /home/lyphe/.claude/MANUAL.md
 
 ## MAN-430 — Collapse and export
 section: 08-rendered-shapes/004 Collapse and export
@@ -5575,7 +5547,7 @@ timeline list still streaming is carded until it settles into its shape.
 **Export.** `collectDocumentStyles` in `buildTranscriptHtml.tsx` reads the running document's own
 stylesheets, so an exported transcript carries `markdownCards.css` with it.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/markdownCards.css, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/constants.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/verve/MANUAL.md
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/markdownCards.css, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/constants.ts
 
 ## MAN-433 — Header, type and motion
 section: 08-rendered-shapes/007 Header, type and motion
@@ -5675,7 +5647,7 @@ so the static render carries no `data-vv-enter` and draws no animation (§"Colla
 the whole export contract). *Reduced motion draws no rule at all* — the stylesheet and the meter's
 rule beside it are both inside the query, so the card is simply there.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/verve/MANUAL.md, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/utils.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/utils.ts
 
 ## MAN-434 — Gotchas
 section: 08-rendered-shapes/008 Gotchas
@@ -5710,7 +5682,7 @@ section: 08-rendered-shapes/008 Gotchas
   renders, so a sub-list of tasks under a task list stays an indented list, never a second card
   inside a bullet.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/MANUAL.md, /home/lyphe/.claude/claudecodeui_lyphe/.verify/artifacts/shapes-elements-baseline.html, /home/lyphe/.claude/MANUAL.md
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/artifacts/shapes-elements-baseline.html
 
 ## MAN-435 — If you change this, check that
 section: 08-rendered-shapes/009 If you change this, check that
@@ -5763,8 +5735,6 @@ along edges the graph really has, and a quiet estate is a dark sky. **The map's 
 module docstring of `scripts/universe/build.py` (lines 1-95, the code that writes it); this document points at
 it rather than restating it. See [docs/architecture/MANUAL.md (07-live-widgets)](MANUAL.md) for the bus a digest rides, and
 [docs/architecture/MANUAL.md (02-realtime-stream)](MANUAL.md) for the transport.
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/architecture/MANUAL.md
 
 ## MAN-437 — Mental model
 section: 09-universe/001 Mental model
@@ -6316,7 +6286,7 @@ One more kind never crosses the wire: **`websocket_reconnected`** is synthesized
 `src/shared/context/WebSocketContext.tsx` when the socket re-opens, so features can catch
 up on what they missed.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/architecture/MANUAL.md, /home/lyphe/.claude/claudecodeui_lyphe/docs/MANUAL.md, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/context/WebSocketContext.tsx, /home/lyphe/.claude/MANUAL.md
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/context/WebSocketContext.tsx
 
 ## MAN-454 — Client → server: the `type` on every frame
 section: README/003 The protocol, in two tables/005 Client → server: the `type` on every frame
@@ -6401,8 +6371,6 @@ section: README/008 Symptom lookup
 
 ---
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/MANUAL.md, /home/lyphe/.claude/MANUAL.md
-
 ## MAN-458 — Related module docs
 section: README/009 Related module docs
 
@@ -6412,5 +6380,3 @@ how the pieces fit together.
 - `server/modules/websocket/MANUAL.md (README)` — the gateway's service map.
 - `server/modules/providers/MANUAL.md (README)` — the provider abstraction.
 - `src/modules/chat/tools/MANUAL.md (README)` — the tool config registry, from the module's side.
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/MANUAL.md, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/websocket/MANUAL.md, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/tools/MANUAL.md

@@ -337,5 +337,3 @@ section: README/012 See also
   each ending above is driven against the real units
 - [`docs/architecture/MANUAL.md (02-realtime-stream)`](../../../../../../docs/architecture/MANUAL.md)
   §"One run, end to end" — why a re-adopted run restarts `seq` at 1
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/architecture/MANUAL.md, /home/lyphe/.claude/claudecodeui_lyphe/docs/MANUAL.md

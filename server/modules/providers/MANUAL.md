@@ -105,7 +105,7 @@ for the retiring server to exit first. The mechanism, that exception, its gate, 
 why three of its files are plain ESM JavaScript, are in
 [`server/modules/providers/list/claude/session-host/MANUAL.md (README)`](list/claude/session-host/MANUAL.md) §"Re-adoption, on boot".
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/chat-process.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/installed-cli-version.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/session-host/MANUAL.md
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/chat-process.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/installed-cli-version.ts
 
 ## MAN-700 — What Each Facet Does
 section: README/004 What Each Facet Does
