@@ -4653,7 +4653,7 @@ when nothing is claimable.
 
 - **Her environment** is `userFacingEnv(extra)` from `server/shared/child-env.ts` — the server's own
   environment minus the variables that describe the server process. That subtraction is not
-  cosmetic: measured 2026-09-11, a plan-runner started from an app session inherited the server's
+  cosmetic: measured 2026-09-11, a plan-runner launched from an app session inherited the server's
   `TSX_TSCONFIG_PATH`, ran a probe through `tsx`, and died with `ERR_MODULE_NOT_FOUND '@/modules'`
   because every `@/…` resolved against the SERVER's folder — and a Metis who starts plan-runners is
   exactly that path. `metis-env.service.ts` never spells `process.env`: what it needs arrives as
@@ -5822,7 +5822,7 @@ reached through the same barrel from `server/modules/settings/index.ts` ([docs/M
 must run different models and a switch that is one file the whole box shares cannot say that.
 `server/modules/kanban-metis/metis-env.service.ts`'s `writeBoardFlag` is that caller: it
 calls the generalised writer with a board's own path, `~/.claude/state/kanban-deepseek/<boardId>.flag`,
-at every Metis spawn — and the precedence a plan-runner started from there then reads by is stated
+at every Metis spawn — and the precedence a plan-runner launched from there then reads by is stated
 in §"The DeepSeek switch" below.
 
 Further callers of the same pair: `jev-switches.ts` (the Jev master and scope flags) and
@@ -5859,7 +5859,7 @@ flip made elsewhere. It belongs to the settings module and the chat module.
 read no `userId`, because the switch steers the souls of one box and there is only one of it. It
 is a file rather than a row in `auth.db` because its readers — the dispatcher's daemon and every
 soul it launches — are separate programs with no database and no HTTP. The exception is a matter of PRECEDENCE, not a second route: a plan-runner
-STARTED BY A BOARD'S METIS reads that board's own flag file,
+LAUNCHED BY A BOARD'S METIS reads that board's own flag file,
 `~/.claude/state/kanban-deepseek/<boardId>.flag`, because the board hands its child the variable
 `PLAN_RUNNER_DEEPSEEK_FLAG_PATH`, and `flag_path()` in `~/.claude/hooks/plan_runner/deepseek.py`
 reads that variable **at call time** — so every plan-runner that child starts, and every re-read
@@ -5976,7 +5976,7 @@ from a hook, with no database and no HTTP.
 | `heal.flag` | THE MASTER — may an ending ASK to launch a heal at all | **ON**, which is today's behaviour: it ships absent |
 | `heal_daily_cap.flag` | the day's ceiling, a plain decimal dollar amount | **NO CEILING** |
 | `heal_model.flag` | WHICH MODEL a heal's souls run on — `deepseek` or `claude`, one word; the HEAL's own choice, unrelated to the chat composer's `deepseek_flash.flag` | **`deepseek`**, the side it ships on |
-| `heal_cycle.flag` | WHEN the maintenance cycle opens — `off`, or `on <hour>` (the UTC hour); a pressed cycle (typed `/heal`) is the operator's own hand and is never gated by it | **ON at hour 10**, the side it ships on |
+| `heal_cycle.flag` | the UTC hour after which a tick opens the maintenance cycle — `off`, or `on <hour>`; no timer fires a tick, so only a press opens one today, and a pressed cycle (typed `/heal`) is the operator's own hand and is never gated by it | **ON at hour 10**, the side it ships on |
 | `deepseek_flash.flag` | the CHAT COMPOSER's own switch — a fifth file, and the one this row is here to rule OUT: no heal door reads or writes it, for any reason, not even as a fallback | not applicable — never read by any of the four above |
 
 `GET`/`PUT /api/settings/heal-master` (`{"enabled": boolean}`; anything else is 400
@@ -6015,12 +6015,11 @@ would raise it past the file's own word. Neither shape is reachable from the row
 emits ASCII and a plain decimal alone.
 
 **What `off` stops is the LAUNCH, and only the launch — for BOTH doors.** Every ending still indexes
-the friction it saw, so nothing is lost while the switch is off, but the typed `/heal` door and the
-watchdog's tick are gated by it exactly alike: the master sits ABOVE the daily cap
+the friction it saw, so nothing is lost while the switch is off, but the typed `/heal` door and every
+tick are gated by it exactly alike: the master sits ABOVE the daily cap
 in the ladder, so it gates every launch attempt before the cap is even consulted. NO WALK BARS A
 LAUNCH — a heal starts beside any plan or chain alike (operator, 2026-09-23: "Heals shouldn't have
-to wait for because a plan is in progress"); the cap and the one-drain-per-box lock are spend and
-one-worker guards, not walk guards.
+to wait for because a plan is in progress"); the cap is a spend guard, not a walk guard.
 
 **One client surface for the master, two for the model.** Settings → Agents → Claude carries the
 master as a third row in `RunnerModelContent.tsx` beneath the swarm one, wearing the heal panel's own
@@ -6044,7 +6043,7 @@ Heal tab's own Start/Stop (`HealStartStopButton.tsx`) is the CYCLE's door, never
 cycle reads "Run a cycle now" (`POST /api/heal/cycle`, disabled while the master is off, captioned where
 the master lives) and opens one — Chiron ranks the live friction, heals walk his list; an open cycle
 reads "End cycle" (`POST /api/heal/cycle/stop`, pressable regardless of the master) and closes it,
-running heals finishing on their own. Both doors ask the same gate the watchdog's tick asks, so a
+running heals finishing on their own. Both doors ask the same gate every tick asks, so a
 press fires at once and, refused, answers with the worker's own sentence (e.g.
 "heal switch off") under the button. Which word the button shows is `cycle_open` off the
 summary, never an optimistic flip — every press ends in a re-read.
