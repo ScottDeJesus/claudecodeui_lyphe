@@ -745,7 +745,6 @@
   "runner": {
     "title": "Runner",
     "empty": "Nothing is running",
-    "phases": "Phases",
     "pipeline": "Pipeline",
     "phaseCount_one": "{{count}} phase",
     "phaseCount": "{{count}} phases",
@@ -787,7 +786,6 @@
       "unscheduled": "scheduled start cancelled",
       "arcStarted": "arc started — card 1 is on its way"
     },
-    "dismiss": "Dismiss",
     "ended": "ended {{elapsed}} ago",
     "outcome": {
       "complete": "COMPLETE",
@@ -799,17 +797,8 @@
       "unknown": "ENDED",
       "incomplete": "INCOMPLETE"
     },
-    "planTotal": "plan ${{usd}} {{vendor}}",
-    "planKinds_one": "{{kinds}} in {{count}} run",
-    "planKinds": "{{kinds}} in {{count}} runs",
     "paid": "${{usd}} {{vendor}}",
     "usage": "{{in}} in · {{out}} out",
-    "kind": {
-      "planning": "planning ${{usd}}",
-      "review": "review ${{usd}}",
-      "scouts": "scouts ${{usd}}",
-      "build": "build ${{usd}}"
-    },
     "tokens": "⛁ {{n}} tok",
     "soulBlocked": "DeepSeek refused or never answered — nothing ran on Claude",
     "repair": {
@@ -850,9 +839,6 @@
     "arcQueued": "queued",
     "arcPaused": "paused",
     "arcDragHint": "drag a card the runner has not started to change its place",
-    "arcViewing": "Card {{n}} of {{total}}",
-    "arcPrevious": "Previous card",
-    "arcNextCard": "Next card",
     "arcStrip": "Cards of {{title}}",
     "arcNoPhases": "Plan not written yet",
     "arcPhaseCount": "{{done}} of {{total}}",
@@ -901,10 +887,33 @@
     "settling": "settling",
     "events_one": "{{count}} event",
     "events": "{{count}} events",
-    "phaseCount_one": "{{count}} phase",
-    "phaseCount": "{{count}} phases",
+    "allPhases_one": "{{count}} phase",
+    "allPhases": "All {{count}} phases",
+    "flow": {
+      "name": "Phases of {{plan}}",
+      "node": "Phase {{position}} · {{title}} · {{word}}",
+      "caption": "{{done}} of {{total}} done",
+      "arc": "Plans of {{arc}}",
+      "plan": "{{name}} · {{word}}"
+    },
+    "pager": {
+      "plan": "Plan {{n}} of {{total}}",
+      "previousPlan": "Previous plan",
+      "nextPlan": "Next plan"
+    },
+    "now": {
+      "next": "Next",
+      "more": "+{{count}} more"
+    },
     "rounds_one": "{{count}} round",
     "rounds": "{{count}} rounds",
+    "pill": {
+      "paid": "${{usd}}",
+      "paidTitle": "${{usd}} billed by {{vendor}}",
+      "in": "{{n}} in",
+      "out": "{{n}} out",
+      "tokens": "{{n}} tokens"
+    },
     "noStages": "No stage has launched for this phase yet.",
     "arcPause": "Pause",
     "arcScheduleStart": "Schedule start",
@@ -913,16 +922,45 @@
     "arcScheduleTitle": "Start every plan of this arc that is not moving when DeepSeek’s daily peak lifts — one timer per plan, at the gate or stopped mid-walk alike, each pressing Start at that hour",
     "park": "Park",
     "unpark": "Unpark",
+    "delete": {
+      "word": "Delete",
+      "menu": "Delete plan…",
+      "title": "Delete {{name}}?",
+      "message": "Deleting removes {{phases}} and {{events}} from the store for good.",
+      "message_design": "Deleting removes its design, {{phases}} and {{events}} from the store for good.",
+      "message_spent": "Deleting removes {{phases}}, {{events}} and its spend ({{spend}}) from the store for good.",
+      "message_designSpent": "Deleting removes its design, {{phases}}, {{events}} and its spend ({{spend}}) from the store for good.",
+      "phases_one": "{{count}} phase",
+      "phases": "{{count}} phases",
+      "events_one": "{{count}} event",
+      "events": "{{count}} events",
+      "arc": "It leaves {{arc}}.arc — the arc itself stands.",
+      "waiters_one": "{{names}} waits on it — that wait goes too, and it may start sooner.",
+      "waiters": "{{names}} wait on it — that wait goes too, and they may start sooner.",
+      "cancel": "Cancel",
+      "confirm": "Delete"
+    },
     "waitsOn": "waits on {{names}}",
+    "hideEnded": "Hide ended · {{count}}",
+    "hide": "Hide plan",
+    "hideArc": "Hide arc",
+    "hideEndedPlans": "Hide ended plans · {{count}}",
+    "menu": "More actions",
+    "hidden": {
+      "title": "Hidden · {{count}}",
+      "show": "Show",
+      "showAll": "Show all",
+      "allHidden": "Every plan on the lane is hidden"
+    },
     "arcStatus": {
-      "designing": "designing",
-      "judged": "judged",
-      "live": "live",
-      "complete": "complete",
-      "empty": "empty",
-      "queued": "queued",
-      "paused": "paused",
-      "scheduled": "scheduled"
+      "designing": "DESIGNING",
+      "judged": "JUDGED",
+      "live": "LIVE",
+      "complete": "COMPLETE",
+      "empty": "EMPTY",
+      "queued": "QUEUED",
+      "paused": "PAUSED",
+      "scheduled": "SCHEDULED"
     },
     "planner": {
       "soul": {
@@ -936,17 +974,9 @@
       "endedShort": "ended short",
       "endedShortCause": "ended short: {{outcome}}"
     },
-    "arcPlans_one": "{{count}} plan",
-    "arcPlans": "{{count}} plans",
     "model": {
       "planLabel": "Model for this plan’s builders",
-      "planDeepseekTitle": "Send this plan’s builders to DeepSeek Flash from its next phase, whatever the chat’s switch says. A phase already building keeps the model it started on.",
-      "planClaudeTitle": "Send this plan’s builders to Claude from its next phase, whatever the chat’s switch says. A phase already building keeps the model it started on.",
-      "planAutoTitle": "Follow the chat’s DeepSeek switch from this plan’s next phase, whatever its arc says.",
-      "arcLabel": "Model for every plan of this arc",
-      "arcDeepseekTitle": "Send every plan of this arc to DeepSeek Flash, from each one’s next phase — including a plan that had been given a word of its own.",
-      "arcClaudeTitle": "Send every plan of this arc to Claude, from each one’s next phase — including a plan that had been given a word of its own.",
-      "arcAutoTitle": "Give this arc’s word to every plan of it: follow the chat’s DeepSeek switch, whatever those plans were saying."
+      "arcLabel": "Model for every plan of this arc"
     }
   },
   "navigation": {

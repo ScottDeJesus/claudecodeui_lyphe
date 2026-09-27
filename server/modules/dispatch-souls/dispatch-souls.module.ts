@@ -12,11 +12,12 @@ import { snapshotLaunches } from './soul-launch.service.js';
 /**
  * Where the launcher keeps its launch directories, unless the operator moved it.
  *
- * The launcher's own root is hard-coded (`hooks/plan_runner/solo/record.py:DISPATCH_DIR`), so this
- * default is a COPY of a constant we do not own — and the env name is ours, a seam for pointing a
+ * The launcher's own root is `hooks/plan_runner/solo/record.py:dispatch_dir()` — `dispatch-souls/`
+ * under the house's state root, `~/.claude/state` unless `$DISPATCHER_HOME` moves it — so this
+ * default is a COPY of a rule we do not own — and the env name is ours, a seam for pointing a
  * probe at a hermetic tree rather than a knob for moving the launcher. Set it and this lane reads
- * somewhere else; a dispatch still writes to the real root, because that is the launcher's and
- * not something a server env var may reach.
+ * somewhere else; a dispatch still writes to the launcher's own root, which is not something an
+ * env var of THIS name may reach.
  */
 const DEFAULT_STATE_DIR = '~/.claude/state/dispatch-souls';
 

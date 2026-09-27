@@ -15,6 +15,10 @@ import { cn } from '@/shared/utils';
  * looking DIFFERENT from each other in the same panel. Each variant emits a marker class whose
  * paint lives in controls.css beside the rest — never a colour utility, which is the second
  * paint mechanism D2 forbids.
+ *
+ * `badgeVariants` is exported for the one toned fact that has to be a CONTROL — the dispatcher's
+ * `StatusFlow` nodes are buttons, which `as` does not draw — so it wears the badge's paint and
+ * `data-tone` rather than a second spelling of them.
  */
 export const badgeVariants = cva('vv-badge inline-flex items-center');
 

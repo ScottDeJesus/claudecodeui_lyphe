@@ -62,6 +62,8 @@ const LABEL: Record<ScheduleScope, { start: string; resume?: string }> = {
  * the last frame carried it; a press relays the word and the next frame redraws. The daemon's own tick is what
  * presses Start then — the note says the operator's time.
  *
+ * 32px TALL, the height of every control in the card's `ActionBar`, which is the only row it is drawn in.
+ *
  * Handles, the scope's own: `data-dispatcher-schedule` / `data-dispatcher-arc-schedule` on the group (the
  * current `start_at`, or empty), `…-schedule-set` on the press and `…-schedule-cancel` on `Cancel`.
  */
@@ -78,13 +80,13 @@ export function ScheduleControl({ scope, verb = 'start', startAt, busy, onSchedu
     <div role="group" aria-label={t('runner.schedule.label')} className="inline-flex items-center"
       {...{ [prefix]: startAt === null ? '' : String(startAt) }}>
       {startAt === null ? (
-        <Button type="button" variant="secondary" size="sm" disabled={busy || offpeakAt === null}
+        <Button type="button" variant="secondary" size="sm" className="h-8" disabled={busy || offpeakAt === null}
           title={t(title)}
           onClick={() => onSchedule('offpeak')} {...{ [`${prefix}-set`]: '' }}>
           {t(label, { time: offpeakAt === null ? '…' : scheduleClock(offpeakAt) })}
         </Button>
       ) : (
-        <Button type="button" variant="ghost" size="sm" disabled={busy} title={t('runner.schedule.cancelTitle')}
+        <Button type="button" variant="ghost" size="sm" className="h-8" disabled={busy} title={t('runner.schedule.cancelTitle')}
           onClick={() => onSchedule('none')} {...{ [`${prefix}-cancel`]: '' }}>
           {t('runner.schedule.cancel')}
         </Button>

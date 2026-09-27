@@ -107,7 +107,7 @@ export function collectSessionSoulLaunches(messages: NormalizedMessage[]): strin
   return ids.slice(-MAX_LAUNCHES);
 }
 
-/** The launcher's root (`hooks/plan_runner/solo/record.py:DISPATCH_DIR`), with the dispatch-souls lane's probe seam. */
+/** The launcher's root (`hooks/plan_runner/solo/record.py:dispatch_dir()`), with the dispatch-souls lane's probe seam. */
 function launchRoot(): string {
   const raw = process.env.DISPATCH_SOULS_STATE_DIR || '~/.claude/state/dispatch-souls';
   return raw.startsWith('~') ? path.join(os.homedir(), raw.slice(1)) : raw;

@@ -85,10 +85,10 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-card-fold.mjs
 
 - measured 2026-09-25: with nothing of the probe running, the stored list toggled between `["darc:restorly"]` and `[]` at 16:18:45, 16:18:52, 16:19:54 and 16:20:02. A second open document was folding and unfolding the operator's own arc card.
 - effect on a probe: after a reload, 3 of 5 keys were missing while the card-side reading was still correct. A fold test run beside an open browser tab of the operator's can fail for this reason alone.
-- `src/modules/dispatcher/dismissedEndings.ts` has the same shape, and `useCardFold.ts` copies it. The merge is per KEY of the blob, not per entry of the list.
+- `src/modules/dispatcher/hiddenPlans.ts` has the same shape, and `useCardFold.ts` copies it. The merge is per KEY of the blob, not per entry of the list. That is why each hide, show and batch there is ONE write: N writes in a row would race each other the same way.
 - not cured: merge-on-write, or a server-side merge, is a refactor. Read the failing key list before blaming the fold.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/dismissedEndings.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useCardFold.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/hiddenPlans.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useCardFold.ts
 
 ## INV-4410 — A console error is explained only by what the browser itself reported — a refusal's URL, or an abandonment
 
@@ -102,30 +102,30 @@ A probe's console gate cannot judge a line by its words: `Failed to load resourc
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-deck-height.mjs
 
-## INV-4449 — The arc header's title is floored and the row wraps — never one letter per line
+## INV-4449 — A lane card's title is floored and its row wraps — never one letter per line
 
-**The arc header's title is floored and the row wraps — at no width does a card draw it one letter per line.**
+**A lane card's title is floored and its row wraps — at no width does a card draw it one letter per line.**
 
-`DeckFrame`'s header row — the one holding the title, a lane's `titleTail`, the status badge and the fold toggle (`src/modules/dispatcher/DeckFrame.tsx`, `data-arc-header`) — is `flex min-w-0 flex-wrap items-start gap-x-2 gap-y-1`, and the title `h4` is `min-w-fit flex-1 break-words`.
+`LaneCardHead` (`src/modules/dispatcher/LaneCardHead.tsx`) is the ONE head both lane cards draw — the plan card (`PlanCard`) and the arc deck (`DeckFrame`, `data-arc-header`). Its row one (`data-lane-head-row`) is `flex min-w-0 items-start gap-2`: a wrapping group — `flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1`, holding the title heading (`min-w-fit flex-1 break-words`; `h3`, or `h4` for a plan inside an arc deck), the status word and `done/total` bound as ONE unbreakable pair (`whitespace-nowrap`, so the count never lands on a line of its own), and the clock — beside a `shrink-0` corner (`⋯`, Hide, the fold). The lead and the spend pills are the head's own rows two and three, in that order, never on row one.
 
-- `min-w-fit` (`min-width: fit-content`) IS THE FLOOR: the title is never narrower than its own longest word, so it reads on one line, or wraps BY WORD — never one character per line. Without it the title (`flex-1`, `min-w-0`) is the only item in the row that CAN give, because the tail, the badge and the fold toggle must not — and it gives all the way down.
-- THE FLOOR HAS ONE BOUND, MEASURED: `fit-content` is `min(max-content, max(min-content, available))` — capped by the room the row can give — and `break-words` (`overflow-wrap: break-word`) does NOT lower a word's intrinsic min-content. A title that is ONE token with no space and no hyphen in it, wider than the row, therefore neither wraps nor shrinks: the name leaves the card (measured 2026-09-25 at 390px with a 74-character token — one 622px line in a 332px row, the title 278px past the deck's right edge, the page itself not scrolling because its ancestors clip it). HEAD was worse there — the same token crushed into a 25px column of 37 stacked letters — and no live name reaches it: the corpus's longest unbroken segment is 19 characters against a 242px narrowest row. THE PROBE CANNOT SEE IT: `lines === 1` passes while the row's own `scrollWidth` against its `clientWidth` is the reading that fails, and every payload is the lane's live arcs.
-- `flex-wrap` IS THE OTHER HALF, and neither half works alone: a floor with no wrap pushes the badge and the toggle past the card's right edge instead of under it; a wrap with no floor (`min-w-0`, the shape HEAD shipped) lets the title shrink to nothing while the row still overflows. A lane's tail (the dispatcher's spend line) therefore DROPS BELOW the title at a narrow width and stays beside it on a wide one.
-- THE FLOOR IS CONTENT-DRIVEN, NEVER A BREAKPOINT: the same decks are drawn in the Runner tab (a `max-w-2xl` column) and in the chat gutter (~380px even at 1440), so `sm:` would put one home's deck on the other home's branch.
-- A LANE'S OWN TAIL MUST NOT TAKE A WIDTH IT CANNOT GIVE BACK: `src/modules/dispatcher/ArcDeck.tsx` draws the spend line `min-w-0` with NO `shrink-0`, so a longer figure wraps by word rather than pushing the title or the card's edge.
+- `min-w-fit` (`min-width: fit-content`) IS THE FLOOR: the title is never narrower than its own longest word, so it reads on one line, or wraps BY WORD (a plan's `--` and `-` break it too) — never one character per line. Without it the title (`flex-1`, `min-w-0`) is the only item in the group that CAN give, because the word, the clock and the count must not — and it gives all the way down.
+- THE FLOOR HAS ONE BOUND, MEASURED: `fit-content` is `min(max-content, max(min-content, available))` — capped by the room the row can give — and `break-words` (`overflow-wrap: break-word`) does NOT lower a word's intrinsic min-content. A title that is ONE token with no space and no hyphen in it, wider than the row, therefore neither wraps nor shrinks: the name leaves the card (measured 2026-09-25 at 390px with a 74-character token — one 622px line in a 332px row, the title 278px past the deck's right edge, the page itself not scrolling because its ancestors clip it). No live name reaches it: the corpus's longest unbroken segment is 19 characters. The row's own `scrollWidth` against its `clientWidth` is the reading that catches it; `lines === 1` passes there.
+- `flex-wrap` IS THE OTHER HALF, and neither half works alone: a floor with no wrap pushes the word, the clock and the count past the card's edge instead of under the title; a wrap with no floor (`min-w-0`) lets the title shrink to nothing.
+- THE CORNER STANDS OUTSIDE THE WRAPPING GROUP, `shrink-0`, so its presses keep the row's top-right whatever the group does; the group's `min-h-10 sm:min-h-7` is the corner's height, so a one-line title centres on it.
+- THE FLOOR IS CONTENT-DRIVEN, NEVER A BREAKPOINT: the same heads are drawn in the Runner tab and in the chat gutter (~380px even at 1440), so `sm:` would put one home's card on the other home's branch.
 
 measured 2026-09-25. Operator, with a phone screenshot of the Runner widget: "This card is rendering funny on my phone" (`/tmp/chains/arc-header-phone.jpg`: `restorly.arc` one letter per line in a monospace column, `$0.32 DeepSeek · 2.6M in · 26k out` whole beside it, the status word and the fold chevron cut off past the card's edge).
 
-- CONTROL ON THE RUNNING BUILD (`--head-css` puts the row back to HEAD's three declarations in the page: row `nowrap`, title `min-width: 0`, tail `shrink-0`): at 390px the dispatch arc's title renders 12 lines in a 0px-wide box under a 101px word and the header overflows the card by 23px; at 320px, 12 lines and 93px of spill with FOUR items past the edge.
-- AFTER: title 1 line in a 332px box at 390px and 262px at 320px, tail below the title at both, 0px of header overflow, no console errors — every reading held across 1440/390/320 × light/dark.
+- CONTROL ON THE RUNNING BUILD (`--head-css` sets the group `nowrap` and the title `min-width: 0` in the page): on the 2026-09-25 header, 12 lines in a 0px-wide box at 390px and 23px of spill; on `LaneCardHead` (2026-09-26), 3 lines in a 43px box at 320px — the corner now stands outside the group, so 390px leaves the title room even without its floor.
+- AFTER (2026-09-26, `LaneCardHead`): all 20 heads of the Runner tab — the `restorly` deck, its 13 plan cards and 6 loose plans — read `scrollWidth === clientWidth` on `data-lane-head-row` at 1920, 390 and 320; the arc's title is 1 line in a 113px box at 390 and 134px at 320, the pills below it, 0px of header overflow, light and dark.
 
 ```probe
 node .verify/probe-arc-header-fit.mjs --tag after             # exit 0: every reading held, 0 failed
-node .verify/probe-arc-header-fit.mjs --tag head --head-css   # the control, expected to FAIL: 12 lines in a 0px box
+node .verify/probe-arc-header-fit.mjs --tag head --head-css   # the control, expected to FAIL at 320: 3 lines in a 43px box
 ```
-expect: on each deck the title's box is at least its longest word wide AND the header row's `scrollWidth` equals its `clientWidth` (the reading that catches the one-bound case above), at 1440, 390 and 320, dark and light; the tail is below the title or beside it with no overlap; 0 console errors of this app's. The `--head-css` pass rewrites three CSS declarations IN THE PAGE (never the source, never the store) and is expected to reproduce the crush — that is what makes those declarations, and not something else in the diff, the cause. The dev client must be up on 127.0.0.1:5183; the probe presses no control and writes nothing.
+expect: on the deck the title's box is at least its longest word wide AND the head row's `scrollWidth` equals its `clientWidth`, at 1440, 390 and 320, dark and light; the pills (`data-arc-spend`) are below the title with no overlap; 0 console errors of this app's. The `--head-css` pass rewrites two CSS declarations IN THE PAGE (never the source, never the store) and is expected to reproduce the crush — that is what makes those declarations, and not something else in the diff, the cause. The dev client must be up on 127.0.0.1:5183; the probe presses no control and writes nothing.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/ArcDeck.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/DeckFrame.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-arc-header-fit.mjs
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/ArcDeck.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/DeckFrame.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/LaneCardHead.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/PlanCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-arc-header-fit.mjs
 
 ## INV-4481 — Probes written against the deleted plan-runner lane fail, and all.mjs is red
 

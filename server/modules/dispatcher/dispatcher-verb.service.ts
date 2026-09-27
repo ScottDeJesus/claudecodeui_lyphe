@@ -5,18 +5,21 @@ import { promisify } from 'node:util';
 import type { DispatcherVerb, DispatcherVerbResult } from '@/shared/types.js';
 
 /**
- * Relaying the dispatcher's own six verbs: `stop`, `resume`, `schedule` (a plan's Start — or its
+ * Relaying the dispatcher's own seven verbs: `stop`, `resume`, `schedule` (a plan's Start — or its
  * Resume, for one already stopped — at a time), `park` (a designed plan set aside), `unpark` (handed
- * back to be cut) and `model` (a plan's or an arc's own DeepSeek / Claude word).
+ * back to be cut), `model` (a plan's or an arc's own DeepSeek / Claude word) and `drop` (a plan
+ * removed, with everything the store holds of it — refused while a phase of it walks or while a
+ * planner outing for the plan or its arc is live, the two gates of `hooks/dispatcher/cmd/drop.py`).
  *
- * FOUR OF THE SIX NAME AN ARC AS READILY AS A PLAN — `stop`, `resume`, `schedule` and `model`, each
+ * FOUR OF THE SEVEN NAME AN ARC AS READILY AS A PLAN — `stop`, `resume`, `schedule` and `model`, each
  * resolved by the dispatcher's own door and by nothing on this side. An arc has no walk of its own:
  * `stop <arc>` is this same verb over the arc's LIVE plans — what is walking and what is approved,
  * unpaused and waiting its turn — and `resume <arc>` over its STOPPED ones, which is every plan of it
  * that is approved, paused and unfinished: queued at the gate as much as stopped mid-walk. One
  * transaction and one kick, and the order the plans then walk in is the daemon's own (`rule.eligible`
  * keeps it). `schedule <arc>` arms the operator's one hour for each of those stopped plans (INV-201
- * knows no arc-level timer). `park` and `unpark` are the plan card's own and no arc header draws them.
+ * knows no arc-level timer). `park`, `unpark` and `drop` are the plan card's own and no arc header
+ * draws them.
  *
  * This server never touches a plan. It does not hold the dispatcher's lock, does not signal its
  * daemon and never writes the store (`hooks/dispatcher/store.py`, which no server writer may reach —
@@ -86,7 +89,8 @@ function readExitCode(value: unknown): number | null {
 /**
  * Runs one verb against one name — a plan's, or an arc's for the four the arc's door also opens on.
  * `verbArgs` follow the name — `schedule`'s hour and `model`'s word, each already checked by the
- * route against the shapes the dispatcher accepts; `stop`, `resume`, `park` and `unpark` take none.
+ * route against the shapes the dispatcher accepts; `stop`, `resume`, `park`, `unpark` and `drop` take
+ * none.
  *
  * `cwd` is the home directory rather than this repository: the dispatcher resolves its own store from
  * `DISPATCHER_HOME`/`$HOME` (`hooks/dispatcher/store.py:home`), and a verb must never be interpreted

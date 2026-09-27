@@ -5575,6 +5575,8 @@ merger through `extendTailwindMerge` rather than importing `twMerge` directly, r
 `text-md-body` really does replace an earlier one. See that file's own header comment for the failure
 this avoids.
 
+**The bare `outline` is the second name the merger misreads.** `tailwind-merge` 3 is written for Tailwind 4, where `outline` is a WIDTH; this app builds on Tailwind 3.4, where `outline` is the STYLE and `outline-2` only a width. Unextended, `cn('outline outline-2')` keeps the last width, the ring is drawn with no style, and nothing draws (measured 2026-09-26 on `StatusFlow`'s selected node). `src/shared/utils.ts` moves bare `outline` into the `outline-style` group and keeps `outline-<number>` in `outline-w`. Any other class the two versions name differently misreads the same way, silently.
+
 **Motion is frames only, and an entrance is remembered by content the way a fold is.** The
 transcript's entrances are one stylesheet, `shapes/shapeMotion.css`, side-effect imported by
 `Markdown.tsx` directly after `markdownCards.css`, and every rule in it sits inside ONE

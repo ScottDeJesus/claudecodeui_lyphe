@@ -21,8 +21,9 @@ type ConfirmDialogProps = {
  * Verve's ConfirmDialog: a question that stops the reader before work is lost, with every answer
  * spelled out as a button.
  *
- * Used by the file-editor module (closing an editor with unsaved changes) and the file-manager
- * module (opening another file, or editing in another project, while a file has unsaved changes).
+ * Used by the file-editor module (closing an editor with unsaved changes), the file-manager module
+ * (opening another file, or editing in another project, while a file has unsaved changes), the jev
+ * module (clearing the replay cache) and the dispatcher module (deleting a plan from the store).
  * Verve draws it (`Verve Design System.dc.html`, ConfirmDialog), which is why it lives here rather
  * than being composed at each site.
  *
@@ -50,7 +51,7 @@ export function ConfirmDialog({ open, title, message, actions, onDismiss }: Conf
               key={action.label}
               type="button"
               variant={action.variant}
-              disabled={action.busy}
+              disabled={action.busy || action.disabled}
               aria-busy={action.busy || undefined}
               className="max-md:h-11"
               onClick={action.onSelect}

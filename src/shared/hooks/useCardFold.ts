@@ -16,8 +16,8 @@ import { readUserPreference, subscribeToUserPreferences, writeUserPreference } f
  * shapes, and it is the one that fails safe: a lost entry shows more, never less.
  *
  * IT RIDES THE SERVER-BACKED PREFERENCES, under the `dispatcher` blob and MERGED into it
- * (`dismissedEndings.ts` is the other writer of that blob, and MAN-498 is why the write is a merge: a
- * replaced blob drops whatever else lives under the key). So a fold made in the Runner tab is there in
+ * (`modules/dispatcher/hiddenPlans.ts` is the other writer of that blob, and MAN-498 is why the write
+ * is a merge: a replaced blob drops whatever else lives under the key). So a fold made in the Runner tab is there in
  * the chat gutter's Runner widget, a fold survives a reload, and a fold made on the phone is there on
  * the desktop at its next load. The mirror in localStorage is what makes the very first paint already
  * folded, with no flash of an open card.
@@ -27,11 +27,12 @@ import { readUserPreference, subscribeToUserPreferences, writeUserPreference } f
  * the strip and the verbs). The prefix is what the PRUNE reads: a surface that can see the plans but
  * not the arcs must not prune the arcs' entries.
  *
- * A FOLD IS OF THE CARD, NEVER OF ONE ENDING, and that is where this DEPARTS from the dismissal store
- * on purpose. `dismissEnding` keys on `{run_id, ended_at}` because a plan that ends again is news; a
- * fold carries no such news — a plan walked again is still the same plan — so the reader who folded a
- * card to get it out of the way finds it still folded when it comes back. Keying on the ending would
- * spring it open every time the dispatcher completed a phase.
+ * A FOLD IS OF THE CARD, AND NOTHING THE PLAN DOES LIFTS IT, which is where this DEPARTS from the hide
+ * store on purpose. A hide (`hiddenPlans.ts`) carries the moment of the press, because a plan that ends
+ * after it is news and comes back on its own; a fold carries no such news — a plan walked again is
+ * still the same plan — so the reader who folded a card to get it out of the way finds it still folded
+ * when it comes back. A fold that lapsed on an ending would spring the card open the moment the plan
+ * finished, which is the one moment the reader who folded it did not ask to see it again.
  *
  * The key form lives HERE rather than beside each card: the prefix is half of this list's address
  * space, and two modules writing their own spelling of it is how the spaces would drift apart.
@@ -54,7 +55,7 @@ export function dispatchArcFoldKey(arcName: string): string {
   return `${DISPATCH_ARC_SPACE}${arcName}`;
 }
 
-/** The preference whose blob this list lives under — the dispatcher's own, shared with the dismissals. */
+/** The preference whose blob this list lives under — the dispatcher's own, shared with the hidden plans. */
 const KEY = 'dispatcher' as const;
 
 type DispatcherPreference = Record<string, unknown> & { collapsedCards?: unknown };
@@ -96,8 +97,8 @@ function spaceOf(key: string): string {
 }
 
 /**
- * The list, written back MERGED into the blob: `dismissedEndings` and anything else a later feature
- * parks under `dispatcher` is carried through untouched, and the fold list is the only key replaced.
+ * The list, written back MERGED into the blob: `hiddenPlans` and anything else a later feature parks
+ * under `dispatcher` is carried through untouched, and the fold list is the only key replaced.
  */
 function writeFolds(keys: readonly string[]): void {
   const { collapsedCards: _prior, ...rest } = readPreference();

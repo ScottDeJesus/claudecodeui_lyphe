@@ -7,10 +7,11 @@ type StripView = { index: number; atStart: boolean; atEnd: boolean };
 /**
  * The arc deck's horizontal strip, moved one card at a time: by its arrows, by the Left/Right keys
  * on the focused strip, and — with no script at all — by a swipe or a trackpad, through CSS scroll
- * snap. This hook owns only the SCROLL POSITION; the cards and their order are the deck's props.
+ * snap; and to any card at once by a node of the arc's flow above it (`goTo`). This hook owns only
+ * the SCROLL POSITION; the cards and their order are the deck's props.
  *
  * THE CARD THE READER IS ON is the one whose centre is nearest the strip's centre, except at an end,
- * where it is that end's card: on a wide screen two cards share the view, and a strip scrolled all
+ * where it is that end's card: mid-swipe two cards share the view, and a strip scrolled all
  * the way over is "at the last card" even when the one before it is also in sight.
  *
  * THE CARD THE ARC IS ON IS BROUGHT INTO VIEW, centred, on mount and whenever `focusIndex` changes —
@@ -32,7 +33,7 @@ type StripView = { index: number; atStart: boolean; atEnd: boolean };
  * pinned at 0 (`measure`, where every scroll is read).
  *
  * The strip must be the offset parent of its items (`relative`): centring reads `offsetLeft`.
- * Used by `DeckFrame`, the one strip every dispatch arc's deck draws.
+ * Used by `DeckStrip`, the one strip an arc deck draws in the gutter home.
  */
 export function useDeckStrip(focusIndex: number, cardCount: number) {
   const stripRef = useRef<HTMLOListElement>(null);
@@ -149,6 +150,11 @@ export function useDeckStrip(focusIndex: number, cardCount: number) {
     scrollToCard(target, 'smooth');
   }, [view.index, cardCount, scrollToCard]);
 
+  /** Centre card `index`, smoothly — a flow node's press, which may jump any distance along the arc. */
+  const goTo = useCallback((index: number) => {
+    scrollToCard(Math.min(Math.max(index, 0), cardCount - 1), 'smooth');
+  }, [cardCount, scrollToCard]);
+
   const onKeyDown = useCallback((event: KeyboardEvent<HTMLOListElement>) => {
     if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
     // Taken over, not added to: the browser's own arrow scroll would move a few pixels and fight
@@ -157,5 +163,5 @@ export function useDeckStrip(focusIndex: number, cardCount: number) {
     step(event.key === 'ArrowLeft' ? -1 : 1);
   }, [step]);
 
-  return { stripRef, view, step, onScroll: measure, onKeyDown, stripHeight };
+  return { stripRef, view, step, goTo, onScroll: measure, onKeyDown, stripHeight };
 }

@@ -1,5 +1,7 @@
 import type { TFunction } from 'i18next';
 
+import type { SpendParts } from '@/shared/types';
+
 /**
  * What a soul — or a plan — has SPENT, as every card in this app writes it.
  *
@@ -23,18 +25,23 @@ import type { TFunction } from 'i18next';
  * `plan_runner/costs.py`. So this file needs no provider parameter — it formats, and the
  * either/or falls out of the two figures being one or the other.
  *
- * ONE SPELLING, THREE SCREENS. The dispatcher's plan card (`PlanFace`, `PlanPhaseRow`), its arc
- * deck's books (`DispatchArcDeck`) and the chat strip's launcher-soul pin (`SoulLaunchPinRow`) all
- * draw the same figure from a different record, and each of them feeding its own template literals
- * is how one app ends up saying `$0.41` on one screen and `0.41 USD` on the next. Every one of them
- * comes through here instead, and a change to the wording is a change to this file.
+ * ONE DECISION, TWO DRAWINGS. Which halves a record has is decided ONCE, by {@link spendParts}, and
+ * drawn two ways from that one answer: as pills by the dispatcher's `SpendPills` (every phase row and
+ * stage line of a plan card, the card's own total, and its arc deck's books), and as a sentence by
+ * {@link spendText} — whose remaining readers are the chat strip's launcher-soul pins
+ * (`SoulLaunchPinRow`), the heal cards (`HealCardList`) and the dispatcher's Delete dialog
+ * (`DeletePlanDialog`), which names what a drop takes. Each screen draws the same figure from a
+ * different record, and each of them feeding its own template literals is how one app ends up saying
+ * `$0.41` on one screen and `0.41 USD` on the next — or a split on one and a total on the next. Every
+ * one of them comes through here instead, and a change to the rule or the wording is a change to
+ * this file.
  *
  * THE FIGURES ARE THE WALK'S OWN. `cost_usd` is PAID dollars by construction —
  * `hooks/plan_runner/costs.py:result_cost` returns 0 for a child on the Claude subscription — and
  * the tokens are the CLAUDE half of the child's usage, split into what it READ (input + cache read
  * + cache write) and what it wrote. A record written before the split shipped carries the total
- * alone, which reads as the `⛁ n tok` form rather than as `0 in · 0 out`; the split is omitted,
- * the total never is.
+ * alone, which reads as the total form (`⛁ n tok`, a `⛁ n tokens` pill) rather than as
+ * `0 in · 0 out`; the split is omitted, the total never is.
  *
  * NOTHING HERE IS TRANSLATED-BY-HAND: the numbers are formatted here, the words come from the
  * caller's `t` (namespace `common`), so the strip and the tab say the same thing in one language.
@@ -44,16 +51,28 @@ import type { TFunction } from 'i18next';
  * The vendor a `$` figure is labelled by.
  *
  * A product name, not copy, which is why it is a constant and not a translation key: the CLI labels
- * the same figure the same way (`plan_runner/costs.py:PAID_VENDOR`). A second paying API would
- * become a parameter of {@link paidText}, never a second constant.
+ * the same figure the same way (`plan_runner/costs.py:PAID_VENDOR`). A vendor is drawn in TWO
+ * places, and a second paying API would become a parameter of both, never a second constant: the
+ * sentence's {@link paidText}, and the dispatcher's paid pill (`SpendPills`), whose title names this
+ * constant and whose mark spells the provider itself (`LLMProviderLogo provider="deepseek"`).
  */
 export const PAID_VENDOR = 'DeepSeek';
 
-/** Byte-for-byte `hooks/plan_runner/costs.py`'s `humanize`: "94.9M", "1M", "12.5k". */
-export function humanizeTokens(n: number): string {
-  if (n < 1000) return String(n);
-  if (n < 999_950) return `${(n / 1e3).toFixed(1).replace(/\.0$/, '')}k`;   // the same cut
-  return `${(n / 1e6).toFixed(1).replace(/\.0$/, '')}M`;
+/**
+ * Byte-for-byte `hooks/plan_runner/costs.py`'s `humanize`: "94.9M", "1M", "12.5k".
+ *
+ * `scale` is the figure whose SHAPE is drawn — its unit, and whether it keeps a decimal — and it is
+ * the figure itself unless a caller says otherwise — and then this is exactly `humanize`. A
+ * count-up passes its TARGET, the way it does to {@link moneyText}: the frames of a `206k` count read
+ * `0k` … `206k` and those of `1.3M` read `0.0M` … `1.3M`, never `205.3k` or `999.9k` — a frame is
+ * then never wider than the figure it lands on, so a pill held at its final width never overflows.
+ */
+export function humanizeTokens(n: number, scale: number = n): string {
+  if (scale < 1000) return String(n);
+  const [divisor, unit] = scale < 999_950 ? [1e3, 'k'] : [1e6, 'M'];   // the same cut
+  const landed = (scale / divisor).toFixed(1).replace(/\.0$/, '');
+  if (n === scale) return `${landed}${unit}`;
+  return `${(n / divisor).toFixed(landed.includes('.') ? 1 : 0)}${unit}`;
 }
 
 /** A count off a JSON record, or `null` — an absent field and a `NaN` are both "not recorded". */
@@ -62,48 +81,29 @@ function count(value: number | null | undefined): number | null {
 }
 
 /**
- * The paid half: `$0.28 DeepSeek`, or `''` when nothing was billed.
- *
- * The empty string is the rule, not an oversight — a figure of 0 means the work rode Claude, and
- * `$0.00` would read as "this cost nothing" when what it means is "this was not a bill". It is also
- * what makes a Claude figure read as tokens alone: with this half empty, {@link spendText} joins
- * one part rather than two.
- */
-export function paidText(t: TFunction, usd: number | null | undefined): string {
-  return paidWith(t, usd, 'runner.paid');
-}
-
-/**
- * The same figure for a PLAN's total, with the word that says so: `plan $6.29 DeepSeek`.
- *
- * The distinction is not decoration. A run card carries two figures — this run's own books and the
- * plan's, which include every other run of it and the planner's own outing — and a bare `$6.29`
- * beside `this run 3/40` reads as this run's. Only the multi-run (or outside-spend) branch uses
- * this; a run that is its whole plan says the figure once, plainly.
- */
-export function planPaidText(t: TFunction, usd: number | null | undefined): string {
-  return paidWith(t, usd, 'runner.planTotal');
-}
-
-/**
  * A billed figure as money: `$0.41` at the cent, four decimals below it — `costs.money`'s rule.
  *
  * Two decimals alone draw a real bill as `$0.00`: 38 of the house's 715 chain stages bill between
  * $0.0005 and $0.005, which reads as "the vendor charged nothing" rather than as a small bill.
+ *
+ * `scale` is the figure whose precision is drawn, and it is the figure itself unless a caller says
+ * otherwise: a count-up passes its TARGET, so the frames of a `$4.47` count read `$0.00` … `$4.47`
+ * at the cent throughout instead of opening on `$0.0000` and changing width at a cent.
  */
-export function moneyText(usd: number): string {
-  return usd >= 0.01 ? usd.toFixed(2) : usd.toFixed(4);
-}
-
-function paidWith(t: TFunction, usd: number | null | undefined, key: string): string {
-  const paid = count(usd);
-  if (paid === null || paid <= 0) return '';
-  return t(key, { usd: moneyText(paid), vendor: PAID_VENDOR });
+export function moneyText(usd: number, scale: number = usd): string {
+  return scale >= 0.01 ? usd.toFixed(2) : usd.toFixed(4);
 }
 
 /**
- * The token half: `1.2M in · 48k out` when the record carries the split, `⛁ 216M tok` when it
- * carries the total alone, and `''` when it carries neither.
+ * Which halves a record's spend has, decided once and not yet worded — the ONE home of both rules.
+ *
+ * THE PAID HALF is `null` for an absent figure or one of 0 or less, and that is the rule, not an
+ * oversight: a figure of 0 means the work rode Claude, and `$0.00` would read as "this cost
+ * nothing" when what it means is "this was not a bill". It is also what makes a Claude figure read
+ * as tokens alone — with this half empty, a drawing has one part rather than two.
+ *
+ * THE TOKEN HALF is `split` (`1.2M in · 48k out`) when the record carries the split, `total`
+ * (`⛁ 216M tok`) when it carries the total alone, and `null` when it carries neither.
  *
  * The split is shown only when BOTH parts were recorded together (`tokens_in` and `tokens_out` on
  * one record). `in + out > 0` is the test rather than `total > 0`, because the total is what a
@@ -115,27 +115,41 @@ function paidWith(t: TFunction, usd: number | null | undefined, key: string): st
  * three disagree the TOTAL speaks, in the form a record without a split already uses — the sum is
  * then never wrong, only less detailed. `costs.usage_line` keeps the identical rule.
  */
-export function usageText(
-  t: TFunction,
+export function spendParts(
+  usd: number | null | undefined,
   tokensIn: number | null | undefined,
   tokensOut: number | null | undefined,
   total: number | null | undefined,
-): string {
+): SpendParts {
+  const billed = count(usd);
   const read = count(tokensIn) ?? 0;
   const written = count(tokensOut) ?? 0;
   const sum = count(total);
   const whole = sum === null || sum === 0 || read + written === sum;
-  if (read + written > 0 && whole) {
-    return t('runner.usage', { in: humanizeTokens(read), out: humanizeTokens(written) });
-  }
-  return sum !== null && sum > 0 ? t('runner.tokens', { n: humanizeTokens(sum) }) : '';
+  const tokens: SpendParts['tokens'] = read + written > 0 && whole
+    ? { kind: 'split', in: read, out: written }
+    : sum !== null && sum > 0 ? { kind: 'total', total: sum } : null;
+  return { paid: billed !== null && billed > 0 ? billed : null, tokens };
+}
+
+/** The paid half as words, `$0.28 DeepSeek`, or `''` when {@link spendParts} found no bill. */
+function paidText(t: TFunction, paid: SpendParts['paid']): string {
+  return paid === null ? '' : t('runner.paid', { usd: moneyText(paid), vendor: PAID_VENDOR });
+}
+
+/** The token half as words, `1.2M in · 48k out` or `⛁ 216M tok`, or `''` when there is none. */
+function usageText(t: TFunction, tokens: SpendParts['tokens']): string {
+  if (tokens === null) return '';
+  return tokens.kind === 'split'
+    ? t('runner.usage', { in: humanizeTokens(tokens.in), out: humanizeTokens(tokens.out) })
+    : t('runner.tokens', { n: humanizeTokens(tokens.total) });
 }
 
 /**
- * Both halves, in the order they are read: what was paid, then the tokens. ONE FIGURE IS NORMAL
- * and is the whole point — a Claude record has no first half, a record a vendor billed has no
- * second, and an aggregate that used both hands has both, its token half counting the CLAUDE
- * records only (settled upstream, never here).
+ * Both halves as one sentence, in the order they are read: what was paid, then the tokens. ONE
+ * FIGURE IS NORMAL and is the whole point — a Claude record has no first half, a record a vendor
+ * billed has no second, and an aggregate that used both hands has both, its token half counting
+ * the CLAUDE records only (settled upstream, never here).
  */
 export function spendText(
   t: TFunction,
@@ -144,25 +158,6 @@ export function spendText(
   tokensOut: number | null | undefined,
   total: number | null | undefined,
 ): string {
-  return [paidText(t, usd), usageText(t, tokensIn, tokensOut, total)].filter(Boolean).join(' · ');
-}
-
-/** One kind of a plan's ledger, as the plan card breaks its dollars down. */
-export type PlanKindSpend = { kind: 'planning' | 'review' | 'scouts' | 'build'; usd: number };
-
-/**
- * Where a plan's PAID dollars went — `planning $1.10 · build $4.49 in 12 runs` — or `''` when no
- * kind was billed at all.
- *
- * A kind that cost nothing is LEFT OUT rather than shown as `$0.00`: with Claude work off the
- * ledger, most kinds are 0 on most plans, and a line of four zeros hides the one figure that is
- * real. An empty list is not a rounding question but a fact — no API was billed — and it reads as
- * no dollar phrase at all.
- */
-export function planKindsText(t: TFunction, kinds: readonly PlanKindSpend[], runs: number): string {
-  const shown = kinds
-    .filter((entry) => count(entry.usd) !== null && (entry.usd as number) > 0)
-    .map((entry) => t(`runner.kind.${entry.kind}`, { usd: moneyText(entry.usd) }));
-  if (shown.length === 0) return '';
-  return t('runner.planKinds', { kinds: shown.join(' · '), count: runs });
+  const parts = spendParts(usd, tokensIn, tokensOut, total);
+  return [paidText(t, parts.paid), usageText(t, parts.tokens)].filter(Boolean).join(' · ');
 }

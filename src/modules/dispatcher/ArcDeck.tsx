@@ -1,15 +1,30 @@
+import { EyeOff } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 import { DispatchArcControls } from '@/modules/dispatcher/ArcControls';
-import { deckFocusIndex, planDismissal, planLayer, planStatusTone, waitsOnSiblings } from '@/modules/dispatcher/dispatcherState';
+import {
+  arcHide,
+  deckFocusIndex,
+  endedHide,
+  epochOf,
+  planHide,
+  planLayer,
+  planStatusTone,
+  scheduleClock,
+  waitsOnSiblings,
+} from '@/modules/dispatcher/dispatcherState';
 import { DeckFrame, DeckItem } from '@/modules/dispatcher/DeckFrame';
 import type { DispatcherArcGroup } from '@/modules/dispatcher/dispatcherState';
+import { LaneCardHead } from '@/modules/dispatcher/LaneCardHead';
 import { PlanCard } from '@/modules/dispatcher/PlanCard';
 import { PlannerBadge } from '@/modules/dispatcher/PlannerBadge';
 import { SessionPin } from '@/modules/dispatcher/SessionPin';
+import { SpendPills } from '@/modules/dispatcher/SpendPills';
 import { dispatchArcFoldKey } from '@/shared/hooks/useCardFold';
-import { spendText } from '@/shared/spend';
-import type { DispatcherArcStatus, Tone } from '@/shared/types';
+import { spendParts } from '@/shared/spend';
+import { Badge } from '@/shared/ui';
+import type { ActionMenuItem } from '@/shared/ui';
+import type { DispatcherArcStatus, DispatcherPlanStatus, LaneFlowNode, Tone } from '@/shared/types';
 import { cn } from '@/shared/utils';
 
 /**
@@ -39,94 +54,132 @@ const ARC_STATUS: Record<DispatcherArcStatus, { key: string; tone: Tone }> = {
 };
 
 /**
- * ONE dispatch arc, drawn as the deck every arc on this screen is drawn as: the arc's own header on
- * top — its name, its word, its books, the goal a designer wrote, and the controls that move the
- * whole arc — and beneath it the plans of that arc in ONE horizontal strip, in the arc's own walk
- * order (`arc.plans`).
+ * A plan's mark on the arc's flow, by its status: done, walking, held and armed each have a glyph of
+ * their own, and every other plan (queued, parked, idle) is its place in the arc — so the node reads
+ * without its colour, and the plans still ahead count off in the order they will walk.
+ */
+const FLOW_MARK: Partial<Record<DispatcherPlanStatus, string>> = { complete: '✓', live: '▶︎', paused: '⏸︎', scheduled: '◷' };
+
+/**
+ * ONE dispatch arc, drawn as the deck every arc on this screen is drawn as, in the lane card's ONE
+ * anatomy (`LaneCardHead`, `ActionBar`): the arc's head on top, its action bar directly under it, the
+ * arc's flow of plans under that, and beneath it the plans of the arc in the arc's own walk order
+ * (`arc.plans`) — a wall of cards in the tab, one card per view in the gutter (`layout`, `DeckFrame`).
+ *
+ * THE FLOW IS ONE NODE A PLAN, in the cards' order: `✓` complete, `▶︎` live (and breathing), `⏸︎`
+ * paused, `◷` scheduled, else the plan's place in the arc (`FLOW_MARK`); toned as the plan's own badge
+ * is (`planStatusTone`), named `<plan> · <word>`, and filled as far as the arc's complete plans reach.
+ *
+ * THE HEAD, ROW BY ROW: the arc's door (`<name>.arc`), its word (`ARC_STATUS`), the hour a Schedule
+ * start armed (the clock slot, `data-dispatch-arc-schedule-note`) and how many of its plans are
+ * complete; then the goal its designer wrote, clamped to two lines, and who is out on it; then its
+ * books as pills, counting at first sight (`darc:<name>`). The corner is `⋯` — carrying `Hide ended
+ * plans · N` when any plan of the deck has ended — then Hide, which puts EVERY plan of the deck in the
+ * `Hidden` list in one write (`arcHide`), then the fold.
+ *
+ * A FOLD KEEPS THAT WHOLE HEAD (MAN-5412) and takes the bar, the flow and the cards: the model
+ * switch and Start/Pause are VERBS, and the reader who folded a deck away asked for the row, not for a
+ * card that has not collapsed.
  *
  * THE DECK IS THE OPERATOR'S OWN ARC CARD (operator, 2026-09-25: "we have an arc already, layouts
  * should already be there" — "please tell him to do it like the other plans"). The chrome, the fold,
- * the arrows, the snap and the focused card are `DeckFrame`'s, and nothing here invents a second
- * layout: an arc of plans is one shape. What is the dispatcher's own, and what this file adds, is its
+ * the grid, the strip and the jump are `DeckFrame`'s, and nothing here invents a layout of its own:
+ * an arc of plans is one shape, laid out as its home asks. What is the dispatcher's own, and what this file adds, is its
  * data (the store's status words, the arc's books) and its cards (`PlanCard`, whole: word, phases,
- * controls and Dismiss, exactly as a plan of no arc has them).
- *
- * THE FOLD TAKES THE STRIP AND THE CONTROLS — the model switch and
- * Stop/Resume are VERBS, and the reader who folded a deck away asked for the row, not for a card that
- * has not collapsed. What stays is the header: which arc this is, its word, its books and how many
- * plans it holds, so a folded deck still says everything but the plans.
+ * bar and Hide, exactly as a plan of no arc has them).
  *
  * A FOCUSED CARD IS THE PLAN WHOSE TURN IT IS (`deckFocusIndex`): the first plan of the arc that has
- * not finished, or the last once all of them have. The strip opens on it and returns to it when the
- * arc moves.
+ * not finished, or the last once all of them have. The gutter's strip opens on it and returns to it
+ * when the arc moves; the tab's grid shows every card at once and needs no focus.
  *
  * THE COUNT IS WHAT THE CARD HOLDS, NOT WHAT THE DOCUMENT LISTED. `arc.plans` is the arc file's
- * names, and a plan whose ending the operator has DISMISSED is gone from the strip while still being
- * named there: a caption reading "14 plans" over thirteen cards is the header lying about the deck
- * under it, which is the one thing `RunnerPanel`'s own count refuses to do. So the note counts
- * `plans` — the group's surviving members, which is exactly what the strip drew.
+ * names, and a plan the operator has HIDDEN (`hiddenPlans.ts`) is gone from the strip while still
+ * being named there: a head reading "13/14" over thirteen cards would be the head lying about the deck
+ * under it. So `done/total`, the flow and the strip's `Plan N of M` all count `plans` — the group's
+ * drawn members, exactly the cards the deck drew.
  *
  * `data-dispatch-arc` and `data-arc-name` are the root's handles (with `data-arc-status` and
  * `data-collapsed`, both written by the frame), and `data-dispatch-plan-row` marks one plan's item in
- * the strip with `data-plan-name`, `data-pinned` and `data-arc-layer`, so a probe counts and names
+ * the deck with `data-plan-name`, `data-pinned` and `data-arc-layer`, so a probe counts and names
  * what an arc holds without reading through the cards' own handles.
  *
  * Used by `DispatchArcDecks`, once per arc the lane carries.
  */
 export function DispatchArcDeck({
   group,
-  cardFillsStrip = false,
+  layout,
   pinnedSessionId = null,
   carriedNames,
 }: {
   /** The arc and the plans of it, in the arc's own order — one `byArc` group. */
   group: DispatcherArcGroup;
-  /** The gutter home's width instead: one whole card per view, paged by the arrows (`DeckFrame`'s own). */
-  cardFillsStrip?: boolean;
+  /** `grid` in the Runner tab, `strip` in the chat gutter — picked by `DispatchArcDecks` from its `home`. */
+  layout: 'grid' | 'strip';
   /** The open chat's session id, in the gutter home; `null` in the tab, where there is no open chat and so no "mine". */
   pinnedSessionId?: string | null;
-  /** The lane's unfiltered plan names, which is what a Dismiss prunes the stored list against (`planDismissal`). */
+  /** The lane's unfiltered plan names, which is what a hide prunes the stored list against (`planHide`). */
   carriedNames: string[];
 }) {
   const { t } = useTranslation();
   const { arc, plans } = group;
   const title = `${arc.name}.arc`;
-  // The arc's own books: the store carries them on the arc row so no header has to add up the cards
-  // itself (INV-4299), and `spendText` is the one spelling every card draws a figure in — dollars or
-  // tokens by who was used, and NOTHING at all where nothing was billed.
-  const spend = spendText(t, arc.cost_usd, arc.tokens_in, arc.tokens_out, arc.tokens);
+  const word = ARC_STATUS[arc.status] ?? ARC_STATUS.designing;
+  // The arc's own books: the store carries them on the arc row so no head has to add up the cards
+  // itself (INV-4299), and `spendParts` is the one decision every card draws a figure from — dollars
+  // or tokens by who was used, and NO pill at all where the arc has neither half.
+  const spend = spendParts(arc.cost_usd, arc.tokens_in, arc.tokens_out, arc.tokens);
+  // The hour a Schedule start armed, over the arc's stopped plans (`report_arcs.hour`) — the head's
+  // clock, so a folded deck still says when it will start. The Cancel that clears it is in the bar.
+  const armed = epochOf(arc.schedule);
+  const ended = endedHide(plans, carriedNames);
+  const doneCount = plans.filter((plan) => plan.status === 'complete').length;
+  const nodes: LaneFlowNode[] = plans.map((plan, index) => ({
+    key: plan.name,
+    mark: FLOW_MARK[plan.status] ?? String(index + 1),
+    tone: planStatusTone(plan.status),
+    label: t('dispatcher.flow.plan', { name: plan.name, word: t(`dispatcher.status.${plan.status}`) }),
+    live: plan.status === 'live',
+  }));
+  const menuItems: ActionMenuItem[] = ended
+    ? [{ key: 'hide-ended', label: t('dispatcher.hideEndedPlans', { count: ended.count }), icon: EyeOff, onSelect: ended.hide }]
+    : [];
 
   return (
     <DeckFrame
       rootAttributes={{ 'data-dispatch-arc': '', 'data-arc-name': arc.name }}
       status={arc.status}
-      title={<span data-arc-door className="font-mono">{title}</span>}
-      badge={ARC_STATUS[arc.status] ?? ARC_STATUS.designing}
-      foldKey={dispatchArcFoldKey(arc.name)}
-      // The arc's books ride the title row's tail — the LAST thing on that row to keep a width, never
-      // the first to take one: `min-w-0` and no `shrink-0`, so a figure too wide for the row wraps by
-      // word rather than pushing the arc's name (or the card's own edge) out of the way. The frame
-      // floors and wraps the title itself; this line is the counterpart to that, stated where the
-      // figure is produced.
-      titleTail={spend
-        ? <p data-arc-spend className="min-w-0 self-center font-mono text-xs text-muted-foreground">{spend}</p>
-        : null}
-      subtitle={arc.planner || arc.goal ? (
-        // THE ARC'S OWN LINE, under the row that says which arc this is: who is out on it, and the
-        // goal its designer wrote. The badge goes HERE rather than beside the status word because of
-        // WIDTH, not because that row cannot wrap: a planner badge is a LONG LINE in a row of marks,
-        // and at 390px it would take a row the arc's own name and books are read on. `DeckFrame` wraps
-        // that row and floors the title, so nothing would be crushed — the cost is a row's height, and
-        // this line is where it is paid. It draws nothing on an arc no planner is on.
-        <>
-          {arc.planner && <PlannerBadge planner={arc.planner} />}
-          {arc.goal && (
-            <p className="line-clamp-2 min-w-0 break-words text-xs leading-snug text-muted-foreground">{arc.goal}</p>
+      head={(
+        <LaneCardHead
+          title={<span data-arc-door className="font-mono">{title}</span>}
+          badge={<Badge tone={word.tone} className="shrink-0">{t(word.key)}</Badge>}
+          clock={armed !== null ? (
+            <span className="flex-none font-mono text-xs text-muted-foreground" data-dispatch-arc-schedule-note>
+              {t('runner.schedule.starts', { time: scheduleClock(armed) })}
+            </span>
+          ) : undefined}
+          progress={{ done: doneCount, total: plans.length }}
+          lead={(
+            <>
+              {/* A measure of its own (`max-w-3xl`): the tab's deck spans the wall, and a goal set at
+                  that width is two lines of 250 characters no eye can track back across. */}
+              {arc.goal && (
+                <p className="line-clamp-2 min-w-0 max-w-3xl break-words text-xs leading-snug text-muted-foreground">{arc.goal}</p>
+              )}
+              {/* Who is out on the arc, under its goal: a planner badge is a LONG LINE, and on row one
+                  it would take the room the arc's door and word are read in. Nothing when none is. */}
+              {arc.planner && <PlannerBadge planner={arc.planner} />}
+            </>
           )}
-        </>
-      ) : null}
-      note={<span data-arc-plans>{t('dispatcher.arcPlans', { count: plans.length })}</span>}
+          spend={spend.paid !== null || spend.tokens !== null
+            ? <div data-arc-spend className="min-w-0"><SpendPills parts={spend} countKey={`darc:${arc.name}`} /></div>
+            : undefined}
+          corner={{ menuLabel: t('dispatcher.menu'), menuItems, onHide: arcHide(plans, carriedNames), hideLabel: t('dispatcher.hideArc') }}
+        />
+      )}
+      foldKey={dispatchArcFoldKey(arc.name)}
+      flow={{ nodes, doneCount, ariaLabel: t('dispatcher.flow.arc', { arc: title }) }}
       bodyTop={<DispatchArcControls arc={arc} />}
+      layout={layout}
       stripLabel={t('runner.arcStrip', { title })}
       focusIndex={deckFocusIndex(plans)}
       cardCount={plans.length}
@@ -137,7 +190,7 @@ export function DispatchArcDeck({
         return (
           <DeckItem
             key={plan.name}
-            cardFillsStrip={cardFillsStrip}
+            itemKey={plan.name}
             data-dispatch-plan-row
             data-plan-name={plan.name}
             data-pinned={String(mine)}
@@ -145,7 +198,7 @@ export function DispatchArcDeck({
             className={cn('flex flex-col gap-1', layer === 'done' && 'opacity-60')}
           >
             {mine && <SessionPin />}
-            <PlanCard plan={plan} waitsOn={waitsOnSiblings(plan, plans)} onDismiss={planDismissal(plan, carriedNames)} />
+            <PlanCard plan={plan} waitsOn={waitsOnSiblings(plan, plans)} onHide={planHide(plan, carriedNames)} headingLevel={4} />
           </DeckItem>
         );
       })}
@@ -159,11 +212,15 @@ export function DispatchArcDeck({
  *
  * ONE DECK FOR EACH ARC, IN EITHER HOME, and that is why this exists rather than a map at each call
  * site: the Runner tab and the chat gutter's Runner widget draw the same arcs from the same split
- * (`byArc`), and the two must agree about the width the column takes as much as about which plans sit
- * under which arc. `home` is the one variance — the TAB centring a measured `max-w-2xl` column with
- * its own inset, the GUTTER flush, because the widget card around it already owns the inset, and each
- * card taking the strip's whole width there (`cardFillsStrip`). It is written on the DOM
- * (`data-dispatch-arcs`) so a reading is always taken from ONE home.
+ * (`byArc`), and the two must agree about which plans sit under which arc. `home` is the one
+ * variance, and it picks the deck's layout: the TAB's wall (`grid`, every card of the arc at once in
+ * the pane's full width), the GUTTER's strip (`strip`, one card per view in a column a card wide).
+ * Neither home's decks carry an inset of their own — the tab's scroll body and the widget's card
+ * already own it. The home is written on the DOM (`data-dispatch-arcs`) so a reading is always taken
+ * from ONE home.
+ *
+ * THE DECKS STACK AT `gap-6`, wider than the cards' own `gap-4` inside a deck, so where one arc ends
+ * and the next begins is read from the spacing before any head is read.
  *
  * NOTHING AT ZERO ARCS: an operator with none sees the pane exactly as it was before arcs existed.
  * Nothing here reads the lane either — the caller hands it the split it already has, so a caller that
@@ -184,16 +241,12 @@ export function DispatchArcDecks({
 }) {
   if (groups.length === 0) return null;
   return (
-    <ul
-      data-dispatch-arcs
-      className={cn('flex min-w-0 flex-col gap-4',
-        home === 'tab' && 'mx-auto w-full max-w-2xl px-4 pt-5')}
-    >
+    <ul data-dispatch-arcs={home} className="flex min-w-0 flex-col gap-6">
       {groups.map((group) => (
         <li key={group.arc.name} className="min-w-0">
           <DispatchArcDeck
             group={group}
-            cardFillsStrip={home === 'gutter'}
+            layout={home === 'tab' ? 'grid' : 'strip'}
             pinnedSessionId={pinnedSessionId}
             carriedNames={carriedNames}
           />

@@ -262,3 +262,18 @@ export const LLM_PROVIDER_LABELS: Record<LLMProvider, string> = {
  * every tool markdown body. User message bubbles and tool errors deliberately do not carry it.
  */
 export const MARKDOWN_CARDS_CLASS = 'chat-md-cards';
+
+// ---------------------------
+
+//----------------- DISPATCHER LANE WALL ------------
+
+/**
+ * The Runner tab's wall: an auto-fill grid of lane cards, each column at least 22rem wide (or the
+ * whole column where the pane is narrower, so a phone gets one card a row and never a sideways
+ * scroll), row-major, and every card at its OWN height (`items-start`) rather than the tallest in
+ * its row. Spelled once so the two walls on the tab cannot drift apart.
+ *
+ * Used by the dispatcher module's `DeckFrame` (an arc's plans, in the tab home) and by the runner-tab
+ * module's `RunnerPanel` (the plans of no arc).
+ */
+export const LANE_WALL_GRID = 'grid grid-cols-[repeat(auto-fill,minmax(min(100%,22rem),1fr))] items-start gap-4';

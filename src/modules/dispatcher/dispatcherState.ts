@@ -1,4 +1,4 @@
-import { dismissEnding } from '@/modules/dispatcher/dismissedEndings';
+import { hidePlans } from '@/modules/dispatcher/hiddenPlans';
 import type { DispatcherArc, DispatcherPhase, DispatcherPlan, DispatcherPlanStatus, DispatcherPlanner, Tone } from '@/shared/types';
 
 /**
@@ -90,15 +90,13 @@ export const PHASE_GLYPH: Record<DispatcherPhase['status'], string> = {
 };
 
 /**
- * How much of the plan is behind it: `done` phases over all of them. A plan with no phases yet is
- * `0` rather than `NaN` — a designed plan whose phases are not cut is a real state and draws an
- * empty meter, not a broken one.
+ * How much of the plan is behind it: `done` phases, and all of them. A plan with no phases yet is
+ * `0 of 0` — a designed plan whose phases are not cut is a real state, and its card draws no track
+ * rather than a broken one.
  */
-export function phaseProgress(plan: DispatcherPlan): { done: number; total: number; percent: number } {
+export function phaseProgress(plan: DispatcherPlan): { done: number; total: number } {
   const phases = plan.phases ?? [];
-  const total = phases.length;
-  const done = phases.filter((phase) => phase.status === 'done').length;
-  return { done, total, percent: total === 0 ? 0 : Math.round((done / total) * 100) };
+  return { done: phases.filter((phase) => phase.status === 'done').length, total: phases.length };
 }
 
 /**
@@ -240,19 +238,68 @@ export function waitsOnSiblings(plan: DispatcherPlan, members: DispatcherPlan[])
 }
 
 /**
- * The dismissal a complete plan's card offers, or `undefined` where it offers none — the ONE rule
- * both homes and every nested list read, so three call sites cannot drift apart about when a Dismiss
- * appears or what it prunes.
- *
- * `carriedNames` is the lane's UNFILTERED list of plan names (`useDispatcherPlans`), because that is
- * what a dismissal prunes the stored list against: pruning against the drawn cards would drop every
- * earlier dismissal the moment a second one was made. A plan whose completion the document cannot
- * date — the field null, or a stamp nothing can parse — has no ending to match and offers nothing.
+ * Whether `dispatcher drop` would take this plan, read off the document. It checks `cmd/drop.py`'s two
+ * gates. First, nothing of the plan walks: no phase is `busy`, which is the chain layer's own answer.
+ * Second, no planner row for the plan or its arc is live: that is `store.live_for`, mirrored over the
+ * lane's `planners` (`queued`/`out`, `target` or `plan` naming either). `plan.planner` cannot answer
+ * the second gate. `report_planners.of_plan` gives a plan's OWN row first, an ending included, so a
+ * plan whose own cut ended short hides its arc's queued cut, and `drop` refuses it. `live` is refused
+ * as well, for the window the document cannot see: `phase_chain.launch` forks the walker before the
+ * phase carries a `chain_id`, and a plan the rule can launch is exactly a `live` one. Where this is
+ * false the card draws no Delete at all.
  */
-export function planDismissal(plan: DispatcherPlan, carriedNames: string[]): (() => void) | undefined {
-  const endedAt = epochOf(plan.completed_at);
-  if (plan.status !== 'complete' || endedAt === null) return undefined;
-  return () => dismissEnding({ run_id: plan.name, ended_at: endedAt }, carriedNames);
+export function planDroppable(plan: DispatcherPlan, planners: readonly DispatcherPlanner[]): boolean {
+  if (plan.status === 'live') return false;
+  if ((plan.phases ?? []).some((phase) => phase.busy)) return false;
+  const subjects = plan.arc === null ? [plan.name] : [plan.name, plan.arc];
+  return !planners.some((row) => row.state !== 'ended'
+    && (subjects.includes(row.target) || subjects.includes(row.plan)));
+}
+
+/**
+ * The plans in `lanePlans` that this plan still holds back, by name, in the order given: the ones
+ * whose `waits_on` names it where that wait is not yet met. `rule.eligible` re-asks every wait on
+ * every pass and passes a wait once the plan waited on is complete. So an edge holds anything only
+ * while this plan is NOT complete and the waiter is not complete either. A drop deletes the edge with
+ * the plan (`store_drop.drop_plan`), and exactly these waiters may then start sooner. A met wait's
+ * edge goes too, but it releases nothing, so it is not listed. A self-wait is not listed either.
+ */
+export function planWaiters(plan: DispatcherPlan, lanePlans: readonly DispatcherPlan[]): string[] {
+  if (plan.status === 'complete') return [];
+  return lanePlans
+    .filter((other) => other.name !== plan.name && other.status !== 'complete' && other.waits_on.includes(plan.name))
+    .map((other) => other.name);
+}
+
+/*
+ * THE THREE HIDES, each ONE write to the hide store (`hiddenPlans.ts`) and each the one rule for its
+ * press, so no home can drift apart from another about what a Hide takes. `carriedNames` is always the
+ * lane's UNFILTERED list of plan names (`useDispatcherPlans`), because that is what the stored list is
+ * pruned against: pruning against the drawn cards would drop every earlier hide the moment a second
+ * one was made. A hide is reversible (`Show` in the `Hidden` list), so no dialog guards any of them.
+ */
+
+/** One plan's Hide: its card leaves the grid for the `Hidden` list. */
+export function planHide(plan: DispatcherPlan, carriedNames: string[]): () => void {
+  return () => hidePlans([plan.name], carriedNames);
+}
+
+/** An arc deck's Hide: every plan of the deck, in one write, so the deck leaves with its last card. */
+export function arcHide(plans: readonly DispatcherPlan[], carriedNames: string[]): () => void {
+  return () => hidePlans(plans.map((plan) => plan.name), carriedNames);
+}
+
+/**
+ * `Hide ended · N`: every COMPLETE plan of `plans` (the drawn ones) in one write, with `count` for the
+ * button's word. `null` when none has ended, so the button is never drawn over nothing to hide.
+ */
+export function endedHide(
+  plans: readonly DispatcherPlan[],
+  carriedNames: string[],
+): { count: number; hide: () => void } | null {
+  const ended = plans.filter((plan) => plan.status === 'complete').map((plan) => plan.name);
+  if (ended.length === 0) return null;
+  return { count: ended.length, hide: () => hidePlans(ended, carriedNames) };
 }
 
 /**

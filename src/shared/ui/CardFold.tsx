@@ -27,7 +27,8 @@ import { cn } from '@/shared/utils';
  * card's own tight 28px from there up — the desktop header is a row of 20px text and does not want a
  * 40px button in it. The glyph stays small either way; only the pressable box changes.
  *
- * Used by `PlanCard` and `DeckFrame`, and — for the glyph alone — by the chat's `ShapeFrame`.
+ * The toggle is drawn by the dispatcher's `LaneCardHead` — the one head of the plan card and the arc deck — and
+ * the glyph alone by the chat's `ShapeFrame`.
  */
 export function FoldChevron({ collapsed, className }: { collapsed: boolean; className?: string }) {
   return (

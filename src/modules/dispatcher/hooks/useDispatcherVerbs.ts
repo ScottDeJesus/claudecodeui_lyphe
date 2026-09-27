@@ -40,14 +40,15 @@ export type DispatcherPlanVerbs = {
   schedule(when: string): Promise<void>;
   park(): Promise<void>;
   unpark(): Promise<void>;
+  drop(): Promise<void>;
   setModel(choice: DispatcherModelChoice): Promise<void>;
   busy: DispatcherVerb | null;
 };
 
 /**
- * What an arc header may press — the four verbs the dispatcher's own arc door opens on. `park` and
- * `unpark` are the plan card's own and no arc header draws them, so no arc callback exists for them
- * rather than one that would have no route to reach.
+ * What an arc header may press — the four verbs the dispatcher's own arc door opens on. `park`,
+ * `unpark` and `drop` are the plan card's own and no arc header draws them, so no arc callback exists
+ * for them rather than one that would have no route to reach.
  */
 export type DispatcherArcVerbs = {
   stop(): Promise<void>;
@@ -58,10 +59,10 @@ export type DispatcherArcVerbs = {
 };
 
 /**
- * Stop, Resume, Schedule, Park, Unpark and Model for one plan — or Stop, Resume, Schedule and
+ * Stop, Resume, Schedule, Park, Unpark, Model and Drop for one plan — or Stop, Resume, Schedule and
  * Model for one dispatch ARC — and what to say about each.
  *
- * ONE HOOK, TWO DOORS, because the two are the same act on the same store through the same six verbs:
+ * ONE HOOK, TWO DOORS, because the two are the same act on the same store through the same verbs:
  * `scope` decides which route a press is relayed through (`POST /api/dispatcher/plans/:name/…` or
  * `POST /api/dispatcher/arcs/:name/…`) and how much of the surface it gets back, and nothing else.
  * The arc arm is what the header's four controls press, and it is deliberately the same `stop`,
@@ -72,7 +73,9 @@ export type DispatcherArcVerbs = {
  * NO CONFIRMATION DIALOG GUARDS STOP: Stop is a PAUSE — a stopped plan
  * keeps its walk and `resume` picks it up — so the press is reversible by the button that replaces
  * it, and a dialog in front of a reversible act is what trains a reader to dismiss the one that is
- * not.
+ * not. `drop` IS that one: it takes the plan and everything the store holds of it, no press undoes
+ * it, and so it is the one verb a card guards with a dialog — the card's (`DeletePlanDialog`), not
+ * this hook's, which relays the press it is handed like any other.
  *
  * THE DISPATCHER'S OWN SENTENCE IS THE ANSWER, ON BOTH PATHS. Every dispatcher verb speaks on STDOUT — `UNSCHEDULED dispatcher-ready` when it worked,
  * `REFUSED schedule dispatcher-ready: is live — stop it first` when it did not — so `stdout` is
@@ -116,7 +119,8 @@ export function useDispatcherVerbs(
   const [busy, setBusy] = useState<DispatcherVerb | null>(null);
 
   // A verb that resolves after the card is gone must not set state or raise a toast about a plan
-  // nobody is looking at any more.
+  // nobody is looking at any more. `drop` alone still speaks (`speaks`): its card leaving IS what a
+  // drop that worked does, and the 2-second poll can deliver that frame before the answer arrives.
   const mountedRef = useRef(true);
   useEffect(() => {
     mountedRef.current = true;
@@ -126,13 +130,14 @@ export function useDispatcherVerbs(
   }, []);
 
   // The word a toast is headed with when the dispatcher said nothing this hook can show. The two
-  // park words are the card's own (`dispatcher.park` / `dispatcher.unpark`), so the button and the
-  // toast that names it cannot drift.
+  // park words and the delete word are the card's own (`dispatcher.park` / `dispatcher.unpark` /
+  // `dispatcher.delete.word`), so the button and the toast that names it cannot drift.
   const word = useCallback(
     (verb: DispatcherVerb): string => {
       if (verb === 'stop') return t('runner.stop');
       if (verb === 'park') return t('dispatcher.park');
       if (verb === 'unpark') return t('dispatcher.unpark');
+      if (verb === 'drop') return t('dispatcher.delete.word');
       if (verb === 'schedule') return t('runner.schedule.refused');
       if (verb === 'model') return t('runner.model.refused');
       return resumeWord ?? t('runner.resume');
@@ -160,11 +165,12 @@ export function useDispatcherVerbs(
     async (verb: DispatcherVerb, call: () => Promise<Response>): Promise<void> => {
       if (!mountedRef.current) return;
       setBusy(verb);
+      const speaks = () => mountedRef.current || verb === 'drop';
 
       try {
         const response = await call();
         const body = await readBody(response);
-        if (!mountedRef.current) return;
+        if (!speaks()) return;
 
         // Read before the status, because a 409 carries the very same shape — and because the
         // dispatcher's successes are sentences too (`PARKED dispatcher-ready`), not empty bodies.
@@ -183,7 +189,7 @@ export function useDispatcherVerbs(
         // The request never completed — the API is down, or the deadline passed. That is the
         // network's word, not the dispatcher's, and it is said as such.
         console.warn(`[useDispatcherVerbs] the ${verb} request did not complete:`, error);
-        if (mountedRef.current) toast({ tone: 'warn', title: t('messages.networkError') });
+        if (speaks()) toast({ tone: 'warn', title: t('messages.networkError') });
       } finally {
         if (mountedRef.current) setBusy(null);
       }
@@ -212,10 +218,11 @@ export function useDispatcherVerbs(
     [name, scope, send],
   );
 
-  // The plan card's own two, which no arc header draws and no arc route exists for.
+  // The plan card's own three, which no arc header draws and no arc route exists for.
   const park = useCallback(() => send('park', () => api.dispatcher.park(name)), [name, send]);
   const unpark = useCallback(() => send('unpark', () => api.dispatcher.unpark(name)), [name, send]);
+  const drop = useCallback(() => send('drop', () => api.dispatcher.drop(name)), [name, send]);
 
   if (scope === 'arc') return { stop, resume, schedule, setModel, busy };
-  return { stop, resume, schedule, park, unpark, setModel, busy };
+  return { stop, resume, schedule, park, unpark, drop, setModel, busy };
 }

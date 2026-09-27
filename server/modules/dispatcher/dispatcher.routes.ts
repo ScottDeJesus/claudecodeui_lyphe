@@ -58,16 +58,16 @@ function statusForVerb(result: DispatcherVerbResult): number {
 }
 
 /**
- * The dispatcher lane's thirteen routes: three reads of the plan list, six presses on a plan, four on
+ * The dispatcher lane's fourteen routes: three reads of the plan list, seven presses on a plan, four on
  * an arc. Auth is the mount's `authenticateToken`, in `server/index.ts`.
  *
  * These handlers validate and translate, and do nothing else: nothing is read here, no process is
  * started here, and no route names a path from the request — the binary and the store are the
  * module's, fixed at composition, and a request can only ever choose a plan or an arc by name, a
- * word from the closed set of six verbs, and — where the verb takes one — a word from the three
+ * word from the closed set of seven verbs, and — where the verb takes one — a word from the three
  * model words.
  *
- * FOUR OF THE SIX ARE RELAYED TWICE, once under `/plans/:name` and once under `/arcs/:name`, because
+ * FOUR OF THE SEVEN ARE RELAYED TWICE, once under `/plans/:name` and once under `/arcs/:name`, because
  * the dispatcher's own doors open on both: `model`, `stop`, `resume` and `schedule` take an arc's
  * name as readily as a plan's. The two spellings are two routes rather than one param because the
  * NAME CLASSES differ (`PLAN_NAME` against `ARC_NAME` below) — a fence that would be lost the moment
@@ -153,6 +153,12 @@ export function createDispatcherRouter(dependencies: DispatcherRouterDependencie
   router.post('/plans/:name/resume', relay('resume'));
   router.post('/plans/:name/park', relay('park'));
   router.post('/plans/:name/unpark', relay('unpark'));
+  // A plan taken out of the store for good (`dispatcher drop <name>`) — the one press no other press
+  // undoes, and a plan's alone: no arc door opens on it. No body and no argument. `statusForVerb`
+  // needs no branch for it: `DROPPED <name>` is a 200, and the dispatcher's two refusals — `REFUSED
+  // drop …` while a phase walks or a planner outing for the plan or its arc is live (exit 2), and
+  // `no plan <name>` (exit 1) — are each a 409 whose body is that sentence, untouched.
+  router.post('/plans/:name/drop', relay('drop'));
   // A plan's own DeepSeek / Claude word (`dispatcher model <name> <word>`). RESTARTS NOTHING AND
   // WAKES NOBODY: the word is read when a chain is launched (`phase_chain.launch_env`), so it takes
   // the plan's NEXT phase and never disturbs a walk already out — which is why no plan's state is a

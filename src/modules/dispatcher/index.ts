@@ -1,27 +1,31 @@
 // The dispatcher lane's door into the live bus. App mounts it once, inside LiveBusProvider and
 // beside every other lane's feed.
 export { DispatcherFeed } from '@/modules/dispatcher/DispatcherFeed';
-// The lane's read side — every plan the store holds, this box's posture beside them, and which
-// complete plans the operator has already dismissed. The Runner tab reads it for the card list and
-// for the count that gates the tab.
+// The lane's read side — every plan the store holds, this box's posture beside them, and which of
+// them the operator has hidden. The Runner tab reads it for the card list, the `Hidden` list and the
+// count and `laneOpen` that badge and gate the tab.
 export { useDispatcherPlans } from '@/modules/dispatcher/hooks/useDispatcherPlans';
-// Both hands, one hook: the plan card's six verbs and the arc header's four — stop, resume, schedule
+// Both hands, one hook: the plan card's seven verbs and the arc header's four — stop, resume, schedule
 // and the arc's model word — relayed to the dispatcher's own binary and answered with its own
 // sentence. `scope` is the whole of what differs: which door a press goes through. A caller presses
-// one and re-draws from the next frame; nothing is guessed here.
+// one and re-draws from the next frame; nothing is guessed here. `drop` is the one verb a card
+// guards with a dialog, because it is the one no press undoes.
 export { useDispatcherVerbs } from '@/modules/dispatcher/hooks/useDispatcherVerbs';
 // The pure vocabulary of a plan, so a card never re-derives a tone, a glyph, a progress count or
 // the order the cards sit in — and the lane's own split, so the Runner tab and the chat gutter's
-// widget group and order the arcs' plans by ONE rule instead of two.
+// widget group and order the arcs' plans by ONE rule instead of two. The three hides are here too:
+// one plan's, an arc deck's and `Hide ended · N`, each one write to the hide store.
 export {
+  arcHide,
   byArc,
   byUrgencyThenNewest,
   deckFocusIndex,
+  endedHide,
   epochOf,
   PHASE_GLYPH,
   phaseProgress,
   phaseStatusTone,
-  planDismissal,
+  planHide,
   planLayer,
   planStatusTone,
   scheduleClock,
@@ -34,6 +38,8 @@ export type { DispatchDeckLayer, DispatcherArcGroup, DispatcherArcSplit } from '
 // (`src/modules/runner-tab`) and by the chat gutter's widget.
 export { PlanCard } from '@/modules/dispatcher/PlanCard';
 export { DispatchArcDeck, DispatchArcDecks } from '@/modules/dispatcher/ArcDeck';
+// The `Hidden · N` list at the foot of both homes: every hidden plan, each with its `Show`.
+export { HiddenPlans } from '@/modules/dispatcher/HiddenPlans';
 // The pin a plan wears when the open chat is the one that launched it, drawn by both homes.
 export { SessionPin } from '@/modules/dispatcher/SessionPin';
 // One planner outing as one line — who is out, on what model, for how long — and the row of them for

@@ -1,12 +1,16 @@
+import { ChevronRight } from 'lucide-react';
+import { useState } from 'react';
+import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { PlanPhaseRow } from '@/modules/dispatcher/PlanPhaseRow';
+import { PlanNow } from '@/modules/dispatcher/PlanNow';
+import { phaseWord, PlanPhaseRow } from '@/modules/dispatcher/PlanPhaseRow';
+import { StatusFlow } from '@/modules/dispatcher/StatusFlow';
 import { clockOf, epochOf, phaseProgress, planStatusTone, scheduleClock } from '@/modules/dispatcher/dispatcherState';
 import { useDispatcherPlans } from '@/modules/dispatcher/hooks/useDispatcherPlans';
 import { useElapsed } from '@/shared/hooks/useElapsed';
-import { spendText } from '@/shared/spend';
-import { Badge, Collapsible, CollapsibleContent, CollapsibleTrigger, Meter } from '@/shared/ui';
-import type { DispatcherPlan } from '@/shared/types';
+import { Badge, Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/shared/ui';
+import type { DispatcherPlan, LaneFlowNode } from '@/shared/types';
 
 /**
  * A plan as its card draws it, in pieces with no frame of their own — the card's face over the
@@ -19,7 +23,7 @@ import type { DispatcherPlan } from '@/shared/types';
 /** How many of the plan's events the feed shows — the newest, newest first. */
 const FEED_LIMIT = 30;
 
-/** The plan's one word, toned by `planStatusTone`. Used by `PlanCard`'s header. */
+/** The plan's one word, toned by `planStatusTone`. Used by `PlanCard`'s head (its badge slot) and by `HiddenPlans`' rows. */
 export function PlanStatusBadge({ plan }: { plan: DispatcherPlan }) {
   const { t } = useTranslation();
   return <Badge tone={planStatusTone(plan.status)}>{t(`dispatcher.status.${plan.status}`)}</Badge>;
@@ -38,7 +42,7 @@ function walkingSince(plan: DispatcherPlan): number | null {
  * The plan's one clock: elapsed while it is live, how long ago it ended once complete, and the
  * operator's hour while it is scheduled. Queued, paused, parked and idle plans have nothing moving
  * and nothing to count, so they draw nothing — the status word already said it.
- * Used by `PlanCard`'s header.
+ * Used by `PlanCard`'s head, as its clock slot.
  */
 export function PlanClock({ plan }: { plan: DispatcherPlan }) {
   const { t } = useTranslation();
@@ -57,12 +61,20 @@ export function PlanClock({ plan }: { plan: DispatcherPlan }) {
 }
 
 /**
- * Everything between the plan's word and its verbs: how far it has got, what it has cost, the
- * route the box walks it on, its phases, and its own log.
+ * The plan's GLANCE FACE — everything between its head and its verbs, in the order a glance reads it:
+ * where it is (the track of its phases and one caption under it), what a pressed node says (its
+ * receipt), what is moving now (`PlanNow`), and then, closed, the whole list and the log. What it has
+ * COST is not here: the head carries the plan's total as pills (`PlanCard`), so the face does not
+ * state it a second time.
  *
- * THE ROUTE RIDES THE METER'S SUB-LINE because it is the box's and not the plan's: DeepSeek or
- * Claude, one at a time or all at once, is the posture every plan on this screen walks under, and
- * a plan that sits still under `one at a time` is explained by it.
+ * THE TRACK IS EVERY PHASE AT ONCE: one node a phase on one row (`StatusFlow`), marked `✓` done,
+ * `▶︎` walking, `…` settling and by its position while not started, toned the way its row is
+ * (`phaseWord`), filled as far as `phaseProgress` has got. A node pressed opens that phase's row
+ * under the track with its stages open — the receipt — and pressed again closes it.
+ *
+ * THE ROUTE RIDES THE CAPTION because it is the box's and not the plan's: DeepSeek or Claude, one at
+ * a time or all at once, is the posture every plan on this screen walks under, and a plan that sits
+ * still under `one at a time` is explained by it.
  *
  * THE EVENT LOG IS THE CARD'S FEED, folded by default: the last thirty events, newest first —
  * time, kind, phase, detail. It is where a relaunch or a held take-up is read in the dispatcher's
@@ -73,47 +85,70 @@ export function PlanClock({ plan }: { plan: DispatcherPlan }) {
 export function PlanFace({ plan }: { plan: DispatcherPlan }) {
   const { t } = useTranslation();
   const { route } = useDispatcherPlans();
+  // The phase whose receipt is open under the track — the node the reader pressed, or none. This
+  // card's own and nobody else's: pressing the same node again clears it.
+  const [selected, setSelected] = useState<string | null>(null);
+  // Whether the full phase list is open. It starts CLOSED, stated here and taken from no prop (see
+  // the list below), and its rows are mounted only while it is open — a closed list is not fourteen
+  // rows of stages and pills drawn into a clip on every card of the wall.
+  const [listOpen, setListOpen] = useState(false);
   const progress = phaseProgress(plan);
-  // What the plan has spent: its PAID dollars (`$0.41 DeepSeek`, labelled by what was billed) and
-  // its CLAUDE records' tokens — A SPEND FIGURE IS DOLLARS **OR** TOKENS, BY WHO WAS USED, so a
-  // plan the vendor billed everywhere shows the `$` and no tokens, one walked on the operator's
-  // Claude subscription shows the tokens and no `$` at all (never a `$0.00`), and a mixed one
-  // shows both, its token half counting the Claude stages only. `src/shared/spend.ts` owns the rule,
-  // so this card, the arc's header and the chat's soul pins cannot spell it three ways.
-  const spend = spendText(t, plan.cost_usd, plan.tokens_in, plan.tokens_out, plan.tokens);
-  const sub = [spend, t('dispatcher.rounds', { count: plan.rounds }), route?.word ?? '']
-    .filter(Boolean).join(' · ');
+  const nodes: LaneFlowNode[] = plan.phases.map((phase) => {
+    const word = phaseWord(phase);
+    return {
+      key: phase.key,
+      mark: word.mark,
+      tone: word.tone,
+      label: t('dispatcher.flow.node', { position: phase.position, title: phase.title, word: t(word.copy) }),
+      live: word.key === 'running',
+    };
+  });
+  const caption = [
+    progress.total > 0 ? t('dispatcher.flow.caption', { done: progress.done, total: progress.total }) : '',
+    t('dispatcher.rounds', { count: plan.rounds }),
+    route?.word ?? '',
+  ].filter(Boolean).join(' · ');
+  const receipt = plan.phases.find((phase) => phase.key === selected) ?? null;
   const feed = plan.events.slice(-FEED_LIMIT).reverse();
 
   return (
     <div className="flex min-w-0 flex-col gap-3">
-      <Meter
-        percent={progress.percent}
-        tone="accent"
-        label={t('runner.phases')}
-        value={`${progress.done} / ${progress.total}`}
-        sub={sub}
-      />
+      <div className="flex min-w-0 flex-col gap-1.5">
+        <StatusFlow
+          nodes={nodes}
+          doneCount={progress.done}
+          selected={receipt?.key ?? null}
+          onSelect={(key) => setSelected((current) => (current === key ? null : key))}
+          ariaLabel={t('dispatcher.flow.name', { plan: plan.name })}
+        />
+        <p className="min-w-0 break-words text-xs text-muted-foreground" data-flow-caption>{caption}</p>
+      </div>
 
-      {/* THE PHASES ARE SHOWN, IN EVERY HOME (operator, 2026-09-25: "cards on the plan runner tab
-          should always show phases like the normal runner cards"). There is no
-          `defaultOpen` to pass: the tab's cards start open and so do the gutter's, because a home
-          that could fold them could disagree with the other one, and the phases ARE this card — a
-          folded plan card leaves a title and a count with nothing under them. The trigger stays, so
-          a person may fold the list on purpose; the card never does it for them. */}
-      <Collapsible defaultOpen className="min-w-0">
-        <CollapsibleTrigger className="rounded-lg px-2 py-1 text-left text-xs text-muted-foreground hover:bg-muted">
-          {t('dispatcher.phaseCount', { count: plan.phases.length })}
-        </CollapsibleTrigger>
-        <CollapsibleContent className="min-w-0">
-          {plan.phases.map((phase) => <PlanPhaseRow key={phase.key} phase={phase} />)}
-        </CollapsibleContent>
-      </Collapsible>
+      {/* The receipt, keyed by its phase so each node pressed opens its row fresh, stages open. */}
+      {receipt && (
+        <div className="min-w-0 rounded-lg border border-border motion-safe:animate-shape-item" data-flow-receipt={receipt.key}>
+          <PlanPhaseRow key={receipt.key} phase={receipt} open />
+        </div>
+      )}
+
+      <PlanNow plan={plan} />
+
+      {/* EVERY PHASE IS ON THE FACE ALREADY, as a node of the track, in both homes — so the full list
+          is the second look, not the first, and it sits CLOSED. Closed is this face's own default
+          (`listOpen`), stated here and taken from no prop: the tab and the gutter draw one face, and
+          a home that could pass its own default could open or close the list for the other. A reader
+          opens it on purpose; the card never does it for them. */}
+      {plan.phases.length > 0 && (
+        <Collapsible open={listOpen} onOpenChange={setListOpen} className="min-w-0" data-dispatcher-phases>
+          <FaceTrigger>{t('dispatcher.allPhases', { count: plan.phases.length })}</FaceTrigger>
+          <CollapsibleContent className="min-w-0">
+            {listOpen && plan.phases.map((phase) => <PlanPhaseRow key={phase.key} phase={phase} />)}
+          </CollapsibleContent>
+        </Collapsible>
+      )}
 
       <Collapsible className="min-w-0" data-dispatcher-events>
-        <CollapsibleTrigger className="rounded-lg px-2 py-1 text-left text-xs text-muted-foreground hover:bg-muted">
-          {t('dispatcher.events', { count: plan.events.length })}
-        </CollapsibleTrigger>
+        <FaceTrigger>{t('dispatcher.events', { count: plan.events.length })}</FaceTrigger>
         <CollapsibleContent className="min-w-0">
           <ul className="flex flex-col gap-0.5 py-1 font-mono text-xs text-muted-foreground">
             {feed.map((event) => (
@@ -125,5 +160,15 @@ export function PlanFace({ plan }: { plan: DispatcherPlan }) {
         </CollapsibleContent>
       </Collapsible>
     </div>
+  );
+}
+
+/** The face's two closed disclosures' trigger: its words, and a chevron that turns when it opens. */
+function FaceTrigger({ children }: { children: ReactNode }) {
+  return (
+    <CollapsibleTrigger className="group flex items-center gap-1 rounded-lg px-2 py-1 text-left text-xs text-muted-foreground hover:bg-muted">
+      <ChevronRight aria-hidden="true" className="size-3.5 flex-none group-data-[state=open]:rotate-90 motion-safe:transition-transform" />
+      {children}
+    </CollapsibleTrigger>
   );
 }

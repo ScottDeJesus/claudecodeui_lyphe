@@ -740,7 +740,7 @@ export const api = {
   },
 
   // The dispatcher lane (docs/MANUAL.md (dispatcher)): the plans in the dispatcher's own store, and the
-  // six verbs the plan cards and the arc header press. The picture is `dispatcher status --json`
+  // seven verbs the plan cards and the arc header press. The picture is `dispatcher status --json`
   // relayed whole, and the verbs are relayed to the dispatcher's own binary by argv, never by a shell.
   //
   // The verbs are read from the RAW response for one reason worth naming: the dispatcher prints its
@@ -755,6 +755,9 @@ export const api = {
     resume: (name: string) => post(`/api/dispatcher/plans/${encodeURIComponent(name)}/resume`, {}),
     park: (name: string) => post(`/api/dispatcher/plans/${encodeURIComponent(name)}/park`, {}),
     unpark: (name: string) => post(`/api/dispatcher/plans/${encodeURIComponent(name)}/unpark`, {}),
+    // A plan out of the store for good (`dispatcher drop <plan>`): `DROPPED <name>`, or the
+    // dispatcher's REFUSED line while a phase walks or a planner outing is live, as a 409.
+    drop: (name: string) => post(`/api/dispatcher/plans/${encodeURIComponent(name)}/drop`, {}),
     // A plan's own DeepSeek / Claude word (`dispatcher model <plan> <word>`). The plan card's
     // control relays it; nothing is optimistic, and the next `dispatcher_state` frame reads the
     // word back. Restarts nothing — the word is read when a chain is LAUNCHED.

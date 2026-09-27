@@ -1,5 +1,5 @@
 import { clsx, type ClassValue } from 'clsx';
-import { extendTailwindMerge } from 'tailwind-merge';
+import { extendTailwindMerge, validators } from 'tailwind-merge';
 
 import type { DispatcherModelChoice, Project, ProjectSession } from '@/shared/types';
 
@@ -24,11 +24,24 @@ export const IS_PLATFORM = import.meta.env?.VITE_IS_PLATFORM === 'true';
  * builds, the element just quietly stops following the reader's chat text size, and no type
  * error ever says so. The five names are `tailwind.config.js`'s `fontSize` — `md-body`,
  * `md-meta`, `md-code`, `md-stat` and `chat-tool`.
+ *
+ * The bare `outline` is the second place the two versions part. tailwind-merge 3 is written for
+ * Tailwind 4, where `outline` is a WIDTH (1px); this app builds on Tailwind 3.4, where `outline` is
+ * the STYLE (`outline-style: solid`) and `outline-2` only a width. Unextended, the merger reads
+ * `cn('outline outline-2')` as two widths and keeps the last, so the ring is drawn with no style —
+ * that is, not at all (measured on the dispatcher's StatusFlow: its selected node lost `outline`).
+ * So bare `outline` is moved into the style group, beside `outline-none` and `outline-dashed`.
  */
 const twMerge = extendTailwindMerge({
+  override: {
+    classGroups: {
+      'outline-w': [{ outline: [validators.isNumber, validators.isArbitraryVariableLength, validators.isArbitraryLength] }],
+    },
+  },
   extend: {
     classGroups: {
       'font-size': [{ text: ['md-body', 'md-meta', 'md-code', 'md-stat', 'chat-tool'] }],
+      'outline-style': ['outline'],
     },
   },
 });

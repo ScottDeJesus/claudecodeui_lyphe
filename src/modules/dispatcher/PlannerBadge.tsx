@@ -4,7 +4,6 @@ import { epochOf, plannerStatusTone } from '@/modules/dispatcher/dispatcherState
 import { useElapsed } from '@/shared/hooks/useElapsed';
 import { Badge } from '@/shared/ui';
 import type { DispatcherPlanner } from '@/shared/types';
-import { cn } from '@/shared/utils';
 
 /**
  * WHO IS OUT, ON WHAT MODEL, FOR HOW LONG — one planner outing, as one line of the shared `Badge`,
@@ -28,7 +27,7 @@ import { cn } from '@/shared/utils';
  * `data-planner-badge`, `data-planner-target`, `data-planner-soul` and `data-planner-state` are the
  * browser harness's handles, so a probe reads one outing's mark without reading the card's text.
  *
- * Used by `PlanCard`'s header and `DispatchArcDeck`'s header (`PlannerBadge`), and by the Runner tab's
+ * Used on the head's lead row of `PlanCard` and `DispatchArcDeck` (`PlannerBadge`), and by the Runner tab's
  * two homes for the outings that have no card and no deck to be drawn in (`LoosePlannerBadges`).
  */
 
@@ -125,24 +124,15 @@ export function PlannerBadge({ planner }: { planner: DispatcherPlanner }) {
  */
 export function LoosePlannerBadges({
   planners,
-  home = 'tab',
 }: {
   /** The entries that name no plan and no arc the lane draws (`useDispatcherPlans`). */
   planners: readonly DispatcherPlanner[];
-  /** The home's own width, exactly as `DispatchArcDecks` takes it: the tab centres a measured column, the gutter is flush. */
-  home?: 'tab' | 'gutter';
 }) {
   if (planners.length === 0) return null;
   return (
-    <ul
-      data-loose-planners
-      className={cn(
-        'flex min-w-0 flex-wrap items-center gap-2',
-        // The same column `DispatchArcDecks` opens for itself in the tab, so a badge stands over the
-        // decks it belongs to rather than at the pane's own edge.
-        home === 'tab' && 'mx-auto w-full max-w-2xl px-4 pt-5',
-      )}
-    >
+    // Flush in both homes: the tab's scroll body and the widget's card own the inset, exactly as they
+    // do for the decks under it, so a badge stands over the decks it belongs to.
+    <ul data-loose-planners className="flex min-w-0 flex-wrap items-center gap-2">
       {planners.map((planner) => (
         <li key={planner.id} className="min-w-0">
           <PlannerBadge planner={planner} />

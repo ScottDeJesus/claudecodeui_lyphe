@@ -32,7 +32,7 @@ export type UserPreferences = {
   themeFollowsSun: boolean;
   /** The transcript's reading size in px. See `useChatFontSize`. */
   chatFontSize: number;
-  /** The Runner tab's memory, a blob merged by its two writers: `{ collapsedCards: string[], dismissedEndings: {run_id, ended_at}[] }`. See `modules/dispatcher/dismissedEndings.ts` and `shared/hooks/useCardFold.ts`. */
+  /** The Runner tab's memory, a blob merged by its two writers: `{ collapsedCards: string[], hiddenPlans: {name, at}[] }`. See `modules/dispatcher/hiddenPlans.ts` and `shared/hooks/useCardFold.ts`. */
   dispatcher: unknown;
   /** Composer toggle: every sent message rides under the `/plain` command. See `usePlainModePreference`. */
   plainMode: boolean;

@@ -46,7 +46,7 @@ import '@/shared/ui/verve/board.css';
 export { ActionMenu } from '@/shared/ui/ActionMenu';
 export type { ActionMenuItem } from '@/shared/ui/ActionMenu';
 export { Avatar } from '@/shared/ui/Avatar';
-export { Badge } from '@/shared/ui/Badge';
+export { Badge, badgeVariants } from '@/shared/ui/Badge';
 export { Banner } from '@/shared/ui/Banner';
 export { Button, buttonVariants } from '@/shared/ui/Button';
 export { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/shared/ui/Card';

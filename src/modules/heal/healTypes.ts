@@ -108,7 +108,7 @@ export type HealCard = {
    * `tokens_out` what they wrote, and `tokens` the total as the chain recorded it
    * (`chain_state.usage`, which zeroes a stage a vendor billed). Both parts read `0` against a real
    * total on a chain whose stages kept no split — a record older than the split — and the card then
-   * states the total alone (`⛁ 2.6M tok`, `usageText`), never a fabricated `2.6M in · 0 out`.
+   * states the total alone (`⛁ 2.6M tok`, `spendParts`), never a fabricated `2.6M in · 0 out`.
    * A SPEND FIGURE IS DOLLARS
    * **OR** TOKENS, BY WHO WAS USED (operator rule, 2026-09-24): the dollar figure above is a
    * PAYING API's share alone, so a heal that only ever paid the vendor bills there and draws NO

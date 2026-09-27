@@ -16,7 +16,7 @@ export type WorkspaceTabGates = {
   memoryPendingCount: number;
   /** True while the Runner tab belongs on the bar — the same sticky rule the Memory tab takes. */
   shouldShowRunnerTab: boolean;
-  /** How many plans the lane is carrying, for the tab's count pill. Paused and queued plans are counted: they are still plans. */
+  /** How many plans the lane DRAWS, for the tab's count pill. Paused and queued plans are counted: they are still plans. A hidden one is not. */
   runnerCount: number;
   /** True while the Heal tab belongs on the bar — the same sticky, data-gated rule the Memory and Runner tabs take. */
   shouldShowHealTab: boolean;
@@ -53,9 +53,9 @@ export type WorkspaceTabGates = {
  * tab a person is standing in it stays on the bar until they choose another one, so filing the
  * last pending memory empties the panel rather than taking the tab out from under them — and no
  * snap-back effect exists for it, because the gate itself never turns off mid-act. The Runner tab
- * is the SECOND DATA-gated, sticky tab and takes that rule whole: it appears while the dispatcher's
- * lane carries a plan, it stays while it is the selected tab even once the last plan is dismissed,
- * and it has no snap-back effect either. The Heal tab is the THIRD and takes the same rule whole: it appears
+ * is the SECOND DATA-gated, sticky tab and takes that rule whole: it appears while the lane is OPEN
+ * (`laneOpen`: a plan is drawn, or a hidden plan has not finished), it stays while it is the selected
+ * tab even once the last plan is hidden, and it has no snap-back effect either. The Heal tab is the THIRD and takes the same rule whole: it appears
  * while the ledger holds live friction and stays while it is the selected tab. The other three are
  * PREFERENCE-gated and keep their snap-backs in WorkspaceMain.
  *
@@ -68,9 +68,10 @@ export function useWorkspaceTabGates(activeTab: AppTab): WorkspaceTabGates {
   const { tasksEnabled, isTaskMasterInstalled } = useTasksSettings();
   const browserUseEnabled = useBrowserUseEnabled();
   const { pendingCount } = useMemoryIntake();
-  // The dispatcher's plans ARE the Runner tab's list — the arcs' decks and the cards they hold — so
-  // this one count is the tab's pill and its gate at once.
-  const { count: runnerCount } = useDispatcherPlans();
+  // The dispatcher's plans ARE the Runner tab's list — the arcs' decks and the cards they hold. The
+  // pill counts the cards drawn; the gate also stays open for a hidden plan that is still walking,
+  // because the tab is the only road to its `Show`.
+  const { count: runnerCount, laneOpen } = useDispatcherPlans();
   // The live count off the Heal tab's own context — the one poll of the ledger, read here in the
   // sidebar, the main region and the palette as well as in the panel. Zero until a read has landed
   // AND while one is failing, so the pill and the gate can never disagree; an unreadable ledger is
@@ -84,7 +85,7 @@ export function useWorkspaceTabGates(activeTab: AppTab): WorkspaceTabGates {
     shouldShowShellTab: !hideShellTab,
     shouldShowMemoryTab: pendingCount > 0 || activeTab === 'memory',
     memoryPendingCount: pendingCount,
-    shouldShowRunnerTab: runnerCount > 0 || activeTab === 'runner',
+    shouldShowRunnerTab: laneOpen || activeTab === 'runner',
     runnerCount,
     shouldShowHealTab: healCount > 0 || activeTab === 'heal',
     healCount,
