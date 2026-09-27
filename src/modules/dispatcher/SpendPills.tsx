@@ -1,9 +1,10 @@
 import { ArrowDown, ArrowUp } from 'lucide-react';
+import type { TFunction } from 'i18next';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useCountUp } from '@/modules/dispatcher/hooks/useCountUp';
-import { humanizeTokens, moneyText, PAID_VENDOR } from '@/shared/spend';
+import { cachePercent, humanizeTokens, moneyText, PAID_VENDOR } from '@/shared/spend';
 import { Badge, LLMProviderLogo } from '@/shared/ui';
 import type { SpendParts } from '@/shared/types';
 
@@ -40,14 +41,19 @@ function CountingFigure({ value, words, countKey }: { value: number; words: Figu
   );
 }
 
-/** One pill: its mark, then its figure — counting when the caller gave a key, else simply stated. */
-function Pill({ half, mark, value, words, countKey, title }: {
+/**
+ * One pill: its mark, then its figure — counting when the caller gave a key, else simply stated —
+ * then its `suffix`, a qualifier of the figure that is STATED, never counted (the `in` pill's
+ * `(94% cache)`): it is decided off the target figures, so it is its final width from frame one.
+ */
+function Pill({ half, mark, value, words, countKey, title, suffix }: {
   half: PillHalf;
   mark: ReactNode;
   value: number;
   words: FigureWords;
   countKey?: string;
   title?: string;
+  suffix?: ReactNode;
 }) {
   return (
     <Badge as="span" tone="neutral" className="min-w-0 gap-1" title={title} data-spend-pill={half}>
@@ -57,14 +63,37 @@ function Pill({ half, mark, value, words, countKey, title }: {
           ? words(value)
           : <CountingFigure value={value} words={words} countKey={`${countKey}:${half}`} />}
       </span>
+      {suffix}
     </Badge>
   );
 }
 
 /**
+ * The `in` pill's cache share as its muted suffix and its exact title, or `null` where the record
+ * states no cache read — which draws no suffix, never a `0%` nobody measured (`cachePercent`).
+ *
+ * Muted by WEIGHT, not by ink: the neutral ink already sits at ~4.5:1 on its soft fill, so a
+ * lighter colour or an opacity would take the share below readable contrast.
+ */
+function cacheWords(t: TFunction, cacheRead: number | null, tokensIn: number): { suffix: ReactNode; title: string } | null {
+  const share = cachePercent(cacheRead, tokensIn);
+  if (share === null || cacheRead === null) return null;
+  return {
+    suffix: (
+      <span className="font-normal" data-spend-cache={share}>
+        {t('dispatcher.pill.cache', { pct: share })}
+      </span>
+    ),
+    title: t('dispatcher.pill.cacheTitle', { hit: humanizeTokens(cacheRead), n: humanizeTokens(tokensIn) }),
+  };
+}
+
+/**
  * A spend figure as a row of pills — the halves `spendParts` decided, each drawn only where it
  * exists: the paid dollars behind the vendor's mark, then the CLAUDE tokens, as `in` and `out` where
- * the record's split is whole and as one `tokens` total where it is not. A DOLLARS-OR-TOKENS record
+ * the record's split is whole and as one `tokens` total where it is not, the `in` pill carrying the
+ * share of those tokens served from cache (`2.6M in (94% cache)`, `cachePercent`) wherever the record
+ * states it and nothing where it does not — never a `0%` nobody measured. A DOLLARS-OR-TOKENS record
  * therefore draws one kind of pill and never a `$0.00` (`src/shared/spend.ts`), and a record with
  * neither half draws nothing at all.
  *
@@ -93,6 +122,8 @@ export function SpendPills({ parts, countKey }: { parts: SpendParts; countKey?: 
   // A count's frame in its target's own shape (`humanizeTokens`' `scale`), so no frame outgrows the
   // pill `CountingFigure` holds at the landing's width.
   const count = (value: number, target: number) => humanizeTokens(Math.round(value), target);
+  // Off the TARGET figures, like the split itself: the share is stated, never counted.
+  const cache = tokens?.kind === 'split' ? cacheWords(t, tokens.cacheRead, tokens.in) : null;
 
   return (
     <span data-spend-pills className="flex min-w-0 flex-wrap items-center gap-1 font-sans">
@@ -114,6 +145,8 @@ export function SpendPills({ parts, countKey }: { parts: SpendParts; countKey?: 
             value={tokens.in}
             words={(value) => t('dispatcher.pill.in', { n: count(value, tokens.in) })}
             countKey={countKey}
+            suffix={cache?.suffix}
+            title={cache?.title}
           />
           <Pill
             half="out"

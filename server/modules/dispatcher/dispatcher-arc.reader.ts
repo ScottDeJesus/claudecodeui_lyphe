@@ -1,6 +1,6 @@
 import type { DispatcherArc, DispatcherArcStatus } from '@/shared/types.js';
 
-import { countSince, each, field, flagSince, isCount, isRecord, isText, isTextOrNull, modelSince, names, need, oneOf, textSince } from './dispatcher-state.transport.js';
+import { countOrNullSince, countSince, each, field, flagSince, isCount, isRecord, isText, isTextOrNull, modelSince, names, need, oneOf, textSince } from './dispatcher-state.transport.js';
 import { plannerSince } from './dispatcher-planner.reader.js';
 
 /**
@@ -65,6 +65,7 @@ export function arcOf(raw: unknown): DispatcherArc {
     tokens: countSince(field(arc, 'tokens'), 'arc.tokens'),
     tokens_in: countSince(field(arc, 'tokens_in'), 'arc.tokens_in'),
     tokens_out: countSince(field(arc, 'tokens_out'), 'arc.tokens_out'),
+    tokens_cache_read: countOrNullSince(field(arc, 'tokens_cache_read'), 'arc.tokens_cache_read'),
   };
 }
 

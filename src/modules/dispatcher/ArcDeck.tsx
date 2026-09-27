@@ -129,7 +129,7 @@ export function DispatchArcDeck({
   // The arc's own books: the store carries them on the arc row so no head has to add up the cards
   // itself (INV-4299), and `spendParts` is the one decision every card draws a figure from — dollars
   // or tokens by who was used, and NO pill at all where the arc has neither half.
-  const spend = spendParts(arc.cost_usd, arc.tokens_in, arc.tokens_out, arc.tokens);
+  const spend = spendParts(arc.cost_usd, arc.tokens_in, arc.tokens_out, arc.tokens, arc.tokens_cache_read);
   // The hour a Schedule start armed, over the arc's stopped plans (`report_arcs.hour`) — the head's
   // clock, so a folded deck still says when it will start. The Cancel that clears it is in the bar.
   const armed = epochOf(arc.schedule);

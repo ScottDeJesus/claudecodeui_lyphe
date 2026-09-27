@@ -144,6 +144,19 @@ export function countSince(value: unknown, where: string): number {
   return value === undefined ? 0 : need(value, isCount, where);
 }
 
+/**
+ * A count-or-null a build OLDER than the field did not write, read as `null` — refused by name when
+ * the key IS there and is neither.
+ *
+ * `countSince`'s doctrine for a figure whose absence must stay absent: `tokens_cache_read` is `null`
+ * where the dispatcher cannot state it (a record written before the field, or a sum over one), and a
+ * build that never wrote the key cannot state it either. Reading either as `0` would draw a
+ * `0% cache` that nothing measured.
+ */
+export function countOrNullSince(value: unknown, where: string): number | null {
+  return value === undefined ? null : need(value, isCountOrNull, where);
+}
+
 /** A list of names — a plan's waits, a phase's `start_here`. */
 export function names(value: unknown, where: string): string[] {
   return each(value, where, (entry) => need(entry, isText, where));

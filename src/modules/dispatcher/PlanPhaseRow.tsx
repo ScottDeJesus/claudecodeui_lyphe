@@ -42,7 +42,7 @@ export function PlanPhaseRow({ phase, open = false }: { phase: DispatcherPhase; 
               a phase the vendor walked has no token pills and one on the subscription no `$` pill. A
               phase that has not walked yet has neither and draws no pill at all, never a `$0.00`. The
               row wraps, so three pills at 390px take a second line rather than overrunning the fold. */}
-          <SpendPills parts={spendParts(phase.cost_usd, phase.tokens_in, phase.tokens_out, phase.tokens)} />
+          <SpendPills parts={spendParts(phase.cost_usd, phase.tokens_in, phase.tokens_out, phase.tokens, phase.tokens_cache_read)} />
           <span className="min-w-0 break-all font-mono text-xs text-muted-foreground">{phase.assignee}</span>
         </span>
       </CollapsibleTrigger>
@@ -62,7 +62,7 @@ export function PlanPhaseRow({ phase, open = false }: { phase: DispatcherPhase; 
                 <span className="min-w-0 whitespace-pre-wrap break-words">
                   {[clockOf(stage.launched_at), stage.name, stage.soul ?? '', stage.verdict ?? ''].filter(Boolean).join('  ')}
                 </span>
-                <SpendPills parts={spendParts(stage.cost_usd, stage.tokens_in, stage.tokens_out, stage.tokens)} />
+                <SpendPills parts={spendParts(stage.cost_usd, stage.tokens_in, stage.tokens_out, stage.tokens, stage.tokens_cache_read)} />
               </li>
             ))}
           </ul>

@@ -2605,7 +2605,11 @@ handles `data-spend-pills` and `data-spend-pill="paid|in|out|tokens"`) over ONE 
 (`src/shared/spend.ts`, INV-4299): A SPEND FIGURE IS DOLLARS **OR** TOKENS, BY WHO WAS USED. The paid pill is the DeepSeek
 mark and `$4.47` (`moneyText`), titled `$4.47 billed by DeepSeek`; the token half is `20.6M in` (↓) and `206k out` (↑) where
 the record's split IS its total, else one `⛁ 216M tokens` pill; a half that does not exist draws no pill (never `$0.00`),
-and a record with neither draws nothing. The card's total (and the arc deck's books) COUNT: `useCountUp` runs 1400 ms on the
+and a record with neither draws nothing. The `in` pill ends in its CACHE SHARE, `3.9M in (97% cache)` (`cachePercent`: cache
+read / `tokens_in`, INV-4299), a stated suffix in the pill's own ink at normal weight (`data-spend-cache=<N>`) titled with the
+two figures (`dispatcher.pill.cacheTitle`); a figure whose `tokens_cache_read` is `null` — a record from before the field, or a
+total over one — draws no suffix, never `0%`. why weight and not ink: the neutral ink already sits at ~4.5:1 on its fill.
+Proof: `.verify/probe-cache-share.mjs`. The card's total (and the arc deck's books) COUNT: `useCountUp` runs 1400 ms on the
 entry curve, from 0 at a key's first sight in the page session and from the last drawn value on each change, under `prefers-reduced-motion: reduce`
 it answers the target at once. A phase's and a stage's pills are stated, not counted. Copy: `dispatcher.pill.*`.
 
@@ -6863,7 +6867,7 @@ to the star count and the update check, and each hook takes its own "we don't kn
 left to the network, GitHub's 60 anonymous requests an hour run out mid-run and the gate
 measures GitHub's quota rather than this app. They match by exact endpoint: a **third** GitHub
 endpoint, or any new third-party origin, goes to the network and reddens the gate — how a new
-outbound call is meant to announce itself, not a fault to route around. `.verify/lib/color.mjs`
+outbound call is meant to announce itself, not a fault to route around. A probe that launches its own Chromium rather than `openConsole` and counts console errors answers those same two endpoints itself, pinned to the same two patterns (`.verify/probe-cache-share.mjs`): unstubbed, its gate fails the hour GitHub's quota is spent. `.verify/lib/color.mjs`
 reads colour as Chromium reports it (`rgb()`, plus the `color(srgb …)` form every color-mix'd
 Tailwind colour now resolves to) and measures WCAG contrast, returning `unmeasurable` rather
 than a number for anything translucent.
@@ -8711,7 +8715,7 @@ key for key. The emitted document is the source of the shape.
   `store_arcs.arc_word`: `empty`, `judged`, `complete`, `live`, then its plans' own waiting word —
   `scheduled`, `paused`, `queued` — else `designing`), `plans` (NAMES, in the
   arc file's order) and the arc's own `created_at`, `completed_at`, `cost_usd`, `tokens`, `tokens_in`,
-  `tokens_out`, PLUS the three readings an arc's own controls are drawn by (`report_arcs.walking` /
+  `tokens_out`, `tokens_cache_read`, PLUS the three readings an arc's own controls are drawn by (`report_arcs.walking` /
   `.stopped` / `.hour`, MAN-5220): `walking: boolean` (does the arc have a `live` plan — walking, or
   approved and unpaused and waiting its turn — what its Pause is drawn for), `stopped: boolean` (a plan
   reading `paused`, `queued` or `scheduled`: approved, paused and unfinished — what its Start and its
@@ -8721,6 +8725,14 @@ key for key. The emitted document is the source of the shape.
   verb reach the same plans. An arc still has no phases and no events; a plan carries no `plans`.
   `walking` and `stopped` are read through `flagSince` and `schedule` through `textSince`, so an older
   frame reads false / null and the header simply offers no arc verbs rather than failing to load.
+- `tokens_cache_read: number | null` rides `DispatcherStage`, `DispatcherPhase`, `DispatcherPlan` and
+  `DispatcherArc` beside `tokens_in`: the part of it SERVED from the prompt cache (`costs.claude_cache_read`,
+  summed by `report.usage_sum`), the numerator of the `in` pill's `(97% cache)` (MAN-1557, INV-4299). NULL
+  MEANS UNKNOWN, NEVER 0: a Claude record written before the field reads null (no backfill), and a phase,
+  plan or arc is null when any record under it is. All four readers read it through `countOrNullSince`
+  (`dispatcher-state.transport.ts`), `countSince`'s doctrine for a figure whose absence must stay absent: an
+  absent key (a build older than the field) and a `null` both read `null`, a count reads the count, and
+  anything else is refused BY NAME — so no reader can turn a silence into a drawn `0%`.
 - `DispatcherPlanner` is ONE planner outing — the `planners` row `report_planners._entry` prints, and
   the store's own words for it: `target` (the work it is FOR) and `plan` (the name it LANDS in, the two
   differing for a judgment, whose `target` is the arc and whose `plan` is `<arc>--judgment`), `soul` (`eupalinos`, `odysseus`), `verb` (the closed four: `design`, `judge`, `tell`, `cut`), `state`
@@ -8748,7 +8760,8 @@ key for key. The emitted document is the source of the shape.
   DISPATCHER block (`DISPATCHER, CLIENT ONLY`) and never inside it: the frame's `plans`, `arcs`, `planners`,
   `route`, `daemon`, `offpeak_at` without `home`, `generated_at` or `at` — what the client's feed retains on
   `dispatcher:all`.
-- `SpendParts` (`spendParts`' output in `src/shared/spend.ts`; `spendText` and `SpendPills` draw it, INV-4299) is client-only: it
+- `SpendParts` (`spendParts`' output in `src/shared/spend.ts`; `spendText` and `SpendPills` draw it, INV-4299; a split carries
+  `cacheRead`, the document's `tokens_cache_read` handed through, which `cachePercent` words) is client-only: it
   sits in its own SPEND block after the client-only picture's, never inside the DISPATCHER block, because that block must
   stay text-identical with the server's copy.
 - `LaneFlowNode` (`key`, `mark`, `tone`, `label`, `live`) and `LaneFlow` (`nodes`, `doneCount`, `ariaLabel`) are client-only, in their own FLOW block after the SPEND block: a lane card's progress track as its caller hands it to the frame that draws it (`StatusFlow`; `DeckFrame`, `DeckStrip`). A plan card's track is built by `PlanFace`, an arc deck's by `DispatchArcDeck`, one node per drawn plan and a node's `key` the plan's name (MAN-643 → "The flow").

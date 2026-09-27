@@ -39,9 +39,10 @@ import type { SpendParts } from '@/shared/types';
  * THE FIGURES ARE THE WALK'S OWN. `cost_usd` is PAID dollars by construction —
  * `hooks/plan_runner/costs.py:result_cost` returns 0 for a child on the Claude subscription — and
  * the tokens are the CLAUDE half of the child's usage, split into what it READ (input + cache read
- * + cache write) and what it wrote. A record written before the split shipped carries the total
- * alone, which reads as the total form (`⛁ n tok`, a `⛁ n tokens` pill) rather than as
- * `0 in · 0 out`; the split is omitted, the total never is.
+ * + cache write) and what it wrote; a card's `in` pill adds the share of that READ served from
+ * cache (`2.6M in (94% cache)`, {@link cachePercent}). A record written before the split shipped
+ * carries the total alone, which reads as the total form (`⛁ n tok`, a `⛁ n tokens` pill) rather
+ * than as `0 in · 0 out`; the split is omitted, the total never is.
  *
  * NOTHING HERE IS TRANSLATED-BY-HAND: the numbers are formatted here, the words come from the
  * caller's `t` (namespace `common`), so the strip and the tab say the same thing in one language.
@@ -114,12 +115,17 @@ export function moneyText(usd: number, scale: number = usd): string {
  * states 5% of it as if it were the sum (measured on the dispatcher board, 2026-09-24). Where the
  * three disagree the TOTAL speaks, in the form a record without a split already uses — the sum is
  * then never wrong, only less detailed. `costs.usage_line` keeps the identical rule.
+ *
+ * `cacheRead` is the part of `tokensIn` served from the prompt cache, and rides a split as its
+ * `cacheRead` — `null` when the record does not state it (the dispatcher's `null`, or a caller that
+ * passes none), which {@link cachePercent} draws as no share at all, never a `0%`.
  */
 export function spendParts(
   usd: number | null | undefined,
   tokensIn: number | null | undefined,
   tokensOut: number | null | undefined,
   total: number | null | undefined,
+  cacheRead?: number | null,
 ): SpendParts {
   const billed = count(usd);
   const read = count(tokensIn) ?? 0;
@@ -127,9 +133,28 @@ export function spendParts(
   const sum = count(total);
   const whole = sum === null || sum === 0 || read + written === sum;
   const tokens: SpendParts['tokens'] = read + written > 0 && whole
-    ? { kind: 'split', in: read, out: written }
+    ? { kind: 'split', in: read, out: written, cacheRead: count(cacheRead) }
     : sum !== null && sum > 0 ? { kind: 'total', total: sum } : null;
   return { paid: billed !== null && billed > 0 ? billed : null, tokens };
+}
+
+/**
+ * The share of `tokensIn` served from cache as a whole percent — the `in` pill's `(94% cache)` — or
+ * `null` when it cannot be stated.
+ *
+ * Byte-for-byte `hooks/plan_runner/costs.py`'s `cache_percent`, so `dispatcher status` and the card
+ * say the same number: `tokensIn` is input + cache read + cache write (the child's own `usage`
+ * block), and the numerator is the cache READ alone — a cache write was processed fresh. Rounded
+ * half UP (`Math.floor(x + 0.5)`; Python's `round` would go half-to-even), then held off the two
+ * ends it would lie at: `100` only when every token came from cache and `0` only when none did.
+ * `null` for an unknown numerator, an empty `in`, or a numerator larger than `in` (two figures that
+ * disagree state no share).
+ */
+export function cachePercent(cacheRead: number | null, tokensIn: number): number | null {
+  if (cacheRead === null || tokensIn <= 0 || cacheRead < 0 || cacheRead > tokensIn) return null;
+  if (cacheRead === 0) return 0;
+  const share = Math.floor((100 * cacheRead) / tokensIn + 0.5);
+  return Math.max(cacheRead < tokensIn ? Math.min(share, 99) : share, 1);
 }
 
 /** The paid half as words, `$0.28 DeepSeek`, or `''` when {@link spendParts} found no bill. */

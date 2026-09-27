@@ -137,7 +137,7 @@ export function PlanCard({
             )}
             spend={(
               <SpendPills
-                parts={spendParts(plan.cost_usd, plan.tokens_in, plan.tokens_out, plan.tokens)}
+                parts={spendParts(plan.cost_usd, plan.tokens_in, plan.tokens_out, plan.tokens, plan.tokens_cache_read)}
                 countKey={`plan:${plan.name}`}
               />
             )}

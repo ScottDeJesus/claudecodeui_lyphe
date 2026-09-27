@@ -1,6 +1,6 @@
 import type { DispatcherEvent, DispatcherPhase, DispatcherPlan, DispatcherStage } from '@/shared/types.js';
 
-import { each, countSince, field, flagSince, isCount, isCountOrNull, isFlag, isRecord, isText, isTextOrNull, modelSince, names, need, oneOf, textSince } from './dispatcher-state.transport.js';
+import { each, countOrNullSince, countSince, field, flagSince, isCount, isCountOrNull, isFlag, isRecord, isText, isTextOrNull, modelSince, names, need, oneOf, textSince } from './dispatcher-state.transport.js';
 import { plannerSince } from './dispatcher-planner.reader.js';
 
 /**
@@ -70,10 +70,12 @@ function stageOf(raw: unknown): DispatcherStage {
     cost_usd: need(field(stage, 'cost_usd'), isCount, 'stage.cost_usd'),
     // The stage's tokens, read at the dispatcher's own report time off the launch's `result.json`
     // (`report._usage_of` — the store holds no token column and is not getting one). Absent from a
-    // build older than the fields, which is what `countSince` is for.
+    // build older than the fields, which is what `countSince` is for. `tokens_cache_read` is `null`
+    // where nothing states it — a record from before the field, or a build older than it.
     tokens: countSince(field(stage, 'tokens'), 'stage.tokens'),
     tokens_in: countSince(field(stage, 'tokens_in'), 'stage.tokens_in'),
     tokens_out: countSince(field(stage, 'tokens_out'), 'stage.tokens_out'),
+    tokens_cache_read: countOrNullSince(field(stage, 'tokens_cache_read'), 'stage.tokens_cache_read'),
   };
 }
 
@@ -99,6 +101,7 @@ function phaseOf(raw: unknown): DispatcherPhase {
     tokens: countSince(field(phase, 'tokens'), 'phase.tokens'),
     tokens_in: countSince(field(phase, 'tokens_in'), 'phase.tokens_in'),
     tokens_out: countSince(field(phase, 'tokens_out'), 'phase.tokens_out'),
+    tokens_cache_read: countOrNullSince(field(phase, 'tokens_cache_read'), 'phase.tokens_cache_read'),
     start_here: names(field(phase, 'start_here'), 'phase.start_here'),
     stages: each(field(phase, 'stages'), 'phase.stages', stageOf),
   };
@@ -165,6 +168,7 @@ export function planOf(raw: unknown): DocumentPlan {
     tokens: countSince(field(plan, 'tokens'), 'plan.tokens'),
     tokens_in: countSince(field(plan, 'tokens_in'), 'plan.tokens_in'),
     tokens_out: countSince(field(plan, 'tokens_out'), 'plan.tokens_out'),
+    tokens_cache_read: countOrNullSince(field(plan, 'tokens_cache_read'), 'plan.tokens_cache_read'),
     rounds: need(field(plan, 'rounds'), isCount, 'plan.rounds'),
     phases: each(field(plan, 'phases'), 'plan.phases', phaseOf),
     events: each(field(plan, 'events'), 'plan.events', eventOf),

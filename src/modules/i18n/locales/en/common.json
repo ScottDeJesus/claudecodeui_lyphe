@@ -821,6 +821,8 @@
       "paid": "${{usd}}",
       "paidTitle": "${{usd}} billed by {{vendor}}",
       "in": "{{n}} in",
+      "cache": "({{pct}}% cache)",
+      "cacheTitle": "{{hit}} of the {{n}} tokens in were read from the prompt cache",
       "out": "{{n}} out",
       "tokens": "{{n}} tokens"
     },
