@@ -3782,6 +3782,11 @@ the "show N more" button raises the limit by four times that. Separately,
 included", because the backend truncates long timelines for transport; that line appears
 only once nothing is left to expand locally.
 
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/session-agents.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/session-subagent-runs.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/usePinnedSubagentRows.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/subagents/subagentSource.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/subagents/SubagentWidgetBody.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/utils/soulLaunchAnchors.ts
+
+## MAN-6221 — Subagents — Live nesting. A running subagent's rows arrive stamped with `parentToolUseId` — Claude's
+section: 06-tool-view/012 Subagents/001 Live nesting. A running subagent's rows arrive stamped with `parentToolUseId` — Claude's
+
 **Live nesting.** A running subagent's rows arrive stamped with `parentToolUseId` — Claude's
 `parent_tool_use_id`, preserved by `transformMessage` in `claude-runtime.provider.js`, which
 maps the SDK's other snake-case field the same way: `tool_use_result` becomes `toolUseResult`,
@@ -3817,6 +3822,11 @@ alone carries no time.
 | any row carrying `usage` + `usageMessageId` | The container's live token reading: `contextTokens` from the newest row, one request per distinct id. Never the reply count — a live row's usage is the snapshot taken when the row was cut, a few tokens into the reply (measured: 69 live against 3,298 on the transcript for one run) |
 | anything else | Nothing |
 
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/session-agents.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/session-subagent-runs.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/usePinnedSubagentRows.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/subagents/subagentSource.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/subagents/SubagentWidgetBody.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/utils/soulLaunchAnchors.ts
+
+## MAN-6222 — Subagents — What an agent has spent.
+section: 06-tool-view/012 Subagents/002 What an agent has spent.
+
 **What an agent has spent.** Every assistant row the Claude provider normalizes carries `usage`
 (`{ contextTokens, outputTokens }`, reduced from the Anthropic payload by `readClaudeMessageUsage`
 in `claude-sessions.provider.ts`) and the API message id as `usageMessageId`. `contextTokens` is
@@ -3842,6 +3852,11 @@ failure; on the live path the fold applies only to the `Agent` container itself,
 resumed agent notifies under the `SendMessage` call that resumed it. `readSubagentSummary` carries it and `describeSubagentUsage`
 prints it (`36K tokens · 3.3K out`; a live reading has no `out`), on the pinned row's second
 line and the agent card's header.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/session-agents.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/session-subagent-runs.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/usePinnedSubagentRows.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/subagents/subagentSource.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/subagents/SubagentWidgetBody.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/utils/soulLaunchAnchors.ts
+
+## MAN-6223 — Subagents — A chat's pinned rows come from the whole history.
+section: 06-tool-view/012 Subagents/003 A chat's pinned rows come from the whole history.
 
 **A chat's pinned rows come from the whole history.** They are drawn in the strip above the chat box
 whenever the desktop chat gutters are NOT showing, and in the chat gutter's Subagents widget
@@ -3869,6 +3884,11 @@ The store holds it per slot (`getAgents`); `useChatSessionState` hands the strip
 containers plus any listed agent the loaded rows do not hold, projecting those together with the
 live rows that concern agents (their own streamed rows and finish rows) so they fold live exactly
 like a loaded container.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/session-agents.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/session-subagent-runs.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/usePinnedSubagentRows.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/subagents/subagentSource.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/subagents/SubagentWidgetBody.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/utils/soulLaunchAnchors.ts
+
+## MAN-6224 — Subagents — A pin is not always an `Agent` tool call.
+section: 06-tool-view/012 Subagents/004 A pin is not always an `Agent` tool call.
 
 **A pin is not always an `Agent` tool call.** The pinned rows hold TWO KINDS OF ROW, sorted into one list
 — running first by oldest launch, then finished by newest finish — because the reader is asking it
@@ -3900,6 +3920,11 @@ and the reader's act is the same either way. The list is read through a module-s
 so every copy of the rows — the strip and the gutter widget alike, whichever has the claim above —
 drops a dismissed row in the same frame; a `storage` listener folds in another tab's dismissal too.
 
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/session-agents.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/session-subagent-runs.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/usePinnedSubagentRows.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/subagents/subagentSource.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/subagents/SubagentWidgetBody.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/utils/soulLaunchAnchors.ts
+
+## MAN-6225 — Subagents — Clear completed is the widget's alone (`subagents/SubagentWidgetClearCompleted.tsx`), and it is worn
+section: 06-tool-view/012 Subagents/005 Clear completed is the widget's alone (`subagents/SubagentWidgetClearCompleted.tsx`), and it is worn
+
 **Clear completed** is the widget's alone (`subagents/SubagentWidgetClearCompleted.tsx`), and it is worn
 in the widget's HEADER rather than above its list: it acts on the list rather than on a row, so it
 belongs where the list's title is, and it gets there through the frame's one generic slot —
@@ -3920,6 +3945,11 @@ published, and both readers drop a cleared row in the same frame. It dismisses e
 ONE storage write and ONE publish for the whole list, where dismissing eight rows one at a time would
 repaint every copy of them eight times. The strip keeps only the per-row X — it holds a window of
 rows and has no room for chrome, and the widget is where a reader goes to tidy up.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/session-agents.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/session-subagent-runs.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/usePinnedSubagentRows.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/subagents/subagentSource.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/subagents/SubagentWidgetBody.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/utils/soulLaunchAnchors.ts
+
+## MAN-6226 — Subagents — Click to read, live.
+section: 06-tool-view/012 Subagents/006 Click to read, live.
 
 **Click to read, live.** Both row components take `onOpen`/`openLabel`: the row's root is a
 keyboard-and-mouse button, its dismiss control calls `event.stopPropagation()` so a click on the X
@@ -3950,6 +3980,11 @@ at once would be a thousand tool renderers the moment the row opens. The entries
 drawing the panel uses: `tools/SubagentNote.tsx` for prose and reasoning, `ToolRenderer` in
 `mode="input"` for everything else.
 
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/session-agents.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/session-subagent-runs.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/usePinnedSubagentRows.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/subagents/subagentSource.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/subagents/SubagentWidgetBody.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/utils/soulLaunchAnchors.ts
+
+## MAN-6227 — Subagents — How history reads an agent's end.
+section: 06-tool-view/012 Subagents/007 How history reads an agent's end.
+
 **How history reads an agent's end.** From the agent's own transcript, last record first: Claude
 Code's interruption marker (`[Request interrupted by user…]`, a user record) means `stopped`; a
 synthetic API-error reply (`isApiErrorMessage`, a rate limit or an overload, which ends on
@@ -3959,6 +3994,11 @@ the file's last write is still running. A `<task-notification>` turn in the pare
 there is one, overrides all of these. A BACKGROUNDED agent's finish time is that last record's,
 when no notification gives one; a foreground agent's is its own `tool_result` row's stamp in the
 parent, which is the better source and the one used.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/session-agents.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/session-subagent-runs.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/usePinnedSubagentRows.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/subagents/subagentSource.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/subagents/SubagentWidgetBody.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/utils/soulLaunchAnchors.ts
+
+## MAN-6228 — Subagents — The same rule, one strip away.
+section: 06-tool-view/012 Subagents/008 The same rule, one strip away.
 
 **The same rule, one strip away.** The sidebar's chat rows carry a purple dot for a conversation
 with an agent still running — the mark the strip draws per agent, drawn per chat. It has to come
@@ -5156,6 +5196,14 @@ section: 08-rendered-shapes/002 The pieces
 | `shapes/useShapeCollapse.ts` | `useShapeCollapse` (fold state, key migration, export override, and `enter` — whether THIS mount may play its entrance) and `useShapeInteractive` (may a control be drawn at all) |
 | `shapes/markdownStreaming.ts` | `MarkdownStreamingContext`, in its own module to avoid an import cycle. Its one consumer is `CodeBlock` |
 | `shapes/remarkShapeGroups.ts` | The one remark plugin, three passes over the root's children: fence runs into `tabbed-code`, a title paragraph and the list or table under it into `lead-in`, headings and their bodies into `section` wrappers |
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/surface-signal.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/command-palette/context/PaletteOpsContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/markdown-preview/MermaidDiagram.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/constants.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/artifacts/shapes-elements-baseline.html, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/mountReact.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/shapes-fixture.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-32.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-33.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-34.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-markdown-cards.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-baseline.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-detect.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-fences.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-groups.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-inline.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-lineopen.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-lists.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-prose.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-tables.mjs
+
+## MAN-5898 — The pieces — `shapes/leadInContext.ts`
+section: 08-rendered-shapes/002 The pieces/001 `shapes/leadInContext.ts`
+
+| File | Role |
+| --- | --- |
 | `shapes/leadInContext.ts` | `LeadInTitle` (`{ title, hasLink }`) and `LeadInTitleContext` — the line above a block, travelling from `LeadIn`, which provides the paragraph's own rendered children AND whether they hold a link, to `ShapeFrame`, which shows them in place of its `title` prop, folds from its chevron alone when `hasLink` is true, and re-provides `null` around its own body so no nested frame can inherit the title |
 | `shapes/LeadIn.tsx` | `LeadIn` — the `lead-in` wrapper: asks `tableRung`/`listRung` whether the block below frames itself, hands the words down through `LeadInTitleContext` when it does, frames the list itself when it does not, and leaves a table that draws no frame exactly as it was |
 | `shapes/ShapeFrame.tsx` | `ShapeFrame` — the header bar, fold and markers every framed shape wears. `kind` is a closed `ShapeKind` union; its default icon and tone come from the file-local `SHAPE_KINDS` registry, overridable by the `tone`/`icon` props for the three kinds whose meaning only the caller knows. `title` is a `ReactNode` (a lead-in title is the author's own rendered paragraph), `prose` keeps `not-prose` off a frame that holds plain prose, `flush` drops the body's inset for a frame whose own content reaches its own edge, and the title span carries `data-shape-title` inside `ChipsSuppressedContext` while the body carries `data-shape-body`. Every header and body size is `em`, off the named scale `tailwind.config.js`'s `fontSize` declares (§"Header, type and motion"). A title holding a link folds from the chevron alone, the same answer `ShapeSection` gives a heading with a link in it |
@@ -5172,6 +5220,14 @@ section: 08-rendered-shapes/002 The pieces
 | `shapes/code/InlineCode.tsx` | Today's inline code span, or a colour swatch, keycaps or a file chip |
 | `shapes/MarkdownLink.tsx` | The `a` override. Asks `parseFileRef` under its loose link policy and forwards the `:line` |
 | `shapes/InlineMarks.tsx` | `FileChip`, `ColorSwatch`, `KeyCaps`, and `linkifyChildren`, the prose scan |
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/surface-signal.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/command-palette/context/PaletteOpsContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/markdown-preview/MermaidDiagram.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/constants.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/artifacts/shapes-elements-baseline.html, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/mountReact.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/shapes-fixture.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-32.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-33.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-34.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-markdown-cards.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-baseline.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-detect.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-fences.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-groups.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-inline.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-lineopen.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-lists.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-prose.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-tables.mjs
+
+## MAN-5899 — The pieces — `shapes/useFilePreview.ts`
+section: 08-rendered-shapes/002 The pieces/002 `shapes/useFilePreview.ts`
+
+| File | Role |
+| --- | --- |
 | `shapes/useFilePreview.ts` | `useFilePreview` — a file chip's preview: reads a picture's or a PDF's bytes through the workspace's `readFileReference` palette op, shared within the reply, and keeps its fold in the shapes' own fold memory. Nothing while loading, when unreadable or mistyped, in an export, where chips are suppressed, in a reply still streaming, or for a PDF unless `navigator.pdfViewerEnabled` is true and the pointer is fine (a phone gets none). An SVG is shown from a `data:` URL, never a `blob:` one a new tab would run in this origin |
 | `shapes/previewScope.ts` | `PreviewScopeContext` — the row a preview belongs to: `MessageComponent` provides a tool row's `toolId`, or a finished reply's trimmed text hashed with its turn anchor — the last tool call before it in its turn, else the prompt, read by `ChatMessagesPane` from the full message order (never an id, which changes as a reply finalises, and never the rows on screen, which "Show work" changes), `false` while a reply streams, and `null` — this mount alone — where neither exists |
 | `shapes/FilePreview.tsx` | `FilePreviewFrame` — the preview under a chip: the picture (a click opens `ImageLightbox`, square as well) or the PDF in an `iframe` at most 32rem or 60vh tall, in a square-cornered hairline frame with nothing drawn over it, so a screenshot's corners and edges all show. The chip beside it carries the open-in-Files button. A loaded preview fires `TRANSCRIPT_GREW_EVENT` (`transcript/transcriptGrew.ts`), which `useChatSessionState` answers by re-pinning a chat left at its bottom |
@@ -5192,6 +5248,14 @@ section: 08-rendered-shapes/002 The pieces
 | `shapes/ShapeSection.tsx` | A plugin `section` wrapper: the heading's words become its fold button. `SECTION_FLOW` restates Typography's positional margins |
 | `src/modules/markdown-preview/MermaidDiagram.tsx` | Draws a `mermaid` fence, shared with the PRD editor. Its failure line reads `common.shapes.diagramFailed` |
 | `src/modules/command-palette/context/PaletteOpsContext.tsx` | `openFileReference(path, line?)` — the door a chip and a file link open through. The rest of the chain is [docs/MANUAL.md (file-manager)](../MANUAL.md) |
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/surface-signal.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/command-palette/context/PaletteOpsContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/markdown-preview/MermaidDiagram.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/constants.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/artifacts/shapes-elements-baseline.html, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/mountReact.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/shapes-fixture.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-32.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-33.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-34.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-markdown-cards.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-baseline.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-detect.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-fences.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-groups.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-inline.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-lineopen.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-lists.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-prose.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-tables.mjs
+
+## MAN-5900 — The pieces — `server/modules/providers/list/claude/surface-signal.ts`
+section: 08-rendered-shapes/002 The pieces/003 `server/modules/providers/list/claude/surface-signal.ts`
+
+| File | Role |
+| --- | --- |
 | `server/modules/providers/list/claude/surface-signal.ts` | `SURFACE_PROMPT_APPEND` — `WIDGET_SIGNAL` then `MARKDOWN_SIGNAL`, the four conventions a model is told about |
 | `src/modules/i18n/locales/<locale>/chat.json` | Every shape string, under `shapes`, in all eleven locales |
 | `.verify/lib/mountReact.mjs` | Mounts a second React root over the running page from the dev server's own modules |
@@ -5869,6 +5933,11 @@ answers with the map the client HOLDS, never with the id a `universe_map` frame 
 announcement says a crawl landed somewhere and not that this client has it (`:83-95`). The announcement opens a
 fetch and the fetch landing opens the gate, so one request is ever in the air (`:96-131`).
 
+governs: /home/lyphe/.claude/claudecodeui_lyphe/scripts/universe-fps-probe.mjs, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useChatRealtimeHandlers.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/live-bus/context/LiveBusContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/universe/hooks/useUniverseMap.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts
+
+## MAN-5654 — The client — The activity reaches the client in two shapes
+section: 09-universe/010 The client/001 The activity reaches the client in two shapes
+
 **The activity reaches the client in two shapes** (`UniverseFeed.tsx:9-38`). The digest — how many edits and
 executions the last window held — is published onto `universe:*` at most once a second, because the bus retains
 one value per topic and compares every publish by `JSON.stringify`, so a lane carrying raw rows would stringify
@@ -5878,6 +5947,11 @@ the server's coalescer keeps. The raw rows go, unreduced, straight to the canvas
 function call, React never consulted (`hooks/useUniverseStream.ts:14-27,130-135`); the ring behind it is capped
 at 200 rows (`:31`). Both readers ask that same freshness rule, so the canvas and the digest can never disagree
 about whether a frame from a retired map is real (`utils/universeFrames.ts:3-23`).
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/scripts/universe-fps-probe.mjs, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useChatRealtimeHandlers.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/live-bus/context/LiveBusContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/universe/hooks/useUniverseMap.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts
+
+## MAN-5655 — The client — What a frame draws.
+section: 09-universe/010 The client/002 What a frame draws.
 
 **What a frame draws.** A star's radius is `2.4 + min(sqrt(max(lines, 1)), 120) / 9`
 (`utils/universeBirth.ts:57`) and its brightness is git recency — full inside `recencyBrightDays`, easing to
@@ -5898,6 +5972,11 @@ the graph carries an endpoint edge, and otherwise to its parent body, so an exec
 round trip (`:20-27`, `utils/universeComets.ts:9-15`). The starfield behind it is decoration, not a reading
 (`utils/universeStarfield.ts:1-12`).
 
+governs: /home/lyphe/.claude/claudecodeui_lyphe/scripts/universe-fps-probe.mjs, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useChatRealtimeHandlers.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/live-bus/context/LiveBusContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/universe/hooks/useUniverseMap.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts
+
+## MAN-5656 — The client — The frame is drawn on five layers, and not every one every time.
+section: 09-universe/010 The client/003 The frame is drawn on five layers, and not every one every time.
+
 **The frame is drawn on five layers, and not every one every time.** `UniverseCanvas.tsx` renders `sky`,
 `stars`, `gl`, `live` and `input` — the layer the pointer reads, carrying
 the pre-stack className and aria-label unchanged (`Canvas:43-78,540-568`). `utils/universeLayers.ts` owns the
@@ -5910,6 +5989,11 @@ header: a row keeps the loop at sixty for the live layer's sake, never as licenc
 which is this cadence's to bound (`:15-19`). A star's glow, core, flare halo/ring and doppler swing are pure
 functions of the node alone in `utils/universeStarGeometry.ts`, with no `ctx` and no frame, so the 2D star
 layer and the GPU layer below read the same shape and cannot drift.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/scripts/universe-fps-probe.mjs, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useChatRealtimeHandlers.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/live-bus/context/LiveBusContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/universe/hooks/useUniverseMap.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts
+
+## MAN-5657 — The client — The `gl` layer draws the stars when the `renderer` tweak reads `webgl` and this page has WebGL to
+section: 09-universe/010 The client/004 The `gl` layer draws the stars when the `renderer` tweak reads `webgl` and this page has WebGL to
 
 **The `gl` layer draws the stars when the `renderer` tweak reads `webgl` and this page has WebGL to give
 it.** `utils/universeStarsGL.ts`'s `createStarsGL` links one program over the `gl` canvas and answers `null`
@@ -5927,6 +6011,11 @@ of the gate in one layer and the other side in the other. The panel's `renderer`
 group beside the tweaks that change what the sky looks like, though it is the one entry there that instead
 changes only what the sky costs to draw (`UniverseTweaksPanel.tsx`'s `WORDS.renderer`).
 
+governs: /home/lyphe/.claude/claudecodeui_lyphe/scripts/universe-fps-probe.mjs, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useChatRealtimeHandlers.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/live-bus/context/LiveBusContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/universe/hooks/useUniverseMap.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts
+
+## MAN-5658 — The client — The loop has four answers
+section: 09-universe/010 The client/005 The loop has four answers
+
 **The loop has four answers** (`utils/universeLoop.ts:3-8`): 60 fps while the estate is alive, a slow tick once
 nothing has happened for 20 s, nothing at all while the tab is hidden, and a single frame for a visitor who
 asked for less motion (`:108,132-139,158-168`). All four answer *when* a frame is owed and none of them what
@@ -5938,6 +6027,11 @@ the frame now drawing was scheduled on, not the one queued next (`:71-74,114-119
 `utils/universePerf.ts` publishes alongside `stepMs` and `drawMs` on `window.__universePerf` every frame, and
 what `node scripts/universe-fps-probe.mjs <app-url> <token>` reads to print one line of cost per camera state.
 
+governs: /home/lyphe/.claude/claudecodeui_lyphe/scripts/universe-fps-probe.mjs, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useChatRealtimeHandlers.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/live-bus/context/LiveBusContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/universe/hooks/useUniverseMap.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts
+
+## MAN-5659 — The client — The chrome reads the map and that 1 Hz snapshot.
+section: 09-universe/010 The client/006 The chrome reads the map and that 1 Hz snapshot.
+
 **The chrome reads the map and that 1 Hz snapshot.** The strip holds six readings — repos, stars, lines, edges,
 when it was built, and the events-per-second rate — and no control, because a chip there would be the second
 control that drifts (`UniverseStatsStrip.tsx:6-18,96-101`). The feed shows the newest 50 rows, newest first; one
@@ -5947,11 +6041,21 @@ big, how alive, what it touches — and only from what the map carries (`Univers
 panel's four fetch states are a spinner, an empty state, an amber banner leaving the sky as it was, and the map
 itself (`UniversePanel.tsx:39-43,97-128`).
 
+governs: /home/lyphe/.claude/claudecodeui_lyphe/scripts/universe-fps-probe.mjs, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useChatRealtimeHandlers.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/live-bus/context/LiveBusContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/universe/hooks/useUniverseMap.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts
+
+## MAN-5660 — The client — The chat reducer returns early on these frames
+section: 09-universe/010 The client/007 The chat reducer returns early on these frames
+
 **The chat reducer returns early on these frames**
 (`src/modules/chat/hooks/useChatRealtimeHandlers.ts:181-195`). Three kinds — `soul_launch_state`, `universe_map` and `universe_activity` — carry no `sessionId`. The early return is a naming, not the fence: what
 actually keeps a frame out of the open transcript is that the append below admits a row only when it carries a
 run's numeric `seq` (`:253`), and no box-wide lane frame ever does. For this pair the second kind is still worth
 naming: it arrives up to ten times a second for as long as anything in the estate is busy.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/scripts/universe-fps-probe.mjs, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useChatRealtimeHandlers.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/live-bus/context/LiveBusContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/universe/hooks/useUniverseMap.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts
+
+## MAN-5661 — The client — The Tweaks dialog
+section: 09-universe/010 The client/008 The Tweaks dialog
 
 **The Tweaks dialog** (`UniverseTweaksPanel.tsx:9-27`) is the ONE control surface — a gear beside Recenter,
 opening a dialog with exactly one control per tunable, so no tunable has a second control anywhere to drift. A
@@ -5965,6 +6069,11 @@ key removed rather than filled (`hooks/useUniverseTweaks.ts:11-27,39-63`, `utils
 Those decorative passes were never deleted: each defaults to zero, and a zero or `false` skips its pass WHOLE,
 so the default frame pays for none of them (`utils/universeTweaks.ts:15-17,70-77`,
 `utils/universeLayout.ts:14-19`, `utils/universeRenderer.ts:53-57,130-131,166,171`).
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/scripts/universe-fps-probe.mjs, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useChatRealtimeHandlers.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/live-bus/context/LiveBusContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/universe/hooks/useUniverseMap.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts
+
+## MAN-5662 — The client — Each galaxy sits in a nebula of its own colour
+section: 09-universe/010 The client/009 Each galaxy sits in a nebula of its own colour
 
 **Each galaxy sits in a nebula of its own colour** (`utils/universeNebula.ts`), the first thing the star layer
 draws inside the world transform, so it is under every edge, glow and star. The haze is the repo's own SHAPE,
@@ -6008,12 +6117,22 @@ Its fields are `fps/stepMs/drawMs/otherMs` per camera state, `other` being the f
 passes the instrument times (`frameMs − stepMs − drawMs`): at fit the baseline was paying 26.8 ms of layout a
 frame it did not need, and at folder 419.2 ms the instrument attributes to neither pass.
 
+governs: /home/lyphe/.claude/claudecodeui_lyphe/scripts/universe-fps-probe.mjs, /home/lyphe/.claude/claudecodeui_lyphe/scripts/universe-token.mjs
+
+## MAN-5507 — What a frame costs — The simulation is bounded by its cadence.
+section: 09-universe/011 What a frame costs/001 The simulation is bounded by its cadence.
+
 **The simulation is bounded by its cadence.** At the floor `relax` runs one frame in `RELAX_EVERY`, and every
 frame while the sky is hot — settling, a drag, a gravity change; while the sky is coarse the call is skipped
 whole, never handed a zero that would read to `advanceTemperature` as a settled sky and end the relaxation for
 good. `applyGravity` returns the moment the tweak already matches `graph.gv`, so a page that never touches the
 gravity control walks the links once, at birth (`utils/universeForces.ts`,
 `utils/universeGraph.ts:234,288-297`).
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/scripts/universe-fps-probe.mjs, /home/lyphe/.claude/claudecodeui_lyphe/scripts/universe-token.mjs
+
+## MAN-5508 — What a frame costs — Every subtree is given the room it needs, and the sources stand outside the repos.
+section: 09-universe/011 What a frame costs/002 Every subtree is given the room it needs, and the sources stand outside the repos.
 
 **Every subtree is given the room it needs, and the sources stand outside the repos.** The export placed
 children on a ring that shrank by 0.55 per depth whatever hung beneath them, and on the merged map sibling
@@ -6042,6 +6161,11 @@ and 3-4 ms at folder zoom 1.8. The
 settled speed floor under the default orbit rises with the sky's size (2.6 at 1,670 units to 3.5-4.0 at 9,200) — the ellipse
 breathing against the spring rests, bounded by the relax cadence as before (`universeForces.ts` header).
 
+governs: /home/lyphe/.claude/claudecodeui_lyphe/scripts/universe-fps-probe.mjs, /home/lyphe/.claude/claudecodeui_lyphe/scripts/universe-token.mjs
+
+## MAN-5509 — What a frame costs — Distance is a tweak, applied as one rigid scale.
+section: 09-universe/011 What a frame costs/003 Distance is a tweak, applied as one rigid scale.
+
 **Distance is a tweak, applied as one rigid scale.** The `distance` slider (0.3-1.5, default 1) multiplies every
 resting and drawn position, spring rest, held ring, room measure and cloud extent about the sun in one call
 (`applyDistance`, `universeGraph.ts`), so the sky closes in on Claude at any zoom — including the fitted view,
@@ -6051,11 +6175,21 @@ so closer means a little more crowded, and at 0.3 the dense folders merge into k
 "star size is not distance". The number input commits on Enter or blur, so a change is one snap and the camera
 eases to the new fit. Operator's word, 2026-09-17.
 
+governs: /home/lyphe/.claude/claudecodeui_lyphe/scripts/universe-fps-probe.mjs, /home/lyphe/.claude/claudecodeui_lyphe/scripts/universe-token.mjs
+
+## MAN-5510 — What a frame costs — Only code is drawn by default.
+section: 09-universe/011 What a frame costs/004 Only code is drawn by default.
+
 **Only code is drawn by default.** The `files` tweak (`code`) keeps every star but the `source` kind — config,
 docs, data, assets, 27% of the map — out of the active list, the hit test, the clouds' bake, the edges and the
 flares (`hiddenKind`, `universeTweaks.ts`; `graph.codeOnly`, written by the regimes). The map is unchanged: the
 stats strip still counts them, and switching the tweak to `all` draws them on the next frame and rebakes the
 clouds. Operator's word, 2026-09-17.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/scripts/universe-fps-probe.mjs, /home/lyphe/.claude/claudecodeui_lyphe/scripts/universe-token.mjs
+
+## MAN-5511 — What a frame costs — The viewport has one home, and the camera is an argument.
+section: 09-universe/011 What a frame costs/005 The viewport has one home, and the camera is an argument.
 
 **The viewport has one home, and the camera is an argument.** `utils/universeView.ts` owns the `Viewport`
 type, `SCREEN_PAD` and `viewportBounds`; `stepLayout(graph, now, tweaks, view)` and
@@ -6066,6 +6200,11 @@ simulation and the drawing, and `act`, the list every display pass walks. A star
 frame's* display and not out of the model — the relaxation is whole-graph by physics, so an unwatched star
 keeps moving, and the frame its parent is marked again it is drawn where the physics put it.
 
+governs: /home/lyphe/.claude/claudecodeui_lyphe/scripts/universe-fps-probe.mjs, /home/lyphe/.claude/claudecodeui_lyphe/scripts/universe-token.mjs
+
+## MAN-5512 — What a frame costs — A pass that redraws at sixty makes everything under it redraw too.
+section: 09-universe/011 What a frame costs/006 A pass that redraws at sixty makes everything under it redraw too.
+
 **A pass that redraws at sixty makes everything under it redraw too.** That is why the sky is five canvases
 and not one — React renders the five elements in JSX, and no file under `utils/` creates one — and why each
 layer got a cadence: `utils/universeRepaint.ts` decides what a frame owes, the sky on a movement or every
@@ -6074,10 +6213,20 @@ and the live layer every frame, because the comets, the flares and the labels ar
 still, a settled sky repaints its star layer every second or third frame instead of sixty times a second, and
 the picture is the same one.
 
+governs: /home/lyphe/.claude/claudecodeui_lyphe/scripts/universe-fps-probe.mjs, /home/lyphe/.claude/claudecodeui_lyphe/scripts/universe-token.mjs
+
+## MAN-5513 — What a frame costs — What a star looks like has one home.
+section: 09-universe/011 What a frame costs/007 What a star looks like has one home.
+
 **What a star looks like has one home.** `utils/universeStarGeometry.ts` holds the glow, the core, the flare's
 halo and the doppler swing as pure functions — no `ctx`, no frame — so the 2D passes and the layer below read
 the same shape and cannot drift; the flare itself is drawn once, on the live layer, because a flare is a thing
 that moves (`utils/universeStarlight.ts`'s `drawFlares`).
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/scripts/universe-fps-probe.mjs, /home/lyphe/.claude/claudecodeui_lyphe/scripts/universe-token.mjs
+
+## MAN-5514 — What a frame costs — The stars themselves go to the GPU when the page has one.
+section: 09-universe/011 What a frame costs/008 The stars themselves go to the GPU when the page has one.
 
 **The stars themselves go to the GPU when the page has one.** `utils/universeStarsGL.ts` packs the small
 lights into one interleaved buffer, uploads it once and reads it with two draws, the glow additive and the
@@ -6089,6 +6238,11 @@ reads the tweak; the same decision is what `perfSample.renderer` reports, which 
 `renderer=webgl` is a fact about the page it ran on and not about the panel's setting. The control is one
 `Select` beside the other Look tweaks, defaulting to `webgl` (`utils/universeTweaks.ts:76,97`).
 
+governs: /home/lyphe/.claude/claudecodeui_lyphe/scripts/universe-fps-probe.mjs, /home/lyphe/.claude/claudecodeui_lyphe/scripts/universe-token.mjs
+
+## MAN-5515 — What a frame costs — Before and after
+section: 09-universe/011 What a frame costs/009 Before and after
+
 **Before and after**, one line per run, quoted from the proof file beside it:
 
 | Run | The line |
@@ -6097,6 +6251,11 @@ reads the tweak; the same decision is what `perfSample.renderer` reports, which 
 | Phase 3, regimes and the cadence — `perf-phase3.txt` | `fit=28.9/0.4/4.2/30.0 package=5.4/8.8/156.5/18.8 folder=1.7/6.0/12.4/574.9 folder+dof=1.7/6.7/14.1/564.1 renderer=canvas painted=2244` |
 | Phase 4, the layer stack — `perf-phase4.txt` | `fit=49.4/0.4/6.7/13.1 package=15.5/6.9/49.5/8.1 folder=3.3/5.7/7.6/292.6 folder+dof=3.4/6.5/9.6/276.0 renderer=canvas painted=2105` |
 | Phase 5, the GPU star layer — `perf-final.txt` | `fit=48.6/0.7/6.9/13.0 package=16.5/8.8/6.9/44.8 folder=3.2/6.9/6.0/301.7 folder+dof=3.2/6.9/8.3/300.6 renderer=webgl painted=1450` |
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/scripts/universe-fps-probe.mjs, /home/lyphe/.claude/claudecodeui_lyphe/scripts/universe-token.mjs
+
+## MAN-5516 — What a frame costs — Re-measure it in one line
+section: 09-universe/011 What a frame costs/010 Re-measure it in one line
 
 **Re-measure it in one line**, with the app up on its dev port and a token from the same origin:
 
