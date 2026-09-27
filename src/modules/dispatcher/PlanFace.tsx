@@ -4,7 +4,8 @@ import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { PlanNow } from '@/modules/dispatcher/PlanNow';
-import { phaseWord, PlanPhaseRow } from '@/modules/dispatcher/PlanPhaseRow';
+import { phaseWord } from '@/modules/dispatcher/phaseWord';
+import { PlanPhaseRow } from '@/modules/dispatcher/PlanPhaseRow';
 import { StatusFlow } from '@/modules/dispatcher/StatusFlow';
 import { clockOf, epochOf, phaseProgress, planStatusTone, scheduleClock } from '@/modules/dispatcher/dispatcherState';
 import { useDispatcherPlans } from '@/modules/dispatcher/hooks/useDispatcherPlans';

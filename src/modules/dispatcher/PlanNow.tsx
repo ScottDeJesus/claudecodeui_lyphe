@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next';
 
-import { phaseWord } from '@/modules/dispatcher/PlanPhaseRow';
+import { phaseWord } from '@/modules/dispatcher/phaseWord';
 import { Badge } from '@/shared/ui';
 import type { DispatcherPhase, DispatcherPlan } from '@/shared/types';
 

@@ -11,11 +11,11 @@ import { Badge } from '@/shared/ui';
  * chat's is news about which ROW this is, never a verdict on the plan itself.
  *
  * It stands on its own here because it is drawn in two places: above a plan of no arc in the chat
- * gutter's Runner widget (`RunnerWidgetBody`) and on a plan inside a dispatch arc's deck
+ * gutter's Runner widget (`WidgetPager`'s page) and on a plan inside a dispatch arc's deck
  * (`DispatchArcDeck`). The memory gutter's own pin (`MemoryWidgetBody`, another module) is still a
  * separate copy, below design doctrine §2's promote-on-the-third rule.
  *
- * Used by `RunnerWidgetBody` and `DispatchArcDeck`.
+ * Used by `WidgetPager` (runner-tab) and `DispatchArcDeck`.
  */
 export function SessionPin() {
   const { t } = useTranslation();

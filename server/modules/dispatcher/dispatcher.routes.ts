@@ -29,7 +29,7 @@ const PLAN_NAME = /^[a-z0-9][a-z0-9-]{0,99}$/;
  * `store.arc` accepts.
  *
  * A SEPARATE FENCE FROM THE PLAN'S (`PLAN_NAME`), and the same fence in kind: this route answers
- * `<name> | <name>.arc`, that one the bare name alone, and neither accepts the other's adornment.
+ * `<name>` or `<name>.arc`, that one the bare name alone and refuses the `.arc` ending.
  */
 const ARC_NAME = /^[a-z0-9][a-z0-9-]{0,99}(\.arc)?$/;
 

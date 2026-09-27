@@ -64,7 +64,12 @@ const FLOW_MARK: Partial<Record<DispatcherPlanStatus, string>> = { complete: '�
  * ONE dispatch arc, drawn as the deck every arc on this screen is drawn as, in the lane card's ONE
  * anatomy (`LaneCardHead`, `ActionBar`): the arc's head on top, its action bar directly under it, the
  * arc's flow of plans under that, and beneath it the plans of the arc in the arc's own walk order
- * (`arc.plans`) — a wall of cards in the tab, one card per view in the gutter (`layout`, `DeckFrame`).
+ * (`arc.plans`) — ONE CARD PER VIEW in a horizontal strip, in either home (`DeckFrame` → `DeckStrip`).
+ *
+ * AN ARC'S PLANS ARE SWIPED, NOT WALLED (operator, 2026-09-26: "Can you please bring back the
+ * swipable plan cards if it's under an arc, a new plan changed it and I think it's poor design").
+ * The tab and the chat gutter draw the arc the same way, so a reader who has paged one has paged the
+ * other; only the plans no arc holds keep the tab's wall (`RunnerPanel`).
  *
  * THE FLOW IS ONE NODE A PLAN, in the cards' order: `✓` complete, `▶︎` live (and breathing), `⏸︎`
  * paused, `◷` scheduled, else the plan's place in the arc (`FLOW_MARK`); toned as the plan's own badge
@@ -83,19 +88,19 @@ const FLOW_MARK: Partial<Record<DispatcherPlanStatus, string>> = { complete: '�
  *
  * THE DECK IS THE OPERATOR'S OWN ARC CARD (operator, 2026-09-25: "we have an arc already, layouts
  * should already be there" — "please tell him to do it like the other plans"). The chrome, the fold,
- * the grid, the strip and the jump are `DeckFrame`'s, and nothing here invents a layout of its own:
- * an arc of plans is one shape, laid out as its home asks. What is the dispatcher's own, and what this file adds, is its
+ * the flow and the strip are `DeckFrame`'s, and nothing here invents a layout of its own: an arc of
+ * plans is one shape, in either home. What is the dispatcher's own, and what this file adds, is its
  * data (the store's status words, the arc's books) and its cards (`PlanCard`, whole: word, phases,
  * bar and Hide, exactly as a plan of no arc has them).
  *
  * A FOCUSED CARD IS THE PLAN WHOSE TURN IT IS (`deckFocusIndex`): the first plan of the arc that has
- * not finished, or the last once all of them have. The gutter's strip opens on it and returns to it
- * when the arc moves; the tab's grid shows every card at once and needs no focus.
+ * not finished, or the last once all of them have. The strip opens on it in either home, and returns
+ * to it when the arc moves — so the tab opens an arc on what is walking rather than on card one.
  *
  * THE COUNT IS WHAT THE CARD HOLDS, NOT WHAT THE DOCUMENT LISTED. `arc.plans` is the arc file's
  * names, and a plan the operator has HIDDEN (`hiddenPlans.ts`) is gone from the strip while still
  * being named there: a head reading "13/14" over thirteen cards would be the head lying about the deck
- * under it. So `done/total`, the flow and the strip's `Plan N of M` all count `plans` — the group's
+ * under it. So `done/total`, the flow and the strip's `Card N of M` all count `plans` — the group's
  * drawn members, exactly the cards the deck drew.
  *
  * `data-dispatch-arc` and `data-arc-name` are the root's handles (with `data-arc-status` and
@@ -107,14 +112,11 @@ const FLOW_MARK: Partial<Record<DispatcherPlanStatus, string>> = { complete: '�
  */
 export function DispatchArcDeck({
   group,
-  layout,
   pinnedSessionId = null,
   carriedNames,
 }: {
   /** The arc and the plans of it, in the arc's own order — one `byArc` group. */
   group: DispatcherArcGroup;
-  /** `grid` in the Runner tab, `strip` in the chat gutter — picked by `DispatchArcDecks` from its `home`. */
-  layout: 'grid' | 'strip';
   /** The open chat's session id, in the gutter home; `null` in the tab, where there is no open chat and so no "mine". */
   pinnedSessionId?: string | null;
   /** The lane's unfiltered plan names, which is what a hide prunes the stored list against (`planHide`). */
@@ -179,7 +181,6 @@ export function DispatchArcDeck({
       foldKey={dispatchArcFoldKey(arc.name)}
       flow={{ nodes, doneCount, ariaLabel: t('dispatcher.flow.arc', { arc: title }) }}
       bodyTop={<DispatchArcControls arc={arc} />}
-      layout={layout}
       stripLabel={t('runner.arcStrip', { title })}
       focusIndex={deckFocusIndex(plans)}
       cardCount={plans.length}
@@ -190,7 +191,6 @@ export function DispatchArcDeck({
         return (
           <DeckItem
             key={plan.name}
-            itemKey={plan.name}
             data-dispatch-plan-row
             data-plan-name={plan.name}
             data-pinned={String(mine)}
@@ -212,12 +212,12 @@ export function DispatchArcDeck({
  *
  * ONE DECK FOR EACH ARC, IN EITHER HOME, and that is why this exists rather than a map at each call
  * site: the Runner tab and the chat gutter's Runner widget draw the same arcs from the same split
- * (`byArc`), and the two must agree about which plans sit under which arc. `home` is the one
- * variance, and it picks the deck's layout: the TAB's wall (`grid`, every card of the arc at once in
- * the pane's full width), the GUTTER's strip (`strip`, one card per view in a column a card wide).
- * Neither home's decks carry an inset of their own — the tab's scroll body and the widget's card
- * already own it. The home is written on the DOM (`data-dispatch-arcs`) so a reading is always taken
- * from ONE home.
+ * (`byArc`), and the two must agree about which plans sit under which arc. AN ARC IS ONE SHAPE IN
+ * BOTH HOMES — its plans in a strip, one card per view — so `home` no longer picks a layout and
+ * decides nothing but the width each home gives the deck: the tab's scroll body spans the pane and
+ * the widget's card is a column a card wide, and NEITHER deck carries an inset of its own, because
+ * those two already own it. The home is still written on the DOM (`data-dispatch-arcs`) so a reading
+ * is always taken from ONE home.
  *
  * THE DECKS STACK AT `gap-6`, wider than the cards' own `gap-4` inside a deck, so where one arc ends
  * and the next begins is read from the spacing before any head is read.
@@ -226,7 +226,8 @@ export function DispatchArcDeck({
  * Nothing here reads the lane either — the caller hands it the split it already has, so a caller that
  * filters its list and one that does not can never draw different decks.
  *
- * Used by `RunnerPanel` (the tab home) and `RunnerWidgetBody` (the gutter), above the plans of no arc.
+ * Used by `RunnerPanel` (the tab home), above the plans of no arc, and by `WidgetPager` (the gutter),
+ * one arc per page (`groups={[group]}`).
  */
 export function DispatchArcDecks({
   groups,
@@ -235,6 +236,7 @@ export function DispatchArcDecks({
   carriedNames,
 }: {
   groups: DispatcherArcGroup[];
+  /** Which home is drawing these decks. It changes no layout — an arc is drawn the same in both — and exists to write `data-dispatch-arcs`, so a probe always reads ONE home's decks and never both. */
   home?: 'tab' | 'gutter';
   pinnedSessionId?: string | null;
   carriedNames: string[];
@@ -246,7 +248,6 @@ export function DispatchArcDecks({
         <li key={group.arc.name} className="min-w-0">
           <DispatchArcDeck
             group={group}
-            layout={home === 'tab' ? 'grid' : 'strip'}
             pinnedSessionId={pinnedSessionId}
             carriedNames={carriedNames}
           />

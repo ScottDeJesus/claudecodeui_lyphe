@@ -11,7 +11,7 @@ export { useDispatcherPlans } from '@/modules/dispatcher/hooks/useDispatcherPlan
 // one and re-draws from the next frame; nothing is guessed here. `drop` is the one verb a card
 // guards with a dialog, because it is the one no press undoes.
 export { useDispatcherVerbs } from '@/modules/dispatcher/hooks/useDispatcherVerbs';
-// The pure vocabulary of a plan, so a card never re-derives a tone, a glyph, a progress count or
+// The pure vocabulary of a plan, so a card never re-derives a tone, a progress count or
 // the order the cards sit in — and the lane's own split, so the Runner tab and the chat gutter's
 // widget group and order the arcs' plans by ONE rule instead of two. The three hides are here too:
 // one plan's, an arc deck's and `Hide ended · N`, each one write to the hide store.
@@ -22,7 +22,6 @@ export {
   deckFocusIndex,
   endedHide,
   epochOf,
-  PHASE_GLYPH,
   phaseProgress,
   phaseStatusTone,
   planHide,
@@ -32,10 +31,10 @@ export {
   waitsOnSiblings,
 } from '@/modules/dispatcher/dispatcherState';
 export type { DispatchDeckLayer, DispatcherArcGroup, DispatcherArcSplit } from '@/modules/dispatcher/dispatcherState';
-// The plan's card — phases, verbs, the fold — and the arc's deck drawn as the screen draws it: the
-// arc's header over a strip of its plans. `DispatchArcDecks` is the strip of decks, given the split
-// that says which plans go under which arc. Drawn by both of the Runner tab's homes
-// (`src/modules/runner-tab`) and by the chat gutter's widget.
+// The plan's card — head, action bar, glance face, the fold — and the arc's deck: the arc's head over
+// its plans, paged one card per view in a strip, in the tab and in the gutter alike. `DispatchArcDecks`
+// is the stack of decks, given the split that says which plans go under which arc. Drawn by both homes
+// in `src/modules/runner-tab`: the Runner tab and the chat gutter's widget.
 export { PlanCard } from '@/modules/dispatcher/PlanCard';
 export { DispatchArcDeck, DispatchArcDecks } from '@/modules/dispatcher/ArcDeck';
 // The `Hidden · N` list at the foot of both homes: every hidden plan, each with its `Show`.

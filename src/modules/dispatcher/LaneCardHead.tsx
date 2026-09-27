@@ -40,6 +40,15 @@ function canFocus(element: HTMLElement): boolean {
   return element.isConnected && element.getClientRects().length > 0 && element.closest('[inert]') === null;
 }
 
+/** Whether a control lies inside its arc strip's visible box: a strip lays its other cards out beside it. */
+function inStripView(element: HTMLElement): boolean {
+  const strip = element.closest<HTMLElement>('[data-arc-strip]');
+  if (strip === null) return true;
+  const box = strip.getBoundingClientRect();
+  const at = element.getBoundingClientRect();
+  return at.left >= box.left - 1 && at.right <= box.right + 1;
+}
+
 /**
  * Hide, with somewhere for the keyboard to land. The pressed button leaves with its card, and a focused
  * node that unmounts drops focus to `<body>` — a keyboard reader who put one card away was thrown back
@@ -48,7 +57,11 @@ function canFocus(element: HTMLElement): boolean {
  * takes its plans with it). It is focused on the next frame, once the hide store's synchronous write
  * has re-rendered the home; a candidate the render took away (the last plan of a deck takes its deck)
  * is skipped, and with none left the heir is the home's `Hidden · N` trigger — which the first hide
- * is what draws.
+ * is what draws. The one home that shows a card only AFTER the hide is the widget's pager: the page
+ * that replaces the hidden one mounts in that render, so where no heir existed before the press, the
+ * home is asked again before falling back to `Hidden · N` — for a PLAN's Hide first, the one in view
+ * when the new page is an arc's strip, so the next press puts one plan away as the last one did and
+ * never the whole arc; the arc head's own Hide only when the page holds no plan card at all.
  */
 function hideKeepingFocus(button: HTMLElement | null, onHide: () => void): void {
   const home = button?.closest<HTMLElement>(HOME) ?? null;
@@ -60,7 +73,10 @@ function hideKeepingFocus(button: HTMLElement | null, onHide: () => void): void 
   onHide();
   if (home === null) return;
   requestAnimationFrame(() => {
-    const heir = heirs.find(canFocus) ?? home.querySelector<HTMLElement>('[data-hidden-plans] button');
+    const arrivals = heirs.length === 0 ? [...home.querySelectorAll<HTMLElement>('[data-dispatcher-hide]')].filter(canFocus) : [];
+    const arrived = arrivals.find((element) => element.closest('[data-dispatcher-card]') !== null && inStripView(element))
+      ?? arrivals[0];
+    const heir = heirs.find(canFocus) ?? arrived ?? home.querySelector<HTMLElement>('[data-hidden-plans] button');
     heir?.focus();
   });
 }

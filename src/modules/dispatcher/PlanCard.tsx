@@ -37,8 +37,8 @@ import { cn } from '@/shared/utils';
  * be a card that had not collapsed. The body is the house's `CardFoldBody`, so a folded card's verbs
  * leave the tab order too.
  *
- * HIDE, NOT DISMISS. Hide sits in the head's corner on every card, whatever its status — a card is
- * put away, not a plan: the dispatcher is never told, `Hidden · N` lists it and `Show` brings it back
+ * HIDE PUTS THE CARD AWAY, NOT THE PLAN. Hide sits in the head's corner on every card, whatever its
+ * status: the dispatcher is never told, `Hidden · N` lists it and `Show` brings it back
  * (`hiddenPlans.ts`). It is reversible, so no dialog guards it. `onHide` is the caller's
  * `planHide(plan, carriedNames)`, because only the caller holds the lane's carried names the store
  * prunes against.
@@ -46,9 +46,10 @@ import { cn } from '@/shared/utils';
  * DELETE IS THE MENU'S, AND ONLY WHERE THE DISPATCHER WOULD TAKE IT. `⋯` carries `Delete plan…`
  * exactly when `planDroppable(plan, planners)` holds. It is never drawn disabled on a `live` plan, a
  * walking phase or a planner out on the plan or its arc. Delete is the menu's only item, so those cards
- * draw no `⋯` at all. The planner half of that gate needs the lane's `planners` list, so this is the
- * one lane read (`useDispatcherPlans`) a card makes: `plan.planner` gives a plan's own ended row ahead
- * of its arc's live one, so it cannot answer what `drop` asks. The press opens `DeletePlanDialog`, the
+ * draw no `⋯` at all. The planner half of that gate needs the lane's `planners` list, so the card reads
+ * the lane (`useDispatcherPlans`) for it, as its face (`PlanFace`) does for the box's route:
+ * `plan.planner` gives a plan's own ended row ahead of its arc's live one, so it cannot answer what
+ * `drop` asks. The press opens `DeletePlanDialog`, the
  * module's one modal, because `dispatcher drop` is the one verb no press undoes. The card does not
  * leave on the press: it leaves when a frame no longer carries the plan.
  *
@@ -68,7 +69,7 @@ import { cn } from '@/shared/utils';
  * harness's handles, on the ROOT so a probe scopes every reading and every press to ONE plan — the
  * live plan walking beside a probe must never be pressed.
  *
- * Used by `RunnerPanel` and `RunnerWidgetBody` (runner-tab), for the plans no arc holds, and by
+ * Used by `RunnerPanel` and `WidgetPager` (runner-tab), for the plans no arc holds, and by
  * `DispatchArcDeck`, for each plan of an arc.
  */
 export function PlanCard({

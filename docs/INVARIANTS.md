@@ -131,10 +131,66 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/ArcDeck.t
 
 `.verify` probes written against the deleted plan-runner lane fail, and `node .verify/all.mjs` runs `phase-23.mjs`..`phase-27.mjs` by glob, so the whole run is red.
 
-- what is gone: the `/api/plan-runner` routes (404 now, MAN-5437), the `runner_state` and `arc_state` frames, the `planRunner` preference (the folds and dismissals live under `dispatcher`), the run and arc cards (`data-runner-card`, `data-arc-card`), and the run and arc directories a fixture wrote into the old runner state tree.
+- what is gone: the `/api/plan-runner` routes (404 now, MAN-5437), the `runner_state` and `arc_state` frames, the `planRunner` preference (the folds and the hidden plans live under `dispatcher`, as `collapsedCards` and `hiddenPlans`), the run and arc cards (`data-runner-card`, `data-arc-card`), and the run and arc directories a fixture wrote into the old runner state tree.
 - find the probes that still name them: `grep -rlE 'api/plan-runner|runner_state|arc_state|planRunner' claudecodeui_lyphe/.verify --include=*.mjs`. 2026-09-26: `phase-23` to `phase-27`, `probe-arc-run-merge`, `probe-phase-wave-mark`, `probe-runner-model-pin`, `probe-runner-schedule`, `probe-side-widgets`, `probe-arc-nest-athena`, `probe-card-fold`, `probe-arc-fill`, `stale-chat/asclepius-stale-proof`. Their fixtures (`lib/runner-fixture.mjs`, `lib/arc-run-fixture.mjs`, `lib/arc-stuck-fixture.mjs`) write fake runs into a tree no server reads.
 - stale for a second reason: `probe-planner-card.mjs`, `probe-planner-card-write.py` and `probe-arc-nest-athena.mjs` still name plans with the retired name suffix (`grep -rl 'v3' claudecodeui_lyphe/.verify`), which the dispatcher refuses, and the planner soul under its retired id.
 - a red `all.mjs` is therefore not a regression in the change under test: read which phase failed.
 - retiring these files is the operator's call: they are the standing-gate record of past phases. `.verify/` is gitignored, so a `git clean -x` deletes it and no commit shows the change.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/all.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/arc-run-fixture.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/arc-stuck-fixture.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/runner-fixture.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-23.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-24.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-25.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-26.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-27.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-arc-fill.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-arc-nest-athena.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-arc-run-merge.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-card-fold.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-phase-wave-mark.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-planner-card.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-planner-card-write.py, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-runner-model-pin.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-runner-schedule.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-side-widgets.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/stale-chat/asclepius-stale-proof.mjs
+
+## INV-4649 — probe — `whole.mjs`'s reduced-motion reading of the pager item passes without reduce too
+
+`whole.mjs`'s reduced-motion reading of the pager item passes without reduce too
+
+```probe
+node /tmp/pipeline-reviews/runner-card-makeover--whole/athena-probes/pagein.mjs
+expect: the line `reduce=false next (first sight of page 2) +100ms` shows "anim":"none", while `reduce=false prev (page 1 again, seen)` shows "anim":"vv-pagein" and every reduce=true line shows "none"
+```
+
+measured 2026-09-26 by chain chain-runner-card-makeover--whole-20260926-210824-bf49, finding L1, LOW
+probe-key: 1e4928fb105751b48435fdef7b5f24889928ee10
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/phaseWord.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/PlanCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/PlanPhaseRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/ScrollArea.tsx
+
+## INV-4650 — probe — MAN-373 and ScrollArea's comment say "a focus" scrolled the outer box; measured, a focus does not
+
+MAN-373 and ScrollArea's comment say "a focus" scrolled the outer box; measured, a focus does not
+
+```probe
+node /tmp/pipeline-reviews/runner-card-makeover--whole/athena-probes/focusescape.mjs
+expect: `before (static):` prints "outerScrollTop":0 with "innerScrollTop" equal to "innerMax" — a focus never reaches the escaped range
+```
+
+measured 2026-09-26 by chain chain-runner-card-makeover--whole-20260926-210824-bf49, finding L2, LOW
+probe-key: 5ba30369542f5607a441e4f2004ee7f839d99d20
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/phaseWord.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/PlanCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/PlanPhaseRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/ScrollArea.tsx
+
+## INV-4651 — probe — MAN-373's ScrollArea roll call names 4 callers, beside a code comment naming all 12
+
+MAN-373's ScrollArea roll call names 4 callers, beside a code comment naming all 12
+
+```probe
+grep -o "Every caller is a pane outside the transcript — [^.]*" /home/lyphe/.claude/claudecodeui_lyphe/docs/architecture/MANUAL.md; grep -rl "<ScrollArea" /home/lyphe/.claude/claudecodeui_lyphe/src | wc -l
+expect: the row names four files while 12 files render <ScrollArea
+```
+
+measured 2026-09-26 by chain chain-runner-card-makeover--whole-20260926-210824-bf49, finding L3, LOW
+probe-key: 5fb1f128c394cc47b391f7f01bc0f2c1f149ac33
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/phaseWord.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/PlanCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/PlanPhaseRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/ScrollArea.tsx
+
+## INV-4652 — probe — PlanCard's comment says it is "the one lane read a card makes"; PlanFace makes a second, and MAN-1557's `waitsOn` rationale is stale with it
+
+PlanCard's comment says it is "the one lane read a card makes"; PlanFace makes a second, and MAN-1557's `waitsOn` rationale is stale with it
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe && grep -n "one lane read" src/modules/dispatcher/PlanCard.tsx; grep -n "useDispatcherPlans()" src/modules/dispatcher/PlanCard.tsx src/modules/dispatcher/PlanFace.tsx; grep -c "would be one bus subscription per card" docs/MANUAL.md
+expect: PlanCard claims the one lane read while both PlanCard.tsx and PlanFace.tsx call useDispatcherPlans(), and MAN still prints the one-subscription rationale (count 1)
+```
+
+measured 2026-09-26 by chain chain-runner-card-makeover--whole-20260926-210824-bf49, finding L4, LOW
+probe-key: fc4abb9778d094436351a99d60c0a4b49ab42bcb
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/phaseWord.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/PlanCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/PlanPhaseRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/ScrollArea.tsx

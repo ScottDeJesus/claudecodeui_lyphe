@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import type { KeyboardEvent } from 'react';
+import type { KeyboardEvent, WheelEvent } from 'react';
 
 /** Where the strip stands: the card the reader is on, and whether either end is reached. */
 type StripView = { index: number; atStart: boolean; atEnd: boolean };
@@ -32,8 +32,17 @@ type StripView = { index: number; atStart: boolean; atEnd: boolean };
  * strip: the horizontal reading is left exactly where the reader put it, and the vertical one is
  * pinned at 0 (`measure`, where every scroll is read).
  *
+ * AN ASK OUTLIVES THE ANIMATION CARRYING IT OUT. `view.index` is read off the SCROLL POSITION, and a
+ * smooth centring rewrites it on every frame it runs, so a press landing mid-flight would be anchored
+ * to wherever the scroll had got instead of to the card the reader asked for. Measured on the tab deck,
+ * 2026-09-26: three quick presses of `next` moved the reader two cards, and a press just after the arc
+ * flow's tenth node ABANDONED that jump and landed on card two. So every ask writes its destination to
+ * `intended`, `step` measures from there while one is out, and the ask is spent when the scroll arrives
+ * or when the reader takes the strip in their own hands.
+ *
  * The strip must be the offset parent of its items (`relative`): centring reads `offsetLeft`.
- * Used by `DeckStrip`, the one strip an arc deck draws in the gutter home.
+ * Used by `DeckStrip`, the one strip an arc deck draws — in the Runner tab and in the chat gutter's
+ * widget alike.
  */
 export function useDeckStrip(focusIndex: number, cardCount: number) {
   const stripRef = useRef<HTMLOListElement>(null);
@@ -49,6 +58,11 @@ export function useDeckStrip(focusIndex: number, cardCount: number) {
   // that changes width keeps that card centred rather than drifting off it. Refs: they paint nothing.
   const readerIndex = useRef(focusIndex);
   const measuredWidth = useRef(0);
+  // THE CARD THE READER ASKED FOR, while the scroll that goes there is still travelling. Written by
+  // every ask (`scrollToCard`: the arrows, the keys, a flow node, the focus centring), read by `step`,
+  // and spent the moment the scroll arrives (`measure`) or the reader takes the strip in their own
+  // hands again (`onReaderGesture`). A ref: it paints nothing.
+  const intended = useRef<number | null>(null);
 
   /**
    * The height of the card the reader is on, as the deck's height. Read off the ITEM rather than
@@ -95,6 +109,8 @@ export function useDeckStrip(focusIndex: number, cardCount: number) {
     if (atStart) index = 0;
     else if (atEnd) index = Math.max(0, items.length - 1);
     readerIndex.current = index;
+    // The ask has arrived: it is spent, and the next press is measured from the card the reader is on.
+    if (intended.current === index) intended.current = null;
     // The deck's own height follows the card, so it is re-read wherever the reader's card is.
     measureHeight();
     setView((prior) =>
@@ -106,7 +122,22 @@ export function useDeckStrip(focusIndex: number, cardCount: number) {
     const strip = stripRef.current;
     const item = strip?.children[index] as HTMLElement | undefined;
     if (!strip || !item) return;
+    // The ask is recorded before it is made: this scroll may run for a few hundred milliseconds, and a
+    // press landing inside that window has to be measured from where the reader is GOING.
+    intended.current = index;
     strip.scrollTo({ left: item.offsetLeft - (strip.clientWidth - item.offsetWidth) / 2, behavior });
+  }, []);
+
+  /** Drop an ask still travelling: the reader has taken the strip in their own hands, so it is no
+   * longer where anyone is going and the next press must be measured from what they scroll to. */
+  const onReaderGesture = useCallback(() => {
+    intended.current = null;
+  }, []);
+
+  /** The same, for a trackpad: its HORIZONTAL wheel scrolls the strip; a vertical one scrolls the pane
+   * behind it (`overflow-y-hidden`), leaves the strip where it stands, and drops no ask. */
+  const onReaderWheel = useCallback((event: WheelEvent<HTMLOListElement>) => {
+    if (event.deltaX !== 0) intended.current = null;
   }, []);
 
   // A strip with no width is not on screen yet (its tab is hidden): centring there is lost, so it
@@ -146,7 +177,11 @@ export function useDeckStrip(focusIndex: number, cardCount: number) {
   }, [cardCount, focusIndex, scrollToCard, measure]);
 
   const step = useCallback((delta: -1 | 1) => {
-    const target = Math.min(Math.max(view.index + delta, 0), cardCount - 1);
+    // From the card the reader asked for, while that ask is still travelling: `view.index` is the
+    // scroll's own reading and the animation is rewriting it, so stepping from it would move a card
+    // from wherever the scroll happens to have got to.
+    const from = intended.current ?? view.index;
+    const target = Math.min(Math.max(from + delta, 0), cardCount - 1);
     scrollToCard(target, 'smooth');
   }, [view.index, cardCount, scrollToCard]);
 
@@ -156,12 +191,33 @@ export function useDeckStrip(focusIndex: number, cardCount: number) {
   }, [cardCount, scrollToCard]);
 
   const onKeyDown = useCallback((event: KeyboardEvent<HTMLOListElement>) => {
-    if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+    // ONLY A KEYSTROKE MADE IN THE STRIP MOVES IT. A card may open a modal that portals its DOM out to
+    // `<body>` while staying a React child of the strip, and React bubbles a keydown along THAT tree,
+    // portal included — so an arrow pressed over an open dialog reached here and paged the deck behind
+    // it (measured 2026-09-26: one ArrowRight with `Delete plan…` up took card 4 to 5). The DOM box is
+    // the honest test: a keystroke belongs to the strip when it happened inside it.
+    if (!stripRef.current?.contains(event.target as Node)) return;
+    if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') {
+      // Any other key inside the strip is the box's own to act on — Home, End and the page keys scroll
+      // it natively — so an ask still travelling is dropped rather than steering the next press.
+      intended.current = null;
+      return;
+    }
     // Taken over, not added to: the browser's own arrow scroll would move a few pixels and fight
     // the snap, where this moves exactly one card.
     event.preventDefault();
     step(event.key === 'ArrowLeft' ? -1 : 1);
   }, [step]);
 
-  return { stripRef, view, step, goTo, onScroll: measure, onKeyDown, stripHeight };
+  return {
+    stripRef,
+    view,
+    step,
+    goTo,
+    onScroll: measure,
+    onKeyDown,
+    onReaderGesture,
+    onReaderWheel,
+    stripHeight,
+  };
 }

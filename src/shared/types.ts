@@ -2295,14 +2295,14 @@ export type LiveBus = {
   isAllowedTopic(topic: unknown): topic is string;
 };
 
-//----------------- THE DISPATCHER: the store's one status document, mirrored key for key ------------
+//----------------- DISPATCHER: the store's one status document, mirrored key for key ------------
 // The dispatcher keeps its plans in a SQLite store rather than in files, so the ONE picture of them
 // is a document: `hooks/dispatcher/report.py::snapshot`, what `dispatcher status --json` prints. The
 // types below mirror it key for key and name for name. The server converts NOTHING — every key, word
 // and string below is the document's own — and the client's `epochOf` is the single ISO-to-epoch
 // edge, because every time below is the store's own `YYYY-MM-DDTHH:MM:SSZ` UTC string, never a
-// number. ONE TEXT IN TWO FILES (`src/shared/types.ts` and `server/shared/types.ts`): a change to
-// either shape belongs in both at once.
+// number. ONE TEXT IN TWO FILES (`src/shared/types.ts` and `server/shared/types.ts`, the two
+// builds' shared trees): a change to either shape belongs in both at once.
 
 /** One stage of a phase's chain: a row of the store's `stages` table, `phase_chain`'s projection of the chain record (`chain.json`). `settle` REPLACES a phase's rows rather than appending, so a stage a walk re-enters is one row again (INV-181). `soul` is the soul the stage launched and `launch_id` that launch's own id; `resumed_sid` is the session a resume ran it under. `verdict` is the soul's own outcome word and is free text, reaching the DOM as a text node. `cost_usd` is PAID dollars — `0` on a stage on the operator's Claude subscription — and the `tokens`/`tokens_in`/`tokens_out` beside it are THE SUBSCRIPTION'S ALONE: a spend figure is dollars OR tokens, by who was used (operator rule, 2026-09-24), so a stage a vendor billed reads `0` in all three beside its `$`. All three come off the launch's own `result.json` at the dispatcher's report time, never from a store column (INV-172). */
 export type DispatcherStage = { name: string; soul: string | null; launch_id: string | null; session_id: string | null; resumed_sid: string | null; launched_at: string | null; returned_at: string | null; output_path: string | null; verdict: string | null; cost_usd: number; tokens: number; tokens_in: number; tokens_out: number };
@@ -2326,8 +2326,6 @@ export type DispatcherRoute = { provider: 'claude' | 'deepseek'; swarm: { enable
 export type DispatcherDaemon = { alive: boolean; pid: number | null; unit: string | null };
 /** The whole picture, pushed on change over `/ws` by the dispatcher lane. It is the document's own keys — `plans`, `arcs`, `planners`, `route`, `daemon`, `offpeak_at`, `home`, `generated_at` — with the frame's clock added as `at`, epoch MILLISECONDS (`Date.now()`), unlike every time inside. `offpeak_at` is always a stamp — the next DeepSeek off-peak moment, and the literal `none` when the clock cannot answer — so it is a string and never null. */
 export type DispatcherStateEvent = { kind: 'dispatcher_state'; arcs: DispatcherArc[]; plans: DispatcherPlan[]; planners: DispatcherPlanner[]; route: DispatcherRoute; daemon: DispatcherDaemon; offpeak_at: string; home: string; generated_at: string; at: number };
-/** What the dispatcher's feed retains on `dispatcher:all`, and what every plan card reads off it: the frame's whole picture MINUS the two keys that change without anything moving (`home`, `generated_at`, restamped on every poll of the watcher) and minus the frame's own clock, which the bus carries as the value's `at`. It is the document's own spelling throughout — `offpeak_at` keeps its underscore — so the one place that renames it is the reader's `epochOf`. `planners` is the store's own list of outings, and it is what draws the badges no plan card and no deck can carry: an arc's design before its arc file loads. */
-export type DispatcherLanePicture = { plans: DispatcherPlan[]; arcs: DispatcherArc[]; planners: DispatcherPlanner[]; route: DispatcherRoute; daemon: DispatcherDaemon; offpeak_at: string };
 /** The verbs this server may relay: `stop`, `resume`, `schedule` (a queued plan's Start at a time — `offpeak`, an ISO timestamp, or `none` to clear), `park` (a designed plan set aside), `unpark` (handed back to be cut), `model` (a plan's or an arc's own DeepSeek / Claude word; restarts nothing and wakes nobody — the word is read when a chain is launched) and `drop` (a plan taken out of the store with everything it holds of it — refused while a phase of it walks or a planner outing for it or its arc is live; the one verb no press undoes). */
 export type DispatcherVerb = 'stop' | 'resume' | 'schedule' | 'park' | 'unpark' | 'model' | 'drop';
 /** What one relayed verb did. A refusal is a RESULT, not an error: the dispatcher prints its refusals on STDOUT (`REFUSED <verb> <name>: <reason>`, exit 2; a not-found line, exit 1 — `no plan <bare>`, or `no plan or arc <bare>` from one of the four verbs an arc's own name also reaches), so `stdout` carries the dispatcher's own first line whole and the reader never gets our paraphrase. `reason` is present only when the dispatcher never got to answer: it timed out, or its binary could not be spawned. */
@@ -2336,6 +2334,10 @@ export type DispatcherVerbResult = { ok: boolean; verb: DispatcherVerb; plan: st
 export type DispatcherModelChoice = 'deepseek' | 'claude' | 'auto';
 /** `GET /plans/offpeak`: the dispatcher's next DeepSeek off-peak moment in epoch SECONDS (`dispatcher offpeak`, derived from `deepseek.PEAK_UTC`), or `null` when the dispatcher could not answer. The card's `Start at …` button shows it in the reader's clock and never computes it. */
 export type DispatcherOffpeak = { at: number | null };
+// ---------------------------
+//----------------- DISPATCHER, CLIENT ONLY: the picture the lane's feed retains ------------
+/** What the dispatcher's feed retains on `dispatcher:all`, and what every plan card reads off it: the frame's whole picture MINUS the two keys that change without anything moving (`home`, `generated_at`, restamped on every poll of the watcher) and minus the frame's own clock, which the bus carries as the value's `at`. It is the document's own spelling throughout — `offpeak_at` keeps its underscore — so the one place that renames it is the reader's `epochOf`. `planners` is the store's own list of outings, and it is what draws the badges no plan card and no deck can carry: an arc's design before its arc file loads. */
+export type DispatcherLanePicture = { plans: DispatcherPlan[]; arcs: DispatcherArc[]; planners: DispatcherPlanner[]; route: DispatcherRoute; daemon: DispatcherDaemon; offpeak_at: string };
 // ---------------------------
 //----------------- SPEND: a spend figure's two halves, decided once ------------
 /** A spend figure DECIDED and not yet worded — `spendParts` (`src/shared/spend.ts`) is its one maker, and `spendText` and `SpendPills` (`src/modules/dispatcher/`) are its two drawers, so a sentence and a row of pills can never disagree about which halves a record has. `paid` is the PAID dollars, `null` where no API billed (a figure of 0 means the work rode Claude, never "this cost nothing"). `tokens` is the CLAUDE half: `split` when the record carries `in` and `out` that ARE its total, `total` when only the total can be trusted (a pre-split record, or a sum over records half of which predate the split), `null` when it carries neither. Client-only: the server's mirrored dispatcher block above never carries it. */

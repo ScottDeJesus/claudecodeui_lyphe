@@ -147,13 +147,11 @@ export default {
         // holds the item invisible instead of flashing it at full opacity before its turn.
         'shape-rise': 'vv-rise var(--dur-move) var(--ease-enter) both',
         'shape-item': 'vv-pagein 240ms var(--ease-enter) backwards',
-        // The dispatcher cards' rings, both on Verve's own `vv-ring` — the halo its StatusFlow puts
-        // round the stage in hand (`_ds_bundle.js`, `vv-ring 2.4s ease-out infinite`). `live-ring`
-        // is that halo on a node whose walk is out right now, breathing for as long as it is.
-        // `ring-once` is the same halo played ONE time, on a card a flow node was pressed to reach,
-        // so the eye finds where it landed and the ring then lets it be.
+        // The dispatcher cards' live ring, on Verve's own `vv-ring` — the halo its StatusFlow puts
+        // round the stage in hand (`_ds_bundle.js`, `vv-ring 2.4s ease-out infinite`). It is that
+        // halo on a node whose walk is out right now, breathing for as long as it is. An arc deck's
+        // plans are paged, not jumped to, so the one-shot flavour the tab's wall used is gone.
         'live-ring': 'vv-ring 2.4s ease-out infinite',
-        'ring-once': 'vv-ring 1.8s ease-out 1',
       },
     },
   },

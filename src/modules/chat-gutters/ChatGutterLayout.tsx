@@ -80,8 +80,8 @@ export function ChatGutterLayout({
 }) {
   const { t } = useTranslation();
   const { placements, moveWidget, toggleWidget } = useGutterPlacements(sessionId);
-  // The Runner widget draws the arcs as decks and the plans no arc holds as cards, so its badge
-  // counts the plans alone: an arc's own plans are already in that list, and the arc's row is a
+  // The Runner widget pages the arcs as decks and the plans no arc holds as cards, so its badge
+  // counts the plans alone: an arc's own plans are already counted, and the arc's deck is a
   // heading over cards the count has counted — the tab's own rule (`useDispatcherPlans.count`).
   const { count: runnerCount } = useDispatcherPlans();
   const { pendingCount } = useMemoryIntake();

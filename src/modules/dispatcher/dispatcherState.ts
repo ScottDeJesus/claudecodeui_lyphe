@@ -80,16 +80,6 @@ export function phaseStatusTone(phase: DispatcherPhase): Tone {
 }
 
 /**
- * The dispatcher's own three phase marks, so a state never reaches a reader as colour alone (design
- * doctrine :147-149). The store's vocabulary, spelled exactly as `report.phase_dict` writes it.
- */
-export const PHASE_GLYPH: Record<DispatcherPhase['status'], string> = {
-  done: '✅',
-  running: '▶',
-  'not started': '·',
-};
-
-/**
  * How much of the plan is behind it: `done` phases, and all of them. A plan with no phases yet is
  * `0 of 0` — a designed plan whose phases are not cut is a real state, and its card draws no track
  * rather than a broken one.
@@ -109,7 +99,7 @@ export function phaseProgress(plan: DispatcherPlan): { done: number; total: numb
  * card's whole point, while a paused one was stopped mid-walk and can wait. PARKED and IDLE follow:
  * both were set aside on purpose, and a list that raised the operator's own decision above a plan in
  * motion would be the app arguing with them. COMPLETE last of all — nothing more will happen to it;
- * it is there to be read and dismissed — and within each rank the most recently touched first, since
+ * it is there to be read and then hidden — and within each rank the most recently touched first, since
  * that is the one the operator came to see.
  *
  * Reversible in one place, by design: change these numbers and the order changes, with nothing else

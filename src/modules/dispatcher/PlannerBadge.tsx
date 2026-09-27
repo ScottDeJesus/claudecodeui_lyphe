@@ -119,8 +119,8 @@ export function PlannerBadge({ planner }: { planner: DispatcherPlanner }) {
  * IT DRAWS NOTHING AT ALL WHEN THERE ARE NONE, and returns `null` rather than an empty row: an
  * operator who was never in this state sees the pane exactly as it was before badges existed.
  *
- * Used by `RunnerPanel` (the tab) and `RunnerWidgetBody` (the gutter), immediately above
- * `DispatchArcDecks`, whose own two homes these are.
+ * Used by `RunnerPanel` (the tab), immediately above `DispatchArcDecks`, and `RunnerWidgetBody` (the
+ * gutter), immediately above the pager whose pages those decks are.
  */
 export function LoosePlannerBadges({
   planners,

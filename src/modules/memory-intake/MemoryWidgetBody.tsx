@@ -25,7 +25,7 @@ const APPROVED_CAP = 20;
  * carries the glance and the badge carries the words. The tone is `info` — which chat a memory came
  * from is news about which ROW this is, never a verdict on the memory.
  *
- * Written here and once more in `RunnerWidgetBody.tsx`; both memory sections share this one copy.
+ * Written here and once more in the dispatcher module (`SessionPin.tsx`), which both Runner homes draw.
  * Two copies is below design doctrine §2's promote-on-the-third rule.
  */
 function SessionPin() {

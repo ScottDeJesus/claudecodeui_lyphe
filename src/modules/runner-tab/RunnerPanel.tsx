@@ -41,18 +41,22 @@ import { cn } from '@/shared/utils';
  * THIS pane, so a card the operator's own lane puts on screen at the same moment is never mistaken
  * for the one under test.
  *
- * THE PANE IS A WALL. Every card is drawn whole in an auto-fill grid across the pane's full width
- * (`LANE_WALL_GRID`), because the glance face makes the cards short and alike — a head, a track of
- * nodes, a caption and at most a few lines of what is moving — and short, alike cards read best side
- * by side, where a measured column stacked them into one long scroll and left most of a desktop
- * workspace empty. On a phone the same grid is one card a row.
+ * THE PANE IS A WALL, AND AN ARC IS NOT A ROW OF IT. The plans NO arc holds are drawn whole in an
+ * auto-fill grid across the pane's full width (`LANE_WALL_GRID`), because the glance face makes those
+ * cards short and alike — a head, a track of nodes, a caption and at most a few lines of what is
+ * moving — and short, alike cards read best side by side, where a measured column stacked them into
+ * one long scroll and left most of a desktop workspace empty. On a phone the same grid is one card a
+ * row. A PLAN OF AN ARC IS NOT ONE OF THOSE: it is paged in its arc's strip, one card per view
+ * (`DeckStrip`; operator, 2026-09-26: "please bring back the swipable plan cards if it's under an
+ * arc"), so the wall here is one layout for the loose plans and the strip is another for the arcs.
  *
  * THE PLANS ARE NESTED BY ARC. The lane is split by ONE rule (`byArc`, so this pane and the chat
  * gutter's widget cannot group differently): every arc of it is one DECK holding the plans of that
- * arc in the ARC's own walk order — its own wall inside the deck, with the arc's flow over it — and
- * the plans no arc holds are `PlanCard`s in their own urgency order, in the same grid below the decks. Every hide passes the lane's own carried names, which
- * is what the hide store (`hiddenPlans.ts`) prunes its list against: `planHide` is a card's,
- * `endedHide` the header's `Hide ended · N`, and `HiddenPlans` at the foot is the way back.
+ * arc in the ARC's own walk order — one strip inside the deck, with the arc's flow over it — and
+ * the plans no arc holds are `PlanCard`s in their own urgency order, in the wall's grid below the
+ * decks. Every hide passes the lane's own carried names, which is what the hide store
+ * (`hiddenPlans.ts`) prunes its list against: `planHide` is a card's, `endedHide` the header's
+ * `Hide ended · N`, and `HiddenPlans` at the foot is the way back.
  *
  * The EmptyState is reachable and is not dead code: the tab is STICKY, so a person standing here when
  * the last plan ends keeps the tab and meets this instead of the tab vanishing under them. It shows
@@ -120,18 +124,19 @@ export function RunnerPanel() {
         </div>
       ) : (
         <ScrollArea className="flex-1">
-          {/* THE WALL: the pane's full width, one inset for everything in it, top to bottom — the
-              outings no deck can carry (`LoosePlannerBadges`, nothing on an ordinary lane), the arc
-              decks one under another, the plans of no arc, and the way back from a Hide. */}
+          {/* THE PANE: the full width, one inset for everything in it, top to bottom — the outings no
+              deck can carry (`LoosePlannerBadges`, nothing on an ordinary lane), the arc decks one
+              under another (each paging its own plans in its own strip), the plans of no arc in the
+              wall's grid, and the way back from a Hide. */}
           <div className="flex min-w-0 flex-col gap-6 px-4 py-5 lg:px-6">
             <LoosePlannerBadges planners={loosePlanners} />
             {/* THE ARCS SIT ABOVE THE PLANS NO ARC HOLDS, each deck holding the plans of its own arc:
-                an arc's word and verbs reach every plan of it, so its plans are that arc's own wall
+                an arc's word and verbs reach every plan of it, so its plans are that arc's own strip
                 rather than cards beside it (`DispatchArcDecks`). */}
             <DispatchArcDecks groups={split.groups} carriedNames={carriedNames} />
-            {/* The plans of no arc, in the decks' own grid: one rule for every card on the wall, so a
-                loose card is the width a deck's card is on the same screen, give or take the deck's
-                frame. */}
+            {/* The plans of no arc, in the pane's own wall. They are the ONLY cards in this grid: an
+                arc's plans are paged one per view inside their deck's strip, so a loose card is the
+                width the wall gives every card that has no arc to be read under. */}
             {split.rest.length > 0 && (
               <ul className={cn('min-w-0', LANE_WALL_GRID)} data-runner-loose-plans>
                 {split.rest.map((plan) => (
