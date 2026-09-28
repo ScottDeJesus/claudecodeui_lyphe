@@ -22,8 +22,8 @@ import { Button, Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/s
  * `data-hidden-plans` is the root's handle and `data-show-plan=<name>` each row's button, so a probe
  * presses one plan's Show without reading the rows' text.
  *
- * Used by the runner-tab module: at the foot of `RunnerPanel`'s scroll body, under `WidgetPager`'s
- * card in the gutter, and under each home's EmptyState, because a lane whose every plan is hidden must still offer
+ * Used by the runner-tab module: at the foot of `RunnerPanel`'s scroll body and of `RunnerWidgetBody`'s
+ * list, and under each home's EmptyState, because a lane whose every plan is hidden must still offer
  * the way back.
  */
 export function HiddenPlans({ hidden, carriedNames }: { hidden: DispatcherPlan[]; carriedNames: string[] }) {

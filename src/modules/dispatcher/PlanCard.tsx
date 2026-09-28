@@ -69,7 +69,7 @@ import { cn } from '@/shared/utils';
  * harness's handles, on the ROOT so a probe scopes every reading and every press to ONE plan — the
  * live plan walking beside a probe must never be pressed.
  *
- * Used by `RunnerPanel` and `WidgetPager` (runner-tab), for the plans no arc holds, and by
+ * Used by `RunnerPanel` and `RunnerWidgetBody` (runner-tab), for the plans no arc holds, and by
  * `DispatchArcDeck`, for each plan of an arc.
  */
 export function PlanCard({

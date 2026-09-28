@@ -1,76 +1,194 @@
 import { ActivityIcon } from 'lucide-react';
-import { useMemo } from 'react';
+import { useLayoutEffect, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { byArc, HiddenPlans, LoosePlannerBadges, useDispatcherPlans } from '@/modules/dispatcher';
+import {
+  byArc,
+  DispatchArcDecks,
+  endedHide,
+  HiddenPlans,
+  LoosePlannerBadges,
+  PlanCard,
+  planHide,
+  SessionPin,
+  useDispatcherPlans,
+} from '@/modules/dispatcher';
+import type { DispatcherArcGroup, DispatcherArcSplit } from '@/modules/dispatcher';
 import { useLaneFoldPrune } from '@/modules/runner-tab/hooks/useLaneFoldPrune';
-import { WidgetPager } from '@/modules/runner-tab/WidgetPager';
-import { EmptyState } from '@/shared/ui';
+import { LANE_CARD_GAP } from '@/shared/constants';
+import type { DispatcherPlan } from '@/shared/types';
+import { Button, EmptyState } from '@/shared/ui';
+import { cn } from '@/shared/utils';
+
+/** One item of the widget's list: a whole arc deck, or one plan no arc holds. */
+type WidgetItem = { kind: 'arc'; group: DispatcherArcGroup } | { kind: 'plan'; plan: DispatcherPlan };
+
+/** An item's identity across polls — `darc:` beside `plan:`, so an arc and a plan never share one. */
+function itemKey(item: WidgetItem): string {
+  return item.kind === 'arc' ? `darc:${item.group.arc.name}` : `plan:${item.plan.name}`;
+}
+
+/** Whether the open chat is the one that opened `plan`. */
+function openedBy(plan: DispatcherPlan, sessionId: string | null): boolean {
+  return sessionId !== null && plan.session_app_id === sessionId;
+}
+
+/** The nearest ancestor of `element` that scrolls vertically: the widget frame's viewport. */
+function scrollViewportOf(element: HTMLElement | null): HTMLElement | null {
+  for (let node = element?.parentElement ?? null; node !== null; node = node.parentElement) {
+    if (/(auto|scroll)/.test(getComputedStyle(node).overflowY)) return node;
+  }
+  return null;
+}
 
 /**
- * The dispatcher's lane as the desktop chat gutter draws it: a PAGER over the lane's top-level items,
- * ONE at a time, the open chat's first (`WidgetPager`).
+ * The lane as the widget's list, the open chat's first. The base order is the tab's own — the arcs in
+ * the lane's order, then the plans of no arc in `byArc`'s urgency order — and the items holding a plan
+ * this chat opened are lifted to the front of it, keeping that order among themselves. An arc holds
+ * the chat's plan when ANY plan of it does: the deck is the item, and it pins that plan's row inside
+ * (`SessionPin`), while the arc's own walk order inside the deck is left alone.
+ */
+function widgetItemsOf(split: DispatcherArcSplit, sessionId: string | null): WidgetItem[] {
+  const holdsMine = (item: WidgetItem) => (item.kind === 'arc'
+    ? item.group.plans.some((plan) => openedBy(plan, sessionId))
+    : openedBy(item.plan, sessionId));
+  const items: WidgetItem[] = [
+    ...split.groups.map((group): WidgetItem => ({ kind: 'arc', group })),
+    ...split.rest.map((plan): WidgetItem => ({ kind: 'plan', plan })),
+  ];
+  return [...items.filter(holdsMine), ...items.filter((item) => !holdsMine(item))];
+}
+
+/**
+ * The dispatcher's lane as the desktop chat gutter draws it: ONE vertical list of every top-level item
+ * the lane carries — each arc as its deck, each plan of no arc as its card — the open chat's first.
  *
- * THE SECOND HOME, BESIDE THE TRANSCRIPT AND NEVER OVER IT. The Runner tab is the card's other home,
- * and it draws the whole lane at once; here the lane is company for a conversation that is still
- * the point, so the column is the gutter's own flush width, one card wide, and it shows one page: an
- * arc's deck, which pages its own plans in its own strip (`DispatchArcDecks`' `home="gutter"`), or one
- * plan of no arc as its card. The row over the page reads `‹ n of total ›` and carries the lane's
- * `Hide ended · N`; `Hidden · N` sits under the card as the way back from any hide.
+ * THE SECOND HOME, BESIDE THE TRANSCRIPT AND NEVER OVER IT. The Runner tab is the card's other home and
+ * lays the loose cards out as a wall; here the column is the gutter's own width, one card wide, so the
+ * same items stand one under another at the tab's own spacing — two cards `LANE_CARD_GAP` apart, a deck
+ * 24px from its neighbours — and the widget frame's body scrolls them (`src/modules/chat-gutters`).
+ * Every item is drawn whole and at once (operator, 2026-09-28: "please remove the arrows and show a
+ * list of plans instead"). A chat switch returns that scroll to the top, where the new chat's own
+ * items stand.
  *
- * THE PAGES ARE THE TAB'S SPLIT, LIFTED FOR THIS CHAT. The lane is split by the one rule both homes
- * read (`byArc`): the arcs in the lane's order, then the plans of no arc by urgency. The pager lifts
- * the pages holding a plan this chat opened to the front, and holds the page the reader is on by KEY,
- * so a poll never turns it. It is keyed by the chat below, so opening another chat starts again on
- * THAT chat's first page.
+ * THE ITEMS ARE THE TAB'S SPLIT, LIFTED FOR THIS CHAT (`widgetItemsOf`). An arc is the SAME deck the tab
+ * draws (`DispatchArcDecks`' `home="gutter"`), its plans still swiped one card per view in its own
+ * strip; a plan of no arc is its `PlanCard`, wearing this chat's `SessionPin` when the chat opened it.
  *
  * THE FOLDS ARE THE TAB'S FOLDS, AND THIS BODY PRUNES THE SAME MEMORY. `useLaneFoldPrune` hands the
  * fold store what this widget draws AND what it has hidden, so a card folded here is folded on the tab,
  * a card shown again keeps its fold, and the folds of cards that have left the lane go with them — one
- * memory, two homes. Nothing here folds a card for space: the pager shows one page, whole.
+ * memory, two homes.
  *
- * `data-runner-widget` is the root's handle — this home's boundary, which a card's Hide looks inside for
- * the next place to put the keyboard (`LaneCardHead`), exactly as it looks inside `data-runner-panel`.
+ * `Hide ended · N` heads the list (every drawn plan that has finished, put away in one write — the tab
+ * header's own button) and `Hidden · N` closes it as the way back from any hide. `data-runner-widget`
+ * is the root's handle — this home's boundary, which a card's Hide looks inside for the next place to
+ * put the keyboard (`LaneCardHead`), exactly as it looks inside `data-runner-panel`.
+ * `data-widget-item` (valued by the item's key), `runner-widget-plan`, `data-plan-name` and
+ * `data-pinned` are the browser harness's handles.
  *
- * IT READS THE BUS AND DRAWS NO FRAME. `useDispatcherPlans` hands it the retained picture, so it
- * paints on its first render; the page it is on is the pager's one piece of state, and the chrome, the
- * slots and the scrolling belong to `src/modules/chat-gutters`.
+ * IT READS THE BUS, HOLDS NO STATE AND DRAWS NO FRAME. `useDispatcherPlans` hands it the retained
+ * picture, so it paints on its first render; the chrome, the slots and the scrolling belong to
+ * `src/modules/chat-gutters`.
  *
  * Used by `src/modules/chat-gutters` (`ChatGutterLayout`), as the Runner widget's body.
  */
 export function RunnerWidgetBody({ sessionId }: { sessionId: string | null }) {
   const { t } = useTranslation();
   const { plans, hidden, arcs, loosePlanners, carriedNames } = useDispatcherPlans();
-  // The lane split once, by the one rule both homes read; the pager turns it into pages.
+  // The lane split once, by the one rule both homes read, then ordered for this chat.
   const split = useMemo(() => byArc(plans, arcs), [plans, arcs]);
+  const items = useMemo(() => widgetItemsOf(split, sessionId), [split, sessionId]);
   useLaneFoldPrune(plans, hidden, arcs);
+  const ended = endedHide(plans, carriedNames);
+  // The widget's root: where `Hide ended · N` hands the keyboard on once the button has left with its
+  // count. One element in both branches below, so a press that hid the whole lane still finds it.
+  const widgetRef = useRef<HTMLDivElement>(null);
+
+  // A chat switch re-renders this body in place — the route changes, the widget stays mounted — so the
+  // frame's scroller would keep the last chat's offset and could open the new chat with another chat's
+  // item filling the widget. The list starts with the open chat's own items, so the top is where a
+  // newly opened chat is read from. A layout effect, so the old offset is never painted.
+  useLayoutEffect(() => {
+    const viewport = scrollViewportOf(widgetRef.current);
+    if (viewport !== null) viewport.scrollTop = 0;
+  }, [sessionId]);
+
+  // `Hide ended · N` takes itself away (nothing ended is left to hide), so a keyboard reader who
+  // pressed it would land on `<body>`. On the next frame, once the hide has re-rendered the widget,
+  // focus goes to the first Hide a reader can reach, else the `Hidden · N` trigger the press drew —
+  // the tab header's own hand-off (`RunnerPanel`).
+  const hideEnded = (hide: () => void) => {
+    hide();
+    requestAnimationFrame(() => {
+      const widget = widgetRef.current;
+      if (widget === null) return;
+      const heir = [...widget.querySelectorAll<HTMLElement>('[data-dispatcher-hide]')]
+        .find((element) => element.getClientRects().length > 0 && element.closest('[inert]') === null)
+        ?? widget.querySelector<HTMLElement>('[data-hidden-plans] button');
+      heir?.focus();
+    });
+  };
 
   // The empty state speaks of the LANE: a planner outing with no card at all is on this lane too — a
-  // soul out on an arc the store has no row for yet — even though nothing here can draw it a page. The
-  // hidden list rides under it, because a lane whose every plan is hidden must still offer the way
-  // back, and the words then say "hidden", never "nothing is running": a hidden plan may still walk.
-  if (plans.length === 0 && arcs.length === 0 && loosePlanners.length === 0) {
-    return (
-      <div data-runner-widget className="flex min-w-0 flex-col gap-4">
-        <EmptyState icon={ActivityIcon} title={t(hidden.length > 0 ? 'dispatcher.hidden.allHidden' : 'runner.empty')} />
-        <HiddenPlans hidden={hidden} carriedNames={carriedNames} />
-      </div>
-    );
-  }
+  // soul out on an arc the store has no row for yet — even though nothing here can draw it an item.
+  // Over hidden plans the words say "hidden", never "nothing is running": a hidden plan may still walk.
+  const nothingDrawn = plans.length === 0 && arcs.length === 0 && loosePlanners.length === 0;
 
   return (
-    <div data-runner-widget className="flex min-w-0 flex-col gap-4">
-      {/* The outings with no deck to be drawn in, above the pages — the tab's own arrangement
-          (`LoosePlannerBadges`). It draws nothing when there are none. */}
-      <LoosePlannerBadges planners={loosePlanners} />
-      <WidgetPager
-        key={sessionId ?? ''}
-        split={split}
-        plans={plans}
-        hidden={hidden}
-        carriedNames={carriedNames}
-        sessionId={sessionId}
-      />
+    <div ref={widgetRef} data-runner-widget className="flex min-w-0 flex-col gap-4">
+      {nothingDrawn ? (
+        <EmptyState icon={ActivityIcon} title={t(hidden.length > 0 ? 'dispatcher.hidden.allHidden' : 'runner.empty')} />
+      ) : (
+        <>
+          {/* The outings with no deck to be drawn in, above the list — the tab's own arrangement
+              (`LoosePlannerBadges`). It draws nothing when there are none. */}
+          <LoosePlannerBadges planners={loosePlanners} />
+          {/* Not drawn when nothing has finished; no dialog: `Show all` undoes it. */}
+          {ended && (
+            <Button variant="secondary" size="sm" className="h-8 self-end" onClick={() => hideEnded(ended.hide)} data-hide-ended>
+              {t('dispatcher.hideEnded', { count: ended.count })}
+            </Button>
+          )}
+          {items.length > 0 && (
+            <ul className={cn('flex min-w-0 flex-col', LANE_CARD_GAP)}>
+              {items.map((item, index) => {
+                // A deck stands 24px from its neighbours, as the tab's decks do (`DispatchArcDecks`'
+                // `gap-6`), so where an arc begins and ends is read from the spacing: the list's card
+                // gap (16px) plus `mt-2`. The list stays flat and keyed by item, so a poll that re-sorts
+                // it moves cards rather than remounting them.
+                const besideDeck = index > 0 && (item.kind === 'arc' || items[index - 1]?.kind === 'arc');
+                return (
+                  <li key={itemKey(item)} data-widget-item={itemKey(item)} className={cn('min-w-0', besideDeck && 'mt-2')}>
+                    {item.kind === 'arc' ? (
+                      <DispatchArcDecks groups={[item.group]} home="gutter" pinnedSessionId={sessionId} carriedNames={carriedNames} />
+                    ) : (
+                      <PlanItem plan={item.plan} mine={openedBy(item.plan, sessionId)} carriedNames={carriedNames} />
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </>
+      )}
+      {/* The way back from any hide — under the EmptyState too, because a lane whose every plan is
+          hidden must still offer it. */}
+      <HiddenPlans hidden={hidden} carriedNames={carriedNames} />
+    </div>
+  );
+}
+
+/**
+ * A plan of no arc as the widget draws it: its card, wearing this chat's pin when the chat opened it —
+ * the same pin a plan inside an arc deck wears on its own row, so "this chat opened that plan" reads
+ * the same at either depth.
+ */
+function PlanItem({ plan, mine, carriedNames }: { plan: DispatcherPlan; mine: boolean; carriedNames: string[] }) {
+  return (
+    <div data-testid="runner-widget-plan" data-plan-name={plan.name} data-pinned={String(mine)} className="flex min-w-0 flex-col gap-1">
+      {mine && <SessionPin />}
+      <PlanCard plan={plan} onHide={planHide(plan, carriedNames)} />
     </div>
   );
 }

@@ -1,4 +1,4 @@
-import { EyeOff } from 'lucide-react';
+import { EyeOff, Layers } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 import { DispatchArcControls } from '@/modules/dispatcher/ArcControls';
@@ -61,6 +61,33 @@ const ARC_STATUS: Record<DispatcherArcStatus, { key: string; tone: Tone }> = {
 const FLOW_MARK: Partial<Record<DispatcherPlanStatus, string>> = { complete: '✓', live: '▶︎', paused: '⏸︎', scheduled: '◷' };
 
 /**
+ * THE ARC'S MARK — what tells an arc deck from a plan card at a glance (operator, 2026-09-28: "can we
+ * also have a special indicator for arcs on arc cards please"). The two draw one head anatomy
+ * (`LaneCardHead`), and the `.arc` ending on the name was all that set the arc apart; the mark
+ * REPLACES that ending rather than standing beside it, so the head says "arc" once.
+ *
+ * A KIND, NOT A STATE: the kit's `Badge` in its OUTLINE shape. Every state word on a lane card is a
+ * filled badge, so the one outlined pill in the head reads as a different kind of fact before its word
+ * is read, and it never argues with the arc's status tone beside it. The `Layers` glyph (a card that
+ * holds cards) and the word carry it without colour (design doctrine §6). No count: the head already
+ * binds `done/total` plans to the arc's word.
+ *
+ * It rides INSIDE the heading, before the name, so heading navigation hears "Arc restorly" and the
+ * mark and the name wrap as words do. A fold keeps it because a fold keeps the head, and no plan card
+ * draws it — a plan's head is `PlanCard`'s, which has no mark to hand. `data-arc-mark` is the browser
+ * harness's handle.
+ */
+function ArcMark() {
+  const { t } = useTranslation();
+  return (
+    <Badge as="span" variant="outline" className="me-1 gap-1 align-middle" data-arc-mark>
+      <Layers aria-hidden="true" className="h-3.5 w-3.5" />
+      {t('dispatcher.arcMark')}
+    </Badge>
+  );
+}
+
+/**
  * ONE dispatch arc, drawn as the deck every arc on this screen is drawn as, in the lane card's ONE
  * anatomy (`LaneCardHead`, `ActionBar`): the arc's head on top, its action bar directly under it, the
  * arc's flow of plans under that, and beneath it the plans of the arc in the arc's own walk order
@@ -75,9 +102,9 @@ const FLOW_MARK: Partial<Record<DispatcherPlanStatus, string>> = { complete: '�
  * paused, `◷` scheduled, else the plan's place in the arc (`FLOW_MARK`); toned as the plan's own badge
  * is (`planStatusTone`), named `<plan> · <word>`, and filled as far as the arc's complete plans reach.
  *
- * THE HEAD, ROW BY ROW: the arc's door (`<name>.arc`), its word (`ARC_STATUS`), the hour a Schedule
- * start armed (the clock slot, `data-dispatch-arc-schedule-note`) and how many of its plans are
- * complete; then the goal its designer wrote, clamped to two lines, and who is out on it; then its
+ * THE HEAD, ROW BY ROW: the arc's mark and name (`ArcMark`), its word (`ARC_STATUS`), the hour a
+ * Schedule start armed (the clock slot, `data-dispatch-arc-schedule-note`) and how many of its plans
+ * are complete; then the goal its designer wrote, clamped to two lines, and who is out on it; then its
  * books as pills, counting at first sight (`darc:<name>`). The corner is `⋯` — carrying `Hide ended
  * plans · N` when any plan of the deck has ended — then Hide, which puts EVERY plan of the deck in the
  * `Hidden` list in one write (`arcHide`), then the fold.
@@ -124,7 +151,9 @@ export function DispatchArcDeck({
 }) {
   const { t } = useTranslation();
   const { arc, plans } = group;
-  const title = `${arc.name}.arc`;
+  // The arc's DOOR, as the CLI and the routes spell it: what the flow and the strip are named by for a
+  // screen reader. The head shows the bare name, because its mark already says "arc".
+  const door = `${arc.name}.arc`;
   const word = ARC_STATUS[arc.status] ?? ARC_STATUS.designing;
   // The arc's own books: the store carries them on the arc row so no head has to add up the cards
   // itself (INV-4299), and `spendParts` is the one decision every card draws a figure from — dollars
@@ -152,7 +181,7 @@ export function DispatchArcDeck({
       status={arc.status}
       head={(
         <LaneCardHead
-          title={<span data-arc-door className="font-mono">{title}</span>}
+          title={<><ArcMark />{' '}<span data-arc-title className="font-mono">{arc.name}</span></>}
           badge={<Badge tone={word.tone} className="shrink-0">{t(word.key)}</Badge>}
           clock={armed !== null ? (
             <span className="flex-none font-mono text-xs text-muted-foreground" data-dispatch-arc-schedule-note>
@@ -168,7 +197,7 @@ export function DispatchArcDeck({
                 <p className="line-clamp-2 min-w-0 max-w-3xl break-words text-xs leading-snug text-muted-foreground">{arc.goal}</p>
               )}
               {/* Who is out on the arc, under its goal: a planner badge is a LONG LINE, and on row one
-                  it would take the room the arc's door and word are read in. Nothing when none is. */}
+                  it would take the room the arc's name and word are read in. Nothing when none is. */}
               {arc.planner && <PlannerBadge planner={arc.planner} />}
             </>
           )}
@@ -179,9 +208,9 @@ export function DispatchArcDeck({
         />
       )}
       foldKey={dispatchArcFoldKey(arc.name)}
-      flow={{ nodes, doneCount, ariaLabel: t('dispatcher.flow.arc', { arc: title }) }}
+      flow={{ nodes, doneCount, ariaLabel: t('dispatcher.flow.arc', { arc: door }) }}
       bodyTop={<DispatchArcControls arc={arc} />}
-      stripLabel={t('runner.arcStrip', { title })}
+      stripLabel={t('runner.arcStrip', { title: door })}
       focusIndex={deckFocusIndex(plans)}
       cardCount={plans.length}
     >
@@ -219,15 +248,15 @@ export function DispatchArcDeck({
  * those two already own it. The home is still written on the DOM (`data-dispatch-arcs`) so a reading
  * is always taken from ONE home.
  *
- * THE DECKS STACK AT `gap-6`, wider than the cards' own `gap-4` inside a deck, so where one arc ends
+ * THE DECKS STACK AT `gap-6`, wider than the `LANE_CARD_GAP` between two cards, so where one arc ends
  * and the next begins is read from the spacing before any head is read.
  *
  * NOTHING AT ZERO ARCS: an operator with none sees the pane exactly as it was before arcs existed.
  * Nothing here reads the lane either — the caller hands it the split it already has, so a caller that
  * filters its list and one that does not can never draw different decks.
  *
- * Used by `RunnerPanel` (the tab home), above the plans of no arc, and by `WidgetPager` (the gutter),
- * one arc per page (`groups={[group]}`).
+ * Used by `RunnerPanel` (the tab home), above the plans of no arc, and by `RunnerWidgetBody` (the
+ * gutter), once per arc item of its list (`groups={[group]}`).
  */
 export function DispatchArcDecks({
   groups,

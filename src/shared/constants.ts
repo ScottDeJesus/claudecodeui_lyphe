@@ -268,12 +268,20 @@ export const MARKDOWN_CARDS_CLASS = 'chat-md-cards';
 //----------------- DISPATCHER LANE WALL ------------
 
 /**
+ * The space between two lane cards, whether they stand side by side on the Runner tab's wall or one
+ * under another in the chat gutter's Runner widget. Both homes read this one value, so the widget's
+ * list keeps the tab's card spacing.
+ *
+ * Used by `LANE_WALL_GRID` below and by the runner-tab module's `RunnerWidgetBody` (its list of cards).
+ */
+export const LANE_CARD_GAP = 'gap-4';
+
+/**
  * The Runner tab's wall: an auto-fill grid of lane cards, each column at least 22rem wide (or the
  * whole column where the pane is narrower, so a phone gets one card a row and never a sideways
  * scroll), row-major, and every card at its OWN height (`items-start`) rather than the tallest in
- * its row. Spelled once so the two walls on the tab cannot drift apart.
+ * its row, spaced `LANE_CARD_GAP` apart.
  *
- * Used by the dispatcher module's `DeckFrame` (an arc's plans, in the tab home) and by the runner-tab
- * module's `RunnerPanel` (the plans of no arc).
+ * Used by the runner-tab module's `RunnerPanel`, for the plans of no arc.
  */
-export const LANE_WALL_GRID = 'grid grid-cols-[repeat(auto-fill,minmax(min(100%,22rem),1fr))] items-start gap-4';
+export const LANE_WALL_GRID = `grid grid-cols-[repeat(auto-fill,minmax(min(100%,22rem),1fr))] items-start ${LANE_CARD_GAP}`;

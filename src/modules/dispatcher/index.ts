@@ -36,7 +36,7 @@ export type { DispatchDeckLayer, DispatcherArcGroup, DispatcherArcSplit } from '
 // is the stack of decks, given the split that says which plans go under which arc. Drawn by both homes
 // in `src/modules/runner-tab`: the Runner tab and the chat gutter's widget.
 export { PlanCard } from '@/modules/dispatcher/PlanCard';
-export { DispatchArcDeck, DispatchArcDecks } from '@/modules/dispatcher/ArcDeck';
+export { DispatchArcDecks } from '@/modules/dispatcher/ArcDeck';
 // The `Hidden · N` list at the foot of both homes: every hidden plan, each with its `Show`.
 export { HiddenPlans } from '@/modules/dispatcher/HiddenPlans';
 // The pin a plan wears when the open chat is the one that launched it, drawn by both homes.

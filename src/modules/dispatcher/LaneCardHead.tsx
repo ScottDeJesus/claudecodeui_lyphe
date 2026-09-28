@@ -7,7 +7,7 @@ import { ActionMenu, Button, CardFoldToggle, Tooltip } from '@/shared/ui';
 import type { ActionMenuItem } from '@/shared/ui';
 
 type LaneCardHeadProps = {
-  /** Which card this is: the plan's mono name, or the arc's `<name>.arc` door. */
+  /** Which card this is: the plan's mono name, or the arc's mark and mono name (`ArcMark`) — the one thing that tells the two heads apart. */
   title: ReactNode;
   /** The card's one status word, in its tone. */
   badge: ReactNode;
@@ -40,28 +40,16 @@ function canFocus(element: HTMLElement): boolean {
   return element.isConnected && element.getClientRects().length > 0 && element.closest('[inert]') === null;
 }
 
-/** Whether a control lies inside its arc strip's visible box: a strip lays its other cards out beside it. */
-function inStripView(element: HTMLElement): boolean {
-  const strip = element.closest<HTMLElement>('[data-arc-strip]');
-  if (strip === null) return true;
-  const box = strip.getBoundingClientRect();
-  const at = element.getBoundingClientRect();
-  return at.left >= box.left - 1 && at.right <= box.right + 1;
-}
-
 /**
  * Hide, with somewhere for the keyboard to land. The pressed button leaves with its card, and a focused
  * node that unmounts drops focus to `<body>` — a keyboard reader who put one card away was thrown back
  * to the top of the document. So the heir is chosen BEFORE the hide, in the same home: the next Hide
  * in document order, else the previous one, never one inside the card that is leaving (an arc's Hide
- * takes its plans with it). It is focused on the next frame, once the hide store's synchronous write
- * has re-rendered the home; a candidate the render took away (the last plan of a deck takes its deck)
- * is skipped, and with none left the heir is the home's `Hidden · N` trigger — which the first hide
- * is what draws. The one home that shows a card only AFTER the hide is the widget's pager: the page
- * that replaces the hidden one mounts in that render, so where no heir existed before the press, the
- * home is asked again before falling back to `Hidden · N` — for a PLAN's Hide first, the one in view
- * when the new page is an arc's strip, so the next press puts one plan away as the last one did and
- * never the whole arc; the arc head's own Hide only when the page holds no plan card at all.
+ * takes its plans with it). Both homes draw every card they carry at once, so every heir there will be
+ * is already on screen at the press. It is focused on the next frame, once the hide store's synchronous
+ * write has re-rendered the home; a candidate the render took away (the last plan of a deck takes its
+ * deck) is skipped, and with none left the heir is the home's `Hidden · N` trigger — which the first
+ * hide is what draws.
  */
 function hideKeepingFocus(button: HTMLElement | null, onHide: () => void): void {
   const home = button?.closest<HTMLElement>(HOME) ?? null;
@@ -73,10 +61,7 @@ function hideKeepingFocus(button: HTMLElement | null, onHide: () => void): void 
   onHide();
   if (home === null) return;
   requestAnimationFrame(() => {
-    const arrivals = heirs.length === 0 ? [...home.querySelectorAll<HTMLElement>('[data-dispatcher-hide]')].filter(canFocus) : [];
-    const arrived = arrivals.find((element) => element.closest('[data-dispatcher-card]') !== null && inStripView(element))
-      ?? arrivals[0];
-    const heir = heirs.find(canFocus) ?? arrived ?? home.querySelector<HTMLElement>('[data-hidden-plans] button');
+    const heir = heirs.find(canFocus) ?? home.querySelector<HTMLElement>('[data-hidden-plans] button');
     heir?.focus();
   });
 }
@@ -108,8 +93,9 @@ function selectKeepingFocus(
 
 /**
  * A lane card's HEAD — the part that says WHICH card this is and how it stands, and the one part a fold
- * never takes. The plan card and the arc deck both draw it, so the two read alike at a glance: the same
- * rows in the same order, the same corner in the same place.
+ * never takes. The plan card and the arc deck both draw it, so the two share one anatomy — the same
+ * rows in the same order, the same corner in the same place — and at a glance differ by one thing: the
+ * arc's mark leading its title (`ArcMark`, handed in by `DispatchArcDeck`).
  *
  * THREE ROWS AND A CORNER. Row one is the title, the card's word bound to `done/total`, and its clock;
  * row two is the lead (the goal, then the planner badge and the waits); row three is the card's total

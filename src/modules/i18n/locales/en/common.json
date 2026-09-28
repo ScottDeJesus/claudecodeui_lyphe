@@ -805,11 +805,7 @@
     "pager": {
       "plan": "Card {{n}} of {{total}}",
       "previousPlan": "Previous card",
-      "nextPlan": "Next card",
-      "of": "{{n}} of {{total}}",
-      "previous": "Previous page",
-      "next": "Next page",
-      "label": "Runner pages — Left and Right turn the page"
+      "nextPlan": "Next card"
     },
     "now": {
       "next": "Next",
@@ -864,6 +860,7 @@
       "showAll": "Show all",
       "allHidden": "Every plan on the lane is hidden"
     },
+    "arcMark": "Arc",
     "arcStatus": {
       "designing": "DESIGNING",
       "judged": "JUDGED",

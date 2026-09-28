@@ -116,12 +116,12 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-deck-height.mjs
 
 measured 2026-09-25. Operator, with a phone screenshot of the Runner widget: "This card is rendering funny on my phone" (`/tmp/chains/arc-header-phone.jpg`: `restorly.arc` one letter per line in a monospace column, `$0.32 DeepSeek · 2.6M in · 26k out` whole beside it, the status word and the fold chevron cut off past the card's edge).
 
-- CONTROL ON THE RUNNING BUILD (`--head-css` sets the group `nowrap` and the title `min-width: 0` in the page): on the 2026-09-25 header, 12 lines in a 0px-wide box at 390px and 23px of spill; on `LaneCardHead` (2026-09-26), 3 lines in a 43px box at 320px — the corner now stands outside the group, so 390px leaves the title room even without its floor.
+- CONTROL ON THE RUNNING BUILD (`--head-css` sets the group `nowrap` and the title `min-width: 0` in the page): on the 2026-09-25 header, 12 lines in a 0px-wide box at 390px and 23px of spill; on `LaneCardHead` with the arc's mark in the title (2026-09-28), 1 line in a 91px box at 390 and 4 lines in a 21px box at 320 — the corner now stands outside the group, so 390px leaves the title room even without its floor.
 - AFTER (2026-09-26, `LaneCardHead`): all 20 heads of the Runner tab — the `restorly` deck, its 13 plan cards and 6 loose plans — read `scrollWidth === clientWidth` on `data-lane-head-row` at 1920, 390 and 320; the arc's title is 1 line in a 113px box at 390 and 134px at 320, the pills below it, 0px of header overflow, light and dark.
 
 ```probe
 node .verify/probe-arc-header-fit.mjs --tag after             # exit 0: every reading held, 0 failed
-node .verify/probe-arc-header-fit.mjs --tag head --head-css   # the control, expected to FAIL at 320: 3 lines in a 43px box
+node .verify/probe-arc-header-fit.mjs --tag head --head-css   # the control, expected to FAIL at 320: 4 lines in a 21px box
 ```
 expect: on the deck the title's box is at least its longest word wide AND the head row's `scrollWidth` equals its `clientWidth`, at 1440, 390 and 320, dark and light; the pills (`data-arc-spend`) are below the title with no overlap; 0 console errors of this app's. The `--head-css` pass rewrites two CSS declarations IN THE PAGE (never the source, never the store) and is expected to reproduce the crush — that is what makes those declarations, and not something else in the diff, the cause. The dev client must be up on 127.0.0.1:5183; the probe presses no control and writes nothing.
 
@@ -138,20 +138,6 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/ArcDeck.t
 - retiring these files is the operator's call: they are the standing-gate record of past phases. `.verify/` is gitignored, so a `git clean -x` deletes it and no commit shows the change.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/all.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/arc-run-fixture.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/arc-stuck-fixture.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/runner-fixture.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-23.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-24.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-25.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-26.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-27.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-arc-fill.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-arc-nest-athena.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-arc-run-merge.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-card-fold.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-phase-wave-mark.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-planner-card.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-planner-card-write.py, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-runner-model-pin.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-runner-schedule.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-side-widgets.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/stale-chat/asclepius-stale-proof.mjs
-
-## INV-4649 — probe — `whole.mjs`'s reduced-motion reading of the pager item passes without reduce too
-
-`whole.mjs`'s reduced-motion reading of the pager item passes without reduce too
-
-```probe
-node /tmp/pipeline-reviews/runner-card-makeover--whole/athena-probes/pagein.mjs
-expect: the line `reduce=false next (first sight of page 2) +100ms` shows "anim":"none", while `reduce=false prev (page 1 again, seen)` shows "anim":"vv-pagein" and every reduce=true line shows "none"
-```
-
-measured 2026-09-26 by chain chain-runner-card-makeover--whole-20260926-210824-bf49, finding L1, LOW
-probe-key: 1e4928fb105751b48435fdef7b5f24889928ee10
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/phaseWord.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/PlanCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/PlanPhaseRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/ScrollArea.tsx
 
 ## INV-4650 — probe — MAN-373 and ScrollArea's comment say "a focus" scrolled the outer box; measured, a focus does not
 

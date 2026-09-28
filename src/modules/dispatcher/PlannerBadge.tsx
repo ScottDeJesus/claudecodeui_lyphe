@@ -120,7 +120,7 @@ export function PlannerBadge({ planner }: { planner: DispatcherPlanner }) {
  * operator who was never in this state sees the pane exactly as it was before badges existed.
  *
  * Used by `RunnerPanel` (the tab), immediately above `DispatchArcDecks`, and `RunnerWidgetBody` (the
- * gutter), immediately above the pager whose pages those decks are.
+ * gutter), immediately above its list of decks and cards.
  */
 export function LoosePlannerBadges({
   planners,
