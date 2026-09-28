@@ -13,8 +13,9 @@ const DEFAULT_BIN = '~/.claude/scripts/dispatcher';
 
 /**
  * How long a kick may take before it is given up on. `kick` is a datagram to a live daemon, or a
- * `systemd-run` for one that is not there yet — both answer in well under a second, so this is a
- * bound on a door that is stuck, never a wait anybody is meant to sit through.
+ * `systemd-run` for one that is not there yet — both answer in well under a second, save a daemon
+ * mid-handoff, which a kick waits up to `HANDOFF_WAIT_S` (3 s, `hooks/dispatcher/daemon_hold.py`)
+ * for — so this is a bound on a door that is stuck, never a wait anybody is meant to sit through.
  */
 const KICK_TIMEOUT_MS = 10_000;
 
@@ -44,7 +45,8 @@ function text(value: unknown): string {
  *
  * A kick wakes the daemon that is already running, or starts one where the store holds work, and its
  * own answer is the record that the flip got there: `woke daemon`, `started daemon unit=…`,
- * `no work`, or `no daemon` when this host has no user manager to hold one.
+ * `no work`, `daemon holds the home` when a daemon mid-handoff keeps the lock, or `no daemon` when
+ * this host has no user manager to hold one.
  *
  * NOTHING HERE RAISES AND NOTHING HERE AWAITS A VERDICT. The toggles that call it must answer with
  * the position on disk whatever the dispatcher is doing — a switch that failed because a daemon was
