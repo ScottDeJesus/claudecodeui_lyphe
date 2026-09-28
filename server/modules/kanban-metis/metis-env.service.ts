@@ -237,6 +237,8 @@ export function buildMetisArgv(spec: MetisChildSpec): string[] {
   }
 
   argv.push('--model', spec.model);
+  // DeepSeek maps xhigh to high (its default); only `max` raises the effort. `souls.py:argv` holds the same rule.
+  if (spec.provider === 'deepseek') argv.push('--effort', 'max');
   argv.push('--append-system-prompt', spec.appendSystemPrompt);
   argv.push('--mcp-config', buildMcpConfig(spec));
   argv.push('--strict-mcp-config');
