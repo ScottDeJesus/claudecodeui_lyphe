@@ -40,9 +40,9 @@ const KIND_TIMEOUT_MS = 20_000;
 
 /**
  * Wall-clock ceiling for a cycle door. Both doors run the worker's own bounded wait for the ledger's
- * flock first (`LOCK_WAIT_S`, 45 s) and then answer, so the bound has to clear that wait with room to
- * index what the press arrives among; 90 s is `heal-reflex`'s own number for this door, kept here so
- * the server does not cut a worker that is behaving exactly as it promised.
+ * flock first (`LOCK_WAIT_S`, 45 s) and then answer, so the bound has to clear that wait with room for
+ * the pass the door runs once it holds the lock; 90 s is `heal-reflex`'s own number for this door, kept
+ * here so the server does not cut a worker that is behaving exactly as it promised.
  */
 const CYCLE_TIMEOUT_MS = 90_000;
 
