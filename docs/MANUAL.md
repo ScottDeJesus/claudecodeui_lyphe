@@ -2660,7 +2660,7 @@ so an id that collides with a member `Object.prototype` carries — `constructor
 `queued` while it waits; while it is out, `designing` for a `design` AND a `tell` (a tell resumes the very
 session a design opened — the same outing continued, so a reader sees the same work being done),
 `judging` for a `judge`, `cutting` for a `cut`. The model is the row's own word (`opus`, `fable` — the
-grant the door booked). The elapsed is `useElapsed` from the stamp that state BEGAN, the store's own:
+grant the door booked, or for a `judge` the arc's own design model the daemon resolved). The elapsed is `useElapsed` from the stamp that state BEGAN, the store's own:
 `created_at` while queued, `launched_at` while out.
 
 AN ENDED OUTING DRAWS NO CLOCK, and says what became of it instead: `ended short: <outcome>`
