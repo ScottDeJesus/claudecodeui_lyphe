@@ -52,7 +52,7 @@ export function HealCardList({ heals }: { heals: HealCard[] }) {
           <EmptyState
             icon={HeartPulseIcon}
             title={t('heal.cards.empty.title', { defaultValue: 'No heal has run yet' })}
-            message={t('heal.cards.empty.message', { defaultValue: 'A cycle fires them — Run a cycle now opens one over the live friction.' })}
+            message={t('heal.cards.empty.message', { defaultValue: 'A cycle fires them — nightly on the schedule, or Run a cycle now.' })}
           />
         </div>
       ) : (

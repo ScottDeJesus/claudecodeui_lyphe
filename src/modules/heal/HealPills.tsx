@@ -105,7 +105,7 @@ export function HealPills({ summary, activePill, onSelect }: HealPillsProps) {
     value: cycleState.text,
     tone: CYCLE_TONE[cycleState.word],
     title: cycleState.at === null
-      ? t('heal.cycles.pillOffTitle', { defaultValue: 'No cycle opens on its own; Run a cycle now opens one' })
+      ? t('heal.cycles.pillOffTitle', { defaultValue: 'The nightly schedule is off; Run a cycle now opens one' })
       : new Date(cycleState.at * 1000).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }),
     wrap: true,
   };

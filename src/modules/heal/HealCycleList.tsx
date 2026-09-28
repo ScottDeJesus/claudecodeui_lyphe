@@ -25,7 +25,7 @@ import { cn } from '@/shared/utils';
  * above zero: Claude is a subscription, and a dollar figure on a Claude cycle would be an invented cost.
  *
  * With no cycle yet the empty line carries the worker's own sentence on how one opens
- * (`cycle_state.text` — "Run a cycle now opens one", "Schedule off").
+ * (`cycle_state.text` — "Next cycle 10:00 UTC", "Schedule off").
  */
 export function HealCycleList({ cycles, cycleState }: { cycles: HealCycle[]; cycleState: HealCycleState }) {
   const { t } = useTranslation();
@@ -37,7 +37,7 @@ export function HealCycleList({ cycles, cycleState }: { cycles: HealCycle[]; cyc
           {t('heal.cycles.title', { defaultValue: 'Cycles' })}
         </h4>
         {shown.length > 0 && <Badge as="span" tone="neutral">{shown.length}</Badge>}
-        <span className="text-xs text-muted-foreground">· {t('heal.cycles.hint', { defaultValue: 'a press opens one — Chiron ranks, heals walk his list' })}</span>
+        <span className="text-xs text-muted-foreground">· {t('heal.cycles.hint', { defaultValue: 'nightly or pressed — Chiron ranks, heals walk his list' })}</span>
       </div>
       {shown.length === 0 ? (
         <p className="text-xs text-muted-foreground" data-heal-cycles-empty>

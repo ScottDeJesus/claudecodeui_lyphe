@@ -6327,7 +6327,7 @@ from a hook, with no database and no HTTP.
 | `heal.flag` | THE MASTER — may an ending ASK to launch a heal at all | **ON**, which is today's behaviour: it ships absent |
 | `heal_daily_cap.flag` | the day's ceiling, a plain decimal dollar amount | **NO CEILING** |
 | `heal_model.flag` | WHICH MODEL a heal's souls run on — `deepseek` or `claude`, one word; the HEAL's own choice, unrelated to the chat composer's `deepseek_flash.flag` | **`deepseek`**, the side it ships on |
-| `heal_cycle.flag` | the UTC hour after which a tick opens the maintenance cycle — `off`, or `on <hour>`; no timer fires a tick, so only a press opens one today, and a pressed cycle (typed `/heal`) is the operator's own hand and is never gated by it | **ON at hour 10**, the side it ships on |
+| `heal_cycle.flag` | the UTC hour the nightly maintenance cycle opens at — `off`, or `on <hour>`; the hour fires as the systemd calendar unit `heal-cycle-nightly.timer`, which `writeHealCycle` re-arms from the file on every write (`heal-nightly.ts` → `scripts/heal-nightly sync`: `on <h>` arms at `h`, `off` disarms, read back out of systemd), and a pressed cycle (typed `/heal`) is the operator's own hand and is never gated by it | **ON at hour 10**, the side it ships on |
 | `deepseek_flash.flag` | the CHAT COMPOSER's own switch — a fifth file, and the one this row is here to rule OUT: no heal door reads or writes it, for any reason, not even as a fallback | not applicable — never read by any of the four above |
 
 `GET`/`PUT /api/settings/heal-master` (`{"enabled": boolean}`; anything else is 400
