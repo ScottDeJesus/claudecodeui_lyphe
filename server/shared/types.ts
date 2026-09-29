@@ -653,6 +653,8 @@ export type NormalizedMessage = {
   toolId?: string;
   toolResult?: {
     content?: string;
+    /** Pictures the tool returned (a Read of an image), drawn by the transcript under the call: an inline data URL on a live frame, the `path` of a stored chat asset in a loaded history. */
+    images?: Array<{ data?: string; path?: string }>;
     isError?: boolean;
     toolUseResult?: unknown;
     /** When the result landed — for an agent, when it finished. Absent when the transcript does not say. */

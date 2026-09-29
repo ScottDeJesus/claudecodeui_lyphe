@@ -331,8 +331,16 @@
       "closeSidebar": "사이드바 닫기"
     }
   },
+  "lightbox": {
+    "close": "미리보기 닫기",
+    "zoomIn": "확대",
+    "zoomOut": "축소",
+    "fit": "화면에 맞추기"
+  },
   "shapes": {
-    "diagramFailed": "이 다이어그램을 그릴 수 없어 소스를 표시합니다."
+    "diagramFailed": "이 다이어그램을 그릴 수 없어 소스를 표시합니다.",
+    "diagram": "다이어그램",
+    "diagramOpen": "다이어그램을 전체 화면으로 열기"
   },
   "runner": {
     "collapse": "접기",

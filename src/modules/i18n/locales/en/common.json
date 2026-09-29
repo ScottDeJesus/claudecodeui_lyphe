@@ -1200,8 +1200,16 @@
       "closeSidebar": "Close sidebar"
     }
   },
+  "lightbox": {
+    "close": "Close preview",
+    "zoomIn": "Zoom in",
+    "zoomOut": "Zoom out",
+    "fit": "Fit to screen"
+  },
   "shapes": {
-    "diagramFailed": "This diagram could not be drawn — showing its source."
+    "diagramFailed": "This diagram could not be drawn — showing its source.",
+    "diagram": "Diagram",
+    "diagramOpen": "Open diagram full screen"
   },
   "gutters": {
     "runner": {

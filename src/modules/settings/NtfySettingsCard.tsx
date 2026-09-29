@@ -2,13 +2,12 @@ import { useTranslation } from 'react-i18next';
 
 import { useNtfySettings } from '@/modules/settings/hooks/useNtfySettings';
 import SettingsCard from '@/modules/settings/SettingsCard';
-import SettingsRow from '@/modules/settings/SettingsRow';
 import SettingsSection from '@/modules/settings/SettingsSection';
 import SettingsToggle from '@/modules/settings/SettingsToggle';
-import { Button, Input } from '@/shared/ui';
+import { Button, Input, SettingRow } from '@/shared/ui';
 
-/** The text inputs' width. Narrow enough that a label and its field still share a row at 390px. */
-const FIELD_WIDTH = 'w-44 sm:w-64';
+/** The text inputs' width. Wider than fits beside a 10rem text column on a phone, so the row drops the field below its label there, where it still fits the row. */
+const FIELD_WIDTH = 'w-64 max-w-full';
 
 /**
  * Rendered by the settings module's notifications tab: the ntfy phone-push channel — its
@@ -33,7 +32,7 @@ export default function NtfySettingsCard() {
         description={t('notifications.ntfy.description')}
       >
         <SettingsCard divided>
-          <SettingsRow label={t('notifications.ntfy.server')}>
+          <SettingRow label={t('notifications.ntfy.server')}>
             <Input
               data-testid="ntfy-server"
               className={FIELD_WIDTH}
@@ -41,9 +40,9 @@ export default function NtfySettingsCard() {
               disabled={isLoading}
               onChange={(event) => setDraft({ serverUrl: event.target.value })}
             />
-          </SettingsRow>
+          </SettingRow>
 
-          <SettingsRow
+          <SettingRow
             label={t('notifications.ntfy.topic')}
             description={
               isConfigured
@@ -63,9 +62,9 @@ export default function NtfySettingsCard() {
               disabled={isLoading}
               onChange={(event) => setDraft({ topic: event.target.value })}
             />
-          </SettingsRow>
+          </SettingRow>
 
-          <SettingsRow label={t('notifications.ntfy.token')}>
+          <SettingRow label={t('notifications.ntfy.token')}>
             <Input
               data-testid="ntfy-token"
               type="password"
@@ -76,9 +75,9 @@ export default function NtfySettingsCard() {
               placeholder={view?.hasToken ? t('notifications.ntfy.tokenKept') : undefined}
               onChange={(event) => setDraft({ token: event.target.value })}
             />
-          </SettingsRow>
+          </SettingRow>
 
-          <SettingsRow
+          <SettingRow
             label={t('notifications.ntfy.appUrl')}
             description={t('notifications.ntfy.appUrlHint')}
           >
@@ -89,9 +88,9 @@ export default function NtfySettingsCard() {
               disabled={isLoading}
               onChange={(event) => setDraft({ appUrl: event.target.value })}
             />
-          </SettingsRow>
+          </SettingRow>
 
-          <SettingsRow label={t('notifications.ntfy.longRun')}>
+          <SettingRow label={t('notifications.ntfy.longRun')}>
             <Input
               data-testid="ntfy-long-run"
               type="number"
@@ -105,9 +104,9 @@ export default function NtfySettingsCard() {
                 setDraft({ longRunMinutes: Math.max(0, Math.trunc(Number(event.target.value) || 0)) })
               }
             />
-          </SettingsRow>
+          </SettingRow>
 
-          <SettingsRow label={t('notifications.ntfy.enabled')}>
+          <SettingRow label={t('notifications.ntfy.enabled')}>
             <div data-testid="ntfy-enabled">
               <SettingsToggle
                 checked={draft.enabled}
@@ -116,11 +115,11 @@ export default function NtfySettingsCard() {
                 disabled={isLoading}
               />
             </div>
-          </SettingsRow>
+          </SettingRow>
 
-          {/* The actions carry the section's own name: SettingsRow always labels its control,
+          {/* The actions carry the section's own name: SettingRow always labels its control,
               and these three act on the whole channel rather than on any one field above. */}
-          <SettingsRow label={t('notifications.ntfy.title')}>
+          <SettingRow label={t('notifications.ntfy.title')}>
             <div className="flex flex-col items-end gap-2">
               <div className="flex flex-wrap justify-end gap-2">
                 <Button
@@ -159,7 +158,7 @@ export default function NtfySettingsCard() {
                 {status.message}
               </p>
             </div>
-          </SettingsRow>
+          </SettingRow>
         </SettingsCard>
       </SettingsSection>
     </div>

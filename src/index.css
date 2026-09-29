@@ -169,10 +169,11 @@
      pair exists to remove.
 
      IT MOVES ONLY WHAT IS IN FLOW. An `absolute` child of the layer is placed against the
-     containing block's padding EDGE, which padding does not move: measured, an ImageLightbox close
+     containing block's padding EDGE, which padding does not move: measured, a Lightbox close
      button stayed at y=16 while its layer's padding went 0 -> 47px. A control that is absolutely
-     positioned must carry the inset in its own offsets — today that is one control, the lightbox's
-     `top-[calc(1rem+var(--safe-area-inset-top))] right-[…]` (chat/transcript/ChatMessageImages.tsx).
+     positioned must carry the inset in its own offsets — today that is two controls, both in
+     shared/ui/Lightbox.tsx: the close button's `top-[calc(1rem+var(--safe-area-inset-top))]
+     right-[…]` and the bottom toolbar's `bottom-[calc(1rem+var(--safe-area-inset-bottom))]`.
 
      Inset-driven, and deliberately NOT scoped by width. Where the inset is 0 the padding is 0, so
      desktop and portrait pay nothing; where it is not, the content has to clear the sensor housing
@@ -188,7 +189,7 @@
      `max()` against `--pwa-notch-safe-pad`, the padding the sheet already wants: a layer declares
      it inline — `class="… pwa-notch-safe [--pwa-notch-safe-pad:1.5rem]"`. Absent, it is 0px and
      the padding is the inset alone, which is what every box that carries no padding of its own
-     wants: the three full-bleed layers (ImageLightbox, `ShapeFrame`, `GutterWidgetFrame`) and the
+     wants: the three full-bleed layers (`Lightbox`, `ShapeFrame`, `GutterWidgetFrame`) and the
      two dialog panels (Settings, ProviderLoginModal). */
   body.pwa-mode .pwa-notch-safe {
     padding-top: max(var(--safe-area-inset-top), var(--pwa-notch-safe-pad, 0px));

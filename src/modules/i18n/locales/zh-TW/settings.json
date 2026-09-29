@@ -8,7 +8,6 @@
   },
   "account": {
     "title": "帳戶",
-    "language": "語言",
     "languageLabel": "顯示語言",
     "languageDescription": "選擇您偏好的介面語言",
     "username": "使用者名稱",

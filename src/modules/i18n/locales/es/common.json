@@ -333,8 +333,16 @@
       "closeSidebar": "Cerrar barra lateral"
     }
   },
+  "lightbox": {
+    "close": "Cerrar vista previa",
+    "zoomIn": "Acercar",
+    "zoomOut": "Alejar",
+    "fit": "Ajustar a la pantalla"
+  },
   "shapes": {
-    "diagramFailed": "No se pudo dibujar este diagrama; se muestra su código fuente."
+    "diagramFailed": "No se pudo dibujar este diagrama; se muestra su código fuente.",
+    "diagram": "Diagrama",
+    "diagramOpen": "Abrir el diagrama a pantalla completa"
   },
   "runner": {
     "collapse": "Contraer",

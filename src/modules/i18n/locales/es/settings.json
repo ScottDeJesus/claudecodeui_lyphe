@@ -9,7 +9,6 @@
   },
   "account": {
     "title": "Cuenta",
-    "language": "Idioma",
     "languageLabel": "Idioma de la interfaz",
     "languageDescription": "Elige tu idioma preferido para la interfaz",
     "username": "Usuario",

@@ -68,37 +68,45 @@ function ProjectSidebarRegion({
     setSidebarOpen(false);
   }, [setSidebarOpen]);
 
-  if (!isMobile) {
-    return (
-      <div className="h-full flex-shrink-0 border-r border-border/50">
-        <Sidebar {...sidebarSharedProps} tabs={tabs} leading={<AppSwitcherDock />} />
-      </div>
-    );
-  }
+  // ONE TREE FOR BOTH LAYOUTS. The sidebar is docked from 768px and a drawer below it, and the two
+  // used to be two different returns — so crossing 768px (a phone turning to landscape, a window
+  // dragged across the line) unmounted the whole sidebar and mounted a new one, and with it the
+  // Settings dialog the sidebar hosts: the dialog stayed open (its flag lives above) but every bit
+  // of its state started again, the open tab first among them, back on Agents. Here the wrapper's
+  // classes change and its children keep their places, so React keeps `Sidebar` mounted: slot 0 is
+  // the scrim or nothing, slot 1 is the panel. The drawer's handlers exist on the drawer only — on
+  // the docked column a stopped click would never reach the document listeners under it.
+  //
+  // The drawer is the mobile frame's second layer, so it takes the status-bar offset with the
+  // shell (`pwa-status-clear`, src/index.css) — its panel's title row and search field are the
+  // chrome that must clear the notch. The scrim deliberately does not: a scrim covers the whole
+  // screen, and keeping it full-bleed is what stops a strip of the app showing above the drawer.
+  const stopPropagation = isMobile ? (event: ReactMouseEvent | ReactTouchEvent) => event.stopPropagation() : undefined;
 
   return (
-    // The drawer is the mobile frame's second layer, so it takes the status-bar offset with the
-    // shell (`pwa-status-clear`, src/index.css) — its panel's title row and search field are the
-    // chrome that must clear the notch. The scrim below it deliberately does not: a scrim covers
-    // the whole screen, and keeping it full-bleed is what stops a strip of the app showing above
-    // the drawer.
     <div
-      className={`pwa-status-clear fixed inset-0 z-50 flex transition-all duration-150 ease-out ${
-        sidebarOpen ? 'visible opacity-100' : 'invisible opacity-0'
-      }`}
+      className={isMobile
+        ? `pwa-status-clear fixed inset-0 z-50 flex transition-all duration-150 ease-out ${
+          sidebarOpen ? 'visible opacity-100' : 'invisible opacity-0'
+        }`
+        : 'h-full flex-shrink-0 border-r border-border/50'}
     >
-      <button
-        className="fixed inset-0 bg-background/60 backdrop-blur-sm transition-opacity duration-150 ease-out"
-        onClick={handleBackdropClick}
-        onTouchStart={handleBackdropTouch}
-        aria-label={t('versionUpdate.ariaLabels.closeSidebar')}
-      />
+      {isMobile && (
+        <button
+          className="fixed inset-0 bg-background/60 backdrop-blur-sm transition-opacity duration-150 ease-out"
+          onClick={handleBackdropClick}
+          onTouchStart={handleBackdropTouch}
+          aria-label={t('versionUpdate.ariaLabels.closeSidebar')}
+        />
+      )}
       <div
-        className={`relative h-full w-[85vw] max-w-sm transform border-r border-border/40 bg-card transition-transform duration-150 ease-out sm:w-[20.5rem] ${
-          sidebarOpen ? 'translate-x-0' : '-translate-x-full'
-        }`}
-        onClick={(event) => event.stopPropagation()}
-        onTouchStart={(event) => event.stopPropagation()}
+        className={isMobile
+          ? `relative h-full w-[85vw] max-w-sm transform border-r border-border/40 bg-card transition-transform duration-150 ease-out sm:w-[20.5rem] ${
+            sidebarOpen ? 'translate-x-0' : '-translate-x-full'
+          }`
+          : 'h-full'}
+        onClick={stopPropagation}
+        onTouchStart={stopPropagation}
       >
         <Sidebar {...sidebarSharedProps} tabs={tabs} leading={<AppSwitcherDock />} />
       </div>

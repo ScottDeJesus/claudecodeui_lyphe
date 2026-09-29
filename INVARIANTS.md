@@ -1081,3 +1081,284 @@ measured 2026-09-29 by chain chain-agent-launch-config--docs-cloudcli-20260928-2
 probe-key: 9d0f1d6765e00c290f340834ae842db81b3d9695
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts
+
+## INV-5758 — probe — MEDIUM — a picture bypasses `MAX_TOOL_RESULT_CONTENT`; an image-heavy session's history page is 4.85× larger
+
+MEDIUM — a picture bypasses `MAX_TOOL_RESULT_CONTENT`; an image-heavy session's history page is 4.85× larger
+
+```probe
+bash /tmp/pipeline-reviews/chat-image-results/athena-probes/history_size.sh
+expect: `under 3 MB: true` (HEAD: 2,034,059 bytes; today: 9,866,660 and `false`)
+```
+
+measured 2026-09-29 by chain chain-chat-image-results-20260929-064842-edca, finding M1, MEDIUM
+probe-key: efe96c67a1a69d1908c92d137ef88f9fc6c07fa7
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/file-tree/file-tree-read-path.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-image-blocks.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/chat-image-results.mjs
+
+## INV-5759 — probe — LOW — `files/content` has no regular-file guard, and the diff made every FIFO under the home dir reachable
+
+LOW — `files/content` has no regular-file guard, and the diff made every FIFO under the home dir reachable
+
+```probe
+bash /tmp/pipeline-reviews/chat-image-results/athena-probes/fifo_content.sh
+expect: `refused instead of hung: true` (today: answered `000`, the request hung)
+```
+
+measured 2026-09-29 by chain chain-chat-image-results-20260929-064842-edca, finding L1, LOW
+probe-key: 5034d4f2e62faed52d721a2efe95405f3bf14dfa
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/files/content
+
+## INV-5760 — probe — LOW — the preview offers Edit on an outside text file, and Edit dead-ends
+
+LOW — the preview offers Edit on an outside text file, and Edit dead-ends
+
+```probe
+bash /tmp/pipeline-reviews/chat-image-results/athena-probes/outside_text_open.sh
+expect: `Edit offered on the outside file: false` (today: `true`, then `editor says: Couldn't open note.txt for editing`)
+```
+
+measured 2026-09-29 by chain chain-chat-image-results-20260929-064842-edca, finding L2, LOW
+probe-key: 0db12e1711c350bb93039bc41d842ab91eba6643
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/file-tree/file-tree-read-path.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-image-blocks.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/chat-image-results.mjs
+
+## INV-5761 — probe — LOW — every open of an outside file requests a listing the server always refuses; it logs a console error and shows an amber refusal, and the probe's console gate is closed before that step
+
+LOW — every open of an outside file requests a listing the server always refuses; it logs a console error and shows an amber refusal, and the probe's console gate is closed before that step
+
+```probe
+bash /tmp/pipeline-reviews/chat-image-results/athena-probes/outside_text_open.sh
+expect: `403s []` and `console errors 0` on the "after opening the chip" line (today: `403s ["/list"] | console errors 1 | folder pane refusal shown: true`)
+```
+
+measured 2026-09-29 by chain chain-chat-image-results-20260929-064842-edca, finding L3, LOW
+probe-key: 88ac5ad1d85b492ebb6eb738b8216f5cfaa1be5a
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/file-tree/file-tree-read-path.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-image-blocks.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/chat-image-results.mjs
+
+## INV-5762 — probe — LOW — a picture is not on the page when the Read sits in a collapsed run, even with Show work on
+
+LOW — a picture is not on the page when the Read sits in a collapsed run, even with Show work on
+
+```probe
+node /tmp/pipeline-reviews/chat-image-results/athena-probes/grouped_read_hides.mjs
+expect: the "group collapsed" line lists a picture, or the collapsed row signals one (today: `[]`, then two pictures only after the group opens)
+```
+
+measured 2026-09-29 by chain chain-chat-image-results-20260929-064842-edca, finding L4, LOW
+probe-key: da814a8d85dc3c9abb20dbea7f14619299037dde
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/file-tree/file-tree-read-path.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-image-blocks.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/chat-image-results.mjs
+
+## INV-5763 — probe — LOW — a picture the assistant read is announced as "Attached image"
+
+LOW — a picture the assistant read is announced as "Attached image"
+
+```probe
+node /tmp/pipeline-reviews/chat-image-results/athena-probes/grouped_read_hides.mjs
+expect: the picture's label names the file, not "Attached image" (today: `["Expand Attached image","Expand Attached image"]`)
+```
+
+measured 2026-09-29 by chain chain-chat-image-results-20260929-064842-edca, finding L5, LOW
+probe-key: 05948b28491557b1487b7e35ce4e17ced0c6e8dc
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/file-tree/file-tree-read-path.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-image-blocks.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/chat-image-results.mjs
+
+## INV-5764 — probe — LOW — `.verify/chat-image-results.mjs` cannot fail
+
+LOW — `.verify/chat-image-results.mjs` cannot fail
+
+```probe
+bash /tmp/pipeline-reviews/chat-image-results/athena-probes/probe_exit_code.sh
+expect: `phases that drew no picture: 4` followed by a non-zero exit code (today: `exit code: 0`; needs a client build without the fix, `:3011` today)
+```
+
+measured 2026-09-29 by chain chain-chat-image-results-20260929-064842-edca, finding L6, LOW
+probe-key: a2960221dedc3a915d0fbca25079be66405dd76b
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/chat-image-results.mjs
+
+## INV-5767 — probe — the old name is still in two plan records
+
+the old name is still in two plan records
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe && grep -rlI "SettingsRow\|ControlRow" src server docs .verify/probe-settings-rows.mjs .verify/lib
+expect: no output (today: docs/plans/ntfy-notifications.plan.md and docs/plans/simple-chat-list.plan.md)
+```
+
+measured 2026-09-29 by chain chain-settings-rows-mobile-20260929-070652-edde, finding L2, LOW
+probe-key: 2e3080b66a8632af85684e1a4786726b0ff7f8f0
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/NtfySettingsCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/SettingRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-settings-rows.mjs
+
+## INV-5768 — the sidebar keeps one place in the tree across 768px
+
+`ProjectSidebarRegion` returns ONE tree for the docked sidebar (from 768px) and the mobile drawer; only classes and the scrim change. Never give the two layouts separate `return`s, nor wrap `Sidebar` in a different element type per layout.
+
+why: `Sidebar` hosts `SidebarModals`, which renders the Settings dialog. Two returns put `Sidebar` at two positions in the React tree, so crossing 768px (a phone turning to landscape, a window dragged over the line, a tablet) unmounts the whole sidebar and mounts a new one. The dialog stays open (its flag lives in `useProjectsState`, above) but every bit of its state starts again: `useSettingsController` seeds `activeTab` from `initialTab`, so the open tab snapped back to Agents, and the sidebar's own draft state was lost with it. Measured before the fix: the `.modal-backdrop` node and the sidebar root were replaced on a 1440 → 700 resize; after it they are the same nodes. `Settings.tsx`'s `key={activeTab}` remounts the pane on a tab change only and is not part of this.
+
+how it holds: slot 0 of the wrapper is the scrim or nothing, slot 1 is the panel, and the drawer's `stopPropagation` handlers are attached on the drawer only.
+
+```probe
+node .verify/probe-settings-rows.mjs after
+expect: the "open Settings tab across a resize over 768" section reads `pane kept=true` on every leg (the two window crossings and the two rotations, both themes), and the run ends settings-rows=pass
+```
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/ProjectSidebarRegion.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/Settings.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/SidebarModals.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/Sidebar.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-settings-rows.mjs
+
+## INV-5769 — probe — the viewer opens INVISIBLY behind the PRD editor (`z-[200]` over the viewer's `z-[100]`)
+
+the viewer opens INVISIBLY behind the PRD editor (`z-[200]` over the viewer's `z-[100]`)
+
+```probe
+cd /tmp/pipeline-reviews/diagram-lightbox && node athena-zindex.mjs
+expect: {"dialogMounted":true,"dialogZ":"100","hostZ":"200","topmostAtCentre":"PRD-EDITOR","topmostAtCorner":"PRD-EDITOR","topmostAtCloseBtn":"PRD-EDITOR"} then "after Esc: dialog still mounted = false"
+```
+
+measured 2026-09-29 by chain chain-diagram-lightbox-20260929-082654-343c, finding H1, HIGH
+probe-key: 56d8db3d3e17f9a037b459e7628a1c517a7fd1df
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/ChatMessageImages.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/markdown-preview/MermaidDiagram.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Lightbox.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/useZoomPan.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lightbox-zoom.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/pwa-notch-close-controls.mjs
+
+## INV-5770 — probe — the id rename breaks mermaid's end-anchored id selectors, so the viewer's copy loses paint on some markers
+
+the id rename breaks mermaid's end-anchored id selectors, so the viewer's copy loses paint on some markers
+
+```probe
+cd /tmp/pipeline-reviews/diagram-lightbox && A_THEME=dark node athena-stick.mjs
+expect: INLINE lists "-crosshead path fill=rgb(211, 211, 211) stroke=rgb(211, 211, 211)"; VIEWER lists "-crosshead-viewer path fill=none stroke=rgb(0, 0, 0)"
+```
+
+measured 2026-09-29 by chain chain-diagram-lightbox-20260929-082654-343c, finding M1, MEDIUM
+probe-key: abacbeb4650072034f187b2620a4c7fcf6ccc6c0
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/ChatMessageImages.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/markdown-preview/MermaidDiagram.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Lightbox.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/useZoomPan.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lightbox-zoom.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/pwa-notch-close-controls.mjs
+
+## INV-5771 — probe — a resize or a phone rotation while zoomed leaves the content outside its pan clamp
+
+a resize or a phone rotation while zoomed leaves the content outside its pan clamp
+
+```probe
+cd /tmp/pipeline-reviews/diagram-lightbox && node athena-interact.mjs
+expect: the "(d)" line ends with a content box whose "top":190 (a band above it) and "bottom":2397 against "dialog [ 700, 500 ]"
+```
+
+measured 2026-09-29 by chain chain-diagram-lightbox-20260929-082654-343c, finding L1, LOW
+probe-key: 331b383baa6c2f643fd1ff510bd98adc39bb5f8c
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/ChatMessageImages.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/markdown-preview/MermaidDiagram.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Lightbox.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/useZoomPan.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lightbox-zoom.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/pwa-notch-close-controls.mjs
+
+## INV-5772 — probe — pressing a toolbar button and sliding off it onto the backdrop closes the viewer
+
+pressing a toolbar button and sliding off it onto the backdrop closes the viewer
+
+```probe
+cd /tmp/pipeline-reviews/diagram-lightbox && node athena-interact.mjs
+expect: (c) press on "+" then release over the backdrop: viewer open = false
+```
+
+measured 2026-09-29 by chain chain-diagram-lightbox-20260929-082654-343c, finding L2, LOW
+probe-key: 760b030a6ce3e247ae92d2aa278a2ac433b50b68
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/ChatMessageImages.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/markdown-preview/MermaidDiagram.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Lightbox.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/useZoomPan.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lightbox-zoom.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/pwa-notch-close-controls.mjs
+
+## INV-5773 — probe — one Ctrl+mouse-wheel notch zooms 2.7×
+
+one Ctrl+mouse-wheel notch zooms 2.7×
+
+```probe
+cd /tmp/pipeline-reviews/diagram-lightbox && node athena-interact.mjs
+expect: (e) one ctrl+mouse-wheel notch (deltaY -100): scale 2.718   and   one plain wheel notch (deltaY -100): scale 1.246
+```
+
+measured 2026-09-29 by chain chain-diagram-lightbox-20260929-082654-343c, finding L3, LOW
+probe-key: 23ea081ceceda910eba3ca8b789d58243841957a
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/ChatMessageImages.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/markdown-preview/MermaidDiagram.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Lightbox.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/useZoomPan.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lightbox-zoom.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/pwa-notch-close-controls.mjs
+
+## INV-5774 — probe — stale pointers to where the close button's offsets live
+
+stale pointers to where the close button's offsets live
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe && grep -n "ChatMessageImages" src/index.css
+expect: no output (today: line 175)
+```
+
+measured 2026-09-29 by chain chain-diagram-lightbox-20260929-082654-343c, finding L4, LOW
+probe-key: 8ecaf9ba35204a4b07920b5a179cde9efc4c64ba
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/ChatMessageImages.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/markdown-preview/MermaidDiagram.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Lightbox.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/useZoomPan.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lightbox-zoom.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/pwa-notch-close-controls.mjs
+
+## INV-5775 — probe — the builder's gate does not reproduce green on the phone phases
+
+the builder's gate does not reproduce green on the phone phases
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe && node .verify/lightbox-zoom.mjs athena2 mobile-dark
+expect: FAIL mobile-dark: the transcript's diagram rendered  (today; the gate is meant to end PROBE OK)
+```
+
+measured 2026-09-29 by chain chain-diagram-lightbox-20260929-082654-343c, finding L5, LOW
+probe-key: f5e68ada55d0782b88d57b3ea9765725f85a962a
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/ChatMessageImages.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/markdown-preview/MermaidDiagram.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Lightbox.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/useZoomPan.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lightbox-zoom.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/pwa-notch-close-controls.mjs
+
+## INV-5776 — probe — focus does not move into the dialog when the viewer opens
+
+focus does not move into the dialog when the viewer opens
+
+```probe
+cd /tmp/pipeline-reviews/diagram-lightbox && node athena-focus.mjs
+expect: after Enter opens the viewer, focus: {"insideDialog":false,"active":"DIV[role=button][aria-label=Open diagram full screen]"}
+```
+
+measured 2026-09-29 by chain chain-diagram-lightbox-20260929-082654-343c, finding L6, LOW
+probe-key: f4e0aaa849312734dbaddfb2db3bfb22e1190cba
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/ChatMessageImages.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/markdown-preview/MermaidDiagram.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Lightbox.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/useZoomPan.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lightbox-zoom.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/pwa-notch-close-controls.mjs
+
+## INV-5777 — probe — the plugin tab's "Install from git" button is cut off at the operator's own width, and the probe cannot see it
+
+the plugin tab's "Install from git" button is cut off at the operator's own width, and the probe cannot see it
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe && A_WIDTHS=341 A_SCALES=1.072 node /tmp/pipeline-reviews/settings-mobile-round2/athena-r2-cards.mjs | grep '^Plugins'
+expect: the line ends installForm:{"form":"17-324","input":"238w","btn":"288-368(79w)","cut":44,"label":"Install"} — cut > 0; healed when cut is -1 at 320, 341 and 360 × 1, 1.072, 1.2
+```
+
+measured 2026-09-29 by chain chain-settings-mobile-round2-20260929-081949-f36c, finding M1, MEDIUM
+probe-key: 9714e0560e36c947e4222c26a9917408463ef863
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/plugins/PluginSettingsTab.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/SettingRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/settings-rows-measure.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/settings-rows-walk.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-settings-rows.mjs
+
+## INV-5778 — probe — the uninstall-confirm banner clips its Remove button on phones
+
+the uninstall-confirm banner clips its Remove button on phones
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe && node /tmp/pipeline-reviews/settings-mobile-round2/athena-r2-banner.mjs | grep -E '^w=(320|341) x1\.(072|2):'
+expect: w=320 x1.072 reads "Usage Dashbo:REMOVE-CUT-7px Session Mana:REMOVE-CUT-11px snake_case_p:REMOVE-CUT-325px Extraordinar:REMOVE-CUT-31px"; healed when every name reads ok
+```
+
+measured 2026-09-29 by chain chain-settings-mobile-round2-20260929-081949-f36c, finding L1, LOW
+probe-key: 2b6e674875c6788262734d2592c59f84e955b85f
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/plugins/PluginSettingsTab.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/SettingRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/settings-rows-measure.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/settings-rows-walk.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-settings-rows.mjs
+
+## INV-5779 — probe — the probe's fixtures do not cover three shapes the intent names
+
+the probe's fixtures do not cover three shapes the intent names
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe && grep -c "command:\|Cancel\|844" .verify/probe-settings-rows.mjs .verify/lib/settings-rows-walk.mjs .verify/lib/settings-rows-measure.mjs
+expect: 0 for each of the three files (a stdio MCP fixture with a `command:`, a confirm-uninstall step that presses `Cancel` and a 844-wide landscape leg would each add a match)
+```
+
+measured 2026-09-29 by chain chain-settings-mobile-round2-20260929-081949-f36c, finding L3, LOW
+probe-key: 494170834dc325482ac2573275fac7e1f9a3bd48
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/plugins/PluginSettingsTab.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/SettingRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/settings-rows-measure.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/settings-rows-walk.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-settings-rows.mjs

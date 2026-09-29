@@ -1,12 +1,12 @@
 import { PlusIcon } from 'lucide-react';
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useHeal } from '@/modules/heal/context/HealContext';
 import { agoWord } from '@/modules/heal/healState';
 import type { HealCycleSwitch, HealSwitches, IgnoreRow } from '@/modules/heal/healTypes';
 import { api, readApiJson } from '@/shared/api';
-import { Badge, Button, Field, Input, Stepper, Switch } from '@/shared/ui';
+import { Badge, Button, Field, Input, SettingRow, Stepper, Switch } from '@/shared/ui';
 
 /**
  * `10:00 UTC · 03:00 AM local` — the slot as the worker keeps it and as the reader's own clock will
@@ -149,7 +149,7 @@ export function HealControls({ switches, ignore }: { switches: HealSwitches; ign
 
   return (
     <div className="flex min-w-0 flex-col divide-y divide-border rounded-lg border border-border" data-heal-controls>
-      <ControlRow
+      <SettingRow
         label={t('heal.schedule.label', { defaultValue: 'Nightly maintenance cycle' })}
         description={schedule.on
           ? t('heal.schedule.on', { defaultValue: 'Every day at {{slot}} a cycle opens on its own: Chiron ranks what hurt over the last two weeks, and heals walk his list one after another. It runs beside whatever else is walking. Takes effect at the next slot.', slot: hourWord(schedule.hour) })
@@ -169,9 +169,9 @@ export function HealControls({ switches, ignore }: { switches: HealSwitches; ign
           />
           <Switch checked={schedule.on} onChange={onScheduleToggle} label={t('heal.schedule.label', { defaultValue: 'Nightly maintenance cycle' })} />
         </div>
-      </ControlRow>
+      </SettingRow>
 
-      <ControlRow
+      <SettingRow
         label={t('heal.cap.label', { defaultValue: 'Daily cap' })}
         description={t('heal.cap.description', { defaultValue: 'The most a day of DeepSeek heals may spend before a cycle waits until midnight instead; blank is no ceiling. It counts DeepSeek dollars only — heals on Claude, your subscription, are never counted here and never held by it.' })}
       >
@@ -189,30 +189,9 @@ export function HealControls({ switches, ignore }: { switches: HealSwitches; ign
             onBlur={() => onDailyCap(capText)}
           />
         </Field>
-      </ControlRow>
+      </SettingRow>
 
       <IgnoreTable rows={ignore} swept={swept} onAdd={onAddIgnore} />
-    </div>
-  );
-}
-
-/**
- * One labelled setting and its control — `settings/SettingsRow`'s classes, stacked below `sm`. Not
- * that component: the boundaries lint admits another module only through its barrel, which does not
- * export the row, and a second consumer is the kit's own admission test (`@/shared/ui/index.ts`) —
- * promoting it is a change of its own, not this screen's.
- */
-function ControlRow({ label, description, children, ...rest }: { label: string; description: string; children: ReactNode; 'data-heal-schedule'?: boolean }) {
-  return (
-    // Stacked on a phone, side by side from `sm`: a stepper and a switch beside a six-line
-    // description at 390px is two columns neither of which can be read.
-    <div className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-start sm:justify-between sm:gap-4" {...rest}>
-      <div className="min-w-0 flex-1">
-        <div className="text-sm font-medium text-foreground">{label}</div>
-        <div className="mt-1 text-xs leading-relaxed text-muted-foreground">{description}</div>
-      </div>
-      {/* Top-aligned, not centred: a two-line helper would drag the control down with it. */}
-      <div className="flex-shrink-0 sm:pt-0.5">{children}</div>
     </div>
   );
 }

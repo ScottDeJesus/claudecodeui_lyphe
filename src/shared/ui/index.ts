@@ -71,6 +71,7 @@ export { Input } from '@/shared/ui/Input';
 export { KanbanCard } from '@/shared/ui/KanbanCard';
 export type { CardPriority, KanbanCardModel, KanbanCardSignals } from '@/shared/ui/KanbanCard';
 export { KanbanLane } from '@/shared/ui/KanbanLane';
+export { Lightbox } from '@/shared/ui/Lightbox';
 export { LLMProviderLogo } from '@/shared/ui/LLMProviderLogo';
 export { Menu } from '@/shared/ui/Menu';
 export { Meter } from '@/shared/ui/Meter';
@@ -93,6 +94,7 @@ export type {
 } from '@/shared/ui/PromptInput';
 export { ScrollArea } from '@/shared/ui/ScrollArea';
 export { Select } from '@/shared/ui/Select';
+export { SettingRow } from '@/shared/ui/SettingRow';
 export { Shimmer } from '@/shared/ui/Shimmer';
 export { Spinner } from '@/shared/ui/Spinner';
 export { SplitPane, SPLIT_MIN_RATIO, SPLIT_MAX_RATIO } from '@/shared/ui/SplitPane';

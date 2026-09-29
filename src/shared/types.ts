@@ -525,6 +525,8 @@ export type SessionEstablishedContext = {
 /** The result returned for a tool call, carrying its content, error flag, timestamp and any provider-specific extras that the tool renderers read. */
 export type ToolResult = {
   content?: unknown;
+  /** Pictures the tool returned (a Read of an image, an MCP screenshot), as inline data URLs; drawn under the call, apart from the text in `content`. */
+  images?: ChatImage[];
   isError?: boolean;
   timestamp?: string | number | Date;
   toolUseResult?: unknown;
@@ -613,7 +615,7 @@ export type NormalizedMessage = {
   toolName?: string;
   toolInput?: unknown;
   toolId?: string;
-  toolResult?: { content: string; isError: boolean; toolUseResult?: unknown; timestamp?: string } | null;
+  toolResult?: { content: string; images?: ChatImage[]; isError: boolean; toolUseResult?: unknown; timestamp?: string } | null;
   isError?: boolean;
   text?: string;
   tokens?: number;

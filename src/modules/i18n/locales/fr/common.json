@@ -333,8 +333,16 @@
       "closeSidebar": "Masquer la barre latérale"
     }
   },
+  "lightbox": {
+    "close": "Fermer l'aperçu",
+    "zoomIn": "Zoom avant",
+    "zoomOut": "Zoom arrière",
+    "fit": "Ajuster à l'écran"
+  },
   "shapes": {
-    "diagramFailed": "Impossible de dessiner ce diagramme — sa source est affichée."
+    "diagramFailed": "Impossible de dessiner ce diagramme — sa source est affichée.",
+    "diagram": "Diagramme",
+    "diagramOpen": "Ouvrir le diagramme en plein écran"
   },
   "runner": {
     "collapse": "Réduire",

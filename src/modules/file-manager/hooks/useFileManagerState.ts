@@ -41,8 +41,10 @@ async function readRefusal(response: Response, fallback: string): Promise<string
  * The three caller families spell a path three ways — the tree and the chat cards hand over an
  * absolute path, the git panel one already relative to the repository root — and the server's own
  * `DirectoryListing.path` is the resolved ABSOLUTE directory. All of them arrive here. Nothing is
- * FILTERED on the way through: a path that climbs out of the project is sent as it came, and the
- * server's 403 is what refuses it.
+ * FILTERED on the way through: an absolute path outside the project stays absolute, exactly as it
+ * came, and the server decides — it serves a file the workspace allows (a picture the assistant
+ * read under `~/.claude`) and answers 403 to the rest. Stripping its leading `/` here would turn
+ * it into a path under the project that names nothing, and the reader would be told "not found".
  */
 function toProjectRelative(path: string, projectPath: string): string {
   const normalized = path.replace(/\\/g, '/').replace(/\/+$/, '');
@@ -54,7 +56,10 @@ function toProjectRelative(path: string, projectPath: string): string {
   if (root && normalized.startsWith(`${root}/`)) {
     return normalized.slice(root.length + 1);
   }
-  return normalized.replace(/^\.?\/+/, '');
+  if (normalized.startsWith('/')) {
+    return normalized;
+  }
+  return normalized.replace(/^\.\/+/, '');
 }
 
 /** The directory one level up from a project-relative path; `''` (the root) has none. */
@@ -299,7 +304,14 @@ export function useFileManagerState(projectId: string, projectPath: string) {
   const currentDir = shownListing ? shownListing.dir : (settledListing?.error ? '' : requestedDir);
 
   const enter = useCallback((directory: string) => {
-    setRequest({ projectId, dir: toProjectRelative(directory, projectPath) });
+    const relativeDirectory = toProjectRelative(directory, projectPath);
+    // A folder outside the project stays absolute, and the listing is project-only: asking would be
+    // a certain 403, a console error and an amber refusal beside a file that opened fine. The reader
+    // stays in the folder they are in.
+    if (relativeDirectory.startsWith('/')) {
+      return;
+    }
+    setRequest({ projectId, dir: relativeDirectory });
   }, [projectId, projectPath]);
 
   const up = useCallback(() => {

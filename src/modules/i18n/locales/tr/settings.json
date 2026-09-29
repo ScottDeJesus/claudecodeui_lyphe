@@ -8,7 +8,6 @@
   },
   "account": {
     "title": "Hesap",
-    "language": "Dil",
     "languageLabel": "Görüntüleme Dili",
     "languageDescription": "Arayüz için tercih ettiğin dili seç",
     "username": "Kullanıcı Adı",

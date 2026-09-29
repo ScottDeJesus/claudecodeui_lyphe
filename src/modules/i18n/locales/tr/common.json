@@ -332,8 +332,16 @@
       "closeSidebar": "Kenar çubuğunu kapat"
     }
   },
+  "lightbox": {
+    "close": "Önizlemeyi kapat",
+    "zoomIn": "Yakınlaştır",
+    "zoomOut": "Uzaklaştır",
+    "fit": "Ekrana sığdır"
+  },
   "shapes": {
-    "diagramFailed": "Bu diyagram çizilemedi; kaynağı gösteriliyor."
+    "diagramFailed": "Bu diyagram çizilemedi; kaynağı gösteriliyor.",
+    "diagram": "Diyagram",
+    "diagramOpen": "Diyagramı tam ekran aç"
   },
   "runner": {
     "collapse": "Daralt",

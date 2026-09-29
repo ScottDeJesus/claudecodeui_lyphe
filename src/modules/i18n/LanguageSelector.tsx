@@ -1,13 +1,7 @@
-
-
 import { useTranslation } from 'react-i18next';
-import { Languages } from 'lucide-react';
 
 import { languages } from '@/modules/i18n/languages';
-
-type LanguageSelectorProps = {
-  compact?: boolean;
-};
+import { SettingRow } from '@/shared/ui';
 
 /**
  * Language Selector Component
@@ -15,13 +9,9 @@ type LanguageSelectorProps = {
  * A dropdown component for selecting the application language.
  * Automatically updates the i18n language and persists it as a user preference.
  *
- * Used by the settings module (appearance tab)
- * so the user can switch language from either surface.
- *
- * Props:
- * @param {boolean} compact - If true, uses compact style (default: false)
+ * Used by the settings module (appearance tab).
  */
-export default function LanguageSelector({ compact = false }: LanguageSelectorProps) {
+export default function LanguageSelector() {
   const { i18n, t } = useTranslation('settings');
 
   const handleLanguageChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
@@ -29,40 +19,8 @@ export default function LanguageSelector({ compact = false }: LanguageSelectorPr
     i18n.changeLanguage(newLanguage);
   };
 
-  // Compact style, for a caller with a narrow row to fill
-  if (compact) {
-    return (
-      <div className="flex items-center justify-between rounded-lg border border-transparent bg-muted/50 p-3 transition-colors hover:border-border hover:bg-accent">
-        <span className="flex items-center gap-2 text-sm text-foreground">
-          <Languages className="h-4 w-4 text-muted-foreground" />
-          {t('account.language')}
-        </span>
-        <select
-          value={i18n.language}
-          onChange={handleLanguageChange}
-          className="w-auto min-w-[120px] max-w-[160px] rounded-lg border border-input bg-card p-2 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary"
-        >
-          {languages.map((lang) => (
-            <option key={lang.value} value={lang.value}>
-              {lang.nativeName}
-            </option>
-          ))}
-        </select>
-      </div>
-    );
-  }
-
-  // Full style for Settings page
   return (
-    <div className="flex items-center justify-between px-4 py-3.5">
-      <div>
-        <div className="text-sm font-medium text-foreground">
-          {t('account.languageLabel')}
-        </div>
-        <div className="mt-0.5 text-xs text-muted-foreground">
-          {t('account.languageDescription')}
-        </div>
-      </div>
+    <SettingRow label={t('account.languageLabel')} description={t('account.languageDescription')}>
       <select
         value={i18n.language}
         onChange={handleLanguageChange}
@@ -74,6 +32,6 @@ export default function LanguageSelector({ compact = false }: LanguageSelectorPr
           </option>
         ))}
       </select>
-    </div>
+    </SettingRow>
   );
 }

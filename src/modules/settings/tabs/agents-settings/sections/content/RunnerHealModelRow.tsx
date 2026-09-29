@@ -2,8 +2,7 @@ import { CpuIcon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 import { HealModelSwitch, useHeal } from '@/modules/heal';
-import SettingsRow from '@/modules/settings/SettingsRow';
-import { Button } from '@/shared/ui';
+import { Button, SettingRow } from '@/shared/ui';
 
 /**
  * WHICH MODEL THE HEAL'S OWN SOULS RUN ON — the fourth switch of the family, under the master that
@@ -31,8 +30,8 @@ export default function RunnerHealModelRow() {
   const label = t('agents.runnerHealModel.label', { defaultValue: 'Model for heal souls' });
 
   return (
-    <SettingsRow
-      icon={<CpuIcon className="h-4 w-4 flex-none" />}
+    <SettingRow
+      icon={<CpuIcon className="h-4 w-4" />}
       label={label}
       description={summary === null
         ? t('agents.runnerHealModel.descriptionUnknown', {
@@ -55,6 +54,6 @@ export default function RunnerHealModelRow() {
       ) : (
         <HealModelSwitch model={summary.switches.model} />
       )}
-    </SettingsRow>
+    </SettingRow>
   );
 }

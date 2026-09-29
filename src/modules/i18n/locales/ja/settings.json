@@ -8,7 +8,6 @@
   },
   "account": {
     "title": "アカウント",
-    "language": "言語",
     "languageLabel": "表示言語",
     "languageDescription": "インターフェースの表示言語を選択してください",
     "username": "ユーザー名",

@@ -331,8 +331,16 @@
       "closeSidebar": "關閉側邊欄"
     }
   },
+  "lightbox": {
+    "close": "關閉預覽",
+    "zoomIn": "放大",
+    "zoomOut": "縮小",
+    "fit": "符合螢幕"
+  },
   "shapes": {
-    "diagramFailed": "無法繪製此圖表，已顯示其原始碼。"
+    "diagramFailed": "無法繪製此圖表，已顯示其原始碼。",
+    "diagram": "圖表",
+    "diagramOpen": "以全螢幕開啟圖表"
   },
   "runner": {
     "collapse": "收合",

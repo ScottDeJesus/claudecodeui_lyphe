@@ -9,7 +9,6 @@
   },
   "account": {
     "title": "账户",
-    "language": "语言",
     "languageLabel": "显示语言",
     "languageDescription": "选择您偏好的界面语言",
     "username": "用户名",

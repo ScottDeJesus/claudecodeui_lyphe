@@ -22,6 +22,10 @@ export function choosePreviewBody(input: {
   view: PreviewView;
 }): PreviewChoice {
   const { preview, path, editingThis, view } = input;
+  // A path that is still absolute is a file outside the project (`toProjectRelative` makes every
+  // other one relative). The server reads it but edits only project files, so the editor could never
+  // open it: Edit is not offered rather than offered and refused twice.
+  const isOutsideProject = path !== null && path.startsWith('/');
 
   // 1. This file is the open edit session: the editor takes the pane whole, so there is nothing to
   //    press Edit on and nothing for a view toggle to switch.
@@ -52,7 +56,7 @@ export function choosePreviewBody(input: {
   if (rendering !== null && preview.kind === 'text' && cap !== null && (preview.bytes ?? Infinity) <= cap) {
     return {
       body: view === 'rendered' ? { kind: 'document', document: rendering } : { kind: 'arms' },
-      canEdit: true,
+      canEdit: !isOutsideProject,
       toggle: rendering === 'markdown'
         ? { renderedLabel: 'Rendered', sourceLabel: 'Source' }
         : { renderedLabel: 'Table', sourceLabel: 'Text' },
@@ -61,5 +65,5 @@ export function choosePreviewBody(input: {
 
   // 5. Everything else: the arms, which is the lines view for a text file, the measured image for
   //    an image, and the download offer for anything else. Edit belongs to text alone.
-  return { body: { kind: 'arms' }, canEdit: preview.kind === 'text', toggle: null };
+  return { body: { kind: 'arms' }, canEdit: preview.kind === 'text' && !isOutsideProject, toggle: null };
 }

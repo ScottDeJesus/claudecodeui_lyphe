@@ -36,9 +36,9 @@ export type AgentLaunchDefaults = {
 /**
  * One side of a lane: the model and effort a launch runs at when `when` holds.
  *
- * `when` is `always` for a lane with a single answer, `claude` / `deepseek` where the DeepSeek switch
- * picks the side, and a planner model word (`opus`, `fable`) for the dispatcher's designer, which
- * rides whichever model the operator picks for each plan. `effort` is null when no flag is passed.
+ * `when` is `always` for a lane with a single answer — a planner's own row in the launch table among
+ * them — and `claude` / `deepseek` where the DeepSeek switch picks the side. `effort` is null when no
+ * flag is passed.
  */
 export type AgentLaunchSide = {
   when: string;

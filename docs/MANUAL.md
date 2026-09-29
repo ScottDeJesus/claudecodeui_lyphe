@@ -3078,8 +3078,8 @@ so an id that collides with a member `Object.prototype` carries — `constructor
 `[object Object]`. The work is the row's `verb` and `state`:
 `queued` while it waits; while it is out, `designing` for a `design` AND a `tell` (a tell resumes the very
 session a design opened — the same outing continued, so a reader sees the same work being done),
-`judging` for a `judge`, `cutting` for a `cut`. The model is the row's own word (`opus`, `fable` — the
-grant the door booked, or for a `judge` the arc's own design model the daemon resolved). The elapsed is `useElapsed` from the stamp that state BEGAN, the store's own:
+`judging` for a `judge`, `cutting` for a `cut`. The model is the row's own word (`opus`, `fable` — the launch table's
+pin for the soul, read when the row was queued). The elapsed is `useElapsed` from the stamp that state BEGAN, the store's own:
 `created_at` while queued, `launched_at` while out.
 
 AN ENDED OUTING DRAWS NO CLOCK, and says what became of it instead: `ended short: <outcome>`
@@ -3879,7 +3879,7 @@ the file it is writing into memory.
 | Route | Query |
 |---|---|
 | `GET …/projects/:projectId/list` | `path` — relative to the project root. Absent, `.` or `./` means the root itself. Entries come back directories-first, then by name, so no client re-sorts. |
-| `GET …/projects/:projectId/preview` | `path` — the file. `lines` — clamped to 1–400, defaulting to 200. `start` — the window's first line, clamped to at least 1 and deliberately given no upper clamp; absent, `0`, `-5` or `abc` all mean the top. |
+| `GET …/projects/:projectId/preview` | `path` — the file: project-relative, or absolute where the workspace allows a read (MAN-543 rule 13). `lines` — clamped to 1–400, defaulting to 200. `start` — the window's first line, clamped to at least 1 and deliberately given no upper clamp; absent, `0`, `-5` or `abc` all mean the top. |
 | `POST …/projects/:projectId/files/upload` | multipart `files` (≤ 20) and `targetPath`. |
 | `GET …/projects/:projectId/edit-window` | `path` — the file. `start` and `lines` — clamped exactly like `preview`'s, above. |
 | `PATCH …/projects/:projectId/edit` | JSON body `FileLinePatch`: `path`, `baseRev` (the revision this patch was read against), `startLine` (1-based, `totalLines + 1` appends), `deleteCount` (original lines removed from `startLine`), `lines` (replacement text; no element may contain `\n` or `\r`). |
@@ -3936,10 +3936,11 @@ section: files-api/001 The rules that bite
 
 | Outcome | Status | Message |
 |---|---|---|
-| The path climbs out of the project, or a symlink's real target lies outside it | 403 | `Path must be under project root` |
+| The path climbs out of the project, or a symlink's real target lies outside it — on every route, and on a read that is not absolute | 403 | `Path must be under project root` |
+| An absolute path a READ names that the workspace refuses — outside `WORKSPACES_ROOT`, or a system directory | 403 | `Path must be under the project or workspace root` |
 | An unreadable file or directory | 403 | `Permission denied` |
-| A NUL byte in the path, or a name past `NAME_MAX` | 400 | `The path is not valid` |
-| A FIFO, socket or device node — caught by `stat` in ~5 ms, since opening a FIFO holds a libuv thread until a writer appears | 400 | `Only regular files can be previewed` |
+| A NUL byte in the path, or a name past `NAME_MAX` — inside the project; outside it the workspace check answers the 403 above | 400 | `The path is not valid` |
+| A FIFO, socket or device node — caught by `stat` in ~5 ms, since opening a FIFO holds a libuv thread until a writer appears | 400 | `Only regular files can be previewed` (`preview`), `Only regular files can be opened` (`files/content`) |
 | Genuinely absent — only a real `ENOENT` may claim this | 404 | `File not found` / `Directory not found` |
 | The file's revision moved between the read and the write, or between a patch's own two revision checks | 409 | `This file changed on disk since it was opened` |
 | A NUL byte in the edited file's first 8 KB | 415 | `This file is not text` |
@@ -3992,7 +3993,21 @@ section: files-api/001 The rules that bite
     at is known. It holds bytes for the lines it is collecting and no others, so a window it never
     asked for is never in memory. Full note: `file-line-index.ts`.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/shared/utils.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-files-api.py
+13. **A read may name an absolute path outside the project; a write, a listing and a relative path may not.**
+    The assistant reads a picture under `~/.claude/state/images`, and the chip it leaves in the reply
+    points at that absolute path, so `files/content`, `file` and `preview` accept one — where it falls
+    inside the project already, or where `validateWorkspacePath` allows it (under `WORKSPACES_ROOT`,
+    symlinks resolved to their real target, not a system directory). All three go through
+    `resolveReadablePath` in `file-tree-read-path.ts`, so the rule has one author. `list`,
+    `create`, `rename`, `delete`, `upload`, `edit-window` and `edit` keep `resolvePathInsideProject`:
+    widening what a client can SEE never widens what it can change. The client half is
+    `toProjectRelative` in `useFileManagerState.ts`, which leaves such a path absolute; stripping its
+    leading `/` once turned it into a project path that named nothing, and the reader was told "File
+    not found". The Files tab draws the picture and does not ask `list` for the file's folder, which it
+    would refuse; the reader stays in the folder they were in, and Edit is not offered on the file, which
+    `edit-window` would refuse.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/file-tree/file-tree-read-path.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/utils.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/file-manager/hooks/useFileManagerState.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-files-api.py
 
 ## MAN-544 — Proving it
 section: files-api/002 Proving it
@@ -6632,7 +6647,7 @@ Every write of this switch ends with `void kickDispatcher()` (`server/modules/se
 as do the swarm and park-at-peak writes — MAN-1497 §"THE KICK".
 
 Two client surfaces draw it, and neither holds a fetch of its own: **Settings → Agents → Claude** —
-`RunnerModelContent.tsx`, a `SettingsRow` + `SettingsToggle` — and the chat composer's own footer,
+`RunnerModelContent.tsx`, a kit `SettingRow` + `SettingsToggle` — and the chat composer's own footer,
 immediately after the Plain chip — `ComposerDeepSeekSwitch.tsx`, a `Chip` wearing the DeepSeek whale
 while on and Claude Code's pixel mascot (`ClaudeCodeMark`) while off, icon-only below `sm` and
 mark-plus-word ("Flash" / "Claude") from `sm` up, standing down entirely on a row too narrow
@@ -7580,6 +7595,7 @@ project, and hands back the page plus `shoot()`, `api()`, and the console errors
 `openConsole({ appUrl })` drives another client than `:5183` — a pre-change `dist` served by
 `vite preview` on a port of its own — and returns `appUrl` for the caller's own `goto`s; it exists for a before/after pair, one probe driving a pre-change build beside the current one.
 `openConsole({ preferences })` is what the pages see laid over the dev account's stored preferences — by default English and an expanded sidebar (`.verify/lib/prefs-pin.mjs`), the two the harness's selectors cannot run without, pinned per page and never written to the account; `null` opts out for a probe whose subject is the stored language or sidebar.
+`openConsole({ stubs })` is `[{pattern: RegExp, body}]`, answered locally beside the built-in stubbed requests and registered before the first navigation — for a route that must answer at mount (`.verify/probe-settings-rows.mjs` stubs the swarm ceiling and TaskMaster-installed so those rows draw). It never writes a real flag.
 
 The page runs with the service worker **blocked** and the app's two `api.github.com` calls
 **answered locally** — browser-context settings that `src/` knows nothing about. A service

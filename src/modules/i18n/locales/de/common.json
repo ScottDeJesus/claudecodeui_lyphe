@@ -302,8 +302,16 @@
       "closeSidebar": "Seitenleiste schließen"
     }
   },
+  "lightbox": {
+    "close": "Vorschau schließen",
+    "zoomIn": "Vergrößern",
+    "zoomOut": "Verkleinern",
+    "fit": "An Bildschirm anpassen"
+  },
   "shapes": {
-    "diagramFailed": "Dieses Diagramm konnte nicht gezeichnet werden – der Quelltext wird angezeigt."
+    "diagramFailed": "Dieses Diagramm konnte nicht gezeichnet werden – der Quelltext wird angezeigt.",
+    "diagram": "Diagramm",
+    "diagramOpen": "Diagramm im Vollbild öffnen"
   },
   "runner": {
     "collapse": "Einklappen",

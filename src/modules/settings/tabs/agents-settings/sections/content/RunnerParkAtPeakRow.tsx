@@ -1,10 +1,9 @@
 import { Moon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
-import SettingsRow from '@/modules/settings/SettingsRow';
 import SettingsToggle from '@/modules/settings/SettingsToggle';
 import { useParkAtPeakSwitch } from '@/shared/hooks/useParkAtPeakSwitch';
-import { Button } from '@/shared/ui';
+import { Button, SettingRow } from '@/shared/ui';
 
 /**
  * WHETHER AN ACCEPT DURING DEEPSEEK'S PEAK WAITS FOR THE WINDOW TO LIFT — the dispatcher's own switch,
@@ -18,8 +17,6 @@ import { Button } from '@/shared/ui';
  * except their grammar — the unknown state in words, the retry in the control's slot.
  *
  * It wears `Moon`: the plan is set down for later, and no other row on this card uses that shape.
- * `flex-none` for the reason every row here carries it — the label wraps on a phone, and a
- * shrinkable icon measures zero wide at 360px.
  */
 export default function RunnerParkAtPeakRow() {
   const { t } = useTranslation('settings');
@@ -31,8 +28,8 @@ export default function RunnerParkAtPeakRow() {
   const unknown = enabled === null;
 
   return (
-    <SettingsRow
-      icon={<Moon className="h-4 w-4 flex-none" />}
+    <SettingRow
+      icon={<Moon className="h-4 w-4" />}
       label={label}
       description={unknown
         ? unreadable
@@ -60,6 +57,6 @@ export default function RunnerParkAtPeakRow() {
           disabled={enabled === null}
         />
       )}
-    </SettingsRow>
+    </SettingRow>
   );
 }

@@ -8,7 +8,6 @@
   },
   "account": {
     "title": "Konto",
-    "language": "Sprache",
     "languageLabel": "Anzeigesprache",
     "languageDescription": "Wähl deine bevorzugte Sprache für die Oberfläche",
     "username": "Benutzername",

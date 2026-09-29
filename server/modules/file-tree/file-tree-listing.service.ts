@@ -10,6 +10,7 @@ import type {
   FileTreeListingServices,
 } from '@/shared/types.js';
 import { AppError, resolvePathInsideProject } from '@/shared/utils.js';
+import { resolveReadablePath } from '@/modules/file-tree/file-tree-read-path.js';
 
 /**
  * Above this size a read is allowed to STOP once the window is full, rather than walking on to
@@ -70,9 +71,14 @@ function readFailure(error: unknown, subject: 'file' | 'directory'): AppError {
  * and the file manager must list the top level. Upload makes the same exception already.
  */
 function resolveRequestedPath(projectRoot: string, requestedPath: string): string {
-  return !requestedPath || requestedPath === '.' || requestedPath === './'
+  return isProjectRootRequest(requestedPath)
     ? path.resolve(projectRoot)
     : resolvePathInsideProject(projectRoot, requestedPath);
+}
+
+/** True for the spellings of "the project root itself": empty, `.` and `./`. */
+function isProjectRootRequest(requestedPath: string): boolean {
+  return !requestedPath || requestedPath === '.' || requestedPath === './';
 }
 
 /** What `readTextPreview` hands back — the text arm of `FilePreview` minus its file metadata. */
@@ -311,7 +317,12 @@ export function createFileTreeListingService(dependencies: FileTreeListingServic
 
     async previewFile(projectId, filePath, maxLines, startLine = 1) {
       const projectRoot = await dependencies.resolveProjectRoot(projectId);
-      const resolvedPath = resolveRequestedPath(projectRoot, filePath);
+      // A preview READS, so it takes the read door: an absolute path outside the project (a picture
+      // the assistant opened under `~/.claude`) is served when the workspace allows it. Listing keeps
+      // the project-only rule.
+      const resolvedPath = isProjectRootRequest(filePath)
+        ? path.resolve(projectRoot)
+        : await resolveReadablePath(projectRoot, filePath);
 
       let stats;
       try {

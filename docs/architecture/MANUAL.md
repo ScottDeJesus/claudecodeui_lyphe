@@ -3698,7 +3698,23 @@ not frozen: the status badge changes, Bash grows an expandable output section, a
 `jump-to-results` row grows its down-arrow link. All three appear only once `toolResult` is
 non-null.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useChatMessages.ts
+**A picture rides beside the text.** The Claude provider lifts every base64 `image` block out of a
+result's `content` array into `images` (`{ data: 'data:<media_type>;base64,…' }`, the `ChatImage`
+shape) and keeps only the joined text blocks as `content`, so the base64 never travels as a JSON
+string (`claude-image-blocks.ts`, used for a live `tool_result` row and for the result a history load
+attaches to its call). An array with no image block is left as it was — the tool views unwrap those
+themselves. A live frame carries the picture inline; a history load stores each one under
+`~/.cloudcli/assets` as `tr-<hash of its base64>.<ext>` (`storeToolResultImages`) and the row carries
+`{ path }`, which `ChatMessageImages` draws through the assets route like any path-based attachment —
+so a page of history stays small and the full-history cache never holds base64. A picture that cannot
+be stored stays inline. The projection copies `images` onto `toolResult`; `shouldHideToolResult` answers false for
+a result that has any; `ToolRenderer` draws them under the call through `ChatMessageImages`. That is
+how a `Read` of a picture, whose text result is hidden, still shows the picture, named for the file it
+read. A folded run of the same tool says how many pictures it holds in its summary line. With "Show
+work" off the whole call is hidden work and its picture goes with it. Proven by
+`node .verify/chat-image-results.mjs` (one Haiku turn, then screenshots of the session).
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-image-blocks.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useChatMessages.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/tools/ToolRenderer.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/chat-image-results.mjs
 
 ## MAN-402 — Grouping consecutive calls
 section: 06-tool-view/010 Grouping consecutive calls
@@ -5278,7 +5294,7 @@ section: 08-rendered-shapes/002 The pieces/002 `shapes/useFilePreview.ts`
 | `shapes/LongOutput.tsx` | Clamps a fence over 25 lines to 12 under a fade, with a "Show all N lines" control |
 | `shapes/TabbedCode.tsx` | A plugin `tabbed-code` group as the shared `Tabs` over the rendered fences |
 | `shapes/ShapeSection.tsx` | A plugin `section` wrapper: the heading's words become its fold button. `SECTION_FLOW` restates Typography's positional margins |
-| `src/modules/markdown-preview/MermaidDiagram.tsx` | Draws a `mermaid` fence, shared with the PRD editor. Its failure line reads `common.shapes.diagramFailed` |
+| `src/modules/markdown-preview/MermaidDiagram.tsx` | Draws a `mermaid` fence, shared with the PRD editor. Its failure line reads `common.shapes.diagramFailed`. A DRAWN diagram is a button that opens the kit's `Lightbox` — from the one component both the chat's fence and a markdown preview render; a diagram shown as its source never opens. The viewer, its id prefix and its strings are MAN-7426 |
 | `src/modules/command-palette/context/PaletteOpsContext.tsx` | `openFileReference(path, line?)` — the door a chip and a file link open through. The rest of the chain is [docs/MANUAL.md (file-manager)](../MANUAL.md) |
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/surface-signal.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/command-palette/context/PaletteOpsContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/markdown-preview/MermaidDiagram.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/constants.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/artifacts/shapes-elements-baseline.html, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/mountReact.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/shapes-fixture.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-32.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-33.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-34.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-markdown-cards.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-baseline.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-detect.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-fences.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-groups.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-inline.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-lineopen.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-lists.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-prose.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-tables.mjs

@@ -5,8 +5,7 @@ import { useDeepSeekFlashSwitch } from '@/shared/hooks/useDeepSeekFlashSwitch';
 import { useHealMasterSwitch } from '@/shared/hooks/useHealMasterSwitch';
 import { LANES_MIN, useSwarmSwitch } from '@/shared/hooks/useSwarmSwitch';
 import { SWARM_FIRST_CEILING } from '@/shared/constants';
-import { Button, LLMProviderLogo, Stepper } from '@/shared/ui';
-import SettingsRow from '@/modules/settings/SettingsRow';
+import { Button, LLMProviderLogo, SettingRow, Stepper } from '@/shared/ui';
 import SettingsToggle from '@/modules/settings/SettingsToggle';
 import RunnerHealModelRow from '@/modules/settings/tabs/agents-settings/sections/content/RunnerHealModelRow';
 import RunnerParkAtPeakRow from '@/modules/settings/tabs/agents-settings/sections/content/RunnerParkAtPeakRow';
@@ -30,9 +29,7 @@ import RunnerParkAtPeakRow from '@/modules/settings/tabs/agents-settings/section
  *
  * THE SWARM ROW WEARS THE SWARM MARK, `Network` — the same Lucide glyph the run card draws beside a
  * swarming run's lanes — and the heal row wears the heal panel's own `HeartPulseIcon`, so one shape
- * means one thing wherever it appears. Both are `flex-none` for the reason `SettingsRow`'s layout
- * makes plain: these labels wrap on a phone, and a shrinkable icon measures zero wide at 360px, which
- * is the mark the row exists to draw, gone.
+ * means one thing wherever it appears.
  */
 export default function RunnerModelContent() {
   const { t } = useTranslation('settings');
@@ -100,7 +97,7 @@ export default function RunnerModelContent() {
 
   return (
     <div className="divide-y divide-border rounded-xl border border-border bg-card">
-      <SettingsRow
+      <SettingRow
         icon={<LLMProviderLogo provider="deepseek" className="h-4 w-4" />}
         label={label}
         description={unknown
@@ -136,17 +133,12 @@ export default function RunnerModelContent() {
             disabled={enabled === null}
           />
         )}
-      </SettingsRow>
+      </SettingRow>
 
-      <SettingsRow
+      <SettingRow
         // The swarm mark, in the slot the DeepSeek row above gives its logo — the same `Network`
         // glyph a swarming run's card wears beside its lanes. One shape, one meaning, both surfaces.
-        //
-        // `flex-none` is what keeps it a mark: `SettingsRow` lays the icon and the label out in a
-        // flex row, and this row's label is long enough to wrap on a phone, so a shrinkable icon
-        // measures 7.4px wide at 430px and ZERO at 360px — the mark the row exists to draw, gone.
-        // The run card's own copy carries the same class for the same reason.
-        icon={<Network className="h-4 w-4 flex-none" />}
+        icon={<Network className="h-4 w-4" />}
         label={swarmLabel}
         description={swarmUnknown
           ? swarmUnreadable
@@ -174,7 +166,7 @@ export default function RunnerModelContent() {
             {t('buttons.retry', { ns: 'common', defaultValue: 'Try again' })}
           </Button>
         ) : (
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             {/* THE CEILING IS OPTIONAL, and this control is where it is chosen: `Unlimited` is the
                 switch's own default and the TOP of the scale, with the counts below it and no
                 largest count at all — the runner's own grammar (`hooks/plan_runner/swarm.py`) has 1
@@ -214,7 +206,7 @@ export default function RunnerModelContent() {
             />
           </div>
         )}
-      </SettingsRow>
+      </SettingRow>
 
       <RunnerParkAtPeakRow />
 
@@ -224,8 +216,8 @@ export default function RunnerModelContent() {
           nothing is lost while it is off, and a typed `/heal` — the operator's own hand — still runs
           one. It ships ABSENT, and absent means on, so this row's OFF is his deliberate word and
           never something the row invented. */}
-      <SettingsRow
-        icon={<HeartPulseIcon className="h-4 w-4 flex-none" />}
+      <SettingRow
+        icon={<HeartPulseIcon className="h-4 w-4" />}
         label={healLabel}
         description={healUnknown
           ? healUnreadable
@@ -254,7 +246,7 @@ export default function RunnerModelContent() {
             disabled={healEnabled === null}
           />
         )}
-      </SettingsRow>
+      </SettingRow>
 
       {/* WHICH MODEL THE HEAL'S OWN SOULS RUN ON — its own file, beside this one: the fourth switch
           of the family, and the row that needs this card's one heal poller rather than a second
