@@ -1,5 +1,6 @@
 import type { Router } from 'express';
 
+import { resolveLaunchSide } from '@/modules/agent-launch/index.js';
 import { readDeepseekApiKey } from '@/modules/deepseek/index.js';
 import { WS_OPEN_STATE, connectedClients } from '@/modules/websocket/index.js';
 import { createPolledLane } from '@/shared/polled-lane.service.js';
@@ -76,6 +77,7 @@ export function createKanbanMetisModule(): Router {
     apiOrigin: resolveApiOrigin(),
     appSecret: readAppJwtSecret(),
     readDeepseekKey: readDeepseekApiKey,
+    resolveLaunchSide,
   });
 
   const broadcast = (frame: KanbanMetisStateEvent): void => {

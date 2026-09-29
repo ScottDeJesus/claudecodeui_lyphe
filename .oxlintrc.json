@@ -113,6 +113,7 @@
           "src/shared/deepseekPeakHours.ts",
           "src/shared/syntaxHighlighter.ts",
           "src/shared/kanban-types.ts",
+          "src/shared/agent-launch-types.ts",
           "src/shared/app-types.ts",
           "src/shared/claude-update-types.ts"
         ],

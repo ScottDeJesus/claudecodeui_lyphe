@@ -394,7 +394,7 @@
     "error": "Error: {{error}}",
     "runnerModel": {
       "label": "Use DeepSeek Flash for build souls",
-      "description": "Dispatch the plan runner’s builder, its fix-pass and Athena on DeepSeek’s deepseek-flash instead of Claude Opus. Prometheus, the scouts and the replanner stay on Claude. Takes effect on the next phase.",
+      "description": "Dispatch the plan runner’s builder, its fix-pass and Athena on DeepSeek’s deepseek-flash instead of Claude Sonnet. Prometheus, the scouts and the replanner stay on Claude. Takes effect on the next phase.",
       "unreadable": "The switch could not be read from the server, so its position is unknown — this is not the same as off. It is retried whenever this page regains focus."
     },
     "runnerHealModel": {

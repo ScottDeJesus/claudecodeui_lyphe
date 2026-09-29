@@ -14,6 +14,7 @@ import { MemoryIntakePanel } from '@/modules/memory-intake';
 import { RunnerPanel } from '@/modules/runner-tab';
 import { HealPanel } from '@/modules/heal';
 import { ApiPanel } from '@/modules/api-tab';
+import { AgentLaunchPanel } from '@/modules/agent-launch';
 import { TaskMasterPanel, useTaskMasterProjectSync } from '@/modules/task-master';
 import { UniversePanel } from '@/modules/universe';
 import { SchedulesPanel } from '@/modules/schedules';
@@ -433,6 +434,13 @@ function WorkspaceMain({
           {activeTab === 'api' && (
             <div className="h-full overflow-hidden">
               <ApiPanel />
+            </div>
+          )}
+
+          {/* No gate either: the launch table is the house's, not the open project's. */}
+          {activeTab === 'agents' && (
+            <div className="h-full overflow-hidden">
+              <AgentLaunchPanel />
             </div>
           )}
 

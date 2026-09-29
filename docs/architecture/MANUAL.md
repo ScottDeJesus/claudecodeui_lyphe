@@ -1325,8 +1325,8 @@ its Accept prompt or its designer's questions put up in the plan's owning chat b
 `permission.required` push. Its asks are held by a permission gateway the lane registers with the
 provider registry (`registerPermissionGateway`), and `providerRegistry.listPermissionGateways()` is the
 one list every reader walks — `chat.subscribe`'s `pendingPermissions`, an answer from the panel or a
-phone tap (`resolveToolApproval` stops at the first gateway that holds the key and warns once when
-none does), and the sidebar's waiting mark. It answers through the dispatcher's own verbs, never a run.
+phone tap (`resolveToolApproval` stops at the first gateway that claims the key and warns once when
+none does — this one claims every key of its own, held or not, and settles it from the store, MAN-7400), and the sidebar's waiting mark. It answers through the dispatcher's own verbs, never a run. Its `requestId` is derived from the store's record of the ask, never minted, so it names the same ask in every process: the id a tab holds across a handover is still the ask's, and a re-issue is the same request rather than a new one.
 
 The client keeps the pending list in `ChatInterface` state, not in the store — permission
 kinds are among the five that are never persisted as rows. The rules:
@@ -1341,7 +1341,10 @@ kinds are among the five that are never persisted as rows. The rules:
 - Duplicate `requestId`s are ignored, because `chat_subscribed` also carries the full
   pending set and can race with a live `permission_request`.
 - `permission_resolved` and `permission_cancelled` remove their `requestId` from the
-  list, whichever tab or replay delivered the request.
+  list, whichever tab or replay delivered the request. A `permission_cancelled` carrying
+  `answerNotCarried: true` is the server saying an answer sent for that id was not carried — the
+  prompt is no longer open, or the dispatcher could not be read to find out: a tab that was told about
+  that ask (its bell rang for it) and never heard it close also shows an "Answer not applied" toast. A frame that also carries `alreadyAnswered: true` is the plan's second approval refused by the store (the prompt was retracted as resolved BEFORE the answer ran, so every tab has heard it close): only the tab that SENT the answer shows "Already answered" — it is the tab whose own pending list had dropped the request when `permission_resolved` arrived (`answeredHereRef`) — and a tab that answered nothing is told nothing.
 - `chat_subscribed` replaces the list wholesale, and rings for any actionable ask in it whose key
   this tab has not yet announced — a handover puts the still-parked question back in that catalogue
   under a fresh `requestId`, and the key is what keeps that delivery silent.
@@ -6416,7 +6419,7 @@ section: README/003 The protocol, in two tables/004 Server → client: the `kind
 | `status` | provider | Progress text, and the token-budget payload. |
 | `permission_request` | provider | A tool is asking for approval. |
 | `permission_resolved` | provider | A client answered that request. Retracts it from replays and other tabs. |
-| `permission_cancelled` | provider | That request is no longer live (timeout, abort, withdrawal). |
+| `permission_cancelled` | provider | That request is no longer live (timeout, abort, withdrawal). A plan's prompt the store no longer holds open is retracted the same way; carrying `answerNotCarried: true` it also says that an answer sent for the prompt was NOT carried (the ask is no longer open, or the dispatcher could not be read) — a tab that was told about that ask and never heard it close shows an "Answer not applied" toast (`useChatRealtimeHandlers.ts`); the frame names the chat only when the server's picture can say which. Also carrying `alreadyAnswered: true` (panel door only) it says the plan's approval was already held, so the answer changed nothing: only the tab that sent the answer toasts "Already answered". |
 | `error` | provider | An informational failure row. **Not terminal.** |
 | `complete` | provider | The one terminal event of a run. Exactly one per run, always. |
 | `session_created` | provider | The runtime announcing its native id. **Swallowed server-side; no client ever sees it.** |

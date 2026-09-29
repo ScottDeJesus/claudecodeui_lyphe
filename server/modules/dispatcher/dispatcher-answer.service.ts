@@ -1,4 +1,4 @@
-import type { DispatcherAsk, ProviderPermissionDecision } from '@/shared/types.js';
+import type { DispatcherAnswerOutcome, DispatcherAsk, ProviderPermissionDecision } from '@/shared/types.js';
 
 import type { DispatcherCommandResult } from './dispatcher-ask.transport.js';
 import { firstLine } from './dispatcher-ask.transport.js';
@@ -11,7 +11,10 @@ import { firstLine } from './dispatcher-ask.transport.js';
  * - `accept` — Accept runs `dispatcher accept --lock <token> --by app:<door> <plans…>`, Queue the same
  *   with `--paused`. The token is the census he was shown, re-checked by the verb itself (`lock.stale`),
  *   so an Accept whose plans moved on since approves NOTHING and the current prompt is raised again.
- *   `--by` names his press — the panel or the phone — in `approved_by`.
+ *   `--by` names his press — the panel or the phone — in `approved_by`. A plan is approved ONCE per load
+ *   (`store.approve`): an Accept that reaches a plan already approved approves nothing and exits
+ *   `ACCEPT_ALREADY_APPROVED_EXIT`, which is an answer that arrived second — `already-answered`, never a
+ *   refusal to put the prompt back for.
  * - Rework approves nothing (the ask already stamped `prompted_at`, which is the hold standing down,
  *   exactly as the intent-lock hook's Rework does) and sends his typed notes verbatim to the designer:
  *   `dispatcher tell <target> --brief -`, once per designer target the Accept names.
@@ -24,6 +27,12 @@ import { firstLine } from './dispatcher-ask.transport.js';
 
 /** The Rework answer's POSITION among the Accept prompt's three (`intent_lock.OPTIONS`: Accept, Queue, Rework). */
 export const REWORK_OPTION = 2;
+
+/**
+ * `dispatcher accept`'s exit code for a plan that was approved already (`accept.ALREADY_APPROVED_EXIT`),
+ * apart from every other refusal's 2. The dispatcher's own constant is the source; change one, change both.
+ */
+const ACCEPT_ALREADY_APPROVED_EXIT = 3;
 
 /** One answer, read: an approval (live or paused), a Rework's notes, or a questions round as one brief. */
 export type AskReply =
@@ -81,9 +90,11 @@ function shown(args: readonly string[]): string {
 }
 
 /**
- * Carries one reply to the plan, answering whether the dispatcher took ALL of it. A verb that refused
- * or never answered is `false`: the caller puts the prompt back up for the operator (a stale Accept's
- * current prompt among them), and the dispatcher's own line is in the journal beside the command.
+ * Carries one reply to the plan, answering what the dispatcher did with it (`DispatcherAnswerOutcome`).
+ * A verb that refused or never answered is `refused`: the caller puts the prompt back up for the
+ * operator (a stale Accept's current prompt among them). An Accept that found the plan approved
+ * already is `already-answered`: nothing changed and the prompt is NOT put back, because the word that
+ * closed it is the one that stands. The dispatcher's own line is in the journal beside each command.
  * Used by `dispatcher-asks.service.ts`.
  */
 export async function carryReply(
@@ -91,7 +102,7 @@ export async function carryReply(
   ask: DispatcherAsk,
   reply: AskReply,
   door: AnswerDoor,
-): Promise<boolean> {
+): Promise<DispatcherAnswerOutcome> {
   const runs: Array<{ args: string[]; stdin?: string }> = [];
   if (reply.kind === 'accept' && ask.kind === 'accept') {
     runs.push({ args: ['accept', '--lock', ask.token, '--by', `app:${door}`, ...(reply.paused ? ['--paused'] : []), ...ask.plans] });
@@ -100,13 +111,20 @@ export async function carryReply(
   } else if (reply.kind === 'answers' && ask.kind === 'questions') {
     runs.push({ args: ['tell', ask.target, '--brief', '-'], stdin: reply.brief });
   }
-  if (runs.length === 0) return false;
-  let tookAll = true;
+  if (runs.length === 0) return 'refused';
+  let outcome: DispatcherAnswerOutcome = 'took';
   for (const { args, stdin } of runs) {
     const result = await dependencies.run(args, stdin);
     const said = firstLine(result.stdout) || firstLine(result.stderr) || '(nothing)';
     dependencies.say(`[Dispatcher] ${ask.plan}: the operator's ${door} answer ran \`${shown(args)}\` → exit ${result.exit ?? 'none'}: ${said}`);
-    if (result.exit !== 0) tookAll = false;
+    if (result.exit === 0) continue;
+    // Only an Accept has an "already" to be told; a refusal of any verb outranks it, so a run that
+    // carried more than one is never reported answered while part of it was not.
+    if (args[0] === 'accept' && result.exit === ACCEPT_ALREADY_APPROVED_EXIT) {
+      if (outcome === 'took') outcome = 'already-answered';
+    } else {
+      outcome = 'refused';
+    }
   }
-  return tookAll;
+  return outcome;
 }

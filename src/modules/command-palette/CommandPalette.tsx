@@ -80,6 +80,7 @@ const NAV_TABS: Array<{ id: AppTab; label: string; keywords: string }> = [
   { id: 'runner', label: 'Go to Runner', keywords: 'runner plan run live phases' },
   { id: 'heal', label: 'Go to Heal', keywords: 'heal friction ledger reflex regression ignore' },
   { id: 'api', label: 'Go to API', keywords: 'api jev deepseek spend balance burn tokens consumers usage outings typesafe' },
+  { id: 'agents', label: 'Go to Agents', keywords: 'agents souls launch model effort pin opus fable sonnet deepseek metis shims' },
 ];
 
 /** Rendered by the project-workspace module to search projects, sessions, files, branches and commits and run their actions. */

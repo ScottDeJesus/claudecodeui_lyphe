@@ -1,8 +1,8 @@
-import type { DispatcherAsk, DispatcherStateEvent, ProviderPermissionDecision, ProviderRuntimePermissionGateway, ProviderRuntimeRecalledPrompt } from '@/shared/types.js';
+import type { DispatcherAnswerOutcome, DispatcherAsk, DispatcherStateEvent, ProviderPermissionDecision, ProviderRuntimePermissionGateway, ProviderRuntimeRecalledPrompt } from '@/shared/types.js';
 
 import { REWORK_OPTION, readReply } from './dispatcher-answer.service.js';
 import type { AnswerDoor, AskReply } from './dispatcher-answer.service.js';
-import { askedPlanOf, doorOfKey, isAskKey, keyOf, requestIdOf } from './dispatcher-ask-names.service.js';
+import { askedPlanOf, doorOfKey, isAskKey, keyOf, promptKeyOfRequestId, requestIdOf } from './dispatcher-ask-names.service.js';
 
 /**
  * The prompts this lane has up in chats: a PROJECTION of the store's open asks onto the question
@@ -10,8 +10,8 @@ import { askedPlanOf, doorOfKey, isAskKey, keyOf, requestIdOf } from './dispatch
  *
  * THE STORE HOLDS THE ASK AND NAMES IT (`dispatcher-ask-names.service.ts`); THIS FILE KEEPS A BOOK OF
  * WHAT THIS PROCESS HAS PUT UP, AND NOTHING ELSE. Every plan of the picture carries `asking` — the
- * prompt the app has put up for it and is still waiting on
- * (`hooks/dispatcher/ask.py`) — and each distinct one is shown in its plan's owning chat exactly as an
+ * prompt the app has put up for it and is still waiting on (`hooks/dispatcher/ask.py`) — and each
+ * distinct one is shown in its plan's owning chat exactly as an
  * `AskUserQuestion` is: a `permission_request` frame to every socket, a `permission.required` push
  * (its buttons included), and a place in `chat_subscribed`'s `pendingPermissions` through the
  * permission gateway below. A restart, a handover's second server and a reopened tab all read the
@@ -28,9 +28,9 @@ import { askedPlanOf, doorOfKey, isAskKey, keyOf, requestIdOf } from './dispatch
  * fresh prompt must buzz the phone and ring the tab like the first), and an Accept's is its LEAD plan's
  * (`ask.asking`), so one arc's lock carried on every plan it names is ONE prompt; a model press or a
  * re-worded goal moves the token and is a new one too (the old is retracted, the new raised). Both
- * names are the same in every process, so a handover neither buzzes the phone (`ntfy-pushed-prompts
- * .service.ts` keys on it) nor rings the tab again (`announceOnce`), and the id a tab holds names the
- * ask in the successor as it did in the process that raised it.
+ * names are the same in every process, so a handover neither buzzes the phone
+ * (`ntfy-pushed-prompts.service.ts` keys on it) nor rings the tab again (`announceOnce`), and the id a
+ * tab holds names the ask in the successor as it did in the process that raised it.
  *
  * THE RAISE PUTS AN ASK UP THE MOMENT IT IS RECORDED (`show`), off the ask the dispatcher printed, so
  * the prompt reaches the chat on the tick that saw its landing; the pictures after it carry the same
@@ -43,14 +43,25 @@ import { askedPlanOf, doorOfKey, isAskKey, keyOf, requestIdOf } from './dispatch
  * `observe` on a fresh picture) and the answer is looked up again. An ask the store holds open is in
  * the book by then and is answered like any other; a name no open ask derives is an answer to an ask
  * that is no longer current (re-cut, answered, nothing owed), which runs nothing, says so in the
- * journal, and tells the chat that owned it (`staleAnswer`) — while that same read has already put up
- * whatever prompt IS current. A phone tap on a push this process never sent is the same read
- * (`recall`), made before its token is spent.
+ * journal, and tells the tabs (`answerNotCarried`) — while that same read has already put up whatever
+ * prompt IS current. A store that cannot be read is told the same way: the click's card left with it.
+ * A phone tap on a push this process never sent is the same read (`recall`), made before its token is
+ * spent. THE READ IS COALESCED AND ITS NEGATIVE ANSWER REMEMBERED (`CLOSED_MEMO_MS`), because the phone's
+ * route is public and a genuine token replays for hours: concurrent callers share ONE read behind the one
+ * in flight, and a key the store was seen not to carry answers a replay without another.
  *
  * AN ANSWER CLOSES THE ASK IN THE STORE — an approval, or a `tell` live for the plan (`ask.asking`) —
  * and the picture that shows it arrives up to a poll later. So a prompt answered here stays down for
  * `ANSWER_GRACE_MS` even while the picture still carries it, and one whose answer the dispatcher did
  * NOT take (a stale token, a refusal, no answer) goes straight back up on the picture in hand.
+ *
+ * A PLAN IS APPROVED ONCE PER LOAD, so a second Accept — a double answer, two servers hearing one tap, a
+ * terminal Accept that got there first — is refused by the store, whichever server sends it, and comes
+ * back as `already-answered` (`carryReply`). That is an answer, not a failure: the prompt stays down, the
+ * journal says the plan was already answered, and the panel's tab that sent it is told
+ * (`tellAlreadyAnswered`) so a hand that pressed second is not left believing it started or held
+ * anything. The phone's own HTTP reply is sent before the verb runs, so a phone tap hears "Answered"
+ * and only the journal hears the truth.
  */
 
 /**
@@ -60,6 +71,14 @@ import { askedPlanOf, doorOfKey, isAskKey, keyOf, requestIdOf } from './dispatch
  * designer who came back having written nothing — and his word is still owed.
  */
 const ANSWER_GRACE_MS = 30_000;
+
+/**
+ * How long a key the store was READ and did not carry stays known as closed, so a replayed token or a
+ * repeated click is answered without another read of a megabyte document. Short, because it is a memo
+ * of a fact the store may change (an ask a designer left open comes back — `raise` forgets the memo of
+ * the key it puts up); and never written from a failed read, which says nothing about the ask.
+ */
+const CLOSED_MEMO_MS = 5_000;
 
 /** The shape the question panel and the phone's buttons read — `AskUserQuestion`'s own input. */
 type PanelQuestion = {
@@ -101,8 +120,8 @@ export type DispatcherAsksDependencies = {
   push: (push: AskPush) => void;
   /** Retires a prompt's phone buttons — it was answered, or it is gone. */
   forgetButtons: (promptKey: string) => void;
-  /** Carries one reply to the plan; resolves whether the dispatcher took it (`carryReply`). */
-  carry: (ask: DispatcherAsk, reply: AskReply, door: AnswerDoor) => Promise<boolean>;
+  /** Carries one reply to the plan; resolves what the dispatcher did with it (`carryReply`). */
+  carry: (ask: DispatcherAsk, reply: AskReply, door: AnswerDoor) => Promise<DispatcherAnswerOutcome>;
   /** One fresh read of the store's plans (`readDispatcherState`) — for an answer whose ask this process has not raised. THROWS when the dispatcher did not answer. */
   read: () => Promise<Pick<DispatcherStateEvent, 'plans' | 'generated_at'>>;
   /** Injected by the composition root — this server has no logger. */
@@ -150,6 +169,11 @@ export function createDispatcherAsks(dependencies: DispatcherAsksDependencies): 
   const answered = new Map<string, number>();
   /** The newest picture, for the re-projection an answer that settled owes. */
   let last: Pick<DispatcherStateEvent, 'plans' | 'generated_at'> | null = null;
+  /** Keys the store was read and did not carry, and when — see `CLOSED_MEMO_MS`. */
+  const closed = new Map<string, number>();
+  /** The store read now out for an answer or a tap, and the ONE read queued behind it (`freshRead`). */
+  let reading: Promise<Error | null> | null = null;
+  let readingNext: Promise<Error | null> | null = null;
 
   const frameOf = (entry: RaisedAsk): Record<string, unknown> => ({
     kind: 'permission_request',
@@ -201,6 +225,8 @@ export function createDispatcherAsks(dependencies: DispatcherAsksDependencies): 
       receivedAt: new Date(),
     };
     raised.set(promptKey, entry);
+    closed.delete(entry.promptKey);
+    closed.delete(entry.requestId);
     dependencies.broadcast(frameOf(entry));
     dependencies.push({
       provider: chat.provider,
@@ -258,6 +284,32 @@ export function createDispatcherAsks(dependencies: DispatcherAsksDependencies): 
     raised.get(approvalKey) ?? [...raised.values()].find((candidate) => candidate.requestId === approvalKey);
 
   /**
+   * Says that an answer just carried was the SECOND word on a plan the store had approved already, so it
+   * changed nothing: in the journal for every door (the dispatcher's own refusal — when, by whom, paused
+   * or live — is in the line `carryReply` journalled beside the command), and to the tabs for the PANEL's
+   * door alone, as `tellNotCarried` does — a phone tap has no card to answer for and is answered in its
+   * own HTTP reply, and a frame for it would land in the tab whose own answer WON. `answer` retracted the
+   * prompt as resolved before the verb ran, so every tab has heard the close and a plain "not carried"
+   * frame would be ignored as one it had already heard; `alreadyAnswered` is what lets a tab say so, and
+   * the tab that says so is the one that sent the answer (`useChatRealtimeHandlers.ts`).
+   */
+  const tellAlreadyAnswered = (entry: RaisedAsk, door: AnswerDoor): void => {
+    dependencies.log(`[Dispatcher] ${entry.ask.plan}: the ${door} answer was already answered — the plan was approved before it arrived, so nothing changed`);
+    if (door !== 'panel') return;
+    dependencies.broadcast({
+      kind: 'permission_cancelled',
+      id: `${entry.requestId}:permission_cancelled:already-answered`,
+      requestId: entry.requestId,
+      promptKey: entry.promptKey,
+      sessionId: entry.sessionId,
+      provider: entry.provider,
+      answerNotCarried: true,
+      alreadyAnswered: true,
+      timestamp: new Date().toISOString(),
+    });
+  };
+
+  /**
    * One answer to a prompt in the book. A decision that is no answer puts the same prompt straight
    * back on the tab that sent it, which has already let it go; an answer takes the prompt down
    * everywhere and is carried to the plan.
@@ -272,17 +324,53 @@ export function createDispatcherAsks(dependencies: DispatcherAsksDependencies): 
     answering.add(entry.promptKey);
     retract(entry, 'permission_resolved');
     void dependencies.carry(entry.ask, reply, door)
-      .catch((error) => {
+      .catch((error): DispatcherAnswerOutcome => {
         dependencies.log(`[Dispatcher] ${entry.ask.plan}: the answer could not be carried: ${error instanceof Error ? error.message : String(error)}`);
-        return false;
+        return 'refused';
       })
-      .then((took) => {
+      .then((outcome) => {
         answering.delete(entry.promptKey);
-        if (took) answered.set(entry.promptKey, Date.now());
+        // An `already-answered` prompt is as closed as a taken one: the store holds the approval that
+        // closed it, and the picture in hand may still show it for a poll.
+        if (outcome !== 'refused') answered.set(entry.promptKey, Date.now());
+        if (outcome === 'already-answered') tellAlreadyAnswered(entry, door);
         // A refused answer's prompt — or the fresh one a stale token's census now asks — goes back up
         // on the picture in hand: a verb that changed nothing moves no frame to wait for.
         if (last !== null) observe(last);
+      })
+      // The chain runs on its own, off any request: a throw out of `observe` (the sessions database, a
+      // broadcast) would be an unhandled rejection, and this process exits on one.
+      .catch((error) => {
+        dependencies.log(`[Dispatcher] ${entry.ask.plan}: the prompt could not be put back after its answer settled: ${error instanceof Error ? error.message : String(error)}`);
       });
+  };
+
+  /** One read of the store, brought into the book. Resolves the error when the dispatcher did not answer, `null` when it did. */
+  const readNow = (): Promise<Error | null> => {
+    const run = (async (): Promise<Error | null> => {
+      try {
+        observe(await dependencies.read());
+        return null;
+      } catch (error) {
+        return error instanceof Error ? error : new Error(String(error));
+      }
+    })().finally(() => { reading = null; });
+    reading = run;
+    return run;
+  };
+
+  /**
+   * A read that began AFTER the caller did. One already out may have begun before the caller's ask was
+   * recorded and cannot answer for it, so a caller that finds one out waits for the read behind it — and
+   * every caller arriving meanwhile shares that ONE, so a burst of taps costs two reads, not one each.
+   */
+  const freshRead = (): Promise<Error | null> => {
+    if (reading === null) return readNow();
+    readingNext ??= reading.then(() => {
+      readingNext = null;
+      return readNow();
+    });
+    return readingNext;
   };
 
   /**
@@ -292,37 +380,64 @@ export function createDispatcherAsks(dependencies: DispatcherAsksDependencies): 
    * picture that reads.
    */
   const catchUp = async (undone: string): Promise<boolean> => {
-    try {
-      observe(await dependencies.read());
-      return true;
-    } catch (error) {
-      dependencies.log(`[Dispatcher] ${undone}: the store could not be read (${error instanceof Error ? error.message : String(error)})`);
-      return false;
+    const failure = await freshRead();
+    if (failure === null) return true;
+    dependencies.log(`[Dispatcher] ${undone}: the store could not be read (${failure.message})`);
+    return false;
+  };
+
+  /** Whether a key the store was read and did not carry is still inside its memo — a replay needs no read. */
+  const knownClosed = (key: string): boolean => {
+    const at = closed.get(key);
+    if (at === undefined) return false;
+    if (Date.now() - at < CLOSED_MEMO_MS) return true;
+    closed.delete(key);
+    return false;
+  };
+
+  /** Notes a key a successful read did not carry, forgetting the memos that have run out while it is at it. */
+  const rememberClosed = (key: string): void => {
+    const now = Date.now();
+    for (const [known, at] of closed) {
+      if (now - at >= CLOSED_MEMO_MS) closed.delete(known);
     }
+    closed.set(key, now);
   };
 
   /**
-   * An answer no open ask stands behind — re-cut (a new `asked` event, so a new name), answered already,
-   * or nothing owed. NOTHING IS CARRIED: an Accept run again would approve the plan a second time and
-   * undo a Queue. The journal says so, and the chat that owned the prompt is told (`staleAnswer`), so
-   * the tab that sent the answer — which let its card go when it sent it — is not left believing it did
-   * something. The prompt that IS current was put up by the read that found this one gone.
+   * Tells the tabs that an answer sent for `approvalKey` was NOT carried — the ask is no longer open, or
+   * the store could not be read to find out — so the tab that sent it, which let its card go when it
+   * sent it, is not left believing it did something. The frame names the ask by BOTH its names and the
+   * chat when the picture in hand can say which: a tab toasts it only for an ask it was told about
+   * itself (`useChatRealtimeHandlers.ts`), so one that names no chat still reaches no stranger.
    */
-  const dropStale = (approvalKey: string, door: AnswerDoor): void => {
+  const tellNotCarried = (approvalKey: string, door: AnswerDoor): void => {
+    // Only the panel has a card to answer for; a phone tap is answered in its own HTTP reply.
+    if (door !== 'panel') return;
     const plan = last === null ? undefined : askedPlanOf(last.plans, approvalKey);
-    dependencies.log(`[Dispatcher] ${plan?.name ?? approvalKey}: a ${door} answer named an ask that is no longer open (answered, re-cut or nothing owed) — nothing was carried`);
     const chat = plan === undefined ? null : dependencies.chatFor(plan);
-    // Only the panel has a card to retract; a phone tap is answered in its own HTTP reply.
-    if (chat === null || door !== 'panel') return;
     dependencies.broadcast({
       kind: 'permission_cancelled',
       id: `${approvalKey}:permission_cancelled`,
       requestId: approvalKey,
-      sessionId: chat.sessionId,
-      provider: chat.provider,
-      staleAnswer: true,
+      promptKey: promptKeyOfRequestId(approvalKey),
+      ...(chat === null ? {} : { sessionId: chat.sessionId, provider: chat.provider }),
+      answerNotCarried: true,
       timestamp: new Date().toISOString(),
     });
+  };
+
+  /**
+   * An answer no open ask stands behind — re-cut (a new `asked` event, so a new name), answered already,
+   * or nothing owed. NOTHING IS CARRIED: a re-cut's notes or answers would reach a designer for a
+   * question no longer asked, and an Accept for a census nobody is shown now is not the operator's word
+   * (the store would refuse a second approval of an approved plan in any case). The journal says so and
+   * the tabs are told. The prompt that IS current was put up by the read that found this one gone.
+   */
+  const dropStale = (approvalKey: string, door: AnswerDoor): void => {
+    const plan = last === null ? undefined : askedPlanOf(last.plans, approvalKey);
+    dependencies.log(`[Dispatcher] ${plan?.name ?? approvalKey}: a ${door} answer named an ask that is no longer open (answered, re-cut or nothing owed) — nothing was carried`);
+    tellNotCarried(approvalKey, door);
   };
 
   /**
@@ -334,10 +449,22 @@ export function createDispatcherAsks(dependencies: DispatcherAsksDependencies): 
    */
   const answerFromStore = async (approvalKey: string, decision: ProviderPermissionDecision): Promise<void> => {
     const door = doorOfKey(approvalKey);
-    if (!(await catchUp(`a ${door} answer to ${approvalKey} was not carried`))) return;
+    if (knownClosed(approvalKey)) {
+      dropStale(approvalKey, door);
+      return;
+    }
+    if (!(await catchUp(`a ${door} answer to ${approvalKey} was not carried`))) {
+      tellNotCarried(approvalKey, door);       // `catchUp` has said why in the journal
+      return;
+    }
     const entry = entryFor(approvalKey);
-    if (entry === undefined) dropStale(approvalKey, door);
-    else answer(entry, decision, door);
+    if (entry === undefined) {
+      rememberClosed(approvalKey);
+      dropStale(approvalKey, door);
+      return;
+    }
+    dependencies.log(`[Dispatcher] ${entry.ask.plan}: the ${door} answer to ${approvalKey} named an ask this process had not raised — read from the store`);
+    answer(entry, decision, door);
   };
 
   /**
@@ -359,6 +486,12 @@ export function createDispatcherAsks(dependencies: DispatcherAsksDependencies): 
     return true;
   };
 
+  /** A prompt in the book as the phone's registry needs it: its chat, its tool, and the input its options are read from. */
+  const recalled = (approvalKey: string): ProviderRuntimeRecalledPrompt | null => {
+    const entry = entryFor(approvalKey);
+    return entry === undefined ? null : { sessionId: entry.sessionId, toolName: 'AskUserQuestion', input: entry.input };
+  };
+
   /**
    * The prompt a phone tap names, as the store holds it now — or `null` when no open ask carries the
    * name. A tap may reach a process that has not raised the prompt yet, whose registry of answerable
@@ -367,9 +500,16 @@ export function createDispatcherAsks(dependencies: DispatcherAsksDependencies): 
    */
   const recall = async (approvalKey: string): Promise<ProviderRuntimeRecalledPrompt | null> => {
     if (!isAskKey(approvalKey)) return null;
-    if (entryFor(approvalKey) === undefined && !(await catchUp(`a tap on ${approvalKey} could not be checked`))) return null;
+    if (entryFor(approvalKey) !== undefined) return recalled(approvalKey);
+    if (knownClosed(approvalKey)) return null;
+    if (!(await catchUp(`a tap on ${approvalKey} could not be checked`))) return null;
     const entry = entryFor(approvalKey);
-    return entry === undefined ? null : { sessionId: entry.sessionId, toolName: 'AskUserQuestion', input: entry.input };
+    if (entry === undefined) {
+      rememberClosed(approvalKey);
+      return null;
+    }
+    dependencies.log(`[Dispatcher] ${entry.ask.plan}: a tap on ${approvalKey} named a prompt this process had not raised — read from the store`);
+    return recalled(approvalKey);
   };
 
   const show = (plan: DispatcherStateEvent['plans'][number], ask: DispatcherAsk): void => {

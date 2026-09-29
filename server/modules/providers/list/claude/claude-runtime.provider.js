@@ -237,9 +237,10 @@ function findByPromptKey(promptKey) {
 
 /**
  * Settles the approval a decision names, answering whether this runtime held it. A key it does not
- * hold is not its to judge: every holder of asks hears every answer (`providerRuntimeService`), and the
- * one warning for a key NOBODY held is the service's — answered already, timed out, or a prompt raised
- * by a predecessor that is no longer pending anywhere (its successor never re-issued it).
+ * hold is not its to judge: the holders of asks are asked in turn and the first to claim a key settles
+ * it (`providerRuntimeService`), and the one warning for a key NOBODY claimed is the service's —
+ * answered already, timed out, or a prompt raised by a predecessor that is no longer pending anywhere
+ * (its successor never re-issued it).
  */
 function resolveToolApproval(requestId, decision) {
   const resolver = pendingToolApprovals.get(requestId) ?? findByPromptKey(requestId);

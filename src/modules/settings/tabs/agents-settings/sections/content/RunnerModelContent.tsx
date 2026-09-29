@@ -110,7 +110,7 @@ export default function RunnerModelContent() {
               })
             : t('status.loading', { ns: 'common', defaultValue: 'Loading...' })
           : t('agents.runnerModel.description', {
-              defaultValue: 'Dispatch the plan runner’s builder, its fix-pass and Athena on DeepSeek’s deepseek-flash instead of Claude Opus. Prometheus, the scouts and the replanner stay on Claude. Takes effect on the next phase.',
+              defaultValue: 'Dispatch the plan runner’s builder, its fix-pass and Athena on DeepSeek’s deepseek-flash instead of Claude Sonnet. Prometheus, the scouts and the replanner stay on Claude. Takes effect on the next phase.',
             })}
       >
         {unknown ? (

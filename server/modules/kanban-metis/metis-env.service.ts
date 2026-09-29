@@ -5,6 +5,7 @@ import path from 'node:path';
 import { writeFlagFile } from '@/modules/settings/index.js';
 import { userFacingEnv } from '@/shared/child-env.js';
 import { resolveMcpCommand } from '@/shared/mcp-command.js';
+import type { AgentLaunchResolved } from '@/shared/types.js';
 
 /**
  * Everything a spawned Metis child is handed: its environment, its argv, its one credential and
@@ -33,12 +34,6 @@ const BOARD_FLAG_DIR = path.join(os.homedir(), '.claude', 'state', 'kanban-deeps
  */
 export const DEEPSEEK_BASE_URL = 'https://api.deepseek.com/anthropic';
 export const DEEPSEEK_MODEL = 'deepseek-flash';
-
-/**
- * The model a board that is NOT on Flash launches on: `sonnet`, the model every house builder and
- * reviewer rides (operator, 2026-09-28). There is no second Claude pin for Metis.
- */
-export const METIS_CLAUDE_MODEL = 'sonnet';
 
 /** Where one board's switch file lives. Exported so the spawner and a probe name the same path. */
 export function boardFlagPath(boardId: string): string {
@@ -91,19 +86,34 @@ export function metisOpeningTurn(boardId: string): string {
   return `Work board \`${boardId}\`. Call \`list_actionable\`, take the top claimable card, and end the turn when nothing is claimable.`;
 }
 
-/** Which endpoint and which `--model` a board's switch buys. Settled at spawn, never re-derived. */
-export function metisRouteFor(deepseekFlash: boolean): { provider: 'deepseek' | 'claude'; model: string } {
-  return deepseekFlash
-    ? { provider: 'deepseek', model: DEEPSEEK_MODEL }
-    : { provider: 'claude', model: METIS_CLAUDE_MODEL };
+/**
+ * Which endpoint, which `--model` and which `--effort` a board's switch buys. Settled at spawn, never
+ * re-derived.
+ *
+ * `resolved` is the launch table's answer for the side the board's switch picked (`resolveLaunchSide`),
+ * and it supplies the Claude model word and the effort word for either side. A Flash board's `--model`
+ * stays this module's own `deepseek-flash` rather than the table's: the word is the whole safety of the
+ * DeepSeek route (INV-34 #1), so it is never read from a file that could be edited or mistyped.
+ */
+export function metisRouteFor(
+  deepseekFlash: boolean,
+  resolved: AgentLaunchResolved,
+): { provider: 'deepseek' | 'claude'; model: string; effort: string | null } {
+  return {
+    provider: deepseekFlash ? 'deepseek' : 'claude',
+    model: deepseekFlash ? DEEPSEEK_MODEL : resolved.model,
+    effort: resolved.effort,
+  };
 }
 
 /** Everything one spawn needs, as the spawner hands it over: identity, route, origin and secrets. */
 export type MetisChildSpec = {
   boardId: string;
   sessionId: string;
-  /** `deepseek-flash` or `sonnet` — the `--model` value, already settled by `metisRouteFor`. */
+  /** The `--model` value, already settled by `metisRouteFor`: `deepseek-flash`, or the Claude word the launch table gives Metis. */
   model: string;
+  /** The `--effort` value the launch table gives this route, or `null` for none, so the CLI's own effortLevel applies. */
+  effort: string | null;
   /** The board's own switch, read from the board row at this spawn. */
   deepseekFlash: boolean;
   provider: 'deepseek' | 'claude';
@@ -240,10 +250,10 @@ export function buildMetisArgv(spec: MetisChildSpec): string[] {
   }
 
   argv.push('--model', spec.model);
-  // `max` on both routes, the row `~/.claude/hooks/plan_runner/soul_model.py`'s `EFFORT_BY_MODEL` holds
-  // for `deepseek-flash` and for `sonnet` alike (`souls.py`'s `argv` reads that table). On Flash it is
-  // the only word that raises anything: DeepSeek maps `xhigh` down to `high`, its own default.
-  argv.push('--effort', 'max');
+  // No `--effort` at all when the table names none for this model: the CLI's own effortLevel then applies.
+  if (spec.effort !== null) {
+    argv.push('--effort', spec.effort);
+  }
   argv.push('--append-system-prompt', spec.appendSystemPrompt);
   argv.push('--mcp-config', buildMcpConfig(spec));
   argv.push('--strict-mcp-config');

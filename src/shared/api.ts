@@ -4,6 +4,7 @@ import {
   storeAuthToken,
 } from '@/shared/authToken';
 import type { DeepseekRange, DispatcherModelChoice, DispatcherSwarmChoice, FileLinePatch, JevRange, NtfySettingsInput, SubagentTranscriptResult } from '@/shared/types';
+import type { AgentLaunchDefaultsChange, AgentLaunchRowChange } from '@/shared/agent-launch-types';
 import type { ClaudeUpdateApplyRequest } from '@/shared/claude-update-types';
 import { IS_PLATFORM } from '@/shared/utils';
 import { readVoiceConfig, voiceConfigHeaders } from '@/shared/voiceConfig';
@@ -252,6 +253,9 @@ const readKanbanMetisTranscript = async (sessionId: string): Promise<SubagentTra
  * `memory-intake/hooks/useLessonReview.ts`; the number lives here, beside the call that sends it.
  */
 export const LESSON_LIST_LIMIT = 500;
+
+/** The deadline of an Agents-tab write: the relay's own 90 s for the CLI, with the network's margin. */
+const AGENT_LAUNCH_WRITE_TIMEOUT_MS = 95_000;
 
 // ─── API endpoints ──────────────────────────────────────────────────────────
 // Every `/api/...` path the frontend talks to is declared here; components
@@ -712,8 +716,8 @@ export const api = {
     update: () => post('/api/system/update', undefined, { timeoutMs: NO_REQUEST_TIMEOUT }),
   },
 
-  // The Claude update pipeline (MAN-7401–MAN-7404 — the check, the install/restart backend and this
-  // client's own row; the fuller account goes into the cloudcli:docs store): what the two Claude
+  // The Claude update pipeline (MAN-7401–MAN-7404 are the check, the install/restart backend and this
+  // client's own row; MAN-7408–MAN-7414 are the reference form): what the two Claude
   // packages are on, what npm has, and the two presses that move them. The report is also what every
   // action answers with, so one read serves the tab, the cards and the sidebar row.
   //
@@ -821,6 +825,21 @@ export const api = {
     // A refusal is a 200 answer `{cycle, started: false, stage, why}`, never an error.
     cycleStart: () => post('/api/heal/cycle', {}),
     cycleStop: () => post('/api/heal/cycle/stop', {}),
+  },
+
+  // The Agents tab's launch table (`~/.claude/charters/launch.toml`), relayed from the launch-table CLI:
+  // the census the tab draws, one row's pins, and the table's defaults. Every write answers with the
+  // census read back after it, so the tab never holds a picture the table did not confirm.
+  //
+  // A write waits as long as the relay lets the CLI run (90 s: the lock, then the shims' regeneration),
+  // plus a margin: at the browser's default 30 s a slow but healthy save would be called "not saved"
+  // while the CLI went on to write it.
+  agentLaunch: {
+    census: () => get('/api/agent-launch'),
+    saveRow: (name: string, change: AgentLaunchRowChange) =>
+      put('/api/agent-launch/rows/' + encodeURIComponent(name), change, { timeoutMs: AGENT_LAUNCH_WRITE_TIMEOUT_MS }),
+    saveDefaults: (change: AgentLaunchDefaultsChange) =>
+      put('/api/agent-launch/defaults', change, { timeoutMs: AGENT_LAUNCH_WRITE_TIMEOUT_MS }),
   },
 
   // The API tab's Jev view: one reader answer per window, and the one thing the view can CHANGE —

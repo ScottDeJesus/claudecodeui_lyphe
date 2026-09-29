@@ -3,9 +3,10 @@ import type { Dispatch, MutableRefObject, SetStateAction } from 'react';
 
 import type { ServerEvent,MarkSessionIdle,MarkSessionProcessing,PendingPermissionRequest,ProjectSession,LLMProvider,NormalizedMessage } from '@/shared/types';
 import { showCompletionTitleIndicator } from '@/modules/chat/utils/pageTitleNotification';
+import { useToast } from '@/shared/context/ToastContext';
 import { playChatCompletionSound, playNotificationSound } from '@/shared/utils';
 import type { SessionStore } from '@/modules/chat/hooks/useSessionStore';
-import { markPermissionSettled } from '@/modules/chat/tools/toolOutcome';
+import { markPermissionSettled, wasPermissionSettled } from '@/modules/chat/tools/toolOutcome';
 
 const isActionablePermissionRequest = (request: { toolName?: unknown } | null | undefined): boolean => {
   return request?.toolName !== 'ExitPlanMode' && request?.toolName !== 'exit_plan_mode';
@@ -123,6 +124,8 @@ export function useChatRealtimeHandlers({
   requestLatestMessages,
   sessionStore,
 }: UseChatRealtimeHandlersArgs) {
+  const pushToast = useToast();
+
   // Session switches can send `chat.subscribe` before this effect has a chance
   // to rebind the websocket listener. Read the visible session id from a ref
   // so a fast `chat_subscribed` ack is matched against the current view, not
@@ -146,6 +149,13 @@ export function useChatRealtimeHandlers({
    * written inside the socket listener, and nothing renders from it.
    */
   const announcedPermissionRequestsRef = useRef<Set<string>>(new Set());
+  /**
+   * The request ids THIS tab sent an answer for, learned when the server's close for one arrives
+   * (`permission_resolved`): a tab that answers lets the request go from its own pending list at the
+   * click, so a close that finds it gone is the answering tab's, and a tab that answered nothing still
+   * holds it. What the `alreadyAnswered` frame that follows is addressed by. Bounded like the bells.
+   */
+  const answeredHereRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     const handleEvent = (msg: ServerEvent) => {
@@ -431,6 +441,12 @@ export function useChatRealtimeHandlers({
           // A fact about the run, recorded whichever session is on screen: the card that sent
           // the answer asks for it when a re-issued prompt arrives (`QuestionAnswerContent`).
           // Cancelled counts as settled — the server is done with the id either way.
+          const heardItClose = typeof msg.requestId === 'string' && wasPermissionSettled(msg.requestId);
+          if (typeof msg.requestId === 'string' && msg.alreadyAnswered !== true && sid === activeViewSessionId
+            && announcedPermissionRequestsRef.current.has(announcementKeyOf(msg))
+            && !pendingPermissionRequestsRef.current.some((request: PendingPermissionRequest) => request.requestId === msg.requestId)) {
+            announceOnce(answeredHereRef.current, msg.requestId);   // the bounded remember, not a bell
+          }
           if (typeof msg.requestId === 'string') markPermissionSettled(msg.requestId);
           if (msg.requestId && sid === activeViewSessionId) {
             const nextPendingPermissionRequests = pendingPermissionRequestsRef.current.filter(
@@ -439,6 +455,22 @@ export function useChatRealtimeHandlers({
 
             pendingPermissionRequestsRef.current = nextPendingPermissionRequests;
             setPendingPermissionRequests(nextPendingPermissionRequests);
+          }
+          // An answer the server did NOT carry (`answerNotCarried`, `dispatcher-asks.service.ts`): its prompt
+          // was answered elsewhere or re-cut, or the dispatcher could not be read. The card left at the
+          // click, so this says why nothing changed — to a tab told about THIS ask that never heard it close.
+          // `alreadyAnswered` is the plan's second approval, refused by the dispatcher: the server retracted the
+          // prompt as resolved BEFORE the answer ran, so every tab has heard it close and `heardItClose` is no
+          // test. The tab that says so is the one that sent the answer (`answeredHereRef`) — a tab that answered
+          // nothing has nothing to be told, and its copy ("your answer") would be false.
+          if (msg.answerNotCarried === true && sid === activeViewSessionId
+            && (msg.alreadyAnswered === true
+              ? typeof msg.requestId === 'string' && answeredHereRef.current.has(msg.requestId)
+              : !heardItClose)
+            && announcedPermissionRequestsRef.current.has(announcementKeyOf(msg))) {
+            pushToast(msg.alreadyAnswered === true
+              ? { tone: 'info', title: 'Already answered', message: 'This plan was approved before your answer arrived, so nothing changed. A queued plan is started with its Start button.' }
+              : { tone: 'info', title: 'Answer not applied', message: 'The prompt was no longer open, or the dispatcher could not be read, so nothing changed. A prompt still owed comes back.' });
           }
           break;
         }
@@ -484,5 +516,6 @@ export function useChatRealtimeHandlers({
     onWebSocketReconnect,
     requestLatestMessages,
     sessionStore,
+    pushToast,
   ]);
 }

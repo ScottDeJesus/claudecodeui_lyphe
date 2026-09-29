@@ -8,6 +8,7 @@ import { runDispatcherAsk, runDispatcherCommand } from './dispatcher-ask.transpo
 import { createDispatcherAsks } from './dispatcher-asks.service.js';
 import type { AskChat } from './dispatcher-asks.service.js';
 import { createDispatcherRaiser } from './dispatcher-raise.service.js';
+import { readDispatcherState } from './dispatcher-state.service.js';
 
 /**
  * The prompts a plan owes the operator, put up in its owning chat — the composition of the raise
@@ -133,6 +134,9 @@ export function createDispatcherPrompts(dependencies: DispatcherPromptsDependenc
       run: (args, stdin) => runDispatcherCommand(commands, args, stdin),
       say: (line) => console.log(line),
     }, ask, reply, door),
+    // The store, read now — the same document the poll reads — for an answer or a tap that names an ask
+    // this process has not raised yet (`dispatcher-asks.service.ts`, "ANY PROCESS ANSWERS").
+    read: () => readDispatcherState(commands),
     log,
   });
   const unregisterAsks = registerPermissionGateway(asks.gateway);

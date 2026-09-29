@@ -343,6 +343,20 @@ export type DispatcherSwarmChoice = DispatcherSwarmWord | 'auto';
 export type DispatcherOffpeak = { at: number | null };
 
 // ---------------------------
+//----------------- DISPATCHER ANSWERS: how the dispatcher took an operator's answer (server only) ------------
+
+/**
+ * What the dispatcher did with ONE operator answer carried to it (`carryReply`): `took` — every verb
+ * the answer ran exited 0; `already-answered` — the Accept reached a plan the store had approved
+ * already (`dispatcher accept` exit 3), so the answer changed nothing and the plan's own approval
+ * stands; `refused` — a verb refused, failed or never answered (a stale lock, a plan no longer
+ * loaded, a timeout). Consumed by the answer service (which derives it from the verbs' exit codes)
+ * and the asks service (which keeps a `took` or `already-answered` prompt down and puts a `refused`
+ * one back). Never crosses the wire: the tabs are told through a frame, not this word.
+ */
+export type DispatcherAnswerOutcome = 'took' | 'already-answered' | 'refused';
+
+// ---------------------------
 /**
  * How a launcher soul is going while it is out, and how it ended once its receipt landed.
  *
@@ -387,9 +401,10 @@ export type SoulLaunchStateEvent = { kind: 'soul_launch_state'; launches: SoulLa
  * truncated to sixteen lowercase hex, DERIVED rather than minted, so a resumed or re-adopted
  * session comes back as the same owner and can still refresh the leases it holds.
  *
- * `model` is the `--model` flag the child was actually given (`deepseek-flash` or `opus`) and
- * `provider` says which endpoint it bills; the pair is settled at spawn from the board's own
- * `deepseekFlash`, never re-derived here, because the switch applies at the NEXT spawn.
+ * `model` is the `--model` flag the child was actually given (`deepseek-flash`, or the Claude word
+ * the launch table gives Metis) and `provider` says which endpoint it bills; the pair is settled at
+ * spawn from the board's own `deepseekFlash`, never re-derived here, because the switch applies at
+ * the NEXT spawn.
  *
  * `lastActivityAt` is `child.log`'s mtime, not a heartbeat the child writes: the child is
  * detached and owns its own log file descriptor, so its log's stamp is the only liveness signal
@@ -813,9 +828,10 @@ export type ProviderRuntimePermissionGateway = {
    *
    * `approvalKey` is the in-app panel's request id, OR the ask's own `promptKey` when the answer
    * came from a phone: a push outlives the process that sent it, so a tap names a prompt the
-   * successor re-issued under a request id of its own. A gateway resolves both. Every gateway hears
-   * every answer (`providerRuntimeService.resolveToolApproval`), so a key a gateway does not hold is
-   * answered `false` in silence, and the service speaks once for a key nobody held.
+   * successor re-issued under a request id of its own. A gateway resolves both. The gateways are asked
+   * in turn and the FIRST to claim the key settles it (`providerRuntimeService.resolveToolApproval`
+   * stops there), so a key a gateway does not hold is answered `false` in silence, and the service
+   * speaks once for a key nobody claimed.
    *
    * A gateway whose asks live in a STORE claims every key of its own and settles it from the store
    * (the dispatcher's plan prompts): the process that hears an answer is not always the one that
@@ -2032,6 +2048,63 @@ export type CliVersionReport = { installed: string | null; reason: string | null
 export type DeepseekBalance =
   | { reachable: true; available: boolean; currency: string; total: string; checkedAt: number }
   | { reachable: false; reason: string };
+
+// ---------------------------
+//----------------- AGENT LAUNCH RELAY: the launch table, through its CLI ------------
+// The launch table (`~/.claude/charters/launch.toml`) says which model and effort every soul, and Metis,
+// launches at. Its one reader and writer is the hooks' `launch_table` package, and this server only runs
+// that package's CLI (`~/.claude/scripts/launch-table`): it never opens the file. So the census the
+// Agents tab draws is carried WHOLE as the CLI printed it, and its shape is written down once, in Python
+// (`hooks/launch_table/census.py`) and mirrored for the client in `src/shared/types.ts`. The
+// vocabulary (which models, which efforts) is Python's too: this side checks no word.
+/**
+ * What one call to the launch table's CLI came to: the object it printed, or why there is none.
+ *
+ *  - `refused`      the CLI answered no, in one sentence (exit 2 with `{"error"}`). `message` IS that sentence,
+ *                   carried untouched, and it is the operator's own mistake, never a server fault.
+ *  - `unreachable`  the CLI never answered: it could not be started, timed out, crashed or exited any other way.
+ *  - `unreadable`   the CLI exited 0 and what it printed was not the one JSON object its contract promises.
+ *
+ * Nothing that produces one of these throws: a caller branches on `ok`. Read by the relay's service and
+ * routes (the status each reason earns) and by kanban-metis's spawn (a failed resolve blocks a launch).
+ */
+export type AgentLaunchResult<T> =
+  | { ok: true; value: T }
+  | { ok: false; reason: 'refused' | 'unreachable' | 'unreadable'; message: string };
+
+/**
+ * What `launch-table resolve <name> --side <side>` answers: the `--model` word and the `--effort` word a
+ * launch of `name` takes on that side. `effort` is `null` when no `--effort` flag is due, so the CLI's own
+ * effortLevel applies. On the `deepseek` side `model` is the house's DeepSeek model word and `effort` is
+ * the one house-wide DeepSeek effort. Read by the relay's service, which checks the shape, and by
+ * kanban-metis's env service, which turns it into a child's argv.
+ */
+export type AgentLaunchResolved = {
+  name: string;
+  side: 'claude' | 'deepseek';
+  model: string;
+  effort: string | null;
+};
+
+/**
+ * One row's edit, as `PUT /api/agent-launch/rows/:name` carries it and `launch-table set` takes it. A field
+ * left out is left alone; a `null` clears that pin (the CLI's `default`), so the row falls back to the table's
+ * defaults. The words themselves are not checked on this side. Read by the relay's routes (the body's shape)
+ * and its service (the argv).
+ */
+export type AgentLaunchRowChange = { model?: string | null; effort?: string | null };
+
+/**
+ * An edit of the table's defaults, as `PUT /api/agent-launch/defaults` carries it and `launch-table defaults`
+ * takes it. `model` is the default model; `effort` maps a model to its default effort word, or to `null` for
+ * "no `--effort` flag on that model"; `deepseek_effort` is the one house-wide DeepSeek effort. A field left out is
+ * left alone. Read by the relay's routes (the body's shape) and its service (the argv).
+ */
+export type AgentLaunchDefaultsChange = {
+  model?: string;
+  effort?: Record<string, string | null>;
+  deepseek_effort?: string;
+};
 
 // ---------------------------
 //----------------- SUBAGENT TRANSCRIPTS ------------

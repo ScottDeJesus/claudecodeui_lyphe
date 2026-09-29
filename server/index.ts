@@ -64,6 +64,7 @@ import { createKanbanMetisModule, kanbanMetisSecretGuard } from './modules/kanba
 import { createMemoryIntakeModule, listMemoryCandidates } from './modules/memory-intake/index.js';
 import { createDispatchSoulsModule } from './modules/dispatch-souls/index.js';
 import { createHealModule } from './modules/heal/index.js';
+import { createAgentLaunchModule } from './modules/agent-launch/index.js';
 import { createJevModule } from './modules/jev/index.js';
 import { createDispatcherModule } from './modules/dispatcher/index.js';
 import { createUniverseModule } from './modules/universe/index.js';
@@ -287,6 +288,12 @@ app.use('/api/dispatcher', authenticateToken, dispatcher.router);
 // for `listen` or a shutdown to start or stop.
 const heal = createHealModule();
 app.use('/api/heal', authenticateToken, heal.router);
+
+// The launch table — the model and effort every soul, and Metis, launches at — and the doors that pin a
+// row or move a default (protected: a save regenerates the shims every session reads). Built inline
+// like the heal lane, and for the same reason: no timer, no socket. The server never opens the table;
+// the routes run its own CLI and carry back the census it prints.
+app.use('/api/agent-launch', authenticateToken, createAgentLaunchModule().router);
 
 // Jev's spend, consumers and live feed — protected, the operator's usage record
 const jev = createJevModule();

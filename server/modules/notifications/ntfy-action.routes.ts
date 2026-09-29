@@ -18,12 +18,19 @@
 import express from 'express';
 
 import { describeDecision, toPermissionDecision } from '@/modules/notifications/services/ntfy-action-decisions.service.js';
-import { consumeActionToken } from '@/modules/notifications/services/ntfy-action-token.service.js';
+import {
+  consumeActionToken,
+  registerPendingAction,
+  unregisteredPromptOf,
+} from '@/modules/notifications/services/ntfy-action-token.service.js';
 import type { NtfyActionDecision } from '@/modules/notifications/services/ntfy-action-token.service.js';
+import type { ProviderRuntimeRecalledPrompt } from '@/shared/types.js';
 
 type ToolApprovalRuntime = {
   /** By the prompt's own key, which is what a token names — see `PendingAction.promptKey`. */
   resolveToolApproval(approvalKey: string, decision: { allow: boolean; updatedInput?: unknown; message?: string }): void;
+  /** What the prompt named by `approvalKey` is, asked of the store that holds it — `null` when no open ask carries the name. Never throws. */
+  recallApproval(approvalKey: string): Promise<ProviderRuntimeRecalledPrompt | null>;
 };
 
 /** Guesses one client may spend inside a window before it is refused outright. */
@@ -114,7 +121,31 @@ export function createNtfyActionRoutes(dependencies: { runtime: ToolApprovalRunt
   const router = express.Router();
   const guesses = createGuessCounter();
 
-  router.post('/', (req, res) => {
+  /**
+   * A tap can outlive the process that pushed it — a handover, a restart — and reach one that has not
+   * raised the prompt yet, so no button of it was ever registered here. A prompt that lives in a store
+   * is not lost with the process that pushed it: the store is asked what the prompt is now, and what
+   * it says is registered exactly as the push would have — the token is then spent on it as on any
+   * other. A prompt no open ask carries stays unregistered and answers 410, as it always did.
+   */
+  async function registerFromStore(orphan: { promptKey: string; userId: string; expiresAt: number }): Promise<void> {
+    try {
+      const recalled = await dependencies.runtime.recallApproval(orphan.promptKey);
+      if (recalled === null) return;
+      registerPendingAction({
+        promptKey: orphan.promptKey,
+        userId: orphan.userId,
+        sessionId: recalled.sessionId,
+        toolName: recalled.toolName,
+        input: recalled.input,
+        ttlMs: orphan.expiresAt - Date.now(),
+      });
+    } catch (error) {
+      console.error('[ntfy] a tap on a prompt this process never registered could not be checked', error instanceof Error ? error.message : error);
+    }
+  }
+
+  const act = async (req: express.Request, res: express.Response): Promise<void> => {
     const client = clientKeyOf(req);
 
     // Every call ends here: one log line (never the token) and one plain-text answer.
@@ -132,6 +163,10 @@ export function createNtfyActionRoutes(dependencies: { runtime: ToolApprovalRunt
 
     const token = typeof req.query.t === 'string' ? req.query.t : '';
     if (!token) return refuseGuess(400, 'missing token');
+
+    // Before the token is spent, and only for a genuine one whose prompt this process has not registered.
+    const orphan = unregisteredPromptOf(token);
+    if (orphan !== null) await registerFromStore(orphan);
 
     const verdict = consumeActionToken(token);
     if (!verdict.ok && verdict.forged) return refuseGuess(verdict.status, verdict.reason);
@@ -158,6 +193,11 @@ export function createNtfyActionRoutes(dependencies: { runtime: ToolApprovalRunt
     // The label comes from the model's own tool input, so it is cut before it is echoed.
     const label = describeDecision(verdict.action, verdict.decision).slice(0, MAX_LABEL_CHARS);
     return answer(200, `Answered: ${label}`, decisionKind(verdict.decision));
+  };
+
+  // A rejection reaches Express's error handler, as a throw from a synchronous handler always did.
+  router.post('/', (req, res, next) => {
+    act(req, res).catch(next);
   });
 
   return router;

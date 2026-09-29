@@ -28,6 +28,7 @@
     "runner": "Runner",
     "heal": "Heal",
     "api": "API",
+    "agents": "Agents",
     "kanban": "Kanban",
     "universe": "Universe",
     "schedules": "Schedules",
@@ -343,6 +344,75 @@
       "deepseek": "DeepSeek"
     },
     "subtabsLabel": "API services"
+  },
+  "agentLaunch": {
+    "title": "Agents",
+    "reload": "Read the launch table again",
+    "reading": "Reading the launch table…",
+    "unreadable": {
+      "title": "The launch table could not be read",
+      "retry": "Try again"
+    },
+    "reach": "Chains, the dispatcher and Metis take a change at their next launch. Agent calls read their definitions once per session, so a change reaches them in new sessions only.",
+    "defaults": {
+      "title": "Defaults",
+      "hint": "what a launch runs at when its row pins nothing",
+      "model": "Default model",
+      "effort": "Default effort",
+      "effortFor": "{{model}} effort",
+      "none": "None · the CLI’s own ({{effort}})",
+      "noneBare": "None · the CLI’s own",
+      "deepseek": "DeepSeek effort",
+      "deepseekHint": "DeepSeek maps xhigh to high; only max raises it",
+      "saving": "Saving…",
+      "notSaved": "not saved"
+    },
+    "souls": {
+      "title": "Souls",
+      "pinned_one": "{{count}} pinned",
+      "pinned_other": "{{count}} pinned"
+    },
+    "metis": {
+      "title": "Metis"
+    },
+    "row": {
+      "model": "Model",
+      "effort": "Effort",
+      "pinned": "pinned",
+      "defaultOf": "Default · {{value}}",
+      "noFlag": "no flag",
+      "saving": "Saving…",
+      "shimBehind": "shim behind",
+      "modelLabel": "{{name}} model",
+      "effortLabel": "{{name}} effort",
+      "more": "Show more",
+      "less": "Show less",
+      "notSaved": "not saved"
+    },
+    "lanes": {
+      "agent": "Agent call",
+      "dispatcher": "Dispatcher",
+      "chain": "Chain",
+      "metis": "Metis",
+      "newSession": "new session",
+      "claude": "Claude",
+      "deepseek": "DeepSeek"
+    },
+    "warnings": {
+      "absent": "There is no launch table yet, so every launch runs at the shipped values. The next save creates the file.",
+      "malformed": "The launch table could not be read, so every launch runs at the shipped values. A save is refused until the file is fixed.",
+      "problems": "The table read with problems:",
+      "regen": "The table is saved, but the shims did not regenerate: {{said}}",
+      "shims_one": "{{count}} shim is behind the table:",
+      "shims_other": "{{count}} shims are behind the table:",
+      "shimLine": "{{name}}: the shim says {{shim}}, the table says {{table}}"
+    },
+    "refused": {
+      "notSaved": "Not saved — the launch table refused it:",
+      "notSavedRow": "Not saved — the launch table refused the change to {{name}}:",
+      "notSavedDefaults": "Not saved — the launch table refused the change to the defaults:",
+      "notRead": "The launch table could not be read again:"
+    }
   },
   "deepseekUsage": {
     "title": "DeepSeek",

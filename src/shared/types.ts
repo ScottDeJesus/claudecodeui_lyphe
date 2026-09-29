@@ -57,7 +57,7 @@ export type ProviderModelActions = {
 //----------------- PROJECTS AND SESSIONS ------------
 
 /** Identifies the workspace pane the user is looking at; plugin panes are namespaced by plugin id. */
-export type AppTab = 'chat' | 'files' | 'shell' | 'git' | 'tasks' | 'browser' | 'memory' | 'runner' | 'heal' | 'api' | 'kanban' | 'universe' | 'schedules' | `plugin:${string}`;
+export type AppTab = 'chat' | 'files' | 'shell' | 'git' | 'tasks' | 'browser' | 'memory' | 'runner' | 'heal' | 'api' | 'agents' | 'kanban' | 'universe' | 'schedules' | `plugin:${string}`;
 
 /** A message queued to be sent to a session at a future time. */
 export type ScheduledMessage = {
@@ -483,7 +483,9 @@ export type PendingPermissionRequest = {
    * The ask's own name, when the provider stamps one (`promptKey`, the key the phone's push dedupes
    * on). The request id is minted per ATTEMPT: a dev-server handover re-issues a parked prompt on a
    * fresh id, so a reader that must recognize a question it has already seen reads this, and falls
-   * back to `requestId` for providers that carry none.
+   * back to `requestId` for providers that carry none. A plan's standalone prompt is the exception:
+   * its request id is derived from the store's record of the ask, so it names the same ask in every
+   * process and an answer sent across a handover still finds it.
    */
   promptKey?: string;
   toolName: string;

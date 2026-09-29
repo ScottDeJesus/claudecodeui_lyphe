@@ -1178,6 +1178,418 @@ is a FUNCTION passed in rather than a wrapper drawn around `WidgetFrame` — it 
 behind that component's mount and streaming gates, which is the only place that knows whether a
 live frame exists at all.
 
+## MAN-7408 — Claude updates — the tab and the sidebar row
+section: claude-updates/000
+
+Claude updates = Settings → Updates plus one sidebar row, both drawn off one report
+(§"Claude updates — the report and its contract"). Code: `src/modules/claude-updates/`.
+Pipeline depth: MAN-7401 (check), MAN-7402 (runner), MAN-7403 (API side), MAN-7404 (client files).
+
+## Settings → Updates — `ClaudeUpdatesSettingsTab.tsx`
+
+| part | says |
+| --- | --- |
+| header | `Claude updates`; `Checked <relative> · next check <relative>` (`Not checked yet` before the first check); `Check now`, disabled with a spinner while `report.checking` |
+| `checkError` | warn `Banner` above the cards |
+| package card (`PackageUpdateCard.tsx`) | `Up to date · <installed>`; `<installed> → <latest> available` when `updateAvailable && updatable`; plain `<installed> → <latest>` when an update exists that is not `updatable`; then `reason` |
+| SDK card | `This server is running <loaded>; it loads <installed> at its next restart` — only when `loaded !== installed` |
+| CLI card | `<n> conversation(s) mid-turn on an older Claude Code move to <installed> when their turn ends` — only when `useCliVersion().staleSessionIds.size > 0` (MAN-503: the tab fetches no `/api/cli-version`) |
+| `Roll back to <from>` | per card, when the last job is `kind: update`, `done`, and this package's step is `done`; applies `{ targets: { <key>: <from> } }` for that package alone |
+| notes (`PatchNotes.tsx`) | newest 10 versions, one `Collapsible` each (first open), body through `MarkdownPreview`; `Show all <n> releases`; the `notesReason` line; `Full changelog` link (new tab) |
+| `Update and restart` | enabled while some package is `updateAvailable && updatable` and no job is active; sends each such package's `latest`; reads `Updating…` while a job is active |
+| line under it | `Installs <versions>, then restarts the server. A conversation mid-turn keeps its version until the turn ends; the rest move to the new version at their next message.` — only while an offer exists |
+| `Restart server` | drawn only when `report.supervised`; disabled while a job is active |
+| refusal | the server's `message`, in a warn `Banner` under the buttons that asked |
+| `UpdateJobPanel.tsx` | whenever `report.job` exists: one sentence per job state; each step with icon, label, `from → to`, detail; `logTail` in a folded monospace block |
+
+- Job active = `installing`, `installed`, `restarting` or `rolling-back` (`isUpdateJobActive`).
+- Step labels and job sentences: `updateWording.ts` (`UPDATE_STEP_LABELS`, `JOB_STATE_SENTENCES`), read by the job panel and the sidebar row.
+- Strings ship their own English `defaultValue`; `en/settings.json` holds only `mainTabs.updates`.
+
+## Sidebar row — `ClaudeUpdateFooterRow.tsx`
+
+| form | where |
+| --- | --- |
+| `ClaudeUpdateFooterRow({ onOpen })` | sidebar footer, directly above the upstream update row; desktop and mobile variants; `Download` icon and pulse dot |
+| `ClaudeUpdateRailButton({ onOpen })` | collapsed rail, right after Settings; icon only, `aria-label` = both lines |
+
+| state | title | detail |
+| --- | --- | --- |
+| some package `updateAvailable && updatable` | `Claude Code <latest>`, plus ` · SDK <latest>` when both | `Update available` |
+| a job is active | `Updating Claude…` | the running step's label, else `Working…` |
+| otherwise | nothing rendered | — |
+
+## The row only opens the tab
+
+- `onOpen` = `onShowUpdates` = `openSettings('updates')` (`useProjectsState.ts`). A press in the sidebar installs, restarts and aborts nothing.
+- why: MAN-504 — "a button in the sidebar would be one click ending work the person cannot see."
+- The pipeline aborts no turn either. A CLI install restarts idle conversations through the existing idle sweep (MAN-502). The SDK restart is a handover, which a turn in flight survives (MAN-676 case A: "the turn's own reply still arrives — once").
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/claude-updates/ClaudeUpdateFooterRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/claude-updates/ClaudeUpdatesSettingsTab.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/claude-updates/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/claude-updates/PackageUpdateCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/claude-updates/PatchNotes.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/claude-updates/UpdateJobPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/claude-updates/updateWording.ts
+
+## MAN-7409 — Claude updates — the report and its contract
+section: claude-updates/001
+
+`GET /api/claude-updates` → 200 `ClaudeUpdatesReport`. Behind `authenticateToken`, mounted in
+`server/index.ts` beside `/api/system`. Barrel `server/modules/claude-updates/index.ts` exports only
+`createClaudeUpdatesModule`.
+
+## Routes — `claude-updates.routes.ts` (parse, call, format; no logic)
+
+| route | answers |
+| --- | --- |
+| `GET /` | 200 report |
+| `POST /check` | awaits `checkNow()`, 200 report |
+| `POST /apply` `{ targets }` | 202 report, or 400/409 `ClaudeUpdateRefusal` (§"Claude updates — the pipeline") |
+| `POST /restart` | 202 `{ requested: true }`, or 409 `ClaudeUpdateRefusal` (§"Claude updates — the reboot request, the commit and rollback") |
+
+## Where the contract lives
+
+- Declared in `server/shared/claude-update-types.ts`; mirrored field for field in `src/shared/claude-update-types.ts`. The two are edited together, always.
+- Both open with `//----------------- CLAUDE UPDATE CONTRACTS ------------`. Read the fields there; no copy is kept here.
+- Both are siblings of the over-ceiling `types.ts` (the `app-types.ts` / `kanban-types.ts` pattern).
+- Types: `ClaudeUpdatePackageKey`, `ClaudeUpdateNote`, `ClaudeUpdatePackage`, `ClaudeUpdateStepKey`, `ClaudeUpdateStepState`, `ClaudeUpdateStep`, `ClaudeUpdateJobState`, `ClaudeUpdateJob`, `ClaudeUpdatesReport`, `ClaudeUpdateApplyRequest`, `ClaudeUpdateRefusal`.
+- Times are epoch milliseconds. A null version means "not known", never `0.0.0`.
+
+## What fills the report
+
+| field | source |
+| --- | --- |
+| `checkedAt`, `checking`, `checkError`, `nextCheckAt` | the check (§"Claude updates — the check") |
+| `supervised` | `supervised-boot.ts`'s `supervised`: this API can hand itself over |
+| `packages` | always `[cli, sdk]`, in that order |
+| `job` | `job.json` plus `logTail` (the last 40 lines of `job.log`, read per answer, never stored); the current job, or the last |
+
+Per package, three versions from three places, none inferred from another:
+
+| field | cli | sdk |
+| --- | --- | --- |
+| `installed` | `readInstalledCliVersion()` through the `@/modules/cli-version` barrel (MAN-502 rule 1); when null, `reason` carries the reading's own words | `readSdkVersionOnDisk()`: the resolved package.json |
+| `loaded` | always null; each conversation announces its own (`/api/cli-version`) | `LOADED_SDK_VERSION`: read once at boot |
+| `latest` | npm dist-tag `latest` at the last check | same |
+| `updateAvailable` | `isBehindInstalled(installed, latest)`, both strings: ordered, never `!==` | same |
+| `updatable` | `readCliUpdatable()` at the last check | always true |
+| `notes` | stored sections with `installed < v <= latest`, newest first | same |
+| `notesReason` | only while `updateAvailable` | same |
+
+- `buildReport` (`update-check.report.ts`) is pure; `claude-updates.module.ts` reads the job and its log tail for every answer.
+- `updateAvailable` is decided once, on the server. The client compares no versions.
+
+## Client read — `hooks/useClaudeUpdates.ts`
+
+- One module-scope store, one poller: every 60 s, every 1.5 s while `job.state` is `installing`, `installed`, `restarting` or `rolling-back`.
+- Publishes only on a changed body; answers are taken in token order; a failed read keeps the last picture.
+- Returns `{ report, refresh, check, apply, restart }`. Each action resolves `{ ok: true }` or `{ ok: false, message }` (the refusal's message), then forces a read. `refresh()` resolves true or false.
+- Requests go through the `claudeUpdates` group of `src/shared/api.ts`.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/claude-updates/claude-updates.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/claude-updates/claude-updates.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/claude-updates/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/claude-updates/update-check.report.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/claude-update-types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/claude-updates/hooks/useClaudeUpdates.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/claude-update-types.ts
+
+## MAN-7410 — Claude updates — the check
+section: claude-updates/002
+
+Files: `update-check.service.ts` (cadence, memory, journal line), `update-check.reader.ts` (the reads),
+`update-check.store.ts` (`check.json`), `changelog.ts`, `packages.ts` (the package table). Depth: MAN-7401.
+
+## One check, per package
+
+1. Read `installed` first: the CLI through `readInstalledCli()`, the SDK through `readSdkVersionOnDisk()`. Both before any network call.
+2. `npm view <name> dist-tags.latest --json` through `execFile('npm', argv)`, cwd `appRoot`, 30 s ceiling; stdout parsed as JSON, and must be a non-empty string.
+   - npm is capped to 10 s and 0 retries (`npm_config_fetch_timeout`, `npm_config_fetch_retries`) so its own `npm error` text arrives before the kill.
+3. Fetch the changelog only when `latest` moved, the stored window's floor (`windowFrom`) is above the install, or an update is on offer and the stored notes do not reach `latest`.
+4. Store the sections `installed < v <= latest`, newest 300.
+5. CLI only: recompute `readCliUpdatable()`.
+
+## `npm view` names the version; the changelog names what is in it
+
+| package | raw source (fetched) | human page (`changelogUrl`) |
+| --- | --- | --- |
+| cli `@anthropic-ai/claude-code` | `https://raw.githubusercontent.com/anthropics/claude-code/main/CHANGELOG.md` | `https://github.com/anthropics/claude-code/blob/main/CHANGELOG.md` |
+| sdk `@anthropic-ai/claude-agent-sdk` | `https://raw.githubusercontent.com/anthropics/claude-agent-sdk-typescript/main/CHANGELOG.md` | `https://github.com/anthropics/claude-agent-sdk-typescript/blob/main/CHANGELOG.md` |
+
+- `fetchChangelog(url)`: global `fetch`, `AbortSignal.timeout(15_000)`. A non-200 answer or a throw is `{ error }` in words, never a rejection.
+- The CLI's file is about 840 KB and is parsed whole, in one forward pass.
+- `parseChangelog(markdown)`: splits on `^## (\d+\.\d+\.\d+)\s*$`. Each body runs to the next `## ` heading of any kind, trimmed, markdown verbatim. Sections stay in file order, newest first.
+- `notesBetween(notes, installed, latest)` = `isBehindInstalled(installed, v) && !isBehindInstalled(latest, v)` (`server/shared/version-order.ts`, the one ordering rule; it also decides `updateAvailable`).
+  - Order, never equality: installed 2.1.281 and latest 2.1.284 read all three sections.
+- A failed changelog read is not a failed check: the version stands, the notes come back short, `notesReason` says why.
+
+## Cadence
+
+| what | value |
+| --- | --- |
+| `start()` | called in the `listen` callback of `server/index.ts` |
+| first tick | 5 s after `start()` |
+| tick | every 5 min; checks only when `now - checkedAt >= 30 min`, when there has been no check, or when `checkedAt` is in the future |
+| `nextCheckAt` | `checkedAt + 30 min` |
+| `checkNow()` | shares one in-flight promise; never throws; `POST /check` awaits it |
+| `checking` | true while a check is in flight in this process |
+| timers | unref'd; `stop()` (shutdown) leaves a check in flight to finish |
+| a job ended | the reconciler calls `runCheck()` (§"Claude updates — the pipeline") |
+
+## `check.json`
+
+- Path: `<dir>/check.json`. `<dir>` is `CLOUDCLI_CLAUDE_UPDATES_DIR`, else `~/.cloudcli/claude-updates` (mode 0700).
+- Written to a temp file, then renamed. Read into memory once, when the service is built: that is what carries the last check across a handover.
+- Shape (the file's own, not the wire): `{ checkedAt, error, cli: { latest, latestError, windowFrom, notes, notesError, updatable, updatableReason }, sdk: { latest, latestError, windowFrom, notes, notesError } }`.
+- `checkedAt` is the last attempt; a failed attempt counts.
+- `error` is that attempt's failure in words, e.g. `npm could not read @anthropic-ai/claude-code: <first "npm error" line>`. On a failure the fields of the last good check stand.
+- A file that is absent, not JSON, or from another build reads as no check; so does a `checkedAt` in the future.
+
+## The journal line — one per check
+
+| outcome | line |
+| --- | --- |
+| success | `[claude-updates] checked npm: Claude Code latest <v> · Claude Agent SDK latest <v>` |
+| failure | `[claude-updates] check failed: <error>` |
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/claude-updates/changelog.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/claude-updates/packages.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/claude-updates/update-check.reader.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/claude-updates/update-check.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/claude-updates/update-check.store.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/version-order.ts
+
+## MAN-7411 — Claude updates — the pipeline
+section: claude-updates/003
+
+An update is a detached runner that installs, then the API's reconciler that finishes. The job is a
+file, `job.json`, beside `job.log` in `<dir>` (`CLOUDCLI_CLAUDE_UPDATES_DIR`, else
+`~/.cloudcli/claude-updates`); writes are a temp file renamed into place. Depth: MAN-7402 (runner),
+MAN-7403 (API side).
+
+## Start — `POST /apply` (`applyUpdate`, `update-actions.service.ts`)
+
+Refusals, in order:
+
+| # | check | refusal |
+| --- | --- | --- |
+| 1 | targets hold only `cli`/`sdk` keys with string values, at least one | 400 `bad-request` |
+| 2 | no job in `installing`, `installed`, `restarting` or `rolling-back` (an in-process `startingUpdate` flag too; the file is re-read with no `await` before the write) | 409 `job-active` |
+| 3 | every target equals its package's current `latest` (kind `update`), or the last job is a `done` update and every target equals that job step's `from` (kind `rollback`); mixing the two is refused | 409 `stale-target`: "the versions on screen are no longer the newest — read them again" |
+| 4 | a `cli` target requires `updatable` | 409 `not-updatable`, carrying `reason` |
+| 5 | targets equal to what is installed are dropped; none left | 409 `nothing-to-update` |
+
+Then, in order:
+1. With an `sdk` target, `cleanAtStart` = exit 0 of `git diff --quiet HEAD -- package.json package-lock.json`.
+2. `createJob` builds the steps and truncates `job.log`.
+3. `spawnUpdateRunner(appRoot, dir, 'install')` returns the pid.
+4. `runnerPid` is written to `job.json`, then `reconciler.kick()`; the answer is 202 with the report.
+
+## Steps
+
+- Only the steps the job has: `cli`?, `sdk`?, then `restart` and `commit` exactly when `sdk` is present.
+- Step states: `pending`, `running`, `done`, `failed`, `skipped`. Each step carries `from`, `to`, `detail`, `startedAt`, `endedAt`.
+- Job `id` = `Date.now().toString(36)`. `job.json` always stores `logTail: []`.
+
+## Job states and who owns each
+
+| state | owner | meaning |
+| --- | --- | --- |
+| `installing` | runner | npm install commands running |
+| `rolling-back` | runner | the rollback's npm command running |
+| `installed` | reconciler | every install step done; the restart is owed |
+| `restarting` | reconciler | reboot requested, or owed by hand; waiting for the new process |
+| `done` | reconciler | terminal |
+| `interrupted` | reconciler | terminal; the runner died before it finished |
+| `failed` | runner or reconciler | terminal |
+| `rolled-back` | runner | terminal; the previous SDK is back |
+
+- The runner acts only in `installing` and `rolling-back`. The state it leaves them for (`installed`, `failed`, `rolled-back`) is its last write. Every other move is the reconciler's.
+- Terminal states: `done`, `failed`, `rolled-back`, `interrupted`. Nothing acts on a terminal job.
+
+## The runner — `update-runner.ts`
+
+- Spawn (`spawnUpdateRunner`, `update-job.ts`): `process.execPath` with the loader pair `deploy/dev-supervisor/child.mjs` uses (`--require <appRoot>/node_modules/tsx/dist/preflight.cjs`, `--import <…>/loader.mjs`), then `update-runner.ts <dir> <install|rollback>`.
+  - cwd `appRoot`; `detached: true`; `stdio: ['ignore', logFd, logFd]` with `job.log` opened for append; `unref()`.
+  - env: `process.env` plus `TSX_TSCONFIG_PATH=<appRoot>/server/tsconfig.json`, with `CLOUDCLI_SUPERVISED` and `CLOUDCLI_HANDOVER` deleted.
+  - why the loader pair: through the tsx CLI the pid would be tsx's, and `isRunnerAlive` would read every live runner as dead.
+- **The runner acts only once `job.json` names its pid.** It polls the file every 100 ms for up to 10 s for `runnerPid === process.pid`; otherwise it logs `the job never named this runner (pid <pid>)`, exits 1 and touches nothing. why: a stray or duplicate spawn must not act on a job it does not own.
+- Every command runs by argv, no shell, with a 10-minute ceiling (`runner-command.ts`).
+- Output is appended to `job.log`, framed `[<ISO time>] $ <command>` and `[<ISO time>] exit <code>`.
+- After each step change the job is re-written. A failed step's detail is the first output line starting `npm error`, else the last non-empty line, else `npm did not finish within 10 minutes`.
+- The runner deletes nothing.
+- `isRunnerAlive(pid)`: `process.kill(pid, 0)` succeeds and `/proc/<pid>/cmdline` contains `update-runner`.
+
+Install mode:
+
+| step | command | done when |
+| --- | --- | --- |
+| `cli` | `npm install -g @anthropic-ai/claude-code@<to>` | exit 0; detail "npm installed Claude Code <to>" |
+| `sdk` | `npm install --save @anthropic-ai/claude-agent-sdk@<to>` | exit 0 and `readSdkVersionOnDisk() === to`; then `hashesAfterInstall` is recorded |
+
+- A failed `sdk` step restores the previous SDK inline (`npm install --save …@<from>`, plus `git checkout HEAD -- package.json package-lock.json` when `cleanAtStart`). `restart` and `commit` become `skipped` ("the SDK did not install"), and the SDK step's detail gains "; <from> restored".
+- End: `installed` (`endedAt` null) when every install step is `done`; otherwise `failed`.
+- A throw at top level marks the running step and the job `failed` with the error's message.
+
+## The reconciler — `update-reconciler.ts` (when), `update-reconciler.states.ts` (what)
+
+- `start()` is the last line of `soleServerDuties` in `server/index.ts`. It registers the reboot-failed listener and arms a 1 s tick only for a non-terminal job. `kick()` re-arms after an action; a pass that sees a terminal job disarms.
+- Each tick is a no-op until `isListening()`, is skipped while a previous pass runs (`busy`), reads `job.json`, and acts once per state.
+
+| state | walk |
+| --- | --- |
+| `installing`, `rolling-back` | runner dead → `interrupted`: the running step `failed` with "the update runner stopped before it finished — the cards show what is on disk now; press Update and restart to finish", `endedAt` set, `runCheck()`. Runner alive → nothing |
+| `installed` | see below |
+| `restarting` | the four rules below |
+
+`installed`, in order:
+1. A `cli` step is `done`: ask `readInstalledCli()`. It answers `to` → detail "Claude Code now answers <to>. Idle conversations restart onto it now; a conversation mid-turn moves when its turn ends." (a rollback's second sentence says conversations already on <from> keep it until they close). Otherwise the step is `failed`: "npm finished, but the Claude CLI answers <v or nothing>".
+2. An `sdk` step is `done`:
+   - `loadedSdkVersion === to` → `restart` `done` ("this server already runs Claude Agent SDK <to>"), then the commit, then the job is `done`.
+   - Else `requestReboot("claude-updates: load Claude Agent SDK <to>")` true → `restart` `running`, job `restarting`, `requestedAt = now`, `requestedBy = process.pid`.
+   - Else (false) → `restart` stays `pending` ("this server is not run by the dev supervisor, so it cannot hand itself over — restart it and SDK <to> loads then"); job `restarting` with nulls.
+3. No `sdk` step: the job is `done` if the `cli` step is `done`, else `failed`; `endedAt` set; `runCheck()`.
+
+`restarting`, four rules in order:
+1. `loadedSdkVersion === to` → `restart` `done` ("the server restarted on Claude Agent SDK <to>"), the commit, job `done`, `runCheck()`.
+2. `requestedBy === process.pid`, `restart` still `running`, more than 60 s since `requestedAt` → back to `pending`, once: "the supervisor did not answer — press Restart server, or the next server restart loads SDK <to> and finishes this update".
+3. `requestedBy` is another pid, and this process started after `requestedAt` (`performance.timeOrigin > requestedAt`), and it loaded something else → `restart` `failed` ("the server restarted but loaded Claude Agent SDK <loaded>, not <to>"), job `failed`.
+4. Anything else leaves the job alone.
+   - A process that started before the request leaves the job alone: a boot already in flight is not the answer to a later request.
+   - A null requester waits: nobody asked, so nothing failed; a person's press or the next server restart brings the answer.
+
+`runCheck()` is `checkNow()` of the check service, so cards read the new versions without waiting out the cadence.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/claude-updates/runner-command.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/claude-updates/update-actions.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/claude-updates/update-job.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/claude-updates/update-reconciler.states.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/claude-updates/update-reconciler.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/claude-updates/update-runner.ts
+
+## MAN-7412 — Claude updates — the reboot request, the commit and rollback
+section: claude-updates/004
+
+Code: `update-commit.ts`, `update-git.ts` (`GitResult`, `RunGit`: types only), `update-reconciler.states.ts`,
+`update-actions.service.ts`, `server/supervised-boot.ts`, `deploy/dev-supervisor/supervisor.mjs`.
+Depth: MAN-7403.
+
+## The reboot request over the supervisor channel
+
+Protocol home: `deploy/dev-supervisor/README.md` §"The four IPC messages". Not restated here.
+
+| side | what | file |
+| --- | --- | --- |
+| child | `requestReboot(reason): boolean`: false and nothing sent unless `supervised && process.connected`; else sends `{ type: 'reboot', reason }` and returns true | `server/supervised-boot.ts` |
+| child | `onRebootFailed(listener)`: its own `process.on('message')` handler for `{ type: 'reboot-failed', detail }` | `server/supervised-boot.ts` |
+| supervisor | honours `reboot` only from the child that is `serving`; logs `reboot requested by pid <n>: <reason>`; sets `rebootRequester`; runs `requestCycle()`, the edit cycle | `deploy/dev-supervisor/supervisor.mjs` |
+| supervisor | boot failed and the requester is still `serving` and connected: sends `{ type: 'reboot-failed', detail }`, logs `reboot failed — told pid <n>`, clears `rebootRequester` | `deploy/dev-supervisor/supervisor.mjs` |
+
+- `detail` is the text `reportFailedBoot` logs for that boot: the first error line, or `boot timed out after 30 s`.
+- A successful handover clears `rebootRequester` when the requester is retired.
+- Callers of `requestReboot`: the reconciler (`installed`, reason `claude-updates: load Claude Agent SDK <to>`) and `restartServer()` (reason `claude-updates: restart requested from Settings`).
+
+`POST /restart` (`restartServer`):
+
+| when | answer |
+| --- | --- |
+| `supervised` false, or `requestReboot` returns false | 409 `not-supervised` |
+| job `installing` or `rolling-back` | 409 `job-active` |
+| otherwise | 202 `{ requested: true }` |
+
+- With a job in `restarting`, it first sets `restart` `running` and records `restart.requestedAt = now`, `restart.requestedBy = process.pid`, so a failed boot still rolls back.
+
+## reboot-failed → rollback
+
+- The reconciler's listener acts only when it is started, the job is `restarting` and `requestedBy === process.pid`.
+- Then: `restart` `failed` with "the new server could not boot: <detail>" (the supervisor's own first error line); job `rolling-back`; `runnerPid = spawnRunner('rollback')`; tick re-armed.
+- The requester keeps serving throughout; the supervisor retired nothing.
+
+## The commit — `update-commit.ts`
+
+Runs from the reconciler once `restart` is `done`. The job ends `done` whatever the commit decided. Guards, in order:
+
+| # | guard | result |
+| --- | --- | --- |
+| 1 | `packageFiles.cleanAtStart` false | `skipped`: "package.json or package-lock.json had uncommitted changes when the update started — left for you to commit" |
+| 2 | `hashPackageFiles(appRoot)` differs from `hashesAfterInstall` (or it is null) | `skipped`: "package.json or package-lock.json changed after the install — left uncommitted" |
+| 3 | otherwise | `git commit -m "chore(deps): bump @anthropic-ai/claude-agent-sdk from <from> to <to>" -- package.json package-lock.json`; a rollback job uses `chore(deps): roll back @anthropic-ai/claude-agent-sdk from <from> to <to>` |
+| 4 | the commit's exit | 0 → `done` "committed <short sha>"; otherwise `failed` with git's first stderr line |
+
+- INV-100: `git commit -- <path>` commits the full working-tree content of each named path. So the commit names only `package.json` and `package-lock.json`, and runs only when both were clean against HEAD at job start and still hash as the runner left them.
+- The commit runs with the repo's hooks and is never pushed.
+
+## Rollback
+
+| kind | trigger | what happens |
+| --- | --- | --- |
+| automatic | `reboot-failed` on a `restarting` job this process requested | job `rolling-back`; runner in `rollback` mode runs `npm install --save @anthropic-ai/claude-agent-sdk@<from>`, then `git checkout HEAD -- package.json package-lock.json` when `cleanAtStart`. Success: job `rolled-back`, `commit` `skipped` "nothing to commit — Claude Agent SDK <from> is back". Failure: job `failed` "the rollback's npm install failed: <line> — node_modules may not match package-lock.json" (or "the rollback's git checkout failed: …") |
+| per-card **Roll back to <from>** | the last job is a `done` update that changed this package | `POST /apply` with `{ targets: { <key>: <from> } }`, one package at a time; it passes check 3 as kind `rollback`, then runs as an ordinary job (install, restart when `sdk`, commit `roll back …`) |
+
+- A CLI rollback is `npm install -g @anthropic-ai/claude-code@<from>`. Conversations already on the newer build keep it until they close.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/deploy/dev-supervisor/README.md, /home/lyphe/.claude/claudecodeui_lyphe/deploy/dev-supervisor/supervisor.mjs, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/claude-updates/update-commit.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/claude-updates/update-git.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/supervised-boot.ts
+
+## MAN-7413 — Claude updates — what is left standing
+section: claude-updates/005
+
+Five limits, known and left.
+
+| # | what stands | what it looks like | what to do |
+| --- | --- | --- | --- |
+| 1 | A unit restart kills the runner. `sudo systemctl restart cloudcli-server-dev` ends the whole cgroup (`KillMode=control-group`), the detached runner with it | the reconciler sees a dead runner pid: job `interrupted`, the running step `failed` "the update runner stopped before it finished — the cards show what is on disk now; press Update and restart to finish" | read the cards (they show what is on disk), press Update and restart |
+| 2 | Another session's `npm install` in the same repo at the same moment. The pipeline refuses only its own second job (`job-active`); it cannot see an npm it did not start | two npm installs over one `node_modules` collide: npm's own error, or a tree that does not hold what the step asked for (the `sdk` step is `done` only when `readSdkVersionOnDisk() === to`) | run one npm at a time in this repo while an update runs |
+| 3 | A changelog that lags npm. The version is offered as soon as npm names it; the notes come from the repo's `CHANGELOG.md` | the card reads `<installed> → <latest> available` with `notesReason` "the changelog has no entry for <latest> yet" | nothing; the notes are re-read on the next check (at most 30 min) or on Check now |
+| 4 | A CLI rollback leaves newer conversations on the newer build until they close. The idle sweep replaces only a process behind the installed binary (`isBehindInstalled`) | the step detail says "Conversations already on <from> keep it until they close." | close the conversation, or restart it from its banner (MAN-503: a differing version is stale on the client) |
+| 5 | The reboot-failed answer exists only on a supervisor restarted since this plan. The supervisor loads its code when its unit starts | on an older supervisor `reboot` is an unknown shape and is ignored ("Any other shape is ignored on both sides", `deploy/dev-supervisor/README.md`): no handover, no answer; the reconciler puts `restart` back to `pending` after 60 s "the supervisor did not answer — press Restart server, or the next server restart loads SDK <to> and finishes this update" | `sudo systemctl restart cloudcli-server-dev` (chats ride the keepalive through it) |
+
+Cross-reference: the reconciler rules behind rows 1 and 5 are in §"Claude updates — the pipeline".
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/deploy/dev-supervisor/supervisor.mjs, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/claude-updates/update-actions.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/claude-updates/update-check.reader.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/claude-updates/update-reconciler.states.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/claude-updates/update-reconciler.ts
+
+## MAN-7414 — Claude updates — proving it
+section: claude-updates/006
+
+Proof: `.verify/artifacts/claude-updates-final/record.md`; driver `.verify/claude-updates-final.mjs`
+(headless Chromium, the repo's `node_modules/playwright`); shots and `*-observations.json` beside the record.
+Run 2026-09-28 21:29 PDT against the live unit, API :3011, UI :5183. It spent no model turn and moved no version.
+
+## The machine the proof ran on
+
+| fact | value |
+| --- | --- |
+| Claude Code | 2.1.284, installed by hand ahead of the pipeline; npm `latest` |
+| Claude Agent SDK | 0.3.284, installed by hand ahead of the pipeline; npm `latest`; `loaded` equals `installed` |
+| `package.json`, `package-lock.json` | clean against HEAD at 0.3.284 (`git status --short` empty): commit `acdfada7` carried the hand bump |
+
+## What the record shows
+
+| step | result |
+| --- | --- |
+| probe job cleared | `~/.cloudcli/claude-updates/job.json` and `job.log` (job `multp4le`, below) removed by literal path after its facts were confirmed; the next `GET` answered `job: null`; `check.json` stayed |
+| tab reads the machine | Settings → Updates, light and dark: `Up to date · 2.1.284` and `Up to date · 0.3.284`; no "loads at its next restart" line; `Update and restart` visible and disabled; no job panel; no sidebar row and no rail icon (Settings control on screen as the positive control); 0 console errors |
+| Check now | `checkedAt` 1790655505519 → 1790656510911; header `Checked 1m ago` → `Checked just now`; cards unchanged; `checkError` null |
+| refusal 1 | `POST /api/claude-updates/apply` `{"targets":{"cli":"2.1.284","sdk":"0.3.284"}}` → 409 `nothing-to-update` |
+| refusal 2 | `POST /api/claude-updates/apply` `{"targets":{"sdk":"0.3.165"}}` → 409 `stale-target` |
+| Restart server through the tab | `POST /api/claude-updates/restart` 202 `{ "requested": true }`; SDK `loaded` 0.3.284 on the new server's next report |
+| newer `latest` | none: `npm view … dist-tags.latest` read 2.1.284 and 0.3.284, so no offer arose and Update and restart was never pressed |
+| at the end | `claude --version`, the SDK on disk, `git status --short package.json package-lock.json` and the sha256 of both files identical to the start; `claude-models.provider.ts` and `modelLabels.ts` untouched |
+
+Restart server, journal (`journalctl -u cloudcli-server-dev --since "2026-09-28 21:35:43" --no-pager | grep -E "\[supervisor\] reboot requested|handover: pid|handover complete"`):
+
+```
+Sep 28 21:35:44 [supervisor] reboot requested by pid 1783361: claude-updates: restart requested from Settings
+Sep 28 21:35:45 [supervisor] handover: pid 1787244 ready — retiring pid 1783361
+Sep 28 21:35:45 [supervisor] handover complete — serving pid 1787244
+```
+
+## The first real install
+
+Left as the operator's press: Update and restart on the tab, on the first `latest` newer than what is installed. The proof did not run it.
+
+## The reboot-failed run (pipeline phase, 2026-09-28 15:32 PDT)
+
+Job `multp4le`: update 0.3.165 → 0.3.284, `restart.requestedBy` 4155946, `cleanAtStart` true. A server file was broken on purpose so the new boot failed. Its files were removed by the final proof; the journal is what remains.
+
+| fact | value |
+| --- | --- |
+| `restart` step | `failed`: "the new server could not boot: Error [TransformError]: Transform failed with 1 error:" |
+| `sdk` step | `done`: "npm installed Claude Agent SDK 0.3.165; 0.3.165 restored" |
+| `commit` step | `skipped`: "nothing to commit — Claude Agent SDK 0.3.165 is back" |
+| job | `rolled-back`; `job.log` held `npm install --save @anthropic-ai/claude-agent-sdk@0.3.165` exit 0, then `git checkout HEAD -- package.json package-lock.json` exit 0 |
+
+Journal (`journalctl -u cloudcli-server-dev --since "2026-09-28 15:30" --until "2026-09-28 15:40" --no-pager | grep -E "reboot|boot failed"`), the run's three lines:
+
+```
+Sep 28 15:32:47 [supervisor] reboot requested by pid 4155946: claude-updates: restart requested from Settings
+Sep 28 15:32:48 [supervisor] boot failed — previous server kept: Error [TransformError]: Transform failed with 1 error:
+Sep 28 15:32:48 [supervisor] reboot failed — told pid 4155946
+```
+
+- The same grep also returns two earlier probe requests (pids 4151385 and 4155298) and one earlier `boot failed`.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/artifacts/claude-updates-final/record.md, /home/lyphe/.claude/claudecodeui_lyphe/.verify/claude-updates-final.mjs
+
 ## MAN-501 — The CLI version report
 section: cli-version/000
 
@@ -4147,6 +4559,7 @@ sudo systemctl restart cloudcli-client-dev      # Vite only
 sudo journalctl -u cloudcli-client-dev -f       # HMR lines: "[vite] (client) hmr update …"
 sudo journalctl -u cloudcli-server-dev -f       # the handover: `[supervisor] change:` → `boot:` → `handover:` → `retired` → `handover complete — serving pid <n>`
                                                 # `boot failed — previous server kept:` = the edit did not compile and the old server still serves
+                                                # `[supervisor] reboot requested by pid <n>: …` = the API asking for its own handover, from Settings → Updates
 curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:5183/            # 200
 curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:5183/api/cli-version  # 401 = alive, auth-gated
 sudo systemctl restart cloudcli-sessions-tmux   # the only cure for a silently dead keepalive — takes every live chat CLI with it
@@ -4988,12 +5401,32 @@ There is no policy in it: WHEN to spawn is the driver's question, and this one a
   mtime freezes — which the quiescence rule would then read as a finished turn. So the log's file
   descriptor IS her stdout and stderr (`stdio: ['pipe', fd, fd]`), and the parent closes only its
   own handle.
+- **Model and effort come from the launch table, asked at every launch.** Spawn, resume and reply all
+  pass through `prepare`, which calls `resolveLaunchSide('metis', side)` (`@/modules/agent-launch/index.js`,
+  MAN-7416): `side` is the board's own switch read at that instant (`deepseek` on, `claude` off), the answer is
+  `{name, side, model, effort}`, and an Agents-tab edit reaches her at her next launch with nothing restarted.
+  - `metisRouteFor(deepseekFlash, resolved)` settles `model`, `provider` and `effort`. A Flash board's
+    `--model` is `metis-env.service.ts`'s own `deepseek-flash`, never the table's word (INV-34 #1); a Claude
+    board's is `resolved.model`. `effort` is `resolved.effort` on both routes.
+  - `effort: null` ⇒ `buildMetisArgv` pushes no `--effort`, and the CLI's own `effortLevel` applies.
+  - The ask sits after the DeepSeek key check and before `startedAt`, the cwd and the flag file: a failed ask
+    refuses the launch with 503 `LAUNCH_TABLE_UNREADABLE` having created nothing. The driver counts it as a
+    failed launch in the relaunch ledger — only a 409 is exempt.
+  - `spec.json` records `model`, `provider` and `effort` (`null` when none); a record with no `effort` key
+    reads back `null`.
+- **The gates run twice.** `prepare` checks the dial early (the cheap refusal) and again as its last
+  synchronous act, `ensureNoRivalSince`: the dial, and for a resume or reply that no other child has taken the
+  same session (409 `Metis session "<id>" is already running.`). Nothing is awaited between it and the door's
+  `registry.record`, so a request that arrived during the key read, the launch-table ask (~85 ms) or the flag
+  write cannot double-spawn. An `await` added to `prepare` after that call reopens the window — add it before.
+  A late refusal can leave the cwd and the board's flag write behind; both are idempotent and per board.
 - **Argv**, in `~/.claude/hooks/plan_runner/souls.py`'s shape:
 
 ```
 claude -p --output-format stream-json --verbose --permission-mode bypassPermissions
        (--session-id <uuid> | --resume <uuid>)      # exactly one, never both
-       --model <deepseek-flash | opus>
+       --model <deepseek-flash | the Claude word the launch table gives Metis>
+       [--effort <the launch table's word for that route>]   # absent when the table names none
        --append-system-prompt <the brief>
        --mcp-config <one JSON string naming kanban-pm> --strict-mcp-config
        [--add-dir <the board's project path>]
@@ -5027,7 +5460,7 @@ when nothing is claimable.
   finish the tool call it is in and write its result, short enough that a Metis ignoring the signal
   cannot sit on a lease the driver believes is free.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/shared/child-env.ts, /home/lyphe/.claude/hooks/plan_runner/souls.py
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/kanban-metis/metis-env.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/kanban-metis/metis-registry.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/kanban-metis/metis-spawn.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/child-env.ts, /home/lyphe/.claude/hooks/plan_runner/souls.py
 
 ## MAN-594 — The kanban-pm MCP surface
 section: kanban/013 The kanban-pm MCP surface
@@ -5982,7 +6415,7 @@ buttons stay good for 5 minutes, but the Claude runtime waits only 55 seconds fo
 (`CLAUDE_TOOL_APPROVAL_TIMEOUT_MS`) and then denies the tool itself: a tap after that is too
 late, and the route cannot tell (§"Gotchas"). Spent tokens live in server memory; a registered
 prompt is re-registered by whichever successor re-issues it (§"One question, one push"), so a
-restart (a dev handover included) no longer voids the buttons of a question that is still parked.
+restart (a dev handover included) no longer voids the buttons of a question that is still parked. A prompt that lives in a STORE — a plan's, raised by the dispatcher lane — does not wait for a re-issue: a tap that reaches a process which has not raised it yet is read from the store first (`unregisteredPromptOf` names it, `recallApproval` reads it, and the route registers what the store says before the token is spent — MAN-7400), so a tap is answered whichever process serves it.
 Rotating the signing secret does — every outstanding button dies with it.
 
 **The route** (`ntfy-action.routes.ts`) answers in plain text:
@@ -5992,7 +6425,7 @@ Rotating the signing secret does — every outstanding button dies with it.
 | 200 | `Answered: <button label>` | The decision was handed to the runtime, which may no longer be waiting (§"Gotchas") |
 | 400 | `missing token` · `malformed token` · `malformed payload` · `unknown option` | Not a token this server minted |
 | 401 | `bad signature` · `expired` · `unknown decision` | Forged, altered or out of time |
-| 410 | `already answered` · `no longer pending` | Spent, or its prompt is gone (answered by a sibling, timed out, or the session's approval was settled before this server took the question over) |
+| 410 | `already answered` · `no longer pending` | Spent, or its prompt is gone (answered by a sibling, timed out, the session's approval was settled before this server took the question over, or — for a plan's prompt — no open ask in the store carries its name any more) |
 | 429 | `too many attempts` | 20 GUESSED tokens from one client inside a minute — a signed token is never refused this way |
 | 500 | `could not answer` | The runtime threw while taking the decision; the token is spent anyway |
 
@@ -6015,7 +6448,7 @@ which would sell an unlimited budget for the price of rotating it. So all caller
 That is safe precisely because of the rule above, and it is why the checks in `.verify/ntfy` hand
 the budget back (one signed token) instead of trying to claim an address of their own.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/ntfy-action.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/services/ntfy-action-token.service.ts
 
 ## MAN-619 — One question, one push
 section: notifications/004 The ntfy channel/009 One question, one push
@@ -9443,6 +9876,7 @@ key for key. The emitted document is the source of the shape.
   `cacheRead`, the document's `tokens_cache_read` handed through, which `cachePercent` words) is client-only: it
   sits in its own SPEND block after the client-only picture's, never inside the DISPATCHER block, because that block must
   stay text-identical with the server's copy.
+- `DispatcherAnswerOutcome` (`took`, `already-answered`, `refused`) is in `server/shared/types.ts` ONLY (`DISPATCHER ANSWERS` block): `carryReply`'s verdict on one answer; `dispatcher accept` exit 3 is `already-answered`. Not on the wire.
 - `LaneFlowNode` (`key`, `mark`, `tone`, `label`, `live`) and `LaneFlow` (`nodes`, `doneCount`, `ariaLabel`) are client-only, in their own FLOW block after the SPEND block: a lane card's progress track as its caller hands it to the frame that draws it (`StatusFlow`; `DeckFrame`, `DeckStrip`). A plan card's track is built by `PlanFace`, an arc deck's by `DispatchArcDeck`, one node per drawn plan and a node's `key` the plan's name (MAN-643 → "The flow").
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts
@@ -9463,8 +9897,160 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts
 
 THE RAISE (`dispatcher-raise.service.ts`). For the two events a landing is — `design-loaded`, `phases-loaded` — it runs `dispatcher ask <name>` (`dispatcher-ask.transport.ts`, `hooks/dispatcher/ask.py`, MAN-7399), which records the ask in the STORE (`prompted_at` and an `asked` event) and prints it in the document's `asking` shape; the prompt goes up at once (`asks.show`), on the tick that saw the landing (measured 2026-09-29: 0.7 s from a probe plan's landing to its `permission_request` frame, the lane polling every 2 s). The owning session is checked FIRST (`plan.session_app_id` through `sessionsDb`): an ask recorded for a chat this server cannot show would stand the `Stop` hold down over a prompt nobody sees, so such a plan is `unreachable` and its debt stays on the hold, as does one the verb refuses (no Eupalinos to take a Rework's notes or a round's answers). THE MARK IS A MAP: `dispatcher_raised_through` in `app_config` holds one entry PER PLAN, the highest landing id already answered, because a landing whose answer is still coming must stay DUE while every other plan's mark advances — a single watermark (the endings' `dispatcher_announced_through`, MAN-5639) would swallow it. It stays due while the writer is still OUT (`store.live_for`'s outing, read off the FRAME's `planners` list) and when the verb did not answer at all; it is read again before it is written, for the handover reason MAN-5639 states, and a double raise across that window costs nothing — the dispatcher checks and records an ask in one write transaction, so the second `ask` waits on the first and hears nothing. BOOTSTRAP, the first sight of a store this database never raised through: every plan in `questions`, or `loaded` with `prompted_at` null, is asked once through the same verb, and every plan is then marked at its own newest landing.
 
-THE PANEL (`dispatcher-asks.service.ts`) is a PROJECTION of every plan's `asking` key, held in nothing of its own but an attempt id: each distinct ask is put up in its plan's owning chat exactly as an `AskUserQuestion` is — a `permission_request` frame to every socket, marked `standalone: true`; a `permission.required` push with the runtime's own meta (`toolName: 'AskUserQuestion'`, `toolInput`, `requestId`, `promptKey`) plus `plan` and `askKind`, so the phone gets its buttons (MAN-618); and a place in `chat_subscribed`'s `pendingPermissions` and the sidebar's waiting mark through a permission gateway registered with the provider registry (`registerPermissionGateway`, MAN-332). An ask's NAME is the ask — its `asked` event, with an Accept's lock token (`dispatcher:lock:<token>:<id>`, the id its LEAD plan's) and a questions round's plan (`dispatcher:questions:<plan>:<id>`) — so one arc's lock carried on every plan it names is ONE prompt, and every landing is a new one: a re-cut after a Rework rewrites phase goals the token does not digest, and its fresh prompt buzzes the phone and rings the tab like the first, and a restart or a handover's second server reads the same asks back off the store without buzzing the phone again. A picture generated no later than an ask's own second cannot retract it (both stamps are the store's second-grained UTC); an answered ask stays down for `ANSWER_GRACE_MS` (30 s) while the store's own close of it reaches the picture, and one whose answer the dispatcher did not take goes straight back up.
+THE PANEL (`dispatcher-asks.service.ts`) is a PROJECTION of every plan's `asking` key, kept in a book of what THIS process has put up, and nothing else: each distinct ask is put up in its plan's owning chat exactly as an `AskUserQuestion` is — a `permission_request` frame to every socket, marked `standalone: true`; a `permission.required` push with the runtime's own meta (`toolName: 'AskUserQuestion'`, `toolInput`, `requestId`, `promptKey`) plus `plan` and `askKind`, so the phone gets its buttons (MAN-618); and a place in `chat_subscribed`'s `pendingPermissions` and the sidebar's waiting mark through a permission gateway registered with the provider registry (`registerPermissionGateway`, MAN-332). An ask's NAME is the ask — its `asked` event, with an Accept's lock token (`dispatcher:lock:<token>:<id>-<stamp>`, the id its LEAD plan's) and a questions round's plan (`dispatcher:questions:<plan>:<id>-<stamp>`); the panel's request id is the same name under the panel's prefix (`dispatcher:ask:lock:<token>:<id>-<stamp>`, `dispatcher:ask:questions:<plan>:<id>-<stamp>`), and both are DERIVED from the store's record in `dispatcher-ask-names.service.ts`, never minted, so they are the same in every process; the `asked` event's stamp (whole epoch seconds) is in the name because `events.id` has no `AUTOINCREMENT` — after `dispatcher drop` frees the tail a re-loaded plan is born under the same ids, and the same plan file asked again would otherwise be taken for the first life's ask (no buzz, no bell) — so one arc's lock carried on every plan it names is ONE prompt, and every landing is a new one: a re-cut after a Rework rewrites phase goals the token does not digest, and its fresh prompt buzzes the phone and rings the tab like the first, and a restart or a handover's second server reads the same asks back off the store without buzzing the phone again. A picture generated no later than an ask's own second cannot retract it (both stamps are the store's second-grained UTC); an answered ask stays down for `ANSWER_GRACE_MS` (30 s) while the store's own close of it reaches the picture, and one whose answer the dispatcher did not take goes straight back up. A PLAN IS APPROVED ONCE PER LOAD (`store.approve`), so a second Accept — a double answer, two servers hearing one tap, a terminal Accept that got there first — is refused by the store whichever server sends it: `dispatcher accept` exits 3 (`accept.ALREADY_APPROVED_EXIT`, apart from every other refusal's 2) and `carryReply` answers `already-answered` (`DispatcherAnswerOutcome`) instead of `refused`. That prompt is NOT put back: it stays down for the grace like a taken one, and the journal says the answer was already answered. For the PANEL's door alone, as `tellNotCarried`, the tabs also get a `permission_cancelled` with `answerNotCarried: true` and `alreadyAnswered: true`, shown as an "Already answered" toast only by the tab that SENT the answer: a tab that answers lets the request go from its own pending list at the click, so the server's `permission_resolved` that finds it gone marks the tab as the answerer (`answeredHereRef`), and a bystander that still holds the request is told nothing (`answer` retracts the prompt as resolved before the verb runs, so `heardItClose` cannot tell them apart). A phone tap has no card and is answered in its own HTTP reply, which is sent before the verb runs: the tap hears `Answered` and only the journal hears the truth.
 
-THE ANSWER (`dispatcher-answer.service.ts`), from the panel (it names the attempt) or the phone (it names the ask): Accept runs `dispatcher accept --lock <token> --by app:panel|app:phone <plans…>`, Queue the same with `--paused` — the verb re-checks the token and a stale one approves NOTHING, after which the current prompt is up again; Rework (its notes typed in the panel, `needsNote`; the phone's Rework button opens the chat instead) runs `dispatcher tell <target> --brief -` with the notes verbatim once per designer target; a questions round runs `dispatcher tell <target> --brief -` with the answers as `Q:`/`A:` pairs in the designer's own words. A decision that carries no answer — a skip, a label the prompt never offered, a Rework with no notes — keeps the prompt up. Every verb an answer runs is one journal line: the command, its exit, and the dispatcher's own first line. The lane's child environment drops `CLAUDE_CODE_SESSION_ID` and `DISPATCHER_SESSION` (`laneEnv`): the server is nobody's Claude session, `accept` refuses inside one, and `tell` would write a stray id onto the outing it queues.
+THE ANSWER (`dispatcher-answer.service.ts`), from the panel (it names the ask by its request id) or the phone (by its prompt key): Accept runs `dispatcher accept --lock <token> --by app:panel|app:phone <plans…>`, Queue the same with `--paused` — the verb re-checks the token and a stale one approves NOTHING, after which the current prompt is up again; Rework (its notes typed in the panel, `needsNote`; the phone's Rework button opens the chat instead) runs `dispatcher tell <target> --brief -` with the notes verbatim once per designer target; a questions round runs `dispatcher tell <target> --brief -` with the answers as `Q:`/`A:` pairs in the designer's own words. A decision that carries no answer — a skip, a label the prompt never offered, a Rework with no notes — keeps the prompt up. Every verb an answer runs is one journal line: the command, its exit, and the dispatcher's own first line. The lane's child environment drops `CLAUDE_CODE_SESSION_ID` and `DISPATCHER_SESSION` (`laneEnv`): the server is nobody's Claude session, `accept` refuses inside one, and `tell` would write a stray id onto the outing it queues.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/provider.registry.ts
+ANY PROCESS ANSWERS (`dispatcher-asks.service.ts`; measured 2026-09-28 18:59:54 on the dev unit's restart). An answer names an ask, and the process that hears it need not be the one that raised it: a click made while the socket was down waits in the tab's outbox and is flushed onto the successor's first frame, before its first picture has been read — the old server had minted the id, the new one had never heard of it, and the answer was dropped as an unknown request — and a phone tap can beat the successor's first raise the same way. So a key of the lane's own that the book does not hold is CLAIMED, not reported unknown, and settled from the STORE: `catchUp` reads it now (`readDispatcherState`, about 0.7 s on a 25-plan store) and runs `observe` on that picture, then the answer is looked up again. An ask the store holds open is in the book by then — the key carries the `asked` event's id and an Accept's lock token, so an id that names the current ask is exactly one the store derives — and is carried like any other, its token re-checked by the verb itself. A key no open ask derives — a re-cut's new `asked` event, an ask already answered or being carried, nothing owed — runs NOTHING (a re-cut's notes or answers would reach a designer for a question no longer asked, and the store refuses a second approval of an approved plan in any case), says so in the journal, and — for the panel's door; a phone tap is answered in its own HTTP reply — broadcasts `permission_cancelled` with `answerNotCarried: true` naming the ask by both its names (and the chat, when the picture in hand can say which), which a tab that was told about that ask and never heard it close shows as an "Answer not applied" toast; the same read has already put up whatever prompt IS current. A store that cannot be read leaves the answer uncarried with one journal line and the SAME notice, and the prompt comes back on the next picture that reads. THE READ IS COALESCED, because the phone's route is public and a genuine token replays for hours: a caller that finds a read out waits for the ONE read queued behind it (a read already out may predate the caller's ask), so a burst of taps costs two reads, and a key a successful read did not carry is remembered as closed for `CLOSED_MEMO_MS` (5 s) so a replay answers 410 without another (`raise` forgets the memo of a key it puts up; a failed read is never memoised). THE PHONE asks the same question before its token is spent: `unregisteredPromptOf` (`ntfy-action-token.service.ts`) names the prompt of a genuine token this process never registered buttons for, `recallApproval` (each gateway's optional `recall`) reads it from the store, and `ntfy-action.routes.ts` registers what the store says — so a tap is 200 while the ask is open and 410 `no longer pending` once it is not, whichever process serves it. Each door leaves one journal line when the store served it: `… named an ask this process had not raised — read from the store` (panel), `a tap on … named a prompt this process had not raised — read from the store` (phone).
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/ntfy-action.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/services/ntfy-action-token.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/provider.registry.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/provider-runtime.service.ts
+
+## MAN-7417 — The Agents tab — where it sits, what the panel shows, its states and layout
+
+The workspace tab where the operator reads and changes the model and effort every soul, and Metis, launches at, and the `/api/agent-launch` relay behind it. The table is `charters/launch.toml` (MAN-7407); `~/.claude/scripts/launch-table` is its one reader and writer (MAN-7415). The tab and the relay open no file: the census the CLI prints is the tab's whole data.
+
+The data path, the hook and the rules that bite: MAN-7420. The routes, `LAUNCH_TABLE_BIN` and Metis's resolve: MAN-7418.
+
+## where the tab sits
+| fact | value |
+|---|---|
+| strip | the house row, last of the built-ins: after `API_TAB`, before plugin tabs |
+| entry | `WorkspaceTabs.tsx` `AGENTS_TAB: BuiltInTab = { id: 'agents', labelKey: 'tabs.agents', icon: Bot }`; label "Agents"; no count dot |
+| why the house row | the table is a fact about the box, whatever project is open; the house row holds the surfaces that read the same in every project |
+| why ungated | the operator opens it to change a launch; a tab that hid on a quiet day would be a table nobody could reach |
+| render | `WorkspaceMain.tsx`: `activeTab === 'agents'` → `<AgentLaunchPanel />` in the lazy block beside `ApiPanel`, no gate |
+| tab id | `'agents'` in `AppTab` (`src/shared/types.ts`) AND in `VALID_TABS` (`useProjectsState.ts`); missing from `VALID_TABS` a reload leaves the tab |
+| command palette | `Go to Agents` in `CommandPalette.tsx` `NAV_TABS` after API; `'agents'` in `ProjectCommandPalette.tsx` `visibleTabs` |
+| locales | `tabs.agents` and the `agentLaunch.*` block exist in `en/common.json` only; other locales fall back to English |
+
+## what the panel shows
+Every choice list is `census.choices`; the panel spells no model or effort word.
+
+| block | shows | a change sends |
+|---|---|---|
+| reach notice | info banner: "Chains, the dispatcher and Metis take a change at their next launch. Agent calls read their definitions once per session, so a change reaches them in new sessions only." (INV-27) | — |
+| Defaults · model | one chip per `choices.models`; `defaults.model` selected | `{model}` |
+| Defaults · effort | one list per model: `none` + `choices.efforts`; `none` = no `--effort` flag, labelled "None · the CLI’s own (<`cli_effort`>)", bare when `cli_effort` is null | `{effort: {<model>: word\|null}}` |
+| Defaults · DeepSeek effort | one list over `choices.efforts`; hint "DeepSeek maps xhigh to high; only max raises it" (INV-4899) | `{deepseek_effort}` |
+| Souls | one row per `kind: "soul"`, census order (by name); count badge and "N pinned" | — |
+| Metis | the `kind: "metis"` row, last, in its own section | — |
+
+**A row** = name, the description beneath (two lines; "Show more" / "Show less" past `DESCRIPTION_CLAMP_CHARS` = 70, `aria-expanded`), a Model and an Effort control, its lanes.
+- Each control reads `pinned` (badge: the row's own table entry) or "Default · <value>". Its first choice is `Default · <value>`; choosing it clears the pin (`null`). The effort default is `defaults.effort[row.model]`, else "no flag".
+- A lane (`Agent call`, `Dispatcher`, `Chain`, `Metis`; which lanes a row has is the census's, MAN-7415) prints every side as `model·effort` (`no flag` when `effort` is null).
+- A side's `when` prints only where it says more than the model beside it: `always`, or a `when` equal to the model, prints nothing; `claude` / `deepseek` print "Claude" / "DeepSeek"; any other `when` prints as it is.
+- The lane's `note` sits beneath it. A lane whose `reach` is `new-session` wears a `new session` marker: an Agent call reads its definition once per session.
+
+**Warnings**: amber `warn` banners above the reach notice, in this order.
+| when | says |
+|---|---|
+| `state` is `absent` | "There is no launch table yet, so every launch runs at the shipped values. The next save creates the file." |
+| `state` is `malformed` | "The launch table could not be read, so every launch runs at the shipped values. A save is refused until the file is fixed." |
+| `problems` non-empty | "The table read with problems:" and every sentence, one banner |
+| `regen.ran` and not `regen.ok` | "The table is saved, but the shims did not regenerate: <said>"; the write is kept |
+| a row's `shim` is not null and `shim.current` is false | "<n> shims are behind the table:" and per row "<name>: the shim says <model · effort>, the table says <model · effort>"; the row also wears `shim behind` |
+
+## states
+| `data-agent-state` | draws |
+|---|---|
+| `loading` | spinner "Reading the launch table…" |
+| `unreadable` | warn banner: "The launch table could not be read", the server's sentence, a "Try again" button (`data-agent-unreadable`) |
+| `ready` | the body |
+
+| while | draws |
+|---|---|
+| a save is in flight | that row, or the Defaults block, is held: dimmed, pointer off, `aria-busy`, "Saving…"; every other control stays live |
+| a save is refused | banner outside the scroll (`data-agent-refused`): a lead line and the server's sentence; the row wears `not saved`; the held census is unchanged |
+
+## draw order and layout
+1. Header: mark, title, `census.file` (≥ 48rem), reload button (`data-agent-reload`).
+2. Refusal banner, outside the scroll.
+3. Body: warnings, reach notice, Defaults, Souls, Metis. The scroll body carries 16rem bottom padding for the last row's open list.
+
+| panel width | row columns |
+|---|---|
+| ≥ 64rem | 3: who · model and effort side by side · lanes |
+| 48rem – 64rem | 2: name and stacked controls beside the lanes |
+| < 48rem | 1 |
+
+The query is the panel's own width (`container-type` on the root). Defaults: 3 fields from 48rem, stacked below.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/agent-launch/AgentLaunchChoice.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/agent-launch/AgentLaunchDefaults.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/agent-launch/AgentLaunchLanes.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/agent-launch/AgentLaunchNotices.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/agent-launch/AgentLaunchPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/agent-launch/AgentLaunchRowItem.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/agent-launch/hooks/useAgentLaunch.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/agent-launch/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/command-palette/CommandPalette.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/hooks/useProjectsState.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/ProjectCommandPalette.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/WorkspaceMain.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/WorkspaceTabs.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/agent-launch-types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts
+
+## MAN-7418 — /api/agent-launch — the three routes and their bodies, refused 400 · unreachable 503 · unreadable 502, LAUNCH_TABLE_BIN, Metis's resolve
+
+`/api/agent-launch` is the relay from the Agents tab (MAN-7417) to `~/.claude/scripts/launch-table`. Module internals (spawn, shape checks, failure classes, timeouts, shared types): MAN-7416. Metis is its second caller (§"Metis's resolve").
+
+Mount: `app.use('/api/agent-launch', authenticateToken, createAgentLaunchModule().router)` in `server/index.ts`, beside the heal mount.
+
+| route | body | runs |
+|---|---|---|
+| `GET /api/agent-launch` | — | `launch-table show` |
+| `PUT /api/agent-launch/rows/:name` | `{model?: string\|null, effort?: string\|null}`; at least one field | `set <name> [--model M] [--effort E]`; `null` → `default` |
+| `PUT /api/agent-launch/defaults` | `{model?: string, effort?: {<model>: string\|null}, deepseek_effort?: string}`; at least one field | `defaults [--model M] [--effort <model>=<E\|none>]... [--deepseek-effort E]`; `null` → `none` |
+
+- A 200 body is the census the CLI printed, whole. A PUT answers the census read back AFTER the write, never the input (MAN-628).
+- `:name` matches `^[a-z][a-z0-9_]{0,63}$`. The routes check transport shape only; the vocabulary is Python's, so `PUT /rows/hermes` with `{"effort":"loud"}` answers 400 carrying the CLI's sentence.
+
+| the CLI | reason | status | body |
+|---|---|---|---|
+| exit 2 with `{"error": "<sentence>"}` | `refused` | 400 | `{error: <the sentence, untouched>}` |
+| did not start, timed out, crashed, any other exit | `unreachable` | 503 | `{error: <message>}` |
+| exit 0 with stdout that is not one JSON object | `unreadable` | 502 | `{error: <message>}` |
+
+A body the route itself cannot read (bad name, stray key, no field) is a 400 with the route's own sentence.
+
+**The CLI is the table's one reader.** Neither this server nor Metis opens `launch.toml`: each runs the CLI with an argv array and no shell, and carries its sentence untouched.
+
+**`LAUNCH_TABLE_BIN`**: the CLI's path, tilde-expanded, default `~/.claude/scripts/launch-table`. Read in `agent-launch.module.ts` and nowhere below it; the routes and `resolveLaunchSide` share the one service it builds. The CLI inherits the server's environment (minus `TSX_TSCONFIG_PATH`), so a `LAUNCH_TABLE_PATH` set on the server moves the CLI to a scratch table (MAN-7407).
+
+## Metis's resolve
+`kanban-metis.module.ts` injects `resolveLaunchSide`, imported through `@/modules/agent-launch/index.js`, into `createMetisSpawner`, as `readDeepseekKey` is.
+- `prepare`, which spawn, resume and reply all pass, asks `resolveLaunchSide('metis', board.deepseekFlash ? 'deepseek' : 'claude')` at EVERY launch: a save in the tab reaches her next launch, nothing restarted.
+- The ask runs before `startedAt`, the board's cwd and `writeBoardFlag`. Any failed result throws `AppError("Metis's launch table could not be read: <message>", {statusCode: 503, code: 'LAUNCH_TABLE_UNREADABLE'})` and no child starts; the driver counts it as a failed launch (INV-5743).
+- A Flash board's `--model deepseek-flash` stays Node's own word (INV-34 #1); its effort is `[deepseek] effort` (INV-4899). Route, argv, the gate order and the `spec.json` record: MAN-593.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/agent-launch/agent-launch.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/agent-launch/agent-launch.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/agent-launch/agent-launch.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/agent-launch/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/kanban-metis/kanban-metis.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/kanban-metis/metis-env.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/kanban-metis/metis-spawn.service.ts
+
+## MAN-7420 — The Agents tab — data path, where each piece lives, the hook contract and the rules that bite
+
+The Agents tab's data path, its hook and the rules a change to either must keep. What the panel draws: MAN-7417. The routes it calls: MAN-7418.
+
+## data path
+| fact | value |
+|---|---|
+| read | `api.agentLaunch.census()` → `GET /api/agent-launch`, on mount and on `refresh()` |
+| write, one row | `api.agentLaunch.saveRow(name, change)` → `PUT /api/agent-launch/rows/<name>`; `change` is an `AgentLaunchRowChange` |
+| write, defaults | `api.agentLaunch.saveDefaults(change)` → `PUT /api/agent-launch/defaults`; `change` is an `AgentLaunchDefaultsChange` |
+| write deadline | `AGENT_LAUNCH_WRITE_TIMEOUT_MS` = 95 000 in `src/shared/api.ts`; the relay lets the CLI run 90 s (MAN-7416); a read keeps the default 30 s |
+| answer of a write | the census read back after it; the hook replaces the held census with it |
+
+## where each piece lives
+| piece | home |
+|---|---|
+| panel | `src/modules/agent-launch/AgentLaunchPanel.tsx`, re-exported lazily by `index.ts` |
+| parts | `AgentLaunchNotices` (warnings, reach notice) · `AgentLaunchDefaults` · `AgentLaunchRowItem` · `AgentLaunchLanes` · `AgentLaunchChoice` |
+| hook | `useAgentLaunch()` → `{ census, error, saving, refresh, saveRow, saveDefaults }` |
+| types | `src/shared/agent-launch-types.ts`: the census key for key in the CLI's snake_case, plus `AgentLaunchRowChange` and `AgentLaunchDefaultsChange`; a rename there is a field the panel stops reading |
+
+## hook contract
+- `census` is `null` until read; a failed call keeps the census already held.
+- `error` is the server's own `{ error }` sentence, never a paraphrase, and names no row; the next successful call clears it.
+- `saving` is the newest write still in flight: a row's name, or `'@defaults'` while the Defaults block saves; else `null`. `DEFAULTS_SAVING` is spelled in both the hook and `AgentLaunchPanel.tsx`; keep them equal.
+- The hook keeps every in-flight write by name, oldest first; each write releases only its own entry. The same name pressed twice holds twice. The panel holds one row at a time: with two saves open the older row is live again.
+- A read that a newer call overtook is dropped (`epoch`): a reload begun before a save cannot land after it and restore the old picture. Writes are never dropped.
+- `readCensus(response)` wraps `readApiJson`: the server's `{ error }` passes through; a body that is not JSON, or is JSON that fails `isCensus`, throws "The launch table's API did not answer with a census (HTTP <status>)." Read and both writes use it.
+- `isCensus` is shallow on purpose: it checks `state`, `problems`, `rows`, `choices.models`, `choices.efforts`, `defaults.effort` only. A field the panel starts to dereference belongs in it only if a body missing it could blank the tab.
+
+## rules
+- **A held row is not disabled.** A row or the Defaults block being saved is dimmed, pointer switched off, `aria-busy`, and its handlers return early. `disabled` or `fieldset disabled` drops keyboard focus off the trigger; a held row must not use either.
+- **The panel remembers what was last pressed.** `last` holds a row name, `'@defaults'` or `'@reload'`; it only decides whose row wears `not saved` and which lead line the refusal banner shows.
+
+| `last` | banner lead |
+|---|---|
+| a row name | "Not saved — the launch table refused the change to {name}:" |
+| `'@defaults'` | "Not saved — the launch table refused the change to the defaults:" |
+| `'@reload'` | "The launch table could not be read again:" |
+| null | "Not saved — the launch table refused it:" |
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/agent-launch/AgentLaunchPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/agent-launch/hooks/useAgentLaunch.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/agent-launch/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/agent-launch-types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts
