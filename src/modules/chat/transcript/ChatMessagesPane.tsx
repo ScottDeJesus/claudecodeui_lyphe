@@ -168,7 +168,11 @@ function ChatMessagesPane({
   // does not carry, which is how the caption falls back to the provider's name
   // instead of printing an identifier.
   const resolveModelLabel = useCallback(
-    (modelId: string): string | null => labelForModelId(providerModelCatalog[provider]?.OPTIONS ?? [], modelId),
+    (modelId: string): string | null => labelForModelId(
+      providerModelCatalog[provider]?.OPTIONS ?? [],
+      modelId,
+      providerModelCatalog[provider]?.LABELS_BY_MODEL_ID,
+    ),
     [provider, providerModelCatalog],
   );
   const lazyRows = useLazyRowObserver(scrollContainerRef);

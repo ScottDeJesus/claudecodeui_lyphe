@@ -849,21 +849,23 @@
       "confirm": "Delete"
     },
     "waitsOn": "waits on {{names}}",
-    "hideEnded": "Hide ended · {{count}}",
+    "dismissDone": "Dismiss done · {{count}}",
+    "dismiss": "Dismiss plan",
+    "dismissArc": "Dismiss arc",
+    "dismissDonePlans": "Dismiss done plans · {{count}}",
     "hide": "Hide plan",
     "hideArc": "Hide arc",
-    "hideEndedPlans": "Hide ended plans · {{count}}",
     "menu": "More actions",
     "hidden": {
       "title": "Hidden · {{count}}",
       "show": "Show",
       "showAll": "Show all",
-      "allHidden": "Every plan on the lane is hidden"
+      "allHidden": "Every unfinished plan is hidden"
     },
     "arcMark": "Arc",
     "arcStatus": {
       "designing": "DESIGNING",
-      "judged": "JUDGED",
+      "judging": "JUDGING",
       "live": "LIVE",
       "complete": "COMPLETE",
       "empty": "EMPTY",
@@ -886,6 +888,24 @@
     "model": {
       "planLabel": "Model for this plan’s builders",
       "arcLabel": "Model for every plan of this arc"
+    },
+    "swarm": {
+      "label": "Swarm for this plan",
+      "hint": "How many of this plan's phases walk at once.",
+      "box": "Box",
+      "boxWord": "Box · {{word}}",
+      "boxTitle": "Follow the box's swarm switch (Settings → Agents → Claude)",
+      "off": "Off",
+      "offTitle": "One of this plan's phases at a time",
+      "on": "On",
+      "onTitle": "Every independent phase of this plan at once, up to its ceiling",
+      "all": "All",
+      "allTitle": "No ceiling: every independent phase of this plan at once",
+      "lanesLabel": "Most of this plan's phases at once",
+      "lanesDown": "One phase fewer at once",
+      "lanesUp": "One phase more at once",
+      "refused": "Swarm not set",
+      "done": "Swarm set — the next take-up reads it"
     }
   },
   "navigation": {

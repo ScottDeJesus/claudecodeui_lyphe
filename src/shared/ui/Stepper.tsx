@@ -20,6 +20,11 @@ type StepperProps = {
   increaseLabel: string;
   /** Names the value itself, e.g. "Chat text size". */
   ariaLabel: string;
+  /**
+   * The 32px-tall form, for a control that shares a card's action row with `h-8` buttons: the
+   * default stepper is 32px of button inside a 1.5px border, and so stands 35px tall in that row.
+   */
+  compact?: boolean;
 };
 
 export function Stepper({
@@ -31,9 +36,10 @@ export function Stepper({
   decreaseLabel,
   increaseLabel,
   ariaLabel,
+  compact = false,
 }: StepperProps) {
   return (
-    <div className="vv-stepper inline-flex items-center" role="group" aria-label={ariaLabel}>
+    <div className={`vv-stepper${compact ? ' vv-stepper--compact' : ''} inline-flex items-center`} role="group" aria-label={ariaLabel}>
       <button
         type="button"
         className="vv-stepper__button"

@@ -20,7 +20,7 @@ import { plannerSince } from './dispatcher-planner.reader.js';
  */
 
 /** The eight words an arc's derived status may be (`store_arcs.arc_word`'s one precedence). Anything else is a build this lane cannot draw. */
-export const ARC_STATUSES: readonly DispatcherArcStatus[] = ['empty', 'judged', 'complete', 'live', 'scheduled', 'paused', 'queued', 'designing'];
+export const ARC_STATUSES: readonly DispatcherArcStatus[] = ['empty', 'complete', 'judging', 'live', 'scheduled', 'paused', 'queued', 'designing'];
 
 /** One arc whole. Its `name` is read first, so every later refusal can name the arc it came from. */
 export function arcOf(raw: unknown): DispatcherArc {

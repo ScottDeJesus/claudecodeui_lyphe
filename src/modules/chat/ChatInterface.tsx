@@ -147,6 +147,7 @@ function ChatInterface({
     currentProviderEffortOptions,
     currentProviderModel,
     currentProviderModelOptions,
+    currentProviderModelLabelsById,
     permissionMode,
     pendingPermissionRequests,
     setPendingPermissionRequests,
@@ -659,6 +660,7 @@ function ChatInterface({
           onSelectEffort={handleSelectComposerEffort}
           model={currentProviderModel}
           availableModelOptions={currentProviderModelOptions}
+          availableModelLabelsById={currentProviderModelLabelsById}
           onSelectModel={handleSelectComposerModel}
           modelsLoading={providerModelsLoading}
           tokenBudget={tokenBudget}

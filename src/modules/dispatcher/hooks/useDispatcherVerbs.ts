@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 
 import { api } from '@/shared/api';
 import { useToast } from '@/shared/context/ToastContext';
-import type { DispatcherModelChoice, DispatcherVerb } from '@/shared/types';
+import type { DispatcherModelChoice, DispatcherSwarmChoice, DispatcherVerb } from '@/shared/types';
 
 /** The dispatcher's answer, as much of it as this hook reads. Both fields are free text it wrote. */
 type VerbBody = { stdout?: unknown; stderr?: unknown };
@@ -42,13 +42,14 @@ export type DispatcherPlanVerbs = {
   unpark(): Promise<void>;
   drop(): Promise<void>;
   setModel(choice: DispatcherModelChoice): Promise<void>;
+  setSwarm(choice: DispatcherSwarmChoice): Promise<void>;
   busy: DispatcherVerb | null;
 };
 
 /**
  * What an arc header may press — the four verbs the dispatcher's own arc door opens on. `park`,
- * `unpark` and `drop` are the plan card's own and no arc header draws them, so no arc callback exists
- * for them rather than one that would have no route to reach.
+ * `unpark`, `drop` and `swarm` are the plan card's own and no arc header draws them, so no arc
+ * callback exists for them rather than one that would have no route to reach.
  */
 export type DispatcherArcVerbs = {
   stop(): Promise<void>;
@@ -59,8 +60,8 @@ export type DispatcherArcVerbs = {
 };
 
 /**
- * Stop, Resume, Schedule, Park, Unpark, Model and Drop for one plan — or Stop, Resume, Schedule and
- * Model for one dispatch ARC — and what to say about each.
+ * Stop, Resume, Schedule, Park, Unpark, Model, Swarm and Drop for one plan — or Stop, Resume, Schedule
+ * and Model for one dispatch ARC — and what to say about each.
  *
  * ONE HOOK, TWO DOORS, because the two are the same act on the same store through the same verbs:
  * `scope` decides which route a press is relayed through (`POST /api/dispatcher/plans/:name/…` or
@@ -101,7 +102,9 @@ export type DispatcherArcVerbs = {
  * of it in one transaction (`store.set_arc_model`), so a press takes the NEXT phase and never
  * disturbs one already out — which is also why the dispatcher never refuses it for the state a plan
  * or an arc is in, and why its answer is a sentence about the STORE (`MODEL <name> model=…`)
- * rather than about a walk.
+ * rather than about a walk. `swarm` is its sibling on the plan card alone (`SWARM <name> swarm=…`):
+ * it too moves no walk, and the dispatcher kicks its own daemon when the word changed, since a wider
+ * word can free a phase the old one held.
  */
 export function useDispatcherVerbs(name: string, scope?: 'plan', resumeWord?: string): DispatcherPlanVerbs;
 export function useDispatcherVerbs(name: string, scope: 'arc', resumeWord?: string): DispatcherArcVerbs;
@@ -140,6 +143,7 @@ export function useDispatcherVerbs(
       if (verb === 'drop') return t('dispatcher.delete.word');
       if (verb === 'schedule') return t('runner.schedule.refused');
       if (verb === 'model') return t('runner.model.refused');
+      if (verb === 'swarm') return t('dispatcher.swarm.refused');
       return resumeWord ?? t('runner.resume');
     },
     [resumeWord, t],
@@ -147,12 +151,15 @@ export function useDispatcherVerbs(
 
   /**
    * The word a SUCCESS is headed with when the dispatcher's body arrived empty. Every verb but
-   * `model` is headed by its own name either way (`Stop`, `Resume`, `Park`); a model press that
-   * worked is not headed "Model not set", which is what its refusal word says.
+   * `model` and `swarm` is headed by its own name either way (`Stop`, `Resume`, `Park`); a word
+   * press that worked is not headed "Model not set", which is what its refusal word says.
    */
   const doneWord = useCallback(
-    (verb: DispatcherVerb): string =>
-      verb === 'model' ? t('runner.toast.model') : word(verb),
+    (verb: DispatcherVerb): string => {
+      if (verb === 'model') return t('runner.toast.model');
+      if (verb === 'swarm') return t('dispatcher.swarm.done');
+      return word(verb);
+    },
     [t, word],
   );
 
@@ -218,11 +225,15 @@ export function useDispatcherVerbs(
     [name, scope, send],
   );
 
-  // The plan card's own three, which no arc header draws and no arc route exists for.
+  // The plan card's own four, which no arc header draws and no arc route exists for.
   const park = useCallback(() => send('park', () => api.dispatcher.park(name)), [name, send]);
   const unpark = useCallback(() => send('unpark', () => api.dispatcher.unpark(name)), [name, send]);
   const drop = useCallback(() => send('drop', () => api.dispatcher.drop(name)), [name, send]);
+  const setSwarm = useCallback(
+    (choice: DispatcherSwarmChoice) => send('swarm', () => api.dispatcher.swarm(name, choice)),
+    [name, send],
+  );
 
   if (scope === 'arc') return { stop, resume, schedule, setModel, busy };
-  return { stop, resume, schedule, park, unpark, drop, setModel, busy };
+  return { stop, resume, schedule, park, unpark, drop, setModel, setSwarm, busy };
 }

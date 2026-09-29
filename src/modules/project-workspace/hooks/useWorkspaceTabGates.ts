@@ -54,8 +54,9 @@ export type WorkspaceTabGates = {
  * last pending memory empties the panel rather than taking the tab out from under them — and no
  * snap-back effect exists for it, because the gate itself never turns off mid-act. The Runner tab
  * is the SECOND DATA-gated, sticky tab and takes that rule whole: it appears while the lane is OPEN
- * (`laneOpen`: a plan is drawn, or a hidden plan has not finished), it stays while it is the selected
- * tab even once the last plan is hidden, and it has no snap-back effect either. The Heal tab is the THIRD and takes the same rule whole: it appears
+ * (`laneOpen`: a plan is drawn, or one is hidden, and a hidden plan is always unfinished), it stays
+ * while it is the selected tab even once the last card is put away, and it has no snap-back effect
+ * either. A lane whose every card is dismissed is closed. The Heal tab is the THIRD and takes the same rule whole: it appears
  * while the ledger holds live friction and stays while it is the selected tab. The other three are
  * PREFERENCE-gated and keep their snap-backs in WorkspaceMain.
  *

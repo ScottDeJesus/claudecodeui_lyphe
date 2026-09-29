@@ -11,9 +11,58 @@ const isActionablePermissionRequest = (request: { toolName?: unknown } | null | 
   return request?.toolName !== 'ExitPlanMode' && request?.toolName !== 'exit_plan_mode';
 };
 
-const hasActionablePermissionRequests = (requests: Array<{ toolName?: unknown }> | null | undefined): boolean => {
-  return Array.isArray(requests) && requests.some((request) => isActionablePermissionRequest(request));
-};
+/**
+ * The identity a bell is owed to.
+ *
+ * A question is asked under TWO names. The `requestId` is the ATTEMPT's: `promptForToolDecision`
+ * mints a fresh one every time a process raises the ask, so a re-issue carries a new id. The
+ * `promptKey` is the ASK's own, and it survives the handover that hands the question to a successor
+ * — the very reason `promptKeyFor` exists, learned on the phone's push (12 pushes for one question,
+ * one per dev-server handover, measured 2026-09-22). Frame and subscribe-ack both carry it.
+ *
+ * So the bell reads the ask's name first, and falls back to the attempt's id for a producer that
+ * stamps none: a frame with no key still rings, once per attempt — the only identity it carries.
+ */
+function announcementKeyOf(entry: Record<string, unknown>): string {
+  if (typeof entry.promptKey === 'string' && entry.promptKey) return entry.promptKey;
+  return typeof entry.requestId === 'string' ? entry.requestId : '';
+}
+
+/**
+ * How many announcements one tab remembers.
+ *
+ * A key names one ask and is never reused for a second one: a new tool call is stamped a new tool
+ * use id — hence a new `promptKey` — while the parked prompt a handover re-issues keeps the key it
+ * was born with. So "this tab has rung for this ask" is a fact that stays true, and the list needs
+ * no pruning — only a bound, so a tab left open for weeks does not hold every key it ever saw. The
+ * oldest is forgotten first; the worst that costs is one repeat bell for a prompt pending since
+ * before two hundred others arrived, which is a bell the operator was due anyway.
+ */
+const ANNOUNCED_PERMISSION_LIMIT = 200;
+
+/**
+ * Whether this tab is hearing about one ask for the first time — and, if so, remembers it.
+ *
+ * A prompt is a QUESTION, and the tab owes the operator one bell per question, not one per delivery.
+ * The same question arrives more than once: a handover re-adopts the CLI host, the successor replays
+ * the parked tool request, and the question is put back on the chat's wire under a FRESH request id
+ * (measured 2026-09-28 across two handovers of one parked `AskUserQuestion`: a new id each time).
+ * Keyed on the attempt, every handover was a new bell — the "done noise" a restart makes; keyed on
+ * the ask, the question rings once.
+ *
+ * Both ring paths ask THIS question instead, and a question rung once is silent however many times
+ * its frame or its ack arrives.
+ */
+function announceOnce(announced: Set<string>, key: string): boolean {
+  if (announced.has(key)) return false;
+  announced.add(key);
+  if (announced.size > ANNOUNCED_PERMISSION_LIMIT) {
+    // Insertion order is iteration order for a Set, so the first key is the oldest announcement.
+    const oldest = announced.values().next().value;
+    if (oldest !== undefined) announced.delete(oldest);
+  }
+  return true;
+}
 
 type UseChatRealtimeHandlersArgs = {
   isActive: boolean;
@@ -92,6 +141,12 @@ export function useChatRealtimeHandlers({
     pendingPermissionRequestsRef.current = pendingPermissionRequests;
   }, [pendingPermissionRequests]);
 
+  /**
+   * The asks this tab has already rung for (`announceOnce`). A ref and not state: it is read and
+   * written inside the socket listener, and nothing renders from it.
+   */
+  const announcedPermissionRequestsRef = useRef<Set<string>>(new Set());
+
   useEffect(() => {
     const handleEvent = (msg: ServerEvent) => {
       if (!msg.kind) {
@@ -142,13 +197,20 @@ export function useChatRealtimeHandlers({
           const isViewedSession = sid === activeViewSessionId;
           if (isViewedSession && Array.isArray(msg.pendingPermissions)) {
             const nextPendingPermissionRequests = msg.pendingPermissions as PendingPermissionRequest[];
-            const hadActionablePermissionRequests = hasActionablePermissionRequests(pendingPermissionRequestsRef.current);
-            const hasPendingActionablePermissionRequests = hasActionablePermissionRequests(nextPendingPermissionRequests);
 
             pendingPermissionRequestsRef.current = nextPendingPermissionRequests;
             setPendingPermissionRequests(nextPendingPermissionRequests);
 
-            if (hasPendingActionablePermissionRequests && !hadActionablePermissionRequests) {
+            // ONE BELL PER QUESTION on this path too. The ack's list is a fresh catalogue of what is
+            // still awaiting the operator, and after a handover it names the prompt this tab was
+            // already told about — under the fresh request id the successor re-raised it on, which
+            // is exactly why the bell reads the ask's own key (`announcementKeyOf`).
+            const announced = announcedPermissionRequestsRef.current;
+            const freshlyAnnounced = nextPendingPermissionRequests.filter((request) => {
+              const key = announcementKeyOf(request);
+              return key !== '' && isActionablePermissionRequest(request) && announceOnce(announced, key);
+            });
+            if (freshlyAnnounced.length > 0) {
               void playNotificationSound();
             }
           }
@@ -282,8 +344,11 @@ export function useChatRealtimeHandlers({
           // hides it immediately and atomically.
           onSessionIdle?.(sid);
           if (sid === activeViewSessionId) {
-            pendingPermissionRequestsRef.current = [];
-            setPendingPermissionRequests([]);
+            // The run's own asks end with it. A STANDALONE ask — a plan's prompt the app raised in
+            // this chat — belongs to no run, and stays up until it is answered.
+            const outlivesRun = pendingPermissionRequestsRef.current.filter((request) => request.standalone);
+            pendingPermissionRequestsRef.current = outlivesRun;
+            setPendingPermissionRequests(outlivesRun);
           }
 
           if (msg.aborted) {
@@ -292,7 +357,13 @@ export function useChatRealtimeHandlers({
             break;
           }
 
-          // Celebrate only successful runs (failed runs end with success: false).
+          // Celebrate only successful runs (failed runs end with success: false). No announcement
+          // bookkeeping here, unlike the two permission paths: a finished run's terminal frame
+          // cannot be handed over a second time the way a parked prompt's can. The registry is not
+          // what stops it — a completed run stays in it for five minutes
+          // (`COMPLETED_RUN_RETENTION_MS`) and `replayEvents` has no status gate at all; the gate is
+          // the caller's, `handleChatSubscribe`'s `if (isProcessing)`
+          // (`chat-websocket.service.ts`), so only a RUNNING run's buffer is ever replayed.
           if (msg.success !== false) {
             showCompletionTitleIndicator();
             void playChatCompletionSound();
@@ -314,7 +385,15 @@ export function useChatRealtimeHandlers({
 
         case 'permission_request': {
           if (!msg.requestId) break;
-          if (isActionablePermissionRequest({ toolName: msg.toolName })) {
+          // One bell per question (`announceOnce`): a re-issued frame for a prompt this tab has
+          // already announced arrives on a fresh request id but carries the same ask, and stays
+          // silent.
+          const announcementKey = announcementKeyOf(msg);
+          if (
+            announcementKey !== ''
+            && isActionablePermissionRequest({ toolName: msg.toolName })
+            && announceOnce(announcedPermissionRequestsRef.current, announcementKey)
+          ) {
             void playNotificationSound();
           }
 
@@ -323,18 +402,22 @@ export function useChatRealtimeHandlers({
             if (!previousPendingPermissionRequests.some((request) => request.requestId === msg.requestId)) {
               const nextPendingPermissionRequests = [...previousPendingPermissionRequests, {
                 requestId: msg.requestId as string,
+                promptKey: typeof msg.promptKey === 'string' ? msg.promptKey : undefined,
                 toolName: (msg.toolName as string) || 'UnknownTool',
                 input: msg.input,
                 context: msg.context,
                 sessionId: sid || null,
                 receivedAt: new Date(),
+                standalone: msg.standalone === true,
               }];
 
               pendingPermissionRequestsRef.current = nextPendingPermissionRequests;
               setPendingPermissionRequests(nextPendingPermissionRequests);
             }
           }
-          if (sid) {
+          // A run's ask means its run is waiting; a standalone ask has no run, and a chat that is
+          // idle stays idle while the plan's prompt is up.
+          if (sid && msg.standalone !== true) {
             onSessionProcessing?.(sid);
           }
           break;

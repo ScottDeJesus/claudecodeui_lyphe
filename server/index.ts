@@ -12,6 +12,7 @@ import cors from 'cors';
 import { AppError, findApplicationRoot, getModuleDirectory, IS_PLATFORM, terminalTextStyles } from '@/shared/utils.js';
 import { createAppsModule } from '@/modules/apps/index.js';
 import {
+    closeSessionsWatcher,
     initializeSessionsWatcher,
     providerRuntimeService,
     readoptKeepaliveSessions,
@@ -21,7 +22,8 @@ import { createWebSocketServer, startRunStallWatchdog } from '@/modules/websocke
 
 import { getConnectableHost } from '../shared/networkHosts.js';
 
-import { handover, onTakeover, signalReady, supervised } from './supervised-boot.js';
+import { armHttpDrain } from './http-drain.js';
+import { handover, onRebootFailed, onTakeover, requestReboot, signalReady, supervised } from './supervised-boot.js';
 import { createGitModule } from './modules/git/index.js';
 import {
     authenticateToken,
@@ -46,6 +48,7 @@ import {
 import providerRoutes from './modules/providers/provider.routes.js';
 import { voiceRoutes } from './modules/voice/index.js';
 import {
+    closeScheduledMessageDispatcher,
     initializeScheduledMessageDispatcher,
     scheduledMessagesRoutes,
 } from './modules/scheduled-messages/index.js';
@@ -53,6 +56,7 @@ import { createSchedulesModule } from './modules/schedules/index.js';
 import browserUseRoutes from './modules/browser-use/browser-use.routes.js';
 import { assetsRoutes } from './modules/assets/index.js';
 import { createAccountsModule } from './modules/accounts/index.js';
+import { createClaudeUpdatesModule } from './modules/claude-updates/index.js';
 import { createCliVersionModule } from './modules/cli-version/index.js';
 import { createDeepseekModule } from './modules/deepseek/index.js';
 import { createKanbanModule } from './modules/kanban/index.js';
@@ -133,6 +137,8 @@ createWebSocketServer(server, {
     },
     getPluginPort,
 });
+// Armed before `listen`, so every request this process ever accepts is one the shutdown drain knows.
+const drainHttpServer = armHttpDrain(server);
 
 app.use(cors({ exposedHeaders: ['X-Refreshed-Token', 'X-Auth-Error'] }));
 app.use(express.json({
@@ -188,7 +194,22 @@ app.use('/api/commands', authenticateToken, commandsRoutes);
 // Settings API Routes (protected)
 app.use('/api/settings', authenticateToken, settingsRoutes);
 
+// The Claude Code and Agent SDK update report, the check behind it, and the two actions in front of
+// the update pipeline (protected). Built once here rather than inline, for the dispatcher's reason
+// below: its check is armed after `listen`, its reconciler is armed as a sole-server duty, and both
+// are stopped on shutdown, so the module has to be something all three can name.
+const claudeUpdates = createClaudeUpdatesModule({
+    appRoot: APP_ROOT,
+    supervised,
+    // Read at the moment it is asked, never captured: the reconciler ticks from before the listen
+    // callback runs, and a pass that acted before this process serves would act on a job it cannot
+    // finish.
+    isListening: () => server.listening,
+    requestReboot,
+    onRebootFailed,
+});
 app.use('/api/system', authenticateToken, systemRoutes);
+app.use('/api/claude-updates', authenticateToken, claudeUpdates.router);
 
 // The Claude account switcher and its usage meter (protected), mounted at `/api` so its four paths
 // land at `/api/accounts`, `/api/usage`, `/api/accounts/switch` and `/api/accounts/capture`.
@@ -299,6 +320,32 @@ app.use('/api/browser-use-mcp', browserUseMcpRoutes);
 app.use('/api/browser-use', authenticateToken, browserUseRoutes);
 
 // Unified provider MCP routes (protected)
+// Settles once this process holds the keepalive hosts: before `listen` on a plain boot, at the takeover
+// on a handover boot (`soleServerDuties`).
+let runsReadopted = false;
+let markRunsReadopted: () => void = () => {};
+const whenRunsReadopted = new Promise<void>((resolve) => { markRunsReadopted = resolve; });
+// The supervisor SIGKILLs a predecessor 10 s after its SIGTERM, which follows this process's READY at
+// once, and the re-adoption after the takeover measured under 0.4 s: past this, no takeover is coming.
+const RUNS_READOPTED_WAIT_MS = 11_000;
+// A handover boot serves before its takeover — for as long as the predecessor drains (http-drain.ts) —
+// and until then its run registry holds none of the keepalive runs (D-11): this read would tell every
+// tab its live runs are idle, and the tab would drop their spinners and waiting marks. It waits for
+// the re-adoption instead, and past the bound answers as it always did, so a takeover that never
+// comes cannot hang the poll.
+app.use('/api/providers/sessions/running', (_req, _res, next) => {
+    if (runsReadopted) return next();
+    // Once, never twice: a re-adoption landing after the bound must not run the route a second time.
+    let released = false;
+    const release = () => {
+        if (released) return;
+        released = true;
+        clearTimeout(bound);
+        next();
+    };
+    const bound = setTimeout(release, RUNS_READOPTED_WAIT_MS);
+    void whenRunsReadopted.then(release);
+});
 app.use('/api/providers', authenticateToken, providerRoutes);
 app.use('/api/scheduled-messages', authenticateToken, scheduledMessagesRoutes);
 
@@ -373,8 +420,43 @@ app.get('*', (req, res) => {
     }
 });
 
+/**
+ * body-parser's own verdict on a request it refused, or null when this is not that kind of error.
+ *
+ * A body that cannot be parsed is the CLIENT's mistake, and the library says so in the error it
+ * throws — `type: 'entity.parse.failed'` (or `'entity.too.large'` past the limit), with the status
+ * the answer should carry. Without this the branch below reports every such request as a server fault
+ * and dumps a raw stack per attempt (measured 2026-09-28: a truncated JSON body answered
+ * `500 INTERNAL_ERROR` on both `/api/claude-updates` actions).
+ */
+function requestBodyRefusal(error: unknown): { status: number; message: string } | null {
+  if (typeof error !== 'object' || error === null) return null;
+  const shape = error as { type?: unknown; statusCode?: unknown };
+  if (shape.type !== 'entity.parse.failed' && shape.type !== 'entity.too.large') return null;
+  const status = typeof shape.statusCode === 'number' && shape.statusCode >= 400 ? shape.statusCode : 400;
+  const message =
+    shape.type === 'entity.too.large'
+      ? 'the request body is larger than this server reads'
+      : 'the request body is not valid JSON';
+  return { status, message };
+}
+
 // global error middleware must be last
 app.use((err: unknown, req: Request, res: Response, next: NextFunction) => {
+  const bodyRefusal = requestBodyRefusal(err);
+  if (bodyRefusal !== null) {
+    // One line, never the stack: nothing here is broken. `/api/claude-updates` answers every refusal
+    // in its own shape (`{ error, message }`, the one its routes use), and a body the parser could not
+    // read is the same kind of answer, so it keeps that shape there; every other route keeps the
+    // app's envelope.
+    console.warn(`[http] ${req.method} ${req.path} → ${bodyRefusal.status} (${bodyRefusal.message})`);
+    return res.status(bodyRefusal.status).json(
+      req.path.startsWith('/api/claude-updates')
+        ? { error: 'bad-request', message: bodyRefusal.message }
+        : { success: false, error: { code: 'BAD_REQUEST', message: bodyRefusal.message } },
+    );
+  }
+
   if (err instanceof AppError) {
     return res.status(err.statusCode).json({
       success: false,
@@ -465,12 +547,20 @@ async function soleServerDuties() {
         // version test logs its own `retiring idle host …` line and is not counted in this one.
         console.log(`[keepalive] re-adopted ${keepalive.readopted} host(s), swept ${keepalive.swept} dead host file(s)`);
     } catch (error) { console.error('[keepalive] re-adopt failed (continuing):', getErrorMessage(error)); }
+    runsReadopted = true;
+    markRunsReadopted();
     // Sends anything that came due while the server was not running, then keeps polling.
     initializeScheduledMessageDispatcher(providerRuntimeService);
     // Start server-side plugin processes for enabled plugins
     startEnabledPluginServers().catch(err => {
         console.error('[Plugins] Error during startup:', err.message);
     });
+    // The Claude update pipeline's reconciler: the half of a job that belongs to whichever process
+    // holds the port. Armed here rather than at module build because a job is only finished by a
+    // serving API — `isListening()` is what a pass waits for — and here rather than in `listen`
+    // because on a handover this is the line the takeover runs, which is the moment the job's answer
+    // becomes knowable.
+    claudeUpdates.startReconciler();
 }
 
 // Stops the stall watchdog on shutdown. Assigned inside the `listen` callback that
@@ -527,6 +617,11 @@ async function startServer() {
             // because the frames are for sockets this server is only now able to accept.
             dispatcher.start();
 
+            // The Claude update check: armed here rather than at module build, because its first
+            // tick writes a file and asks the registry, and a boot that never got this far has no
+            // business doing either.
+            claudeUpdates.start();
+
             // The launcher souls, read off their own state root and broadcast the same way.
             dispatchSouls.start();
 
@@ -541,13 +636,23 @@ async function startServer() {
 
         // Clean up plugin processes on shutdown
         const shutdownRuntimeServices = async () => {
-            // Stop accepting first: with reusePort the kernel would keep handing this exiting
-            // process new connections. Never awaited — open WebSockets keep it from resolving.
-            server.close();
+            // Stop accepting first and close idle sockets; websockets stay open until the exit (http-drain.ts).
+            const drained = drainHttpServer();
+            // Both start new work — a watcher-driven DB sync, a queued send — and the successor
+            // already runs its own; neither may keep going on a process that is leaving.
+            closeSessionsWatcher().catch((err: unknown) => {
+                console.error('[Sessions] Error closing session watchers during shutdown:', getErrorMessage(err));
+            });
+            closeScheduledMessageDispatcher();
             dispatcher.stop();
+            claudeUpdates.stop();
             dispatchSouls.stop();
             universe.stop();
             stopRunStallWatchdog?.();
+            // Requests already running finish before anything they may still need is torn down, and
+            // before the keepalive hosts are released: the successor takes them over only once this
+            // process has exited, so a request here may still be starting a turn on one.
+            await drained;
             try {
                 await browserUseService.stopAllSessions();
             } catch (err) {

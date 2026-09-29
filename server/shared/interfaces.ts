@@ -90,13 +90,16 @@ export interface IProviderFork {
 /**
  * Model catalog contract for one provider.
  *
- * Implementations supply CloudCLI's curated predefined models and can inspect
- * provider-native session state. The Providers service merges these immutable
- * source-controlled definitions with user-created SQLite rows at read time.
+ * Implementations supply the provider's predefined models — a curated list, or
+ * the provider's own catalog where it reports one (Claude) — and can inspect
+ * provider-native session state. The Providers service merges those definitions
+ * with user-created SQLite rows at read time.
  */
 export interface IProviderModels {
   /**
-   * Returns the curated predefined catalog owned by this provider adapter.
+   * Returns the predefined catalog this provider adapter owns. Called on every
+   * models request and on the send path, so an adapter that asks its CLI must
+   * answer from its own cache.
    */
   getSupportedModels(): Promise<ProviderModelsDefinition>;
 

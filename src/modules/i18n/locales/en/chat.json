@@ -387,9 +387,13 @@
   },
   "question": {
     "needsInput": "Claude needs your input",
+    "planNeedsInput": "A plan needs your word",
+    "collapse": "Hide",
+    "expand": "Open",
     "selectAll": "Select all that apply",
     "other": "Other...",
     "otherPlaceholder": "Type your answer...",
+    "notePlaceholder": "Your notes — sent word for word",
     "skip": "Skip",
     "skipAll": "Skip all",
     "back": "Back",

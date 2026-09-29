@@ -1,8 +1,9 @@
-import { EyeOff, MoreHorizontal } from 'lucide-react';
+import { EyeOff, MoreHorizontal, X } from 'lucide-react';
 import { useRef } from 'react';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { putAwayKeepingFocus, selectKeepingFocus } from '@/modules/dispatcher/putAwayFocus';
 import { ActionMenu, Button, CardFoldToggle, Tooltip } from '@/shared/ui';
 import type { ActionMenuItem } from '@/shared/ui';
 
@@ -15,12 +16,20 @@ type LaneCardHeadProps = {
   clock?: ReactNode;
   /** How far the card has got: phases done for a plan, plans complete for an arc. `null`, or a total of 0, draws no count. */
   progress: { done: number; total: number } | null;
-  /** The second row: the goal clamped to two lines, then who is out on the card and what it waits on. */
+  /** The second row: the card's description (`cardDescription`) clamped to two lines, then who is out on the card and what it waits on. */
   lead?: ReactNode;
   /** The third row: the card's total, as pills. */
   spend?: ReactNode;
-  /** The corner's presses: the overflow menu (drawn only when it has items), Hide, and the fold. */
-  corner: { menuLabel: string; menuItems: ActionMenuItem[]; onHide: () => void; hideLabel: string };
+  /**
+   * The corner's presses: the overflow menu (drawn only when it has items), the put-away press, and
+   * the fold. `putAway.verb` is `dismiss` on a DONE card and `hide` on an unfinished one
+   * (`putAwayVerb`), and `label` is its name and its tooltip.
+   */
+  corner: {
+    menuLabel: string;
+    menuItems: ActionMenuItem[];
+    putAway: { verb: 'dismiss' | 'hide'; label: string; onPress: () => void };
+  };
   /** The title's heading level: 3 for a card that stands on its own, 4 for a plan inside an arc deck, so heading navigation reads the deck's plans as its members. */
   headingLevel?: 3 | 4;
 };
@@ -32,65 +41,6 @@ type LaneCardHeadProps = {
  */
 const CORNER_BUTTON = 'h-10 w-10 text-muted-foreground sm:h-7 sm:w-7';
 
-/** The two homes a card is drawn in; a Hide's focus heir is looked for in the SAME one. */
-const HOME = '[data-runner-panel], [data-runner-widget]';
-
-/** Whether a control can take focus now: attached, painted, and not inside a folded (`inert`) body. */
-function canFocus(element: HTMLElement): boolean {
-  return element.isConnected && element.getClientRects().length > 0 && element.closest('[inert]') === null;
-}
-
-/**
- * Hide, with somewhere for the keyboard to land. The pressed button leaves with its card, and a focused
- * node that unmounts drops focus to `<body>` — a keyboard reader who put one card away was thrown back
- * to the top of the document. So the heir is chosen BEFORE the hide, in the same home: the next Hide
- * in document order, else the previous one, never one inside the card that is leaving (an arc's Hide
- * takes its plans with it). Both homes draw every card they carry at once, so every heir there will be
- * is already on screen at the press. It is focused on the next frame, once the hide store's synchronous
- * write has re-rendered the home; a candidate the render took away (the last plan of a deck takes its
- * deck) is skipped, and with none left the heir is the home's `Hidden · N` trigger — which the first
- * hide is what draws.
- */
-function hideKeepingFocus(button: HTMLElement | null, onHide: () => void): void {
-  const home = button?.closest<HTMLElement>(HOME) ?? null;
-  const leaving = button?.closest('[data-dispatcher-card], [data-dispatch-arc]') ?? null;
-  const hides = home ? [...home.querySelectorAll<HTMLElement>('[data-dispatcher-hide]')] : [];
-  const at = button ? hides.indexOf(button) : -1;
-  const heirs = at === -1 ? [] : [...hides.slice(at + 1), ...hides.slice(0, at).reverse()]
-    .filter((element) => !leaving?.contains(element) && canFocus(element));
-  onHide();
-  if (home === null) return;
-  requestAnimationFrame(() => {
-    const heir = heirs.find(canFocus) ?? home.querySelector<HTMLElement>('[data-hidden-plans] button');
-    heir?.focus();
-  });
-}
-
-/**
- * A menu action, with somewhere for the keyboard to land. `Hide ended plans · N` empties the menu it
- * sits in, so the whole `ActionMenu` unmounts in the same commit as the press and its own close can
- * only restore focus to a trigger that no longer exists — focus fell to `<body>`. So on the next
- * frame, if the menu is gone, focus goes to this head's own Hide (a menu action never takes its own
- * card), else — the action took the whole card — to the home's first Hide, else its `Hidden · N`
- * trigger. A menu that survives its action restores focus to its trigger itself, and nothing here
- * moves it.
- */
-function selectKeepingFocus(
-  menu: { current: HTMLElement | null },
-  hide: { current: HTMLElement | null },
-  onSelect: () => void,
-): void {
-  const home = menu.current?.closest<HTMLElement>(HOME) ?? null;
-  onSelect();
-  requestAnimationFrame(() => {
-    if (menu.current !== null) return;
-    const heir = [hide.current, ...(home ? home.querySelectorAll<HTMLElement>('[data-dispatcher-hide]') : [])]
-      .find((element): element is HTMLElement => element !== null && canFocus(element))
-      ?? home?.querySelector<HTMLElement>('[data-hidden-plans] button');
-    heir?.focus();
-  });
-}
-
 /**
  * A lane card's HEAD — the part that says WHICH card this is and how it stands, and the one part a fold
  * never takes. The plan card and the arc deck both draw it, so the two share one anatomy — the same
@@ -98,17 +48,19 @@ function selectKeepingFocus(
  * arc's mark leading its title (`ArcMark`, handed in by `DispatchArcDeck`).
  *
  * THREE ROWS AND A CORNER. Row one is the title, the card's word bound to `done/total`, and its clock;
- * row two is the lead (the goal, then the planner badge and the waits); row three is the card's total
- * as pills. The corner holds `⋯` (only when the menu has something in it), Hide, and the fold. It is
- * drawn inside the card's `Collapsible` and OUTSIDE its `CardFoldBody`, so a folded card keeps every
- * row of it: name, word, clock, count, goal, spend and the three presses. What folds is the body —
- * the action bar, the face, the strip.
+ * row two is the lead (the description, then the planner badge and the waits); row three is the
+ * card's total as pills. The corner holds `⋯` (only when the menu has something in it), Dismiss or
+ * Hide, and the fold. It is drawn inside the card's `Collapsible` and OUTSIDE its `CardFoldBody`, so a
+ * folded card keeps every row of it: name, word, clock, count, description, spend and the three
+ * presses. What folds is the body — the action bar, the face, the strip.
  *
- * HIDE IS IN THE CORNER, NOT IN THE BAR, because it is not a verb on the plan: the dispatcher is never
- * told. It puts the card in the `Hidden` list (`hiddenPlans.ts`), `Show` brings it back, and so no
- * dialog guards it. Focus does not fall to `<body>` with the card: it lands on the next Hide in the
- * same home (`hideKeepingFocus`), and a menu action that empties the menu hands it to this head's
- * own Hide (`selectKeepingFocus`).
+ * DISMISS AND HIDE ARE IN THE CORNER, NOT IN THE BAR, because neither is a verb on the plan: the
+ * dispatcher is never told (`hiddenPlans.ts`). A DONE card offers Dismiss (`X`): the card leaves the
+ * board, and nothing lists it. An unfinished card offers Hide (`EyeOff`): the card goes to the
+ * `Hidden` list and `Show` brings it back. Neither deletes anything, so no dialog guards either. Focus
+ * does not fall to `<body>` with the card: it lands on the next corner press in the same home
+ * (`putAwayKeepingFocus`), and a menu action that empties the menu hands it to this head's own
+ * (`selectKeepingFocus`).
  *
  * THE ROW WRAPS AND THE TITLE HAS A FLOOR, AND BOTH ARE NEEDED — each alone still crushes the name
  * (INV-4449). The badge, the clock, the count and the corner are all things that must not give, so the
@@ -139,18 +91,23 @@ function selectKeepingFocus(
  * other home's branch.
  *
  * Handles: `data-lane-head` (the head), `data-lane-head-row` (row one), `data-lane-progress`,
- * `data-lane-menu`, `data-dispatcher-hide` and the fold's own `data-card-fold`.
+ * `data-lane-menu`, the corner press's `data-dispatcher-dismiss` or `data-dispatcher-hide`, and the
+ * fold's own `data-card-fold`.
  *
  * Used by `PlanCard` and `DispatchArcDeck`.
  */
 export function LaneCardHead({ title, badge, clock, progress, lead, spend, corner, headingLevel = 3 }: LaneCardHeadProps) {
   const { t } = useTranslation();
-  const hideRef = useRef<HTMLButtonElement>(null);
+  const pressRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLSpanElement>(null);
   const menuItems = corner.menuItems.map((item) => ({
     ...item,
-    onSelect: () => selectKeepingFocus(menuRef, hideRef, item.onSelect),
+    onSelect: () => selectKeepingFocus(menuRef, pressRef, item.onSelect),
   }));
+  const { putAway } = corner;
+  const PutAwayIcon = putAway.verb === 'dismiss' ? X : EyeOff;
+  // One handle per verb, on the button itself, so a probe tells a Dismiss from a Hide without its words.
+  const verbHandle = putAway.verb === 'dismiss' ? { 'data-dispatcher-dismiss': '' } : { 'data-dispatcher-hide': '' };
   const Heading = headingLevel === 4 ? 'h4' : 'h3';
   const counted = progress !== null && progress.total > 0 ? progress : null;
   const countWords = counted ? t('dispatcher.flow.caption', counted) : '';
@@ -194,20 +151,20 @@ export function LaneCardHead({ title, badge, clock, progress, lead, spend, corne
               />
             </span>
           )}
-          <Tooltip content={corner.hideLabel}>
+          <Tooltip content={putAway.label}>
             {/* `flex`, not the kit's `inline-flex`: the tooltip's wrapper is an inline box, and an
                 inline button would sit on its line's baseline and add the strut's descent under it. */}
             <Button
-              ref={hideRef}
+              ref={pressRef}
               type="button"
               variant="ghost"
               size="icon"
               className={`flex ${CORNER_BUTTON}`}
-              aria-label={corner.hideLabel}
-              onClick={() => hideKeepingFocus(hideRef.current, corner.onHide)}
-              data-dispatcher-hide
+              aria-label={putAway.label}
+              onClick={() => putAwayKeepingFocus(pressRef.current, putAway.onPress)}
+              {...verbHandle}
             >
-              <EyeOff aria-hidden="true" />
+              <PutAwayIcon aria-hidden="true" />
             </Button>
           </Tooltip>
           <CardFoldToggle />

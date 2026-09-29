@@ -88,8 +88,8 @@ function readExitCode(value: unknown): number | null {
 
 /**
  * Runs one verb against one name — a plan's, or an arc's for the four the arc's door also opens on.
- * `verbArgs` follow the name — `schedule`'s hour and `model`'s word, each already checked by the
- * route against the shapes the dispatcher accepts; `stop`, `resume`, `park`, `unpark` and `drop` take
+ * `verbArgs` follow the name — `schedule`'s hour, `model`'s word and `swarm`'s, each already checked
+ * by the route against the shapes the dispatcher accepts; `stop`, `resume`, `park`, `unpark` and `drop` take
  * none.
  *
  * `cwd` is the home directory rather than this repository: the dispatcher resolves its own store from

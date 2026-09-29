@@ -1,7 +1,7 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 
 import { epochOf } from '@/modules/dispatcher/dispatcherState';
-import { useHiddenPlans } from '@/modules/dispatcher/hiddenPlans';
+import { noteLaneClock, usePutAwayEntries } from '@/modules/dispatcher/hiddenPlans';
 import { DISPATCHER_ALL_TOPIC, useLiveTopic } from '@/modules/live-bus';
 import type { DispatcherArc, DispatcherDaemon, DispatcherLanePicture, DispatcherPlan, DispatcherPlanner, DispatcherRoute } from '@/shared/types';
 
@@ -21,18 +21,19 @@ import type { DispatcherArc, DispatcherDaemon, DispatcherLanePicture, Dispatcher
  * are `null` then rather than a made-up default, because a posture the app has not been told is not
  * a posture it may state.
  *
- * A PLAN THE OPERATOR HID IS STILL ON THE LANE, AND THIS IS WHERE THE HIDE TAKES EFFECT, so the tab's
- * badge and its list agree. The list is `hiddenPlans` under the `dispatcher` preference
- * (`hiddenPlans.ts`): a plan's name beside the moment it was hidden. The lane splits in two here,
- * into `plans` (drawn) and `hidden` (the `Hidden` list's). A hide holds the plan that stood under its
- * name at the press, and it lets go by itself only when that plan reaches its FIRST ending after the
- * press: an ending the operator never saw is news. The store stamps `completed_at` once and never
- * clears it, so a finished plan re-cut and walked again under its hide stays hidden until `Show`.
+ * A PLAN THE OPERATOR PUT AWAY IS STILL ON THE LANE, AND THIS IS WHERE THE PRESS TAKES EFFECT, so the
+ * tab's badge and its lists agree. The entries are `hiddenPlans` under the `dispatcher` preference
+ * (`hiddenPlans.ts`): a plan's name beside the moment it was put away. Every plan of the lane reads as
+ * ONE of three here (`putAwayReading`): DRAWN (`plans`), HIDDEN (`hidden`, the `Hidden` list's, which
+ * holds only unfinished plans) or DISMISSED, a done plan that is on no list and in no count at all.
  */
 export function useDispatcherPlans(): {
-  /** The plans this screen DRAWS: the lane less the hidden ones, in the lane's order. */
+  /** The plans this screen DRAWS: the lane less the hidden and the dismissed ones, in the lane's order. */
   plans: DispatcherPlan[];
-  /** The lane's hidden plans, in the lane's order: what the `Hidden` list at the foot of both homes offers back. */
+  /**
+   * The lane's hidden plans, in the lane's order: what the `Hidden` list at the foot of both homes
+   * offers back. Every one is unfinished; a done plan put away is dismissed, and is not here.
+   */
   hidden: DispatcherPlan[];
   /**
    * The arcs the lane carries — each with its own word, its derived status and the NAMES of its
@@ -41,12 +42,13 @@ export function useDispatcherPlans(): {
    * halves read the same document, and this is that join's other side.
    */
   arcs: DispatcherArc[];
-  /** How many plans are DRAWN: the tab's badge and the pane's own count. A hidden plan is not counted. */
+  /** How many plans are DRAWN: the tab's badge and the pane's own count. A hidden or dismissed plan is not counted. */
   count: number;
   /**
-   * Whether the Runner tab belongs on the bar: a plan is drawn, or a hidden plan has not finished. A
-   * lane whose every plan is hidden but one of them is still walking must keep its tab, or the way
-   * back to that plan (the `Hidden` list) would be unreachable while it runs.
+   * Whether the Runner tab belongs on the bar: a plan is drawn, or one is hidden. A hidden plan is an
+   * unfinished one, so a lane whose every card is put away but one of them still walks keeps its tab,
+   * or the way back to that plan (the `Hidden` list) would be unreachable while it runs. A lane whose
+   * every card is dismissed does not.
    */
   laneOpen: boolean;
   route: DispatcherRoute | null;
@@ -65,29 +67,33 @@ export function useDispatcherPlans(): {
   loosePlanners: DispatcherPlanner[];
   /** The dispatcher's next DeepSeek off-peak moment, epoch SECONDS, or `null` when the clock answered `none` or nothing is retained. */
   offpeakAt: number | null;
-  /** Every plan name the lane carries, hidden or not: what a hide or a show prunes the stored list against. */
+  /** Every plan name the lane carries, put away or not: what a press or a show prunes the stored list against. */
   carriedNames: string[];
 } {
   const value = useLiveTopic<DispatcherLanePicture>(DISPATCHER_ALL_TOPIC);
-  const entries = useHiddenPlans();
+  const entries = usePutAwayEntries();
+  // The frame's server stamp is the floor a press's moment is held to (`noteLaneClock`): an effect,
+  // because it only has to land before the next press, and a press is an event after this commit.
+  useEffect(() => noteLaneClock(value?.at), [value]);
 
   return useMemo(() => {
     const picture = value?.payload;
     const lane = Array.isArray(picture?.plans) ? picture.plans : [];
     // One entry per name is the store's own guarantee (`hiddenPlans.ts`), so a map loses nothing.
-    const hiddenAt = new Map(entries.map((entry) => [entry.name, entry.at]));
-    const plans = lane.filter((plan) => !isHiddenPlan(plan, hiddenAt));
-    const hidden = lane.filter((plan) => isHiddenPlan(plan, hiddenAt));
+    const entryOf = new Map(entries.map((entry) => [entry.name, entry]));
+    const arcNews = arcNewsOf(lane);
+    const plans = lane.filter((plan) => putAwayReading(plan, entryOf.get(plan.name), arcNews) === 'drawn');
+    const hidden = lane.filter((plan) => putAwayReading(plan, entryOf.get(plan.name), arcNews) === 'hidden');
 
     // The UNFILTERED lane on purpose: every write prunes the stored list against every name the lane
-    // still carries, and pruning against the drawn `plans` would drop every earlier hide the moment a
-    // second one was made. The dispatcher still holds those plans, so they would come straight back
+    // still carries, and pruning against the drawn `plans` would drop every earlier entry the moment
+    // a second one was made. The dispatcher still holds those plans, so they would come straight back
     // as cards.
     const carriedNames = lane.map((plan) => plan.name);
 
     // THE ARCS THE SCREEN ACTUALLY HAS CARDS FOR, which is one step stricter than the lane's own
-    // list: the server drops an arc with no plan left on the lane, and a HIDDEN plan is on the lane
-    // but not on the screen. An arc whose every card the operator has hidden would otherwise leave a
+    // list: the server drops an arc with no plan left on the lane, and a put-away plan is on the lane
+    // but not on the screen. An arc whose every card the operator has put away would otherwise leave a
     // header standing over nothing, which no further frame would ever clear.
     const drawn = new Set(plans.map((plan) => plan.name));
     const arcs = (Array.isArray(picture?.arcs) ? picture.arcs : [])
@@ -99,13 +105,13 @@ export function useDispatcherPlans(): {
       plans,
       arcs,
       planners,
-      // Asked of what this screen DRAWS, never of the frame's own lists: a hidden plan, or an arc
-      // every one of whose cards the operator has hidden, draws no card for its outing's badge to
+      // Asked of what this screen DRAWS, never of the frame's own lists: a put-away plan, or an arc
+      // every one of whose cards the operator has put away, draws no card for its outing's badge to
       // ride, and a soul at work there would otherwise be invisible on a lane still carrying it.
       loosePlanners: plannersWithNoHome(planners, plans, arcs),
       hidden,
       count: plans.length,
-      laneOpen: plans.length > 0 || hidden.some((plan) => plan.status !== 'complete'),
+      laneOpen: plans.length > 0 || hidden.length > 0,
       route: picture?.route ?? null,
       daemon: picture?.daemon ?? null,
       offpeakAt: epochOf(picture?.offpeak_at ?? null),
@@ -115,29 +121,72 @@ export function useDispatcherPlans(): {
 }
 
 /**
- * Whether the operator's hide still holds this plan: an entry names it, the plan already EXISTED at
- * the press, and it has not ENDED since. The entry carries a moment for both reasons: a card shown
- * again costs a look, a card hidden twice costs the operator a plan they never saw finish.
+ * How the operator's entry for this plan reads NOW: `drawn` (no entry, or it has let go), `hidden` (it
+ * holds an unfinished plan) or `dismissed` (it holds a done one). The plan decides between the last
+ * two, never the press, so a done plan that sat in `Hidden` from before Dismiss existed is dismissed.
  *
  * - A plan CREATED after the press is a different plan under a reused name (dropped and opened
- *   again), and the hide was never of it. An entry outlives its plan until the next hide or show
- *   prunes it, so without this gate a re-opened plan would be born hidden. A `created_at` nothing can
- *   parse cannot prove it is newer, and the hide holds.
- * - A plan that has not ended (`completed_at` null) or cannot be dated stays hidden, and so does one
- *   whose ending is at or before the press, which the operator had in front of him when he hid it. One
- *   that ended AFTER it comes back as a card.
+ *   again), and the entry was never of it. An entry outlives its plan until the next press or show
+ *   prunes it, so without this gate a re-opened plan would be born put away. A `created_at` nothing
+ *   can parse cannot prove it is newer, and the entry holds.
+ * - A plan that ENDED after the press comes back as a card: an ending the operator never saw is news.
+ *   One that has not ended, cannot be dated, or ended at or before the press (he had that ending in
+ *   front of him) stays put away.
+ * - Held, a plan that is not complete is HIDDEN, because unfinished work must stay reachable. That
+ *   covers a done plan re-cut and walking again under its dismissal: it waits in `Hidden` while it
+ *   walks, and comes back as a card at the new ending.
  *
- * Every side is epoch SECONDS: `at` as `hidePlans` stamps it, the two stamps through `epochOf`, so a
- * hide and this reading compare one number and not two spellings of one moment. A carried dismissal
- * passes the creation gate by construction: its `at` is the plan's own ending, which follows its birth.
+ * - An entry an ARC's corner wrote reads the arc's news instead of its own plan's: the newest
+ *   creation or ending across every plan of that arc the lane carries (`arcNewsOf`).
+ *
+ * Every side is epoch SECONDS: `at` as `putAwayPlans` stamps it, the stamps through `epochOf`, so an
+ * entry and this reading compare one number and not two spellings of one moment.
  */
-function isHiddenPlan(plan: DispatcherPlan, hiddenAt: ReadonlyMap<string, number>): boolean {
-  const at = hiddenAt.get(plan.name);
-  if (at === undefined) return false;
-  const createdAt = epochOf(plan.created_at);
-  if (createdAt !== null && createdAt > at) return false;
-  const endedAt = epochOf(plan.completed_at);
-  return endedAt === null || endedAt <= at;
+function putAwayReading(
+  plan: DispatcherPlan,
+  entry: { at: number; arc?: string } | undefined,
+  arcNews: ReadonlyMap<string, number>,
+): 'drawn' | 'hidden' | 'dismissed' {
+  if (entry === undefined) return 'drawn';
+  // An ARC PRESS lets go as one (`hiddenPlans.ts`): its entries read the arc's newest moment, so a
+  // plan of the arc that opens or ends after the press brings the whole deck back, not one card of it.
+  const news = entry.arc !== undefined ? arcNews.get(entry.arc) ?? null : newestMoment(plan);
+  if (news !== null && news > entry.at) return 'drawn';
+  return plan.status === 'complete' ? 'dismissed' : 'hidden';
+}
+
+/**
+ * The newest moment the plan itself has on record, epoch seconds: its creation or its latest ending,
+ * whichever is later, or `null` when neither can be dated. Either one after a press is news (the two
+ * gates above), and a creation is never later than an ending, so the later of the two answers both.
+ */
+function newestMoment(plan: DispatcherPlan): number | null {
+  const moments = [epochOf(plan.created_at), latestEnding(plan)].filter((moment): moment is number => moment !== null);
+  return moments.length > 0 ? Math.max(...moments) : null;
+}
+
+/** Each arc's newest moment across every plan of it the lane carries, drawn or put away: what an arc press reads. */
+function arcNewsOf(lane: readonly DispatcherPlan[]): Map<string, number> {
+  const news = new Map<string, number>();
+  for (const plan of lane) {
+    const moment = plan.arc === null ? null : newestMoment(plan);
+    if (plan.arc !== null && moment !== null) news.set(plan.arc, Math.max(moment, news.get(plan.arc) ?? moment));
+  }
+  return news;
+}
+
+/**
+ * When the plan last ENDED, epoch seconds, or `null` when it cannot be dated. The store stamps
+ * `completed_at` once and never moves it (`store_write.mark_complete`, guarded by the rule pass), so a
+ * re-cut plan that walks to a second ending keeps its first stamp. A COMPLETE plan's latest ending is
+ * therefore its newest phase `done_at`, which also dates a first ending the rule pass stamped late. A
+ * plan that is not complete has only the stamp: a phase finishing is not the plan ending.
+ */
+function latestEnding(plan: DispatcherPlan): number | null {
+  const stamp = epochOf(plan.completed_at);
+  if (plan.status !== 'complete') return stamp;
+  const phaseEnds = (plan.phases ?? []).map((phase) => epochOf(phase.done_at)).filter((end): end is number => end !== null);
+  return phaseEnds.length > 0 ? Math.max(...phaseEnds) : stamp;
 }
 
 /**

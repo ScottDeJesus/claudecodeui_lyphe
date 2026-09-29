@@ -2,16 +2,17 @@ import type { ReactNode } from 'react';
 
 /**
  * A card's ONE row of presses, directly under its head: the verbs its status allows on the left, the
- * model switch at the row's end. The plan card and the arc deck both draw exactly this row, so a
- * reader who learned one card's controls has learned the other's — same place, same order, same size.
+ * card's switches at the row's end — the model switch, and on a plan card the plan's swarm word beside
+ * it. The plan card and the arc deck both draw exactly this row, so a reader who learned one card's
+ * controls has learned the other's — same place, same order, same size.
  *
  * `model` rides `ml-auto`, so it sits at the row's END whether or not a verb shares the row — the
- * switch keeps one place on every card, and a reader looking for it looks right. The row wraps, so on
- * a narrow card the switch drops under the verbs, still at the end, rather than pushing either off
- * the card.
+ * switches keep one place on every card, and a reader looking for them looks right. The row wraps, so
+ * on a narrow card the switches drop under the verbs, still at the end, rather than pushing either
+ * off the card; the slot wraps too, so two switches that do not fit one line stack at its end.
  *
  * EVERY CONTROL IN IT IS 32px TALL (`h-8`), set by each control this module puts here
- * (`PlanControls`, `DispatchArcControls`, `ScheduleControl`, `RunModelControl`) rather than by a
+ * (`PlanControls`, `DispatchArcControls`, `ScheduleControl`, `RunModelControl`, `SwarmControl`) rather than by a
  * descendant rule on this row: the model switch is a bordered group of buttons, and a rule sizing
  * every button in the row would size the group's own options past the group.
  *
@@ -30,7 +31,7 @@ export function ActionBar({ verbs, model }: { verbs: ReactNode; model: ReactNode
   return (
     <div data-action-bar className="flex min-w-0 flex-wrap items-center gap-2">
       {verbs}
-      {model !== null && <div className="ml-auto flex">{model}</div>}
+      {model !== null && <div className="ml-auto flex flex-wrap items-center justify-end gap-2">{model}</div>}
     </div>
   );
 }

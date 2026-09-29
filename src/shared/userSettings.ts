@@ -1,5 +1,16 @@
 import { api } from '@/shared/api';
-import type { ClaudeSettings } from '@/shared/types';
+import {
+  applyEntryPatch,
+  clearEntryOutbox,
+  foldEntryPatches,
+  readEntryOutbox,
+  recordEntryPatch,
+  refreshEntryPatch,
+  replaceEntryOutbox,
+  settleEntryPatch,
+  unreflectedEntries,
+} from '@/shared/preferenceEntryPatch';
+import type { ClaudeSettings, PreferenceEntryPatch } from '@/shared/types';
 
 /**
  * The one reader and writer for the settings that used to live in browser
@@ -32,7 +43,7 @@ export type UserPreferences = {
   themeFollowsSun: boolean;
   /** The transcript's reading size in px. See `useChatFontSize`. */
   chatFontSize: number;
-  /** The Runner tab's memory, a blob merged by its two writers: `{ collapsedCards: string[], hiddenPlans: {name, at}[] }`. See `modules/dispatcher/hiddenPlans.ts` and `shared/hooks/useCardFold.ts`. */
+  /** The Runner tab's memory, two entry lists written by entry patch (`writeUserPreferenceEntries`): `{ collapsedCards: string[], hiddenPlans: {name, at}[] }`. See `modules/dispatcher/hiddenPlans.ts` and `shared/hooks/useCardFold.ts`. */
   dispatcher: unknown;
   /** Composer toggle: every sent message rides under the `/plain` command. See `usePlainModePreference`. */
   plainMode: boolean;
@@ -88,6 +99,15 @@ const LEGACY_STORAGE_KEYS: Record<UserPreferenceKey, string | null> = {
 };
 
 const PREFERENCE_KEYS = Object.keys(LEGACY_STORAGE_KEYS) as UserPreferenceKey[];
+
+/**
+ * The preferences whose wire value is an ENTRY PATCH (`writeUserPreferenceEntries`,
+ * `preferenceEntryPatch.ts`): documents of entry lists that every open client writes, where sending
+ * the whole document let one client erase another's entries. Two queued patches are folded rather
+ * than replaced, a retry is rebuilt per named entry, and every patch is kept in the persisted outbox
+ * (`preferenceEntryPatch.ts`) until the server has it, so a reload or a late sign-in read loses none.
+ */
+const ENTRY_PATCHED_KEYS: ReadonlySet<UserPreferenceKey> = new Set<UserPreferenceKey>(['dispatcher']);
 
 type PreferenceRecord = Partial<Record<UserPreferenceKey, unknown>>;
 
@@ -152,8 +172,9 @@ const isRetryableStatus = (status: number | null): boolean => (
 );
 
 /**
- * Folds a queued save into the one already waiting. Every key but `chatGutters` replaces: the newest
- * value of a setting is the setting. A gutter message names ONE chat (or, for a chat not sent yet,
+ * Folds a queued save into the one already waiting. Every key but `chatGutters` and the entry-patched
+ * ones (`ENTRY_PATCHED_KEYS`, folded per entry) replaces: the newest value of a setting is the
+ * setting. A gutter message names ONE chat (or, for a chat not sent yet,
  * only the fallback), so replacing it would drop the chat the earlier message carried — two arranges
  * inside the debounce window is enough — and the queue must keep the promise the wire value makes:
  * a message never asserts a chat it did not touch.
@@ -165,6 +186,9 @@ const isRetryableStatus = (status: number | null): boolean => (
  * throw its arrangement away, so it becomes the fallback over whatever chats are pending.
  */
 function foldServerWrite(key: UserPreferenceKey, pending: unknown, incoming: unknown): unknown {
+  if (ENTRY_PATCHED_KEYS.has(key)) {
+    return foldEntryPatches(pending, incoming);
+  }
   if (key !== 'chatGutters' || !isRecord(pending) || !isRecord(incoming)) {
     return incoming;
   }
@@ -192,10 +216,15 @@ function foldServerWrite(key: UserPreferenceKey, pending: unknown, incoming: unk
  *
  * For `chatGutters` that means the current arrangement of the chats THIS message named, and no
  * others — the retry must keep the wire's promise that a message never asserts a chat it did not
- * touch. A chat the store has since forgotten is dropped from it.
+ * touch. A chat the store has since forgotten is dropped from it. An entry patch keeps the same
+ * promise per entry (`refreshEntryPatch`).
  */
 function refreshForRetry(key: UserPreferenceKey, sent: unknown): unknown {
   const current = preferences[key];
+  if (ENTRY_PATCHED_KEYS.has(key)) {
+    // The entries this patch named, as the store holds them now, and no others.
+    return refreshEntryPatch(current, sent);
+  }
   if (key !== 'chatGutters') {
     return current === undefined ? sent : current;
   }
@@ -237,9 +266,19 @@ function flushServerWrites(): void {
   const generation = storeGeneration;
   let status: number | null = null;
 
+  // An entry patch leaves the outbox once the server has it, or has refused it for good. Before the
+  // sign-in read lands a stored one stays: the hydrate asks the fetched copy whether it is there.
+  const settleEntryPatches = (storedByServer: boolean) => {
+    if (generation !== storeGeneration || (storedByServer && !hasHydrated)) return;
+    for (const [key, value] of Object.entries(updates) as Array<[UserPreferenceKey, unknown]>) {
+      if (ENTRY_PATCHED_KEYS.has(key)) settleEntryPatch(key, value);
+    }
+  };
+
   const keep = (error: unknown) => {
     if (!isRetryableStatus(status)) {
       console.error('Failed to save user preferences; the server refused it:', error);
+      settleEntryPatches(false);
       return;
     }
     console.error('Failed to save user preferences; retrying:', error);
@@ -269,6 +308,7 @@ function flushServerWrites(): void {
           throw new Error(`HTTP ${response.status}`);
         }
         failedServerWrites = 0;
+        settleEntryPatches(true);
       })
       .catch(keep);
   } catch (error) {
@@ -343,6 +383,20 @@ export function writeUserPreference(key: UserPreferenceKey, value: unknown, wire
   // asserted nor reverted. Absent, the value itself goes up, which is right for every other key.
   queueServerWrite({ [key]: wireValue === undefined ? value : wireValue });
   notifyListeners();
+}
+
+/**
+ * Changes some ENTRIES of an entry-listed preference (`ENTRY_PATCHED_KEYS`) and sends ONLY them: this
+ * device's copy gets `patch` applied, and the server applies the same patch to its own copy, so an
+ * entry another device wrote since this one signed in is neither asserted nor erased.
+ */
+export function writeUserPreferenceEntries(key: UserPreferenceKey, patch: PreferenceEntryPatch): void {
+  const next = applyEntryPatch(preferences[key], patch);
+  if (JSON.stringify(preferences[key]) === JSON.stringify(next)) {
+    return;
+  }
+  recordEntryPatch(key, patch);
+  writeUserPreference(key, next, patch);
 }
 
 /** Writes several preferences as one change, so listeners re-render once. */
@@ -439,6 +493,12 @@ function readLegacyPreference(key: UserPreferenceKey): unknown {
 function settleOnTheMirrorAlone(reason: unknown): void {
   console.error('Failed to load user preferences:', reason);
   hasHydrated = true;
+  // The mirror already shows every unconfirmed entry patch, but a patch a closed page never sent has
+  // no queue left to carry it: send the outbox again, whole, since there is no fetched copy to ask.
+  const outbox = readEntryOutbox();
+  for (const key of ENTRY_PATCHED_KEYS) {
+    if (outbox[key] !== undefined) queueServerWrite({ [key]: outbox[key] });
+  }
   notifyListeners();
 }
 
@@ -487,12 +547,25 @@ export async function hydrateUserPreferences(): Promise<void> {
   // Anything still queued for a key the server just answered for was computed
   // from pre-hydrate state and is now stale. Letting it flush would push this
   // device's start-up value over the one that was just fetched — the exact
-  // shape of a preference silently resetting itself on a second device.
+  // shape of a preference silently resetting itself on a second device. An ENTRY PATCH is the
+  // exception: it names only what it changed, so it is never stale, and it stays queued.
   for (const key of Object.keys(serverPreferences) as UserPreferenceKey[]) {
-    delete pendingServerWrites[key];
+    if (!ENTRY_PATCHED_KEYS.has(key)) delete pendingServerWrites[key];
   }
 
   preferences = { ...serverPreferences, ...migrated };
+  // Every entry patch the server has not confirmed (queued, in flight, or left by a page that closed
+  // before its PATCH landed, `preferenceEntryPatch.ts`) is laid over the fetched copy, whether or not
+  // the server holds the key at all, and whatever of it that copy lacks is sent again. What the copy
+  // already holds is confirmed, and leaves the outbox.
+  const outbox = readEntryOutbox();
+  for (const key of ENTRY_PATCHED_KEYS) {
+    const missing = unreflectedEntries(serverPreferences[key], outbox[key]);
+    replaceEntryOutbox(key, missing);
+    if (missing === null) continue;
+    preferences[key] = applyEntryPatch(preferences[key], missing);
+    queueServerWrite({ [key]: missing });
+  }
   hasHydrated = true;
   writeMirror();
 
@@ -530,6 +603,7 @@ export function resetUserPreferences(): void {
     clearTimeout(serverWriteTimer);
     serverWriteTimer = null;
   }
+  clearEntryOutbox();
   try {
     localStorage.removeItem(MIRROR_STORAGE_KEY);
   } catch {

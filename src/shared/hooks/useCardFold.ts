@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useSyncExternalStore } from 'react';
 
-import { readUserPreference, subscribeToUserPreferences, writeUserPreference } from '@/shared/userSettings';
+import { readUserPreference, subscribeToUserPreferences, writeUserPreferenceEntries } from '@/shared/userSettings';
 
 /**
  * Which CARDS the operator has folded shut, and the one way to change that.
@@ -15,11 +15,14 @@ import { readUserPreference, subscribeToUserPreferences, writeUserPreference } f
  * missing from it is an open card. That is the same default `collapseState.ts` states for the chat's
  * shapes, and it is the one that fails safe: a lost entry shows more, never less.
  *
- * IT RIDES THE SERVER-BACKED PREFERENCES, under the `dispatcher` blob and MERGED into it
- * (`modules/dispatcher/hiddenPlans.ts` is the other writer of that blob, and MAN-498 is why the write
- * is a merge: a replaced blob drops whatever else lives under the key). So a fold made in the Runner tab is there in
- * the chat gutter's Runner widget, a fold survives a reload, and a fold made on the phone is there on
- * the desktop at its next load. The mirror in localStorage is what makes the very first paint already
+ * IT RIDES THE SERVER-BACKED PREFERENCES, as `collapsedCards` under the `dispatcher` key
+ * (`modules/dispatcher/hiddenPlans.ts` writes the other list there), and every change is an ENTRY
+ * PATCH (`writeUserPreferenceEntries`) naming only the cards it folds or opens. A client's copy is read
+ * at sign-in and never again, so a write that sent the whole document let a client open a while erase
+ * every fold, and every HIDE, made elsewhere since (INV-4406; the operator's arc Hide of 2026-09-28 was
+ * undone that way by another client's fold). So a fold made in the Runner tab is there in the chat
+ * gutter's Runner widget, a fold survives a reload, and a fold made on the phone is there on the
+ * desktop at its next load. The mirror in localStorage is what makes the very first paint already
  * folded, with no flash of an open card.
  *
  * THE KEY IS `space:id`, AND THE SPACE IS WHY. Two kinds of card fold and one list holds them all: a
@@ -27,11 +30,11 @@ import { readUserPreference, subscribeToUserPreferences, writeUserPreference } f
  * the strip and the verbs). The prefix is what the PRUNE reads: a surface that can see the plans but
  * not the arcs must not prune the arcs' entries.
  *
- * A FOLD IS OF THE CARD, AND NOTHING THE PLAN DOES LIFTS IT, which is where this DEPARTS from the hide
- * store on purpose. A hide (`hiddenPlans.ts`) carries the moment of the press, because a plan that ends
- * after it is news and comes back on its own; a fold carries no such news — a plan walked again is
- * still the same plan — so the reader who folded a card to get it out of the way finds it still folded
- * when it comes back. A fold that lapsed on an ending would spring the card open the moment the plan
+ * A FOLD IS OF THE CARD, AND NOTHING THE PLAN DOES LIFTS IT, which is where this DEPARTS from the
+ * put-away store on purpose. A Hide or a Dismiss (`hiddenPlans.ts`) carries the moment of the press,
+ * because a plan that ends after it is news and comes back on its own; a fold carries no such news — a
+ * plan walked again is still the same plan — so the reader who folded a card to get it out of the way
+ * finds it still folded when it comes back. A fold that lapsed on an ending would spring the card open the moment the plan
  * finished, which is the one moment the reader who folded it did not ask to see it again.
  *
  * The key form lives HERE rather than beside each card: the prefix is half of this list's address
@@ -55,23 +58,19 @@ export function dispatchArcFoldKey(arcName: string): string {
   return `${DISPATCH_ARC_SPACE}${arcName}`;
 }
 
-/** The preference whose blob this list lives under — the dispatcher's own, shared with the hidden plans. */
-const KEY = 'dispatcher' as const;
-
-type DispatcherPreference = Record<string, unknown> & { collapsedCards?: unknown };
-
 /**
- * The most folds kept. A one-line cap on a list that only ever grows by a press, so no reader has to
- * reason about eviction: the oldest fold of a card nobody has folded in a long time is the one
- * dropped, and a dropped entry shows an OPEN card — the safe direction.
+ * The preference this list lives under — the dispatcher's own, shared with the hidden plans. The list
+ * keeps its newest 200 folds (`preferenceEntryPatch.ts`, on both sides): the oldest fold of a card
+ * nobody has folded in a long time is the one dropped, and a dropped entry shows an OPEN card — the
+ * safe direction.
  */
-const CAP = 200;
+const KEY = 'dispatcher' as const;
 
 const EMPTY: readonly string[] = Object.freeze([]);
 
-function readPreference(): DispatcherPreference {
+function readPreference(): Record<string, unknown> {
   const value = readUserPreference<unknown>(KEY, null);
-  return value !== null && typeof value === 'object' && !Array.isArray(value) ? (value as DispatcherPreference) : {};
+  return value !== null && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
 }
 
 function isFoldKey(value: unknown): value is string {
@@ -82,7 +81,7 @@ let lastRaw: unknown = undefined;
 let lastFolds: readonly string[] = EMPTY;
 
 /** The folded cards, as a reference that changes only when the preference does. */
-export function readCollapsedCards(): readonly string[] {
+function readCollapsedCards(): readonly string[] {
   const raw = readPreference().collapsedCards;
   if (raw === lastRaw) return lastFolds;
   lastRaw = raw;
@@ -97,21 +96,17 @@ function spaceOf(key: string): string {
 }
 
 /**
- * The list, written back MERGED into the blob: `hiddenPlans` and anything else a later feature parks
- * under `dispatcher` is carried through untouched, and the fold list is the only key replaced.
+ * The ONE write a fold change makes: an entry patch naming exactly the cards it changes, a fold as its
+ * own key and an opening as `null`. Every other fold, and the hidden plans beside them, stand.
  */
-function writeFolds(keys: readonly string[]): void {
-  const { collapsedCards: _prior, ...rest } = readPreference();
-  writeUserPreference(KEY, { ...rest, collapsedCards: keys });
+function writeFolds(changes: Record<string, string | null>): void {
+  writeUserPreferenceEntries(KEY, { collapsedCards: changes });
 }
 
 /** Records one card's fold. Absent means expanded, so an unfolded card is REMOVED rather than stored `false`. */
-export function setCardFold(key: string, collapsed: boolean): void {
-  const current = readCollapsedCards();
-  if (collapsed === current.includes(key)) return;
-  writeFolds(collapsed
-    ? [...current, key].slice(-CAP)
-    : current.filter((held) => held !== key));
+function setCardFold(key: string, collapsed: boolean): void {
+  if (collapsed === readCollapsedCards().includes(key)) return;
+  writeFolds({ [key]: collapsed ? key : null });
 }
 
 /**
@@ -129,14 +124,14 @@ export function setCardFold(key: string, collapsed: boolean): void {
  * have: the bus hands out an empty frame for a moment and every fold the operator ever made is gone.
  * The cost is one stale entry per space, which a later frame carrying that lane clears.
  */
-export function pruneCardFolds(live: readonly string[]): void {
+function pruneCardFolds(live: readonly string[]): void {
   const current = readCollapsedCards();
   if (current.length === 0) return;
   const keep = new Set(live);
   const spaces = new Set(live.map(spaceOf));
-  const next = current.filter((key) => keep.has(key) || !spaces.has(spaceOf(key)));
-  if (next.length === current.length) return;
-  writeFolds(next);
+  const dropped = current.filter((key) => !keep.has(key) && spaces.has(spaceOf(key)));
+  if (dropped.length === 0) return;
+  writeFolds(Object.fromEntries(dropped.map((key) => [key, null])));
 }
 
 /**

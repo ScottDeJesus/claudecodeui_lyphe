@@ -26,7 +26,7 @@ const BOARD_FLAG_DIR = path.join(os.homedir(), '.claude', 'state', 'kanban-deeps
 /**
  * The DeepSeek endpoint and the model name a Flash child runs on.
  *
- * `~/.claude/hooks/plan_runner/deepseek.py:56-57` is the canonical home of both, and these are
+ * `~/.claude/hooks/plan_runner/deepseek.py` is the canonical home of both, and these are
  * its values transcribed rather than a second opinion: that file's `BASE_URL` and `MODEL` are
  * what every plan-runner on this box already routes on. A drift here would point a board's Metis
  * at an endpoint that no other child on the host uses, and nothing would say so.
@@ -34,8 +34,11 @@ const BOARD_FLAG_DIR = path.join(os.homedir(), '.claude', 'state', 'kanban-deeps
 export const DEEPSEEK_BASE_URL = 'https://api.deepseek.com/anthropic';
 export const DEEPSEEK_MODEL = 'deepseek-flash';
 
-/** The model a board that is NOT on Flash launches on. There is no second Claude pin for Metis. */
-export const METIS_CLAUDE_MODEL = 'opus';
+/**
+ * The model a board that is NOT on Flash launches on: `sonnet`, the model every house builder and
+ * reviewer rides (operator, 2026-09-28). There is no second Claude pin for Metis.
+ */
+export const METIS_CLAUDE_MODEL = 'sonnet';
 
 /** Where one board's switch file lives. Exported so the spawner and a probe name the same path. */
 export function boardFlagPath(boardId: string): string {
@@ -81,7 +84,7 @@ export function metisBearer(appSecret: string, sessionId: string): string {
  * `claude -p` with nothing written to stdin waits for input forever — the brief is the system
  * prompt, not a turn — so this string is what makes the child start working at all. It is
  * recorded VERBATIM in the session's `spec.json`, both so a reader months later knows what she
- * was actually asked and so a resume sends the same words (`souls.py:310-312` writes the prompt
+ * was actually asked and so a resume sends the same words (`souls.py`'s `spawn` writes the prompt
  * to stdin and then closes it for exactly this reason).
  */
 export function metisOpeningTurn(boardId: string): string {
@@ -99,7 +102,7 @@ export function metisRouteFor(deepseekFlash: boolean): { provider: 'deepseek' | 
 export type MetisChildSpec = {
   boardId: string;
   sessionId: string;
-  /** `deepseek-flash` or `opus` — the `--model` value, already settled by `metisRouteFor`. */
+  /** `deepseek-flash` or `sonnet` — the `--model` value, already settled by `metisRouteFor`. */
   model: string;
   /** The board's own switch, read from the board row at this spawn. */
   deepseekFlash: boolean;
@@ -137,7 +140,7 @@ export type MetisChildSpec = {
  */
 export function buildMetisEnv(spec: MetisChildSpec): NodeJS.ProcessEnv {
   const extra: NodeJS.ProcessEnv = {
-    // The shelves loader's own bypass (`souls.py:186-202`): a Metis is a NEW session, so the
+    // The shelves loader's own bypass (`souls.py`'s `_child_env`): a Metis is a NEW session, so the
     // operator's shell shelves are not hers to load.
     MAIN_SHELVES_LOADER_DISABLE: '1',
     KANBAN_METIS_BOARD_ID: spec.boardId,
@@ -207,7 +210,7 @@ function buildMcpConfig(spec: MetisChildSpec): string {
 }
 
 /**
- * The child's argv, in the shape `~/.claude/hooks/plan_runner/souls.py:172-184` builds for a
+ * The child's argv, in the shape `~/.claude/hooks/plan_runner/souls.py`'s `argv` builds for a
  * launcher soul.
  *
  * `--permission-mode bypassPermissions` is what lets a detached session work unattended; the
@@ -237,8 +240,10 @@ export function buildMetisArgv(spec: MetisChildSpec): string[] {
   }
 
   argv.push('--model', spec.model);
-  // DeepSeek maps xhigh to high (its default); only `max` raises the effort. `souls.py:argv` holds the same rule.
-  if (spec.provider === 'deepseek') argv.push('--effort', 'max');
+  // `max` on both routes, the row `~/.claude/hooks/plan_runner/soul_model.py`'s `EFFORT_BY_MODEL` holds
+  // for `deepseek-flash` and for `sonnet` alike (`souls.py`'s `argv` reads that table). On Flash it is
+  // the only word that raises anything: DeepSeek maps `xhigh` down to `high`, its own default.
+  argv.push('--effort', 'max');
   argv.push('--append-system-prompt', spec.appendSystemPrompt);
   argv.push('--mcp-config', buildMcpConfig(spec));
   argv.push('--strict-mcp-config');

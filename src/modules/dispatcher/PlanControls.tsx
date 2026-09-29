@@ -3,12 +3,24 @@ import { useTranslation } from 'react-i18next';
 
 import { ActionBar } from '@/modules/dispatcher/ActionBar';
 import { epochOf } from '@/modules/dispatcher/dispatcherState';
+import { useDispatcherPlans } from '@/modules/dispatcher/hooks/useDispatcherPlans';
 import { useDispatcherVerbs } from '@/modules/dispatcher/hooks/useDispatcherVerbs';
 import { RunModelControl } from '@/modules/dispatcher/RunModelControl';
 import { ScheduleControl } from '@/modules/dispatcher/ScheduleControl';
+import { SwarmControl } from '@/modules/dispatcher/SwarmControl';
 import { Button } from '@/shared/ui';
-import type { DispatcherPlan } from '@/shared/types';
+import type { DispatcherPlan, DispatcherRoute, DispatcherSwarmWord } from '@/shared/types';
 import { effectiveModelWord } from '@/shared/utils';
+
+/**
+ * The box's swarm switch as one word of the grammar — `off`, `on`, `on <N>` — the word a plan on
+ * `Box` walks under, which its swarm control wears. `null` before the first frame has a route.
+ */
+function boxSwarmWord(route: DispatcherRoute | null): DispatcherSwarmWord | null {
+  if (route === null) return null;
+  if (!route.swarm.enabled) return 'off';
+  return route.swarm.lanes === null ? 'on' : `on ${route.swarm.lanes}`;
+}
 
 /**
  * The plan card's `ActionBar`: the verbs that apply to a plan, chosen by its status, then its model
@@ -45,6 +57,11 @@ import { effectiveModelWord } from '@/shared/utils';
  * control here: the arc's action bar carries the ARC's word and hands it down, and this is where one plan
  * speaks for itself again.
  *
+ * THE PLAN'S OWN SWARM WORD RIDES BESIDE IT (`SwarmControl`), on the same plans and for the same
+ * reason: `dispatcher swarm` is never refused for a plan's state either (the word is read at the
+ * rule's next take-up). `Box` hands the plan back to the box's switch and wears that switch's word, so
+ * the card says what bounds the plan whichever switch it is.
+ *
  * A refusal is the dispatcher's own first line, toasted by `useDispatcherVerbs`.
  *
  * Used by `PlanCard`, directly under its head.
@@ -57,8 +74,9 @@ export function PlanControls({ plan }: { plan: DispatcherPlan }) {
   // reads `queued`).
   const stops = plan.status === 'paused' || (plan.status === 'scheduled' && plan.launched);
   const starts = plan.status === 'queued' || (plan.status === 'scheduled' && !plan.launched);
-  const { stop, resume, schedule, park, unpark, setModel, busy } = useDispatcherVerbs(plan.name, 'plan',
+  const { stop, resume, schedule, park, unpark, setModel, setSwarm, busy } = useDispatcherVerbs(plan.name, 'plan',
     starts ? t('runner.start') : t('runner.resume'));
+  const { route } = useDispatcherPlans();
   const held = busy !== null;
   const armed = epochOf(plan.schedule?.start_at ?? null);
   const word = starts ? t('runner.start') : t('runner.resume');
@@ -101,12 +119,17 @@ export function PlanControls({ plan }: { plan: DispatcherPlan }) {
   }
 
   const movable = plan.status !== 'complete';
+  const modelWord = effectiveModelWord(plan.model);
   return (
     <ActionBar
       verbs={verbs}
       model={movable ? (
-        <RunModelControl scope="plan" value={effectiveModelWord(plan.model)} busy={held}
-          onChoose={(choice) => void setModel(choice)} />
+        <>
+          <SwarmControl value={plan.swarm ?? null} boxWord={boxSwarmWord(route)} busy={held}
+            onChoose={(choice) => void setSwarm(choice)} />
+          <RunModelControl scope="plan" value={modelWord} busy={held}
+            onChoose={(choice) => void setModel(choice)} />
+        </>
       ) : null}
     />
   );

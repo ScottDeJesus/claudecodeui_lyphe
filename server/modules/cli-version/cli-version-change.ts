@@ -18,8 +18,8 @@
  * - The same version READ BACKWARDS never happens here (a re-probe is a new reading, and nothing
  *   reorders them), so `from` is always the older answer in time. Which of the two is the OLDER
  *   BUILD is a different question, and the one consumer answers it with the ordered comparison the
- *   message path already uses (`chat-process.ts`'s `isBehindInstalled`) — a downgrade is a change,
- *   and no process ahead of the binary is retired for it.
+ *   message path already uses (`isBehindInstalled`, `server/shared/version-order.ts`) — a downgrade
+ *   is a change, and no process ahead of the binary is retired for it.
  *
  * An observer runs inside the probe's own promise chain, so it must not throw and must not block
  * on the reading: each call is guarded, and the keepalive's sweep defers its own work

@@ -208,15 +208,17 @@ export async function initializeSessionsWatcher(): Promise<void> {
     try {
       await fsPromises.mkdir(rootPath, { recursive: true });
 
+      // Native file events (inotify), not polling. Polling put a stat watcher on every file and
+      // directory under the root — 15,740 of them on 2026-09-28 — and arming them right after the
+      // initial sync held the fs thread pool and the event loop for 3-11 s, stalling every request a
+      // freshly booted API served. Every root here is on a local disk, which inotify sees whole; a root
+      // on a filesystem it cannot see (NFS, some FUSE mounts) is the one case that needs polling.
       const watcher = chokidar.watch(rootPath, {
         ignored: WATCHER_IGNORED_PATTERNS,
         persistent: true,
         ignoreInitial: true,
         followSymlinks: false,
         depth: 6,
-        usePolling: true,
-        interval: 6_000,
-        binaryInterval: 6_000,
       });
 
       watcher

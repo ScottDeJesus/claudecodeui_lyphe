@@ -1201,10 +1201,10 @@ standing as soon as the binary behind it changes — see rules 6 and 8.
 
 `CliVersionReport` and `CliVersionRun` are declared under `CLI VERSION CONTRACTS` in
 `server/shared/types.ts`, documented where declared. Read them there, not a copy here. The client
-mirrors them in `src/shared/types.ts` under `CLI VERSION`, because three screens and one composer
+mirrors them in `src/shared/types.ts` under `CLI VERSION`, because two screens and one composer
 read the same body.
 
-The rules that follow are the server's. The client half — one hook, three surfaces, one restart —
+The rules that follow are the server's. The client half — one hook, two surfaces, one restart —
 starts below them.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts
@@ -1285,8 +1285,9 @@ section: cli-version/001 The rules that bite
    and the read is asked only when the running process has a version of its own, so an adapter that
    never speaks never spends a probe. A turn IN FLIGHT is never retired for a version — that is the
    banner's case, below.
-   The comparison is ORDERED, not an inequality (`isBehindInstalled`): only a process BEHIND the
-   binary is replaced. The live side is what a process announced at its own init and is never stale;
+   The comparison is ORDERED, not an inequality (`isBehindInstalled`, in
+   `server/shared/version-order.ts`): only a process BEHIND the binary is replaced.
+   The live side is what a process announced at its own init and is never stale;
    the installed side is a reading, and a reading older than the process is no reason to replace it —
    on "differs" alone, a current process would be retired and respawned as the same build once per
    message until the reading turned over, each time paying a cold start and a full resume replay. Two
@@ -1298,7 +1299,8 @@ section: cli-version/001 The rules that bite
    so it sat on the old build for up to the idle closer's two hours and no surface said so (rule 4:
    an idle host is in no report). `idle-version-sweep.ts` runs the SAME test — both sides a version
    string, the ordered comparison, and no work in flight — on two triggers, and it reuses
-   `planLiveChanges`'s `isBehindInstalled` rather than restating it: the probe's cache moving from one
+   `isBehindInstalled` (`server/shared/version-order.ts`) rather than restating it: the probe's
+   cache moving from one
    version string to a different one (`cli-version-change.ts`, whose observer the keepalive's owning
    process subscribes to at boot), and boot re-adoption, where the keepers are put through it after
    `retireOlderHosts`. "In flight" is asked in two places because the two triggers cannot ask it in
@@ -1318,7 +1320,7 @@ section: cli-version/001 The rules that bite
 section: cli-version/002 The client's one reading
 
 `src/shared/hooks/useCliVersion.ts` is the only place in the app that reads the route, and the only
-place the comparison is made — three screens making three comparisons is three chances to disagree
+place the comparison is made — two screens making two comparisons is two chances to disagree
 about one fact. The report is held at MODULE scope behind a single 60 s poller and published through
 `useSyncExternalStore`. Not a per-component `useState`: the sidebar mounts this hook once per session
 row, so a hook that fetched on its own would put one request per conversation on the wire every
@@ -1340,7 +1342,7 @@ is not stale either: it is not in `running[]` at all.
 **And stale no longer means "somebody must press something" for an idle conversation.** A run is listed
 while a turn is in flight, and a process between turns the server replaces ITSELF — on a version
 change or at boot (rule 9), which is the same reading being polled here; what is left for a person is
-the turn that is running NOW, which is the banner's own case. The three surfaces still read one hook
+the turn that is running NOW, which is the banner's own case. The two surfaces still read one hook
 and one comparison — the client is told the same fact it always was, and the server has stopped
 waiting for it.
 
@@ -1362,35 +1364,19 @@ reading landed.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useCliVersion.ts
 
-## MAN-504 — The three surfaces
-section: cli-version/003 The three surfaces
+## MAN-504 — The two surfaces
+section: cli-version/003 The two surfaces
 
 | Where | What it says | What it does |
 | --- | --- | --- |
 | Sidebar session row (`SidebarSessionItem`) | a warn `Badge` reading `↻ On CLI 2.1.240`, titled *Open the conversation to restart it on Claude CLI 2.1.261* | nothing — inert on purpose |
-| Sidebar footer (`SidebarFooter`) | one fact line, `cliVersionFactLine()` | nothing |
 | Above the transcript (`ChatInterface`) | a warn `Banner` | *Restart and resume* · *Stay on 2.1.240* |
 
-The chip is inert because the restart lives in that conversation's own banner, beside the sentence
+The badge is inert because the restart lives in that conversation's own banner, beside the sentence
 that explains what it does. Its title says where to go rather than being a second door.
 
-The footer states the fact and stops there — a button in a footer would be one click ending work the
-person cannot see. Its line joins what is installed to what is still running, and the difference
-between the two not-knowns at the bottom is the whole point:
-
-```
-Claude CLI 2.1.261 is installed
-Claude CLI 2.1.261 is installed · 1 conversation still runs 2.1.240
-Claude CLI 2.1.261 is installed · 2 conversations still run other versions
-Claude CLI version — the Claude CLI is chosen when a run starts, so its version is not known in advance
-Claude CLI version —
-```
-
-Two stale runs that agree are named (`2 conversations still run 2.1.240`); two that disagree are only
-counted, because naming one would be false about the other. The fourth line is `installed: null` with
-the route's OWN words — never a stand-in `0.0.0`, and never one not-known standing in for another.
-The fifth is the state every cold mount passes through: `installed` and `reason` are both null, so
-nothing has been read and nothing may be explained.
+The badge states the fact and stops there — a button in the sidebar would be one click ending work
+the person cannot see.
 
 The banner is the one place the fact carries an action, and it stands for the case the automatic
 retirement cannot cover — a turn already running, which keeps the version it started on. It stands
@@ -1483,8 +1469,8 @@ after the send (that is what `refresh()` resolving `true` means), whatever that 
 that, by the report no longer saying what it said at the press; and failing both, by a 20 s
 backstop. A read that FAILED releases nothing — released on the clock or on a request that merely
 settled, the hold would end on the picture taken before the abort, and the banner would come back
-describing the run this restart replaced. The chip and the footer count clear on that same reading,
-because all three read one hook.
+describing the run this restart replaced. The badge clears on that same reading, because both
+surfaces read one hook.
 
 ## MAN-509 — What is left standing
 section: cli-version/008 What is left standing
@@ -2334,8 +2320,12 @@ the read-picture / compare / broadcast-on-change loop that every state lane on t
 this one, a board's own Metis sessions (`kanban-metis/kanban-metis.module.ts`, the `kanban_metis_state` frame), and the dispatcher's (`dispatcher/dispatcher-watcher.service.ts`,
 the `dispatcher_state` frame — the one lane here whose reading is a SUBPROCESS, and the reason the
 mechanism takes a snapshot that may answer a PROMISE: a tick that finds a previous read still out
-is SKIPPED rather than queued, `current()` answers the `initial` picture its caller passed until the
-first reading lands, and such a lane is refused at construction without one). That dispatcher lane
+is SKIPPED rather than queued, `current()` answers `null` until the first reading lands — no seed
+picture is handed in, because a made-up empty one is indistinguishable, on the wire and in every
+client downstream, from a real reading of an empty host — and a reader that must not serve an unread
+lane waits for that first landing through `whenLanded(timeoutMs)`, a bound the CALLER names (only it
+knows whether it would rather wait or be told), answering "not read yet" when the wait runs out).
+That dispatcher lane
 is also the one that supplies the mechanism's `serialize` — how a picture becomes the string a lane
 compares for change, the whole picture `JSON.stringify`ed by default: its document is stamped
 `generated_at` from the dispatcher's own clock at SECOND resolution on a poll of two seconds, so
@@ -2442,13 +2432,13 @@ governs: /home/lyphe/.claude/hooks/skill_router.py, /home/lyphe/.claude/skills/h
 section: dispatcher/000
 
 A polled lane on this server: fourteen routes under `/api/dispatcher`, behind `authenticateToken` in `server/index.ts` (`createDispatcherModule()`, the mount, and its `start()`/`stop()` after `listen` and on shutdown), wired in `dispatcher.module.ts`, plus one websocket frame pushed to every open `/ws` socket whenever the picture changes — `kind:
-'dispatcher_state'` — and one notification for each plan ending. A path under `/api` that no lane names answers 404 JSON (MAN-5437).
+'dispatcher_state'` — and one notification for each plan ending. A plan that lands owing the OPERATOR's word has its prompt put up in its owning chat's question panel — the Accept prompt or the designer's questions, raised by this lane itself through `dispatcher ask <name>` and answered back through `dispatcher accept` and `dispatcher tell` (MAN-7400) — and still not a word of it is this lane's composition: the census, the options and the questions are the dispatcher's. A path under `/api` that no lane names answers 404 JSON (MAN-5437).
 
 The dispatcher is a separate program. It owns a SQLite store under `~/.claude/state/dispatcher`
 (`hooks/dispatcher/`), a daemon that walks one phase at a time, and a command whose `status --json`
 prints one document whole. **This lane writes none of it**: it reads that document and relays the
 dispatcher's own verbs. No route here can put this server's words into the store (INV-170), and no
-file of the lane holds anything but a reading.
+file of the lane holds anything of the store but a reading.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/
 
@@ -2459,8 +2449,13 @@ section: dispatcher/000/001 The poll. `dispatcher-watcher.service.ts` wraps `cre
 (`server/shared/polled-lane.service.ts`) with `POLL_MS` 2000 and the frame above. It is the one lane
 here whose reading is a SUBPROCESS, which is what the mechanism's promise support was added for: a
 tick that arrives while the previous read is still out is SKIPPED rather than queued, and `current()`
-answers the `initial` picture — the shape's own empties, in the watcher — until the first reading
-lands. A read of the live store is ~170 ms for a 27 KB document, under a tenth of the interval, and a
+answers `null` — no reading has landed, and none is invented — until the first one does. A route
+that must not answer an unread lane waits for that first landing (`whenLanded`, bounded by
+`FIRST_READ_WAIT_MS` in `dispatcher.module.ts`) and then answers the lane's not-read-yet body: a
+200, because a read with nothing to say yet is not a fault, and a body that is not the picture, so
+no client draws it (`DispatcherFeed`'s `asPicture` refuses anything that is not the whole picture),
+and the frame the first landing broadcasts fills the tab a moment later. A read of the live store is
+~170 ms for a 27 KB document, under a tenth of the interval, and a
 read that throws leaves the LAST good picture on the tab with one line in the journal per distinct
 message.
 
@@ -2555,8 +2550,18 @@ re-worded by these routes. `model` hands its word to EVERY plan of the arc (`sto
 own controls are drawn for (`report_arcs.walking` / `.stopped`), and the next frame redraws the header
 and its plans together: nothing optimistic, and nothing copied by this server.
 
-Reads: `GET /plans` → `{ ...current(), at }`; `GET /plans/offpeak` → `{ at }`, epoch seconds or null,
-registered BEFORE `/plans/:name` and answered by `createOffpeakClock` (`dispatcher-offpeak.service.ts`): it runs `dispatcher offpeak`, whose one line is `OFFPEAK at=<epoch seconds> utc=<iso>`, and CACHES the answer until the moment it names has passed (it moves once a day and the tab asks on every mount); a failed ask caches nothing and answers `null` — a missing button time is not a fault. `GET /plans/:name` → `{ plan }` or 404 `{ error: 'no such plan' }`, the name compared as written.
+Reads: `GET /plans` and `GET /plans/:name` both start by awaiting `current()` (`dependencies.current`,
+`polled-lane.service.ts`'s `whenLanded`-bound reading) and answer `NOT_READ_YET` — `{ error: 'the
+dispatcher has not been read yet' }`, status 200 — when it comes back `null`, which is the one honest
+answer before this boot's first `dispatcher status --json` has landed; there is no empty-picture
+stand-in. Once a picture has landed, `GET /plans` → `{ ...picture, at: Date.now() }`; `GET
+/plans/:name` → `{ plan }` from `picture.plans`, or 404 `{ error: 'no such plan' }` for a name the
+picture does not hold, the name compared as written. `GET /plans/offpeak` is registered BEFORE
+`/plans/:name` and answered by `createOffpeakClock` (`dispatcher-offpeak.service.ts`): it runs
+`dispatcher offpeak`, whose one line is `OFFPEAK at=<epoch seconds> utc=<iso>`, and CACHES the answer
+until the moment it names has passed (it moves once a day and the tab asks on every mount) — `{ at }`,
+epoch seconds or null; a failed ask caches nothing and answers `null`, since a missing button time is
+not a fault.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/
 
@@ -2590,11 +2595,13 @@ section: dispatcher/010 The plan card/001 The frame. `Card` with `data-dispatche
 
 **The frame.** `Card` with `data-dispatcher-card`, `data-plan-name`, `data-plan-status` and `data-collapsed` on the ROOT (a
 probe scopes every reading and every press to ONE plan — the live plan walking beside it must never be
-pressed). Its head is `LaneCardHead` (`LaneCardHead.tsx`), the arc deck's own head too: row one is the mono `plan.name`, `PlanStatusBadge`, `PlanClock` and `done/total` phases (`phaseProgress`, `data-lane-progress`) in a wrapping group floored at the title's longest word (INV-4449), beside the corner — `⋯` while the plan is droppable (§"Delete asks first"), Hide (`EyeOff`, `data-dispatcher-hide`) and the fold; row two is the goal's FIRST non-empty line, clamped to two lines, then — where the document gives the plan an outing — `PlannerBadge` (§"Who is out on this
+pressed). Its head is `LaneCardHead` (`LaneCardHead.tsx`), the arc deck's own head too: row one is the mono `plan.name`, `PlanStatusBadge`, `PlanClock` and `done/total` phases (`phaseProgress`, `data-lane-progress`) in a wrapping group floored at the title's longest word (INV-4449), beside the corner — `⋯` while the plan is droppable (§"Delete asks first"), Dismiss on a complete plan (`X`, `data-dispatcher-dismiss`, "Dismiss plan") or Hide on any other (`EyeOff`, `data-dispatcher-hide`, "Hide plan"), by `putAwayVerb` (§"The put-away store"), and the fold; row two is the plan's description (`cardDescription` in `dispatcherState.ts`, `data-card-description`) — the first non-empty line of its design's `delivers`, read as plain text (a code span keeps its contents and loses its fence, `**` and `__` outside one go, whitespace collapses), or the goal's first non-empty line as written where `delivers` yields nothing — an arc's judgment plan before its own design loads (it carries the arc's goal), or a first line of markers alone; a plan being designed carries neither and draws no lead — clamped to two lines, then — where the document gives the plan an outing — `PlannerBadge` (§"Who is out on this
 plan" below) and `waits on` (`data-plan-waits-on`); row three is the plan's total as `SpendPills` (§"The spend pills" below), counting under the key
-`plan:<plan name>`. The body (`CardFoldBody`) is `PlanControls` — the card's `ActionBar` (`ActionBar.tsx`, `data-action-bar`): ONE wrapping row directly under the head, the verbs its status allows and then the model switch at `ml-auto`, every control in it 32px tall, and nothing at all when it has neither — then `PlanFace`. Props `{ plan, waitsOn?, onHide, headingLevel? }`, `onHide` being the caller's `planHide(plan, carriedNames)`; `headingLevel` is the title's heading — `3`, or `4` for a plan inside an arc deck (`ArcDeck.tsx` passes it) — NO `defaultOpen`.
+`plan:<plan name>`. The body (`CardFoldBody`) is `PlanControls` — the card's `ActionBar` (`ActionBar.tsx`, `data-action-bar`): ONE wrapping row directly under the head, the verbs its status allows and then the model switch at `ml-auto`, every control in it 32px tall, and nothing at all when it has neither — then `PlanFace`. Props `{ plan, waitsOn?, onPutAway, headingLevel? }`, `onPutAway` being the caller's `planPutAway(plan, carriedNames)`; `headingLevel` is the title's heading — `3`, or `4` for a plan inside an arc deck (`ArcDeck.tsx` passes it) — NO `defaultOpen`.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-arc-nest.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-arc-strip-return.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dispatch-arc-start.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dispatch-card-phases.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dispatch-card-version-word.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dispatch-model-word.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dispatch-resume-3am.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-planner-card.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-planner-card-write.py
+The description's standing proof: `node .verify/probe-card-description.mjs` (the Runner tab at 1440 and 390, light and dark, on the dev client). It judges one plan card and one arc head — `--plan <name>` and `--arc <name>`, each of which must be drawn; else `claude-update-pipeline` while the lane carries it and the first plan card drawn once it does not (a `[NOTE]`), and the first arc deck drawn (a tab with no arc is a `[NOTE]`, the arc half skipped). exit 0 = each one's `data-card-description` text equals `cardDescription(delivers, goal)` over the row `dispatcher status --json` prints (the helper imported from the source), differs from the goal's first line where `delivers` is written, computes `-webkit-line-clamp: 2` and paints one or two lines (a card whose helper reading is empty draws no lead at all); every lead on the tab equals the helper's reading; 0 console errors. It presses no card control and writes nothing: the page reads a copy of the preferences with an empty put-away list, and every preference write is answered in the browser. 2026-09-28, 5183: 8/8 leads equal in all four passes, `claude-update-pipeline` reading "CloudCLI notices a new Claude release on its own and installs it from Settings."; exit 0.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-arc-nest.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-arc-strip-return.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-card-description.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dispatch-arc-start.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dispatch-card-phases.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dispatch-card-version-word.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dispatch-model-word.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dispatch-resume-3am.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-planner-card.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-planner-card-write.py
 
 ## MAN-6782 — The plan card — The rise (`useRiseOnce`, `hooks/useFirstSight.ts`). The root rises once
 section: dispatcher/010 The plan card/002 The rise (`useRiseOnce`, `hooks/useFirstSight.ts`). The root rises once
@@ -2603,10 +2610,10 @@ section: dispatcher/010 The plan card/002 The rise (`useRiseOnce`, `hooks/useFir
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-arc-nest.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-arc-strip-return.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dispatch-arc-start.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dispatch-card-phases.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dispatch-card-version-word.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dispatch-model-word.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dispatch-resume-3am.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-planner-card.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-planner-card-write.py
 
-## MAN-6783 — The plan card — Hide keeps the keyboard's place
-section: dispatcher/010 The plan card/003 Hide keeps the keyboard's place
+## MAN-6783 — The plan card — A corner press keeps the keyboard's place
+section: dispatcher/010 The plan card/003 A corner press keeps the keyboard's place
 
-**Hide keeps the keyboard's place** (`LaneCardHead.tsx`). The pressed Hide leaves with its card, and a focused node that unmounts drops focus to `<body>`. So the heir is chosen BEFORE the hide (`hideKeepingFocus`), in the same home (`[data-runner-panel]` / `[data-runner-widget]`): the next `[data-dispatcher-hide]` in document order, else the previous, never one inside the leaving card (an arc's Hide takes its plans); it is focused on the next frame, skipping a candidate the render removed, and with none left the home's `Hidden · N` trigger. Both homes draw every card they carry at once, so every heir there will be is already on screen at the press. Every `⋯` menu item is wrapped (`selectKeepingFocus`): if the action emptied the menu (`Hide ended plans · N`), focus goes to this head's own Hide, else — the card went too — the home's first reachable Hide, else `Hidden · N`. The Runner header's `Hide ended · N` (`RunnerPanel`) does the same for the pane. A menu item whose action empties the menu or removes the card by the NEXT frame gets the hand-off with no code of its own; one whose card leaves later gets none (`Delete plan…`, §"Delete asks first").
+**A corner press keeps the keyboard's place** (`putAwayFocus.ts`). The pressed Dismiss or Hide leaves with its card, and a focused node that unmounts drops focus to `<body>`. So the heir is chosen BEFORE the press (`putAwayKeepingFocus`), in the same home (`[data-runner-panel]` / `[data-runner-widget]`): the next corner press (`[data-dispatcher-dismiss]` or `[data-dispatcher-hide]`) in document order, else the previous, never one inside the leaving card (an arc's press takes its plans); it is focused on the next frame, skipping a candidate the render removed, and with none left `landFocusInHome` takes over: the home's first reachable corner press, else its `Hidden · N` trigger, else the home itself. Both homes carry `tabIndex={-1}` for that last step, because dismissing the last done card with nothing hidden leaves nothing else to land on. Both homes draw every card they carry at once, so every heir there will be is already on screen at the press. Every `⋯` menu item is wrapped (`selectKeepingFocus`): if the action emptied the menu (`Dismiss done plans · N`), focus goes to this head's own corner press, else wherever `landFocusInHome` finds. The homes' `Dismiss done · N` (`RunnerPanel`, `RunnerWidgetBody`) hands off through `landFocusInHome` too. A menu item whose action empties the menu or removes the card by the NEXT frame gets the hand-off with no code of its own; one whose card leaves later gets none (`Delete plan…`, §"Delete asks first").
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-arc-nest.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-arc-strip-return.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dispatch-arc-start.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dispatch-card-phases.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dispatch-card-version-word.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dispatch-model-word.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dispatch-resume-3am.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-planner-card.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-planner-card-write.py
 
@@ -2622,7 +2629,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/, /home/l
 ## MAN-6785 — The plan card — The card folds
 section: dispatcher/010 The plan card/005 The card folds
 
-**The card folds** (MAN-5412): a `CardFoldToggle` in the head's corner, key `plan:<plan name>` — the plan's own name and nothing else: a fold carries no moment the way a hide does (`{ name, at }`), so a plan cut and walked again is still folded. Folded, the card keeps its whole head — the title, the status, the clock, `done/total`, the goal, the planner badge, `waits on`, the total's pills and the corner; the action bar and the face go, out of the tab order with them.
+**The card folds** (MAN-5412): a `CardFoldToggle` in the head's corner, key `plan:<plan name>` — the plan's own name and nothing else: a fold carries no moment the way a hide does (`{ name, at }`), so a plan cut and walked again is still folded. Folded, the card keeps its whole head — the title, the status, the clock, `done/total`, the description, the planner badge, `waits on`, the total's pills and the corner; the action bar and the face go, out of the tab order with them.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-arc-nest.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-arc-strip-return.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dispatch-arc-start.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dispatch-card-phases.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dispatch-card-version-word.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dispatch-model-word.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dispatch-resume-3am.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-planner-card.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-planner-card-write.py
 
@@ -2765,8 +2772,8 @@ IS `resume`) AND `Start at …`; `scheduled` → the same pair, reading the arme
 epochOf(schedule.start_at)`); the hour itself is the card's own clock (`PlanClock`, `data-dispatcher-clock`)
 and is not said a second time beside the buttons; `parked` → Unpark; `idle` in state `designed` or
 `questions` → Park (the way out of the designed Stop hold); `complete` and any other `idle` → no verb.
-A `complete` plan's bar draws nothing at all (no verb and no switch); putting its card away is Hide, in
-the head's corner, on every card whatever its status.
+A `complete` plan's bar draws nothing at all (no verb and no switch); putting its card away is Dismiss
+on a complete plan and Hide on any other (`putAwayVerb`, MAN-6803), in the head's corner on every card.
 
 `paused` AND `scheduled` ARE BOTH THE STOPPED PLAN, and `launched` is what picks the WORD: a plan that
 has WALKED and been stopped reads `paused` with no hour and `scheduled` with one, and its button says
@@ -2818,23 +2825,23 @@ section: dispatcher/010 The plan card/017 The arc's deck.
 **The arc's deck.** A dispatch arc is drawn by `DispatchArcDeck` (`src/modules/dispatcher/ArcDeck.tsx`) through `DeckFrame` (`src/modules/dispatcher/DeckFrame.tsx`, MAN-643), which supplies the chrome, the fold, the flow of plans and the cards — ONE HORIZONTAL STRIP of pages, the same in both homes (`DeckStrip`, MAN-643); `DispatchArcDeck` hands it this lane's word, its books, its flow and its cards.
 
 The deck's HEADER is the arc's own top: the arc's mark and its bare name (`ArcMark`, `data-arc-mark`, then `data-arc-title`; MAN-643 → "What the frame owns"), the arc's derived status as a
-`Badge` (`dispatcher.arcStatus.*`: `designing` and `live` info, `judged` neutral, `complete` positive,
+`Badge` (`dispatcher.arcStatus.*`: `designing`, `live` and `judging` info — `judging` is the arc whose judgment is still being designed, cut or walked, work in flight — `complete` positive,
 `empty` warn, and the three waiting words — `queued`, `paused`, `scheduled` —
 wearing the PLAN's own tone through `planStatusTone`, the very function the status badge on the card under them is toned by, so a header cannot argue with its own cards; the eight words are
 `store.arc_word`'s and `dispatcher-arc.reader.ts` refuses any other BY
 NAME, so no default is invented here; standing proof MAN-5419), the arc's own spend where it has one (`data-arc-spend` holding `SpendPills` counting under
 `darc:<arc name>`; the plan card's own rule — dollars OR tokens by who was used, nothing at all for a lane that has not spent), the
 ARC's own planner badge where the store gives it one (`arc.planner`, `report_planners.of_arc`; drawn by
-the same `PlannerBadge` on the head's lead row, under the goal — the full-width line under the title row, because of
+the same `PlannerBadge` on the head's lead row, under the description — the full-width line under the title row, because of
 WIDTH and not because that row cannot wrap: the row WRAPS and its title is floored at its own longest
 word (`min-w-fit`, the wrap and the floor landing together 2026-09-25), so nothing would be crushed,
 but a planner badge is a LONG LINE among a row of marks and at 390px it would take a row the arc's
-own name and books are read on), the goal clamped to two lines and capped at `max-w-3xl` (across the tab's full-width card it would run two lines of 250 characters), the armed hour in the clock slot (`data-dispatch-arc-schedule-note`), and `done/total` over the plans the deck DREW (see the
-count below). The head is `LaneCardHead`, the plan card's own; its corner is `⋯` (`Hide ended plans · N`, `endedHide`, when any plan of the deck has ended), Hide (`arcHide`: every plan of the deck, one write) and the fold. Beneath the header the
+own name and books are read on), the description (`cardDescription` over the arc's own `delivers` and `goal`, the plan card's rule; `data-card-description`) clamped to two lines and capped at `max-w-3xl` (across the tab's full-width card it would run two lines of 250 characters), the armed hour in the clock slot (`data-dispatch-arc-schedule-note`), and `done/total` over the plans the deck DREW (see the
+count below). The head is `LaneCardHead`, the plan card's own; its corner is `⋯` (`Dismiss done plans · N`, `doneDismiss`, while some plans of the deck are complete and some are not), the deck's own press (`arcPutAway`: every plan of the deck, one write) and the fold. That press is Dismiss (`X`, "Dismiss arc") once every plan of the deck is complete, and Hide ("Hide arc") before then — its unfinished plans go to `Hidden`, its done ones leave with the deck — by the one rule a plan's corner follows (`putAwayVerb`). It is ONE press: its entries carry `arc`, and a `Show` of any of its plans, or news on any plan of the arc, brings the whole deck back (MAN-6803); a wholly done deck draws no `Dismiss done plans`, which would be its corner again. Beneath the header the
 deck's BODY holds this lane's own first row — `DispatchArcControls`, ONE `ActionBar`: Pause, or Start and Schedule start, then the model switch —
 then the arc's flow (`StatusFlow`, one node a plan, MAN-643 → "The flow"), and then the cards: `ol[data-arc-strip]`, ONE CARD PER VIEW, in the tab as in the gutter — operator, 2026-09-26: "please bring back the swipable plan cards if it's under an arc"; an arc's plans are paged and only the plans NO arc holds are the wall's. Each plan of the arc is ONE ITEM
 (`li[data-dispatch-plan-row]`, a `DeckItem`, with `data-plan-name`, `data-pinned` and `data-arc-layer`) holding that plan's own `PlanCard`, WHOLE: its word, its phases, its bar
-and its Hide, exactly as a plan of no arc has them. The gutter's strip opens on the plan whose turn it is
+and its corner, exactly as a plan of no arc has them. The gutter's strip opens on the plan whose turn it is
 (`deckFocusIndex`: the first member that has not finished, or the last once all of them have) and, with more than one card, carries the deck's two arrows and its `Card N of M` line — the same strip in both homes, so the deck opens on that plan wherever it is drawn. `data-dispatch-arc`,
 `data-arc-name`, `data-arc-status` and `data-collapsed` sit on the DECK's root — `data-dispatch-arc` and `data-arc-name` are the deck's own handles, so a probe reads one arc's state and its plans' states from one
 element.
@@ -2917,7 +2924,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/, /home/l
 section: dispatcher/010 The plan card/022 The fold takes the cards AND the verbs, and what it hides is inert.
 
 **The fold takes the cards AND the verbs, and what it hides is inert.** The deck folds (`useCardFold`, key `darc:<arc name>` — the arc's own name):
-what stays is the whole head — which arc this is, its word, its armed hour, `done/total`, its goal, its books and the corner — and what
+what stays is the whole head — which arc this is, its word, its armed hour, `done/total`, its description, its books and the corner — and what
 goes is the body: the `ActionBar` (`DispatchArcControls`: Pause/Start and the model switch) together with the flow and the
 cards. The verbs ride `bodyTop`: they are VERBS, the same layer a plan card's own controls fold, and keeping them in the header made a folded deck 164px against 86px — a "collapsed" row that had not collapsed (measured 2026-09-25). The fold hides through the house's body slot (`CardFoldBody`, `inert` + `aria-hidden` while
 closed) and never a raw clip: the hidden body of a dispatch arc is every plan of the arc with its own verbs
@@ -2935,15 +2942,17 @@ first line, amber, exactly as a plan's does.
 
 The arcs come from `useDispatcherPlans`, and the list is filtered there one step stricter than the lane's
 own: the server drops an arc with no plan left on the lane (`arcsOnLane`), and this drops an arc whose
-every remaining card the operator has HIDDEN — a deck standing over nothing is the one shape no later
-frame would ever clear.
+every remaining card the operator has PUT AWAY — hidden, dismissed, or both — a deck standing over
+nothing is the one shape no later frame would ever clear.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-arc-nest.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-arc-strip-return.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dispatch-arc-start.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dispatch-card-phases.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dispatch-card-version-word.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dispatch-model-word.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dispatch-resume-3am.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-planner-card.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-planner-card-write.py
 
-## MAN-6803 — The plan card — The hide store.
-section: dispatcher/010 The plan card/023 The hide store.
+## MAN-6803 — The plan card — The put-away store.
+section: dispatcher/010 The plan card/023 The put-away store.
 
-**The hide store.** Any plan can be hidden into a per-user list (`hiddenPlans.ts`: `hiddenPlans` under the `dispatcher` preference key, MERGED into the blob — MAN-498 — and capped at 200) of `{ name: <plan name>, at: <epoch seconds of the press> }`, one entry per name. `useHiddenPlans()` reads it; `hidePlans(names, onLane)` and `showPlans(names, onLane)` are each ONE write, pruned WHOLE against `onLane`, the caller's `carriedNames` — the UNFILTERED lane, hidden plans included, or the prune would drop every earlier hide. `useDispatcherPlans` hides a plan an entry names while it was CREATED no later than `at` (a plan dropped and opened again under the name is a different plan, never born hidden; a `created_at` nothing can parse holds the hide) and `epochOf(completed_at)` is null or not later than `at`, so a hidden plan comes back by itself only at its FIRST ending after the press (the store stamps `completed_at` once and never clears it); it returns `plans` (drawn), `hidden`, `count` (drawn) and `laneOpen`. The press builders live in `dispatcherState.ts`: `planHide(plan, carriedNames)`, `arcHide(plans, carriedNames)` (every plan of a deck, one write) and `endedHide(plans, carriedNames)` (every drawn `complete` plan, one write; `null` at zero). Reading also carries the pre-hide dismissal list's entries `{run_id, ended_at}` as `{ name: run_id, at: ended_at }`, and every write stores the merged list and drops the old key, so nothing dismissed before the hide store reappears. `HiddenPlans` (`Hidden · N`, a closed disclosure: each hidden plan's name, word and `Show`, then `Show all`; handles `data-hidden-plans`, `data-show-plan`, `data-show-all`) is the way back, at the foot of both homes and under their EmptyState.
+**The put-away store.** A card's corner puts its plan away into a per-user list (`hiddenPlans.ts`: `hiddenPlans` under the `dispatcher` preference key, named for the one press it first held, written by ENTRY PATCH — INV-4406 — and capped at 200, newest kept) of `{ name: <plan name>, at: <epoch seconds of the press>, arc?: <arc name> }`, one entry per name. `at` is never earlier than the server clock of the newest lane frame the page has received (`noteLaneClock`, fed by `useDispatcherPlans` from the bus value's `at`; `pressMoment`): a browser clock running behind stamped a Dismiss before the ending it dismissed, and the card stayed. A clock running ahead still stamps late. Dismiss and Hide write the SAME entry, and the plan, never the press, decides how it reads: so every done plan that sat in `Hidden` before Dismiss existed left that list with no migration (operator, 2026-09-28: "when its done i want to dismiss it off the board, and not show that its hidden"). `usePutAwayEntries()` reads it; `showPlans(names, onLane)` and the file-private `putAwayPlans(names, onLane, arc?)` are each ONE patch: the pressed names, plus a `null` for every entry this client holds whose plan `onLane` (the caller's `carriedNames` — the UNFILTERED lane, put-away plans included, or the prune would drop every earlier entry) no longer names. An entry the patch does not name stands, so a press made on another client survives this one's write. The lane carries a finished plan for a day, so a dismissal is pruned soon after its plan leaves.
+
+`useDispatcherPlans` reads every plan as ONE of three (`putAwayReading`). DRAWN when no entry names it, when it was CREATED after `at` (a plan dropped and opened again under the name is a different plan, never born put away; a `created_at` nothing can parse holds the entry), or when it ENDED after `at` (news the operator never saw): one comparison, its `newestMoment` against `at`. AN ARC'S CORNER IS ONE PRESS: its entries carry `arc` and one `at`, read the newest moment across every plan of that arc on the lane (`arcNewsOf`), and `showPlans` nulls every entry of the same `arc` and `at` as a plan it shows. So a mixed arc's Hide (unfinished plans to `Hidden`, done ones dismissed) comes back whole on a `Show` or on news, never as a deck missing its done cards; a plan's own press and both `Dismiss done` presses carry no `arc`. Otherwise HIDDEN when it is not `complete` (unfinished work stays reachable) and DISMISSED when it is (on no list, in no count). Its ending (`latestEnding`) is `completed_at` for a plan that is not complete and the newest phase `done_at` for one that is: the store stamps `completed_at` once and never moves it, so only the phases date a re-cut plan's second ending — a done plan re-cut under its dismissal waits in `Hidden` while it walks, and comes back as a card at the new ending. It returns `plans` (drawn), `hidden` (unfinished only), `count` (drawn) and `laneOpen` (`plans` or `hidden` non-empty, so a lane whose every card is dismissed closes the tab). The presses live beside the store: `putAwayVerb(plans)` (`dismiss` when every plan is `complete`, else `hide`), `planPutAway(plan, carriedNames)`, `arcPutAway(arc, plans, carriedNames)` (every plan of a deck, one write, one press) and `doneDismiss(plans, carriedNames)` (every drawn `complete` plan, one write; `null` at zero). No dialog guards any of them: nothing is deleted, and the dispatcher keeps the plan. `HiddenPlans` (`Hidden · N`, a closed disclosure: each hidden plan's name, word and `Show`, then `Show all`; handles `data-hidden-plans`, `data-show-plan`, `data-show-all`) is the way back from a Hide, at the foot of both homes and under their EmptyState; a dismissal needs none. Proof: `node .verify/probe-dismiss-done.mjs` (the tab at 1440 and 390, the widget at 1920, dark and light; the operator's own stored row; a done-only lane closing the tab; two clients).
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-arc-nest.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-arc-strip-return.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dispatch-arc-start.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dispatch-card-phases.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dispatch-card-version-word.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dispatch-model-word.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dispatch-resume-3am.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-planner-card.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-planner-card-write.py
 
@@ -2979,7 +2988,7 @@ name reaches (MAN-1498). The verbs return the
 raw `Response`: a refusal is a RESULT on a 409 with the dispatcher's line on `stdout`, which
 `useDispatcherVerbs` reads before `stderr`. `api.dispatcher` never throws on `!response.ok`.
 
-Every string the card draws — a goal, a title, a verdict, an event detail, the dispatcher's stdout —
+Every string the card draws — a description, a title, a verdict, an event detail, the dispatcher's stdout —
 reaches the DOM as a text node. Proven on the live dev app 2026-09-24: `dispatcher-ready` drawn LIVE with its fourteen phases and 45 events; `card-probe` pressed Park, Unpark and Park again, and left parked.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-arc-nest.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-arc-strip-return.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dispatch-arc-start.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dispatch-card-phases.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dispatch-card-version-word.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dispatch-model-word.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dispatch-resume-3am.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-planner-card.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-planner-card-write.py
@@ -3074,9 +3083,9 @@ section: dispatcher/010 The plan card/030 An arc's plans nested inside the arc's
 
 **An arc's plans nested inside the arc's deck — the standing proof.** `node .verify/probe-arc-nest.mjs [--url http://127.0.0.1:5183]` (tab at 1440, gutter at 1920, on the dev client).
 
-- it READS THE LIVE LANE AND NEVER WRITES TO IT: the expected split is computed in the probe from `GET /api/dispatcher/plans` and the operator's own preference blob (a hide is `{ name, at }`, and holds for a plan created no later than `at` until it ends after `at` — the hook's rule), so the assertion is against the store rather than a fixture — every plan of the lane must be drawn exactly once, inside its arc's deck if the store gives it one and outside every deck if it does not.
+- it READS THE LIVE LANE AND NEVER WRITES TO IT: the expected split is computed in the probe from `GET /api/dispatcher/plans` and the operator's own preference blob (an entry is `{ name, at, arc? }`, and holds until the plan's newest creation or ending (`newestMoment`, a complete plan's ending being its newest phase `done_at`) is later than `at`, an arc press reading the newest across its arc — the hook's rule, MAN-6803; a held entry of a complete plan is a dismissal, of any other a hide), so the assertion is against the store rather than a fixture — every plan of the lane must be drawn exactly once, inside its arc's deck if the store gives it one and outside every deck if it does not.
 - exit 0 = each arc deck holds exactly that arc's plans IN THE ARC'S OWN ORDER (urgency would put a `live` member first; the arc's file puts `restorly--kit` first whether anything walks or not), DRAWN AS THE DECK EVERY ARC IS DRAWN AS — the plans are the items of the deck's card list (in BOTH homes `ol[data-arc-strip]`: equal tops, left to right in the arc's own order), the header is the deck's own (`[data-arc-header]`, carrying one arc mark (`[data-arc-mark]`) and the arc's name (`[data-arc-title]`), and exactly one fold toggle) — each item holds a whole `[data-dispatcher-card]`, the caption counts the cards drawn, and the `waits on …` line is drawn exactly where the store names a plan of the arc and nowhere else.
-- STALE ON DISMISS: `judgeDismiss` still judges cards by the retired Dismiss handle (present on exactly the complete plans), a control no card draws — every card's corner carries Hide (`[data-dispatcher-hide]`) whatever its status — and it is called at all four of the probe's reading sites: the tab's arc rows and its plans of no arc, the gutter's arc rows and its loose plans. So it fails `<name> is complete, yet its card offers no Dismiss` once for EVERY complete plan each home draws, in an arc or not, until that one judge is re-aimed at Hide. `.verify/probe-arc-nest-athena.mjs` breaks earlier: its pure-function step imports the deleted dismissal builder from `dispatcherState.ts` by name and calls it four times, so the step throws `… is not a function` before any card is read.
+- STALE: `.verify/probe-arc-nest-athena.mjs` breaks before any card is read: its pure-function step imports the deleted dismissal builder `planDismissal` from `dispatcherState.ts` by name and calls it four times, so the step throws `… is not a function`. (`judgeDismiss` in this probe reads true: a card's corner carries `[data-dispatcher-dismiss]` on exactly the complete plans.)
 - ONE DECK IS FOLDED AND OPENED AGAIN, per arc and per home: folded, the body slot carries `inert` and `aria-hidden="true"`, the browser REFUSES focus to the first control inside it, one Tab from the deck's own toggle never lands inside, the header stays and the strip's arrows go; unfolded, the body is back in the tab order — so the pass leaves the fold store as it found it. A deck found folded at the start is opened first and a `[NOTE]` printed (a fold is the operator's own press, kept in his preference blob), because only an open deck can be read or photographed.
 - shots: `shots/arc-nest-<port>-tab.png`, `-tab-tall.png` (one page sized to the lane, so a thirteen-plan deck is photographed whole), `-<arc>-card.png`, `-<arc>-head.png`, `-<arc>-tail.png`, and the gutter's own framed on the deck's top; reading in `artifacts/arc-nest.json`.
 - 2026-09-25 on 5183: the `restorly` deck is thirteen plan cards in the arc's own order under its own header, the three plans of no arc (`athena-scenarios`, `dispatcher-refit`, `dispatcher-ready`) stand below it from 3123px, 16 of 16 plans drawn once; folded the deck is 124px (header 86px) and its 188 hidden controls refuse focus.
@@ -3125,7 +3134,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/ArcDeck.t
 ## MAN-5706 — The arc deck's frame — What the frame owns.
 section: dispatcher/015 The arc deck's frame/002 What the frame owns.
 
-**What the frame owns.** The root (`data-arc-status`, `data-collapsed`, and the caller's own handles through `rootAttributes` — `data-dispatch-arc`, `data-arc-name`), the `Collapsible` whose trigger is the header's fold (`CardFoldToggle`, `data-card-fold`), the header (`data-arc-header`, holding the `head` the caller hands in — a `LaneCardHead`, the plan card's own head: title, word, clock and `done/total` in a WRAPPING group whose title is floored at its own longest word, INV-4449, beside the corner — `⋯` while its menu holds an item, Hide, the fold; then the lead and the pills — and, first in its title, the arc's mark, below), the body slot (`CardFoldBody`, `data-arc-deck-body`), top to bottom: the caller's `bodyTop` — its `ActionBar` — then the strip. The root rises once, `motion-safe:animate-shape-rise`, on the first mount of the page session that draws its `foldKey`, claimed by the copy whose rise plays and gone when it ends (`useRiseOnce`; the root carries its `className`, `onAnimationStart` and `onAnimationEnd` — MAN-1557 → "The rise").
+**What the frame owns.** The root (`data-arc-status`, `data-collapsed`, and the caller's own handles through `rootAttributes` — `data-dispatch-arc`, `data-arc-name`), the `Collapsible` whose trigger is the header's fold (`CardFoldToggle`, `data-card-fold`), the header (`data-arc-header`, holding the `head` the caller hands in — a `LaneCardHead`, the plan card's own head: title, word, clock and `done/total` in a WRAPPING group whose title is floored at its own longest word, INV-4449, beside the corner — `⋯` while its menu holds an item, Dismiss or Hide by `putAwayVerb`, the fold; then the lead and the pills — and, first in its title, the arc's mark, below), the body slot (`CardFoldBody`, `data-arc-deck-body`), top to bottom: the caller's `bodyTop` — its `ActionBar` — then the strip. The root rises once, `motion-safe:animate-shape-rise`, on the first mount of the page session that draws its `foldKey`, claimed by the copy whose rise plays and gone when it ends (`useRiseOnce`; the root carries its `className`, `onAnimationStart` and `onAnimationEnd` — MAN-1557 → "The rise").
 
 **The arc's mark is the one thing in the head a plan card never has** (operator, 2026-09-28: "can we also have a special indicator for arcs on arc cards please"). `DispatchArcDeck` hands the head a title that LEADS with `ArcMark` (`ArcDeck.tsx`) — the kit's `Badge` in its OUTLINE shape, the lucide `Layers` glyph and `dispatcher.arcMark` ("Arc"), handle `data-arc-mark` — then the arc's bare name (`data-arc-title`, mono). It REPLACED the `.arc` ending the name carried, so the head says "arc" once; the `<name>.arc` door still names the flow and the strip for a screen reader. Outline because it is a KIND, not a state: every state word on a lane card is a filled, toned badge, so the one outlined pill never argues with the arc's status tone beside it, and the glyph and the word carry it without colour. No count in it: the head already binds `done/total` plans to the arc's word. It sits INSIDE the heading, so heading navigation hears "Arc restorly" and the mark and the name wrap as words do. The mark costs the title's line about 72px, so at 390px (and in the 1920px widget, ~202px of group) a name of up to 14 characters shares the mark's line and a longer one breaks at its hyphen — measured 2026-09-28: `dispatcher-refit`, `agent-launch-config` and `runner-card-makeover` read two lines where they read one without the mark; at 320px the mark stands over the name. Every break is by word and none leaves the card (INV-4449); the live arcs, `restorly` and `docstore`, are 8 characters and read one line. A fold keeps it (the head is outside the fold's body), and no plan card draws it, loose or in the strip: `PlanCard` hands its head a bare name.
 
@@ -3175,7 +3184,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/ArcDeck.t
 ## MAN-5711 — The arc deck's frame — The fold hides through `CardFoldBody`, never a raw clip (MAN-5412): while a deck is closed, its body
 section: dispatcher/015 The arc deck's frame/007 The fold hides through `CardFoldBody`, never a raw clip (MAN-5412): while a deck is closed, its body
 
-**The fold** hides through `CardFoldBody`, never a raw clip (MAN-5412): while a deck is closed, its body slot carries `inert` and `aria-hidden` and the browser REFUSES focus inside it — on a dispatch arc that is thirteen plans and 188 controls behind a 0px clip (measured 2026-09-25). A folded deck keeps its whole head — door, word, armed hour, `done/total`, goal, planner, pills and the corner — and loses its whole body: the `ActionBar` (`bodyTop`; the model switch and Start/Pause are VERBS, the same layer a plan card's own controls fold) and the strip. Its memory is the card fold's: `useCardFold` key `darc:<arc name>`, so a fold survives a reload and is shared by the tab and the gutter.
+**The fold** hides through `CardFoldBody`, never a raw clip (MAN-5412): while a deck is closed, its body slot carries `inert` and `aria-hidden` and the browser REFUSES focus inside it — on a dispatch arc that is thirteen plans and 188 controls behind a 0px clip (measured 2026-09-25). A folded deck keeps its whole head — door, word, armed hour, `done/total`, description, planner, pills and the corner — and loses its whole body: the `ActionBar` (`bodyTop`; the model switch and Start/Pause are VERBS, the same layer a plan card's own controls fold) and the strip. Its memory is the card fold's: `useCardFold` key `darc:<arc name>`, so a fold survives a reload and is shared by the tab and the gutter.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/ArcDeck.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/DeckFrame.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/DeckStrip.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/hooks/useDeckStrip.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-arc-strip-return.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-deck-height.mjs
 
@@ -3221,11 +3230,11 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/ArcDeck.t
 ## MAN-642 — The Runner tab
 section: dispatcher/020 The Runner tab
 
-`RunnerPanel` is where every plan the dispatcher carries is drawn: a plan of an arc is nested INSIDE that arc's own deck (`DispatchArcDecks`, MAN-643), and a plan of no arc is a `PlanCard` (MAN-1557) in the wall's grid beneath the decks. `RunnerPanel` and `RunnerWidgetBody` (the chat gutter's Runner widget) live in `src/modules/runner-tab`, a host module that imports the dispatcher through its barrel (`@/modules/dispatcher`); nothing in the dispatcher module imports it back. They read `useDispatcherPlans` (`plans`, `hidden`, `arcs`, `loosePlanners`, `carriedNames`, and the tab's `count`) and nothing else — no fetch on mount and no state of their own — so selecting the tab paints on the FIRST render with whatever the bus was already holding rather than blanking until the dispatcher next moves. Every card they draw folds (MAN-5412), and both hand the drawn plans, the hidden plans and the arcs to `useLaneFoldPrune`, so a card that leaves the lane takes its remembered fold with it and a hidden card keeps its own.
+`RunnerPanel` is where every plan the dispatcher carries is drawn: a plan of an arc is nested INSIDE that arc's own deck (`DispatchArcDecks`, MAN-643), and a plan of no arc is a `PlanCard` (MAN-1557) in the wall's grid beneath the decks. `RunnerPanel` and `RunnerWidgetBody` (the chat gutter's Runner widget) live in `src/modules/runner-tab`, a host module that imports the dispatcher through its barrel (`@/modules/dispatcher`); nothing in the dispatcher module imports it back. They read `useDispatcherPlans` (`plans`, `hidden`, `arcs`, `loosePlanners`, `carriedNames`, and the tab's `count`) and nothing else — no fetch on mount and no state of their own — so selecting the tab paints on the FIRST render with whatever the bus was already holding rather than blanking until the dispatcher next moves. Every card they draw folds (MAN-5412), and both hand the drawn plans, the hidden plans and the arcs to `useLaneFoldPrune`, so a card that leaves the lane takes its remembered fold with it, a hidden card keeps its own, and a dismissed card's goes.
 
 **Nothing renders over the transcript.** Operator ruling 2026-09-09: not a card, not a strip, not a chip, not a banner. The Runner widget sits BESIDE the transcript in the desktop gutter (`src/modules/chat-gutters`), the tab is its own pane, and the chat view keeps the whole height the composer and the CLI banner leave it. why: a card once pinned above the transcript took half a 390px screen and left one visible line with the keyboard open.
 
-**The gate rule is the memory tab's, and the Runner tab is the second tab to take it.** `useWorkspaceTabGates` computes `shouldShowRunnerTab: laneOpen || activeTab === 'runner'`, where `laneOpen` is `useDispatcherPlans().laneOpen` — a plan is drawn, or a hidden plan has not finished, so a walking plan the operator hid keeps the road to its `Show` — and the pill's `runnerCount` is `count`, the plans on screen, hidden ones excluded, an arc's own plans already among them. That ONE reading is what the three call sites share: `WorkspaceMain`, `ProjectSidebarRegion` and `ProjectCommandPalette` each pass their own `activeTab` and none recomputes the rule. The tab therefore appears while the lane is open, and is STICKY: it holds while it is the selected tab even after the last plan is hidden, so a plan finishing under someone reading its phases empties the panel instead of taking the tab out from under them. There is consequently **no snap-back effect** for it in `WorkspaceMain` — the three effects there belong to the PREFERENCE-gated tabs, whose gates really can turn off mid-act; a data-gated tab's gate is written never to. `VALID_TABS` names `runner`, so a restored `runner` tab lands on the panel rather than an empty pane; switching session returns to chat from it as from every tab (`handleSessionSelect`).
+**The gate rule is the memory tab's, and the Runner tab is the second tab to take it.** `useWorkspaceTabGates` computes `shouldShowRunnerTab: laneOpen || activeTab === 'runner'`, where `laneOpen` is `useDispatcherPlans().laneOpen` — a plan is drawn, or one is hidden (always an unfinished one, so a walking plan the operator hid keeps the road to its `Show`) — and the pill's `runnerCount` is `count`, the plans on screen, an arc's own plans among them. That ONE reading is what the three call sites share: `WorkspaceMain`, `ProjectSidebarRegion` and `ProjectCommandPalette` each pass their own `activeTab` and none recomputes the rule. The tab therefore appears while the lane is open, and is STICKY: it holds while it is the selected tab even after the last card is put away, so a plan finishing under someone reading its phases empties the panel instead of taking the tab out from under them. There is consequently **no snap-back effect** for it in `WorkspaceMain` — the three effects there belong to the PREFERENCE-gated tabs, whose gates really can turn off mid-act; a data-gated tab's gate is written never to. `VALID_TABS` names `runner`, so a restored `runner` tab lands on the panel rather than an empty pane; switching session returns to chat from it as from every tab (`handleSessionSelect`).
 
 **The badge.** `runnerCount` travels to `WorkspaceTabs` as a prop — the strip never reads the lane itself, which would be a second source for a decision already made — and is drawn only above zero. The workspace tabs are icon-only, so the number does not reach a `.vv-tabs__count` pill at all: `Tabs` renders that pill for word tabs only, and marks an icon tab with a `.vv-tabs__dot` while carrying the count in words in the tab's `title` (`Runner (2)`). Anything reading this strip's count reads the title.
 
@@ -3236,13 +3245,13 @@ section: dispatcher/020 The Runner tab
 3. One `PlanCard` per plan NO arc holds, in the list's urgency order (live, scheduled, queued, paused, parked, idle, complete; newest `updated_at` first inside each), in the tab's OWN wall (`ul[data-runner-loose-plans]`, `LANE_WALL_GRID`, `src/shared/constants.ts` — columns of at least 22rem, one card a row on a phone), which is the layout for the plans NO arc holds and for nothing else: a deck's cards are strip pages, each as wide as the deck. A card is passed no `defaultOpen`: a plan card's phases are shown in every home it has, so the tab and the gutter cannot disagree about what it shows.
 4. `HiddenPlans`, in a left-aligned `max-w-2xl` measure and only when something is hidden: its rows put a plan's name and its `Show` at either end of a line, and across the wall the two would be a screen apart.
 
-Every hide passes the lane's `carriedNames`: a card's corner Hide is `planHide(plan, carriedNames)` at either depth, and the tab's header ends in `Hide ended · N` (`data-hide-ended`, `endedHide`, one write) at `ml-auto` whenever a drawn plan is complete. `HiddenPlans` closes the tab's wall and the widget's list, and sits under each one's EmptyState too, because a lane whose every plan is hidden must still offer the way back. `EmptyState` shows only when the count is zero AND `arcs` is empty AND no loose planner is out; its words are `runner.empty` at nothing hidden and `dispatcher.hidden.allHidden` ("Every plan on the lane is hidden") as soon as anything is, since a hidden plan may still be walking — a soul at work on the lane with no card of its own is still something on this screen, and "nothing here" over it would be the pane lying. It is reachable precisely because the tab is sticky.
+Every press passes the lane's `carriedNames`: a card's corner is `planPutAway(plan, carriedNames)` at either depth, and the tab's header ends in `Dismiss done · N` (`data-dismiss-done`, `doneDismiss`, one write, nothing added to `Hidden`) at `ml-auto` whenever a drawn plan is complete. `HiddenPlans` closes the tab's wall and the widget's list, and sits under each one's EmptyState too, because a lane whose every unfinished plan is hidden must still offer the way back. `EmptyState` shows only when the count is zero AND `arcs` is empty AND no loose planner is out; its words are `runner.empty` at nothing hidden and `dispatcher.hidden.allHidden` ("Every unfinished plan is hidden") as soon as anything is, since a hidden plan may still be walking — a soul at work on the lane with no card of its own is still something on this screen, and "nothing here" over it would be the pane lying. It is reachable precisely because the tab is sticky.
 
 **The gutter.** `RunnerWidgetBody` (`src/modules/runner-tab/RunnerWidgetBody.tsx`) draws the lane as ONE vertical list, every item at once — operator, 2026-09-28: "please remove the arrows and show a list of plans instead". There are no arrows, no `n of total` and no paging: the widget frame's body scrolls the list (`src/modules/chat-gutters`), and the widget holds no state of its own. A chat switch re-renders the body in place (the route changes, the widget stays mounted), so a layout effect on `sessionId` returns the frame's scroll viewport to the top before paint, where the new chat's own items stand; otherwise the last chat's offset would open the new chat on another chat's item.
 
-- **The items** are the tab's split (`byArc`): one item per arc in the lane's order, then one per plan of no arc in urgency order; the items holding a plan this chat opened (`session_app_id === sessionId`) are lifted to the front, keeping that order among themselves (`widgetItemsOf`). An arc item is `<DispatchArcDecks groups={[group]} home="gutter" />` — the SAME component the tab calls, its plans still swiped one card per view in its own strip (MAN-643), its pin on the ROW (`li[data-dispatch-plan-row]`); a plan item is its `PlanCard` (`planHide(plan, carriedNames)`) in `div[data-testid=runner-widget-plan]` carrying `data-plan-name` and `data-pinned` (`true` for the open chat's, with `SessionPin`). Each item is an `li[data-widget-item=<key>]`, the key `darc:<arc name>` or `plan:<plan name>`.
+- **The items** are the tab's split (`byArc`): one item per arc in the lane's order, then one per plan of no arc in urgency order; the items holding a plan this chat opened (`session_app_id === sessionId`) are lifted to the front, keeping that order among themselves (`widgetItemsOf`). An arc item is `<DispatchArcDecks groups={[group]} home="gutter" />` — the SAME component the tab calls, its plans still swiped one card per view in its own strip (MAN-643), its pin on the ROW (`li[data-dispatch-plan-row]`); a plan item is its `PlanCard` (`planPutAway(plan, carriedNames)`) in `div[data-testid=runner-widget-plan]` carrying `data-plan-name` and `data-pinned` (`true` for the open chat's, with `SessionPin`). Each item is an `li[data-widget-item=<key>]`, the key `darc:<arc name>` or `plan:<plan name>`.
 - **The spacing** is the tab's: two cards stand `LANE_CARD_GAP` apart, the gap `LANE_WALL_GRID` also reads (`src/shared/constants.ts`), and a deck stands 24px from its neighbours, the tab's deck gap (`gap-6`), as the list's gap plus `mt-2` on every item beside a deck. The list stays flat and keyed by item, so a poll that re-sorts it moves cards and remounts none.
-- **Top to bottom**: `LoosePlannerBadges` (flush in both homes), then `Hide ended · N` (`data-hide-ended`, `endedHide`, every drawn plan, one write) at the column's right edge whenever a drawn plan is complete, then the list, then `HiddenPlans`. `Hide ended · N` takes itself away, so on the next frame focus goes to the widget's first reachable Hide, else its `Hidden · N` trigger — the tab header's own hand-off.
+- **Top to bottom**: `LoosePlannerBadges` (flush in both homes), then `Dismiss done · N` (`data-dismiss-done`, `doneDismiss`, every drawn complete plan, one write) at the column's right edge whenever a drawn plan is complete, then the list, then `HiddenPlans`. `Dismiss done · N` takes itself away, so on the next frame focus goes where `landFocusInHome` finds — the tab header's own hand-off.
 - **The standing proof**: `node .verify/probe-runner-widget-list.mjs --when after` (1920, dark and light, in the chat that opened a loose plan): no ‹ › button and no `n of m` outside the cards, the list's items and their order held to the record in `artifacts/runner-widget-list-before.json` (a snapshot of 2026-09-28, so that one check reads true only while the lane carries the same top-level items), the pinned card first, the items stacked at the tab wall's gap, the arc's strip moving one card on ArrowRight, and 0 console errors; every non-GET request the page makes is answered locally. Measured 2026-09-28 on 5183: 3 items (`plan:archpulse-estimate-flow`, `darc:restorly`, `plan:agent-launch-config`), 7 plan cards.
 
 The widget's `EmptyState` shows only when there is no plan, no arc and no loose planner, with the same two words, `HiddenPlans` under it. Its badge in `ChatGutterLayout` is `useDispatcherPlans().count`. Its cards fold on the same memory as the tab's: a fold pressed in one home is folded in the other.
@@ -3276,22 +3285,22 @@ Wiring on every card: `Collapsible open={!collapsed} onOpenChange={toggle}` arou
 
 | card | key | header keeps | body goes |
 | --- | --- | --- | --- |
-| `PlanCard` | `plan:<plan name>` | title, status, clock, `done/total`, goal, planner badge, `waits on`, spend pills, corner (`⋯` while droppable, Hide, fold) | the action bar (verbs, model switch), the face |
-| dispatch arc deck | `darc:<arc name>` | door, word, armed hour, `done/total`, goal, planner badge, spend pills, corner (`⋯` while a plan of it has ended, Hide, fold) | the action bar (Pause/Start/Schedule start, model switch), the flow and the cards (MAN-1557 → "The fold takes the cards AND the verbs") |
+| `PlanCard` | `plan:<plan name>` | title, status, clock, `done/total`, description, planner badge, `waits on`, spend pills, corner (`⋯` while droppable, Dismiss or Hide by `putAwayVerb`, fold) | the action bar (verbs, model switch), the face |
+| dispatch arc deck | `darc:<arc name>` | door, word, armed hour, `done/total`, description, planner badge, spend pills, corner (`⋯` — `Dismiss done plans · N` while some of its plans are complete and some are not — Dismiss or Hide by `putAwayVerb`, fold) | the action bar (Pause/Start/Schedule start, model switch), the flow and the cards (MAN-1557 → "The fold takes the cards AND the verbs") |
 
-Measured 2026-09-26 on 5183: `dispatcher-planners` (complete, 14 phases, no bar) is 250px open and 112px folded, and folded it still reads `dispatcher-planners`, `COMPLETE`, `14/14`, `$4.47 · 20.6M in · 206k out`, with Hide and the fold drawn.
+Measured 2026-09-26 on 5183: `dispatcher-planners` (complete, 14 phases, no bar) is 250px open and 112px folded, and folded it still reads `dispatcher-planners`, `COMPLETE`, `14/14`, `$4.47 · 20.6M in · 206k out`, with Dismiss and the fold drawn.
 
 A dispatch arc's body holds its plan cards, so a fold can hold a fold.
 
 ## the store — `src/shared/hooks/useCardFold.ts`
 
 - `useCardFold(key)` → `{ collapsed, toggle }` over `useSyncExternalStore` on the preference mirror: first paint is already folded, and the tab and the gutter widget read one memory.
-- Storage: `dispatcher.collapsedCards`, a string list in the server-synced user preferences, MERGED into the blob so `hiddenPlans` survives (MAN-498).
+- Storage: `dispatcher.collapsedCards`, a string list in the server-synced user preferences, written by ENTRY PATCH (INV-4406): a fold sends `{ collapsedCards: { <key>: <key> } }`, an opening `{ <key>: null }`, and every other fold and every hide stands.
 - ABSENT MEANS EXPANDED. Nothing folds a card by itself; the list holds only folded cards.
 - Key builders `planFoldKey`, `dispatchArcFoldKey` are the only spelling of the prefixes. why: a plan name and an arc name are free-form; a prefix cannot collide.
 - A fold belongs to the CARD, and nothing the plan does lifts it: a plan can be walked again, so the card returns still folded. This departs from `hiddenPlans.ts`, whose `{ name, at }` lapses when the plan ends after the hide.
 - Cap 200, oldest dropped; a dropped entry shows an open card.
-- Prune: `useLaneFoldPrune(plans, hidden, dispatchArcs)` (`src/modules/runner-tab/hooks/useLaneFoldPrune.ts`) is called by `RunnerPanel` and `RunnerWidgetBody` with the drawn plans AND the hidden ones: a hide is reversible, so a card shown again keeps its fold, and a deck whose every plan is hidden keeps its `darc:` key through the arcs those hidden plans name. `pruneCardFolds(live)` keeps a key in `live` and any key whose space (`plan`, `darc`) the caller sees not at all, so an empty bus frame prunes nothing. It writes nothing when nothing drops.
+- Prune: `useLaneFoldPrune(plans, hidden, dispatchArcs)` (`src/modules/runner-tab/hooks/useLaneFoldPrune.ts`) is called by `RunnerPanel` and `RunnerWidgetBody` with the drawn plans AND the hidden ones: a hide is reversible, so a card shown again keeps its fold, and a deck whose every plan is hidden keeps its `darc:` key through the arcs those hidden plans name. `pruneCardFolds(live)` keeps a key in `live` and any key whose space (`plan`, `darc`) the caller sees not at all, so an empty bus frame prunes nothing. It writes nothing when nothing drops, and a prune is a patch of `null`s for exactly the keys it drops.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/runner-tab/hooks/useLaneFoldPrune.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useCardFold.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/CardFold.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/index.ts
 
@@ -5947,13 +5956,13 @@ and a tap makes the phone send `POST <appUrl>/api/ntfy/act?t=<token>`:
 
 | Request | Buttons | What a tap does |
 | --- | --- | --- |
-| `AskUserQuestion` with one single-select question of 1–3 options | One per option, labelled with it | Answers with that option, exactly as the in-app question panel does |
+| `AskUserQuestion` with one single-select question of 1–3 options | One per option, labelled with it | Answers with that option, exactly as the in-app question panel does — except an option marked `needsNote` (a plan prompt's Rework), whose answer is not complete without the operator's own words: its button is an ntfy `view` action that opens the session, where the panel takes the note, and it carries no token |
 | `AskUserQuestion` of any other shape | None | Answer it in the app |
 | `ExitPlanMode` | Approve · Revise | Approves the plan, or declines it with "User asked to revise the plan" |
 | Any other tool | Approve · Deny | Allows the tool, or denies it with "User denied tool use" |
 
 Buttons need a `meta.promptKey` (the ask's identity) and a `meta.toolInput` on the
-`permission.required` event, and a stored app URL. They are built for every such event, whether
+`permission.required` event, and a stored app URL. Two producers put them there: the Claude runtime, and the dispatcher lane for a plan's prompt it raised itself in the owning chat (MAN-7400) — the same meta, plus `plan` and `askKind`, which the copy reads for a headline that names the plan (`Accept <plan>?`, `<plan> has questions`). They are built for every such event, whether
 or not that event's own push goes out (§"One question, one push"). The Claude runtime puts both on the event — the
 prompt key it is waiting on, and the tool's raw input — so on a configured instance a permission
 push carries buttons; a producer that names only a `meta.requestId` still gets buttons, keyed that
@@ -6023,8 +6032,10 @@ Two halves make one push:
 
 - **The prompt key** (`promptKeyFor` in `claude-runtime.provider.js`) is the ask's own identity:
   the tool use id the CLI stamped on the call, which the replayed request carries unchanged. The
-  re-issue keeps its own `requestId` — the in-app `permission_request` frame is a new ask for the
-  panel — but carries the same key, and the notification's `dedupeKey` is built on the key.
+  re-issue keeps its own `requestId` — the attempt's name, fresh every time — but carries the same
+  key, and both readers of a question are built on it: the notification's `dedupeKey`, and the
+  panel's bell, which rings once per key rather than once per handover
+  (`useChatRealtimeHandlers.ts`).
 - **The memory of the push** (`ntfy-pushed-prompts.service.ts`) is a record on disk at
   `~/.cloudcli/ntfy-pushed-prompts.json`, keyed by the prompt key and forgotten after the
   question's own window (4 hours — the same window its buttons live for). The channel checks it
@@ -6052,6 +6063,8 @@ That ordering is load-bearing, not incidental. The watched-session skip is the o
 a question pushed while the chat tab was hidden, then brought on screen, then handed over, would
 have had its re-issue dropped by the presence check before anything re-registered it — and the tap
 that came an hour later, on a phone that still showed the push, would answer nothing (410).
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/services/ntfy-pushed-prompts.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-runtime.provider.js, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useChatRealtimeHandlers.ts
 
 ## MAN-620 — How a push is published
 section: notifications/004 The ntfy channel/010 How a push is published
@@ -6294,7 +6307,7 @@ for the identical reason: another process reads this file while this one writes 
 
 **One client surface:** Settings → Agents → Claude, a second row in `RunnerModelContent.tsx` beneath
 the DeepSeek one, wearing the swarm mark (the Lucide `Network` glyph) with a `Stepper` whose `Unlimited` is the TOP of its scale rather than
-a dead state: `−` on it chooses the first ceiling (two lanes, `FIRST_CEILING` in the row, the
+a dead state: `−` on it chooses the first ceiling (two lanes, `SWARM_FIRST_CEILING` in `src/shared/constants.ts`, shared with the plan card's swarm control, the
 smallest count that runs phases beside each other), `+` on it is refused because nothing is wider,
 `+` on any count raises it with no upper bound, `−` stops at one lane, and the `Unlimited` action
 drawn beside the stepper whenever a ceiling is set clears it — with both presses live while the
@@ -6308,7 +6321,7 @@ the server reads back off the file, the same `unreadable` kept distinct from an 
 switches sharing a coordinator move together the first time either is edited, and these two must
 never.
 
-**What the switch DOES is the dispatcher's rule and lives there, not in this repository.** The flag's whole grammar and its fail-closed parse are `~/.claude/hooks/plan_runner/swarm.py` (`max_lanes()`: `1` when the flag is off, `None` for a bare `on`); `hooks/dispatcher/width.py` reads it to set how many phases walk at once (INV-202).
+**What the switch DOES is the dispatcher's rule and lives there, not in this repository.** The flag's whole grammar and its fail-closed parse are `~/.claude/hooks/plan_runner/swarm.py` (`max_lanes()`: `1` when the flag is off, `None` for a bare `on`); `hooks/dispatcher/width.py` reads it to set how many phases walk at once for every plan with no swarm word of its own (INV-202).
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/settings/swarm-switch.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useSwarmSwitch.ts, /home/lyphe/.claude/hooks/plan_runner/swarm.py, /home/lyphe/.claude/state/swarm.flag
 
@@ -9361,8 +9374,8 @@ key for key. The emitted document is the source of the shape.
   `running`, `done`.
 - `offpeak_at` is a `string`, never null: `plan_runner.when.stamp` answers the literal `none` when
   the clock cannot.
-- `DispatcherVerb` is seven of the CLI's own verbs: `stop`, `resume`, `schedule`, `park`, `unpark`,
-  `model` (the plan's own DeepSeek / Claude word — one verb serving a plan and an arc, resolved
+- `DispatcherVerb` is eight of the CLI's own verbs: `stop`, `resume`, `schedule`, `park`, `unpark`,
+  `swarm` (a plan's own swarm word, `DispatcherSwarmChoice`: `DispatcherSwarmWord` or `auto`; a plan's verb alone, `hooks/dispatcher/cmd/swarm.py`), `model` (the plan's own DeepSeek / Claude word — one verb serving a plan and an arc, resolved
   plan-first-then-arc, `hooks/dispatcher/cmd/model.py`) and `drop` (the plan out of the store for
   good, `hooks/dispatcher/cmd/drop.py`). FOUR OF THEM — `stop`, `resume`, `schedule`,
   `model` — take an ARC's name as readily as a plan's (`arc_verbs.py`, MAN-1465), which is why the
@@ -9378,7 +9391,7 @@ key for key. The emitted document is the source of the shape.
   refuse any other word BY NAME (`modelSince`).
 - `DispatcherArc` is the store's `arcs` row as `report_arcs.arc_dict` prints it: `name`, `goal`,
   `architecture`, `delivers`, `model`, the derived `status` (`DispatcherArcStatus` — the eight words of
-  `store_arcs.arc_word`: `empty`, `judged`, `complete`, `live`, then its plans' own waiting word —
+  `store_arcs.arc_word`: `empty`, `complete`, `judging`, `live`, then its plans' own waiting word —
   `scheduled`, `paused`, `queued` — else `designing`), `plans` (NAMES, in the
   arc file's order) and the arc's own `created_at`, `completed_at`, `cost_usd`, `tokens`, `tokens_in`,
   `tokens_out`, `tokens_cache_read`, PLUS the three readings an arc's own controls are drawn by (`report_arcs.walking` /
@@ -9443,3 +9456,15 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/ly
 - proof: `curl -s -w ' %{http_code}' http://127.0.0.1:3011/api/no-such-lane` → the body above and `404`; a mounted route still answers itself.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts
+
+## MAN-7400 — The dispatcher lane — the prompts a plan owes the operator, raised in its owning chat: the raise, the panel, the answer
+
+**The prompts a plan owes the operator, raised in its owning chat.** Composed in `dispatcher-prompts.module.ts` under the lane's root, from three pieces that watch the SAME picture the endings do (`dispatcher.module.ts`'s `broadcast`). No model is involved in asking, no turn of the chat is spent, and nothing is written into its transcript in the operator's name.
+
+THE RAISE (`dispatcher-raise.service.ts`). For the two events a landing is — `design-loaded`, `phases-loaded` — it runs `dispatcher ask <name>` (`dispatcher-ask.transport.ts`, `hooks/dispatcher/ask.py`, MAN-7399), which records the ask in the STORE (`prompted_at` and an `asked` event) and prints it in the document's `asking` shape; the prompt goes up at once (`asks.show`), on the tick that saw the landing (measured 2026-09-29: 0.7 s from a probe plan's landing to its `permission_request` frame, the lane polling every 2 s). The owning session is checked FIRST (`plan.session_app_id` through `sessionsDb`): an ask recorded for a chat this server cannot show would stand the `Stop` hold down over a prompt nobody sees, so such a plan is `unreachable` and its debt stays on the hold, as does one the verb refuses (no Eupalinos to take a Rework's notes or a round's answers). THE MARK IS A MAP: `dispatcher_raised_through` in `app_config` holds one entry PER PLAN, the highest landing id already answered, because a landing whose answer is still coming must stay DUE while every other plan's mark advances — a single watermark (the endings' `dispatcher_announced_through`, MAN-5639) would swallow it. It stays due while the writer is still OUT (`store.live_for`'s outing, read off the FRAME's `planners` list) and when the verb did not answer at all; it is read again before it is written, for the handover reason MAN-5639 states, and a double raise across that window costs nothing — the dispatcher checks and records an ask in one write transaction, so the second `ask` waits on the first and hears nothing. BOOTSTRAP, the first sight of a store this database never raised through: every plan in `questions`, or `loaded` with `prompted_at` null, is asked once through the same verb, and every plan is then marked at its own newest landing.
+
+THE PANEL (`dispatcher-asks.service.ts`) is a PROJECTION of every plan's `asking` key, held in nothing of its own but an attempt id: each distinct ask is put up in its plan's owning chat exactly as an `AskUserQuestion` is — a `permission_request` frame to every socket, marked `standalone: true`; a `permission.required` push with the runtime's own meta (`toolName: 'AskUserQuestion'`, `toolInput`, `requestId`, `promptKey`) plus `plan` and `askKind`, so the phone gets its buttons (MAN-618); and a place in `chat_subscribed`'s `pendingPermissions` and the sidebar's waiting mark through a permission gateway registered with the provider registry (`registerPermissionGateway`, MAN-332). An ask's NAME is the ask — its `asked` event, with an Accept's lock token (`dispatcher:lock:<token>:<id>`, the id its LEAD plan's) and a questions round's plan (`dispatcher:questions:<plan>:<id>`) — so one arc's lock carried on every plan it names is ONE prompt, and every landing is a new one: a re-cut after a Rework rewrites phase goals the token does not digest, and its fresh prompt buzzes the phone and rings the tab like the first, and a restart or a handover's second server reads the same asks back off the store without buzzing the phone again. A picture generated no later than an ask's own second cannot retract it (both stamps are the store's second-grained UTC); an answered ask stays down for `ANSWER_GRACE_MS` (30 s) while the store's own close of it reaches the picture, and one whose answer the dispatcher did not take goes straight back up.
+
+THE ANSWER (`dispatcher-answer.service.ts`), from the panel (it names the attempt) or the phone (it names the ask): Accept runs `dispatcher accept --lock <token> --by app:panel|app:phone <plans…>`, Queue the same with `--paused` — the verb re-checks the token and a stale one approves NOTHING, after which the current prompt is up again; Rework (its notes typed in the panel, `needsNote`; the phone's Rework button opens the chat instead) runs `dispatcher tell <target> --brief -` with the notes verbatim once per designer target; a questions round runs `dispatcher tell <target> --brief -` with the answers as `Q:`/`A:` pairs in the designer's own words. A decision that carries no answer — a skip, a label the prompt never offered, a Rework with no notes — keeps the prompt up. Every verb an answer runs is one journal line: the command, its exit, and the dispatcher's own first line. The lane's child environment drops `CLAUDE_CODE_SESSION_ID` and `DISPATCHER_SESSION` (`laneEnv`): the server is nobody's Claude session, `accept` refuses inside one, and `tell` would write a stray id onto the outing it queues.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/provider.registry.ts

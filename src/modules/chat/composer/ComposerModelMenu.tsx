@@ -25,6 +25,8 @@ type ComposerModelMenuProps = {
   model: string;
   /** Model catalog for the active provider; empty hides the section. */
   modelOptions: ProviderModelOption[];
+  /** The provider's own name for each model id its catalog lists (`LABELS_BY_MODEL_ID`), for a stored id on the chip. */
+  modelLabelsById?: Record<string, string>;
   onSelectModel: (model: string) => void;
   modelsLoading: boolean;
   /**
@@ -58,6 +60,7 @@ function ComposerModelMenu({
   onSelectEffort,
   model,
   modelOptions,
+  modelLabelsById,
   onSelectModel,
   modelsLoading,
   permissionMode,
@@ -87,11 +90,7 @@ function ComposerModelMenu({
   // resolves it the same way the transcript caption does. The id itself is the
   // last resort and only a custom model reaches it — there, the id IS the name
   // the user gave it.
-  const modelLabel = selectedModelOption?.label || resolveModelLabel(modelOptions, model) || model;
-  // The chip has one line beside the composer, and every model in this catalog carries the 1M
-  // window — so "(1M context)" spends a third of that line distinguishing nothing. The menu
-  // keeps the full label, where it still separates a `[1m]` alias from a bare one.
-  const chipModelLabel = modelLabel.replace(/\s*\(1M context\)\s*$/i, '');
+  const modelLabel = selectedModelOption?.label || resolveModelLabel(modelOptions, model, modelLabelsById) || model;
 
   const hasEffortSection = resolvedEffortOptions.length > 0;
   const hasModelSection = modelOptions.length > 0 || modelsLoading;
@@ -106,7 +105,7 @@ function ComposerModelMenu({
   const permissionLabel = (mode: PermissionMode) => t(`composer.editMode.labels.${mode}`, { defaultValue: mode });
   const permissionHelp = (mode: PermissionMode) => t(`composer.editMode.help.${mode}`, { defaultValue: '' }) || undefined;
 
-  const triggerLabel = hasModelSection ? chipModelLabel : effortLabel;
+  const triggerLabel = hasModelSection ? modelLabel : effortLabel;
   // The mark on the pill is colour and fill; the words it replaced live on here, so the
   // current mode is still readable by anyone hovering, or on a screen reader.
   const ariaLabel = hasPermissionSection && permissionMode

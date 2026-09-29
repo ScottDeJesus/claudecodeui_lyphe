@@ -56,7 +56,7 @@ type LoginFlow = 'account' | 'design';
 
 // Every tab the sidebar can land on. A tab missing from here is silently rewritten to
 // "agents" when a caller deep-links to it, which is how Voice became unreachable by name.
-const KNOWN_MAIN_TABS: SettingsMainTab[] = ['agents', 'appearance', 'git', 'tasks', 'notifications', 'api', 'voice', 'plugins', 'browser', 'about'];
+const KNOWN_MAIN_TABS: SettingsMainTab[] = ['agents', 'appearance', 'git', 'tasks', 'notifications', 'api', 'voice', 'plugins', 'browser', 'updates', 'about'];
 
 const normalizeMainTab = (tab: string): SettingsMainTab => {
   // Keep backwards compatibility with older callers that still pass "tools".

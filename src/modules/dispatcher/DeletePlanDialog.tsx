@@ -38,7 +38,9 @@ function useReturnFocus(): void {
  * plan belongs to an arc, the plan leaves that arc and the arc stays. It also names every plan whose
  * `waits_on` holds this one while that wait is still unmet (`planWaiters`): those are the plans the
  * drop may let start sooner. A met wait's edge goes too but releases nothing, so it is not named.
- * Hidden plans count as well, because the store keeps their edges whether or not a card is drawn.
+ * Hidden plans count as well, because the store keeps their edges whether or not a card is drawn. A
+ * dismissed plan is in neither list and needs to be in none: it is complete, and `planWaiters` never
+ * names a complete plan as a waiter.
  *
  * A DISMISSAL WAITS FOR THE ANSWER. Once Delete is pressed, the press is already at the dispatcher,
  * so Cancel is disabled and Escape and the backdrop do nothing until `drop()` answers (within the

@@ -2,8 +2,8 @@
 // beside every other lane's feed.
 export { DispatcherFeed } from '@/modules/dispatcher/DispatcherFeed';
 // The lane's read side — every plan the store holds, this box's posture beside them, and which of
-// them the operator has hidden. The Runner tab reads it for the card list, the `Hidden` list and the
-// count and `laneOpen` that badge and gate the tab.
+// them the operator has hidden or dismissed. The Runner tab reads it for the card list, the `Hidden`
+// list and the count and `laneOpen` that badge and gate the tab.
 export { useDispatcherPlans } from '@/modules/dispatcher/hooks/useDispatcherPlans';
 // Both hands, one hook: the plan card's seven verbs and the arc header's four — stop, resume, schedule
 // and the arc's model word — relayed to the dispatcher's own binary and answered with its own
@@ -13,18 +13,14 @@ export { useDispatcherPlans } from '@/modules/dispatcher/hooks/useDispatcherPlan
 export { useDispatcherVerbs } from '@/modules/dispatcher/hooks/useDispatcherVerbs';
 // The pure vocabulary of a plan, so a card never re-derives a tone, a progress count or
 // the order the cards sit in — and the lane's own split, so the Runner tab and the chat gutter's
-// widget group and order the arcs' plans by ONE rule instead of two. The three hides are here too:
-// one plan's, an arc deck's and `Hide ended · N`, each one write to the hide store.
+// widget group and order the arcs' plans by ONE rule instead of two.
 export {
-  arcHide,
   byArc,
   byUrgencyThenNewest,
   deckFocusIndex,
-  endedHide,
   epochOf,
   phaseProgress,
   phaseStatusTone,
-  planHide,
   planLayer,
   planStatusTone,
   scheduleClock,
@@ -37,7 +33,12 @@ export type { DispatchDeckLayer, DispatcherArcGroup, DispatcherArcSplit } from '
 // in `src/modules/runner-tab`: the Runner tab and the chat gutter's widget.
 export { PlanCard } from '@/modules/dispatcher/PlanCard';
 export { DispatchArcDecks } from '@/modules/dispatcher/ArcDeck';
-// The `Hidden · N` list at the foot of both homes: every hidden plan, each with its `Show`.
+// The presses that put a card away, each one write to the put-away store: one plan's corner, an arc
+// deck's and `Dismiss done · N`. A done card's is Dismiss and an unfinished card's Hide.
+export { doneDismiss, planPutAway } from '@/modules/dispatcher/hiddenPlans';
+// Where the keyboard lands once a press has taken its own control away with the card.
+export { landFocusInHome } from '@/modules/dispatcher/putAwayFocus';
+// The `Hidden · N` list at the foot of both homes: every hidden (unfinished) plan, each with its `Show`.
 export { HiddenPlans } from '@/modules/dispatcher/HiddenPlans';
 // The pin a plan wears when the open chat is the one that launched it, drawn by both homes.
 export { SessionPin } from '@/modules/dispatcher/SessionPin';

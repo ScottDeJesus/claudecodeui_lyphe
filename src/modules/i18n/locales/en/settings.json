@@ -1,6 +1,7 @@
 {
   "title": "Settings",
   "savedAsYouChange": "Saved as you change them",
+  "close": "Close",
   "tabs": {
     "account": "Account",
     "permissions": "Permissions",
@@ -131,6 +132,7 @@
     "browser": "Browser",
     "notifications": "Notifications",
     "plugins": "Plugins",
+    "updates": "Updates",
     "about": "About"
   },
   "notifications": {

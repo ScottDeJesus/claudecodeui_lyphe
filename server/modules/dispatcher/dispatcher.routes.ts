@@ -1,11 +1,12 @@
 import express from 'express';
 
-import type { DispatcherOffpeak, DispatcherVerb, DispatcherVerbResult } from '@/shared/types.js';
+import type { DispatcherOffpeak, DispatcherSwarmChoice, DispatcherVerb, DispatcherVerbResult } from '@/shared/types.js';
 import {
   dispatcherModelChoiceError,
   dispatcherScheduleWhenError,
   readDispatcherModelChoice,
   readDispatcherScheduleWhen,
+  readDispatcherSwarmWord,
 } from '@/shared/utils.js';
 
 import type { DispatcherPicture } from './dispatcher-state.service.js';
@@ -33,14 +34,40 @@ const PLAN_NAME = /^[a-z0-9][a-z0-9-]{0,99}$/;
  */
 const ARC_NAME = /^[a-z0-9][a-z0-9-]{0,99}(\.arc)?$/;
 
+/** The 400 sentence the swarm route answers with when the body names no word the dispatcher takes. */
+const SWARM_CHOICE_ERROR = 'swarm must be off, on, on <N> (N a whole number from 1 to 9007199254740991), or auto';
+
 export type DispatcherRouterDependencies = {
-  /** The watcher's last reading. Never a fresh read: the poll already owns the subprocess. */
-  current: () => DispatcherPicture;
+  /**
+   * The reading to answer a request with: the watcher's last, and — in the gap before this boot's
+   * first `dispatcher status --json` has landed — that first reading, waited for up to the bound the
+   * composition root names (`FIRST_READ_WAIT_MS`, `dispatcher.module.ts`). Never a fresh read of its
+   * own: the poll already owns the subprocess.
+   *
+   * `null` means the wait ended with this boot still holding no picture, and the routes below answer
+   * that with `NOT_READ_YET` — never with an empty plan list, which every client downstream would
+   * publish as a reading.
+   */
+  current: () => Promise<DispatcherPicture | null>;
   /** Relays one of the dispatcher's own verbs and comes back with what it said; `verbArgs` follow the plan's name. */
   runVerb: (verb: DispatcherVerb, plan: string, verbArgs?: readonly string[]) => Promise<DispatcherVerbResult>;
   /** The dispatcher's next DeepSeek off-peak moment, epoch SECONDS or `null` (`dispatcher-offpeak.service.ts`). */
   offpeak: () => Promise<number | null>;
 };
+
+/**
+ * What a read is told while this boot has not read the dispatcher yet.
+ *
+ * Never an empty picture, and never an error status. "No plans" is a CLAIM about the host, and this
+ * server may only make it after reading the store; before that, the one true thing to say is that
+ * there is nothing to say yet. 200, not 503: a read with nothing to say yet is not a fault, and a
+ * non-2xx status is what puts a console error in every tab that seeds while a handover is still
+ * reading (the rule `accounts.routes.ts` states for its reads). The body is what keeps this from
+ * being drawn — not the whole picture, so `DispatcherFeed`'s `asPicture` answers `null` for it and
+ * publishes nothing — and the frame the first landing broadcasts fills the tab a moment later. The
+ * reader sees the plans arrive, instead of watching them drop to zero and climb back.
+ */
+const NOT_READ_YET = { error: 'the dispatcher has not been read yet' } as const;
 
 /**
  * How a relayed verb's outcome becomes a status.
@@ -58,16 +85,19 @@ function statusForVerb(result: DispatcherVerbResult): number {
 }
 
 /**
- * The dispatcher lane's fourteen routes: three reads of the plan list, seven presses on a plan, four on
+ * The dispatcher lane's fifteen routes: three reads of the plan list, eight presses on a plan, four on
  * an arc. Auth is the mount's `authenticateToken`, in `server/index.ts`.
  *
  * These handlers validate and translate, and do nothing else: nothing is read here, no process is
  * started here, and no route names a path from the request — the binary and the store are the
  * module's, fixed at composition, and a request can only ever choose a plan or an arc by name, a
- * word from the closed set of seven verbs, and — where the verb takes one — a word from the three
- * model words.
+ * word from the closed set of eight verbs, and — where the verb takes one — a word from the three
+ * model words or the swarm grammar.
  *
- * FOUR OF THE SEVEN ARE RELAYED TWICE, once under `/plans/:name` and once under `/arcs/:name`, because
+ * A READ THAT FINDS NO PICTURE IS TOLD SO (`NOT_READ_YET` above), and the read waits a bound for one
+ * first: the two together are what keep a handover from being drawn as an empty plan list.
+ *
+ * FOUR OF THE EIGHT ARE RELAYED TWICE, once under `/plans/:name` and once under `/arcs/:name`, because
  * the dispatcher's own doors open on both: `model`, `stop`, `resume` and `schedule` take an arc's
  * name as readily as a plan's. The two spellings are two routes rather than one param because the
  * NAME CLASSES differ (`PLAN_NAME` against `ARC_NAME` below) — a fence that would be lost the moment
@@ -76,8 +106,13 @@ function statusForVerb(result: DispatcherVerbResult): number {
 export function createDispatcherRouter(dependencies: DispatcherRouterDependencies): express.Router {
   const router = express.Router();
 
-  router.get('/plans', (_request, response) => {
-    response.json({ ...dependencies.current(), at: Date.now() });
+  router.get('/plans', async (_request, response) => {
+    const picture = await dependencies.current();
+    if (picture === null) {
+      response.json(NOT_READ_YET);
+      return;
+    }
+    response.json({ ...picture, at: Date.now() });
   });
 
   // BEFORE `/plans/:name`, which would otherwise answer `no such plan` for the word `offpeak`. The
@@ -87,11 +122,16 @@ export function createDispatcherRouter(dependencies: DispatcherRouterDependencie
     response.json(body);
   });
 
-  router.get('/plans/:name', (request, response) => {
+  router.get('/plans/:name', async (request, response) => {
+    const picture = await dependencies.current();
+    if (picture === null) {
+      response.json(NOT_READ_YET);
+      return;
+    }
     // The bare name, which is the only spelling there is: the store holds it, the document prints it,
     // and the card and every verb address a plan by it. No name is ever rewritten here.
     const wanted = request.params.name;
-    const plan = dependencies.current().plans.find((entry) => entry.name === wanted);
+    const plan = picture.plans.find((entry) => entry.name === wanted);
     if (!plan) {
       response.status(404).json({ error: 'no such plan' });
       return;
@@ -149,6 +189,17 @@ export function createDispatcherRouter(dependencies: DispatcherRouterDependencie
     return choice === null ? null : [choice];
   };
 
+  /**
+   * A plan's swarm word — `readDispatcherSwarmWord`'s canonical `off`, `on`, `on <N>`, or the door's
+   * own `auto` — or `null`. The same shape as `modelArgs`: the word becomes an argv word only once it
+   * is one this server spelled.
+   */
+  const swarmArgs = (body: unknown): string[] | null => {
+    const typed = (body as { swarm?: unknown } | undefined)?.swarm;
+    const choice: DispatcherSwarmChoice | null = typed === 'auto' ? 'auto' : readDispatcherSwarmWord(typed);
+    return choice === null ? null : [choice];
+  };
+
   router.post('/plans/:name/stop', relay('stop'));
   router.post('/plans/:name/resume', relay('resume'));
   router.post('/plans/:name/park', relay('park'));
@@ -164,6 +215,11 @@ export function createDispatcherRouter(dependencies: DispatcherRouterDependencie
   // the plan's NEXT phase and never disturbs a walk already out — which is why no plan's state is a
   // reason to refuse this verb, and why the dispatcher's own answer is the whole verdict.
   router.post('/plans/:name/model', relay('model', modelArgs, dispatcherModelChoiceError()));
+  // A plan's own swarm word (`dispatcher swarm <name> <word>`), or `auto` to hand it back to the box's
+  // switch. A PLAN'S VERB ALONE — an arc carries no swarm word — and never refused for a plan's state:
+  // the word is read at the rule's next take-up (`width.reason`), and the dispatcher kicks its own
+  // daemon when the word changed, so a wider word frees a held phase without a press here.
+  router.post('/plans/:name/swarm', relay('swarm', swarmArgs, SWARM_CHOICE_ERROR));
   // A QUEUED plan's Start at a time, and the only verb here with an argument:
   // `dispatcher schedule <name> offpeak|<iso>|none`. The dispatcher refuses a plan that is live or
   // has never waited, and a time already past; that sentence is the 409's body, untouched.

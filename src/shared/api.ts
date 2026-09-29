@@ -3,7 +3,8 @@ import {
   getStoredAuthToken,
   storeAuthToken,
 } from '@/shared/authToken';
-import type { DeepseekRange, DispatcherModelChoice, FileLinePatch, JevRange, NtfySettingsInput, SubagentTranscriptResult } from '@/shared/types';
+import type { DeepseekRange, DispatcherModelChoice, DispatcherSwarmChoice, FileLinePatch, JevRange, NtfySettingsInput, SubagentTranscriptResult } from '@/shared/types';
+import type { ClaudeUpdateApplyRequest } from '@/shared/claude-update-types';
 import { IS_PLATFORM } from '@/shared/utils';
 import { readVoiceConfig, voiceConfigHeaders } from '@/shared/voiceConfig';
 
@@ -711,6 +712,25 @@ export const api = {
     update: () => post('/api/system/update', undefined, { timeoutMs: NO_REQUEST_TIMEOUT }),
   },
 
+  // The Claude update pipeline (MAN-7401–MAN-7404 — the check, the install/restart backend and this
+  // client's own row; the fuller account goes into the cloudcli:docs store): what the two Claude
+  // packages are on, what npm has, and the two presses that move them. The report is also what every
+  // action answers with, so one read serves the tab, the cards and the sidebar row.
+  //
+  // `check` opts out of the request ceiling for the same reason `system.update` does: it waits out
+  // however long npm takes to answer, and a ceiling here would report a check that is still running
+  // as a failed one.
+  //
+  // `apply` and `restart` refuse with a `ClaudeUpdateRefusal` — a 400/409 whose `message` is the
+  // sentence the tab shows under the button that asked. The caller reads it off the raw response
+  // rather than through `readApiJson`, because the status IS the answer.
+  claudeUpdates: {
+    report: () => get('/api/claude-updates'),
+    check: () => post('/api/claude-updates/check', undefined, { timeoutMs: NO_REQUEST_TIMEOUT }),
+    apply: (request: ClaudeUpdateApplyRequest) => post('/api/claude-updates/apply', request),
+    restart: () => post('/api/claude-updates/restart'),
+  },
+
   // The Claude account switcher and its usage meter, served by the server's own accounts module.
   // Both reads answer 200 whatever the state — the calm `{reachable:false, reason}` picture when
   // nothing can be computed — so a caller reads the BODY rather than the status. Both writes carry
@@ -762,6 +782,10 @@ export const api = {
     // control relays it; nothing is optimistic, and the next `dispatcher_state` frame reads the
     // word back. Restarts nothing — the word is read when a chain is LAUNCHED.
     model: (name: string, model: DispatcherModelChoice) => post(`/api/dispatcher/plans/${encodeURIComponent(name)}/model`, { model }),
+    // A plan's own swarm word (`dispatcher swarm <plan> <word>`) — `off`, `on`, `on <N>`, or `auto` to
+    // follow the box's switch again. The plan card's swarm control relays it; nothing is optimistic,
+    // and the next `dispatcher_state` frame reads the word back. A plan's verb alone: no arc route.
+    swarm: (name: string, swarm: DispatcherSwarmChoice) => post(`/api/dispatcher/plans/${encodeURIComponent(name)}/swarm`, { swarm }),
     // The DISPATCH ARC header's four presses (`dispatcher model|stop|resume|schedule <arc> …`), each
     // relayed to the arc's own door. Separate routes from the plan's because an arc is addressed by
     // its own door (`.arc`), never through a plan's.

@@ -368,20 +368,21 @@ export default function ProviderSelectionEmptyState({
             </DialogContent>
           </Dialog>
 
+          {/* Named the way the card above names it: the option's label, not the value it sends. */}
           <p className="mt-4 text-center text-sm text-muted-foreground/70">
             {
               {
                 claude: t("providerSelection.readyPrompt.claude", {
-                  model: providerModels.claude,
+                  model: currentModelLabel,
                 }),
                 cursor: t("providerSelection.readyPrompt.cursor", {
-                  model: providerModels.cursor,
+                  model: currentModelLabel,
                 }),
                 codex: t("providerSelection.readyPrompt.codex", {
-                  model: providerModels.codex,
+                  model: currentModelLabel,
                 }),
                 opencode: t("providerSelection.readyPrompt.opencode", {
-                  model: providerModels.opencode,
+                  model: currentModelLabel,
                   defaultValue: "Ready with OpenCode {{model}}",
                 }),
               }[provider]

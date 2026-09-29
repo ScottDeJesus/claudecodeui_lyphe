@@ -147,6 +147,20 @@ The two writes the sidebar owns outside the chat itself live in
 Both answers are followed by a `session_upserted` broadcast on the chat
 websocket, so every open tab re-renders the row.
 
+## MAN-7405 — The Claude model catalog
+section: README/004 What Each Facet Does/001 The Claude model catalog
+
+The Claude picker's options, labels, descriptions and effort levels come from the installed CLI's own catalog. There is no list typed in beside the aliases, so a CLI release that moves an alias moves the picker with it.
+
+- **The read** (`list/claude/claude-model-catalog.ts`). It starts an SDK `query` in streaming-input mode, with a prompt that yields nothing, and calls `supportedModels()`. The CLI answers with every model it can run, the alias each family answers to, its name for each, a description and the effort levels each accepts, and it does so without starting a turn. Measured 2026-09-28 on Claude Code 2.1.284: 633–901 ms, no API request, no transcript. The read runs on Haiku (`claude-haiku-4-5-20251001`), from `os.tmpdir()`, with the executable the chat runtime spawns, and with `settingSources: []`. With no settings source named, the SDK loads every one, the read's cwd included, and each read ran the user's SessionStart and SessionEnd hooks plus any `.claude/settings.json` another user left in world-writable `/tmp`. The catalog is byte-identical with no source loaded.
+- **When it runs.** Once per installed CLI version, keyed on `readInstalledCliVersion()`, the `cli-version` module's one cached reading; the catalog never runs a `--version` of its own. The answer is kept at `~/.cloudcli/claude-model-catalog.json` beside the version it was read on (`CLOUDCLI_CLAUDE_MODEL_CATALOG_PATH` redirects it), so the dev server's handovers load it instead of respawning the CLI. A reading with no version ("not heard") is served whatever is kept under a real version and never spawns the CLI or replaces that record; only a CLI never named by path, with nothing keyed, is read once per process. `getSupportedModels` also sits on the send path (effort validation), so a caller waits at most 3 s for a read in flight and is otherwise served what is already known.
+- **When the read fails.** The server serves the last good catalog on disk, whatever version it came from. With none, it serves `CLAUDE_FALLBACK_MODELS`, whose rows are named by family alone ("Opus", "Sonnet") and state no generation. One `[Claude models]` log line says which. A failed version is asked again after 10 minutes.
+- **What is offered** (`list/claude/claude-model-options.ts`). One row per family, the newest: the family's alias entry where the catalog has one, else its newest pinned id (Fable, on 2.1.284). `default` and the older pinned versions are dropped. A new family appears on its own, in the catalog's order. Ultracode is added exactly where the catalog's effort levels include `xhigh`. Values stay the ones stored sessions hold (`opus[1m]`, `fable`, `sonnet[1m]`, `haiku`), so every stored selection still matches an option.
+- **Stored ids.** The definition carries `LABELS_BY_MODEL_ID`, the catalog's name for every concrete id it lists. `mergeProviderModels` passes it through, and `src/modules/chat/utils/modelLabels.ts` reads it before its own generation-parsing fallback, which names only ids the catalog does not list. So `claude-sonnet-5-5` reads "Sonnet 5.5" and `claude-sonnet-5` reads "Sonnet 5".
+- **Proof.** `.verify/probe-claude-catalog-picker.mjs <before|after>` prints the API's answer and the picker's rows, desktop and mobile, dark and light. `.verify/probe-opus-55-selector.mjs` covers stored-turn captions and the resumed-session chip.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-model-catalog.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-model-options.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-models.provider.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/utils/modelLabels.ts
+
 ## MAN-701 — How To Add A Provider
 section: README/005 How To Add A Provider
 

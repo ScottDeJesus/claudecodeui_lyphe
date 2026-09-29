@@ -78,7 +78,9 @@
           "server/shared/mcp-command.ts",
           "server/shared/polled-lane.service.ts",
           "server/shared/kanban-types.ts",
-          "server/shared/app-types.ts"
+          "server/shared/app-types.ts",
+          "server/shared/claude-update-types.ts",
+          "server/shared/version-order.ts"
         ],
         "mode": "file"
       },
@@ -104,13 +106,15 @@
           "src/shared/authToken.ts",
           "src/shared/voiceConfig.ts",
           "src/shared/userSettings.ts",
+          "src/shared/preferenceEntryPatch.ts",
           "src/shared/chatDrafts.ts",
           "src/shared/solarSchedule.ts",
           "src/shared/spend.ts",
           "src/shared/deepseekPeakHours.ts",
           "src/shared/syntaxHighlighter.ts",
           "src/shared/kanban-types.ts",
-          "src/shared/app-types.ts"
+          "src/shared/app-types.ts",
+          "src/shared/claude-update-types.ts"
         ],
         "mode": "file"
       },

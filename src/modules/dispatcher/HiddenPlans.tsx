@@ -8,23 +8,26 @@ import { Button, Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/s
 
 /**
  * The way back from a Hide: `Hidden · N`, a disclosure listing every plan the operator has hidden,
- * each as its name, its word and a `Show`, then `Show all`.
+ * each as its name, its word and a `Show`, then `Show all`. EVERY ONE IS UNFINISHED: a done card put
+ * away is dismissed (`hiddenPlans.ts`), off the board and off this list, so the list never fills up
+ * with work that has ended (operator, 2026-09-28: "otherwise ill have a ton of hidden cards that are
+ * done").
  *
  * CLOSED BY DEFAULT, and drawn only when something is hidden. The list is what the operator put away,
  * so it stays one quiet line until asked for. At zero it draws nothing at all, since a `Hidden · 0`
  * would be a line about nothing.
  *
- * THE STATUS WORD RIDES EVERY ROW because hiding is not only for finished plans: a plan hidden while
- * it walks is still walking, and the row is the one place on the screen that says so. `Show` and
- * `Show all` are each ONE write to the hide store (`showPlans`), pruned against the whole lane
- * (`carriedNames`), and a shown card returns to the grid on the render the write triggers.
+ * THE STATUS WORD RIDES EVERY ROW because an unfinished plan is still moving or waiting: a plan
+ * hidden while it walks is still walking, and the row is the one place on the screen that says so.
+ * `Show` and `Show all` are each ONE write to the put-away store (`showPlans`), pruned against the
+ * whole lane (`carriedNames`), and a shown card returns to the grid on the render the write triggers.
  *
  * `data-hidden-plans` is the root's handle and `data-show-plan=<name>` each row's button, so a probe
  * presses one plan's Show without reading the rows' text.
  *
  * Used by the runner-tab module: at the foot of `RunnerPanel`'s scroll body and of `RunnerWidgetBody`'s
- * list, and under each home's EmptyState, because a lane whose every plan is hidden must still offer
- * the way back.
+ * list, and under each home's EmptyState, because a lane whose every unfinished plan is hidden must
+ * still offer the way back.
  */
 export function HiddenPlans({ hidden, carriedNames }: { hidden: DispatcherPlan[]; carriedNames: string[] }) {
   const { t } = useTranslation();

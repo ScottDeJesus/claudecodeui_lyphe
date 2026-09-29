@@ -196,6 +196,13 @@ function permissionCopy(meta: Record<string, unknown>): { headline: string; body
   const toolInput = isRecord(meta.toolInput) ? meta.toolInput : null;
 
   if (toolName === 'AskUserQuestion') {
+    // A plan's prompt, raised by the app itself in the plan's owning chat (`dispatcher-asks.service.ts`):
+    // the headline names the plan, since no model is the one asking.
+    const plan = readText(meta.plan);
+    if (plan) {
+      const headline = meta.askKind === 'accept' ? `Accept ${plan}?` : `${plan} has questions`;
+      return { headline, body: questionBody(toolInput) };
+    }
     return { headline: 'Claude has a question', body: questionBody(toolInput) };
   }
   if (toolName === 'ExitPlanMode') {

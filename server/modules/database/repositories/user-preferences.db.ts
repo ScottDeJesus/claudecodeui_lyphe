@@ -79,6 +79,52 @@ function mergeGutters(stored: unknown, incoming: unknown): unknown {
   return { fallback: incoming.fallback ?? (isRecord(stored) ? stored.fallback : undefined), sessions, order: ordered };
 }
 
+/**
+ * The Runner lane's memory (`dispatcher`) is the other document every open client writes: two ENTRY
+ * LISTS, `hiddenPlans` (`{ name, at }` per hidden plan) and `collapsedCards` (one fold key per folded
+ * card). Replaced whole, it let any client write back the copy it read at sign-in and erase every hide
+ * and fold made elsewhere since: on 2026-09-28 the operator's arc Hide (22:17:49) was undone 11 s later
+ * by another of his clients folding the same arc. So the write unit is the ENTRY. A list sent as a
+ * RECORD is an entry patch (`src/shared/preferenceEntryPatch.ts`, whose rule this mirrors):
+ * `{ <entry key>: <entry> | null }` drops every entry it names, appends its non-null entries in its
+ * own order (the newest last) and keeps the newest `ENTRY_LIST_CAP`, and every entry it does not name
+ * stands. A list sent as an ARRAY is an older build's whole list, and replaces that list alone.
+ */
+const ENTRY_LISTED_KEYS: ReadonlySet<string> = new Set(['dispatcher']);
+/** The most entries one list keeps, newest last. Mirrors the client's own cap. */
+const ENTRY_LIST_CAP = 200;
+
+/** An entry's key: a bare string is its own key, a record's is its `name`. `null` for anything else. */
+const entryKeyOf = (entry: unknown): string | null => {
+  if (typeof entry === 'string') return entry;
+  return isRecord(entry) && typeof entry.name === 'string' ? entry.name : null;
+};
+
+function patchEntryList(stored: unknown, listPatch: Record<string, unknown>): unknown[] {
+  const named = new Set(Object.keys(listPatch));
+  const kept = (Array.isArray(stored) ? stored : []).filter((entry) => {
+    const key = entryKeyOf(entry);
+    return key !== null && !named.has(key);
+  });
+  // An entry whose own key is not the key it was sent under is malformed and is not stored.
+  const added = Object.entries(listPatch)
+    .filter(([key, entry]) => entry !== null && entryKeyOf(entry) === key)
+    .map(([, entry]) => entry);
+  return [...kept, ...added].slice(-ENTRY_LIST_CAP);
+}
+
+function mergeEntryLists(stored: unknown, incoming: unknown): unknown {
+  if (!isRecord(incoming)) {
+    return incoming;
+  }
+
+  const merged: Record<string, unknown> = isRecord(stored) ? { ...stored } : {};
+  for (const [list, value] of Object.entries(incoming)) {
+    merged[list] = isRecord(value) ? patchEntryList(merged[list], value) : value;
+  }
+  return merged;
+}
+
 export const userPreferencesDb = {
   /**
    * Returns every preference the user has ever set, as one object.
@@ -111,11 +157,11 @@ export const userPreferencesDb = {
    * Merge-patches preferences: keys present in `updates` are written, keys
    * absent are left alone, and a key given as `undefined` is deleted.
    *
-   * `chatGutters` merges one level deeper, per chat — see `mergeGutters` above for why that key
-   * cannot be replaced wholesale.
+   * `chatGutters` merges one level deeper, per chat, and `dispatcher` per entry of its lists — see
+   * `mergeGutters` and `mergeEntryLists` above for why neither can be replaced wholesale.
    *
    * Runs in one transaction so a multi-key save from the settings dialog can
-   * never be observed half-applied. The gutter read-modify-write happens INSIDE it, so two saves
+   * never be observed half-applied. Both read-modify-writes happen INSIDE it, so two saves
    * cannot both compute their merge from the same stored value.
    */
   savePreferences(userId: number, updates: Record<string, unknown>): void {
@@ -141,10 +187,11 @@ export const userPreferencesDb = {
           continue;
         }
 
-        if (key === GUTTERS_KEY) {
+        if (key === GUTTERS_KEY || ENTRY_LISTED_KEYS.has(key)) {
           const row = readOne.get(userId, key) as PreferenceRow | undefined;
           const stored = row ? decodePreference(row)?.[1] : undefined;
-          upsert.run(userId, key, JSON.stringify(mergeGutters(stored, value)));
+          const merged = key === GUTTERS_KEY ? mergeGutters(stored, value) : mergeEntryLists(stored, value);
+          upsert.run(userId, key, JSON.stringify(merged));
           continue;
         }
 

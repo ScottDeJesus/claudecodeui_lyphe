@@ -5,11 +5,12 @@ import { useTranslation } from 'react-i18next';
 import {
   byArc,
   DispatchArcDecks,
-  endedHide,
+  doneDismiss,
   HiddenPlans,
+  landFocusInHome,
   LoosePlannerBadges,
   PlanCard,
-  planHide,
+  planPutAway,
   SessionPin,
   useDispatcherPlans,
 } from '@/modules/dispatcher';
@@ -80,10 +81,10 @@ function widgetItemsOf(split: DispatcherArcSplit, sessionId: string | null): Wid
  * a card shown again keeps its fold, and the folds of cards that have left the lane go with them — one
  * memory, two homes.
  *
- * `Hide ended · N` heads the list (every drawn plan that has finished, put away in one write — the tab
- * header's own button) and `Hidden · N` closes it as the way back from any hide. `data-runner-widget`
- * is the root's handle — this home's boundary, which a card's Hide looks inside for the next place to
- * put the keyboard (`LaneCardHead`), exactly as it looks inside `data-runner-panel`.
+ * `Dismiss done · N` heads the list (every drawn plan that is done, off the board in one write — the
+ * tab header's own button) and `Hidden · N` closes it as the way back from any Hide. `data-runner-widget`
+ * is the root's handle — this home's boundary, which a card's corner press looks inside for the next
+ * place to put the keyboard (`LaneCardHead`), exactly as it looks inside `data-runner-panel`.
  * `data-widget-item` (valued by the item's key), `runner-widget-plan`, `data-plan-name` and
  * `data-pinned` are the browser harness's handles.
  *
@@ -100,9 +101,9 @@ export function RunnerWidgetBody({ sessionId }: { sessionId: string | null }) {
   const split = useMemo(() => byArc(plans, arcs), [plans, arcs]);
   const items = useMemo(() => widgetItemsOf(split, sessionId), [split, sessionId]);
   useLaneFoldPrune(plans, hidden, arcs);
-  const ended = endedHide(plans, carriedNames);
-  // The widget's root: where `Hide ended · N` hands the keyboard on once the button has left with its
-  // count. One element in both branches below, so a press that hid the whole lane still finds it.
+  const done = doneDismiss(plans, carriedNames);
+  // The widget's root: where `Dismiss done · N` hands the keyboard on once the button has left with its
+  // count. One element in both branches below, so a press that emptied the lane still finds it.
   const widgetRef = useRef<HTMLDivElement>(null);
 
   // A chat switch re-renders this body in place — the route changes, the widget stays mounted — so the
@@ -114,19 +115,13 @@ export function RunnerWidgetBody({ sessionId }: { sessionId: string | null }) {
     if (viewport !== null) viewport.scrollTop = 0;
   }, [sessionId]);
 
-  // `Hide ended · N` takes itself away (nothing ended is left to hide), so a keyboard reader who
-  // pressed it would land on `<body>`. On the next frame, once the hide has re-rendered the widget,
-  // focus goes to the first Hide a reader can reach, else the `Hidden · N` trigger the press drew —
-  // the tab header's own hand-off (`RunnerPanel`).
-  const hideEnded = (hide: () => void) => {
-    hide();
+  // `Dismiss done · N` takes itself away (nothing done is left to dismiss), so a keyboard reader who
+  // pressed it would land on `<body>`. On the next frame, once the write has re-rendered the widget,
+  // focus goes where `landFocusInHome` finds — the tab header's own hand-off (`RunnerPanel`).
+  const dismissDone = (dismiss: () => void) => {
+    dismiss();
     requestAnimationFrame(() => {
-      const widget = widgetRef.current;
-      if (widget === null) return;
-      const heir = [...widget.querySelectorAll<HTMLElement>('[data-dispatcher-hide]')]
-        .find((element) => element.getClientRects().length > 0 && element.closest('[inert]') === null)
-        ?? widget.querySelector<HTMLElement>('[data-hidden-plans] button');
-      heir?.focus();
+      if (widgetRef.current !== null) landFocusInHome(widgetRef.current);
     });
   };
 
@@ -136,7 +131,8 @@ export function RunnerWidgetBody({ sessionId }: { sessionId: string | null }) {
   const nothingDrawn = plans.length === 0 && arcs.length === 0 && loosePlanners.length === 0;
 
   return (
-    <div ref={widgetRef} data-runner-widget className="flex min-w-0 flex-col gap-4">
+    // `tabIndex={-1}`: the last place a press that emptied the board hands the keyboard (`landFocusInHome`).
+    <div ref={widgetRef} tabIndex={-1} data-runner-widget className="flex min-w-0 flex-col gap-4 outline-none">
       {nothingDrawn ? (
         <EmptyState icon={ActivityIcon} title={t(hidden.length > 0 ? 'dispatcher.hidden.allHidden' : 'runner.empty')} />
       ) : (
@@ -144,10 +140,10 @@ export function RunnerWidgetBody({ sessionId }: { sessionId: string | null }) {
           {/* The outings with no deck to be drawn in, above the list — the tab's own arrangement
               (`LoosePlannerBadges`). It draws nothing when there are none. */}
           <LoosePlannerBadges planners={loosePlanners} />
-          {/* Not drawn when nothing has finished; no dialog: `Show all` undoes it. */}
-          {ended && (
-            <Button variant="secondary" size="sm" className="h-8 self-end" onClick={() => hideEnded(ended.hide)} data-hide-ended>
-              {t('dispatcher.hideEnded', { count: ended.count })}
+          {/* Not drawn when nothing is done; no dialog: it deletes nothing, and the dispatcher keeps every plan. */}
+          {done && (
+            <Button variant="secondary" size="sm" className="h-8 self-end" onClick={() => dismissDone(done.dismiss)} data-dismiss-done>
+              {t('dispatcher.dismissDone', { count: done.count })}
             </Button>
           )}
           {items.length > 0 && (
@@ -172,8 +168,8 @@ export function RunnerWidgetBody({ sessionId }: { sessionId: string | null }) {
           )}
         </>
       )}
-      {/* The way back from any hide — under the EmptyState too, because a lane whose every plan is
-          hidden must still offer it. */}
+      {/* The way back from any Hide — under the EmptyState too, because a lane whose every unfinished
+          plan is hidden must still offer it. */}
       <HiddenPlans hidden={hidden} carriedNames={carriedNames} />
     </div>
   );
@@ -188,7 +184,7 @@ function PlanItem({ plan, mine, carriedNames }: { plan: DispatcherPlan; mine: bo
   return (
     <div data-testid="runner-widget-plan" data-plan-name={plan.name} data-pinned={String(mine)} className="flex min-w-0 flex-col gap-1">
       {mine && <SessionPin />}
-      <PlanCard plan={plan} onHide={planHide(plan, carriedNames)} />
+      <PlanCard plan={plan} onPutAway={planPutAway(plan, carriedNames)} />
     </div>
   );
 }

@@ -277,6 +277,10 @@
   text-align: center;
   line-height: 32px;
 }
+/* The action-row form: 29px of button inside the 1.5px border is the row's 32px (`h-8`), so a
+ * stepper beside a card's buttons lines up with them instead of standing 3px proud. */
+.vv-stepper--compact .vv-stepper__button { width: 28px; height: 29px; }
+.vv-stepper--compact .vv-stepper__value { min-width: 34px; font-size: 12px; line-height: 29px; }
 
 /* ---------------------------------------------------------------- Switch */
 .vv-switch {

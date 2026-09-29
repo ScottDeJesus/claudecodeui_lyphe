@@ -338,9 +338,13 @@
   },
   "question": {
     "needsInput": "Claude necesita tu respuesta",
+    "planNeedsInput": "Un plan necesita tu respuesta",
+    "collapse": "Ocultar",
+    "expand": "Abrir",
     "selectAll": "Selecciona todas las que correspondan",
     "other": "Otra...",
     "otherPlaceholder": "Escribe tu respuesta...",
+    "notePlaceholder": "Tus notas — enviadas palabra por palabra",
     "skip": "Omitir",
     "skipAll": "Omitir todas",
     "back": "Atrás",

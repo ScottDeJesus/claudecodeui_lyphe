@@ -300,9 +300,13 @@
   },
   "question": {
     "needsInput": "Claude があなたの回答を待っています",
+    "planNeedsInput": "プランがあなたの回答を待っています",
+    "collapse": "隠す",
+    "expand": "開く",
     "selectAll": "当てはまるものをすべて選択",
     "other": "その他...",
     "otherPlaceholder": "回答を入力...",
+    "notePlaceholder": "メモ — そのまま送信されます",
     "skip": "スキップ",
     "skipAll": "すべてスキップ",
     "back": "戻る",

@@ -24,8 +24,9 @@
  *
  * The test is the message path's, not a second one: BOTH sides a version string (a process that has
  * not spoken, or a reading of `null`, is "not heard" — never a reason to replace anything), the
- * process BEHIND the binary in the ordered comparison (`chat-process.ts`'s `isBehindInstalled`,
- * so a downgrade retires nothing that is ahead of it), and no work in flight for its app session
+ * process BEHIND the binary in the ordered comparison (`isBehindInstalled` in
+ * `server/shared/version-order.ts`, the message path's own test, so a downgrade retires nothing
+ * that is ahead of it), and no work in flight for its app session
  * (`busyReason` below — the registry where it can answer, the host's own meta where it cannot).
  *
  * consumer: readopt.ts (boot), and the observer this package registers with the reading
@@ -33,8 +34,7 @@
 
 import { observeInstalledCliVersionChanges } from '@/modules/cli-version/index.js';
 import { chatRunRegistry } from '@/modules/websocket/index.js';
-
-import { isBehindInstalled } from '../chat-process.js';
+import { isBehindInstalled } from '@/shared/version-order.js';
 
 import { listLiveHosts, retireHost } from './hosts.js';
 import type { LiveHost } from './hosts.js';

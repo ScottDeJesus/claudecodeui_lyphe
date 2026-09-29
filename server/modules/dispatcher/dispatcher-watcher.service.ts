@@ -13,10 +13,11 @@ import type { DispatcherPicture } from './dispatcher-state.service.js';
  * and the snapshot it takes.
  *
  * This is the one lane on the server whose reading is a SUBPROCESS, so its snapshot answers a
- * promise; the lane's own rules cover that (a tick with a reading still out is skipped, and the
- * picture it serves meanwhile is the last one that landed). It is also the one lane whose picture
- * carries a clock of its own, so it is the one lane that states how its pictures are compared
- * (`changeOf`) — without that, it would speak on every tick.
+ * promise; the lane's own rules cover that (a tick with a reading still out is skipped, the picture
+ * it serves is the last one that landed, and until the first one lands there is no picture at all —
+ * `current()` answers `null` and a reader waits the gap out through `whenLanded`). It is also the
+ * one lane whose picture carries a clock of its own, so it is the one lane that states how its
+ * pictures are compared (`changeOf`) — without that, it would speak on every tick.
  */
 
 export type DispatcherWatcherDependencies = {
@@ -31,35 +32,6 @@ export type DispatcherWatcherDependencies = {
 };
 
 export type DispatcherWatcher = PolledLane<DispatcherPicture>;
-
-/**
- * The picture `current()` answers with in the gap between the lane's construction and its first
- * landing: a few tens of milliseconds, and the length of a restart's handover.
- *
- * It is the shape's own empties — no plans, no arcs, no planners, no daemon, no hour — and the two route fields that
- * cannot be empty are the CONSERVATIVE pair rather than a claim about this box: the Claude route is
- * the one-at-a-time route, and `word` is left blank rather than given a phrase this build would be
- * inventing (the phrase is `width.word`'s, in Python). Nothing draws any of it while `plans` is
- * empty — a plan's own card is the only place the route's phrase is shown — and the reading that
- * replaces this picture is one interval away at the most.
- */
-const EMPTY_PICTURE: DispatcherPicture = {
-  plans: [],
-  arcs: [],
-  planners: [],
-  route: {
-    provider: 'claude',
-    swarm: { enabled: false, lanes: null },
-    ceiling: 1,
-    word: '',
-    park_at_peak: false,
-    peak_until: null,
-  },
-  daemon: { alive: false, pid: null, unit: null },
-  offpeak_at: 'none',
-  home: '',
-  generated_at: '',
-};
 
 /**
  * The picture as the lane compares it for change: everything but the read's own clock.
@@ -83,7 +55,6 @@ function changeOf(picture: DispatcherPicture): string {
 export function createDispatcherWatcher(dependencies: DispatcherWatcherDependencies): DispatcherWatcher {
   return createPolledLane<DispatcherPicture, DispatcherStateEvent>({
     ...dependencies,
-    initial: EMPTY_PICTURE,
     serialize: changeOf,
     // The document's own keys, exactly as the service built them, plus the frame's two: its kind and
     // its millisecond clock (`at`), which is what tells a client when the picture was read.

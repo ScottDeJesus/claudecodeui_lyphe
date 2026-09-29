@@ -300,7 +300,7 @@ export function createMetisSpawner(dependencies: MetisSpawnDependencies): MetisS
         });
       }
       // The turn, then EOF: `claude -p` with unwritten stdin waits for input forever
-      // (`souls.py:310-312` writes the prompt and closes for exactly this reason).
+      // (`souls.py`'s `spawn` writes the prompt and closes for exactly this reason).
       child.stdin.write(specRecord.openingTurn);
       child.stdin.end();
 

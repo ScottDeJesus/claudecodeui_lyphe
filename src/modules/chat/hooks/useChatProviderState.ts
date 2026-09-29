@@ -680,6 +680,9 @@ export function useChatProviderState({ selectedSession, selectedProject: _select
     () => providerModelCatalog[provider]?.OPTIONS ?? [],
     [provider, providerModelCatalog],
   );
+  // The provider's own name for each model id its catalog lists (Claude only), so the composer's chip
+  // captions a resumed session's stored id the way the transcript does.
+  const currentProviderModelLabelsById = providerModelCatalog[provider]?.LABELS_BY_MODEL_ID;
 
   const applyProviderCatalog = useCallback((
     targetProvider: LLMProvider,
@@ -790,6 +793,7 @@ export function useChatProviderState({ selectedSession, selectedProject: _select
     currentProviderEffortOptions,
     currentProviderModel,
     currentProviderModelOptions,
+    currentProviderModelLabelsById,
     permissionMode,
     pendingPermissionRequests,
     setPendingPermissionRequests,

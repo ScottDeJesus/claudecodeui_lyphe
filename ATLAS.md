@@ -1,5 +1,6 @@
 <!-- docstore export; edit rows with docstore write, never this file -->
 
+cloudcli:. [store] (INV 50)
 cloudcli:docs [store] One document per user-facing piece of the fork: the account, application and CLI-version switchers, chat contracts, the file, git, kanban, schedules, notifications and API panels, memory intake, hosting, the launcher-souls and dispatcher lanes, and the verification harness. (INV 13)
 cloudcli:docs/architecture [store] How one message gets from the composer to a provider CLI and back onto the screen: nine documents on the websocket transport, the realtime stream, conversation handoff, the message store and lazy loading, scrolling, tool views, live widgets, the rendered shapes, and the estate's own live map. (INV 0)
 cloudcli:server/modules/providers [store] The provider contract: every wrapper exposes the same seven facets — runtime, models, auth, mcp, skills, sessions, sessionSynchronizer — over the shared interfaces, so a new provider is added without guessing which file moves. (INV 0)

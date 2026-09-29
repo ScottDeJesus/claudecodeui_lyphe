@@ -29,6 +29,7 @@ import type {
   ProviderModelsDefinition,
   ProviderSkillSource,
   DispatcherModelChoice,
+  DispatcherSwarmWord,
   SubagentActivity,
   WorkspacePathValidationResult,
 } from '@/shared/types.js';
@@ -1478,6 +1479,36 @@ export function readDispatcherModelChoice(value: unknown): DispatcherModelChoice
 /** The 400 sentence both model routes answer with when `readDispatcherModelChoice` finds no word. */
 export function dispatcherModelChoiceError(): string {
   return `model must be one of ${DISPATCHER_MODEL_CHOICES.join(', ')}`;
+}
+
+
+// ---------------------------
+//----------------- DISPATCHER SWARM WORD UTILITIES ------------
+
+/** One canonical swarm word: `off`, `on`, or `on` and a count with no leading zero. */
+const DISPATCHER_SWARM_WORD = /^(?:off|on|on ([1-9][0-9]*))$/;
+
+/**
+ * A plan's own swarm word in its CANONICAL spelling — `off`, `on`, `on <N>` — or `null` for anything
+ * else: a missing field, another casing, padding, `on 0`, a count past the safe-integer range.
+ *
+ * The grammar is the runner's (`hooks/plan_runner/swarm.py:parse`) and the spelling is the store's
+ * (`hooks/dispatcher/swarm_word.py:spell`), so a word this accepts is one the dispatcher stores
+ * unchanged. The count is rebuilt from its number rather than echoed, so what reaches an argv array
+ * is a string this server wrote. `Number.isSafeInteger` is the floor for the reason
+ * `swarm-switch.ts` gives: past it this server's double and the runner's int disagree about the count.
+ *
+ * Used by the plan route (`POST /plans/:name/swarm`, which adds the door's `auto` itself) to refuse
+ * a body with a 400 before anything is spawned, and by `dispatcher-plan.reader.ts` to carry the
+ * document's stored word into the picture.
+ */
+export function readDispatcherSwarmWord(value: unknown): DispatcherSwarmWord | null {
+  if (typeof value !== 'string') return null;
+  const match = DISPATCHER_SWARM_WORD.exec(value);
+  if (!match) return null;
+  if (match[1] === undefined) return value as 'off' | 'on';
+  const lanes = Number(match[1]);
+  return Number.isSafeInteger(lanes) ? `on ${lanes}` : null;
 }
 
 

@@ -16,13 +16,14 @@ Both are properties of the ORDER, not of the watcher, so the fix is the order: b
 
 ## The state machine
 
-Three variables in `supervisor.mjs` hold everything:
+Four variables in `supervisor.mjs` hold everything:
 
-| Variable  | Meaning |
-| --------- | ------- |
-| `serving` | the child that answered READY and holds the port |
-| `pending` | a child still booting; nothing listens on its behalf yet |
-| `queued`  | an edit arrived while a boot or a retirement was in flight |
+| Variable          | Meaning |
+| ----------------- | ------- |
+| `serving`         | the child that answered READY and holds the port |
+| `pending`         | a child still booting; nothing listens on its behalf yet |
+| `queued`          | an edit arrived while a boot or a retirement was in flight |
+| `rebootRequester` | the serving child that asked for the cycle now running; it is owed an answer if that cycle's boot fails |
 
 ```
        ┌──────────────────────── change (debounced) ────────────────────────┐
@@ -39,6 +40,10 @@ Three variables in `supervisor.mjs` hold everything:
 - **on change** — if a child is already booting, that child is stopped and the boot restarts (it
   loaded the previous version of the edited file, so there is nothing to salvage). If a retirement
   is finishing, the edit is queued and the running cycle picks it up. Otherwise a boot starts.
+- **on a serving child's `reboot`** — the same cycle, asked for over IPC instead of by the watcher:
+  it enters at the same point and follows the same three rules. This is how the update pipeline
+  restarts the API, and the one case where the requester is owed an answer (see the four messages
+  below).
 - **on READY with a predecessor** — the old child gets SIGTERM. In **its exit handler**, and only
   there, the new child is sent `takeover`. Not one moment earlier: until the old process is gone
   its keepalive hosts are live, and the successor's re-adoption would end those sessions with
@@ -73,13 +78,23 @@ predecessor exists to trigger.
 `TSX_TSCONFIG_PATH=<repo>/server/tsconfig.json` is set on every child too — that is how tsx's
 loader resolves the `@/*` alias. `--tsconfig` is a flag of the tsx *CLI*, which is not in play here.
 
-## The two IPC messages
+## The four IPC messages
 
 `stdio: ['ignore', 'inherit', 'pipe', 'ipc']`.
 
 - child → supervisor: `{ type: 'ready', pid }` — exactly once, from the listen callback.
 - supervisor → child: `{ type: 'takeover' }` — exactly once per handover child, after the previous
   child's `exit` event.
+- child → supervisor: `{ type: 'reboot', reason }` — the serving child asking to be replaced by a
+  fresh boot of its own code, which is how the update pipeline's **Restart server** restarts the
+  API. Honoured **only** from the child that is `serving` when the message arrives, and only when
+  `reason` is a string: any other shape, and the same message from any other child, is ignored. The
+  boot it starts is the edit cycle exactly, and the reason reaches the journal on one line whatever
+  it holds.
+- supervisor → child: `{ type: 'reboot-failed', detail }` — the answer owed to that requester when
+  the boot its request started did not come up: the first error line of that boot, or
+  `boot timed out after 30 s` when it hung. The requester keeps serving throughout. A request whose
+  boot succeeds is answered by the handover instead — retire, `takeover`, `handover complete`.
 
 Any other shape is ignored on both sides. stdout stays **inherited** so the child's own pid remains
 on its journal entries (`_PID`); only stderr is piped, so a failed boot can be explained in one
@@ -91,15 +106,18 @@ All on stdout, all prefixed `[supervisor] `:
 
 ```
 watching <abs dir>
+watching <n> directories under <dir>             the watches the watcher holds open
 change: <rel path>
+reboot requested by pid <n>: <reason>            the serving child asked for this cycle
 boot: pid <n>
 serving pid <n>                                  first boot ready — it holds the port
 handover: pid <new> ready — retiring pid <old>
 retired pid <old> (<exit code|signal>)
-handover complete — serving pid <new>             only once the takeover has landed
+handover complete — serving pid <new>            only once the takeover has landed
 boot failed — previous server kept: <first error line>
 boot failed — no previous server: <first error line>
 boot timed out after 30 s — <previous server kept|no previous server>
+reboot failed — told pid <n>                     the requester keeps serving
 change during boot — restarting boot
 server pid <n> exited (<code|signal>) — waiting for the next change
 boot aborted: <message>                          never expected: see below
@@ -123,12 +141,18 @@ the `boot failed` lines above, so this line can only mean a bug in the superviso
 without the catch behind it that bug would surface as an unhandled rejection, end this process, and
 let `Restart=always` turn one bad edit into a five-second crash loop. Seeing it means read the code.
 
-Three more go to stderr, kept out of the list above because they report on the machinery rather
-than on the state: `watch error on <dir>: …` (the tree became unwatchable — the API serves on,
-blind to further edits), `child pid <n>: …` (a ChildProcess error after READY, when there is no
-boot left to fail) and `takeover to pid <n> failed: …` (the channel closed before the message
-landed — a successor that died inside the retirement window, whose own exit line and empty `serving`
-slot already tell the truth; the completion line above is withheld rather than name a dead pid). Everything the children themselves write is relayed untouched.
+Five more go to stderr, kept out of the list above because they report on the machinery rather
+than on the state: `cannot watch <dir>: …` (the watch could not be opened at all, so that directory
+is invisible from the start — its parent reports an event naming it and it is walked again),
+`watch error on <dir>: …` (an existing watch became unwatchable — that one watch is finished, the
+rest of the tree serves on and the API stays blind to further edits there), `child pid <n>: …` (a
+ChildProcess error after READY, when there is no boot left to fail), `takeover to pid <n> failed: …`
+(the channel closed before the message landed — a successor that died inside the retirement window,
+whose own exit line and empty `serving` slot already tell the truth; the completion line above is
+withheld rather than name a dead pid) and `reboot-failed to pid <n> failed: …` (the requester's
+channel closed between the connected check and the send — the request is dropped rather than retried,
+because a child that has just lost its channel is on its way out and there is nothing left to
+answer). Everything the children themselves write is relayed untouched.
 
 ## The three constants
 
@@ -151,11 +175,16 @@ Each lives in the module that consumes it, because `watchServerDir(dir, onChange
 | **Crash after READY** | one line, then the supervisor waits for the next change. It never auto-restarts — a server that crashes on this code crashes again on it, and a crash loop is what the watchdog's three-heal rule exists to catch |
 | **First boot fails** (nothing serving) | `boot failed — no previous server: …`. The supervisor stays alive, so `Restart=always` does not turn a broken edit into a 5-second crash loop. Nothing is listening, so the API canary fails and `/usr/local/bin/cloudcli-dev-watchdog.sh` heals the unit on its own 60 s timer — that script is never edited by this package |
 | **Predecessor crashes mid-boot** | its exit line prints, then the booting child — which deferred its duties on the word it was given at spawn — is released the moment it is READY (`handover complete — serving pid <n>`, then `[keepalive] taking over`). Measured against a stand-in: without that release the API serves with its keepalive hosts unadopted for good |
+| **Requested reboot** (a serving child asking for its own handover, as the update pipeline's restart does) | the edit cycle exactly: boot beside, READY, retire the requester, `handover complete — serving pid <new>`. Honoured only while the requester is still the `serving` child, so an answer can never land on a child that has already been replaced |
+| **Requested reboot that fails to boot** | the requester is still serving, so it is told: `reboot-failed` carrying the boot's first error line (or `boot timed out after 30 s`), and the journal says `reboot failed — told pid <n>`. Nothing was retired and `:3011` keeps its server. What the requester does with that answer is its own affair — the update pipeline rolls the Agent SDK back from its `restarting` state; nothing in this package rolls anything back |
 | **`systemctl restart`** | `KillMode=control-group` (the default) ends the supervisor and both children together. Accepted: a restart is a restart, and chat sessions survive it through the tmux keepalive |
 | **Supervisor dies mid-boot** | the child's `signalReady()` finds the channel gone, logs once and serves anyway; a deferred child logs `supervisor channel closed before takeover` and stays deferred rather than stealing the predecessor's hosts |
 
 At rest there is exactly one child: `ps -o pid= --ppid $(systemctl show -p MainPID --value
-cloudcli-server-dev)` prints one line. Two is the handover window and lasts about a second.
+cloudcli-server-dev)` prints one line. Two is the handover window: near-instant with nothing in
+flight on the retiring child, stretching up to its own drain bound (`HTTP_DRAIN_BOUND_MS`,
+[`server/http-drain.ts`](../../server/http-drain.ts)) while an HTTP request it already accepted is
+still finishing.
 
 ## SO_REUSEPORT
 

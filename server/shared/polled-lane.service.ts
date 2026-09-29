@@ -25,6 +25,12 @@
  * pictures the host has already moved past. What the lane serves meanwhile is the last picture that
  * LANDED, which is also what a failed reading leaves behind — a broken document keeps the tab on the
  * last good picture instead of blanking it.
+ *
+ * AND BEFORE THE FIRST READING LANDS THERE IS NO PICTURE AT ALL. A promise lane hands out nothing it
+ * has not read: `current()` answers `null`, and a reader that needs a picture now asks for one with
+ * `whenLanded`, which waits — bounded — for that first landing. There is deliberately no stand-in to
+ * hand in: a made-up empty picture is indistinguishable, on the wire and in every client downstream,
+ * from a real reading of an empty host.
  */
 
 export type PolledLaneDependencies<TPicture, TFrame> = {
@@ -61,13 +67,6 @@ export type PolledLaneDependencies<TPicture, TFrame> = {
    * something takes a closure rather than reaching for one (`system.module.ts:57-58`).
    */
   logError: (message: string) => void;
-  /**
-   * The picture `current()` answers with until the first reading of a PROMISE-returning snapshot
-   * lands. A synchronous snapshot makes it redundant — the construction reading is the seed — and
-   * a lane that answers promises WITHOUT one is refused at construction rather than left serving an
-   * `undefined` its type says cannot happen.
-   */
-  initial?: TPicture;
 };
 
 export type PolledLane<TPicture> = {
@@ -75,11 +74,23 @@ export type PolledLane<TPicture> = {
   stop(): void;
   /**
    * The last picture taken. Pictures are rebuilt whole on every tick and never mutated in place, so
-   * this is safe to serialize straight into a response. For a promise-returning lane it is `initial`
-   * until the first reading lands, and the last one that landed after that — a failed reading is
-   * never a picture.
+   * this is safe to serialize straight into a response — and `null` until a promise-returning lane's
+   * first reading lands, which is the honest answer and never a placeholder. A synchronous lane's
+   * construction reading IS a picture, so a `null` there is a type's, not a fact's; a failed reading
+   * is never a picture, and leaves the last good one standing.
    */
-  current(): TPicture;
+  current(): TPicture | null;
+  /**
+   * The picture a reader should be given, waiting out a promise-returning lane's gap: the last
+   * reading that landed, or — while none has — the first one that does, within `timeoutMs`. Answers
+   * `null` when that wait ends with nothing landed, which a caller answers "not read yet" to rather
+   * than with a picture it does not have.
+   *
+   * The bound belongs to the reader, not to the lane: the lane cannot tell a request that would
+   * rather wait from one that would rather be told, so it takes the wait as an argument and gives
+   * the caller's own answer back when it times out.
+   */
+  whenLanded(timeoutMs: number): Promise<TPicture | null>;
 };
 
 /** Whether a reading is still on its way — a promise, by the only test that matters: it has a `then`. */
@@ -137,6 +148,23 @@ export function createPolledLane<TPicture, TFrame>(
   };
 
   /**
+   * Readers waiting for a first picture, each woken once — by a landing, or by its own bound when
+   * the wait ends with nothing. Empty on every synchronous lane and on any promise lane that has
+   * already landed, which is the ordinary state; it only fills during the gap a boot's first
+   * subprocess read leaves open.
+   */
+  const waiting = new Set<(picture: TPicture) => void>();
+
+  const wakeWaiting = (next: TPicture): void => {
+    if (waiting.size === 0) return;
+    // Copied and cleared before any waker runs: a woken promise resolves a microtask later, but the
+    // copy is what makes this file's own state settled no matter when that microtask runs.
+    const woken = [...waiting];
+    waiting.clear();
+    for (const wake of woken) wake(next);
+  };
+
+  /**
    * A reading came back, and its picture is the lane's.
    *
    * The picture is kept whether or not anybody is listening — a lane that was never started, or one
@@ -149,13 +177,15 @@ export function createPolledLane<TPicture, TFrame>(
    */
   const land = (next: TPicture): void => {
     inFlight = null;
-    if (timer === null) {
-      picture = next;
-      return;
-    }
+    // The picture is the lane's from here on, and every reader waiting for a first one has it. Both
+    // happen BEFORE the compare below: a picture that landed is a picture, whether or not the frame
+    // carrying it makes it out to some socket.
+    picture = next;
+    wakeWaiting(next);
+    // A landing with no interval armed seeds the picture and says nothing.
+    if (timer === null) return;
     try {
       const serialized = compare(next);
-      picture = next;
       if (serialized === lastBroadcast) return;
       // Recorded AFTER the send returns, never before. `lastBroadcast` is a claim that this picture
       // went out, so a `broadcast` that throws part-way must leave it at the last picture that
@@ -185,28 +215,23 @@ export function createPolledLane<TPicture, TFrame>(
    *
    * A synchronous snapshot answers a value here and the lane starts with a real picture without ever
    * being started. A promise cannot be awaited in a constructor, so the reading is left IN FLIGHT and
-   * its landing takes over — and until it lands, the lane holds the `initial` picture its caller
-   * passed. That parameter is not optional for such a lane: the alternative is a `current()` that
-   * answers `undefined` while its type promises a picture, which is the one failure this whole file
-   * exists to avoid.
+   * its landing takes over — and until it lands the lane holds NO picture, which is what `current()`
+   * answers with and what `whenLanded` waits out. There is deliberately nothing to pass in as a
+   * stand-in: a caller-supplied empty picture would be served, and published by every client
+   * downstream, exactly as if the host had been read and found empty.
    */
-  const seedPicture = (): TPicture => {
+  const seedPicture = (): TPicture | null => {
     const first = dependencies.snapshot();
     if (!isThenable(first)) return first;
-    if (dependencies.initial === undefined) {
-      throw new Error(
-        'a lane whose snapshot answers a promise must be given an `initial` picture: it is what `current()` answers until the first reading lands',
-      );
-    }
     inFlight = first;
     void first.then(land, fail);
-    return dependencies.initial;
+    return null;
   };
 
-  // The picture the last reading took. Seeded with a reading rather than left undefined so
-  // `current()` answers with something real even if the lane is never started — and, for a
-  // promise-returning lane, seeded with `initial` until that reading lands.
-  let picture: TPicture = seedPicture();
+  // The picture the last reading took, or `null` while a promise-returning lane's first reading is
+  // still out. Seeded with a reading rather than left undefined so `current()` answers with something
+  // real even if the lane is never started.
+  let picture: TPicture | null = seedPicture();
 
   const tick = (): void => {
     // A reading still out is the whole of "no overlap": this tick is skipped, never queued.
@@ -252,8 +277,24 @@ export function createPolledLane<TPicture, TFrame>(
       lastBroadcast = null;
     },
 
-    current(): TPicture {
+    current(): TPicture | null {
       return picture;
+    },
+
+    whenLanded(timeoutMs: number): Promise<TPicture | null> {
+      // The ordinary case answers on the spot, without a timer or a registration.
+      if (picture !== null) return Promise.resolve(picture);
+      return new Promise((resolve) => {
+        const timer = setTimeout(() => {
+          waiting.delete(wake);
+          resolve(null);
+        }, timeoutMs);
+        const wake = (next: TPicture): void => {
+          clearTimeout(timer);
+          resolve(next);
+        };
+        waiting.add(wake);
+      });
     },
   };
 }

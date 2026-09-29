@@ -132,6 +132,8 @@ type SidebarContentProps = {
   latestVersion: string | null;
   onShowVersionModal: () => void;
   onShowSettings: () => void;
+  /** Opens Settings on its Updates tab — passed through to the footer's Claude row. */
+  onShowUpdates: () => void;
   projectListProps: SidebarProjectListProps;
   t: TFunction;
 };
@@ -181,6 +183,7 @@ export default function SidebarContent({
   latestVersion,
   onShowVersionModal,
   onShowSettings,
+  onShowUpdates,
   projectListProps,
   t,
 }: SidebarContentProps) {
@@ -704,6 +707,7 @@ export default function SidebarContent({
           latestVersion={latestVersion}
           onShowVersionModal={onShowVersionModal}
           onShowSettings={onShowSettings}
+          onShowUpdates={onShowUpdates}
           t={t}
         />
       )}

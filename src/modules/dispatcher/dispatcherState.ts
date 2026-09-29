@@ -1,4 +1,3 @@
-import { hidePlans } from '@/modules/dispatcher/hiddenPlans';
 import type { DispatcherArc, DispatcherPhase, DispatcherPlan, DispatcherPlanStatus, DispatcherPlanner, Tone } from '@/shared/types';
 
 /**
@@ -261,37 +260,6 @@ export function planWaiters(plan: DispatcherPlan, lanePlans: readonly Dispatcher
     .map((other) => other.name);
 }
 
-/*
- * THE THREE HIDES, each ONE write to the hide store (`hiddenPlans.ts`) and each the one rule for its
- * press, so no home can drift apart from another about what a Hide takes. `carriedNames` is always the
- * lane's UNFILTERED list of plan names (`useDispatcherPlans`), because that is what the stored list is
- * pruned against: pruning against the drawn cards would drop every earlier hide the moment a second
- * one was made. A hide is reversible (`Show` in the `Hidden` list), so no dialog guards any of them.
- */
-
-/** One plan's Hide: its card leaves the grid for the `Hidden` list. */
-export function planHide(plan: DispatcherPlan, carriedNames: string[]): () => void {
-  return () => hidePlans([plan.name], carriedNames);
-}
-
-/** An arc deck's Hide: every plan of the deck, in one write, so the deck leaves with its last card. */
-export function arcHide(plans: readonly DispatcherPlan[], carriedNames: string[]): () => void {
-  return () => hidePlans(plans.map((plan) => plan.name), carriedNames);
-}
-
-/**
- * `Hide ended · N`: every COMPLETE plan of `plans` (the drawn ones) in one write, with `count` for the
- * button's word. `null` when none has ended, so the button is never drawn over nothing to hide.
- */
-export function endedHide(
-  plans: readonly DispatcherPlan[],
-  carriedNames: string[],
-): { count: number; hide: () => void } | null {
-  const ended = plans.filter((plan) => plan.status === 'complete').map((plan) => plan.name);
-  if (ended.length === 0) return null;
-  return { count: ended.length, hide: () => hidePlans(ended, carriedNames) };
-}
-
 /**
  * The time part of the document's ISO stamp (`2026-09-24T10:02:11Z` → `10:02:11Z`). Sliced, not
  * parsed: the stamp is the store's own UTC shape, and the `Z` stays so a reader knows whose clock
@@ -302,4 +270,31 @@ export function clockOf(at: string | null): string {
   if (!at) return '';
   const marker = at.indexOf('T');
   return marker === -1 ? at : at.slice(marker + 1);
+}
+
+/** The first line of a text with anything on it, trimmed; empty for a null or blank text. */
+function firstLineOf(text: string | null): string {
+  return (text ?? '').split('\n').map((line) => line.trim()).find(Boolean) ?? '';
+}
+
+/** A whole code span (its backtick fence, its contents, the same fence), else a bare `**`, `__` or stray backtick. */
+const INLINE_MARK = /(`+)([\s\S]*?)\1|\*\*|__|`/g;
+
+/**
+ * The line a lane card leads with under its title: what the plan or arc DELIVERS, in its designer's
+ * words, not the request it was opened with (operator, 2026-09-28: "can we put the feature/plan
+ * description as the plan description instead of my words verbatim"). It is the first non-empty line
+ * of `delivers` read as plain text: a code span keeps its contents and loses its fence, so a
+ * `__init__.py` in one survives, while `**` and `__` outside one go; whitespace is collapsed.
+ *
+ * THE GOAL'S FIRST LINE STANDS IN, AS WRITTEN, only where `delivers` yields nothing: an arc's judgment
+ * plan before its own design loads (it carries the arc's goal), or a first line of markers alone. A
+ * plan being designed carries neither, so it draws no lead. Used by `PlanCard` and `DispatchArcDeck`.
+ */
+export function cardDescription(delivers: string | null, goal: string | null): string {
+  const described = firstLineOf(delivers)
+    .replace(INLINE_MARK, (_mark: string, _fence?: string, code?: string) => code ?? '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return described || firstLineOf(goal);
 }

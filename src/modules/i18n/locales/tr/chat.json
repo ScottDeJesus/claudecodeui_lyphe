@@ -313,9 +313,13 @@
   },
   "question": {
     "needsInput": "Claude yanıtınızı bekliyor",
+    "planNeedsInput": "Bir plan yanıtınızı bekliyor",
+    "collapse": "Gizle",
+    "expand": "Aç",
     "selectAll": "Uygun olanların tümünü seçin",
     "other": "Diğer...",
     "otherPlaceholder": "Yanıtınızı yazın...",
+    "notePlaceholder": "Notlarınız — kelimesi kelimesine gönderilir",
     "skip": "Atla",
     "skipAll": "Tümünü atla",
     "back": "Geri",

@@ -23,3 +23,7 @@ export { readoptKeepaliveSessions, releaseKeepaliveOwnership } from './list/clau
 // provider session id is the only handle on the file, and this module is the one that knows where
 // Claude keeps it.
 export { readClaudeTranscriptBySessionId } from './list/claude/claude-transcript-activity.js';
+
+// registerPermissionGateway: used by the dispatcher module to answer, list and mark the plan prompts it
+// raises in a chat through the same doors a tool approval uses (the panel, the phone, the sidebar dot).
+export { registerPermissionGateway } from './provider.registry.js';

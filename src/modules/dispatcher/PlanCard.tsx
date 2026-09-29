@@ -3,7 +3,8 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { DeletePlanDialog } from '@/modules/dispatcher/DeletePlanDialog';
-import { phaseProgress, planDroppable } from '@/modules/dispatcher/dispatcherState';
+import { cardDescription, phaseProgress, planDroppable } from '@/modules/dispatcher/dispatcherState';
+import { putAwayVerb } from '@/modules/dispatcher/hiddenPlans';
 import { useDispatcherPlans } from '@/modules/dispatcher/hooks/useDispatcherPlans';
 import { useRiseOnce } from '@/modules/dispatcher/hooks/useFirstSight';
 import { LaneCardHead } from '@/modules/dispatcher/LaneCardHead';
@@ -23,31 +24,33 @@ import { cn } from '@/shared/utils';
  * that says which plan this is and how it stands, the action bar directly under it, and the face.
  *
  * - THE HEAD (`LaneCardHead`): the mono name, the word (`PlanStatusBadge`), the clock (`PlanClock`)
- *   and `done/total` phases on row one; the goal's FIRST line clamped to two, then who is out on the
+ *   and `done/total` phases on row one; the plan's description (`cardDescription`: its design's
+ *   `delivers` line, else its goal's where that yields nothing) clamped to two, then who is out on the
  *   plan (`PlannerBadge`) and what of its arc it waits on, on row two; the plan's total as pills
- *   (`SpendPills`, counting at first sight) on row three; Hide and the fold in the corner.
+ *   (`SpendPills`, counting at first sight) on row three; Dismiss or Hide, and the fold, in the corner.
  * - THE BAR (`PlanControls` → `ActionBar`): the verbs the plan's status allows and its model switch.
  * - THE FACE (`PlanFace`): the phases' track, what is moving now, and the closed lists. Its own rules —
  *   which disclosures start closed and why no home can open them — are stated there, not here.
  *
  * A FOLD KEEPS THE WHOLE HEAD AND TAKES THE REST (MAN-5412). The head is what says WHICH plan this is
- * and how it stands — name, word, clock, count, goal, spend — and the corner is how the card comes
- * back or goes away, so a reader who folded ten cards still reads all ten at a glance. The bar and
+ * and how it stands — name, word, clock, count, description, spend — and the corner is how the card
+ * comes back or goes away, so a reader who folded ten cards still reads all ten at a glance. The bar and
  * the face fold: they are the plan's verbs and its detail, and a fold that left verbs on screen would
  * be a card that had not collapsed. The body is the house's `CardFoldBody`, so a folded card's verbs
  * leave the tab order too.
  *
- * HIDE PUTS THE CARD AWAY, NOT THE PLAN. Hide sits in the head's corner on every card, whatever its
- * status: the dispatcher is never told, `Hidden · N` lists it and `Show` brings it back
- * (`hiddenPlans.ts`). It is reversible, so no dialog guards it. `onHide` is the caller's
- * `planHide(plan, carriedNames)`, because only the caller holds the lane's carried names the store
- * prunes against.
+ * THE CORNER PUTS THE CARD AWAY, NOT THE PLAN, and the dispatcher is never told (`hiddenPlans.ts`). A
+ * COMPLETE plan's corner is Dismiss: the card leaves the board, and no list or count keeps it. Any
+ * other plan's is Hide: `Hidden · N` lists it and `Show` brings it back, because a plan still walking
+ * must stay reachable. Neither deletes anything, so no dialog guards either. `onPutAway` is the
+ * caller's `planPutAway(plan, carriedNames)`, because only the caller holds the lane's carried names
+ * the store prunes against.
  *
  * DELETE IS THE MENU'S, AND ONLY WHERE THE DISPATCHER WOULD TAKE IT. `⋯` carries `Delete plan…`
  * exactly when `planDroppable(plan, planners)` holds. It is never drawn disabled on a `live` plan, a
  * walking phase or a planner out on the plan or its arc. Delete is the menu's only item, so those cards
  * draw no `⋯` at all. The planner half of that gate needs the lane's `planners` list, so the card reads
- * the lane (`useDispatcherPlans`) for it, as its face (`PlanFace`) does for the box's route:
+ * the lane (`useDispatcherPlans`) for it, as its controls (`PlanControls`) do for the box's swarm word:
  * `plan.planner` gives a plan's own ended row ahead of its arc's live one, so it cannot answer what
  * `drop` asks. The press opens `DeletePlanDialog`, the
  * module's one modal, because `dispatcher drop` is the one verb no press undoes. The card does not
@@ -67,7 +70,8 @@ import { cn } from '@/shared/utils';
  *
  * `data-dispatcher-card`, `data-plan-name`, `data-plan-status` and `data-collapsed` are the browser
  * harness's handles, on the ROOT so a probe scopes every reading and every press to ONE plan — the
- * live plan walking beside a probe must never be pressed.
+ * live plan walking beside a probe must never be pressed. `data-card-description` marks the lead's
+ * description line, the arc deck's too.
  *
  * Used by `RunnerPanel` and `RunnerWidgetBody` (runner-tab), for the plans no arc holds, and by
  * `DispatchArcDeck`, for each plan of an arc.
@@ -75,19 +79,19 @@ import { cn } from '@/shared/utils';
 export function PlanCard({
   plan,
   waitsOn = [],
-  onHide,
+  onPutAway,
   headingLevel = 3,
 }: {
   plan: DispatcherPlan;
   /** The plan names of this plan's own arc that it waits on, as the document spells them; `[]` for a plan of no arc. */
   waitsOn?: readonly string[];
-  /** Puts this card in the `Hidden` list: the caller's `planHide(plan, carriedNames)`. */
-  onHide: () => void;
+  /** The corner's press, Dismiss or Hide by the plan's state: the caller's `planPutAway(plan, carriedNames)`. */
+  onPutAway: () => void;
   /** The title's heading level: 4 inside an arc deck, whose own title is the 3 its plans sit under. */
   headingLevel?: 3 | 4;
 }) {
   const { t } = useTranslation();
-  const goal = (plan.goal ?? '').split('\n').map((line) => line.trim()).find(Boolean) ?? '';
+  const description = cardDescription(plan.delivers, plan.goal);
   const { collapsed, toggle } = useCardFold(planFoldKey(plan.name));
   const rise = useRiseOnce(`plan:${plan.name}`);
   // Whether `Delete plan…` has been pressed and its question is up. Local, since it is this card's
@@ -97,6 +101,7 @@ export function PlanCard({
   const menuItems: ActionMenuItem[] = planDroppable(plan, planners)
     ? [{ key: 'delete', label: t('dispatcher.delete.menu'), icon: Trash2, isDanger: true, onSelect: () => setDeleting(true) }]
     : [];
+  const verb = putAwayVerb([plan]);
 
   return (
     <Card
@@ -117,12 +122,12 @@ export function PlanCard({
             progress={phaseProgress(plan)}
             lead={(
               <>
-                {goal && (
-                  <p className="line-clamp-2 min-w-0 break-words text-xs leading-snug text-muted-foreground">{goal}</p>
+                {description && (
+                  <p data-card-description className="line-clamp-2 min-w-0 break-words text-xs leading-snug text-muted-foreground">{description}</p>
                 )}
-                {/* WHO IS OUT ON THIS PLAN and what it waits on, under its goal: the word says what the
-                    PLAN is (`designing`), the badge who is doing something about it; the wait is a fact
-                    about THIS plan ("before this, that"). Neither draws anything when absent. */}
+                {/* WHO IS OUT ON THIS PLAN and what it waits on, under its description: the word says
+                    what the PLAN is (`designing`), the badge who is doing something about it; the wait is
+                    a fact about THIS plan ("before this, that"). Neither draws anything when absent. */}
                 {(plan.planner || waitsOn.length > 0) && (
                   <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
                     {plan.planner && <PlannerBadge planner={plan.planner} />}
@@ -141,7 +146,7 @@ export function PlanCard({
                 countKey={`plan:${plan.name}`}
               />
             )}
-            corner={{ menuLabel: t('dispatcher.menu'), menuItems, onHide, hideLabel: t('dispatcher.hide') }}
+            corner={{ menuLabel: t('dispatcher.menu'), menuItems, putAway: { verb, label: t(`dispatcher.${verb}`), onPress: onPutAway } }}
             headingLevel={headingLevel}
           />
         </CardHeader>

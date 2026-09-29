@@ -5,11 +5,12 @@ import { useTranslation } from 'react-i18next';
 import {
   byArc,
   DispatchArcDecks,
-  endedHide,
+  doneDismiss,
   HiddenPlans,
+  landFocusInHome,
   LoosePlannerBadges,
   PlanCard,
-  planHide,
+  planPutAway,
   useDispatcherPlans,
 } from '@/modules/dispatcher';
 import { useLaneFoldPrune } from '@/modules/runner-tab/hooks/useLaneFoldPrune';
@@ -32,7 +33,8 @@ import { cn } from '@/shared/utils';
  * through the same hook the gutter widget calls, so the two homes cannot disagree about which folds are
  * worth keeping.
  *
- * THE COUNT IS OF THE CARDS DRAWN — plans paused, queued and ended included, the hidden ones not — and
+ * THE COUNT IS OF THE CARDS DRAWN — plans paused, queued and ended included, the hidden and dismissed
+ * ones not — and
  * it agrees with the tab's badge because both read the same `count` off the same hook: the badge from
  * `useWorkspaceTabGates`, this header from here, one value with two readers. A badge of 3 over a panel
  * of 2 cards would make a liar of one of them.
@@ -54,44 +56,42 @@ import { cn } from '@/shared/utils';
  * gutter's widget cannot group differently): every arc of it is one DECK holding the plans of that
  * arc in the ARC's own walk order — one strip inside the deck, with the arc's flow over it — and
  * the plans no arc holds are `PlanCard`s in their own urgency order, in the wall's grid below the
- * decks. Every hide passes the lane's own carried names, which is what the hide store
- * (`hiddenPlans.ts`) prunes its list against: `planHide` is a card's, `endedHide` the header's
- * `Hide ended · N`, and `HiddenPlans` at the foot is the way back.
+ * decks. Every press passes the lane's own carried names, which is what the put-away store
+ * (`hiddenPlans.ts`) prunes its list against: `planPutAway` is a card's corner (Dismiss on a done card,
+ * Hide on an unfinished one), `doneDismiss` the header's `Dismiss done · N`, and `HiddenPlans` at the
+ * foot is the way back from a Hide. A dismissed card has no way back and needs none: the dispatcher
+ * still holds the plan, and the card returns by itself when the plan has news.
  *
  * The EmptyState is reachable and is not dead code: the tab is STICKY, so a person standing here when
  * the last plan ends keeps the tab and meets this instead of the tab vanishing under them. It shows
  * only when nothing is DRAWN — no plan, no arc and no loose planner outing: an arc whose plans have all
- * been hidden draws no deck at all (`useDispatcherPlans` drops it). `HiddenPlans` rides under it,
- * because a lane whose every plan is hidden must still offer the way back.
+ * been put away draws no deck at all (`useDispatcherPlans` drops it). `HiddenPlans` rides under it,
+ * because a lane whose every unfinished plan is hidden must still offer the way back.
  */
 export function RunnerPanel() {
   const { t } = useTranslation();
   const { plans, hidden, arcs, loosePlanners, count, carriedNames } = useDispatcherPlans();
   const split = useMemo(() => byArc(plans, arcs), [plans, arcs]);
   useLaneFoldPrune(plans, hidden, arcs);
-  const ended = endedHide(plans, carriedNames);
-  // The pane's root: where `Hide ended · N` hands the keyboard on once the button has left with its count.
+  const done = doneDismiss(plans, carriedNames);
+  // The pane's root: where `Dismiss done · N` hands the keyboard on once the button has left with its count.
   const panelRef = useRef<HTMLDivElement>(null);
 
-  // `Hide ended · N` takes itself away (nothing ended is left to hide), so a keyboard reader who
-  // pressed it would land on `<body>`. On the next frame, once the hide has re-rendered the pane,
-  // focus goes to the first Hide a reader can reach, else the `Hidden · N` trigger the press drew.
-  const hideEnded = (hide: () => void) => {
-    hide();
+  // `Dismiss done · N` takes itself away (nothing done is left to dismiss), so a keyboard reader who
+  // pressed it would land on `<body>`. On the next frame, once the write has re-rendered the pane,
+  // focus goes where `landFocusInHome` finds: the first corner press, else `Hidden · N`, else the pane.
+  const dismissDone = (dismiss: () => void) => {
+    dismiss();
     requestAnimationFrame(() => {
-      const panel = panelRef.current;
-      if (panel === null) return;
-      const heir = [...panel.querySelectorAll<HTMLElement>('[data-dispatcher-hide]')]
-        .find((element) => element.getClientRects().length > 0 && element.closest('[inert]') === null)
-        ?? panel.querySelector<HTMLElement>('[data-hidden-plans] button');
-      heir?.focus();
+      if (panelRef.current !== null) landFocusInHome(panelRef.current);
     });
   };
 
   return (
-    <div ref={panelRef} className="flex h-full flex-col" data-runner-panel>
+    // `tabIndex={-1}`: the last place a press that emptied the board hands the keyboard (`landFocusInHome`).
+    <div ref={panelRef} tabIndex={-1} className="flex h-full flex-col outline-none" data-runner-panel>
       {/* The header spans the pane, inset as the wall under it is, so the icon stands over the
-          wall's left edge and `Hide ended · N` over its right. */}
+          wall's left edge and `Dismiss done · N` over its right. */}
       <div className="flex items-center gap-2 border-b border-border px-4 py-3 lg:px-6">
         <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg border border-primary/25 bg-primary/10 text-primary">
           <ActivityIcon className="h-4 w-4" aria-hidden="true" />
@@ -100,13 +100,14 @@ export function RunnerPanel() {
         {/* No badge at zero: the EmptyState below already says "nothing", and a "0" over it would
             say it a second time in a shape that reads like a count worth checking. */}
         {count > 0 && <Badge tone="neutral">{count}</Badge>}
-        {/* Every drawn plan that has finished, put away in ONE write. Not drawn when none has, so
-            the button never offers to hide nothing. No dialog: `Show all` undoes it. `-my-1` lets
-            the 36px button sit in the row's 28px line, so the header keeps one height whether or not
-            it is drawn. */}
-        {ended && (
-          <Button variant="secondary" size="sm" className="-my-1 ml-auto" onClick={() => hideEnded(ended.hide)} data-hide-ended>
-            {t('dispatcher.hideEnded', { count: ended.count })}
+        {/* Every drawn plan that is done, off the board in ONE write, with nothing added to
+            `Hidden`. Not drawn when none is, so the button never offers to dismiss nothing. No
+            dialog: it deletes nothing, and the dispatcher keeps every plan. `-my-1` lets the 36px
+            button sit in the row's 28px line, so the header keeps one height whether or not it is
+            drawn. */}
+        {done && (
+          <Button variant="secondary" size="sm" className="-my-1 ml-auto" onClick={() => dismissDone(done.dismiss)} data-dismiss-done>
+            {t('dispatcher.dismissDone', { count: done.count })}
           </Button>
         )}
       </div>
@@ -115,8 +116,8 @@ export function RunnerPanel() {
           of its own, and "nothing here" over a soul at work would be the pane's one lie. */}
       {count === 0 && arcs.length === 0 && loosePlanners.length === 0 ? (
         <div className="flex flex-1 flex-col items-center justify-center gap-4 p-4">
-          {/* Over hidden plans the words are "every plan is hidden", never "nothing is running": a
-              hidden plan may still be walking, and the list below says which. */}
+          {/* Over hidden plans the words are "every unfinished plan is hidden", never "nothing is
+              running": a hidden plan may still be walking, and the list below says which. */}
           <EmptyState icon={ActivityIcon} title={t(hidden.length > 0 ? 'dispatcher.hidden.allHidden' : 'runner.empty')} />
           <div className="w-full max-w-md">
             <HiddenPlans hidden={hidden} carriedNames={carriedNames} />
@@ -141,7 +142,7 @@ export function RunnerPanel() {
               <ul className={cn('min-w-0', LANE_WALL_GRID)} data-runner-loose-plans>
                 {split.rest.map((plan) => (
                   <li key={plan.name} className="min-w-0">
-                    <PlanCard plan={plan} onHide={planHide(plan, carriedNames)} />
+                    <PlanCard plan={plan} onPutAway={planPutAway(plan, carriedNames)} />
                   </li>
                 ))}
               </ul>

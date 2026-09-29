@@ -1,13 +1,11 @@
-import { EyeOff, Layers } from 'lucide-react';
+import { Layers, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 import { DispatchArcControls } from '@/modules/dispatcher/ArcControls';
 import {
-  arcHide,
+  cardDescription,
   deckFocusIndex,
-  endedHide,
   epochOf,
-  planHide,
   planLayer,
   planStatusTone,
   scheduleClock,
@@ -15,6 +13,7 @@ import {
 } from '@/modules/dispatcher/dispatcherState';
 import { DeckFrame, DeckItem } from '@/modules/dispatcher/DeckFrame';
 import type { DispatcherArcGroup } from '@/modules/dispatcher/dispatcherState';
+import { arcPutAway, doneDismiss, planPutAway, putAwayVerb } from '@/modules/dispatcher/hiddenPlans';
 import { LaneCardHead } from '@/modules/dispatcher/LaneCardHead';
 import { PlanCard } from '@/modules/dispatcher/PlanCard';
 import { PlannerBadge } from '@/modules/dispatcher/PlannerBadge';
@@ -32,9 +31,10 @@ import { cn } from '@/shared/utils';
  * with plans hanging off it, so it states its vocabulary here rather than mapping it onto anything
  * else's shape. It lives beside the deck that wears it.
  *
- * `judged` is neutral because a judgment is a fact and not a verdict; `empty` is warn because an arc
- * whose every plan was dropped is the one state an operator did not ask for, and it is the state
- * nothing else on the screen would show.
+ * `judging` is info, the tone the lane gives work in flight (a running phase, a soul out): the arc's
+ * judgment is still being designed, cut or walked. `complete` is positive, and it is the word once the
+ * judgment has finished too — stamped, or every phase of it done. `empty` is warn because an arc whose every plan was dropped is the one
+ * state an operator did not ask for, and it is the state nothing else on the screen would show.
  *
  * THE THREE WAITING WORDS WEAR THE PLAN'S OWN TONE, through `planStatusTone` and not a colour of
  * their own: `queued`, `paused` and `scheduled` are the plans' words too (`DispatcherPlanStatus`),
@@ -44,7 +44,7 @@ import { cn } from '@/shared/utils';
  */
 const ARC_STATUS: Record<DispatcherArcStatus, { key: string; tone: Tone }> = {
   designing: { key: 'dispatcher.arcStatus.designing', tone: 'info' },
-  judged: { key: 'dispatcher.arcStatus.judged', tone: 'neutral' },
+  judging: { key: 'dispatcher.arcStatus.judging', tone: 'info' },
   live: { key: 'dispatcher.arcStatus.live', tone: 'info' },
   complete: { key: 'dispatcher.arcStatus.complete', tone: 'positive' },
   empty: { key: 'dispatcher.arcStatus.empty', tone: 'warn' },
@@ -104,10 +104,16 @@ function ArcMark() {
  *
  * THE HEAD, ROW BY ROW: the arc's mark and name (`ArcMark`), its word (`ARC_STATUS`), the hour a
  * Schedule start armed (the clock slot, `data-dispatch-arc-schedule-note`) and how many of its plans
- * are complete; then the goal its designer wrote, clamped to two lines, and who is out on it; then its
- * books as pills, counting at first sight (`darc:<name>`). The corner is `⋯` — carrying `Hide ended
- * plans · N` when any plan of the deck has ended — then Hide, which puts EVERY plan of the deck in the
- * `Hidden` list in one write (`arcHide`), then the fold.
+ * are complete; then the arc's description (`cardDescription`: its design's `delivers` line, else its
+ * goal's where that yields nothing), clamped to two lines, and who is out on it; then its
+ * books as pills, counting at first sight (`darc:<name>`). The corner is `⋯` — carrying `Dismiss done
+ * plans · N` while some plans of the deck are done and some are not — then the deck's own press, which
+ * puts EVERY plan of the deck away in one write (`arcPutAway`), then the fold. That press is Dismiss
+ * once every plan of the deck is complete (the deck leaves the board, and nothing lists it), and Hide
+ * before then (its unfinished plans go to the `Hidden` list, its done ones leave with the deck), by
+ * the one rule a plan's corner follows (`putAwayVerb`). It is ONE press: a `Show` of any of its plans,
+ * or news on any plan of the arc, brings the whole deck back (`hiddenPlans.ts`). A wholly done deck
+ * draws no `Dismiss done plans`, which would be its corner again.
  *
  * A FOLD KEEPS THAT WHOLE HEAD (MAN-5412) and takes the bar, the flow and the cards: the model
  * switch and Start/Pause are VERBS, and the reader who folded a deck away asked for the row, not for a
@@ -118,14 +124,14 @@ function ArcMark() {
  * the flow and the strip are `DeckFrame`'s, and nothing here invents a layout of its own: an arc of
  * plans is one shape, in either home. What is the dispatcher's own, and what this file adds, is its
  * data (the store's status words, the arc's books) and its cards (`PlanCard`, whole: word, phases,
- * bar and Hide, exactly as a plan of no arc has them).
+ * bar and corner, exactly as a plan of no arc has them).
  *
  * A FOCUSED CARD IS THE PLAN WHOSE TURN IT IS (`deckFocusIndex`): the first plan of the arc that has
  * not finished, or the last once all of them have. The strip opens on it in either home, and returns
  * to it when the arc moves — so the tab opens an arc on what is walking rather than on card one.
  *
  * THE COUNT IS WHAT THE CARD HOLDS, NOT WHAT THE DOCUMENT LISTED. `arc.plans` is the arc file's
- * names, and a plan the operator has HIDDEN (`hiddenPlans.ts`) is gone from the strip while still
+ * names, and a plan the operator has PUT AWAY (`hiddenPlans.ts`) is gone from the strip while still
  * being named there: a head reading "13/14" over thirteen cards would be the head lying about the deck
  * under it. So `done/total`, the flow and the strip's `Card N of M` all count `plans` — the group's
  * drawn members, exactly the cards the deck drew.
@@ -133,7 +139,8 @@ function ArcMark() {
  * `data-dispatch-arc` and `data-arc-name` are the root's handles (with `data-arc-status` and
  * `data-collapsed`, both written by the frame), and `data-dispatch-plan-row` marks one plan's item in
  * the deck with `data-plan-name`, `data-pinned` and `data-arc-layer`, so a probe counts and names
- * what an arc holds without reading through the cards' own handles.
+ * what an arc holds without reading through the cards' own handles. `data-card-description` marks
+ * the head's description line, as it does a plan card's.
  *
  * Used by `DispatchArcDecks`, once per arc the lane carries.
  */
@@ -146,7 +153,7 @@ export function DispatchArcDeck({
   group: DispatcherArcGroup;
   /** The open chat's session id, in the gutter home; `null` in the tab, where there is no open chat and so no "mine". */
   pinnedSessionId?: string | null;
-  /** The lane's unfiltered plan names, which is what a hide prunes the stored list against (`planHide`). */
+  /** The lane's unfiltered plan names, which is what a press prunes the stored list against (`planPutAway`). */
   carriedNames: string[];
 }) {
   const { t } = useTranslation();
@@ -155,6 +162,7 @@ export function DispatchArcDeck({
   // screen reader. The head shows the bare name, because its mark already says "arc".
   const door = `${arc.name}.arc`;
   const word = ARC_STATUS[arc.status] ?? ARC_STATUS.designing;
+  const description = cardDescription(arc.delivers, arc.goal);
   // The arc's own books: the store carries them on the arc row so no head has to add up the cards
   // itself (INV-4299), and `spendParts` is the one decision every card draws a figure from — dollars
   // or tokens by who was used, and NO pill at all where the arc has neither half.
@@ -162,7 +170,8 @@ export function DispatchArcDeck({
   // The hour a Schedule start armed, over the arc's stopped plans (`report_arcs.hour`) — the head's
   // clock, so a folded deck still says when it will start. The Cancel that clears it is in the bar.
   const armed = epochOf(arc.schedule);
-  const ended = endedHide(plans, carriedNames);
+  const verb = putAwayVerb(plans);
+  const done = verb === 'hide' ? doneDismiss(plans, carriedNames) : null;
   const doneCount = plans.filter((plan) => plan.status === 'complete').length;
   const nodes: LaneFlowNode[] = plans.map((plan, index) => ({
     key: plan.name,
@@ -171,8 +180,8 @@ export function DispatchArcDeck({
     label: t('dispatcher.flow.plan', { name: plan.name, word: t(`dispatcher.status.${plan.status}`) }),
     live: plan.status === 'live',
   }));
-  const menuItems: ActionMenuItem[] = ended
-    ? [{ key: 'hide-ended', label: t('dispatcher.hideEndedPlans', { count: ended.count }), icon: EyeOff, onSelect: ended.hide }]
+  const menuItems: ActionMenuItem[] = done
+    ? [{ key: 'dismiss-done', label: t('dispatcher.dismissDonePlans', { count: done.count }), icon: X, onSelect: done.dismiss }]
     : [];
 
   return (
@@ -191,20 +200,24 @@ export function DispatchArcDeck({
           progress={{ done: doneCount, total: plans.length }}
           lead={(
             <>
-              {/* A measure of its own (`max-w-3xl`): the tab's deck spans the wall, and a goal set at
-                  that width is two lines of 250 characters no eye can track back across. */}
-              {arc.goal && (
-                <p className="line-clamp-2 min-w-0 max-w-3xl break-words text-xs leading-snug text-muted-foreground">{arc.goal}</p>
+              {/* A measure of its own (`max-w-3xl`): the tab's deck spans the wall, and a description
+                  set at that width is two lines of 250 characters no eye can track back across. */}
+              {description && (
+                <p data-card-description className="line-clamp-2 min-w-0 max-w-3xl break-words text-xs leading-snug text-muted-foreground">{description}</p>
               )}
-              {/* Who is out on the arc, under its goal: a planner badge is a LONG LINE, and on row one
-                  it would take the room the arc's name and word are read in. Nothing when none is. */}
+              {/* Who is out on the arc, under its description: a planner badge is a LONG LINE, and on
+                  row one it would take the room the arc's name and word are read in. Nothing when none is. */}
               {arc.planner && <PlannerBadge planner={arc.planner} />}
             </>
           )}
           spend={spend.paid !== null || spend.tokens !== null
             ? <div data-arc-spend className="min-w-0"><SpendPills parts={spend} countKey={`darc:${arc.name}`} /></div>
             : undefined}
-          corner={{ menuLabel: t('dispatcher.menu'), menuItems, onHide: arcHide(plans, carriedNames), hideLabel: t('dispatcher.hideArc') }}
+          corner={{
+            menuLabel: t('dispatcher.menu'),
+            menuItems,
+            putAway: { verb, label: t(verb === 'dismiss' ? 'dispatcher.dismissArc' : 'dispatcher.hideArc'), onPress: arcPutAway(arc.name, plans, carriedNames) },
+          }}
         />
       )}
       foldKey={dispatchArcFoldKey(arc.name)}
@@ -227,7 +240,7 @@ export function DispatchArcDeck({
             className={cn('flex flex-col gap-1', layer === 'done' && 'opacity-60')}
           >
             {mine && <SessionPin />}
-            <PlanCard plan={plan} waitsOn={waitsOnSiblings(plan, plans)} onHide={planHide(plan, carriedNames)} headingLevel={4} />
+            <PlanCard plan={plan} waitsOn={waitsOnSiblings(plan, plans)} onPutAway={planPutAway(plan, carriedNames)} headingLevel={4} />
           </DeckItem>
         );
       })}

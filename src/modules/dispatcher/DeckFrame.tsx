@@ -25,8 +25,8 @@ import { cn } from '@/shared/utils';
  * however far along the arc it is.
  *
  * THE HEAD SAYS EVERYTHING BUT THE PLANS: the arc's door and word, its armed hour, how many of its
- * plans are complete (`done/total`), its goal and planner, its books as pills, and the corner — `⋯`,
- * Hide and the fold.
+ * plans are complete (`done/total`), its description and planner, its books as pills, and the
+ * corner — `⋯`, Hide and the fold.
  *
  * A FOLD KEEPS THE HEAD AND TAKES THE BODY (MAN-5412). What stays is every row of the head, so a
  * reader who folded three decks away still knows which is stalled, which is complete, how far each has

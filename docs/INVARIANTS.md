@@ -79,16 +79,15 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/Coll
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-card-fold.mjs
 
-## INV-4406 — Two open documents overwrite each other's card folds: collapsedCards is written whole
+## INV-4406 — The dispatcher preference is written by entry patch, never whole
 
-`writeFolds` and `pruneCardFolds` (`src/shared/hooks/useCardFold.ts`) read the localStorage mirror and PATCH the whole `dispatcher.collapsedCards` list, so the last document to write wins.
+Every write to the `dispatcher` preference (`hiddenPlans`, `collapsedCards`) goes through `writeUserPreferenceEntries` (`src/shared/userSettings.ts`) as an ENTRY PATCH, `{ <list>: { <entry key>: <entry> | null } }`, naming only the entries its press changes. The server applies it per entry (`mergeEntryLists`, `server/modules/database/repositories/user-preferences.db.ts`), and the client applies the same rule to its own copy (`src/shared/preferenceEntryPatch.ts`): drop every named entry, append the non-null ones in the patch's order, keep the newest 200.
 
-- measured 2026-09-25: with nothing of the probe running, the stored list toggled between `["darc:restorly"]` and `[]` at 16:18:45, 16:18:52, 16:19:54 and 16:20:02. A second open document was folding and unfolding the operator's own arc card.
-- effect on a probe: after a reload, 3 of 5 keys were missing while the card-side reading was still correct. A fold test run beside an open browser tab of the operator's can fail for this reason alone.
-- `src/modules/dispatcher/hiddenPlans.ts` has the same shape, and `useCardFold.ts` copies it. The merge is per KEY of the blob, not per entry of the list. That is why each hide, show and batch there is ONE write: N writes in a row would race each other the same way.
-- not cured: merge-on-write, or a server-side merge, is a refactor. Read the failing key list before blaming the fold.
+- why: a client's copy of the preference is read at sign-in and never again. While writes sent the whole document, any second open client (a phone, a second tab, the :5184 build) wrote its old copy back and erased every hide and fold made elsewhere since. Measured 2026-09-28 in `auth.db`: the operator's arc Hide stored restorly's 4 lane plans at 22:17:49; at 22:18:00 another of his clients folded the same arc and stored `{"hiddenPlans":[],"collapsedCards":["darc:restorly"]}`, and the arc was back at his next load ("unable to dismiss an arc"). `.verify/probe-dismiss-done.mjs` replays it with two browsers (the arc's corner is Dismiss now: the dismissal is the same entry).
+- never hand `writeUserPreference('dispatcher', …)` a whole document. A list sent as an ARRAY still REPLACES that list (the write of a bundle from before the patch), so a tab still running such a bundle can erase entries until it is reloaded.
+- a patch stays in the persisted outbox (localStorage `user-preferences:entry-outbox`, `preferenceEntryPatch.ts`) until the server has stored it or refused it for good. The sign-in read lays every unconfirmed entry over the copy it fetched, whether or not the server holds the key, and sends again what that copy lacks; a failed read sends the whole outbox again. So a reload before the PATCH lands (the 400 ms debounce, a retry backing off behind a 5xx or a dropped request) and a read the server answered before the PATCH landed both keep the press. Sending twice is safe: a patch names only its own entries. A queued patch folds per entry with the next one (`foldEntryPatches`), and a retry is rebuilt from the store's current entries (`refreshEntryPatch`).
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/hiddenPlans.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useCardFold.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/user-preferences.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/hiddenPlans.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useCardFold.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/preferenceEntryPatch.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/userSettings.ts
 
 ## INV-4410 — A console error is explained only by what the browser itself reported — a refusal's URL, or an abandonment
 

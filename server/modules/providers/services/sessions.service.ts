@@ -196,9 +196,9 @@ export const sessionsService = {
         projectDisplayName: resolveProjectDisplayName(projectPath, project?.custom_project_name),
         sessionTitle: session?.custom_name?.trim() || run.sessionId,
         lastActivity: session?.updated_at ?? session?.created_at ?? null,
-        // Read from the providers directly: `providerRuntimeService` imports this service.
-        awaitingInput: providerRegistry.listProviders().some(
-          (provider) => (provider.runtime.permissions?.listPending(run.sessionId) ?? []).length > 0,
+        // Read from the registry directly: `providerRuntimeService` imports this service.
+        awaitingInput: providerRegistry.listPermissionGateways().some(
+          (gateway) => gateway.listPending(run.sessionId).length > 0,
         ),
       };
     });
@@ -213,13 +213,14 @@ export const sessionsService = {
    * it was parked on — in both states the question is pending on screen while the run registry has
    * already forgotten the session. A mark read off the runs alone cannot appear in either.
    *
-   * Reads the providers directly: `providerRuntimeService` imports this service.
+   * Reads the registry directly: `providerRuntimeService` imports this service.
    */
   listAwaitingInputSessionIds(): string[] {
     const sessionIds = new Set<string>();
 
-    for (const provider of providerRegistry.listProviders()) {
-      for (const sessionId of provider.runtime.permissions?.listPendingSessions() ?? []) {
+    // Every holder of an ask — a provider's run, or a plan prompt the app raised in the chat itself.
+    for (const gateway of providerRegistry.listPermissionGateways()) {
+      for (const sessionId of gateway.listPendingSessions()) {
         sessionIds.add(sessionId);
       }
     }

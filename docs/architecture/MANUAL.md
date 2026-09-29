@@ -1283,16 +1283,17 @@ change, and do not assume the status text you see in the UI came from it.
 section: 02-realtime-stream/010 Permission requests
 
 Claude is the only provider with interactive tool approvals. Asking a human is one function,
-`promptForToolDecision` in `claude-runtime.provider.js`: it emits `permission_request` with a
-`requestId`, raises the `permission.required` notification that can carry the question to a
+`promptForToolDecision` in `claude-runtime.provider.js`: it emits `permission_request` under two
+names — `requestId`, the ATTEMPT's, minted fresh every time a process raises the ask, and
+`promptKey`, the ASK's own (the tool use id the CLI stamped on the call, carried unchanged by a
+replayed request) — raises the `permission.required` notification that can carry the question to a
 phone ([docs/MANUAL.md (notifications)](../MANUAL.md) §"Answering from the phone"), and blocks
 until the client answers with `chat.permission-response`. When an answer arrives it emits
 `permission_resolved` with the same id; if the run ends or the request times out it emits
 `permission_cancelled` instead. The distinction matters because the answer itself travels only
 on the inbound socket: without the outbound `permission_resolved`, the `permission_request`
 sitting in the replay buffer had nothing to retract it, so a mid-run page refresh resurrected an
-already-answered prompt — and a second tab kept it forever. `permissionPromptReplay.test.tsx`
-pins the replayed request-then-resolution netting out to nothing.
+already-answered prompt — and a second tab kept it forever.
 
 **Two callers ask, and exactly one of them asks per mode.** `canUseTool` is the ordinary door.
 But the SDK resolves approval at the permission-mode step and never calls `canUseTool` in
@@ -1317,11 +1318,23 @@ that is deliberately waiting on a person. The wait itself has no timeout for an 
 through either caller; an ordinary tool's wait is `CLAUDE_TOOL_APPROVAL_TIMEOUT_MS` and the
 runtime denies the tool when it runs out.
 
+**A third asker belongs to no run: the app itself.** A plan that lands owing the operator's word has
+its Accept prompt or its designer's questions put up in the plan's owning chat by the dispatcher lane
+(`server/modules/dispatcher/dispatcher-asks.service.ts`, MAN-7400) — an `AskUserQuestion`-shaped
+`permission_request` with `standalone: true`, broadcast to every socket, and the same
+`permission.required` push. Its asks are held by a permission gateway the lane registers with the
+provider registry (`registerPermissionGateway`), and `providerRegistry.listPermissionGateways()` is the
+one list every reader walks — `chat.subscribe`'s `pendingPermissions`, an answer from the panel or a
+phone tap (`resolveToolApproval` stops at the first gateway that holds the key and warns once when
+none does), and the sidebar's waiting mark. It answers through the dispatcher's own verbs, never a run.
+
 The client keeps the pending list in `ChatInterface` state, not in the store — permission
 kinds are among the five that are never persisted as rows. The rules:
 
-- A request plays a notification sound, **except** for `ExitPlanMode` / `exit_plan_mode`,
-  which are not actionable prompts.
+- A request plays a notification sound **once per ask**, never once per delivery — the bell is
+  keyed on the ask's own `promptKey` (`announcementKeyOf` / `announceOnce`), so the question a
+  handover re-issues under a fresh `requestId` is already rung and arrives silent. `ExitPlanMode` /
+  `exit_plan_mode` do not ring at all: they are not actionable prompts.
 - The list is only maintained for the **viewed** session. A request for a background
   session still marks that session processing and still plays the sound, but does not
   enter the list.
@@ -1329,9 +1342,20 @@ kinds are among the five that are never persisted as rows. The rules:
   pending set and can race with a live `permission_request`.
 - `permission_resolved` and `permission_cancelled` remove their `requestId` from the
   list, whichever tab or replay delivered the request.
-- `chat_subscribed` replaces the list wholesale, and plays the sound only on the
-  transition from "no actionable requests" to "some".
-- `complete` empties the list for the viewed session.
+- `chat_subscribed` replaces the list wholesale, and rings for any actionable ask in it whose key
+  this tab has not yet announced — a handover puts the still-parked question back in that catalogue
+  under a fresh `requestId`, and the key is what keeps that delivery silent.
+- `complete` empties the list for the viewed session — of the RUN's asks: a `standalone` ask stays
+  until its own `permission_resolved` or `permission_cancelled`.
+- A `standalone` ask marks no session processing, and is drawn above the composer by
+  `PermissionRequestsBanner` in the same `AskUserQuestionPanel` an inline ask uses — no transcript row
+  carries it — with no Skip (the operator's word is owed). Outside the scrolling transcript, the card
+  is BOUNDED at half the dynamic viewport, its body scrolling between a header and a footer that stay,
+  the census never shortened (the token pins it); and it folds to a one-line bar without answering —
+  the plan still owes, one tap re-opens it — so an unanswered prompt never holds the composer; and an option marked `needsNote` opening a
+  field for his note, sent beside the answers as `updatedInput.notes`.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-runtime.provider.js, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useChatRealtimeHandlers.ts
 
 ## MAN-333 — Cross-session behaviour
 section: 02-realtime-stream/011 Cross-session behaviour
@@ -1897,8 +1921,10 @@ section: 03-conversation-handoff/012 Transcripts on disk
 **RULE: the watcher discovers conversations independently of the app, and its rows are keyed
 by the provider id until the app claims them.**
 
-`sessions-watcher.service.ts` watches four provider directories with chokidar in polling mode
-(`usePolling`, a 6 s interval, `depth: 6`, `ignoreInitial`), keeps only `*.jsonl` files —
+`sessions-watcher.service.ts` watches four provider directories with chokidar on native file
+events (inotify, one watch per file and directory; `depth: 6`, `ignoreInitial`) — never polling,
+whose one stat watcher per entry stalled a freshly booted API for seconds while it armed — keeps
+only `*.jsonl` files —
 `opencode.db` for OpenCode — and calls `sessionSynchronizerService.synchronizeProviderFile`.
 Indexed ids are queued and flushed with a 500 ms debounce and a 2 s maximum wait
 (`PROJECTS_UPDATE_DEBOUNCE_MS`, `PROJECTS_UPDATE_MAX_WAIT_MS`), then handed to
@@ -1938,6 +1964,8 @@ The sidebar's `session_upserted` reducer in `useProjectsState.ts` then does five
 4. Bumps `externalMessageUpdate` when the delta names the viewed session and that session is
    not processing; otherwise marks the row for attention.
 5. Navigates to `/session/:appId` when the URL still holds the provider-native alias.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/sessions-watcher.service.ts
 
 ## MAN-349 — Forking and resuming
 section: 03-conversation-handoff/013 Forking and resuming
@@ -3414,7 +3442,8 @@ section: 06-tool-view/002 The pieces
 | `src/modules/chat/tools/SubagentNote.tsx` | One prose or reasoning entry from an agent's own narration. Extracted out of `SubagentPanel.tsx` so it can be shared, verbatim, with the gutter's read-on-demand transcript view (§Subagents) |
 | `src/modules/chat/tools/PlanDisplay.tsx` | ExitPlanMode card with the inline Build and Revise buttons |
 | `src/modules/chat/tools/ContentRenderers/` | The bodies a collapsible can contain |
-| `src/modules/chat/tools/InteractiveRenderers/AskUserQuestionPanel.tsx` | Keyboard-driven answer picker for an `AskUserQuestion` prompt |
+| `src/modules/chat/tools/InteractiveRenderers/AskUserQuestionPanel.tsx` | Keyboard-driven answer picker for an `AskUserQuestion` prompt — inline, and above the composer for a `standalone` ask the app raised (no Skip; a `needsNote` option opens a note field) |
+| `src/modules/chat/tools/InteractiveRenderers/QuestionTextField.tsx` | The panel's typed half of an answer: the "Other" option's words, or a `needsNote` option's note |
 | `src/modules/chat/transcript/MessageComponent.tsx` | Draws one transcript row. Decides container versus tool versus error |
 | `src/modules/chat/transcript/ToolGroupContainer.tsx` | The collapsed `Read x4` row and its expanded children |
 | `src/modules/chat/transcript/ThinkingRow.tsx` | A thinking block as a tool row: brain, `Thinking /`, the first line truncated, copy on hover (always shown on touch); the row toggles the full text |

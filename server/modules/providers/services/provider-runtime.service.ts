@@ -6,13 +6,15 @@ import type {
   AnyRecord,
   LLMProvider,
   ProviderPermissionDecision,
+  ProviderRuntimePermissionGateway,
+  ProviderRuntimeRecalledPrompt,
   ProviderRunFunction,
   ProviderRuntimeContext,
   ProviderRuntimeWriter,
 } from '@/shared/types.js';
 
 type ProviderRuntimeServiceDependencies = {
-  listProviders(): IProvider[];
+  listPermissionGateways(): ProviderRuntimePermissionGateway[];
   resolveProvider(provider: string): IProvider;
   resolveProviderSessionId(sessionId: string | null | undefined): string | null;
   resolveResumeModel(
@@ -24,7 +26,7 @@ type ProviderRuntimeServiceDependencies = {
 };
 
 const defaultDependencies: ProviderRuntimeServiceDependencies = {
-  listProviders: () => providerRegistry.listProviders(),
+  listPermissionGateways: () => providerRegistry.listPermissionGateways(),
   resolveProvider: (provider) => providerRegistry.resolveProvider(provider),
   resolveProviderSessionId: (sessionId) => sessionsService.resolveProviderSessionId(sessionId),
   resolveResumeModel: (provider, sessionId, requestedModel) =>
@@ -91,16 +93,29 @@ export function createProviderRuntimeService(
       return Boolean(await dependencies.resolveProvider(providerName).runtime.abort(sessionId));
     },
 
+    // The first holder of the key settles it — a provider's run, or a prompt the app raised itself
+    // (`providerRegistry.listPermissionGateways`). Keys cannot collide across holders: a runtime's are
+    // a bare uuid or a `toolu:`/`ask:` prompt key, the dispatcher's carry its own `dispatcher:` prefix —
+    // and the dispatcher claims every key of its own, holding it or not, because its asks live in the
+    // store and any process can settle one. Only a key nobody claims is unknown.
     resolveToolApproval(approvalKey: string, decision: ProviderPermissionDecision): void {
-      for (const provider of dependencies.listProviders()) {
-        provider.runtime.permissions?.resolve(approvalKey, decision);
+      if (dependencies.listPermissionGateways().some((gateway) => gateway.resolve(approvalKey, decision))) return;
+      console.warn(`[permission] decision for unknown request ${approvalKey}: no pending approval in this process`);
+    },
+
+    // What the prompt a phone tap names is NOW, asked of the gateways whose asks live in a store — the
+    // one thing a process that never sent the push cannot know from its own memory. `null` for a key
+    // nobody's store holds open (or a runtime's, which has no store to ask).
+    async recallApproval(approvalKey: string): Promise<ProviderRuntimeRecalledPrompt | null> {
+      for (const gateway of dependencies.listPermissionGateways()) {
+        const recalled = await gateway.recall?.(approvalKey);
+        if (recalled) return recalled;
       }
+      return null;
     },
 
     getPendingApprovalsForSession(sessionId: string): unknown[] {
-      return dependencies.listProviders().flatMap(
-        (provider) => provider.runtime.permissions?.listPending(sessionId) ?? [],
-      );
+      return dependencies.listPermissionGateways().flatMap((gateway) => gateway.listPending(sessionId));
     },
   };
 }

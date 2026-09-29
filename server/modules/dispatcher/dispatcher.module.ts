@@ -8,8 +8,9 @@ import { userFacingEnv } from '@/shared/child-env.js';
 import { expandHome } from '@/shared/utils.js';
 
 import { createDispatcherEndingsNotifier } from './dispatcher-endings.service.js';
-import { createOffpeakClock } from './dispatcher-offpeak.service.js';
 import type { DispatcherEnding } from './dispatcher-endings.service.js';
+import { createOffpeakClock } from './dispatcher-offpeak.service.js';
+import { createDispatcherPrompts } from './dispatcher-prompts.module.js';
 import { createDispatcherRouter } from './dispatcher.routes.js';
 import { readDispatcherState } from './dispatcher-state.service.js';
 import { runDispatcherVerb } from './dispatcher-verb.service.js';
@@ -21,10 +22,13 @@ import { createDispatcherWatcher } from './dispatcher-watcher.service.js';
  *
  * The dispatcher is the plan store's OWN owner — a SQLite store under `~/.claude/state/dispatcher`,
  * a daemon that walks one phase at a time, and a command that answers `status --json` (`hooks/
- * dispatcher/`). NOTHING HERE WRITES ANY OF IT. The lane reads one document and relays verbs; the
- * dispatcher decides what each verb means and prints its own refusal when it will not act. That
- * division is the whole design, and it is the reason no route in this module can put this server's
- * words into the store.
+ * dispatcher/`). NOTHING HERE WRITES ANY OF IT. The lane reads one document, relays verbs, and puts
+ * the prompts a plan owes the operator up in its owning chat's question panel — the ask recorded by the
+ * dispatcher's own `ask` verb (`dispatcher-raise.service.ts`), shown from the document's `asking` key
+ * (`dispatcher-asks.service.ts`), and answered through its own `accept` and `tell`. The dispatcher
+ * decides what each verb means and prints its own refusal when it will not act. That division is the
+ * whole design, and it is the reason no route in this module can put this server's words into the
+ * store.
  *
  * The composition root is the only place here that reads the environment, names a binary, spawns a
  * process or touches a socket. Everything under it takes what it needs as an argument, which is what
@@ -58,6 +62,17 @@ const POLL_MS = 2000;
  */
 const VERB_TIMEOUT_MS = 20000;
 
+/**
+ * How long a read of the plan list waits for this boot's first `dispatcher status --json`.
+ *
+ * The read the lane starts at construction lands in tens of milliseconds on an ordinary host, so this
+ * bound is only ever felt when the dispatcher's command is slow or wedged — and a reader is owed an
+ * answer either way. Long enough that a first read on a loaded box is waited out rather than reported
+ * missing; short enough that a page hung on a wedged binary is told "not read yet" while the tab is
+ * still worth looking at, with the first landing's frame arriving on its own the moment it comes.
+ */
+const FIRST_READ_WAIT_MS = 5000;
+
 /** The `app_config` key holding the highest event id already announced — durable on purpose, see `dispatcher-endings.service.ts`. */
 const ANNOUNCED_THROUGH_KEY = 'dispatcher_announced_through';
 
@@ -74,6 +89,20 @@ const buildEndingEvent = createNotificationEvent as (input: {
   dedupeKey: string | null;
 }) => object;
 
+/**
+ * The lane's child environment: the server's own, minus the two names that say WHOSE SESSION a verb
+ * runs in. This server is nobody's Claude session, whatever shell it was started from, and the
+ * dispatcher reads those names as exactly that: `accept` refuses inside a Claude session (the
+ * operator's press on a prompt this lane raised is his own, and must land), and `tell` writes the
+ * session it finds onto the outing it queues, where a stray id would own the designer's next load.
+ */
+function laneEnv(): NodeJS.ProcessEnv {
+  const env = userFacingEnv({ PATH: process.env.PATH ?? DEFAULT_PATH });
+  delete env.CLAUDE_CODE_SESSION_ID;
+  delete env.DISPATCHER_SESSION;
+  return env;
+}
+
 export type DispatcherModule = {
   router: Router;
   start(): void;
@@ -82,10 +111,10 @@ export type DispatcherModule = {
 
 export function createDispatcherModule(): DispatcherModule {
   const bin = expandHome(process.env.DISPATCHER_BIN || DEFAULT_BIN);
-  const env = userFacingEnv({ PATH: process.env.PATH ?? DEFAULT_PATH });
+  const env = laneEnv();
 
-  /** Every frame this module's sockets carry. */
-  const broadcast = (frame: DispatcherStateEvent): void => {
+  /** Every frame this module's sockets carry: the lane's picture, and a chat prompt's own frames. */
+  const broadcast = (frame: object): void => {
     const message = JSON.stringify(frame);
     connectedClients.forEach((client) => {
       if (client.readyState === WS_OPEN_STATE) client.send(message);
@@ -145,6 +174,9 @@ export function createDispatcherModule(): DispatcherModule {
     },
   });
 
+  const commands = { bin, timeoutMs: VERB_TIMEOUT_MS, env };
+  const prompts = createDispatcherPrompts({ commands, broadcast, log: logErrorOnce });
+
   const watcher = createDispatcherWatcher({
     // One subprocess, and the promise support in `polled-lane.service.ts` is what a tick does with
     // it: a tick that arrives while this read is still out is SKIPPED rather than queued, and a
@@ -159,6 +191,9 @@ export function createDispatcherModule(): DispatcherModule {
       } catch (error) {
         logErrorOnce(`[Dispatcher] could not announce an ending: ${error instanceof Error ? error.message : String(error)}`);
       }
+      // The prompts a plan owes the operator ride the same picture and the same rule, and never cost
+      // the tabs their frame either (`dispatcher-prompts.module.ts` logs its own failures).
+      prompts.observe(frame);
       broadcast(frame);
     },
     pollMs: POLL_MS,
@@ -166,9 +201,11 @@ export function createDispatcherModule(): DispatcherModule {
   });
 
   const router = createDispatcherRouter({
-    current: () => watcher.current(),
+    // A read waits, bounded, for this boot's first reading rather than being handed a picture nobody
+    // has read; past the bound it is told so, and the landing's own frame fills the tab.
+    current: () => watcher.whenLanded(FIRST_READ_WAIT_MS),
     runVerb: (verb: DispatcherVerb, plan: string, verbArgs?: readonly string[]) =>
-      runDispatcherVerb(verb, plan, { bin, timeoutMs: VERB_TIMEOUT_MS, env }, verbArgs),
+      runDispatcherVerb(verb, plan, commands, verbArgs),
     // The dispatcher's own `offpeak` verb prints the hour, so the card's `Start at …` button shows the
     // moment this box will really start a plan.
     offpeak: createOffpeakClock({ bin, timeoutMs: VERB_TIMEOUT_MS }),
@@ -177,6 +214,9 @@ export function createDispatcherModule(): DispatcherModule {
   return {
     router,
     start: () => watcher.start(),
-    stop: () => watcher.stop(),
+    stop: () => {
+      prompts.stop();
+      watcher.stop();
+    },
   };
 }

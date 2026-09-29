@@ -1,6 +1,7 @@
 import {
   Bell,
   Bot,
+  Download,
   GitBranch,
   Info,
   KeyRound,
@@ -68,8 +69,14 @@ type SettingsMainTabMeta = {
 };
 
 /**
- * The ordered list of top-level settings tabs. The settings sidebar renders it directly and
- * the command palette turns each entry into an "open settings" command, so both stay in sync.
+ * The ordered list of top-level settings tabs, in the order they are shown. The command palette
+ * turns each entry into an "open settings" command.
+ *
+ * IT IS NOT THE SIDEBAR'S LIST. The settings sidebar keeps its own `NAV_ITEMS`
+ * (`SettingsSidebar.tsx`) and the two are kept in step by hand: a tab added here and not there is a
+ * palette command that opens a panel the sidebar cannot reach, and one added there and not here is
+ * a panel the palette cannot name. `mainTabs.*` in the settings namespace holds the sidebar's
+ * labels; these are the palette's.
  */
 export const SETTINGS_MAIN_TABS: SettingsMainTabMeta[] = [
   { id: 'agents', label: 'Agents', keywords: 'agents subagents claude code', icon: Bot },
@@ -81,6 +88,7 @@ export const SETTINGS_MAIN_TABS: SettingsMainTabMeta[] = [
   { id: 'voice', label: 'Voice', keywords: 'voice speech dictation transcription', icon: Mic },
   { id: 'plugins', label: 'Plugins', keywords: 'plugins extensions integrations', icon: Plug },
   { id: 'browser', label: 'Browser', keywords: 'browser playwright chromium automation', icon: MonitorPlay },
+  { id: 'updates', label: 'Updates', keywords: 'updates claude code sdk versions patch notes', icon: Download },
   { id: 'about', label: 'About', keywords: 'about version info', icon: Info },
 ];
 
@@ -262,6 +270,22 @@ export const LLM_PROVIDER_LABELS: Record<LLMProvider, string> = {
  * every tool markdown body. User message bubbles and tool errors deliberately do not carry it.
  */
 export const MARKDOWN_CARDS_CLASS = 'chat-md-cards';
+
+// ---------------------------
+
+//----------------- SWARM CEILING STEPPERS ------------
+
+/**
+ * The first stop below `Unlimited` on a swarm ceiling stepper: the smallest ceiling that is a swarm
+ * at all. `Unlimited` is the TOP of the scale — nothing is wider — so the press that steps down from
+ * it has to land somewhere, and it cannot land on one lane: one lane is the serial walk that `off`
+ * already says, so a press that arrived there would have changed nothing anyone can see. Two is the
+ * first count that runs phases beside each other.
+ *
+ * Used by the settings module's `RunnerModelContent` (the box's switch) and the dispatcher module's
+ * `SwarmControl` (one plan's own word), so the two steppers step the same scale.
+ */
+export const SWARM_FIRST_CEILING = 2;
 
 // ---------------------------
 

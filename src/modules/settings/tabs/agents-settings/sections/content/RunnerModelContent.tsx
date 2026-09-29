@@ -4,20 +4,12 @@ import { useTranslation } from 'react-i18next';
 import { useDeepSeekFlashSwitch } from '@/shared/hooks/useDeepSeekFlashSwitch';
 import { useHealMasterSwitch } from '@/shared/hooks/useHealMasterSwitch';
 import { LANES_MIN, useSwarmSwitch } from '@/shared/hooks/useSwarmSwitch';
+import { SWARM_FIRST_CEILING } from '@/shared/constants';
 import { Button, LLMProviderLogo, Stepper } from '@/shared/ui';
 import SettingsRow from '@/modules/settings/SettingsRow';
 import SettingsToggle from '@/modules/settings/SettingsToggle';
 import RunnerHealModelRow from '@/modules/settings/tabs/agents-settings/sections/content/RunnerHealModelRow';
 import RunnerParkAtPeakRow from '@/modules/settings/tabs/agents-settings/sections/content/RunnerParkAtPeakRow';
-
-/**
- * The first stop below `Unlimited` on the ceiling stepper: the smallest ceiling that is a swarm at
- * all. `Unlimited` is the TOP of the scale — nothing is wider — so the press that steps down from
- * it has to land somewhere, and it cannot land on one lane: `LANES_MIN` is the serial walk the
- * switch is off for, so a press that arrived there would have changed nothing anyone can see. Two
- * is the first count that runs phases beside each other, which is the thing this row turns on.
- */
-const FIRST_CEILING = 2;
 
 /**
  * Rendered by AgentCategoryContentSection under Claude's "account" panel: which model the plan
@@ -98,7 +90,7 @@ export default function RunnerModelContent() {
   // first ceiling, `+` from Unlimited is refused because nothing is wider than it, and `+` on any
   // count is unbounded. One lane is the floor: there is no lane under one to ask for.
   const dropCeiling = () => {
-    if (lanes === null) void setLanes(FIRST_CEILING);
+    if (lanes === null) void setLanes(SWARM_FIRST_CEILING);
     else if (lanes > LANES_MIN) void setLanes(lanes - 1);
   };
   const raiseCeiling = () => {
@@ -165,16 +157,16 @@ export default function RunnerModelContent() {
           : swarmEnabled === true
             ? lanes === null
               ? t('agents.runnerSwarm.descriptionOnUnlimited', {
-                  defaultValue: 'The plan runner runs every independent phase of the plan at once — only ever phases that touch no file each other writes and that do not wait on each other. Everything else stays serial, one phase at a time. Takes effect at the next phase boundary.',
+                  defaultValue: 'The plan runner runs every independent phase of a plan at once — only ever phases that touch no file each other writes and that do not wait on each other; everything else stays serial. A plan given its own swarm word on its card follows that word instead of this switch. Takes effect at the next phase boundary.',
                 })
               : t('agents.runnerSwarm.descriptionOn', {
-                  defaultValue: 'The plan runner runs up to {{lanes}} independent phases at once, and only phases that touch no file each other writes and that do not wait on each other. Everything else stays serial, one phase at a time. Takes effect at the next phase boundary.',
+                  defaultValue: 'At most {{lanes}} independent phases walk at once, and only phases that touch no file each other writes and that do not wait on each other; everything else stays serial. A plan given its own swarm word on its card follows that word instead of this switch. Takes effect at the next phase boundary.',
                   lanes,
                 })
             // Said in the tense the runner is in: with the switch off exactly one phase is admitted,
             // so a sentence about lanes would be describing a walk that is not happening.
             : t('agents.runnerSwarm.descriptionOff', {
-                defaultValue: 'Off: the plan runner walks one phase at a time, exactly as it always has. Turn this on and it runs every independent phase of a plan at once — with an optional ceiling on how many at a time — and only ever phases that touch no file each other writes and that do not wait on each other. Takes effect at the next phase boundary.',
+                defaultValue: 'Off: the plan runner walks one phase at a time. Turn this on and it runs every independent phase of a plan at once — with an optional ceiling on how many at a time — and only ever phases that touch no file each other writes and that do not wait on each other. A plan given its own swarm word on its card follows that word instead of this switch. Takes effect at the next phase boundary.',
               })}
       >
         {swarmUnknown ? (

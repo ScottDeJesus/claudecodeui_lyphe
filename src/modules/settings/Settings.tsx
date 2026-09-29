@@ -14,6 +14,7 @@ import BrowserUseSettingsTab from '@/modules/settings/tabs/browser-use-settings/
 import NotificationsSettingsTab from '@/modules/settings/tabs/NotificationsSettingsTab';
 import TasksSettingsTab from '@/modules/settings/tabs/tasks-settings/TasksSettingsTab';
 import { PluginSettingsTab } from '@/modules/plugins';
+import { ClaudeUpdatesSettingsTab } from '@/modules/claude-updates';
 import AboutTab from '@/modules/settings/tabs/AboutTab';
 import { useSettingsController } from '@/modules/settings/hooks/useSettingsController';
 import { useWebPush } from '@/modules/settings/hooks/useWebPush';
@@ -164,6 +165,7 @@ function Settings({ isOpen, onClose, projects = [], initialTab = 'agents' }: Set
               variant="ghost"
               size="sm"
               onClick={onClose}
+              aria-label={t('close')}
               className="h-10 w-10 touch-manipulation p-0 text-muted-foreground hover:text-foreground active:bg-accent/50"
             >
               <X className="h-5 w-5" />
@@ -231,6 +233,8 @@ function Settings({ isOpen, onClose, projects = [], initialTab = 'agents' }: Set
                   <PluginSettingsTab />
                 </Suspense>
               )}
+
+              {activeTab === 'updates' && <ClaudeUpdatesSettingsTab />}
 
               {activeTab === 'about' && <AboutTab />}
             </div>
