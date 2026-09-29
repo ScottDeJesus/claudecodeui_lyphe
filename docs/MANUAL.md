@@ -3007,11 +3007,11 @@ section: dispatcher/010 The plan card/001 The frame. `Card` with `data-dispatche
 
 **The frame.** `Card` with `data-dispatcher-card`, `data-plan-name`, `data-plan-status` and `data-collapsed` on the ROOT (a
 probe scopes every reading and every press to ONE plan — the live plan walking beside it must never be
-pressed). Its head is `LaneCardHead` (`LaneCardHead.tsx`), the arc deck's own head too: row one is the mono `plan.name`, `PlanStatusBadge`, `PlanClock` and `done/total` phases (`phaseProgress`, `data-lane-progress`) in a wrapping group floored at the title's longest word (INV-4449), beside the corner — `⋯` while the plan is droppable (§"Delete asks first"), Dismiss on a complete plan (`X`, `data-dispatcher-dismiss`, "Dismiss plan") or Hide on any other (`EyeOff`, `data-dispatcher-hide`, "Hide plan"), by `putAwayVerb` (§"The put-away store"), and the fold; row two is the plan's description (`cardDescription` in `dispatcherState.ts`, `data-card-description`) — the first non-empty line of its design's `delivers`, read as plain text (a code span keeps its contents and loses its fence, `**` and `__` outside one go, whitespace collapses), or the goal's first non-empty line as written where `delivers` yields nothing — an arc's judgment plan before its own design loads (it carries the arc's goal), or a first line of markers alone; a plan being designed carries neither and draws no lead — clamped to two lines, then — where the document gives the plan an outing — `PlannerBadge` (§"Who is out on this
+pressed). Its head is `LaneCardHead` (`LaneCardHead.tsx`), the arc deck's own head too: row one is the mono `plan.name`, `PlanStatusBadge`, `PlanClock` and `done/total` phases (`phaseProgress`, `data-lane-progress`) in a wrapping group floored at the title's longest word (INV-4449), beside the corner — `⋯` while the plan is droppable (§"Delete asks first"), Dismiss on a complete plan (`X`, `data-dispatcher-dismiss`, "Dismiss plan") or Hide on any other (`EyeOff`, `data-dispatcher-hide`, "Hide plan"), by `putAwayVerb` (§"The put-away store"), and the fold; row two is the plan's description (`cardDescription` in `dispatcherState.ts`, `data-card-description`) — the first non-empty line of its design's `delivers`, read as plain text (a code span keeps its contents and loses its fence, `**` and `__` outside one go, whitespace collapses), or the goal's first non-empty line as written where `delivers` yields nothing — an arc's judgment plan before its own design loads (it carries the arc's goal), or a first line of markers alone; a plan being designed carries neither and draws no lead; a description is drawn whole — it wraps and no line of it is cut — then, where the document gives the plan an outing — `PlannerBadge` (§"Who is out on this
 plan" below) and `waits on` (`data-plan-waits-on`); row three is the plan's total as `SpendPills` (§"The spend pills" below), counting under the key
 `plan:<plan name>`. The body (`CardFoldBody`) is `PlanControls` — the card's `ActionBar` (`ActionBar.tsx`, `data-action-bar`): ONE wrapping row directly under the head, the verbs its status allows and then the model switch at `ml-auto`, every control in it 32px tall, and nothing at all when it has neither — then `PlanFace`. Props `{ plan, waitsOn?, onPutAway, headingLevel? }`, `onPutAway` being the caller's `planPutAway(plan, carriedNames)`; `headingLevel` is the title's heading — `3`, or `4` for a plan inside an arc deck (`ArcDeck.tsx` passes it) — NO `defaultOpen`.
 
-The description's standing proof: `node .verify/probe-card-description.mjs` (the Runner tab at 1440 and 390, light and dark, on the dev client). It judges one plan card and one arc head — `--plan <name>` and `--arc <name>`, each of which must be drawn; else `claude-update-pipeline` while the lane carries it and the first plan card drawn once it does not (a `[NOTE]`), and the first arc deck drawn (a tab with no arc is a `[NOTE]`, the arc half skipped). exit 0 = each one's `data-card-description` text equals `cardDescription(delivers, goal)` over the row `dispatcher status --json` prints (the helper imported from the source), differs from the goal's first line where `delivers` is written, computes `-webkit-line-clamp: 2` and paints one or two lines (a card whose helper reading is empty draws no lead at all); every lead on the tab equals the helper's reading; 0 console errors. It presses no card control and writes nothing: the page reads a copy of the preferences with an empty put-away list, and every preference write is answered in the browser. 2026-09-28, 5183: 8/8 leads equal in all four passes, `claude-update-pipeline` reading "CloudCLI notices a new Claude release on its own and installs it from Settings."; exit 0.
+The description's standing proof: `node .verify/probe-card-description.mjs` (the Runner tab at 1440 and 390, light and dark, on the dev client). It judges one plan card and one arc head — `--plan <name>` and `--arc <name>`, each of which must be drawn; else `claude-update-pipeline` while the lane carries it and the first plan card drawn once it does not (a `[NOTE]`), and the first arc deck drawn (a tab with no arc is a `[NOTE]`, the arc half skipped). exit 0 = each one's `data-card-description` text equals `cardDescription(delivers, goal)` over the row `dispatcher status --json` prints (the helper imported from the source), differs from the goal's first line where `delivers` is written, is drawn whole — computes `-webkit-line-clamp: none`, paints one or more lines, and hides none of them (its `scrollHeight` equals its `clientHeight`, its `scrollWidth` fits its `clientWidth`, and no ancestor up to the card's root clips it; a card whose helper reading is empty draws no lead at all); every lead on the tab equals the helper's reading; 0 console errors. It presses no card control and writes nothing: the page reads a copy of the preferences with an empty put-away list, and every preference write is answered in the browser. Measured 2026-09-29, 5183: `agent-launch-config`'s 1,008 characters paint on 13 lines at 1440 and 20 at 390, and the arc `restorly`'s head (1,367 characters) on 11 and 25, none clamped.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-arc-nest.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-arc-strip-return.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-card-description.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dispatch-arc-start.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dispatch-card-phases.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dispatch-card-version-word.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dispatch-model-word.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dispatch-resume-3am.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-planner-card.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-planner-card-write.py
 
@@ -3041,7 +3041,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/, /home/l
 ## MAN-6785 — The plan card — The card folds
 section: dispatcher/010 The plan card/005 The card folds
 
-**The card folds** (MAN-5412): a `CardFoldToggle` in the head's corner, key `plan:<plan name>` — the plan's own name and nothing else: a fold carries no moment the way a hide does (`{ name, at }`), so a plan cut and walked again is still folded. Folded, the card keeps its whole head — the title, the status, the clock, `done/total`, the description, the planner badge, `waits on`, the total's pills and the corner; the action bar and the face go, out of the tab order with them.
+**The card folds** (MAN-5412): a `CardFoldToggle` in the head's corner, key `plan:<plan name>` — the plan's own name and nothing else: a fold carries no moment the way a hide does (`{ name, at }`), so a plan cut and walked again is still folded. Folded, the card keeps its whole head — the title, the status, the clock, `done/total`, the description, the planner badge, `waits on`, the total's pills and the corner; the action bar and the face go, out of the tab order with them. The description is drawn whole, so a folded card is as tall as its description is long: a fold does not make the card compact.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-arc-nest.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-arc-strip-return.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dispatch-arc-start.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dispatch-card-phases.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dispatch-card-version-word.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dispatch-model-word.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dispatch-resume-3am.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-planner-card.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-planner-card-write.py
 
@@ -3248,7 +3248,7 @@ the same `PlannerBadge` on the head's lead row, under the description — the fu
 WIDTH and not because that row cannot wrap: the row WRAPS and its title is floored at its own longest
 word (`min-w-fit`, the wrap and the floor landing together 2026-09-25), so nothing would be crushed,
 but a planner badge is a LONG LINE among a row of marks and at 390px it would take a row the arc's
-own name and books are read on), the description (`cardDescription` over the arc's own `delivers` and `goal`, the plan card's rule; `data-card-description`) clamped to two lines and capped at `max-w-3xl` (across the tab's full-width card it would run two lines of 250 characters), the armed hour in the clock slot (`data-dispatch-arc-schedule-note`), and `done/total` over the plans the deck DREW (see the
+own name and books are read on), the description (`cardDescription` over the arc's own `delivers` and `goal`, the plan card's rule; `data-card-description`) drawn whole and capped at `max-w-3xl` (across the tab's full-width card it would run in lines of 250 characters), the armed hour in the clock slot (`data-dispatch-arc-schedule-note`), and `done/total` over the plans the deck DREW (see the
 count below). The head is `LaneCardHead`, the plan card's own; its corner is `⋯` (`Dismiss done plans · N`, `doneDismiss`, while some plans of the deck are complete and some are not), the deck's own press (`arcPutAway`: every plan of the deck, one write) and the fold. That press is Dismiss (`X`, "Dismiss arc") once every plan of the deck is complete, and Hide ("Hide arc") before then — its unfinished plans go to `Hidden`, its done ones leave with the deck — by the one rule a plan's corner follows (`putAwayVerb`). It is ONE press: its entries carry `arc`, and a `Show` of any of its plans, or news on any plan of the arc, brings the whole deck back (MAN-6803); a wholly done deck draws no `Dismiss done plans`, which would be its corner again. Beneath the header the
 deck's BODY holds this lane's own first row — `DispatchArcControls`, ONE `ActionBar`: Pause, or Start and Schedule start, then the model switch —
 then the arc's flow (`StatusFlow`, one node a plan, MAN-643 → "The flow"), and then the cards: `ol[data-arc-strip]`, ONE CARD PER VIEW, in the tab as in the gutter — operator, 2026-09-26: "please bring back the swipable plan cards if it's under an arc"; an arc's plans are paged and only the plans NO arc holds are the wall's. Each plan of the arc is ONE ITEM
@@ -5419,7 +5419,7 @@ There is no policy in it: WHEN to spawn is the driver's question, and this one a
 - **Model and effort come from the launch table, asked at every launch.** Spawn, resume and reply all
   pass through `prepare`, which calls `resolveLaunchSide('metis', side)` (`@/modules/agent-launch/index.js`,
   MAN-7416): `side` is the board's own switch read at that instant (`deepseek` on, `claude` off), the answer is
-  `{name, side, model, effort}`, and an Agents-tab edit reaches her at her next launch with nothing restarted.
+  `{name, side, model, effort}`, and an edit in Settings → Agents → Edit Agent Chains reaches her at her next launch with nothing restarted.
   - `metisRouteFor(deepseekFlash, resolved)` settles `model`, `provider` and `effort`. A Flash board's
     `--model` is `metis-env.service.ts`'s own `deepseek-flash`, never the table's word (INV-34 #1); a Claude
     board's is `resolved.model`. `effort` is `resolved.effort` on both routes.
@@ -9922,23 +9922,18 @@ ANY PROCESS ANSWERS (`dispatcher-asks.service.ts`; measured 2026-09-28 18:59:54 
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/ntfy-action.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/services/ntfy-action-token.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/provider.registry.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/provider-runtime.service.ts
 
-## MAN-7417 — The Agents tab — where it sits, what the panel shows, its states and layout
+## MAN-7417 — Agent Chains — what the panel shows, its states and layout, and the doors that are gone
 
-The workspace tab where the operator reads and changes the model and effort every soul, and Metis, launches at, and the `/api/agent-launch` relay behind it. The table is `charters/launch.toml` (MAN-7407); `~/.claude/scripts/launch-table` is its one reader and writer (MAN-7415). The tab and the relay open no file: the census the CLI prints is the tab's whole data.
+Agent Chains: the panel where the operator reads and changes the model and effort every soul, and Metis, launches at, and the `/api/agent-launch` relay behind it. It opens from Settings → Agents → Edit Agent Chains, in a window above Settings (MAN-7427). The table is `charters/launch.toml` (MAN-7407); `~/.claude/scripts/launch-table` is its one reader and writer (MAN-7415). The panel and the relay open no file: the census the CLI prints is the panel's whole data.
 
-The data path, the hook and the rules that bite: MAN-7420. The routes, `LAUNCH_TABLE_BIN` and Metis's resolve: MAN-7418.
+The data path, the hook and the rules that bite: MAN-7420. The window, its stand-ins and the row: MAN-7427. The routes, `LAUNCH_TABLE_BIN` and Metis's resolve: MAN-7418.
 
-## where the tab sits
+## where it lives
 | fact | value |
 |---|---|
-| strip | the house row, last of the built-ins: after `API_TAB`, before plugin tabs |
-| entry | `WorkspaceTabs.tsx` `AGENTS_TAB: BuiltInTab = { id: 'agents', labelKey: 'tabs.agents', icon: Bot }`; label "Agents"; no count dot |
-| why the house row | the table is a fact about the box, whatever project is open; the house row holds the surfaces that read the same in every project |
-| why ungated | the operator opens it to change a launch; a tab that hid on a quiet day would be a table nobody could reach |
-| render | `WorkspaceMain.tsx`: `activeTab === 'agents'` → `<AgentLaunchPanel />` in the lazy block beside `ApiPanel`, no gate |
-| tab id | `'agents'` in `AppTab` (`src/shared/types.ts`) AND in `VALID_TABS` (`useProjectsState.ts`); missing from `VALID_TABS` a reload leaves the tab |
-| command palette | `Go to Agents` in `CommandPalette.tsx` `NAV_TABS` after API; `'agents'` in `ProjectCommandPalette.tsx` `visibleTabs` |
-| locales | `tabs.agents` and the `agentLaunch.*` block exist in `en/common.json` only; other locales fall back to English |
+| opens from | Settings → Agents → Edit Agent Chains (MAN-7427); it has no workspace-strip entry, no command-palette row and no `AppTab` member |
+| saved tab | a stored `activeTab` of `'agents'` fails `isValidTab` (`useProjectsState.ts`) and lands on `'chat'` |
+| locales | `agentLaunch.*` (title "Agent Chains") in `en/common.json` only; other locales fall back to English |
 
 ## what the panel shows
 Every choice list is `census.choices`; the panel spells no model or effort word.
@@ -9980,7 +9975,7 @@ Every choice list is `census.choices`; the panel spells no model or effort word.
 | a save is refused | banner outside the scroll (`data-agent-refused`): a lead line and the server's sentence; the row wears `not saved`; the held census is unchanged |
 
 ## draw order and layout
-1. Header: mark, title, `census.file` (≥ 48rem), reload button (`data-agent-reload`).
+1. Header: mark, title "Agent Chains" (the `<h2>` carries `titleId` when the window gives one), `census.file` (≥ 48rem), reload button (`data-agent-reload`; a native `title`, no `Tooltip`), and — only when the window gives `onClose` — a close button (`data-agent-close`, `autoFocus`).
 2. Refusal banner, outside the scroll.
 3. Body: warnings, reach notice, Defaults, Souls, Metis. The scroll body carries 16rem bottom padding for the last row's open list.
 
@@ -9990,13 +9985,13 @@ Every choice list is `census.choices`; the panel spells no model or effort word.
 | 48rem – 64rem | 2: name and stacked controls beside the lanes |
 | < 48rem | 1 |
 
-The query is the panel's own width (`container-type` on the root). Defaults: 3 fields from 48rem, stacked below.
+The query is the panel's own width (`container-type` on the root). Defaults: 3 fields from 48rem, stacked below. Below 30rem each Select list anchors to its trigger's right edge (MAN-7427 §"rules").
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/agent-launch/AgentLaunchChoice.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/agent-launch/AgentLaunchDefaults.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/agent-launch/AgentLaunchLanes.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/agent-launch/AgentLaunchNotices.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/agent-launch/AgentLaunchPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/agent-launch/AgentLaunchRowItem.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/agent-launch/hooks/useAgentLaunch.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/agent-launch/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/command-palette/CommandPalette.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/hooks/useProjectsState.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/ProjectCommandPalette.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/WorkspaceMain.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/WorkspaceTabs.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/agent-launch-types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts
 
 ## MAN-7418 — /api/agent-launch — the three routes and their bodies, refused 400 · unreachable 503 · unreadable 502, LAUNCH_TABLE_BIN, Metis's resolve
 
-`/api/agent-launch` is the relay from the Agents tab (MAN-7417) to `~/.claude/scripts/launch-table`. Module internals (spawn, shape checks, failure classes, timeouts, shared types): MAN-7416. Metis is its second caller (§"Metis's resolve").
+`/api/agent-launch` is the relay from the Agent Chains window (MAN-7417) to `~/.claude/scripts/launch-table`. Module internals (spawn, shape checks, failure classes, timeouts, shared types): MAN-7416. Metis is its second caller (§"Metis's resolve").
 
 Mount: `app.use('/api/agent-launch', authenticateToken, createAgentLaunchModule().router)` in `server/index.ts`, beside the heal mount.
 
@@ -10023,15 +10018,15 @@ A body the route itself cannot read (bad name, stray key, no field) is a 400 wit
 
 ## Metis's resolve
 `kanban-metis.module.ts` injects `resolveLaunchSide`, imported through `@/modules/agent-launch/index.js`, into `createMetisSpawner`, as `readDeepseekKey` is.
-- `prepare`, which spawn, resume and reply all pass, asks `resolveLaunchSide('metis', board.deepseekFlash ? 'deepseek' : 'claude')` at EVERY launch: a save in the tab reaches her next launch, nothing restarted.
+- `prepare`, which spawn, resume and reply all pass, asks `resolveLaunchSide('metis', board.deepseekFlash ? 'deepseek' : 'claude')` at EVERY launch: a save in the window reaches her next launch, nothing restarted.
 - The ask runs before `startedAt`, the board's cwd and `writeBoardFlag`. Any failed result throws `AppError("Metis's launch table could not be read: <message>", {statusCode: 503, code: 'LAUNCH_TABLE_UNREADABLE'})` and no child starts; the driver counts it as a failed launch (INV-5743).
 - A Flash board's `--model deepseek-flash` stays Node's own word (INV-34 #1); its effort is `[deepseek] effort` (INV-4899). Route, argv, the gate order and the `spec.json` record: MAN-593.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/agent-launch/agent-launch.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/agent-launch/agent-launch.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/agent-launch/agent-launch.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/agent-launch/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/kanban-metis/kanban-metis.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/kanban-metis/metis-env.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/kanban-metis/metis-spawn.service.ts
 
-## MAN-7420 — The Agents tab — data path, where each piece lives, the hook contract and the rules that bite
+## MAN-7420 — Agent Chains — data path, where each piece lives, the hook contract and the rules that bite
 
-The Agents tab's data path, its hook and the rules a change to either must keep. What the panel draws: MAN-7417. The routes it calls: MAN-7418.
+The Agent Chains panel's data path, its hook and the rules a change to either must keep. What the panel draws: MAN-7417. The window that hosts it: MAN-7427. The routes it calls: MAN-7418.
 
 ## data path
 | fact | value |
@@ -10045,7 +10040,8 @@ The Agents tab's data path, its hook and the rules a change to either must keep.
 ## where each piece lives
 | piece | home |
 |---|---|
-| panel | `src/modules/agent-launch/AgentLaunchPanel.tsx`, re-exported lazily by `index.ts` |
+| panel | `src/modules/agent-launch/AgentLaunchPanel.tsx`, re-exported lazily by `index.ts`, rendered only by `AgentChainsContent` (MAN-7427) |
+| panel props | `onClose?: () => void` (draws the header's close button) · `titleId?: string` (the id the `<h2>` carries, so the window is named by it) |
 | parts | `AgentLaunchNotices` (warnings, reach notice) · `AgentLaunchDefaults` · `AgentLaunchRowItem` · `AgentLaunchLanes` · `AgentLaunchChoice` |
 | hook | `useAgentLaunch()` → `{ census, error, saving, refresh, saveRow, saveDefaults }` |
 | types | `src/shared/agent-launch-types.ts`: the census key for key in the CLI's snake_case, plus `AgentLaunchRowChange` and `AgentLaunchDefaultsChange`; a rename there is a field the panel stops reading |
@@ -10057,7 +10053,7 @@ The Agents tab's data path, its hook and the rules a change to either must keep.
 - The hook keeps every in-flight write by name, oldest first; each write releases only its own entry. The same name pressed twice holds twice. The panel holds one row at a time: with two saves open the older row is live again.
 - A read that a newer call overtook is dropped (`epoch`): a reload begun before a save cannot land after it and restore the old picture. Writes are never dropped.
 - `readCensus(response)` wraps `readApiJson`: the server's `{ error }` passes through; a body that is not JSON, or is JSON that fails `isCensus`, throws "The launch table's API did not answer with a census (HTTP <status>)." Read and both writes use it.
-- `isCensus` is shallow on purpose: it checks `state`, `problems`, `rows`, `choices.models`, `choices.efforts`, `defaults.effort` only. A field the panel starts to dereference belongs in it only if a body missing it could blank the tab.
+- `isCensus` is shallow on purpose: it checks `state`, `problems`, `rows`, `choices.models`, `choices.efforts`, `defaults.effort` only. A field the panel starts to dereference belongs in it only if a body missing it could blank the window.
 
 ## rules
 - **A held row is not disabled.** A row or the Defaults block being saved is dimmed, pointer switched off, `aria-busy`, and its handlers return early. `disabled` or `fieldset disabled` drops keyboard focus off the trigger; a held row must not use either.
@@ -10071,3 +10067,53 @@ The Agents tab's data path, its hook and the rules a change to either must keep.
 | null | "Not saved — the launch table refused it:" |
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/agent-launch/AgentLaunchPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/agent-launch/hooks/useAgentLaunch.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/agent-launch/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/agent-launch-types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts
+
+## MAN-7427 — Agent Chains window — the Settings row, the dialog, its stand-ins and the rules that bite
+
+Agent Chains opens from one row in Settings → Agents → Claude → Account, in a window above Settings. The workspace strip and both command palettes carry no Agents entry. Panel: MAN-7417. Data path and hook: MAN-7420. Routes: MAN-7418.
+
+## the row
+| fact | value |
+|---|---|
+| home | `AgentChainsContent.tsx`, first in the house-wide stack `AgentCategoryContentSection.tsx` renders under Claude → Account, above `RunnerModelContent` |
+| shape | one `SettingsCard` holding one `SettingRow`: label "Agent chains", button "Edit Agent Chains" |
+| trigger | the button is the kit `DialogTrigger asChild`; that is what returns focus to it on close |
+| strings | `agents.agentChains.{label,description,button,loadFailed,reload}` in `en/settings.json`; each call carries a `defaultValue`; other locales fall back to English |
+| palette | Settings' own row (`SETTINGS_MAIN_TABS` id `agents`, `src/shared/constants.ts`) carries the keywords `chains model effort launch` |
+
+## the window
+| fact | value |
+|---|---|
+| parts | kit `Dialog` + `DialogContent`; `open` is `useState` in `AgentChainsContent`, read by nothing else |
+| z | `wrapperClassName="z-[10000]"`: `Settings.tsx` is a hand-built backdrop at `z-[9999]`, so a bare kit Dialog opens behind it |
+| ≥ `md` | centred, `md:w-[calc(100vw-2rem)] md:max-w-6xl` (72rem), `md:h-[calc(100dvh-2rem)]`; entrance `md:animate-dialog-content-show` |
+| < `md` | full screen: `max-md:left-0 max-md:top-0 max-md:h-full max-md:w-full`, no centring translate, no radius, `pwa-notch-safe`; entrance `max-md:animate-shape-rise` |
+| name | `aria-labelledby` = a `useId` handed to the panel as `titleId`; the panel's `<h2>` carries it |
+| Escape | closes only this window: the kit takes the key in the capture phase; Settings stays open |
+| read | `DialogContent` renders nothing while closed, so the panel mounts and reads the census on every open |
+| columns | the panel's own width decides (MAN-7417); 3 columns need a viewport ≥ 1056 px, 2 run 800–1055 px |
+
+## stand-ins — the panel is `React.lazy` (`agent-launch/index.ts`)
+`WindowStandIn` = title + close button + a body slot.
+| while | the window shows |
+|---|---|
+| chunk loading | `Suspense` fallback: `WindowStandIn` around `Spinner` ("Reading the launch table…") |
+| chunk failed | `react-error-boundary` `ErrorBoundary` fallback: `WindowStandIn` around a `warn` Banner "Agent Chains could not be loaded." and a "Reload the page" button (`window.location.reload()`); the error goes to `console.error` |
+| loaded | `AgentLaunchPanel onClose titleId` |
+
+- Reload, never Retry: `React.lazy` remembers a rejected import, so a retry renders the same rejection.
+- The boundary keeps a rejected chunk from reaching the app-wide boundary, which replaces Settings and everything under it.
+
+## rules
+- Every state of the window has a close button. On a phone the window is the whole screen with no Escape; a state without one is left only by reloading the page.
+- `autoFocus` sits on both close buttons (the panel's header, `WindowStandIn`). why: the kit's first-focus pass runs on open, before the lazy panel exists, and finds nothing; focus would stay on the button behind.
+- No kit `Tooltip` inside the window. why: it portals at `zIndex: 9999`, under the window's 10000, so the bubble is drawn behind it. The reload buttons use a native `title` with `aria-label`.
+- `animationClassName` is split by breakpoint. why: the kit's default entrance carries the centring in its keyframes; on the phone, where the centring translate is dropped, it slides the sheet off-screen.
+- Below `30rem` panel width the panel's scroll wrapper anchors each Select list to its trigger's right edge at the trigger's width: `[@container(max-width:30rem)]:[&_.vv-select\_\_panel]:left-auto` and `:w-full`. why: the kit floors a list at 14rem (`min(14rem, 100vw-24px)`, viewport-measured) and grows it rightwards from the trigger's left; on a phone the trigger has less than 14rem to its right. Wider windows keep the kit's placement.
+- Escape each `_` in that arbitrary variant. why: Tailwind reads a bare `_` as a space, so `.vv-select__panel` compiles to `.vv-select  panel` and matches nothing.
+
+## verify
+`node .verify/probe-agent-chains.mjs`: strip and palettes lack Agents; row and window open; window rows equal the census's; a hermes effort edit through the window reaches the census and `agents/hermes.md`, and `PUT {"model":null,"effort":null}` restores both byte-identical; Escape closes only the window and returns focus to the button; a saved `activeTab` of `'agents'` reloads to chat; phone 360×800 at 1.072× (full screen, one column, close button hittable, no sideways overflow).
+- 2026-09-29: 41 checks passed before the stand-ins, the error boundary, the reload `title` and the phone list anchor landed; those four are not measured in a browser, and the probe was not re-run after them.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/agent-launch/AgentLaunchPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/agent-launch/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/settings.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/agents-settings/sections/AgentCategoryContentSection.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/agents-settings/sections/content/AgentChainsContent.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/constants.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-agent-chains.mjs

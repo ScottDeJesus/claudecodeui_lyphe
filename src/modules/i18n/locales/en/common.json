@@ -28,7 +28,6 @@
     "runner": "Runner",
     "heal": "Heal",
     "api": "API",
-    "agents": "Agents",
     "kanban": "Kanban",
     "universe": "Universe",
     "schedules": "Schedules",
@@ -346,7 +345,7 @@
     "subtabsLabel": "API services"
   },
   "agentLaunch": {
-    "title": "Agents",
+    "title": "Agent Chains",
     "reload": "Read the launch table again",
     "reading": "Reading the launch table…",
     "unreadable": {

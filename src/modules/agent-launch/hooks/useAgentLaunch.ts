@@ -19,7 +19,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 /**
  * Whether a body carries every part of the census the panel dereferences. A census is not checked field
  * for field — the Python side owns its shape — only enough that a body which is not one (a refusal an
- * envelope let through with a 200, an empty object) cannot reach the panel and blank the tab.
+ * envelope let through with a 200, an empty object) cannot reach the panel and blank the window.
  */
 function isCensus(body: unknown): body is AgentLaunchCensus {
   if (!isRecord(body)) return false;
@@ -57,7 +57,7 @@ async function readCensus(response: Response): Promise<AgentLaunchCensus> {
 }
 
 /**
- * Used by the Agents panel (`AgentLaunchPanel`) for everything it draws and every press it takes.
+ * Used by the Agent Chains panel (`AgentLaunchPanel`) for everything it draws and every press it takes.
  *
  * `saving` is the name of the row being saved, or `'@defaults'` while the Defaults block saves — the
  * newest write still in flight, so a save that finishes never releases the hold of one that has not;

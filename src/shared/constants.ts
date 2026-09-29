@@ -79,7 +79,7 @@ type SettingsMainTabMeta = {
  * labels; these are the palette's.
  */
 export const SETTINGS_MAIN_TABS: SettingsMainTabMeta[] = [
-  { id: 'agents', label: 'Agents', keywords: 'agents subagents claude code', icon: Bot },
+  { id: 'agents', label: 'Agents', keywords: 'agents subagents claude code chains model effort launch', icon: Bot },
   { id: 'appearance', label: 'Appearance', keywords: 'appearance theme dark light language', icon: Palette },
   { id: 'git', label: 'Git', keywords: 'git github commits', icon: GitBranch },
   { id: 'tasks', label: 'Tasks', keywords: 'tasks taskmaster', icon: ListChecks },

@@ -2,6 +2,7 @@ import type { AgentCategory, AgentContextByProvider, AgentProvider, AgentSetting
 import { McpServers } from '@/modules/mcp';
 import { ProviderSkills } from '@/modules/skills';
 import AccountContent from '@/modules/settings/tabs/agents-settings/sections/content/AccountContent';
+import AgentChainsContent from '@/modules/settings/tabs/agents-settings/sections/content/AgentChainsContent';
 import EditModeContent from '@/modules/settings/tabs/agents-settings/sections/content/EditModeContent';
 import JevContent from '@/modules/settings/tabs/agents-settings/sections/content/JevContent';
 import PermissionsContent from '@/modules/settings/tabs/agents-settings/sections/content/PermissionsContent';
@@ -54,6 +55,9 @@ export default function AgentCategoryContentSection({
           above rather than a setting of its own. */}
       {selectedCategory === 'account' && selectedAgent === 'claude' && (
         <div className="mt-6 space-y-6">
+          {/* First: the one row here that is not a switch. It opens the launch table — which model and
+              effort every soul launches at — and the switches below decide how those souls are run. */}
+          <AgentChainsContent />
           <RunnerModelContent />
           {/* Under the model switch, not beside it: this is the narrower question of what may leave
               the machine to answer one, and it reaches hooks rather than the runner's hands. */}

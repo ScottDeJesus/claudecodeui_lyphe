@@ -254,7 +254,7 @@ const readKanbanMetisTranscript = async (sessionId: string): Promise<SubagentTra
  */
 export const LESSON_LIST_LIMIT = 500;
 
-/** The deadline of an Agents-tab write: the relay's own 90 s for the CLI, with the network's margin. */
+/** The deadline of an Edit Agent Chains write: the relay's own 90 s for the CLI, with the network's margin. */
 const AGENT_LAUNCH_WRITE_TIMEOUT_MS = 95_000;
 
 // ─── API endpoints ──────────────────────────────────────────────────────────
@@ -827,9 +827,9 @@ export const api = {
     cycleStop: () => post('/api/heal/cycle/stop', {}),
   },
 
-  // The Agents tab's launch table (`~/.claude/charters/launch.toml`), relayed from the launch-table CLI:
-  // the census the tab draws, one row's pins, and the table's defaults. Every write answers with the
-  // census read back after it, so the tab never holds a picture the table did not confirm.
+  // The launch table (`~/.claude/charters/launch.toml`) behind Settings → Agents → Edit Agent Chains, relayed
+  // from the launch-table CLI: the census the window draws, one row's pins, and the table's defaults. Every
+  // write answers with the census read back after it, so the window never holds a picture the table did not confirm.
   //
   // A write waits as long as the relay lets the CLI run (90 s: the lock, then the shims' regeneration),
   // plus a margin: at the browser's default 30 s a slow but healthy save would be called "not saved"

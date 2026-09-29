@@ -10,8 +10,9 @@ const FENCE_LINE = /^ {0,3}(```|~~~)/;
 /**
  * Gives a question's lists the blank lines a model leaves out.
  *
- * Questions arrive written line by line — a title, `1. …` to `8. …`, then `Run it? · lock:…` — with
- * single newlines only. Markdown reads that last line as a LAZY CONTINUATION of item 8, so the
+ * A question can arrive written line by line — a title, `1. …` to `8. …`, then `Run it? · lock:…` —
+ * with single newlines only (the Accept prompt `dispatcher question` prints already sets its blocks
+ * apart by a blank line). Markdown reads that last line as a LAZY CONTINUATION of item 8, so the
  * closing question would render inside the list; and a list opening at anything but `1.` cannot
  * interrupt the paragraph above it. So a blank line goes in wherever an unindented plain line meets
  * a list, on either side. An indented line is left alone — that one really does continue its item —

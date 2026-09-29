@@ -16,7 +16,7 @@ type LaneCardHeadProps = {
   clock?: ReactNode;
   /** How far the card has got: phases done for a plan, plans complete for an arc. `null`, or a total of 0, draws no count. */
   progress: { done: number; total: number } | null;
-  /** The second row: the card's description (`cardDescription`) clamped to two lines, then who is out on the card and what it waits on. */
+  /** The second row: the card's description (`cardDescription`) drawn whole, then who is out on the card and what it waits on. */
   lead?: ReactNode;
   /** The third row: the card's total, as pills. */
   spend?: ReactNode;

@@ -1354,7 +1354,7 @@ kinds are among the five that are never persisted as rows. The rules:
   `PermissionRequestsBanner` in the same `AskUserQuestionPanel` an inline ask uses — no transcript row
   carries it — with no Skip (the operator's word is owed). Outside the scrolling transcript, the card
   is BOUNDED at half the dynamic viewport, its body scrolling between a header and a footer that stay,
-  the census never shortened (the token pins it); and it folds to a one-line bar without answering —
+  the prompt never shortened (the token pins it); and it folds to a one-line bar without answering —
   the plan still owes, one tap re-opens it — so an unanswered prompt never holds the composer; and an option marked `needsNote` opening a
   field for his note, sent beside the answers as `updatedInput.notes`.
 

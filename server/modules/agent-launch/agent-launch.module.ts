@@ -38,7 +38,7 @@ function launchService(): AgentLaunchService {
  * Builds the agent-launch lane for the server entrypoint: the three routes and the one CLI behind them.
  *
  * This is the whole composition — no watcher, no timer, no socket. The table changes when the
- * operator presses a save in the Agents tab or edits the file by hand, and the CLI is spawned per
+ * operator presses a save in Settings → Agents → Edit Agent Chains or edits the file by hand, and the CLI is spawned per
  * request; nothing here polls, because the client reads when it opens and after each save.
  */
 export function createAgentLaunchModule(): AgentLaunchModule {

@@ -1362,3 +1362,138 @@ measured 2026-09-29 by chain chain-settings-mobile-round2-20260929-081949-f36c, 
 probe-key: 494170834dc325482ac2573275fac7e1f9a3bd48
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/plugins/PluginSettingsTab.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/SettingRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/settings-rows-measure.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/settings-rows-walk.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-settings-rows.mjs
+
+## INV-5790 — probe — The standing proof cannot see a lead cut by an ellipsis or by a clipping ancestor
+
+The standing proof cannot see a lead cut by an ellipsis or by a clipping ancestor
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe && T=$(mktemp -d) && sed -e "s#'../src/#'$PWD/src/#" -e "s#^async function openTab(page, viewport) {#&\n  await page.addInitScript(() => document.addEventListener('DOMContentLoaded', () => { const s = document.createElement('style'); s.textContent = '[data-card-description]{white-space:nowrap !important;overflow:hidden !important;text-overflow:ellipsis !important}'; document.head.appendChild(s); }));#" .verify/probe-card-description.mjs > $T/p.mjs && node $T/p.mjs --tag ellipsis | grep -E "arc restorly's lead is drawn whole|reading\(s\) failed" | sed -E 's/^(PASS|FAIL) tab [0-9]+ (light|dark)/\1 tab/' | sort | uniq -c; echo "exit ${PIPESTATUS[0]}"
+expect: exit 1 and a FAIL on the arc restorly's "drawn whole" line for a 1,367-character lead painted on 1 line (today: 4× PASS "painted on 1 line(s)", "0 reading(s) failed", exit 0)
+```
+
+measured 2026-09-29 by chain chain-card-description-full-20260929-105755-1234, finding M1, MEDIUM
+probe-key: 3cbc33de2fe16b8b75d50c03ee129c05f614d28a
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/ArcDeck.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/LaneCardHead.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/PlanCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-card-description.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dispatch-arc-word.mjs
+
+## INV-5791 — probe — MANUAL.md still says the standing proof's rule is the old clamp, and the builder's report says no leftover exists
+
+MANUAL.md still says the standing proof's rule is the old clamp, and the builder's report says no leftover exists
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe && grep -n 'computes `-webkit-line-clamp: 2` and paints one or two lines' docs/MANUAL.md | cut -c1-60
+expect: no output (today: line 3014 prints)
+```
+
+measured 2026-09-29 by chain chain-card-description-full-20260929-105755-1234, finding M2, MEDIUM
+probe-key: 47d8307d23c46999a1685bc02b4eb4829502d29e
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/ArcDeck.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/LaneCardHead.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/PlanCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-card-description.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dispatch-arc-word.mjs
+
+## INV-5792 — probe — The standing proof's shots are capped at 480px, so the head of a long description is cut in the one picture a human checks
+
+The standing proof's shots are capped at 480px, so the head of a long description is cut in the one picture a human checks
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe && node .verify/probe-card-description.mjs --tag capcheck > /dev/null; python3 -c "import struct;d=open('.verify/shots/card-description-capcheck-390-dark-arc.png','rb').read(24);print(struct.unpack('>II',d[16:24]))"
+expect: a height above 496, the whole 525px arc head at 390 (today: (348, 496), cut at the 480px cap)
+```
+
+measured 2026-09-29 by chain chain-card-description-full-20260929-105755-1234, finding L1, LOW
+probe-key: a26a3eb60633ae8b179cacbd33b3e64e29752446
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/ArcDeck.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/LaneCardHead.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/PlanCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-card-description.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dispatch-arc-word.mjs
+
+## INV-5793 — probe — PlanCard's fold rationale still promises a compact head, and a folded card is no longer one
+
+PlanCard's fold rationale still promises a compact head, and a folded card is no longer one
+
+```probe
+node /tmp/pipeline-reviews/card-description-full/athena-probes/fold.mjs | grep -E "^390"
+expect: either the fold's rationale no longer says "at a glance", or every folded loose card at 390 reads under ~250px (today: folded 151 / 470 / 206 / 338, arc 539)
+```
+
+measured 2026-09-29 by chain chain-card-description-full-20260929-105755-1234, finding L2, LOW
+probe-key: f77ce2f9cabcc4086a663f85bfa98a8bea965f0f
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/ArcDeck.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/LaneCardHead.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/PlanCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-card-description.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dispatch-arc-word.mjs
+
+## INV-5794 — probe — the longest real prompt is the arc lock, not `coi-backend-conformance`; the panel proof stops at a fifth of it
+
+the longest real prompt is the arc lock, not `coi-backend-conformance`; the panel proof stops at a fifth of it
+
+```probe
+cd ~/.claude && PYTHONPATH=hooks python3 -c "
+from dispatcher import store, lock
+c=store.connect(); a=c.execute(\"SELECT id FROM arcs WHERE name='restorly'\").fetchone()[0]
+n=[p['name'] for p in store.arc_plans(c,a)]; print(len(n), len(lock.question_text(c,n)))"
+expect: 14 plans and ~39.8k characters — 5x the 7,451-char prompt the panel proof used (moves with the store; the shape is what matters)
+```
+
+measured 2026-09-29 by chain chain-lock-prompt-glance-20260929-110148-17f8, finding M1, MEDIUM
+probe-key: c6145a3457e6d12ef4613f3ac632435aedb1d64f
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-intent-lock-prompt.mjs, /home/lyphe/.claude/hooks/dispatcher/lock_glance.py, /home/lyphe/.claude/hooks/dispatcher/lock.py, /home/lyphe/.claude/skills/plan/SKILL.md
+
+## INV-5795 — probe — an unclosed code fence in a plan's `delivers` swallows the facts line, the phase list and the token into the code block
+
+an unclosed code fence in a plan's `delivers` swallows the facts line, the phase list and the token into the code block
+
+```probe
+cd ~/.claude && PYTHONPATH=hooks python3 -c "
+from dispatcher import lock_glance as g
+x=g.Glance('p','see:\n\`\`\`sh\nrun','/tmp',None,None,(),1,1,0,'',(),'')
+print(sum(1 for b in g.blocks([x]) for l in b.splitlines() if l.startswith('\`\`\`')) % 2)"
+expect: 1 — the prompt's blocks carry an odd number of fence lines, so nothing closes the fence before the facts, phase list and token
+```
+
+measured 2026-09-29 by chain chain-lock-prompt-glance-20260929-110148-17f8, finding L1, LOW
+probe-key: f761e8f6129637e561901ea900beaa317b2e4d1c
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-intent-lock-prompt.mjs, /home/lyphe/.claude/hooks/dispatcher/lock_glance.py, /home/lyphe/.claude/hooks/dispatcher/lock.py, /home/lyphe/.claude/skills/plan/SKILL.md
+
+## INV-5796 — probe — three lines still describe the old prompt shape
+
+three lines still describe the old prompt shape
+
+```probe
+cd ~/.claude/claudecodeui_lyphe && grep -c "census word for word" server/shared/types.ts; grep -c "single newlines only" src/modules/chat/tools/ContentRenderers/QuestionText.tsx
+expect: 1 and 1 — both still describe the old shape (0 once healed)
+```
+
+measured 2026-09-29 by chain chain-lock-prompt-glance-20260929-110148-17f8, finding L2, LOW
+probe-key: a2e8cb06d0adeaa9543eea5c39d72cc3ce71ed19
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-intent-lock-prompt.mjs, /home/lyphe/.claude/hooks/dispatcher/lock_glance.py, /home/lyphe/.claude/hooks/dispatcher/lock.py, /home/lyphe/.claude/skills/plan/SKILL.md
+
+## INV-5797 — probe — "read ONCE for the text and the token" is not what runs; the two can part under a concurrent write
+
+"read ONCE for the text and the token" is not what runs; the two can part under a concurrent write
+
+```probe
+cd ~/.claude && PYTHONPATH=hooks python3 -c "
+from dispatcher import store, lock, lock_glance as g
+c=store.connect(); n=[]; o=g.read; g.read=lambda c_,r:(n.append(1),o(c_,r))[1]
+lock.question_text(c,['agent-launch-config']); print(len(n))"
+expect: 2 for one plan's prompt (the docstring, MANUAL and MAN-1443 say once)
+```
+
+measured 2026-09-29 by chain chain-lock-prompt-glance-20260929-110148-17f8, finding L3, LOW
+probe-key: e5c97527ca014e1398bcf3be3e1557e755bb9143
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-intent-lock-prompt.mjs, /home/lyphe/.claude/hooks/dispatcher/lock_glance.py, /home/lyphe/.claude/hooks/dispatcher/lock.py, /home/lyphe/.claude/skills/plan/SKILL.md
+
+## INV-5798 — probe — `Arc <arc>, plan <i> of <n>` shows the store's id order, which is wrong for the real `restorly` arc
+
+`Arc <arc>, plan <i> of <n>` shows the store's id order, which is wrong for the real `restorly` arc
+
+```probe
+cd ~/.claude && scripts/dispatcher question restorly--vendors | grep -o "Arc restorly, plan [0-9]* of [0-9]*"; python3 -c "import tomllib; o=[p['name'] for p in tomllib.load(open('plans/restorly.arc.toml','rb'))['plan']]; print(o.index('restorly--vendors')+1, len(o))"
+expect: the prompt says "plan 9 of 14" while the arc file lists it 7th of 13
+```
+
+measured 2026-09-29 by chain chain-lock-prompt-glance-20260929-110148-17f8, finding L4, LOW
+probe-key: f96881d501a30e609e660221eb73cc93c2d093e7
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-intent-lock-prompt.mjs, /home/lyphe/.claude/hooks/dispatcher/lock_glance.py, /home/lyphe/.claude/hooks/dispatcher/lock.py, /home/lyphe/.claude/skills/plan/SKILL.md

@@ -17,7 +17,7 @@ const execFileAsync = promisify(execFile);
  *
  * This server keeps no view of the table and owns none of its state. It never opens `launch.toml` and
  * never regenerates a shim: it runs the CLI's own verbs and carries back what the CLI said. The hooks'
- * `launch_table` package is the one reader and writer of the file, so every shape the Agents tab draws
+ * `launch_table` package is the one reader and writer of the file, so every shape Settings → Agents → Edit Agent Chains draws
  * — and every word it may pick, and every sentence that refuses one — exists once in this house rather
  * than once per language. One reader per store, one transport, and the transport is a process this
  * service does not look inside of.
@@ -53,13 +53,13 @@ const SAID_MAX_CHARS = 300;
 
 /**
  * The CLI's `show`, `set` and `defaults` payload, carried WHOLE. This service does not reshape it:
- * every key in it belongs to the tab, the tab reads it by the name the CLI printed, and a translation
+ * every key in it belongs to the window, the window reads it by the name the CLI printed, and a translation
  * layer here would be a second place the census's shape is written down.
  */
 type AgentLaunchCensus = Record<string, unknown>;
 
 export type AgentLaunchService = {
-  /** The whole census the tab reads: the defaults, one row per soul and Metis, each row's lanes. */
+  /** The whole census the window reads: the defaults, one row per soul and Metis, each row's lanes. */
   census(): Promise<AgentLaunchResult<AgentLaunchCensus>>;
   /** Pin or clear one row's model and effort. Answers the census the CLI printed AFTER the write. */
   setRow(name: string, change: AgentLaunchRowChange): Promise<AgentLaunchResult<AgentLaunchCensus>>;

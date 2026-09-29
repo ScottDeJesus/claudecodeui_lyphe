@@ -25,8 +25,9 @@ import { cn } from '@/shared/utils';
  *
  * - THE HEAD (`LaneCardHead`): the mono name, the word (`PlanStatusBadge`), the clock (`PlanClock`)
  *   and `done/total` phases on row one; the plan's description (`cardDescription`: its design's
- *   `delivers` line, else its goal's where that yields nothing) clamped to two, then who is out on the
- *   plan (`PlannerBadge`) and what of its arc it waits on, on row two; the plan's total as pills
+ *   `delivers` line, else its goal's where that yields nothing) drawn WHOLE — it wraps, and no line of
+ *   it is cut — then who is out on the plan (`PlannerBadge`) and what of its arc it waits on, on row
+ *   two; the plan's total as pills
  *   (`SpendPills`, counting at first sight) on row three; Dismiss or Hide, and the fold, in the corner.
  * - THE BAR (`PlanControls` → `ActionBar`): the verbs the plan's status allows and its model switch.
  * - THE FACE (`PlanFace`): the phases' track, what is moving now, and the closed lists. Its own rules —
@@ -34,10 +35,11 @@ import { cn } from '@/shared/utils';
  *
  * A FOLD KEEPS THE WHOLE HEAD AND TAKES THE REST (MAN-5412). The head is what says WHICH plan this is
  * and how it stands — name, word, clock, count, description, spend — and the corner is how the card
- * comes back or goes away, so a reader who folded ten cards still reads all ten at a glance. The bar and
- * the face fold: they are the plan's verbs and its detail, and a fold that left verbs on screen would
- * be a card that had not collapsed. The body is the house's `CardFoldBody`, so a folded card's verbs
- * leave the tab order too.
+ * comes back or goes away, so a reader who folded ten cards still knows which ten they are. The
+ * description is drawn whole, so a folded card is as tall as its description is long: a fold takes the
+ * plan's verbs and its detail, and does not make the card compact. The bar and the face fold: a fold
+ * that left verbs on screen would be a card that had not collapsed. The body is the house's
+ * `CardFoldBody`, so a folded card's verbs leave the tab order too.
  *
  * THE CORNER PUTS THE CARD AWAY, NOT THE PLAN, and the dispatcher is never told (`hiddenPlans.ts`). A
  * COMPLETE plan's corner is Dismiss: the card leaves the board, and no list or count keeps it. Any
@@ -123,7 +125,7 @@ export function PlanCard({
             lead={(
               <>
                 {description && (
-                  <p data-card-description className="line-clamp-2 min-w-0 break-words text-xs leading-snug text-muted-foreground">{description}</p>
+                  <p data-card-description className="min-w-0 break-words text-xs leading-snug text-muted-foreground">{description}</p>
                 )}
                 {/* WHO IS OUT ON THIS PLAN and what it waits on, under its description: the word says
                     what the PLAN is (`designing`), the badge who is doing something about it; the wait is

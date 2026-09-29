@@ -42,9 +42,9 @@ const noteOptionOf = (question: Question | undefined): string | null =>
  * word owed, so it offers no Skip: it stays up until he answers it.
  *
  * A STANDALONE CARD IS BOUNDED (half the dynamic viewport): it sits in the composer shell, outside the
- * scrolling transcript, so a real census — ten phases and more — grew it past the screen and took
+ * scrolling transcript, so a real prompt — the plan's description above ten phases and more — grew it past the screen and took
  * Submit and the composer with it (measured 2026-09-29: a 1245 px card on a 390×844 phone). Its header
- * and footer stay put and everything between scrolls inside the card — the census is never shortened,
+ * and footer stay put and everything between scrolls inside the card — the prompt is never shortened,
  * because the lock token pins what the operator sees. `onCollapse` folds it to a one-line bar
  * (`PermissionRequestsBanner`) without answering it: the plan still owes, and one tap re-opens it.
  *

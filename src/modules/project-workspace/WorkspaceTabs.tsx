@@ -1,6 +1,5 @@
 import {
   Activity,
-  Bot,
   Brain,
   Clock,
   Coins,
@@ -51,11 +50,10 @@ type BuiltInTab = {
 // a speech bubble for the conversation, a terminal for the shell, a file tree for the files,
 // a branch for git, lanes for the board, a globe for the browser, a checklist for tasks, a
 // brain for memory, an orbit for the sky, a pulse for the runner — the one view whose
-// subject is something moving on its own — a clock for what the box runs on a schedule, and a
-// heartbeat for the heal reflex, the view whose subject is the house mending itself, coins
+// subject is something moving on its own — a clock for what the box runs on a schedule, a
+// heartbeat for the heal reflex, the view whose subject is the house mending itself, and coins
 // for the API tab, the view whose subject is what the house spends on third-party services —
-// Jev and DeepSeek — and a bot for the Agents tab, the view whose subject is the souls
-// themselves and the model and effort each one launches at.
+// Jev and DeepSeek.
 
 // Row one — views of THIS project: what each one shows changes with the project selected.
 const PROJECT_BASE_TABS: BuiltInTab[] = [
@@ -93,18 +91,13 @@ const HEAL_TAB: BuiltInTab = { id: 'heal', labelKey: 'tabs.heal', icon: HeartPul
 // hide on a quiet day.
 const API_TAB: BuiltInTab = { id: 'api', labelKey: 'tabs.api', icon: Coins };
 
-// Ungated, for the same reason: which model and effort every soul launches at is a fact about the box
-// whatever project is open, and the operator opens it to change one — a tab that hid on a quiet day
-// would be a table nobody could reach.
-const AGENTS_TAB: BuiltInTab = { id: 'agents', labelKey: 'tabs.agents', icon: Bot };
-
 /**
  * Rendered by ProjectSidebarRegion, under the wordmark, to show the built-in workspace tabs plus
  * any enabled plugin tabs — in TWO rows, split by kind.
  *
  * Row one is this project: Chat, Shell, Files, Git, Browser, Tasks — views whose content changes
  * with the project selected. Row two is the house: Kanban, Universe, Schedules, Memory, Runner,
- * Heal, API, Agents, then plugin tabs — surfaces that read the same whichever project is open, which is why
+ * Heal, API, then plugin tabs — surfaces that read the same whichever project is open, which is why
  * every count dot the strip carries lives there. One row held both kinds until it outgrew the
  * sidebar: measured at 328px (a 304px strip, 36px a glyph), nine tabs made 340px of content and
  * the ninth sat past the edge with no affordance at all, three more tabs still to come. Split by
@@ -151,7 +144,6 @@ export default function WorkspaceTabs({
     ...(shouldShowRunnerTab ? [RUNNER_TAB] : []),
     ...(shouldShowHealTab ? [HEAL_TAB] : []),
     API_TAB,
-    AGENTS_TAB,
   ];
 
   // Three tabs carry a count, and each only while there is something to count: `undefined` is what

@@ -391,6 +391,13 @@
       "button": "Authenticate"
     },
     "error": "Error: {{error}}",
+    "agentChains": {
+      "label": "Agent chains",
+      "description": "The model and effort every soul, and Metis, launches at in each lane.",
+      "button": "Edit Agent Chains",
+      "loadFailed": "Agent Chains could not be loaded.",
+      "reload": "Reload the page"
+    },
     "runnerModel": {
       "label": "Use DeepSeek Flash for build souls",
       "description": "Dispatch the plan runner’s builder, its fix-pass and Athena on DeepSeek’s deepseek-flash instead of Claude Sonnet. Prometheus, the scouts and the replanner stay on Claude. Takes effect on the next phase.",

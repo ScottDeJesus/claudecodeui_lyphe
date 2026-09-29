@@ -1,6 +1,6 @@
 // ---------------------------
 //----------------- AGENT LAUNCH CONTRACTS (CLIENT MIRROR) ------------
-// The Agents tab's view of the launch table: every shape it reads off `GET /api/agent-launch` and
+// Settings → Agents → Edit Agent Chains' view of the launch table: every shape it reads off `GET /api/agent-launch` and
 // every change it sends back. The census mirrors what `~/.claude/scripts/launch-table show` prints,
 // KEY FOR KEY and in that CLI's own snake_case — the relay (`server/modules/agent-launch/`) carries the
 // CLI's one JSON object untouched, so a rename here is a field the panel quietly stops reading.
@@ -72,7 +72,7 @@ export type AgentLaunchShim = {
 };
 
 /**
- * One row of the tab: a soul, or Metis (`kind: 'metis'`, always last, with no shim).
+ * One row of the launch table: a soul, or Metis (`kind: 'metis'`, always last, with no shim).
  *
  * `model` and `effort` are what the row RESOLVES to; `model_pinned` and `effort_pinned` say whether
  * the row's own table entry set them (a pin) or they came from `defaults`. Clearing a pin is sending
@@ -122,7 +122,7 @@ export type AgentLaunchCensus = {
   regen: AgentLaunchRegen | null;
 };
 
-//----------------- WHAT THE TAB SENDS ------------
+//----------------- WHAT THE WINDOW SENDS ------------
 
 /**
  * A change to one row's own pins. A field left out is untouched; a word pins it; `null` clears the

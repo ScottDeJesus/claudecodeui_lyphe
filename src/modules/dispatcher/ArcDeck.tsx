@@ -105,7 +105,7 @@ function ArcMark() {
  * THE HEAD, ROW BY ROW: the arc's mark and name (`ArcMark`), its word (`ARC_STATUS`), the hour a
  * Schedule start armed (the clock slot, `data-dispatch-arc-schedule-note`) and how many of its plans
  * are complete; then the arc's description (`cardDescription`: its design's `delivers` line, else its
- * goal's where that yields nothing), clamped to two lines, and who is out on it; then its
+ * goal's where that yields nothing), drawn whole, and who is out on it; then its
  * books as pills, counting at first sight (`darc:<name>`). The corner is `⋯` — carrying `Dismiss done
  * plans · N` while some plans of the deck are done and some are not — then the deck's own press, which
  * puts EVERY plan of the deck away in one write (`arcPutAway`), then the fold. That press is Dismiss
@@ -201,9 +201,10 @@ export function DispatchArcDeck({
           lead={(
             <>
               {/* A measure of its own (`max-w-3xl`): the tab's deck spans the wall, and a description
-                  set at that width is two lines of 250 characters no eye can track back across. */}
+                  set at that width runs in lines of 250 characters no eye can track back across. It
+                  is drawn whole, so the measure is the only thing that shapes it. */}
               {description && (
-                <p data-card-description className="line-clamp-2 min-w-0 max-w-3xl break-words text-xs leading-snug text-muted-foreground">{description}</p>
+                <p data-card-description className="min-w-0 max-w-3xl break-words text-xs leading-snug text-muted-foreground">{description}</p>
               )}
               {/* Who is out on the arc, under its description: a planner badge is a LONG LINE, and on
                   row one it would take the room the arc's name and word are read in. Nothing when none is. */}

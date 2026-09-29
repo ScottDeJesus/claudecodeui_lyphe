@@ -387,7 +387,7 @@ export function createMetisSpawner(dependencies: MetisSpawnDependencies): MetisS
     }
 
     // THE LAUNCH TABLE IS ASKED AT EVERY SPAWN, RESUME AND REPLY — all three pass through here — so an
-    // edit made in the Agents tab reaches her at her next launch with nothing restarted. The side is the
+    // edit made in Settings → Agents → Edit Agent Chains reaches her at her next launch with nothing restarted. The side is the
     // board's own switch, read at this instant. It is asked HERE, before `startedAt`, the cwd or the
     // board's flag file exist, so a table that cannot be read refuses the launch having created nothing:
     // the alternative is a child launched at whatever words this file could guess, unannounced.

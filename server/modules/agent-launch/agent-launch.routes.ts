@@ -14,7 +14,7 @@ const ROW_NAME = /^[a-z][a-z0-9_]{0,63}$/;
 /**
  * What a model word, an effort word or a model key may look like. This is a TOKEN fence and not the
  * vocabulary — which words the table accepts is Python's to say, and it says so in a sentence the
- * tab shows. The fence exists because these strings become argv, and a word that begins with `-`
+ * window shows. The fence exists because these strings become argv, and a word that begins with `-`
  * would be read by the CLI's parser as one of its own flags instead of as this flag's value.
  */
 const WORD = /^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$/;
@@ -102,7 +102,7 @@ function parseDefaultsChange(body: unknown): Parsed<AgentLaunchDefaultsChange> {
 
 /**
  * One answer, written: the census itself, or the CLI's own sentence under the status its reason earns.
- * The sentence travels UNTOUCHED — it is the answer, and the tab shows it as it stands.
+ * The sentence travels UNTOUCHED — it is the answer, and the window shows it as it stands.
  */
 function emit(response: express.Response, answer: AgentLaunchResult<Record<string, unknown>>): void {
   if (answer.ok) {
@@ -137,7 +137,7 @@ export function createAgentLaunchRouter(
       }
     };
 
-  /** The whole census the tab reads: the defaults, one row per soul and Metis, each row's lanes. */
+  /** The whole census the window reads: the defaults, one row per soul and Metis, each row's lanes. */
   router.get('/', relay(() => dependencies.census()));
 
   /** Pin or clear one row's model and effort. */
