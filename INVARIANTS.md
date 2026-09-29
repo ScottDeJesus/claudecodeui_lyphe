@@ -767,7 +767,7 @@ expect: [] — the Enforced line names neither the deleted `word_of` nor `reason
 measured 2026-09-28 by chain chain-claude-swarm-20260928-195521-ce60, finding L1, LOW
 probe-key: 60d2230d13605ada2fae5d4f237d4d3e83cff8c1
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-claude-swarm.mjs, /home/lyphe/.claude/hooks/dispatcher/width.py, /home/lyphe/.claude/hooks/planner_spend.py, /home/lyphe/.claude/scripts/runner_fixtures/claude_swarm.py, /home/lyphe/.claude/skills/arc/SKILL.md
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-claude-swarm.mjs, /home/lyphe/.claude/hooks/dispatcher/width.py, /home/lyphe/.claude/scripts/runner_fixtures/claude_swarm.py, /home/lyphe/.claude/skills/arc/SKILL.md
 
 ## INV-5702 — probe — `probe-claude-swarm.mjs` cannot tell a DeepSeek caption from a Claude one, so its "Claude route" precondition proves less than it says
 
@@ -781,7 +781,7 @@ expect: false false — the gate rejects a caption that is not a Claude-route po
 measured 2026-09-28 by chain chain-claude-swarm-20260928-195521-ce60, finding L2, LOW
 probe-key: f4758479bffab72a143c3321a70bdb15ecd8af44
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-claude-swarm.mjs, /home/lyphe/.claude/hooks/dispatcher/width.py, /home/lyphe/.claude/hooks/planner_spend.py, /home/lyphe/.claude/scripts/runner_fixtures/claude_swarm.py, /home/lyphe/.claude/skills/arc/SKILL.md
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-claude-swarm.mjs, /home/lyphe/.claude/hooks/dispatcher/width.py, /home/lyphe/.claude/scripts/runner_fixtures/claude_swarm.py, /home/lyphe/.claude/skills/arc/SKILL.md
 
 ## INV-5709 — probe — Every replay of a spent-out, genuine ntfy token costs a full store read, uncapped, on a public route
 
