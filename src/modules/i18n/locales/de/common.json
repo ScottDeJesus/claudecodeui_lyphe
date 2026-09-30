@@ -362,7 +362,6 @@
     "exitFullscreen": "Vollbild verlassen"
   },
   "applications": {
-    "fabLabel": "Anwendungen",
     "fabLabelMenu": "Menü öffnen",
     "fabLabelCollapse": "Chat einklappen",
     "radialLabel": "Schnellaktionen",

@@ -1597,20 +1597,6 @@ probe-key: c5e4f8710c1c0b5195fc0fd14f4bd392283f37e3
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/.oxlintrc.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/context/ProjectsStateContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/hooks/useOpenProjectChat.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/hooks/useProjectsState.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/hooks/useSidebarController.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/SidebarContent.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/utils/sidebarProjectFormatting.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/sessionRecency.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/open-project-chat.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/recency-tree.mjs
 
-## INV-5901 — probe — `radialLayout` crushes the first two items in every reachable FAB corner, including the FAB's default resting corner
-
-`radialLayout` crushes the first two items in every reachable FAB corner, including the FAB's default resting corner
-
-```probe
-cd /home/lyphe/.claude/claudecodeui_lyphe && npx tsx -e "import { radialLayout as r } from './src/modules/app-switcher/utils/radialLayout.ts'; const p = r({left:1404,top:864,width:28,height:28},{width:1440,height:900},5); let m=1e9; for (let i=0;i<5;i++) for (let j=i+1;j<5;j++) m=Math.min(m,Math.hypot(p[i].x-p[j].x,p[i].y-p[j].y)); console.log(m.toFixed(2))"
-expect: 25.56 — the smallest pairwise distance between the five centres at the default bottom-right resting corner; 44px items overlap by 18px
-```
-
-measured 2026-09-29 by chain chain-app-drawer-chat--switcher-acts-20260929-172332-8408, finding M1, MEDIUM
-probe-key: a79caec385aa956db45967665e0019a4df06e74b
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/hooks/useCurrentApplication.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/hooks/useFrontPane.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/hooks/useSwitcherActions.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/utils/paneSlots.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/utils/radialLayout.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/constants.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/utils.ts
-
 ## INV-5902 — probe — When the registry loses the row of the left slot, the layer draws the right application under `data-pane-side="left"`, and every act over it is greyed
 
 When the registry loses the row of the left slot, the layer draws the right application under `data-pane-side="left"`, and every act over it is greyed
@@ -1849,34 +1835,6 @@ probe-key: f8df98b1c8786e0e6655fa9ebfafeaa4fc4c2d14
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/utils.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/host-window-home.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/host-window-kit.mjs
 
-## INV-5950 — probe — . `useChatHost`'s docblock names a consumer that does not import it
-
-. `useChatHost`'s docblock names a consumer that does not import it
-
-```probe
-cd /home/lyphe/.claude/claudecodeui_lyphe && sed -n 142p src/modules/chat-host/context/ChatHostContext.tsx | cut -c1-70; grep -rln "useChatHost\b" src/modules/project-workspace src/modules/app-switcher; echo "exit $?"
-expect: line 142 starts "/** Used by project-workspace to read"; the grep prints nothing and exit 1
-```
-
-measured 2026-09-29 by chain chain-app-drawer-chat--chat-host-home-20260929-195616-ce23, finding L1, LOW
-probe-key: 766398768467631eea36d34c797950b4e231a0a3
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-host/ChatHostSlot.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-host/context/ChatHostContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-host/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/ProjectWorkspaceShell.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/WorkspaceFrame.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/chat-host-home.mjs
-
-## INV-5951 — probe — . `placeNode.ts` says its slot uses it; the slot does not (outside the 7 target paths)
-
-. `placeNode.ts` says its slot uses it; the slot does not (outside the 7 target paths)
-
-```probe
-cd /home/lyphe/.claude/claudecodeui_lyphe && sed -n 23p src/modules/chat-host/utils/placeNode.ts; grep -c "placeNode" src/modules/chat-host/ChatHostSlot.tsx
-expect: line 23 ends "and its slot, which adopt the chat's node into each host."; the count is 0
-```
-
-measured 2026-09-29 by chain chain-app-drawer-chat--chat-host-home-20260929-195616-ce23, finding L2, LOW
-probe-key: 9934874776ee4750102116b99919122dbaefd7a3
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-host/ChatHostSlot.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-host/context/ChatHostContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-host/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/ProjectWorkspaceShell.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/WorkspaceFrame.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/chat-host-home.mjs
-
 ## INV-5952 — probe — . Standing proof G5 no longer notices a ChatInterface remount at the gutter threshold (outside the 7 target paths)
 
 . Standing proof G5 no longer notices a ChatInterface remount at the gutter threshold (outside the 7 target paths)
@@ -1932,3 +1890,202 @@ measured 2026-09-29 by chain chain-app-drawer-chat--seam-chat-surfaces-20260929-
 probe-key: e1d729832beb76a9bf65f3fa9b1d437f5c11af3c
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/widgets/hooks/useWidgetHost.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/utils.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/chat-surfaces-home.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/chat-surfaces-window.mjs
+
+## INV-6002 — probe — The updated proof script cannot fail for the regression it names, and nothing in it guards H1
+
+The updated proof script cannot fail for the regression it names, and nothing in it guards H1
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe && node /tmp/pipeline-reviews/app-drawer-chat--float-panel/probes/guard-vacuous.mjs
+expect: the mutant line (`hidden`, display none) does not read the same assertionValue as the as-built line (today both read "assertionValue":0, with display flex vs none)
+```
+
+measured 2026-09-30 by chain chain-app-drawer-chat--float-panel-20260929-224731-39b9, finding M1, MEDIUM
+probe-key: 3d2505355b432dfaed5d0ad22452cf30cffe063d
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-gutters/ChatGutterLayout.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-host/ChatHostPlaceholder.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-host/ChatHostSlot.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-host/hooks/useFloatingPanel.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-host/utils/placeNode.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/hooks/useChatDoor.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/chat-floats-panel.mjs
+
+## INV-6003 — probe — `ChatHostContext.tsx:152` still says `moveBefore` keeps the composer's caret
+
+`ChatHostContext.tsx:152` still says `moveBefore` keeps the composer's caret
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe && grep -n 'then keeps' src/modules/chat-host/context/ChatHostContext.tsx
+expect: no output (today: line 152, "`moveBefore` then keeps / the composer's caret and the widget frames alive")
+```
+
+measured 2026-09-30 by chain chain-app-drawer-chat--float-panel-20260929-224731-39b9, finding L1, LOW
+probe-key: ce23ae3d8f64fb75b7e69b209f95595d083951f1
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-gutters/ChatGutterLayout.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-host/ChatHostPlaceholder.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-host/ChatHostSlot.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-host/hooks/useFloatingPanel.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-host/utils/placeNode.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/hooks/useChatDoor.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/chat-floats-panel.mjs
+
+## INV-6010 — WorkspaceFrame's reportCovered is a layout effect — a passive one loses the race with a reply
+
+`WorkspaceFrame` reports whether an application covers the main region with `useLayoutEffect(() => reportCovered(covered), [covered, reportCovered])`. Keep it a layout effect.
+
+why: chat-host's unread rule judges a frame against `covered`. A passive effect runs after the paint that draws the application, and a reply landing in that gap is judged against a chat still in sight. Measured 2026-09-30: as a passive effect it lost the race with a reply that landed 0ms after the drawer closed; as a layout effect that reply lights the dot.
+
+Proof: `.verify/fab-radial-door.mjs`, dot leg (MAN-7481). The rule: MAN-7482.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/WorkspaceFrame.tsx
+
+## INV-6011 — probe — a double activation of a radial item inside the close fade runs the act twice (Open in a new tab: two pages; Reload: two document requests)
+
+a double activation of a radial item inside the close fade runs the act twice (Open in a new tab: two pages; Reload: two document requests)
+
+```probe
+node /tmp/pipeline-reviews/app-drawer-chat--radial-fill/athena-radial-dblclick.mjs
+expect: every row prints newPages 1 (today: gapMs 0, 30, 60 print newPages 2)
+```
+
+measured 2026-09-30 by chain chain-app-drawer-chat--radial-fill-20260930-002344-4ad4, finding L1, LOW
+probe-key: d0acbb8cd3549ac83ed13eaec368502feb5d83e0
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/AppSwitcherFab.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-host/hooks/useUnreadReply.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/fab-radial-door.mjs
+
+## INV-6012 — probe — three checks in `.verify/fab-radial-door.mjs` cannot fail
+
+three checks in `.verify/fab-radial-door.mjs` cannot fail
+
+```probe
+sed -n 325,336p /home/lyphe/.claude/claudecodeui_lyphe/.verify/fab-radial-door.mjs | grep -c "frame("
+expect: at least 1 (a frame delivered before the check that claims a reply landed on screen; today 0)
+```
+
+measured 2026-09-30 by chain chain-app-drawer-chat--radial-fill-20260930-002344-4ad4, finding L2, LOW
+probe-key: 41705d7e6e2e0f2f60aa2258d74911df0ba6c6fb
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/fab-radial-door.mjs
+
+## INV-6016 — probe — a `requestWindow` that throws synchronously, or returns a non-promise, wedges the door for the life of the page
+
+a `requestWindow` that throws synchronously, or returns a non-promise, wedges the door for the life of the page
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe && node --input-type=module -e "
+import { openConsole } from './.verify/lib/console.mjs';
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const s = await openConsole({ viewport: { width: 1440, height: 900 } });
+await s.page.unrouteAll({ behavior: 'ignoreErrors' }); await s.page.context().unrouteAll({ behavior: 'ignoreErrors' });
+await s.page.waitForSelector('textarea'); const errs = []; s.page.on('pageerror', (e) => errs.push(String(e).slice(0, 40)));
+await s.page.evaluate(() => { window.documentPictureInPicture.requestWindow = () => { throw new Error('sync boom'); }; });
+await s.page.keyboard.press('Control+.'); await sleep(400);
+await s.page.evaluate(() => { delete window.documentPictureInPicture.requestWindow; });
+await s.page.keyboard.press('Control+.'); await sleep(1500);
+console.log('pages', s.page.context().pages().length, JSON.stringify(errs)); await s.browser.close();"
+expect: pages 1 ["Error: sync boom"]   (a healthy door would show pages 2 after the second, good press)
+```
+
+measured 2026-09-30 by chain chain-app-drawer-chat--float-window-20260930-002344-4b26, finding M1, MEDIUM
+probe-key: 24f5e1c8ad434587d730bcfcc15bc55278fe9914
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-host/ChatHostWindow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-host/context/ChatHostContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-host/hooks/usePictureInPicture.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/chat-floats-window.mjs
+
+## INV-6017 — probe — a window closed between the browser making it and the app attaching its `pagehide` listener strands the tab: placement `'window'`, no window, the door dead, sometimes the chat lost in the dead document
+
+a window closed between the browser making it and the app attaching its `pagehide` listener strands the tab: placement `'window'`, no window, the door dead, sometimes the chat lost in the dead document
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe && node --input-type=module -e "
+import { openConsole } from './.verify/lib/console.mjs';
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+for (let i = 0; i < 6; i++) {
+  const s = await openConsole({ viewport: { width: 1440, height: 900 } });
+  await s.page.unrouteAll({ behavior: 'ignoreErrors' }); await s.page.context().unrouteAll({ behavior: 'ignoreErrors' });
+  await s.page.waitForSelector('textarea');
+  s.page.context().on('page', (p) => setTimeout(() => p.close().catch(() => {}), 0));
+  await s.page.keyboard.press('Control+.'); await sleep(1500); await s.page.keyboard.press('Control+.'); await sleep(800);
+  console.log(i, JSON.stringify(await s.page.evaluate(() => ({ ph: document.querySelector('[data-chat-host-placeholder]')?.getAttribute('data-chat-host-placeholder') ?? null, nodeHere: !!document.querySelector('[data-chat-host-node]') }))));
+  await s.browser.close(); }"
+expect: every run prints {"ph":null,"nodeHere":true}; a stranded run prints {"ph":"window","nodeHere":false} and stays so after the second press (measured on 1 of 6; probabilistic, so run it a few times)
+```
+
+measured 2026-09-30 by chain chain-app-drawer-chat--float-window-20260930-002344-4b26, finding M2, MEDIUM
+probe-key: 30bfc02ef14eeebc4cd0bf43ccbd0e69e4244d80
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-host/ChatHostWindow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-host/context/ChatHostContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-host/hooks/usePictureInPicture.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/chat-floats-window.mjs
+
+## INV-6023 — probe — The picker orders projects by `projects`, so after a star toggle in the sidebar it disagrees with the sidebar until the next full refresh
+
+The picker orders projects by `projects`, so after a star toggle in the sidebar it disagrees with the sidebar until the next full refresh
+
+```probe
+cd /tmp/pipeline-reviews/app-drawer-chat--picker-fill/athena-probes && node star-order.mjs
+expect: prints "sidebar first: hub | picker first: .claude" then "orders DIFFER" and exits 1; after a fix it prints "orders agree" and exits 0
+```
+
+measured 2026-09-30 by chain chain-app-drawer-chat--picker-fill-20260930-021128-e83a, finding M1, MEDIUM
+probe-key: e4bed96f9a1869591558f586caaa6cabd715bc73
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/FloatingChatHeader.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/hooks/useSessionPicker.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/header-picker.mjs
+
+## INV-6024 — probe — In simple-list mode the floating picker keeps a conversation that was archived or deleted in the sidebar until some unrelated `session_upserted` arrives
+
+In simple-list mode the floating picker keeps a conversation that was archived or deleted in the sidebar until some unrelated `session_upserted` arrives
+
+```probe
+cd /tmp/pipeline-reviews/app-drawer-chat--picker-fill/athena-probes && node archived-row.mjs
+expect: prints "6s after the archive, the picker lists it: 1" then "after one unrelated upsert, the picker lists it: 0" and exits 1; after a fix the 6 s line reads 0 and it exits 0
+```
+
+measured 2026-09-30 by chain chain-app-drawer-chat--picker-fill-20260930-021128-e83a, finding L1, LOW
+probe-key: b3d14a7d0270871fddb722dc0f86a2c9d2316a4f
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/FloatingChatHeader.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/hooks/useSessionPicker.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/header-picker.mjs
+
+## INV-6025 — probe — (MEDIUM) — the forget effect fires on a transient `null` while an application is still up, so a press re-routes inside a visit that never ended
+
+(MEDIUM) — the forget effect fires on a transient `null` while an application is still up, so a press re-routes inside a visit that never ended
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe && node /tmp/pipeline-reviews/app-drawer-chat--routing/athena-probes/dual-close.mjs dualclose
+expect: exit 1 with `VIOLATED the left application was up the whole time (one visit)…` whose `s.url` is /session/0f01a88c-b726-42e9-9b75-7236641b603b (ArchPulse) and whose press log holds two pushState entries; fixed, it prints `HELD` with the URL on the .claude conversation and an empty log
+```
+
+measured 2026-09-30 by chain chain-app-drawer-chat--routing-20260930-022953-8cd0, finding M1, MEDIUM
+probe-key: a9eb2f3cb817cb2ad86e348f6b470ef96bdb172c
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/hooks/useChatDoor.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/chat-door-application.mjs
+
+## INV-6026 — probe — (LOW) — with no chat mounted, the first press routes but does not float
+
+(LOW) — with no chat mounted, the first press routes but does not float
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe && node /tmp/pipeline-reviews/app-drawer-chat--routing/athena-probes/routing-door.mjs nomount
+expect: exit 1 with `VIOLATED a press with an application linked to ArchPulse: the chat ends up FLOATING…` showing `"ph":null,"panel":false` on the ArchPulse newest URL, then `(info) a SECOND press then floats it: true`
+```
+
+measured 2026-09-30 by chain chain-app-drawer-chat--routing-20260930-022953-8cd0, finding L1, LOW
+probe-key: d0b3c8d20d5f66ea286510e85dff5736be4d6b39
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/hooks/useChatDoor.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/chat-door-application.mjs
+
+## INV-6027 — probe — (LOW) — MAN-7444 still says the project-chat door has no readers
+
+(LOW) — MAN-7444 still says the project-chat door has no readers
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe && grep -n "Readers: none yet" MANUAL.md
+expect: no output (today: line 525)
+```
+
+measured 2026-09-30 by chain chain-app-drawer-chat--routing-20260930-022953-8cd0, finding L2, LOW
+probe-key: ca5d0b773d982253b0e18fe281c57fa05ec5e420
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/hooks/useChatDoor.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/chat-door-application.mjs
+
+## INV-6043 — A cold `/session/<id>` in simple-list mode is replaced by `/` when the projects list lands before the session lookup, so the chat opens the new-chat screen on the saved project
+
+`SidebarSimpleList.tsx`'s effect "keeps Files/Git/Shell on the saved project whenever no chat is open" and fires whenever `selectedSession` is null. On a cold deep link `selectedSession` IS null until `useProjectsState`'s URL effect finishes its lookup (`api.sessionDetails`, one lookup per URL id). If the projects list has loaded first, `useSimpleChatProject` answers a project, the effect calls `onProjectSelect(saved project)`, and `handleProjectSelect` ends in `navigate('/')`. The URL loses the session; the lookup then answers into "the user navigated elsewhere while the lookup was in flight" and is discarded. Nothing re-runs: `sessionLookupRef` allows one lookup per id, and the effect's deps do not change.
+
+What a reader sees: reloading (or opening a link to) a conversation lands on `/`, the new-chat screen, on the saved project; the floating chat's header reads "New Session" beside that project. Tree mode has no such effect and keeps the deep link. With a fast lookup (the box idle) the lookup wins and nothing shows, which is why it looks intermittent: measured 2026-09-30 in the whole-check runs at 390x844, two misses in about eight cold loads, then reproduced on demand by holding ONLY the lookup back 2.5s (tree kept the link; simple lost it, header "New Session .claude").
+
+A fix has to keep the unknown-id case alive: when the lookup fails and no project is selected, `useProjectsState` leaves the workspace with no project (its placeholder needs `selectedProjectRef.current`), and today this very effect is what lands such a URL on `/` in the saved project. So the guard cannot be "skip while the URL names a session" alone; it needs to wait for the lookup to SETTLE (answered, or failed), then act. The same effect is the one INV-5891 names for `openProjectChat(B, 'new')` ending on the saved project.
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe && node .verify/simple-list-deep-link.mjs
+expect: exit 1 with `VIOLATED: in simple-list mode the deep link is replaced by / while tree mode keeps it` (today: simple `url=/ deep link LOST, header="New Session .claude"`, tree `KEPT`); a fixed tree prints `held:` and exits 0
+```
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/hooks/useProjectsState.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/hooks/useSimpleChatProject.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/SidebarSimpleList.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/simple-list-deep-link.mjs

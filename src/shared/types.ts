@@ -2835,6 +2835,8 @@ export type CurrentApplication = { app: AppEntry; src: string };
 export type ChatDoor = {
   /** Whether the live chat is floating (the panel or the picture-in-picture window) rather than home. */
   floating: boolean;
+  /** A reply landed in the chat's conversation while the chat was out of sight; the FAB draws it as its dot while the chat is not floating. */
+  unread: boolean;
   /** Collapses a floating chat; else floats it and brings the front application's project. MUST run inside the press. */
   toggle: () => void;
   /** Brings a floating chat home. */

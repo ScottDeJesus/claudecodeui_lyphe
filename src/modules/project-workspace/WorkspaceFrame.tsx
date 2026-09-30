@@ -1,5 +1,8 @@
-import { AppSwitcherFab, AppSwitcherLayer } from '@/modules/app-switcher';
+import { useLayoutEffect } from 'react';
+
+import { AppSwitcherFab, AppSwitcherLayer, useCurrentApplication } from '@/modules/app-switcher';
 import { ChatHostFloating, useChatHost } from '@/modules/chat-host';
+import FloatingChatHeader from '@/modules/project-workspace/FloatingChatHeader';
 import ProjectEffects from '@/modules/project-workspace/controllers/ProjectEffects';
 import type { ProjectWorkspaceShellProps } from '@/shared/types';
 import ProjectCommandPalette from '@/modules/project-workspace/ProjectCommandPalette';
@@ -13,8 +16,10 @@ import { useChatHotkey } from '@/modules/project-workspace/hooks/useChatHotkey';
  *
  * The floating chat is mounted here, inside the container, just before the FAB: above the application layer and
  * below the FAB, which stays the reader's way out. The FAB's drawn rect goes to the chat's host through
- * `reportAnchor`, so the panel stands beside it and follows it; the chat's door (`useChatDoor`) is pressed by the
- * hotkey wherever the reader's keys land.
+ * `reportAnchor`, so the panel stands beside it and follows it, and whether an application covers the main region
+ * goes to `reportCovered`. The chat's door (`useChatDoor`) is built once here and pressed from three places: the
+ * hotkey, wherever the reader's keys land (this tab or the chat's picture-in-picture window), the FAB, and the
+ * command palette's Applications group.
  */
 export default function WorkspaceFrame({
   isMobile,
@@ -23,8 +28,17 @@ export default function WorkspaceFrame({
   navigate,
 }: ProjectWorkspaceShellProps) {
   const door = useChatDoor();
-  useChatHotkey(door.toggle);
-  const { reportAnchor } = useChatHost();
+  const { reportAnchor, reportCovered, pipWindow } = useChatHost();
+  useChatHotkey(door.toggle, pipWindow);
+
+  // Whether an application is up over the main region, told to the chat's host: with one up, the chat tab
+  // under it is out of sight, and a reply that lands there is the unread rule's to count. A LAYOUT effect, so
+  // the host knows in the commit that draws the application: a passive one runs after the paint, and a reply
+  // landing in that gap (measured at 0ms after the drawer closed) would be judged against a chat still "in sight".
+  const covered = useCurrentApplication() !== null;
+  useLayoutEffect(() => {
+    reportCovered(covered);
+  }, [covered, reportCovered]);
 
   return (
     <>
@@ -49,9 +63,9 @@ export default function WorkspaceFrame({
           <AppSwitcherLayer />
         </div>
 
-        <ProjectCommandPalette />
-        <ChatHostFloating header={null} />
-        <AppSwitcherFab onAnchorChange={reportAnchor} />
+        <ProjectCommandPalette chatDoor={door} />
+        <ChatHostFloating header={<FloatingChatHeader />} />
+        <AppSwitcherFab chatDoor={door} onAnchorChange={reportAnchor} />
       </div>
     </>
   );

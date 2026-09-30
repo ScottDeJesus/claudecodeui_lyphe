@@ -1,4 +1,4 @@
-import { useCallback, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react';
 
 import { useChatHostMechanics } from '@/modules/chat-host/context/ChatHostContext';
 import { usePanelViewport } from '@/modules/chat-host/hooks/usePanelViewport';
@@ -21,6 +21,27 @@ function restingAnchor(viewport: { width: number; height: number }) {
   };
 }
 
+/** How far the FAB keeps from the bottom of the viewport (`VIEWPORT_EDGE_PX` in DockableFab), which the panel keeps from every edge too. */
+const ANCHOR_EDGE_PX = 8;
+
+/**
+ * The FAB's rect, lifted if it stands below the room the panel has (the viewport less the virtual keyboard).
+ *
+ * The FAB does not move for a keyboard: it is `position: fixed` against the layout viewport, which a keyboard
+ * leaves alone, so its reported rect can stand under the keyboard. A panel that stands above the FAB (the
+ * phone's stance) would then stand above the keyboard's top edge only by luck — its composer would sit under
+ * the keys. The panel stands above the FAB AS IF it stood at the lowest point still in view, so the stance is
+ * the same and only the keyboard's room is honoured. Rects that are already in view come back unchanged. Built
+ * field by field because the FAB's rect is a `DOMRect`, whose fields are getters a spread would not copy.
+ */
+function anchorInsideViewport(
+  rect: { left: number; top: number; width: number; height: number },
+  viewport: { width: number; height: number },
+) {
+  const lowestTop = Math.max(viewport.height - rect.height - ANCHOR_EDGE_PX, ANCHOR_EDGE_PX);
+  return { left: rect.left, top: Math.min(rect.top, lowestTop), width: rect.width, height: rect.height };
+}
+
 /**
  * Everything the floating panel decides, so `ChatHostPanel` can stay a frame that measures nothing: where it
  * stands, the body it adopts the chat's node into, and what the resize grip does.
@@ -31,9 +52,10 @@ function restingAnchor(viewport: { width: number; height: number }) {
  *
  * THE SIZE is what the reader chose (or the default), and the size DRAWN is that choice held to the viewport
  * on every render, so a window shrunk under the panel shrinks the panel and a window grown again gives the
- * chosen size back. The resize starts from the size DRAWN, not the size chosen: beside the FAB the panel can be
- * narrower than it was asked to be, and a grip that grew from the wider number would not move under the
- * pointer until the delta had eaten the difference.
+ * chosen size back. The resize starts from the size DRAWN and stores the size DRAWN, never the size asked for:
+ * beside the FAB the panel can be narrower than it was asked to be, and a grip measured against the wider
+ * number would not move under the pointer until the pointer had travelled the difference back, and would store
+ * a size the reader never saw.
  *
  * THE BODY ADOPTS THE NODE in a layout effect, before the browser paints, so the chat is never drawn
  * between hosts. It does not give the node back: collapse carries it home while the panel is still mounted.
@@ -47,7 +69,8 @@ export function useFloatingPanel() {
   // grip is dragged and nothing else holds it; it is written to storage once per resize, on release.
   const [chosenSize, setChosenSize] = useState(() => readPanelSize() ?? defaultPanelSize(viewport));
   const size = clampPanelSize(chosenSize, viewport);
-  const placement = panelPlacement(anchor ?? restingAnchor(viewport), size, viewport);
+  const anchorRect = anchorInsideViewport(anchor ?? restingAnchor(viewport), viewport);
+  const placement = panelPlacement(anchorRect, size, viewport);
 
   const bodyRef = useRef<HTMLDivElement | null>(null);
   useLayoutEffect(() => {
@@ -59,30 +82,33 @@ export function useFloatingPanel() {
   const resizeBaseRef = useRef<{ width: number; height: number } | null>(null);
 
   // Adds the grip's delta to the size at the press, for the grip's corner: a grip on the left grows the
-  // width as `dx` goes negative, one on the top grows the height as `dy` goes negative. Answers the
-  // clamped size it set, which the release writes.
-  const applyResize = useCallback(({ dx, dy }: { dx: number; dy: number }) => {
+  // width as `dx` goes negative, one on the top grows the height as `dy` goes negative. The result goes
+  // through `panelPlacement` (which clamps it to the viewport and to the room beside the FAB) and what
+  // comes out — the size that is drawn — is what is kept and what the release writes.
+  function applyResize({ dx, dy }: { dx: number; dy: number }) {
     resizeBaseRef.current ??= { width: placement.width, height: placement.height };
     const base = resizeBaseRef.current;
-    const next = clampPanelSize(
+    const drawn = panelPlacement(
+      anchorRect,
       {
         width: base.width + (placement.grip.endsWith('left') ? -dx : dx),
         height: base.height + (placement.grip.startsWith('top') ? -dy : dy),
       },
       viewport,
     );
-    setChosenSize(next);
-    return next;
-  }, [placement.width, placement.height, placement.grip, viewport]);
+    const drawnSize = { width: drawn.width, height: drawn.height };
+    setChosenSize(drawnSize);
+    return drawnSize;
+  }
 
-  const onResize = useCallback((delta: { dx: number; dy: number }) => {
+  function onResize(delta: { dx: number; dy: number }) {
     applyResize(delta);
-  }, [applyResize]);
+  }
 
-  const onResizeEnd = useCallback((delta: { dx: number; dy: number }) => {
+  function onResizeEnd(delta: { dx: number; dy: number }) {
     writePanelSize(applyResize(delta));
     resizeBaseRef.current = null;
-  }, [applyResize]);
+  }
 
   return { placement, bodyRef, onResize, onResizeEnd };
 }

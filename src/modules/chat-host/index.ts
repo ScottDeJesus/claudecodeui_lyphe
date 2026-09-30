@@ -4,9 +4,11 @@
 //
 // EXACTLY FOUR THINGS LEAVE, and each is the smallest shape a decision takes across a module
 // boundary: the provider that owns the chat's one node, the slot that renders the chat into it, the
-// floating host the chat is carried to, and `useChatHost`, the ANSWER to where the chat is drawn and the
-// three verbs that move it (`open`, `collapse`) and tell it where the FAB is (`reportAnchor`). Placement
-// is decided in here alone, so a caller asks where the chat is and never holds the node to work it out.
+// floating host the chat is carried to, and `useChatHost`, the ANSWERS to where the chat is drawn
+// (`placement`) and whether a reply waits out of sight (`unread`), and the verbs that move it (`open`,
+// `collapse`) and tell it what is around it (`reportAnchor` for the FAB, `reportCovered` for an application
+// over the main region). Placement and the unread rule are decided in here alone, so a caller asks where the
+// chat is and never holds the node — or the websocket — to work it out.
 //
 // NOTHING ELSE LEAVES THIS MODULE — not the mechanics hook the slot and the hosts read the node and its
 // carriage with, not `moveTo`, not the node, not the anchor store, not the mirror or the geometry utils.

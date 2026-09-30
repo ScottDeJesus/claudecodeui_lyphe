@@ -364,7 +364,6 @@
     "exitFullscreen": "Выйти из полноэкранного режима"
   },
   "applications": {
-    "fabLabel": "Приложения",
     "fabLabelMenu": "Открыть меню",
     "fabLabelCollapse": "Свернуть чат",
     "radialLabel": "Быстрые действия",

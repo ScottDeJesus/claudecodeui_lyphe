@@ -520,19 +520,36 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/console.mjs
 ## MAN-478 — The application switcher
 section: applications/000
 
-Eight routes under `/api/apps`, behind `authenticateToken` on the MOUNT (`server/index.ts:207` — no
+Eight routes under `/api/apps`, behind `authenticateToken` on the MOUNT (`app.use('/api/apps', authenticateToken, createAppsModule())` in `server/index.ts` — no
 route file imports the guard), wired in `createAppsModule()`. What they carry is a list of the
 operator's own applications; what the client draws from it is a small round button in the sidebar's
-logo row, a drawer of rows, and one or two framed panes over the main region. The client's half is
-one group in `src/shared/api.ts` (`api.apps`, built on the same `get`/`post`/`del` helpers the rest
+logo row, a radial of five acts that fans out from it, a drawer of rows, and one or two framed panes over the main region. The client's half is
+one group in `src/shared/api.ts` (`api.apps`, built on the same `get`/`post`/`patch`/`del` helpers the rest
 of that file uses, with the bearer token attached by `authenticatedFetch` — no caller passes one).
 
-**It replaced the Applications Hub**, the page the operator's own applications used to be opened
-from as links off a sheet of their own (`~/.claude/hub`). That page and its directory are deleted,
-and nothing here reads it. Where the hub left the
-workspace, the switcher frames an application INSIDE it: the sidebar, the project list and a chat
-streaming its answer all keep running while an application is up, because the panes are a layer
-over the main region rather than a route away from it.
+**An application is framed INSIDE the workspace**: the sidebar, the project list and a chat streaming its answer all keep running while an application is up, because the panes are a layer over the main region rather than a route away from it.
+
+## The chat travels with the switcher
+
+The FAB, the radial, the command palette and a hotkey press one door, `ChatDoor` (`src/shared/types.ts`). project-workspace's `useChatDoor` builds it: the one place that knows which conversation an application brings. chat-host and app-switcher never import each other (MAN-7489).
+
+Three ways in, each `door.toggle`, run inside the press:
+| way | where |
+|---|---|
+| the radial's Chat act | first item of the FAB's radial; "Collapse chat" while the chat floats (MAN-7475) |
+| the palette's Applications group | its Chat row, printing the chord (MAN-7483) |
+| the hotkey | Ctrl+. (⌘. on a Mac), heard in the tab and in the picture-in-picture window (MAN-7492) |
+
+A FAB tap while the chat floats is `door.collapse`; the FAB has no other way in (MAN-486).
+
+**The routing rule** — `toggle` while the chat is not floating:
+1. `open()` runs first and synchronously. why: a picture-in-picture window can be requested only from a user gesture.
+2. When the application in front names a `project` (`AppEntry.project`, MAN-479) and is not the application last routed for, `openProjectChat(app.project, 'latest')` runs and the application is remembered.
+3. The memory is forgotten the moment no application is up, so the next framing of that row brings its project again. A conversation the reader picks during the visit is left alone.
+
+`openProjectChat(path, 'latest')` does nothing when the workspace is already on that project, so an older conversation there is never swapped for its newest; otherwise it opens the project's most recent session, else a new chat there. `'new'` is a new chat there. A null or unknown path means the selected project (MAN-7444). An application with no project brings whatever conversation is selected.
+
+The floating header's New chat is `openProjectChat(front application's project ?? null, 'new')` (MAN-7493). Placements, the node and the panel: MAN-7489.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts
 
@@ -569,10 +586,10 @@ absolute path of the repository the row is built from: trimmed, at most 1024 cha
 `path.resolve`d so a trailing slash never makes one project two strings (the client matches a row to a
 project's `fullPath` by string equality), and absent when blank. Only its shape is judged, never the
 disk — a repository not cloned here is a valid project. A non-text or relative one is a 400
-`APPS_PROJECT_INVALID`; an over-long one is `APPS_PROJECT_TOO_LONG`. `updateApp(id, patch)` takes only
+`APPS_PROJECT_INVALID` (a relative one reads "A project is the absolute path of its repository, like /home/lyphe/eis-app."); an over-long one is `APPS_PROJECT_TOO_LONG`. `updateApp(id, patch)` takes only
 the keys the caller sent: an absent key leaves its field alone, a present key is judged like a new
 row's and replaces the field, a blank value removes it, and a patch with neither key answers the row
-without writing the file. A bad value is a 400 whichever id it was sent to. A duplicate `id` on create is a 409; an
+without writing the file. `PATCH /:id` hands it only the keys PRESENT in the body (`description`, `project`) and answers `{ app }`; the client's `api.apps.update(id, { description?, project? })` is that verb. A bad value is a 400 whichever id it was sent to. A duplicate `id` on create is a 409; an
 unknown `id` on delete is a 404; both are `AppError`s with an explicit `statusCode`, rendered by the
 global handler as `{ success: false, error: { code, message } }`. A registry row whose `description`
 or `project` is present and not a string is a broken row, and the registry read answers 500.
@@ -582,7 +599,7 @@ the server already uses to describe itself: `SERVER_PORT || 3001` and `VITE_PORT
 box that answers `[3011, 5183]` — the API on its loopback port and Vite on the port the browser
 actually opened.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/shared/app-types.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/app-types.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/apps/apps.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/apps/apps.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/app-types.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/app-types.ts
 
 ## MAN-480 — The registry file
 section: applications/002 The registry file
@@ -757,8 +774,7 @@ section: applications/008 The FAB
 
 One control, and it is the reader's way in and out of every pane.
 
-- **It is 28px drawn, docked or floating, inside a 44px round catch** — the size measured off the
-  retired hub's own design reference. Its face is the app's logo (`/logo-64.png`), filling the
+- **It is 28px drawn, docked or floating, inside a 44px round catch**. Its face is the app's logo (`/logo-64.png`), filling the
   circle inside a 1px accent rim. The catch is a transparent `::before` on `.vv-fab`,
   so a press up to 22px from the centre starts a drag while `getBoundingClientRect()` still answers
   28px, and every rect the drag, the clamp and the dock snap read is the circle the reader sees.
@@ -770,22 +786,41 @@ One control, and it is the reader's way in and out of every pane.
   to `Sidebar` at both of its call sites (the desktop branch and the mobile drawer branch), and
   `SidebarHeader` renders it as the FIRST child of the logo row — a sibling of the anchor and the
   `LogoBlock`, never inside them, because two of `LogoBlock`'s call sites sit inside an `<a>` and a
-  button inside an anchor is invalid HTML that navigates away instead of opening the drawer. The
+  button inside an anchor is invalid HTML that navigates away instead of answering the press. The
   sidebar module never imports the switcher, exactly as it never imports the tabs.
 - **Exactly one dock is on the page**, gated the way `tabs` is (`{leading && !isCompact}` in the
   desktop header, `{leading && isCompact}` in the mobile one). The header draws both blocks and
   hides one with CSS; a slot placed in both would leave two docks reporting one rect.
-- **It drags.** Past a 4px threshold the press becomes a drag; below it, the release is a click
-  that opens the drawer, and Enter or Space does the same from the keyboard. Clamped to the
-  viewport with 8px of padding on every side, so it can never be thrown off screen and lost.
+- **It drags.** Past a 4px threshold the press becomes a drag; `onDragStart` fires once, on the first move
+  past it, and the radial closes on it. Clamped to the viewport with 8px of padding on every side, so it can
+  never be thrown off screen and lost.
+- **A tap is `onPress({ keyboard })`** — a click that did not end a drag: a mouse click, a finger's tap, Enter or
+  Space; `keyboard` is true when no pointer was behind it. `AppSwitcherFab` answers it: while the chat floats a
+  tap collapses it; otherwise a tap opens the radial of five acts and a second tap closes it (MAN-7475). The FAB
+  opens nothing else: the drawer is the Applications act (printed "Apps"), a radial item and a row of the palette's Applications group (MAN-487).
+- **Its label says what a tap will do**: `applications.fabLabelMenu` ("Open the menu"), or
+  `applications.fabLabelCollapse` ("Collapse chat") while the chat floats. It is the tooltip too.
+- **Ctrl+. (⌘. on a Mac)** presses the chat's door from anywhere in the workspace and from inside the
+  picture-in-picture window: it floats the chat, or collapses it while it floats (MAN-7492). The radial's Chat
+  act and the palette's Chat row print the chord.
 - **Released within 64px of the dock's centre it snaps back into the dock**; anywhere else it
   floats where it was let go. A dock that is not on screen means the button floats at its clamped
   default rather than at a remembered point that no longer exists.
-- **`z-index: 60`**, a measured number with its five neighbours in the comment beside it in
+- **`z-index: 60`**, a measured number with its neighbours in the comment beside it in
   `src/shared/ui/verve/surfaces.css`: it beats the mobile sidebar drawer (`z-50`, in the same
   stacking context) because a FAB under that backdrop is dimmed and unclickable exactly when the
-  reader is trying to leave a pane, and loses to the portalled drawer it opens and the menus inside
+  reader is trying to leave a pane, and loses to the portalled drawer its Applications act opens and the menus inside
   it.
+- **The dot (`indicator`) means it is the reader's turn** — an answer finished, a run waiting on them. It is a
+  10px `span.vv-fab__dot[aria-hidden]` INSIDE the one button (`DockableFab.tsx`), hung on the rim's 45° point,
+  14px from the centre, so showing and hiding it never remounts the button and its press and drag are the
+  button's. Fill `--warn-dot` with a 1px `--warn-ink` edge and a 2px `--surface` ring: the amber alone is 2.2:1
+  on the light surface, the edge is 5:1 light and 9:1 dark. `pointer-events: none`. What it means in words is
+  the owner's, put into `label`, which is also the tooltip; the dot is decoration to a screen reader. The pop on
+  arrival is its only motion (none under `prefers-reduced-motion`); forced colours draw `Highlight` with a
+  `Canvas` ring. `AppSwitcherFab` passes `indicator` while `chatDoor.unread` and the chat is not floating, and appends `applications.fabUnread` to the label. `active` (`aria-expanded`, the pressed wash) is on while the radial or the drawer is up.
+
+  What lights it: a `complete` frame (unless the reader aborted the turn) or a `permission_request` for the chat's own conversation, arriving while the chat is out of sight — its tab hidden, or an application covering the main region — and not floating. What clears it: the chat coming on screen (floated, or the chat tab open with nothing over it), or the conversation changing (MAN-7492, MAN-7482).
 
 **What is remembered is furniture, and only furniture** — one `localStorage` key, `app-switcher`,
 per browser, never the server:
@@ -809,21 +844,19 @@ floating near the bottom-right below that. Once the reader moves it, the record 
 width.
 
 On a phone that corner is over the chat composer's first line: the 44px catch covers the right end
-of it, so a press there opens the sheet rather than placing the caret, and text under the catch
+of it, so a press there opens the radial rather than placing the caret, and text under the catch
 cannot be reached. Left as it stands — no fixed pair of insets clears a composer whose height
 follows the text in it and the keyboard, and lifting the button past the composer puts the catch in
 the middle of the conversation, where a press meant for the text moves the button.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/verve/surfaces.css
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/AppSwitcherFab.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/DockableFab.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/verve/surfaces.css
 
 ## MAN-487 — The drawer
 section: applications/009 The drawer
 
-The retired hub's drawer, on the kit. Its design reference and a captured screenshot of its layout
-are this screen's visual spec — every measurement below (the sheet's width, the 22px slide, the
-row height, the tile size) is read off one of the two rather than guessed. A sheet down the LEFT,
+The applications drawer, on the kit: a sheet down the LEFT,
 `min(88vw, 364px)` on the canvas
-ground, sliding in 22px from the edge the FAB docks on. Top to bottom in the order a reader's
+ground, sliding in 22px from the edge the FAB docks on. It has two doors and one act (`setDrawerOpen(true)`): the radial's Applications act, printed "Apps", opened from the FAB (MAN-7475), and the same act in the command palette's Applications group (MAN-7483). Top to bottom in the order a reader's
 questions are asked — what is this and how do I leave, how will what I pick be shown, what can I
 pick, how do I add one:
 
@@ -838,7 +871,7 @@ pick, how do I add one:
   half the next choice fills. There is no on/off switch: a row's **Open in dual screen** turns it
   on and **Close dual screen** turns it off.
 - A scrolling list of cards in file order: the app's icon (or its letter), the name, and its
-  description — the resolved host when it has none — which reads **… · on screen** while the app is up (the tile turns accent then), and ends ` · <project name>` on a row linked to a project (MAN-7448). Pressing a card puts
+  description — the resolved host when it has none — which reads **… · on screen** while the app is up (the tile turns accent then), and ends ` · <project name>` on a row linked to a project, or ` · ▲ <path>` in the warn tone when the project list has loaded and none has that path (MAN-7448). Pressing a card puts
   it in its half, or takes it down again. Until `registryRead` (the context flag `useAppRegistry.ts`
   sets once the FIRST read has answered, with rows or with a refusal) turns true, the list draws
   three skeleton rows instead — never the empty state, because an unmeasured registry is not an
@@ -849,7 +882,7 @@ pick, how do I add one:
 - A **kebab menu** per card: **Reload** (live only while that app is up), **Open in a new tab**,
   **Open in dual screen** — or **Close dual screen** on the app holding the second half —
   **Edit description**, which turns the second line into a field in place (Enter or leaving it
-  saves, Escape puts it back, blank clears it), **Link project…** (framed rows; drawn, does nothing yet — MAN-7448 §"Status"), **Move up** / **Move down** (greyed at the list's
+  saves, Escape puts it back, blank clears it), **Link project…** (every row but this app's own), which turns the second line into a kit `Select` in place — **No project**, then every project by name, alphabetically (`projectChoices` order) — and saves the choice through `linkRegistryProject` (`PATCH /api/apps/:id`, blank unlinks) and then `refresh()` (MAN-7448), **Move up** / **Move down** (greyed at the list's
   ends), and **Remove**, which calls `removeRegistryApp` (`utils/registryRequests.ts`) — `DELETE
   /api/apps/:id` — and then `refresh()`. **Open in dual screen** turns dual screen on with THIS
   app in the second half in one update — the context's own `openInDualScreen` — because it cannot
@@ -876,15 +909,16 @@ pick, how do I add one:
   list and raises the banner beside it, because "no applications yet" would be a claim nobody
   measured.
 
-Favourites, reordering and Edit — all in the hub's drawer — are not here: the registry API has no
-verb for any of them (`GET`, `POST` and `DELETE /api/apps` are the whole surface).
+The drawer writes through `/api/apps` (MAN-478): `POST` adds a row, `DELETE` removes one, `PATCH /:id` sets a
+**description** and/or a **project** — an absent key leaves its field alone, a blank one clears it — and the move and
+divider verbs order the rows.
 
 Every word the switcher draws comes from the `applications` block of
 `src/modules/i18n/locales/<lang>/common.json`, in all eleven locales. There is no namespace file
 of its own — the block is where these keys belong — and a key missing from a non-English locale
 falls back to English without a word, which is what makes a skipped translation easy to miss.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/overlayEscape.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/AppDrawerRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/AppDrawer.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/AppRowProjectLink.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/overlayEscape.ts
 
 ## MAN-488 — The panes, and the layer
 section: applications/010 The panes, and the layer
@@ -950,7 +984,7 @@ setting here:
 ## MAN-490 — The kit the switcher is built on
 section: applications/012 The kit the switcher is built on
 
-Three files joined `src/shared/ui/` for this lane, plus a stylesheet, because each is mechanism
+Four files joined `src/shared/ui/` for this lane, plus a stylesheet, because each is mechanism
 rather than appearance — pointer capture, viewport clamping, a dock hit-test, a clamped divider —
 which is what earns a component in this house. Every screen composes them; none re-implements them.
 
@@ -960,9 +994,9 @@ which is what earns a component in this house. Every screen composes them; none 
   capture and the drag dies in the reader's hand. 28px drawn everywhere, with a 44px catch. Its
   drag threshold is 4px, its snap radius 64px, its edge padding 8px. It presses on the CLICK, never
   on the pointer release: a phone dispatches a tap's click after the release, at the finger's point,
-  into whatever is on screen by then — and the drawer it opens covers it, so a drawer opened on the
-  release caught its own tap on the backdrop and shut again (or pressed a row inside the sheet). The
-  click that ends a drag is swallowed; Enter and Space carry `detail === 0` and always press.
+  into whatever is on screen by then — and what it opens is drawn over it, so a surface opened on the
+  release caught its own tap, on its backdrop (shut again) or on an item inside it (pressed that item). The
+  click that ends a drag is swallowed; Enter and Space carry `detail === 0` and always press. `onPress({ keyboard })` reports `keyboard: event.detail === 0`, so an owner that opens a menu moves focus into it for a keys press and leaves it on the button for a tap. `indicator` (optional, default false) draws a dot on the rim as a child of the one button, so showing it never remounts the node (look and meaning: MAN-486). `onDragStart()` (optional) fires once per drag, on the first move past the threshold, so an owner puts away what the button opened before the button moves out from under it.
   `onRectChange(rect)` (optional) reports the button's placed rect after every placement (docked,
   floating, each move of a drag) and on every window `resize`, because a floating position is a CSS
   `clamp()` whose pixels exist only after layout. The rect is `getBoundingClientRect()` with the
@@ -973,15 +1007,15 @@ which is what earns a component in this house. Every screen composes them; none 
 - **`SplitPane.tsx`** — two panes and a draggable seam, or one pane filling the row. The seam is
   its own narrow gutter BESIDE the panes rather than over them: a grab area laid over a pane would
   steal the clicks of whatever that application draws flush against its edge. It carries
-  `SPLIT_MIN_RATIO` and `SPLIT_MAX_RATIO` (0.15 and 0.85, the clamp the hub measured) and moves by
+  `SPLIT_MIN_RATIO` and `SPLIT_MAX_RATIO` (0.15 and 0.85) and moves by
   0.02 per arrow key.
 - **`usePointerDrag.ts`** — the one drag mechanism all of them run on. It lives with the kit rather
   than in `src/shared/hooks/`, and is not exported from the barrel: the frontend standard sends a
   hook used by multiple FEATURE modules to `src/shared/hooks/`, and this one has none — what binds
   it here is direction, since it writes class names whose only meaning is in the kit's own
   stylesheet and its `PointerDragKind` (`'fab' | 'split' | 'resize'`) names the three kit components.
-- **`ResizeGrip.tsx`** — joined later than the three above: a button the caller stands at one corner of
-  a panel, dragged to size it; its one caller outside the kit is chat-host's `ChatHostPanel` (MAN-7467). It
+- **`ResizeGrip.tsx`** — a button the caller stands at one corner of
+  a panel, dragged to size it; its one caller outside the kit is chat-host's `ChatHostPanel` (MAN-7491). It
   paints and never places. Props: `label` (aria-label), `corner` (`'top-left' | 'top-right' |
   'bottom-left' | 'bottom-right'`, which sets its cursor and glyph), `onResize({dx, dy})`,
   `onResizeEnd({dx, dy})`. It reports raw pointer deltas since the press and never a size — the sign
@@ -1000,6 +1034,24 @@ the frames, which React owns and would undo on its next render. The release is b
 and `pointercancel` in the CAPTURE phase, so the frames are clickable again before any of their own
 handlers run, and the same release runs on unmount so a component torn down mid-drag cannot leave
 the whole application unclickable.
+
+**The overlays are drawn in the chat's host window.** The chat can stand in a picture-in-picture window (MAN-7488), so
+`Dialog`, `Tooltip`, `ActionMenu`, `Menu`, `Select`, `Lightbox` and `useZoomPan` read `useHostWindow()`
+(`src/shared/context/HostWindowContext.tsx`) and never the global `window` or `document`. `DockableFab`,
+`usePointerDrag` and `SplitPane` stay on the global: the FAB and the split live in the opener.
+
+| the overlay's line | binds to |
+|---|---|
+| portal | `hostWindow.document.body` |
+| listener: Escape, outside press, `resize`, `scroll`, pointer | the host window or its document; `hostWindow` is a dependency of the effect, so a move binds again |
+| viewport clamp | `hostWindow.innerWidth`, `hostWindow.innerHeight` |
+| animation frame, show delay, autofocus frame | the host window; a timer keeps the window that armed it |
+| observer (`Tabs`, `useZoomPan`) | `resizeObserverIn(hostWindow, cb)`, built again when the host changes |
+| DOM test | `isNodeLike`, `isElementLike`; never `instanceof` |
+
+- `otherOverlayHoldsEscape(doc: Document)` (`overlayEscape.ts`) queries the document it is handed; each caller passes its host document.
+- `Dialog` binds Escape on the host window's capture phase and marks the event, so closing a dialog never also stops a running turn.
+- Rules, the audit grep and the opener's own facts: MAN-7488. Per-unit tables: MAN-7451.
 
 `src/shared/ui/verve/surfaces.css` is the fourth Verve paint file, holding `.vv-fab`, `.vv-split`,
 the divider rules, `.vv-resize-grip` and the body classes. Colours come from tokens and nowhere else.
@@ -1020,32 +1072,34 @@ at all on a press with no travel); the four arrow deltas; the four corner cursor
 `onRectChange` reports (one on mount, none for a new callback identity, the last rect after a drag equals
 the button's own rect once the pointer is off it, one more on a viewport resize, same node throughout).
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/DockableFab.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/ResizeGrip.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/usePointerDrag.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/verve/surfaces.css, /home/lyphe/.claude/claudecodeui_lyphe/.verify/resize-grip-fab-rect.mjs
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/DockableFab.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/overlayEscape.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/ResizeGrip.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/usePointerDrag.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/verve/surfaces.css, /home/lyphe/.claude/claudecodeui_lyphe/.verify/resize-grip-fab-rect.mjs
 
 ## MAN-491 — The switcher's own files
 section: applications/013 The switcher's own files
 
-`src/modules/app-switcher/`, whose barrel exports six things and nothing else: four mounts — the provider, the dock, the FAB and the layer — and two hooks, `useCurrentApplication` (an ANSWER: the application in front, or null) and `useSwitcherActions` (a set of VERBS: the five acts). Both hooks compute from the state hook inside the module, so which pane is in front and which row is this app are decided in one place. A third export is how a rule decided in one place starts being read in two.
+`src/modules/app-switcher/`, whose barrel exports six things and nothing else: four mounts — the provider, the dock, the FAB and the layer — and two hooks, `useCurrentApplication` (an ANSWER: the application in front, or null) and `useSwitcherActions` (a set of VERBS: the five acts). Exactly these two leave because each is computed inside the module from the state hook and hands out a result, never the state: which pane is in front and which row is this app are decided in one place. The state hook (`useAppSwitcher`), the registry hook, the url and storage utils, the drawer and the pane stay inside. A third export is how a rule decided in one place starts being read in two.
 
 | File | What |
 |---|---|
-| `context/AppSwitcherContext.tsx` | The one state home: the registry, the two panes, dual, the ratio, the FAB position, the dock rect, the drawer's open flag, `frontSide`, `closePane`, `openInDualScreen` (dual-on-and-filled in one update) — and `refresh()` on every drawer open. Once a registry read has landed it clears, in the render that sees it, any pane whose row the registry no longer holds; a failed read keeps the last good list, so a refusal never empties a pane. |
+| `context/AppSwitcherContext.tsx` | The one state home: the registry, the two panes, dual, the ratio, the FAB position, the dock rect, the drawer's open flag, `projects` (`ProjectChoice[]`, handed in by the shell: the one outside list the switcher reads), `frontSide`, `closePane`, `openInDualScreen` (dual-on-and-filled in one update) — and `refresh()` on every drawer open. Once a registry read has landed it clears, in the render that sees it, any pane whose row the registry no longer holds; a failed read keeps the last good list, so a refusal never empties a pane. |
 | `AppSwitcherDock.tsx` | The empty 28px box in the logo row. It paints nothing; it holds the space open and reports its rect. |
-| `AppSwitcherFab.tsx` · `AppDrawer.tsx` | The kit's FAB wearing the app logo, wired to the drawer it opens. |
+| `AppSwitcherFab.tsx` · `AppDrawer.tsx` | The kit's FAB wearing the app logo. A tap collapses a floating chat, else opens `AppSwitcherRadial` beside it, whose Applications act opens `AppDrawer` (MAN-7475). `AppSwitcherFab({ chatDoor: ChatDoor, onAnchorChange: (rect: DOMRect \| null) => void })` passes the kit's rect report on and reports `null` when it unmounts; it draws the dot while `chatDoor.unread` and the chat is not floating (MAN-486); the module imports nothing of chat-host (MAN-7478). |
+| `AppSwitcherRadial.tsx` · `utils/radialLabels.ts` | The five acts drawn on the arc as `role="menuitem"` discs with label pills, and the plan that puts each label on a side of its disc. Not in the barrel; mounted only by `AppSwitcherFab`. Rules, seams, proof: MAN-7475. |
 | `AppDrawerHeader.tsx` | The sheet's "Your apps" heading, the count line and Close all — extracted out of `AppDrawer.tsx` at the 300-line ceiling. |
 | `AppDrawerDivider.tsx` · `hooks/useDrawerLayout.ts` · `utils/moveItems.ts` | One divider row with its in-place title; the drawer's layout acts (add/rename/remove a divider, move a row) with their one refusal banner; the kebab's shared Move up / Move down pair. |
-| `AppDrawerRow.tsx` · `NewApplicationForm.tsx` | One application's card, kebab and in-place description edit; the inline New application form (name, address, optional description) and its field checks. |
+| `AppDrawerRow.tsx` · `NewApplicationForm.tsx` | One application's card, kebab, in-place description edit and Link project…; the inline New application form (name, address, optional description) and its field checks. |
+| `AppRowProjectLink.tsx` | `AppRowProjectLine({ app, choices, fallback })`: the row's second line — the description or host, then ` · ` and the linked project's name; a path no known project carries reads in the warn tone behind ▲ (`applications.projectUnknown`, the path's tail kept, the full path as the tooltip), and against a project list not yet read (empty `choices`) it reads neutral. `AppRowProjectPicker(...)`: the in-place kit `Select` — No project, then every project by name in `projectChoices` order — with `OWNS_ESCAPE`, a ✕ and the server's own refusal under it. Rendered by `AppDrawerRow` only, which is 338 lines (2026-09-30), over the 300-line default; MAN-7448. |
 | `AppPane.tsx` · `AppSwitcherLayer.tsx` | One framed application, carrying `data-pane-side` (`left` or `right`); the panes composed over the main region. |
-| `hooks/useFrontPane.ts` | `useFrontPane(panes, setPanes)` → `{ frontSide, closePane }`, mounted by the provider. `frontSide` is the side whose frame last took focus (default `left`; resets to `left` when that side empties). `closePane(side)` empties one slot and moves a survivor left. |
+| `hooks/useFrontPane.ts` | `useFrontPane(panes, setPanes)` → `{ frontSide, closePane }`, mounted by the provider. `frontSide` is the side whose frame last took focus (default `left`). What the hook returns is the side READ as in front: a side whose slot is empty reads as `left` in the very render that emptied it (a survivor is always left), so no reader sees a one-commit "nothing up"; an effect then resets the stored side to `left`. `closePane(side)` empties one slot and moves a survivor left. |
 | `hooks/useCurrentApplication.ts` | `useCurrentApplication()` → `CurrentApplication` (`{ app, src }`) of `frontSide`'s slot, or null when nothing is up or the registry lacks the row. Memoised on `app` and `src`. |
-| `hooks/useSwitcherActions.ts` | `useSwitcherActions(chatDoor)` → the five `SwitcherAction`s in order: Chat, Applications, Reload, Close, Open in a new tab. Chat and Applications are always enabled; the other three are `disabled` while nothing is up and act on `frontSide`. Open in a new tab is `window.open(src, '_blank', 'noopener')`. `chatDoor` comes from the caller: only project-workspace knows which conversation an application brings. No mounted caller yet. |
+| `hooks/useSwitcherActions.ts` | `useSwitcherActions(chatDoor)` → the five `SwitcherAction`s in order: Chat, Applications, Reload, Close, Open in a new tab (keys `chat`, `applications`, `reload`, `close`, `open-in-tab`; printed "Chat", or "Collapse chat" while the chat floats, "Apps", "Reload app", "Close app", "Open in tab": `applications.actChat` … `actOpenInTab`). Chat and Applications are always enabled; the other three are `disabled` while nothing is up and act on `frontSide`. Open in a new tab is `window.open(src, '_blank', 'noopener')`. `chatDoor` comes from the caller: only project-workspace knows which conversation an application brings; `AppSwitcherFab` and `ProjectCommandPalette` each call it with the one door `WorkspaceFrame` hands them, so the radial and the palette's Applications group (MAN-7483) draw one list. |
 | `hooks/useAppRegistry.ts` | `GET /api/apps` on mount and on every drawer open — no polling, no websocket. A failed read keeps the last good list and raises an error beside it; `registryRead` is set once, after the first read settles either way. |
-| `utils/registryRequests.ts` | The registry's WRITE verbs — `addRegistryApp`, `describeRegistryApp`, `removeRegistryApp`, `moveRegistryRow` and the three divider verbs — and `refusalInWords`, the one reader of a refusal's sentence every registry request in this module shares. |
+| `utils/registryRequests.ts` | The registry's WRITE verbs — `addRegistryApp`, `describeRegistryApp` and `linkRegistryProject` (both `api.apps.update`, `PATCH /api/apps/:id`; blank unlinks), `removeRegistryApp`, `moveRegistryRow` and the three divider verbs — and `refusalInWords`, the one reader of a refusal's sentence every registry request in this module shares. |
 | `utils/paneSlots.ts` | `EMPTY_SLOT` and `loneAppOnTheLeft(panes)`. A lone application always sits in `panes.left`, because `SplitPane` draws its left child whether or not a right one exists. Every act that takes an application down passes its result through `loneAppOnTheLeft`. It lives here, not in the context, because the context imports `useFrontPane`, which needs it. |
-| `utils/radialLayout.ts` | `radialLayout(fab, viewport, count)` → item centres for the radial's arc; imports nothing; `[]` when `count` is below 1 or NaN. Constants at the top: 92° sweep, 110px radius, 44px item, 8px edge gap. The arc is centred on the FAB and faces the viewport's centre; where a wall leaves no room it turns to the nearest angle that fits. A corner too tight for any turn narrows the sweep and grows the radius, up to 88px past 110, until neighbours stand as far apart as the open arc's (43.86px for five) or an item's width, if smaller; a viewport too small for that clamps each centre in and slides it along the wall to a full radius. Every centre is at least 110px from the FAB's centre and inside the viewport, so a drawing caller reads the returned centres and never assumes 110px. No mounted caller yet. |
+| `utils/radialLayout.ts` | `radialLayout(fab, viewport, count)` → item centres for the radial's arc; imports nothing; `[]` when `count` is below 1 or NaN. Constants at the top: 110° sweep, 170px radius, 72px item, 8px edge gap. The item is the ROOM an item is given; the drawn disc is `RADIAL_DISC_PX` (48px, `utils/radialLabels.ts`). The arc is centred on the FAB and faces the viewport's centre; where a wall leaves no room it turns to the nearest angle that fits. A corner too tight for any turn narrows the sweep and grows the radius, up to 144px past 170, until neighbours stand as far apart as the smaller of the open arc's spacing (80.8px for five) and an item's room (72px); a viewport too small for that clamps each centre in and slides it along the wall to a full radius. Every centre is at least 170px from the FAB's centre and 44px (edge gap plus half an item) inside each wall, so a drawing caller reads the returned centres and never assumes 170px. `AppSwitcherFab` reads it for the radial's `points`. |
 | `utils/resolveAppUrl.ts` · `utils/appSwitcherStorage.ts` · `utils/dockRect.ts` | The pure functions of §"`{host}`…", the `localStorage` record, and the two rules (`dockableRect`, `sameRect`) a measured dock rect passes before the provider believes it. |
 
-Types live in `src/shared/types.ts`, group `APPLICATION SWITCHER`: `PaneSide`, `PaneSlot`, `CurrentApplication`, `ChatDoor` (`{ floating, toggle, collapse }`) and `SwitcherAction` (`{ key, label, keywords, icon, disabled, shortcut, run }`).
+Types live in `src/shared/types.ts`, group `APPLICATION SWITCHER`: `PaneSide`, `PaneSlot`, `CurrentApplication`, `ChatDoor` (`{ floating, unread, toggle, collapse }`, built by project-workspace's `useChatDoor`: MAN-7478) and `SwitcherAction` (`{ key, label, keywords, icon, disabled, shortcut, run }`).
 
 **The front pane is read from focus.** A pane is a cross-origin iframe, so the page never hears a click that lands in it. `useFrontPane` reads `document.activeElement`'s `data-pane-side` at two moments:
 
@@ -1059,11 +1113,11 @@ standard asks for and what the ten contexts already in this repo do. The provide
 `src/modules/project-workspace/ProjectWorkspaceShell.tsx`, whose tree is `ChatHostProvider` →
 `AppSwitcherProvider` → `WorkspaceFrame`. The layer and the FAB are mounted by
 `src/modules/project-workspace/WorkspaceFrame.tsx`: it gives its main-region wrapper the `relative`
-the layer needs, renders the layer as that wrapper's last child and the FAB as the last sibling of
-the command palette — outside the main region, so the button floats over an open application
-instead of being covered by it.
+the layer needs, renders the layer as that wrapper's last child and the FAB as the container's last child, after the command
+palette and `ChatHostFloating` (MAN-7478) — outside the main region, so the button floats over an open application
+instead of being covered by it. It builds the one `door` (`useChatDoor`), hands it to the FAB and to `ProjectCommandPalette` as `chatDoor={door}` and to the hotkey as `door.toggle`, and reports `useCurrentApplication() !== null` to chat-host's `reportCovered` in a layout effect (MAN-7464).
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/hooks/useCurrentApplication.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/hooks/useFrontPane.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/hooks/useSwitcherActions.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/utils/paneSlots.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/utils/radialLayout.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/ProjectWorkspaceShell.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/WorkspaceFrame.tsx
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/AppRowProjectLink.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/AppSwitcherFab.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/AppSwitcherRadial.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/context/AppSwitcherContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/hooks/useCurrentApplication.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/hooks/useFrontPane.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/hooks/useSwitcherActions.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/utils/paneSlots.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/utils/radialLayout.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/utils/registryRequests.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/ProjectWorkspaceShell.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/WorkspaceFrame.tsx
 
 ## MAN-492 — Proving it
 section: applications/014 Proving it
@@ -7416,7 +7470,7 @@ on the new-chat screen, beside the model, and saved as the list's project for ne
 hooks (`hooks/useSimpleChatList.ts`, `hooks/useSimpleChatRemove.ts`) and is rendered by
 `Sidebar.tsx` in a slot `SidebarContent` never imports, so the tree's own code carries no
 knowledge of this view. Settings stays reachable either way — this replaces the tree, not the
-whole sidebar.
+whole sidebar. The list has a second reader: `SidebarSessionPicker` (MAN-7493) lists the same feed (`useSimpleChatList`) as the floating chat's compact conversation picker while this view is on, and picks by `handleRowSelect`'s shape — the project, then the session tagged with it.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/hooks/useOpenProjectChat.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/SidebarSimpleList.tsx
 
@@ -10309,3 +10363,287 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/agent-launch/AgentLa
 - Two projects with the same `displayName` list as identical options; telling them apart needs a `title` on the kit `Select`'s options (a kit change).
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/AppDrawerRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/AppRowProjectLink.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/app-drawer-link-project.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/app-row-project-link.mjs
+
+## MAN-7488 — The chat host — the host window
+
+`src/shared/context/HostWindowContext.tsx` names the window a subtree is drawn in. The chat stands in the opener's own `window` or in a picture-in-picture window; a line that binds to `window` or `document` by name binds to the opener either way. Whole-file tables: kit MAN-7451, chat state MAN-7452, chat surfaces MAN-7466, the seam MAN-7443. The move it hears: MAN-7489.
+
+## Exports
+| export | does |
+|---|---|
+| `HostWindowProvider({ value, children })` | mounted by `ChatHostSlot` around the chat's portal, and by `ChatHostWindow` around the window's header |
+| `useHostWindow(): Window` | the provider's `hostWindow`; the global `window` outside a provider |
+| `useHostMove(listener)` | calls the LATEST `listener` on every move, synchronously; nothing outside a provider |
+
+Types in `src/shared/types.ts`: `HostWindowValue` = `{ hostWindow: Window; subscribeMove }`, `HostMove` = `{ phase: 'before' | 'after'; floating: boolean }`.
+
+## Rules — every window-bound line in `src/shared/ui`, `src/modules/chat`, `src/modules/widgets`, and each shared hook the chat calls
+| the line is | do |
+|---|---|
+| a listener | bind to `useHostWindow()` or its `document`; the window is a dependency of the effect, so a move binds again |
+| a portal | target `hostWindow.document.body` |
+| a viewport measurement | read `hostWindow.innerWidth`, `hostWindow.innerHeight` |
+| an animation frame, or a timer that paces what the reader sees (stream flush, tooltip delay, dialog autofocus) | run on the host window. why: a hidden opener runs no frames and throttles timers |
+| a timer | keep the window that armed it (`{ id, armedOn }`); clear on it |
+| an observer | build with the host window's constructor (`resizeObserverIn(hostWindow, cb)`, `hostWindow.IntersectionObserver`); build it again when the host changes |
+| a DOM class test | never `instanceof HTML…Element`, `Element` or `Node`; use `isNodeLike`, `isElementLike` (`src/shared/utils.ts`), `nodeType`, `tagName`. why: a node made in the window belongs to that window's realm |
+| a clipboard write | `copyTextToClipboard(text, hostWindow)` |
+| work pending at `'before'` | flush it. `useChatRealtimeHandlers` flushes the stream timer, so a timer armed on a closing window is never lost |
+
+- No provider ⇒ the global `window`. At home nothing changed.
+- `useHostMove` writes its latest-listener ref in a LAYOUT effect declared before the subscribing one. why: a move is emitted from a layout effect; a passive write leaves the ref one render stale at `'before'`.
+- The value is set in one place: chat-host's `moveTo`.
+- Escape order, in either window: `Dialog` binds Escape on the host window's capture phase and marks the event; `ChatInterface` stops the running turn from the host document's capture listener unless the event is marked; window capture runs first. Panels carry `OWNS_ESCAPE`.
+- `otherOverlayHoldsEscape(doc: Document)` (`overlayEscape.ts`): whether a modal dialog or an `OWNS_ESCAPE` panel that is not a fullscreen surface is in front, in the document handed in. Each caller passes its host document (`WidgetFrame`, `ChatGutterLayout`: `hostWindow.document`). why: a panel open in the picture-in-picture window is in that window's document.
+
+## Audit
+`grep -rnE "document\.(body|addEventListener|activeElement)|window\.(addEventListener|innerWidth|innerHeight|requestAnimationFrame)|instanceof (HTML[A-Za-z]*Element|Element|Node)\b" src/shared/ui src/modules/chat src/modules/widgets` prints only:
+- `hostWindow.document.body` and `hostWindow.document.activeElement` reads;
+- comments that name `instanceof` (`Tooltip.tsx`, `Lightbox.tsx`);
+- the opener's own facts below.
+
+## The opener's own facts — stay on the global
+| what | why |
+|---|---|
+| `window.open`, `location`, `localStorage`, `navigator` | the opener's |
+| `document.title`: `pageTitleNotification.ts`, `usePageTitle` | the tab's title |
+| `DockableFab`, `usePointerDrag`, `SplitPane` | live in the opener, around the chat |
+| `KanbanLane`, `KanbanCard` | the board's own code |
+| `pinnedDismissals` `storage` listener | `storage` is `localStorage`'s news, the opener's |
+| `useVoiceAvailable` | listens for an event settings dispatches on the opener's `window` |
+| `widgetBridgeScript.ts` | runs inside the widget's own frame |
+| the websocket, `SessionProtectionContext`, `ToastContext`, the Jev switch stores | one per page; toasts draw in the opener's tab |
+| `ThemeContext` | writes the opener's `<body>`; the window mirrors it (MAN-7490) |
+| `useSessionPresence`'s 30 s heartbeat, restart deadlines, hours-out repaints, `useChatSessionState`'s wait-bounding timers | pace data, not what the reader sees |
+| `postTheme`'s token read | the opener's `document`; `WidgetFrame`'s first build reads the host document |
+
+Complete lists: "Deliberately on the opener" in MAN-7451, MAN-7452, MAN-7466.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/context/HostWindowContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/overlayEscape.ts
+
+## MAN-7489 — The chat host
+
+`src/modules/chat-host/` owns the live chat's one DOM node and every place the chat is drawn. Parts of this manual: the host window MAN-7488; the picture-in-picture window MAN-7490; the panel MAN-7491; the unread rule, the door and the hotkey MAN-7492. Per-file mechanics and probes: MAN-7464 (provider, slot), MAN-7446 (pure parts), MAN-7478 (floating host), MAN-7467 (chrome).
+
+## Barrel — `index.ts`
+Exactly four names leave: `ChatHostProvider`, `ChatHostSlot`, `ChatHostFloating`, `useChatHost`.
+| stays inside | why |
+|---|---|
+| `useChatHostMechanics`: the node, `moveTo`, `subscribeMove`, `comeHome`, the anchor store, `publishFacts` | one function carries the chat and announces it in one order; a second caller starts moving the chat around it |
+| the mirror, the geometry, the storage, `placeNode` | parts of the hosts |
+
+The module imports neither app-switcher nor project-workspace. project-workspace wires the two through `ChatDoor` and the facts it reports (`reportAnchor`, `reportCovered`).
+
+## Placements
+`ChatPlacement` (`src/shared/types.ts`) = `'home' | 'panel' | 'window'`.
+| placement | the chat is drawn in | host |
+|---|---|---|
+| `home` | the chat tab | `ChatHostSlot`'s home `div` |
+| `panel` | a fixed frame beside the FAB, in the page | `ChatHostPanel` (MAN-7491) |
+| `window` | a Document Picture-in-Picture window | `ChatHostWindow` (MAN-7490) |
+
+- The placement is never stored: every load opens `home`. why: only furniture is remembered (the panel's size, MAN-7491).
+- `pipWindow` is set exactly while the placement is `window`; the two are written together.
+- While the chat floats, `WorkspaceMain` passes `isActive={activeTab === 'chat' || floating}` and `ChatGutterLayout enabled={!isMobile && !floating}`; the floating chat draws its own pinned subagent strip.
+
+## `useChatHost()`
+| member | does |
+|---|---|
+| `placement`, `pipWindow`, `unread` | read |
+| `open()` | floats the chat. MUST run inside the press. Nothing when no chat is mounted, when the chat floats, or while a window is opening |
+| `collapse()` | brings the chat home: closes the window (its `pagehide` moves the chat home), or moves the chat home from the panel. While a window is opening it abandons the request: the window is closed the moment it arrives |
+| `reportAnchor(rect \| null)` | the FAB's drawn rect; `null` when there is none |
+| `reportCovered(covered)` | whether an application covers the main region |
+
+`open()`, in order:
+1. `'documentPictureInPicture' in window` → `requestWindow({ width: 420, height: 680 })`, synchronously, first in the press. why: it spends the press's user activation.
+2. No API, a refusal, a throw, or a resolve with no window → placement `panel` (unless a `collapse` abandoned the request).
+3. A window that arrives after a `collapse`, after the chat unmounted, or already closed is closed, not adopted.
+
+## The one node
+- One `div` (`data-chat-host-node`), created once by `ChatHostProvider`, `flex h-full min-h-0 flex-col`: it fills whatever host it stands in.
+- **The chat always portals.** `ChatHostSlot` renders `createPortal(<HostWindowProvider>…{children}</HostWindowProvider>, node)`, at home as when floating. why: rendering in place at home and through a portal when floating gives `ChatInterface` another parent fiber and React remounts it; one portal into one node keeps the fiber, so a move keeps the draft, the scroll position and the stream.
+- The slot's home `div` (`data-chat-host-home`) holds only the node; it adopts it in a layout effect while the placement is `home`.
+- While the chat is away the tab shows `ChatHostPlaceholder` (which host holds the chat; Bring it back = `collapse`), and the home gives up its height (`h-0 overflow-hidden`), never `hidden`. why: collapse carries the node home while the placement still says floating, and a field inside `display: none` loses its caret.
+- "Away" follows the `'after'` of a move (`floating`), not the placement. why: a window receives the chat only after its stylesheets load; until then the tab keeps showing the chat.
+- The slot publishes `{ sessionId, showing }` in a layout effect and clears them in a second effect, on unmount only. A floating host whose chat unmounts collapses.
+
+## The announced move — `moveTo(target, floating)`
+| step | |
+|---|---|
+| 1 | emit `{ phase: 'before', floating }`: the node still stands in the host it leaves |
+| 2 | `placeNode(node, target)` |
+| 3 | set the host window to `target.ownerDocument.defaultView` |
+| 4 | emit `{ phase: 'after', floating }` |
+
+- One synchronous step: no frame paints between the phases. Nothing happens when the node is already in `target`.
+- A listener that throws is logged and skipped; the move goes on.
+- The context's `hostWindow` follows one render later; an `'after'` listener that needs the new window now reads it off its element's `ownerDocument.defaultView`.
+- The node's first adoption at mount is a move.
+- Who hears it: `useHostMove` (MAN-7488); the scroll owner restores the reader's place (MAN-373); stream flush, presence and observers (MAN-7452); the composer takes focus on an `'after'` whose `floating` is true.
+- `placeNode(node, parent)` makes the node the last child of `parent`: `moveBefore` inside one tree where the browser has it (frames survive), else `append`. A move into or out of the picture-in-picture window crosses documents, so it is an `append` and always reloads the chat's widget frames, whatever `placeNode` uses. A focused text field gets its focus and caret back by hand: `moveBefore` resets the selection, `append` drops focus.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-host/ChatHostFloating.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-host/ChatHostSlot.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-host/context/ChatHostContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-host/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-host/utils/placeNode.ts
+
+## MAN-7490 — The chat host — the picture-in-picture window
+
+The chat's `window` placement: a Document Picture-in-Picture window (Chromium, secure context) that stays over every other window. Files: `ChatHostWindow.tsx`, `hooks/usePictureInPicture.ts`, `utils/mirrorDocument.ts`. Request, node, placements: MAN-7489. Per-file rules and probes: MAN-7479, MAN-7446.
+
+## Opening
+- `open()` requests the window synchronously, first in the press (MAN-7489). First-open size 420×680. The browser remembers the size the reader gives it; code never positions the window.
+- No `documentPictureInPicture`, or a refusal: the placement is `panel` instead (MAN-7491).
+
+## `usePictureInPicture(pip)`, in order
+1. `mirrorDocument(document, pip.document)` runs first. `document` is the opener's: the mirror copies from it.
+2. The window's body gets one column element: a header container, then a chat container. It is built during render, once per window, and attached in the effect. why: the mirror rewrites the body's own `style`, and StrictMode runs the effect twice.
+3. `ChatHostWindow` portals `ChatHostHeader` into the header container, inside `HostWindowProvider(pip)`. The window is the header's host window from its first render, so the picker's menu and the collapse tooltip open in the window.
+4. Once the mirror's `ready` resolves, `moveTo(chatContainer, true)`. A flag guards it: `ready` also settles at `stop()`.
+
+## One `pagehide` path
+- On `pip`'s `pagehide`: `comeHome()` runs — `moveTo(homeElement, false)` synchronously, then the placement is `home` and `pipWindow` is null — then `mirror.stop()`.
+- `collapse()` calls `pip.close()`. Collapse, the header's button, the FAB's tap, the hotkey, Bring it back, the window's own close and the browser's "back to tab" all end in that one `pagehide`.
+- A window already closed when the listener attaches, or when `collapse` runs, gets `comeHome()` directly: it will never fire `pagehide`.
+- The effect's cleanup never closes the window (it would end every window under StrictMode). It removes the listener, stops the mirror and removes the column.
+- A provider that unmounts closes the window.
+- The hotkey binds to `pipWindow` too (MAN-7492).
+
+## `mirrorDocument(source, target) → { ready, stop }`
+| does | how |
+|---|---|
+| `<base href>` | from `source.baseURI` |
+| stylesheets | clones every `<link rel="stylesheet">` (absolute `href`) and every `<style>` of the opener's head, in order, and keeps them live: a MutationObserver on the head (childList, subtree, characterData, and the `href` `media` `rel` `crossorigin` attributes). why: Vite's HMR and lazy panels add and rewrite sheets after the window opens |
+| root attributes | copies `class`, `style`, `lang`, `dir` and every `data-*` of `<html>` and `<body>`, live, and writes an attribute only when its SOURCE value changed. Carries `dark`, `pwa-mode`, `vv-anim` and the CSS variables |
+| `ready` | settles once every cloned link has loaded or failed, after 8 s, or at `stop()` |
+| `stop()` | disconnects both observers; removes the sheets and the `<base>` the mirror made |
+
+- Observers come from the SOURCE window's constructor; elements are recognised by `nodeName` and `rel`, never `instanceof`.
+- A kept clone is never moved. why: moving a link reloads it.
+- The opener `<body>`'s inline `style` is live on the window's body, so an opener-side dialog's `overflow: hidden` reaches it.
+- Toasts of a floating chat draw in the opener's tab (MAN-7488).
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-host/ChatHostWindow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-host/hooks/usePictureInPicture.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-host/utils/mirrorDocument.ts
+
+## MAN-7491 — The chat host — the panel: geometry, stacking, storage
+
+The chat's `panel` placement: a frame beside the FAB, in the page, over an application. Files in `src/modules/chat-host/`: `ChatHostPanel.tsx`, `ChatHostHeader.tsx`, `ChatHostPlaceholder.tsx`, `hooks/useFloatingPanel.ts`, `hooks/usePanelViewport.ts`, `utils/panelGeometry.ts`, `utils/anchorStore.ts`, `utils/chatHostStorage.ts`. Placements and the node: MAN-7489. Per-file rules and probes: MAN-7467, MAN-7478, MAN-7446.
+
+## Stacking
+- `position: fixed`, at `z-[45]`, rendered by `ChatHostFloating`, which `WorkspaceFrame` places in the shell's fixed container just before the FAB.
+- Above the application layer (z-40). Below the FAB and the radial (60), and below the mobile sidebar drawer (z-50).
+- Dialogs and menus stay above it: they portal to `body`.
+- Frame: the kit's `Card`, `border-input`, `--shadow-lift`. Parts, top to bottom: `ChatHostHeader`, the body the chat's node is adopted into (`moveTo(body, true)` in a layout effect), the kit's `ResizeGrip`.
+
+## Where it stands — `panelPlacement(anchor, size, viewport)`
+`utils/panelGeometry.ts` imports only a type, so it runs under `tsx`. `clampPanelSize(size, viewport)` and `defaultPanelSize(viewport)` sit beside it.
+| constant | value |
+|---|---|
+| gap from the FAB, each axis | 12 px |
+| margin from every viewport edge | 8 px |
+| minimum size | 376 × 360 |
+| default, viewport 768 px or wider | 420 × 640 |
+| default, a phone | width = viewport − 16, height = 60% of the viewport |
+
+| room | stance |
+|---|---|
+| the roomier side of the FAB holds 376 px | Beside. The near corner stands 12 px off the FAB on both axes. Width shrinks to the room; height never shrinks for the FAB, it slides along its axis. Grows toward the side with more room per axis; the far corner holds the grip |
+| neither side holds 376 px (every phone) | Above or below. Full width less the margins, 12 px off the FAB's edge, toward the side with more room; height is what fits; the grip stands at the far vertical edge, on the side away from the FAB's half of the screen |
+
+- A tie goes right and down. NaN and infinities count as 0.
+- `clampPanelSize`: at least the minimum, at most the viewport less 2 × 8 px; where the viewport is smaller than the minimum the viewport wins. `defaultPanelSize` is not clamped: the caller clamps.
+- Viewport height = the window's height less `--keyboard-height`. The FAB's rect is lifted to the lowest point still in view above the keyboard.
+- No rect reported ⇒ the FAB's resting corner: 16 px from the right, 56 px from the bottom.
+
+## Following the FAB
+- The FAB's rect goes through `reportAnchor` into `anchorStore`. Only `useFloatingPanel` reads it (`useSyncExternalStore`), and only while the panel is mounted. A drag re-renders the panel and nothing else.
+- An unchanged rect keeps the old object.
+- The panel measures nothing: `useFloatingPanel` hands `ChatHostPanel` a `PanelPlacement`.
+
+## Resize
+- The grip sits at the corner away from the FAB (`placement.grip`).
+- `useFloatingPanel` adds each delta to the size DRAWN at the press, for the grip's corner, through `panelPlacement`, and keeps the size drawn, never the size asked.
+- `onResizeEnd` writes the size, once, at release.
+- A grip in a top corner reserves header room (`--chat-host-header-left` / `-right`: 28 px, 36 px under a coarse pointer); a bottom grip under a coarse pointer reserves a 20 px band under the chat.
+- The drag is the kit's (`ResizeGrip`, kind `'resize'`, MAN-490). chat-host writes none.
+
+## Storage — `utils/chatHostStorage.ts`
+- `localStorage` key `'chat-host'`, value `{ panel: { width, height } }`. Per browser, never the server.
+- `readPanelSize()` → size or null. `writePanelSize(size)` refuses a non-size. Neither throws; a bad or absent record means the default size.
+- Never stored: the placement, and the panel's position (the FAB answers it).
+
+## Header and placeholder
+- `ChatHostHeader({ header, onCollapse })`: one 40 px row. The `header` slot fills it (project-workspace's `FloatingChatHeader`: MAN-7493), then a 32 px collapse button with a 40 px hit area. The panel and the window share it.
+- `ChatHostPlaceholder({ placement, onBringBack })`: the chat tab's stand-in while the chat floats: an `EmptyState` naming the host, and Bring it back. Words: the `chatHost` block of `src/modules/i18n/locales/<lang>/common.json`, all eleven locales.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-host/ChatHostHeader.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-host/ChatHostPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-host/ChatHostPlaceholder.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-host/hooks/useFloatingPanel.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-host/hooks/usePanelViewport.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-host/utils/anchorStore.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-host/utils/chatHostStorage.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-host/utils/panelGeometry.ts
+
+## MAN-7492 — The chat host — the unread rule, the door and the hotkey
+
+Three parts that decide when the chat is drawn out of sight, who presses it, and which key does. Provider and placements: MAN-7489. The door's routing across applications: MAN-478. Per-file rules and probes: MAN-7482 (unread), MAN-7478 (door, hotkey), MAN-7486 (routing proof).
+
+## The unread rule — `hooks/useUnreadReply.ts`
+`useUnreadReply({ sessionId, onScreen })` runs once, in `ChatHostProvider`; the result is `useChatHost().unread`.
+- **On screen** = floating, or home with the chat tab showing and no application covering the main region (`reportCovered`).
+- **Lights** on a frame for the chat's own `sessionId`, arriving while the chat is off screen, that is a `complete` (not an `aborted` one: the reader's own act) or a `permission_request`. Every other frame leaves it alone.
+- **Clears** when the chat comes on screen, and when the conversation changes.
+- Drawn by `AppSwitcherFab` as the dot: `indicator` while `chatDoor.unread` and the chat is not floating (MAN-486).
+- The frame is judged against the latest facts: the socket subscription is bound once and reads `sessionId` and `onScreen` through refs written in a layout effect.
+- `WorkspaceFrame` reports `covered` from a layout effect. why: a passive one lets a reply that lands right after the drawer closes be judged against a chat still in sight (INV-6010).
+
+## The door — `ChatDoor`
+Type in `src/shared/types.ts`: `{ floating, unread, toggle, collapse }`. Built by project-workspace's `useChatDoor`, the one place that knows which conversation an application brings; chat-host and app-switcher never import each other.
+| member | does |
+|---|---|
+| `floating` | `placement !== 'home'` |
+| `toggle()` | floating → `collapse()`. Else `open()` first and synchronously, then the routing rule (MAN-478). MUST run inside the press |
+| `collapse()` | the way home that does not ask |
+
+- `toggle` and `collapse` keep one identity for the host's life: `toggle` reads `floating` and the front application through refs written after each commit.
+- Pressed from four places, all through the one door: the FAB (collapse only, while floating), the radial's Chat act, the palette's Applications group, the hotkey.
+
+## The hotkey — `hooks/useChatHotkey.ts`
+`useChatHotkey(toggle, pipWindow)`, run by `WorkspaceFrame` with `door.toggle`.
+- Ctrl or ⌘ plus `CHAT_TOGGLE_KEY` (`'.'`, `src/shared/constants.ts`), without Alt: `preventDefault()`, then `toggle()`, in the same keydown.
+- A repeat does nothing.
+- The listener is on `window`, in the capture phase, and on `pipWindow` while one is open. why: a key pressed in the picture-in-picture window reaches that window and never the opener.
+- `toggle` is read through a ref written in a layout effect.
+- Printed `⌘.` on Apple hardware and `Ctrl+.` elsewhere, by `formatShortcut(CHAT_TOGGLE_KEY)`: the one shared check `isApplePlatform()` decides.
+- The palette closes when it sees the chord already handled (`defaultPrevented`): the Chat row prints that chord, so pressing it is choosing the row.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-host/hooks/useUnreadReply.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/hooks/useChatDoor.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/hooks/useChatHotkey.ts
+
+## MAN-7493 — The sidebar's session picker
+
+`SidebarSessionPicker` (`src/modules/sidebar/SidebarSessionPicker.tsx`) is the sidebar's own list of conversations as a compact picker, so a floating chat's header switches conversations the way the sidebar does. It is the sidebar barrel's second export beside `Sidebar` (`src/modules/sidebar/index.ts`).
+
+## Who uses it
+- One caller: project-workspace's `FloatingChatHeader`, the `header` of the floating chat, in the panel and in the picture-in-picture window (MAN-7489). The chat tab at home carries no picker.
+- `FloatingChatHeader` is the only reader of the sidebar state in this wiring. `WorkspaceFrame`, the shell and the door never subscribe to it. why: that state is rebuilt on every session upsert, and every reader wakes on each.
+
+## Props
+| prop | is |
+|---|---|
+| `projects`, `selectedProject`, `selectedSession` | the sidebar's own |
+| `onProjectSelect(project)`, `onSessionSelect(session)` | the sidebar's own handlers |
+| `onNewChat()` | `FloatingChatHeader` passes `openProjectChat(front application's project ?? null, 'new')` (MAN-7444) |
+
+## What it lists
+The trigger names the open conversation by the sidebar's own rule, `getSessionName` (summary, else name, else "New Session"), with its project's `displayName` under it. It opens a list: New chat first, then the list the sidebar holds for this reader.
+| reader's setting | list after New chat |
+|---|---|
+| simple chat list on (`useSimpleChatListPreferences().enabled`) | the simple list's rows (`useSimpleChatList`), in the reader's own order (MAN-661) |
+| off | each project in `sortProjects` order (the reader's `projectSortOrder`), each with its loaded sessions from `getAllSessions(project)`, newest first (INV-5889) |
+
+- The open conversation is marked. Busy, awaiting-input and subagent marks are the sidebar rows' own.
+- The popover is the kit's (`Card`, portalled through `useHostWindow()`): in the picture-in-picture window it opens in the window (MAN-7488).
+
+## A pick
+The path the sidebar's row takes, the simple list's `handleRowSelect` shape: `onProjectSelect(project)` first, then `onSessionSelect({ ...session, __projectId: project.projectId })`. From the simple list the session is built from the row (`id`, `summary`, provider, project). A session with an id alone would title the workspace "New Session".
+
+## Stays in the sidebar
+Rename, delete, star and reorder.
+
+## Where the rest is
+- Files, groups, data, limits, words: MAN-7473. Panel, trigger, row rules: MAN-7484. Proofs: MAN-7485.
+- `getAllSessions`, `getSessionDate`, `getSessionProvider` and the two timestamp readers live in `src/shared/sessionRecency.ts`; `sidebarProjectFormatting.ts` imports them (INV-5889).
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/SidebarSessionPicker.tsx

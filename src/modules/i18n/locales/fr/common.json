@@ -393,7 +393,6 @@
     "exitFullscreen": "Quitter le plein écran"
   },
   "applications": {
-    "fabLabel": "Applications",
     "fabLabelMenu": "Ouvrir le menu",
     "fabLabelCollapse": "Réduire le chat",
     "radialLabel": "Actions rapides",

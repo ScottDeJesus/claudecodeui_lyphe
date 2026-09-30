@@ -25,8 +25,10 @@ import {
 } from '@/shared/ui';
 import { useTheme } from '@/shared/context/ThemeContext';
 import { usePaletteOps } from '@/modules/command-palette/context/PaletteOpsContext';
-import { SETTINGS_MAIN_TABS } from '@/shared/constants';
-import type { AppTab, Project } from '@/shared/types';
+import { CHAT_TOGGLE_KEY, SETTINGS_MAIN_TABS } from '@/shared/constants';
+import type { AppTab, Project, SwitcherAction } from '@/shared/types';
+import { PaletteSwitcherGroup } from '@/modules/command-palette/PaletteSwitcherGroup';
+import { createSwitcherFilter } from '@/modules/command-palette/utils/switcherActFilter';
 import { useSessionsSource } from '@/modules/command-palette/hooks/useSessionsSource';
 import { useFilesSource } from '@/modules/command-palette/hooks/useFilesSource';
 import { useCommitsSource } from '@/modules/command-palette/hooks/useCommitsSource';
@@ -59,6 +61,12 @@ type CommandPaletteProps = {
    * NAV_TABS rows this list names, so a row added below without a matching gate never appears.
    */
   visibleTabs: AppTab[];
+  /**
+   * The application switcher's five acts, from the switcher's own list (the one the radial draws), drawn
+   * as the Applications group. The palette knows nothing of what an act does; it lists them and runs the
+   * one selected.
+   */
+  switcherActions: SwitcherAction[];
 };
 
 /**
@@ -90,6 +98,7 @@ function CommandPalette({
   onShowTab,
   onShowRepoInGitTab,
   visibleTabs,
+  switcherActions,
 }: CommandPaletteProps) {
   const [open, setOpen] = React.useState(false);
   const [search, setSearch] = React.useState('');
@@ -173,11 +182,22 @@ function CommandPalette({
     setPages((prev) => prev.slice(0, -1));
   }, []);
 
+  // The switcher's acts are listed only for a query that really names them (see createSwitcherFilter), so a
+  // greyed act's next-best fuzzy match can never be a state change the reader did not ask for.
+  const commandFilter = React.useMemo(() => createSwitcherFilter(switcherActions), [switcherActions]);
+
   const handleKeyDown = React.useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'Backspace' && !search && pages.length > 0) {
       e.preventDefault();
       popPage();
+      return;
     }
+    // The chat's hotkey (useChatHotkey, on window capture) hears its chord BEFORE this handler, runs the Chat
+    // act, and marks the event handled. The Chat row prints that chord, so pressing it with the palette open is
+    // choosing that row: the palette closes as it does for a selection. Left open, the chat's composer would
+    // take the focus and the palette would stay on screen, modal and dead to the keyboard until Escape.
+    const isChatChord = (e.ctrlKey || e.metaKey) && !e.altKey && e.key === CHAT_TOGGLE_KEY;
+    if (isChatChord && e.defaultPrevented) setOpen(false);
   }, [search, pages.length, popPage]);
 
   const startNewChatDisabled = !selectedProject;
@@ -191,7 +211,7 @@ function CommandPalette({
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogContent className="max-w-xl overflow-hidden p-0">
         <DialogTitle>Command palette</DialogTitle>
-        <Command label="Command palette" onKeyDown={handleKeyDown}>
+        <Command label="Command palette" onKeyDown={handleKeyDown} filter={commandFilter}>
           {page && (
             <div className="flex items-center gap-2 border-b px-3 py-2">
               <span className="inline-flex items-center gap-1 rounded-md bg-accent px-2 py-0.5 text-xs font-medium text-accent-foreground">
@@ -213,7 +233,10 @@ function CommandPalette({
             value={search}
             onValueChange={setSearch}
           />
-          <CommandList>
+          {/* Tall enough for the Actions and Applications groups to stand whole on open (about 330px), so all
+              five acts are on screen and the list's fold falls inside the Navigate group; on a short window
+              it keeps to what the window can hold, as the kit's 300px did. */}
+          <CommandList className="max-h-[min(360px,calc(100dvh-6rem))]">
             <CommandEmpty>No results.</CommandEmpty>
 
             {showActions && (
@@ -242,6 +265,8 @@ function CommandPalette({
                 </CommandItem>
               </CommandGroup>
             )}
+
+            {showActions && <PaletteSwitcherGroup actions={switcherActions} run={run} />}
 
             {showActions && (
               <CommandGroup heading="Navigate">

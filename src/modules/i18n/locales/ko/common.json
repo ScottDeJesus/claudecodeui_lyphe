@@ -391,7 +391,6 @@
     "exitFullscreen": "전체 화면 종료"
   },
   "applications": {
-    "fabLabel": "애플리케이션",
     "fabLabelMenu": "메뉴 열기",
     "fabLabelCollapse": "채팅 접기",
     "radialLabel": "빠른 작업",

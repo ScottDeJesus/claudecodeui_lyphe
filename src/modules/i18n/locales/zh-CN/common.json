@@ -391,7 +391,6 @@
     "exitFullscreen": "退出全屏"
   },
   "applications": {
-    "fabLabel": "应用",
     "fabLabelMenu": "打开菜单",
     "fabLabelCollapse": "收起聊天",
     "radialLabel": "快捷操作",

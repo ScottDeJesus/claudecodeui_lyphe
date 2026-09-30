@@ -391,7 +391,6 @@
     "exitFullscreen": "全画面を終了"
   },
   "applications": {
-    "fabLabel": "アプリケーション",
     "fabLabelMenu": "メニューを開く",
     "fabLabelCollapse": "チャットを折りたたむ",
     "radialLabel": "クイック操作",

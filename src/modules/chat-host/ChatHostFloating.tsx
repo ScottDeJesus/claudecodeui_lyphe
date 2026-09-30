@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 
 import { ChatHostHeader } from '@/modules/chat-host/ChatHostHeader';
 import { ChatHostPanel } from '@/modules/chat-host/ChatHostPanel';
+import { ChatHostWindow } from '@/modules/chat-host/ChatHostWindow';
 import { useChatHost } from '@/modules/chat-host/context/ChatHostContext';
 import { useFloatingPanel } from '@/modules/chat-host/hooks/useFloatingPanel';
 
@@ -25,12 +26,13 @@ function FloatingPanel({ header }: { header: ReactNode }) {
  * Used by project-workspace's WorkspaceFrame inside the shell's fixed container, before the FAB: the host the
  * chat floats in. `header` is the header's session part.
  *
- * It draws the panel while the placement is 'panel' and nothing otherwise. It reads only the placement, so a
- * drag of the FAB — which moves the anchor many times a second — re-renders the panel beneath it and never
- * this component.
+ * It draws the panel while the placement is 'panel', the picture-in-picture window's header while it is
+ * 'window', and nothing otherwise. It reads only the placement and the window, so a drag of the FAB — which
+ * moves the anchor many times a second — re-renders the panel beneath it and never this component.
  */
 export function ChatHostFloating({ header }: { header: ReactNode }) {
-  const { placement } = useChatHost();
-  if (placement !== 'panel') return null;
-  return <FloatingPanel header={header} />;
+  const { placement, pipWindow } = useChatHost();
+  if (placement === 'panel') return <FloatingPanel header={header} />;
+  if (placement === 'window' && pipWindow) return <ChatHostWindow pip={pipWindow} header={header} />;
+  return null;
 }

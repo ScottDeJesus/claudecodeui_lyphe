@@ -1255,7 +1255,6 @@
     "exitFullscreen": "Leave fullscreen"
   },
   "applications": {
-    "fabLabel": "Applications",
     "fabLabelMenu": "Open the menu",
     "fabLabelCollapse": "Collapse chat",
     "radialLabel": "Quick actions",

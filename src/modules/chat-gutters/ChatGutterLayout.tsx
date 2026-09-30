@@ -179,8 +179,11 @@ export function ChatGutterLayout({
       // than unmounting it, so this region measures 0 while another tab is open — and a gutters-off
       // reading there would tear down the widgets and the state inside them (a scrolled run list,
       // an expanded phase) on a trip to the Files tab and back. The real width answers when the tab
-      // comes back, which is a resize the observer sees.
-      if (width === 0) return;
+      // comes back, which is a resize the observer sees. ONLY WHILE `enabled`: a region switched off by
+      // its owner (the chat floats) is off whatever it measures, and a hidden tab's 0 must not leave the
+      // gutters standing — with the columns, their claim on the pinned subagent strip stands too, and
+      // the floating chat would draw no strip at all.
+      if (width === 0 && enabled) return;
       const next = enabled && width >= MIN_REGION_PX;
       setWide((previous) => (previous === next ? previous : next));
       // The gutters going away ends any drag they were carrying — the handle is unmounted and the

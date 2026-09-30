@@ -27,8 +27,9 @@ type ChatHostPlaceholderProps = {
  * THE SLOT MUST GIVE ITS HOME UP WHILE THIS STANDS. ChatHostSlot's home `div` is `h-full` and empty while the
  * chat floats; drawn beside it in the tab's block cell, this placeholder lands entirely below the tab's box
  * (measured: top at 900 in a 900px tab, its button at y 1378) where the tab's `overflow-hidden` clips it, so
- * the reader sees an empty tab with nothing to press. The home is `hidden` whenever the placement is not
- * `'home'`, which is the composition the fixture photographs.
+ * the reader sees an empty tab with nothing to press. The home gives up its height (`h-0 overflow-hidden`, still
+ * rendered rather than `hidden`, so collapse can hand the composer its focus back) for as long as the placeholder is
+ * drawn, which is from the moment the chat has left it, and that draws the composition the fixture photographs.
  *
  * The explanation line is the kit's `--ink-faint` at 13.5px, which is 3.1:1 on the light canvas, under AA for
  * small text, and it is the one sentence that says what the empty tab means. The root scopes it to

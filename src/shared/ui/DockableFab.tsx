@@ -21,7 +21,8 @@ type DockableFabProps = {
   dockRect: DOMRect | null;       // where the dock is, measured by the owner; null = nowhere to dock
   active?: boolean;               // renders as aria-expanded and the pressed wash
   indicator?: boolean;            // a dot on the rim: it is the reader's turn. Drawn inside the one button
-  onPress: () => void;            // a click that did not end a drag — a tap, a mouse click, Enter or Space
+  onPress: (press: { keyboard: boolean }) => void;  // a click that did not end a drag — a tap, a mouse click, Enter or Space; `keyboard` is true when no pointer was behind it
+  onDragStart?: () => void;       // once, when a gesture becomes a drag: the first move past the threshold
   onPositionChange: (next: DockableFabPosition) => void;  // exactly once per drag, at release
   onRectChange?: (rect: DOMRect) => void;                 // the button's measured rect, after every placement and window resize
 };
@@ -186,10 +187,16 @@ function overDock(release: FabPoint, dockRect: DOMRect | null): boolean {
  *
  * The press is the CLICK, never the pointer release. On a touch screen the browser dispatches the
  * tap's click after the release, hit-tested at the finger's point in whatever is on screen by then —
- * and what this button opens is portalled over it. Opened on the release, the drawer caught its own
- * opening tap: on its backdrop, which shut it again at once, or on a row inside the sheet, which
- * pressed that row. So the release only records whether the gesture moved, and the click that ends a
+ * and what this button opens is drawn over it. Opened on the release, the surface caught its own
+ * opening tap: on its backdrop, which shut it again at once, or on an item inside it, which
+ * pressed that item. So the release only records whether the gesture moved, and the click that ends a
  * drag is swallowed; every other click — a tap, a mouse click, Enter or Space — presses.
+ *
+ * `onPress` says HOW it was pressed: `keyboard` is true for a click with no pointer behind it
+ * (`detail === 0`: Enter, Space, a screen reader), so an owner that opens a menu can move focus into it
+ * for the reader who pressed with keys and leave it on the button for the one who tapped.
+ * `onDragStart` fires once per drag, on the first move past the threshold, so an owner can put away
+ * what the button opened before the button starts to move out from under it.
  *
  * The tooltip is the native `title`: the library `Tooltip` measures a wrapper element, and a
  * wrapper around a fixed node sits in the caller's flow at zero size, somewhere else entirely.
@@ -202,6 +209,7 @@ export function DockableFab({
   active = false,
   indicator = false,
   onPress,
+  onDragStart,
   onPositionChange,
   onRectChange,
 }: DockableFabProps) {
@@ -215,6 +223,9 @@ export function DockableFab({
   const grab = useRef<FabPoint>({ x: 0, y: 0 });
   // Whether the last pointer gesture ended as a drag: its click, if the browser sends one, is not a press.
   const dragEnded = useRef(false);
+  // Whether this gesture's start has been announced to `onDragStart`, so the first move says it and the
+  // rest do not. Rearmed on every press; a ref because nothing draws from it.
+  const dragAnnounced = useRef(false);
 
   // The top-left that keeps the grabbed point under the pointer, for whatever size the box is now.
   function heldFrom(x: number, y: number): FabPoint {
@@ -230,6 +241,10 @@ export function DockableFab({
   const drag = usePointerDrag({
     kind: 'fab',
     onMove: ({ x, y }) => {
+      if (!dragAnnounced.current) {
+        dragAnnounced.current = true;
+        onDragStart?.();
+      }
       setHeldPoint(heldFrom(x, y));
     },
     onEnd: ({ x, y, moved }) => {
@@ -292,6 +307,7 @@ export function DockableFab({
   function handlePointerDown(event: PointerEvent<HTMLButtonElement>) {
     // A touch drag sends no click, so the last drag's flag must not swallow this gesture's.
     dragEnded.current = false;
+    dragAnnounced.current = false;
     // Measured off the live box rather than derived from the stored point: docked, the button is
     // centred on the dock and its top-left is nowhere near the x/y the record holds.
     const rect = buttonRef.current?.getBoundingClientRect();
@@ -302,7 +318,7 @@ export function DockableFab({
   }
 
   function handleClickCapture(event: MouseEvent<HTMLButtonElement>) {
-    // A pointer click that ends a drag would open the drawer the reader was only moving out of the
+    // A pointer click that ends a drag would press the button the reader was only moving out of the
     // way. A click with no pointer behind it (`detail === 0`: Enter, Space, a screen reader) never
     // ends a drag, whatever the last gesture was.
     if (event.detail !== 0 && dragEnded.current) {
@@ -311,7 +327,7 @@ export function DockableFab({
       event.stopPropagation();
       return;
     }
-    onPress();
+    onPress({ keyboard: event.detail === 0 });
   }
 
   return (

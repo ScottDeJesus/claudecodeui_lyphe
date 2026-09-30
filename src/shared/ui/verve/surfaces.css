@@ -29,7 +29,7 @@
  *   - the mobile sidebar drawer, `fixed inset-0 z-50`, IN THE SAME TREE (ProjectSidebarRegion.tsx:86).
  *     The one it must beat: under that backdrop the FAB is dimmed, blurred and unclickable at the
  *     exact moment the reader is trying to leave a pane.
- *   - Dialog, z-50, portalled to <body> (Dialog.tsx:224,244): the drawer this FAB opens.
+ *   - Dialog, z-50, portalled to <body> (Dialog.tsx:224,244): the drawer the FAB's Applications act opens.
  *   - ActionMenu (ActionMenu.tsx:307), two branches on one line, and the default moved to the
  *     portalled one on 2026-09-25: `portal` is now ON unless a mount asks for `false`, and all but
  *     one mount takes the default, so it is `fixed z-[70]` — the menus inside that drawer, and 60

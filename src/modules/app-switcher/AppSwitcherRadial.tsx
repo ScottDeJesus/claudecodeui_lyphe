@@ -1,4 +1,4 @@
-import type { CSSProperties } from 'react';
+import { type CSSProperties, useEffect, useLayoutEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import {
@@ -7,6 +7,7 @@ import {
   RADIAL_DISC_PX,
 } from '@/modules/app-switcher/utils/radialLabels';
 import type { SwitcherAction } from '@/shared/types';
+import { OWNS_ESCAPE } from '@/shared/ui/overlayEscape';
 import { cn } from '@/shared/utils';
 
 type AppSwitcherRadialProps = {
@@ -18,6 +19,8 @@ type AppSwitcherRadialProps = {
   points: Array<{ x: number; y: number }>;
   /** Puts the radial away: after an act runs, on Escape, on a press outside. */
   onClose: () => void;
+  /** Whether this open came from the keyboard (the FAB pressed with no pointer behind it): the first item then takes focus. */
+  openedByKeyboard?: boolean;
 };
 
 /** How long each item waits after the one before it when the radial opens, so the arc blooms in order. */
@@ -26,6 +29,8 @@ const BLOOM_STAGGER_MS = 35;
 const FADE_MS = 200;
 /** How long a press or a hover takes to show: the same 150ms every button in the house answers in. */
 const FEEDBACK_MS = 150;
+/** The kit's FAB, which the radial fans out from: the press that is its own toggle, and where focus goes back to. There is one. */
+const FAB_SELECTOR = '.vv-fab';
 
 /**
  * The disc: a target sized by `RADIAL_DISC_PX`, with the house's border and lift; the ground and ink come per
@@ -94,6 +99,14 @@ function keyShortcutsOf(shortcut: string): string {
  * no name, no escape claim, and `visibility: hidden` on the items keeps them out of the tab order and
  * off the hit test — because a panel's claim on the Escape key is honest only for as long as it is up.
  *
+ * KEYBOARD AND DISMISSAL. Enter or Space on the FAB opens the radial with the first item focused
+ * (`openedByKeyboard`, which the FAB reads off the press); the arrow keys move between the enabled items,
+ * wrapping — a greyed act is skipped — and Enter and Space are the focused item's own click. Escape, a press
+ * outside the arc and the FAB, and focus moving into an application's frame each put it away (the effect
+ * below says why each is bound where it is), and Escape gives focus back to the FAB. While open the shell
+ * carries `OWNS_ESCAPE`, so a dialog under it stands down and ChatInterface's Escape, which stops a running
+ * turn, finds the key already taken (`defaultPrevented`).
+ *
  * STACKING. `z-[60]`, the FAB's own level in the shell's stacking context (see the note above `.vv-fab` in
  * surfaces.css), and later in the tree, so it draws over the application layer (40) and the floating
  * chat's panel (45). The layer is `pointer-events-none`, so the FAB and the page beneath stay pressable
@@ -103,8 +116,60 @@ function keyShortcutsOf(shortcut: string): string {
 export function AppSwitcherRadial(props: AppSwitcherRadialProps) {
   const { t } = useTranslation();
   const { open, acts, points } = props;
-  // FILL: close — `const { onClose } = props;`; every item, Escape and the outside press put the radial away through it
-  // FILL: outside-press
+  const { onClose, openedByKeyboard = false } = props;
+  // The shell, for the arrow keys (they find the items by role, never by per-item refs) and for the outside press.
+  const container = useRef<HTMLDivElement>(null);
+  // The latest `onClose`, read when a key or a press lands: the FAB hands a new function every render, and a
+  // listener bound to one render's would either be stale or be rebound on each render of the FAB.
+  const closeRef = useRef(onClose);
+  useLayoutEffect(() => {
+    closeRef.current = onClose;
+  });
+
+  // The three ways the reader puts an open radial away without choosing an item, bound only while it is open.
+  // The radial belongs to the opener's own window, like the FAB it fans out from, so this is the global `window`.
+  //  - Escape, on a WINDOW CAPTURE listener, which runs before every document listener: `preventDefault()` is
+  //    the mark ChatInterface's Escape reads (`defaultPrevented`), so a running turn is left alone, and the
+  //    shell carries `OWNS_ESCAPE` while open so a dialog under it stands down too. Focus goes back to the FAB.
+  //  - A pointerdown outside the shell and the FAB. The FAB is outside the shell but its press is its own
+  //    toggle: closing here as well would put the radial away on the pointerdown and let the click reopen it.
+  //  - Focus moving into an application's frame. A frame is a cross-origin document, so a press inside it never
+  //    reaches this page as a pointerdown; the window's blur, with a frame now holding focus, is that press.
+  useEffect(() => {
+    if (!open) return undefined;
+    const fabOf = () => document.querySelector<HTMLElement>(FAB_SELECTOR);
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key !== 'Escape') return;
+      event.preventDefault();
+      closeRef.current();
+      fabOf()?.focus();
+    }
+    function handlePointerDown(event: PointerEvent) {
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+      if (container.current?.contains(target) || fabOf()?.contains(target)) return;
+      closeRef.current();
+    }
+    function handleBlur() {
+      if (document.activeElement?.tagName === 'IFRAME') closeRef.current();
+    }
+    window.addEventListener('keydown', handleKeyDown, true);
+    window.addEventListener('pointerdown', handlePointerDown, true);
+    window.addEventListener('blur', handleBlur);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown, true);
+      window.removeEventListener('pointerdown', handlePointerDown, true);
+      window.removeEventListener('blur', handleBlur);
+    };
+  }, [open]);
+
+  // A keyboard open moves focus into the menu in the commit that opens it, before the browser paints, so the
+  // arrow keys work at once; a pointer open leaves focus where the reader put it. A layout effect: the items
+  // are in the document and visible by then (`visibility` flips with no delay on open — see `itemTiming`).
+  useLayoutEffect(() => {
+    if (!open || !openedByKeyboard) return;
+    container.current?.querySelector<HTMLElement>('[role="menuitem"]')?.focus();
+  }, [open, openedByKeyboard]);
 
   // Read at the moment of drawing, and only while open: the FAB reads the same two numbers to make `points`,
   // and the labels are kept off the viewport's walls by them. The chip is not drawn under a coarse pointer (the
@@ -128,8 +193,33 @@ export function AppSwitcherRadial(props: AppSwitcherRadialProps) {
       data-app-switcher-radial={open ? 'open' : 'closed'}
       // A closed radial exposes nothing: not a menu, not a name, not a claim on Escape.
       {...(open ? { role: 'menu', 'aria-label': t('applications.radialLabel') } : { 'aria-hidden': true })}
-      // FILL: keyboard — first item focused on a keyboard open; arrows move; Enter runs
-      // FILL: escape — window capture, preventDefault, OWNS_ESCAPE while open
+      ref={container}
+      // Arrows move between the ENABLED items and wrap; Enter and Space are the focused item's own click,
+      // which the item's handler runs. A greyed item is skipped by the arrows so focus never rests on an act
+      // that would do nothing. Tab leaves the menu, so the radial closes rather than stay up with focus gone.
+      onKeyDown={(event) => {
+        if ((event.key === 'Enter' || event.key === ' ') && event.repeat) {
+          // A held Enter would press the focused item again and again, and the first item is the Chat toggle.
+          event.preventDefault();
+          return;
+        }
+        if (event.key === 'Tab') {
+          onClose();
+          return;
+        }
+        const forward = event.key === 'ArrowDown' || event.key === 'ArrowRight';
+        const backward = event.key === 'ArrowUp' || event.key === 'ArrowLeft';
+        if (!forward && !backward) return;
+        event.preventDefault();
+        const items = Array.from(event.currentTarget.querySelectorAll<HTMLElement>('[role="menuitem"]'));
+        const enabled = items.filter((item) => item.getAttribute('aria-disabled') !== 'true');
+        if (enabled.length === 0) return;
+        const at = enabled.indexOf(document.activeElement as HTMLElement);
+        // Focus not on an enabled item (on the FAB, or on a greyed one): forward starts at the first, backward at the last.
+        const next = at === -1 ? (forward ? 0 : enabled.length - 1) : (at + (forward ? 1 : -1) + enabled.length) % enabled.length;
+        enabled[next]?.focus();
+      }}
+      {...(open ? OWNS_ESCAPE : null)}
       className="pointer-events-none fixed inset-0 z-[60]"
     >
       {acts.map((act, index) => {
@@ -148,8 +238,17 @@ export function AppSwitcherRadial(props: AppSwitcherRadialProps) {
             aria-keyshortcuts={act.shortcut === null ? undefined : keyShortcutsOf(act.shortcut)}
             data-act={act.key}
             // A press on a greyed act does nothing and says so with the cursor; it is still a press the
-            // handler below receives, so the fill's run must skip an act that `disabled` names.
-            onClick={() => { /* FILL: run — act.run() then onClose() */ }}
+            // handler below receives, so the run skips an act that `disabled` names.
+            onClick={(event) => {
+              // A radial that is closing still has hit-testable discs until the fade ends (`itemTiming` holds
+              // `visibility`), so a second click inside the fade would run Reload or Open in a new tab twice.
+              if (!open || act.disabled) return;
+              act.run();
+              onClose();
+              // A keyboard press (no pointer behind the click) gives the FAB its focus back: the item is about to
+              // be hidden, and a drawer this act opens returns focus to whatever held it when it opened.
+              if (event.detail === 0) document.querySelector<HTMLElement>(FAB_SELECTOR)?.focus();
+            }}
             className={cn(
               'group',
               DISC,

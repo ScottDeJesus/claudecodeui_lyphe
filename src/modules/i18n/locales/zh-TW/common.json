@@ -391,7 +391,6 @@
     "exitFullscreen": "離開全螢幕"
   },
   "applications": {
-    "fabLabel": "應用程式",
     "fabLabelMenu": "開啟選單",
     "fabLabelCollapse": "收合聊天",
     "radialLabel": "快速動作",

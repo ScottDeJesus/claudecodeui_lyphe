@@ -56,5 +56,14 @@ export function useFrontPane(
     setPanes((current) => loneAppOnTheLeft({ ...current, [side]: EMPTY_SLOT }));
   }, [setPanes]);
 
-  return { frontSide, closePane };
+  // What readers get is the side READ as in front, not the stored one: the effect above runs a commit
+  // AFTER the panes change, so for that one render the stored side still names the emptied slot, and
+  // every reader would see "no application up" (measured, 2026-09-30: dual screen, the front right pane
+  // closed while the left application stayed up — `useCurrentApplication()` read null for a commit, and
+  // the chat door, which forgets its route when nothing is up, re-routed inside a visit that never
+  // ended). A survivor is always left, so an emptied side reads as the left one at once; the effect
+  // still resets the stored side, or a later fill of the right would silently take the front.
+  const readSide: PaneSide = frontAppId === null ? 'left' : frontSide;
+
+  return { frontSide: readSide, closePane };
 }

@@ -30,8 +30,12 @@ const WIDE_CHAR_PX = 12;
 const SHORTCUT_EXTRA_PX = 18;
 /** The FAB's catch: a press within 22px of its centre is the FAB's, and a label standing there would be pressed instead. */
 const FAB_CATCH_PX = 44;
-/** The most a label's WORD may draw when the room is too short for the whole word (the chip beside it is not cut). */
-const CLIPPED_TEXT_PX = 64;
+/**
+ * The most a label's WORD may draw when the room is too short for the whole word, tried in this order: a first
+ * cut that keeps most short words whole, then a harder one for the corner where even that meets a neighbour.
+ * The chip beside a word is never cut.
+ */
+const CLIPPED_TEXT_STEPS_PX = [64, 48];
 
 const WIDE_CHARACTER = /[\u1100-\u11ff\u2e80-\u9fff\uac00-\ud7af\uff00-\uffef]/;
 
@@ -173,8 +177,9 @@ export type RadialLabelPlan = {
  * The whole words first: each label on its outward side where it can stand clear of the discs, the FAB and
  * the other labels (`leastCovering`). Where they cannot all stand clear — a phone's corner, the longest
  * label the radial draws ("Collapse chat" and its chip, 158px), a language with long words — the words are
- * cut to `CLIPPED_TEXT_PX` and the arc is searched again, and the plan that covers less stands. A cut word
- * is a visual truncation only: the button's name is still the whole word.
+ * cut to `CLIPPED_TEXT_STEPS_PX`, the gentler cut first, and the arc is searched again at each; the plan that
+ * covers least stands, and a cut only wins by covering LESS than the plan before it. A cut word is a visual
+ * truncation only: the button's name is still the whole word.
  *
  * The arc's centre, which is the FAB, is read off the points themselves (the circle through the first, middle
  * and last), so the radial needs no FAB rect: `points` is all it is given.
@@ -189,15 +194,21 @@ export function planRadialLabels(
     count >= 3 ? circumcentre(points[0], points[Math.floor(count / 2)], points[count - 1]) : null;
   if (centre === null) return { sides: points.map(() => 'right'), textClip: null };
 
-  const whole = leastCovering(points, labels.map((entry) => estimateLabelWidth(entry.label, entry.shortcut)), centre, viewport);
-  if (whole.cost === 0) return { sides: whole.sides, textClip: null };
-  const cut = leastCovering(
-    points,
-    labels.map((entry) => estimateLabelWidth(entry.label, entry.shortcut, CLIPPED_TEXT_PX)),
-    centre,
-    viewport,
-  );
-  return cut.cost < whole.cost ? { sides: cut.sides, textClip: CLIPPED_TEXT_PX } : { sides: whole.sides, textClip: null };
+  let best: RadialLabelPlan & { cost: number } = {
+    ...leastCovering(points, labels.map((entry) => estimateLabelWidth(entry.label, entry.shortcut)), centre, viewport),
+    textClip: null,
+  };
+  for (const textClip of CLIPPED_TEXT_STEPS_PX) {
+    if (best.cost === 0) break;
+    const cut = leastCovering(
+      points,
+      labels.map((entry) => estimateLabelWidth(entry.label, entry.shortcut, textClip)),
+      centre,
+      viewport,
+    );
+    if (cut.cost < best.cost) best = { ...cut, textClip };
+  }
+  return { sides: best.sides, textClip: best.textClip };
 }
 
 /**

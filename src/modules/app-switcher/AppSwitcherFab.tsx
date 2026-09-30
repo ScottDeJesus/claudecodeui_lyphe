@@ -1,11 +1,19 @@
-import { useEffect, useLayoutEffect, useRef } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { AppDrawer } from '@/modules/app-switcher/AppDrawer';
 import { AppSwitcherRadial } from '@/modules/app-switcher/AppSwitcherRadial';
 import { useAppSwitcher } from '@/modules/app-switcher/context/AppSwitcherContext';
+import { useSwitcherActions } from '@/modules/app-switcher/hooks/useSwitcherActions';
+import { radialLayout } from '@/modules/app-switcher/utils/radialLayout';
+import type { ChatDoor } from '@/shared/types';
 import { AppLogo, DockableFab } from '@/shared/ui';
 import type { DockableFabPosition } from '@/shared/ui';
+
+/** The same box: the kit reports a fresh `DOMRect` per placement, and only a moved or resized one is news. */
+function sameRect(a: DOMRect, b: DOMRect): boolean {
+  return a.left === b.left && a.top === b.top && a.width === b.width && a.height === b.height;
+}
 
 /**
  * The switcher's one control on screen: the kit's DockableFab, the radial that fans out from it, and the
@@ -18,17 +26,43 @@ import type { DockableFabPosition } from '@/shared/ui';
  * its parent: the FAB is one node for its whole life (DockableFab.tsx), and a radial drawn inside it would
  * unmount it — and the pointer capture of a drag — whenever the radial changed.
  *
- * The radial is mounted closed and the press still opens the drawer: the press moves to the radial in the
- * change that fills these markers in, together with the Applications act that reaches the drawer from it.
+ * A TAP COLLAPSES A FLOATING CHAT, or else opens the radial of five acts (`useSwitcherActions`); a second tap
+ * closes it. The drawer is one of the five — Applications — so it stays reachable from the FAB at every moment,
+ * and the FAB reads as pressed while either the radial or the drawer is up. The radial closes when a drag
+ * starts (the button is about to move out from under its arc) and when the chat starts floating (the reader's
+ * attention has moved to the chat, and its Chat act has become Collapse). The label says what a tap will do,
+ * and while a reply waits out of sight the dot shows and the label says so.
  *
- * `onAnchorChange` is how the floating chat knows where to stand: the kit reports the button's measured
- * rect after every placement and window resize, this passes each one on, and it reports `null` when the FAB
+ * `chatDoor` is the chat's one door, handed in by project-workspace, which alone knows which conversation an
+ * application brings; this module never imports the chat's host. `onAnchorChange` is how the floating chat
+ * knows where to stand: the kit reports the button's measured rect after every placement and window resize,
+ * this passes each one on (and keeps it to draw the radial's arc around), and it reports `null` when the FAB
  * unmounts so nothing keeps standing beside a button that is gone. The owner wires it (project-workspace's
- * WorkspaceFrame hands chat-host's `reportAnchor`); this module never imports the chat's host.
+ * WorkspaceFrame hands chat-host's `reportAnchor`).
  */
-export function AppSwitcherFab({ onAnchorChange }: { onAnchorChange: (rect: DOMRect | null) => void }) {
+export function AppSwitcherFab({
+  chatDoor,
+  onAnchorChange,
+}: {
+  chatDoor: ChatDoor;
+  onAnchorChange: (rect: DOMRect | null) => void;
+}) {
   const { t } = useTranslation();
-  const { fabPosition, dockRect, drawerOpen, setDrawerOpen, moveFab } = useAppSwitcher();
+  const { fabPosition, dockRect, drawerOpen, moveFab } = useAppSwitcher();
+  const acts = useSwitcherActions(chatDoor);
+
+  // How the radial is open, or null while it is closed. State because only the FAB draws the radial, and the
+  // FAB's tap, its drag and the chat's float are what open and close it. The input that opened it is kept in
+  // the same value as the open flag: a keyboard open moves focus into the arc, a pointer open leaves it be.
+  const [radialOpenedBy, setRadialOpenedBy] = useState<'pointer' | 'keyboard' | null>(null);
+  // The chat starting to float puts the radial away: a radial left open would go on offering "Chat" for a
+  // chat that is already out. Dropped in the render that finds the chat floating, so no frame draws both.
+  if (chatDoor.floating && radialOpenedBy !== null) setRadialOpenedBy(null);
+  const radialOpen = radialOpenedBy !== null && !chatDoor.floating;
+
+  // The FAB's rect as the kit last measured it. State because the radial's arc is drawn around it and must
+  // follow it (a resize, or the docked FAB's row moving); the same rect goes to the chat's host.
+  const [fabRect, setFabRect] = useState<DOMRect | null>(null);
 
   // The latest `onAnchorChange`, so the report on unmount reaches the owner's current function whatever
   // the owner passed the render before. The kit re-reports only when a placement input changes, so an
@@ -39,9 +73,30 @@ export function AppSwitcherFab({ onAnchorChange }: { onAnchorChange: (rect: DOMR
   });
   useEffect(() => () => anchorListener.current(null), []);
 
-  // A press that never became a drag, or Enter/Space. It toggles, so the FAB closes what it opened.
-  function handlePress() {
-    setDrawerOpen(!drawerOpen);
+  // Read at the render, as the radial reads them: the arc is fitted to the viewport as it is now.
+  const viewportWidth = window.innerWidth;
+  const viewportHeight = window.innerHeight;
+  const actCount = acts.length;
+  // Worked out whether the radial is open or not: a close is drawn, so the items keep their points through
+  // the fade. Empty until the kit has measured the FAB once.
+  const points = useMemo(
+    () => (fabRect === null ? [] : radialLayout(fabRect, { width: viewportWidth, height: viewportHeight }, actCount)),
+    [fabRect, viewportWidth, viewportHeight, actCount],
+  );
+
+  function handleRectChange(rect: DOMRect) {
+    setFabRect((previous) => (previous !== null && sameRect(previous, rect) ? previous : rect));
+    onAnchorChange(rect);
+  }
+
+  // A press that never became a drag, or Enter/Space. A floating chat is put away; otherwise the press
+  // toggles the radial, so the FAB closes what it opened.
+  function handlePress({ keyboard }: { keyboard: boolean }) {
+    if (chatDoor.floating) {
+      chatDoor.collapse();
+      return;
+    }
+    setRadialOpenedBy((current) => (current === null ? (keyboard ? 'keyboard' : 'pointer') : null));
   }
 
   // Exactly once per drag, at release: docked, or the clamped point where the reader let go.
@@ -49,29 +104,32 @@ export function AppSwitcherFab({ onAnchorChange }: { onAnchorChange: (rect: DOMR
     moveFab(next);
   }
 
+  // What a press will do, in words; the label is the tooltip too. The dot is aria-hidden, so what it means is
+  // said here, after what the press does.
+  const pressLabel = chatDoor.floating ? t('applications.fabLabelCollapse') : t('applications.fabLabelMenu');
+  const showsDot = chatDoor.unread && !chatDoor.floating;
+
   return (
     <>
       <DockableFab
-        // FILL: label — "collapse" while the chat floats, "the menu" otherwise
-        // The two branches read `applications.fabLabelCollapse` and `applications.fabLabelMenu`. While the dot
-        // shows, `applications.fabUnread` is appended to the label: the dot is aria-hidden, so the label is its
-        // only description, and the label is the tooltip too. `applications.fabLabel` goes when they land.
-        label={t('applications.fabLabel')}
+        label={showsDot ? `${pressLabel} — ${t('applications.fabUnread')}` : pressLabel}
         // The app's own logo is the switcher's face; the kit fills the circle with an image glyph.
         icon={<AppLogo size={64} />}
         position={fabPosition}
         dockRect={dockRect}
-        active={drawerOpen}
-        indicator={false /* FILL: chatDoor.unread && !chatDoor.floating */}
+        active={radialOpen || drawerOpen}
+        indicator={showsDot}
         onPress={handlePress}
+        onDragStart={() => setRadialOpenedBy(null)}
         onPositionChange={handlePositionChange}
-        onRectChange={onAnchorChange}
+        onRectChange={handleRectChange}
       />
       <AppSwitcherRadial
-        open={false /* FILL: radial-open */}
-        acts={[] /* FILL: acts — useSwitcherActions(chatDoor) */}
-        points={[] /* FILL: points — radialLayout(fabRect, viewport, acts.length) */}
-        onClose={() => { /* FILL: close */ }}
+        open={radialOpen}
+        openedByKeyboard={radialOpenedBy === 'keyboard'}
+        acts={acts}
+        points={points}
+        onClose={() => setRadialOpenedBy(null)}
       />
       <AppDrawer />
     </>

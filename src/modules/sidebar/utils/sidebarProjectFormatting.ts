@@ -8,6 +8,7 @@ import {
 } from '@/shared/sessionRecency';
 import type {
   Project,
+  ProjectSession,
   ProjectSortOrder,
   SessionWithProvider,
   SettingsProject,
@@ -38,7 +39,12 @@ export const formatCompactAge = (
   return hours < 24 ? `${hours}hr` : `${Math.floor(hours / 24)}d`;
 };
 
-const getSessionName = (session: SessionWithProvider, t: TFunction): string => {
+/**
+ * Used by the sidebar's rows (through `createSessionViewModel`) and by SidebarSessionPicker's trigger and list: the
+ * one rule for what a conversation is called — its summary, else its name, else "New Session". It reads only those
+ * two fields, so it takes any `ProjectSession`: the picker names the open conversation, which carries no provider tag.
+ */
+export const getSessionName = (session: ProjectSession, t: TFunction): string => {
   return session.summary || session.name || t('projects.newSession');
 };
 

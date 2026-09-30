@@ -24,16 +24,22 @@ const PAGE_SIZE = 20;
 const RELOAD_DEBOUNCE_MS = 500;
 
 /**
- * The paginated, server-tagged feed behind SidebarSimpleList: `api.recentConversations` called
- * with `simpleList: true`, which is the ONLY source that knows which sessions were started from
+ * The paginated, server-tagged feed behind SidebarSimpleList and SidebarSessionPicker: `api.recentConversations`
+ * called with `simpleList: true`, which is the ONLY source that knows which sessions were started from
  * this view — the tree's `projects[].sessions` arrays never carry the tag.
+ *
+ * `enabled` is false for a caller that mounts this hook in a view where the feed is not the list on
+ * screen (the picker, in the project tree's shape): no page is fetched, no websocket subscription is
+ * held, and the open-chat reload stays quiet. Turning it on fetches the first page, turning it off
+ * lets go of the subscription. The sidebar's list is only ever mounted with the feed on, so it
+ * takes the default.
  *
  * The pager idiom (request-sequence guard, append-time dedupe by sessionId) mirrors
  * `useSidebarController.ts`'s `fetchRecentConversationsPage` on purpose: this hook is a second
  * copy of that seam until the controller is split, and the two are meant to stay recognisably
  * one shape.
  */
-export function useSimpleChatList(selectedSessionId: string | null): {
+export function useSimpleChatList(selectedSessionId: string | null, enabled = true): {
   rows: RecentConversationListItem[];
   total: number;
   hasMore: boolean;
@@ -109,15 +115,16 @@ export function useSimpleChatList(selectedSessionId: string | null): {
     [fetchPage],
   );
 
-  // The initial fetch.
+  // The initial fetch: on mount when enabled, or the moment it turns on. `fetchPage` is stable, so
+  // `enabled` is the only thing that ever re-runs this.
   useEffect(() => {
+    if (!enabled) return;
     void fetchPage(0, PAGE_SIZE, false);
-    // fetchPage is stable (empty deps); this is mount-only by design.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [enabled, fetchPage]);
 
   // A row in this feed may have just been created, retitled or bumped to the top.
   useEffect(() => {
+    if (!enabled) return;
     let timer: ReturnType<typeof setTimeout> | null = null;
     const unsubscribe = subscribe((event) => {
       if (event?.kind !== 'session_upserted') return;
@@ -131,19 +138,19 @@ export function useSimpleChatList(selectedSessionId: string | null): {
       if (timer) clearTimeout(timer);
       unsubscribe();
     };
-  }, [subscribe, reload]);
+  }, [enabled, subscribe, reload]);
 
   // The open chat may be one this page hasn't paged in yet. Reload at most once per id: if it
   // is still missing afterwards (a session outside this feed entirely), retrying on every
   // render would loop forever instead of settling.
   const attemptedForRef = useRef<string | null>(null);
   useEffect(() => {
-    if (!selectedSessionId) return;
+    if (!enabled || !selectedSessionId) return;
     if (rows.some((row) => row.sessionId === selectedSessionId)) return;
     if (attemptedForRef.current === selectedSessionId) return;
     attemptedForRef.current = selectedSessionId;
     void reload();
-  }, [selectedSessionId, rows, reload]);
+  }, [enabled, selectedSessionId, rows, reload]);
 
   // The optimistic write behind a rename and an icon pick: the row shows the change at once and
   // the server's own `session_upserted` refetch confirms it a moment later. Merging rather than

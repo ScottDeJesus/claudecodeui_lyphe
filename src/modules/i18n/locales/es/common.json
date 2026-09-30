@@ -393,7 +393,6 @@
     "exitFullscreen": "Salir de pantalla completa"
   },
   "applications": {
-    "fabLabel": "Aplicaciones",
     "fabLabelMenu": "Abrir el menú",
     "fabLabelCollapse": "Contraer el chat",
     "radialLabel": "Acciones rápidas",
