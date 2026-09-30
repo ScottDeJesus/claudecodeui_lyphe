@@ -1,11 +1,7 @@
 import { type CSSProperties, useEffect, useLayoutEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import {
-  labelTranslate,
-  planRadialLabels,
-  RADIAL_DISC_PX,
-} from '@/modules/app-switcher/utils/radialLabels';
+import { labelTranslate, planRadialLabels } from '@/modules/app-switcher/utils/radialLabels';
 import type { SwitcherAction } from '@/shared/types';
 import { OWNS_ESCAPE } from '@/shared/ui/overlayEscape';
 import { cn } from '@/shared/utils';
@@ -13,10 +9,12 @@ import { cn } from '@/shared/utils';
 type AppSwitcherRadialProps = {
   /** Whether the radial is up. The shell stays mounted through the close so the close can be drawn. */
   open: boolean;
-  /** The switcher's five acts, in the operator's order; one item each, at the point of the same index. */
+  /** The acts to draw, in the operator's order; one item each, at the point of the same index. The caller leaves out any act that cannot run. */
   acts: SwitcherAction[];
-  /** The item centres in viewport pixels, from `radialLayout`. */
+  /** The item centres in viewport pixels, from `radialLayout` for exactly these acts. */
   points: Array<{ x: number; y: number }>;
+  /** The FAB's centre, which the arc is drawn around; null until the kit has measured the FAB, when there are no points either. */
+  origin: { x: number; y: number } | null;
   /** Puts the radial away: after an act runs, on Escape, on a press outside. */
   onClose: () => void;
   /** Whether this open came from the keyboard (the FAB pressed with no pointer behind it): the first item then takes focus. */
@@ -33,8 +31,8 @@ const FEEDBACK_MS = 150;
 const FAB_SELECTOR = '.vv-fab';
 
 /**
- * The disc: a target sized by `RADIAL_DISC_PX`, with the house's border and lift; the ground and ink come per
- * state below. The transitioned properties are listed in ONE order, and `itemTiming` writes a duration and a
+ * The disc: the kit's `vv-fab-disc` (the FAB's own size, glyph size and 44px catch, all from `--vv-fab-size`
+ * in surfaces.css), with the house's border and lift; the ground and ink come per state below. The transitioned properties are listed in ONE order, and `itemTiming` writes a duration and a
  * delay for each in that order: opacity, scale, transform, background-color, visibility. The entry and the exit
  * are `opacity` and the individual `scale` property; a press is the `transform` (Tailwind's `active:scale-95`)
  * and a hover the background colour — separate properties, so the bloom's stagger can delay the first pair and
@@ -42,9 +40,9 @@ const FAB_SELECTOR = '.vv-fab';
  * inline below is moot there.
  */
 const DISC =
-  'absolute -translate-x-1/2 -translate-y-1/2 pointer-events-auto flex touch-manipulation items-center justify-center rounded-full border ' +
+  'vv-fab-disc absolute -translate-x-1/2 -translate-y-1/2 pointer-events-auto flex touch-manipulation items-center justify-center rounded-full border ' +
   'transition-[opacity,scale,transform,background-color,visibility] ease-enter motion-reduce:transition-none ' +
-  'active:scale-95 [&_svg]:pointer-events-none [&_svg]:size-5 [&_svg]:shrink-0';
+  'active:scale-95 [&_svg]:pointer-events-none [&_svg]:shrink-0';
 
 /**
  * The timing of one item's transitions, for the order `DISC` lists them in.
@@ -71,16 +69,15 @@ function keyShortcutsOf(shortcut: string): string {
 }
 
 /**
- * Used by this module's AppSwitcherFab: the switcher's five acts drawn on an arc around the FAB, each a
- * disc with an icon and a label beside it, so the reader sees what a press will do before making it.
+ * Used by this module's AppSwitcherFab: the switcher's acts that can run drawn on an arc around the FAB, each a
+ * disc the size of the FAB with an icon and a label beside it, so the reader sees what a press will do before
+ * making it.
  *
  * READING THE ARC. Chat is the first act and the one the reader most often wants, so it is the one disc
- * with a colour (the accent wash and ink); the four beside it are surface discs. An act that cannot run
- * (Reload, Close and Open in a new tab while no application is up) stays where it is, drawn as a dashed
- * ring on the canvas ground with faint ink — opaque, so what it floats over never shows through it: the
- * arc never changes shape under the reader's hand, and the reason a press does nothing is visible before
- * they try it. It keeps `aria-disabled` rather than `disabled`, so a screen
- * reader and the arrow keys still reach it and can hear that it is unavailable.
+ * with a colour (the accent wash and ink); the others are surface discs. An act that cannot run (Reload,
+ * Close and Open in a new tab while no application is up) is not drawn at all: the caller hands in only the
+ * acts that can, and lays the arc out for exactly those, so the two acts of an empty workspace sit together
+ * beside the FAB and the five of a workspace with an application up spread over the whole arc.
  *
  * THE LABEL IS A PILL ON THE SURFACE GROUND, not bare text: the radial floats over an application of any
  * colour, and only an opaque ground holds the ink's contrast on all of them. Which side of its disc a
@@ -100,8 +97,8 @@ function keyShortcutsOf(shortcut: string): string {
  * off the hit test — because a panel's claim on the Escape key is honest only for as long as it is up.
  *
  * KEYBOARD AND DISMISSAL. Enter or Space on the FAB opens the radial with the first item focused
- * (`openedByKeyboard`, which the FAB reads off the press); the arrow keys move between the enabled items,
- * wrapping — a greyed act is skipped — and Enter and Space are the focused item's own click. Escape, a press
+ * (`openedByKeyboard`, which the FAB reads off the press); the arrow keys move between the items,
+ * wrapping, and Enter and Space are the focused item's own click. Escape, a press
  * outside the arc and the FAB, and focus moving into an application's frame each put it away (the effect
  * below says why each is bound where it is), and Escape gives focus back to the FAB. While open the shell
  * carries `OWNS_ESCAPE`, so a dialog under it stands down and ChatInterface's Escape, which stops a running
@@ -115,7 +112,7 @@ function keyShortcutsOf(shortcut: string): string {
  */
 export function AppSwitcherRadial(props: AppSwitcherRadialProps) {
   const { t } = useTranslation();
-  const { open, acts, points } = props;
+  const { open, acts, points, origin } = props;
   const { onClose, openedByKeyboard = false } = props;
   // The shell, for the arrow keys (they find the items by role, never by per-item refs) and for the outside press.
   const container = useRef<HTMLDivElement>(null);
@@ -173,18 +170,21 @@ export function AppSwitcherRadial(props: AppSwitcherRadialProps) {
 
   // Read at the moment of drawing, and only while open: the FAB reads the same two numbers to make `points`,
   // and the labels are kept off the viewport's walls by them. The chip is not drawn under a coarse pointer (the
-  // same media query hides it in the class below), so it takes no room in the plan either.
+  // same media query hides it in the class below), so it takes no room in the plan either. Without an origin
+  // the FAB is unmeasured and there are no points to hang a label on.
   const viewport = open
     ? { width: window.innerWidth, height: window.innerHeight }
     : { width: 0, height: 0 };
   const keyboardless = open && window.matchMedia('(pointer: coarse)').matches;
-  const plan = open
-    ? planRadialLabels(
-        points,
-        acts.map((act) => ({ label: act.label, shortcut: keyboardless ? null : act.shortcut })),
-        viewport,
-      )
-    : null;
+  const plan =
+    open && origin !== null
+      ? planRadialLabels(
+          points,
+          acts.map((act) => ({ label: act.label, shortcut: keyboardless ? null : act.shortcut })),
+          viewport,
+          origin,
+        )
+      : null;
   const sides = plan?.sides ?? [];
   const textClip = plan?.textClip ?? null;
 
@@ -194,9 +194,8 @@ export function AppSwitcherRadial(props: AppSwitcherRadialProps) {
       // A closed radial exposes nothing: not a menu, not a name, not a claim on Escape.
       {...(open ? { role: 'menu', 'aria-label': t('applications.radialLabel') } : { 'aria-hidden': true })}
       ref={container}
-      // Arrows move between the ENABLED items and wrap; Enter and Space are the focused item's own click,
-      // which the item's handler runs. A greyed item is skipped by the arrows so focus never rests on an act
-      // that would do nothing. Tab leaves the menu, so the radial closes rather than stay up with focus gone.
+      // Arrows move between the items and wrap; Enter and Space are the focused item's own click, which the
+      // item's handler runs. Tab leaves the menu, so the radial closes rather than stay up with focus gone.
       onKeyDown={(event) => {
         if ((event.key === 'Enter' || event.key === ' ') && event.repeat) {
           // A held Enter would press the focused item again and again, and the first item is the Chat toggle.
@@ -212,12 +211,11 @@ export function AppSwitcherRadial(props: AppSwitcherRadialProps) {
         if (!forward && !backward) return;
         event.preventDefault();
         const items = Array.from(event.currentTarget.querySelectorAll<HTMLElement>('[role="menuitem"]'));
-        const enabled = items.filter((item) => item.getAttribute('aria-disabled') !== 'true');
-        if (enabled.length === 0) return;
-        const at = enabled.indexOf(document.activeElement as HTMLElement);
-        // Focus not on an enabled item (on the FAB, or on a greyed one): forward starts at the first, backward at the last.
-        const next = at === -1 ? (forward ? 0 : enabled.length - 1) : (at + (forward ? 1 : -1) + enabled.length) % enabled.length;
-        enabled[next]?.focus();
+        if (items.length === 0) return;
+        const at = items.indexOf(document.activeElement as HTMLElement);
+        // Focus not on an item (it is on the FAB): forward starts at the first, backward at the last.
+        const next = at === -1 ? (forward ? 0 : items.length - 1) : (at + (forward ? 1 : -1) + items.length) % items.length;
+        items[next]?.focus();
       }}
       {...(open ? OWNS_ESCAPE : null)}
       className="pointer-events-none fixed inset-0 z-[60]"
@@ -226,7 +224,7 @@ export function AppSwitcherRadial(props: AppSwitcherRadialProps) {
         const point = points[index];
         if (!point) return null;
         const Icon = act.icon;
-        const primary = act.key === 'chat' && !act.disabled;
+        const primary = act.key === 'chat';
         return (
           <button
             key={act.key}
@@ -234,15 +232,12 @@ export function AppSwitcherRadial(props: AppSwitcherRadialProps) {
             role="menuitem"
             // Focus is moved by the menu, never by Tab: one Tab stop for the FAB, arrows inside the radial.
             tabIndex={-1}
-            aria-disabled={act.disabled}
             aria-keyshortcuts={act.shortcut === null ? undefined : keyShortcutsOf(act.shortcut)}
             data-act={act.key}
-            // A press on a greyed act does nothing and says so with the cursor; it is still a press the
-            // handler below receives, so the run skips an act that `disabled` names.
             onClick={(event) => {
               // A radial that is closing still has hit-testable discs until the fade ends (`itemTiming` holds
               // `visibility`), so a second click inside the fade would run Reload or Open in a new tab twice.
-              if (!open || act.disabled) return;
+              if (!open) return;
               act.run();
               onClose();
               // A keyboard press (no pointer behind the click) gives the FAB its focus back: the item is about to
@@ -253,17 +248,13 @@ export function AppSwitcherRadial(props: AppSwitcherRadialProps) {
               'group',
               DISC,
               open ? 'visible opacity-100 [scale:1]' : 'invisible opacity-0 [scale:0.5]',
-              act.disabled
-                ? 'cursor-not-allowed border-dashed border-input bg-background text-ink-faint'
-                : primary
-                  ? 'border-[var(--accent)] bg-[var(--accent-soft)] text-accent-ink shadow-[var(--shadow-hover)] [@media(hover:hover)]:hover:bg-[var(--accent-soft-hover)]'
-                  : 'border-input bg-card text-foreground shadow-[var(--shadow-hover)] [@media(hover:hover)]:hover:bg-secondary',
+              primary
+                ? 'border-[var(--accent)] bg-[var(--accent-soft)] text-accent-ink shadow-[var(--shadow-hover)] [@media(hover:hover)]:hover:bg-[var(--accent-soft-hover)]'
+                : 'border-input bg-card text-foreground shadow-[var(--shadow-hover)] [@media(hover:hover)]:hover:bg-secondary',
             )}
             style={{
               left: point.x,
               top: point.y,
-              width: RADIAL_DISC_PX,
-              height: RADIAL_DISC_PX,
               ...itemTiming(open, index),
             }}
           >
@@ -273,11 +264,8 @@ export function AppSwitcherRadial(props: AppSwitcherRadialProps) {
               className={cn(
                 'absolute left-1/2 top-1/2 flex items-center gap-1.5 whitespace-nowrap rounded-full border px-2 py-1 text-xs font-medium leading-4',
                 'transition-colors duration-200 motion-reduce:transition-none',
-                act.disabled
-                  ? 'border-dashed border-input bg-card text-ink-faint'
-                  : 'border-input bg-card text-foreground shadow-[var(--shadow-rest)]',
-                !act.disabled &&
-                  'group-focus-visible:border-[var(--accent)] group-focus-visible:bg-[var(--accent-soft)] [@media(hover:hover)]:group-hover:border-[var(--accent)]',
+                'border-input bg-card text-foreground shadow-[var(--shadow-rest)]',
+                'group-focus-visible:border-[var(--accent)] group-focus-visible:bg-[var(--accent-soft)] [@media(hover:hover)]:group-hover:border-[var(--accent)]',
               )}
               style={{ transform: labelTranslate(sides[index] ?? 'right', point) }}
             >

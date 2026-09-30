@@ -1,13 +1,8 @@
+import { FAB_CATCH_PX, FAB_SIZE_PX } from '@/shared/constants';
+
 type Point = { x: number; y: number };
 type Size = { width: number; height: number };
 type Box = { left: number; top: number; right: number; bottom: number };
-
-/**
- * The drawn disc's width and height. The layout's own `RADIAL_ITEM_PX` (72px) is the room an item is given, the
- * disc and the air around it, which is what keeps neighbours apart in a tight corner; the disc is what stands
- * in that room, and 48px is over the 44px a finger needs. Used by AppSwitcherRadial, which sizes each disc to it.
- */
-export const RADIAL_DISC_PX = 48;
 
 /** Which side of its disc an item's label is drawn on. */
 export type RadialLabelSide = 'right' | 'left' | 'above' | 'below';
@@ -28,8 +23,6 @@ const LATIN_CHAR_PX = 6.4;
 const WIDE_CHAR_PX = 12;
 /** The shortcut chip beside a label: its own padding and border, and the gap that separates it from the word. */
 const SHORTCUT_EXTRA_PX = 18;
-/** The FAB's catch: a press within 22px of its centre is the FAB's, and a label standing there would be pressed instead. */
-const FAB_CATCH_PX = 44;
 /**
  * The most a label's WORD may draw when the room is too short for the whole word, tried in this order: a first
  * cut that keeps most short words whole, then a harder one for the corner where even that meets a neighbour.
@@ -56,22 +49,9 @@ export function estimateLabelWidth(label: string, shortcut: string | null, textC
   return Math.ceil(Math.min(text, textClip) + chip + LABEL_PADDING_PX);
 }
 
-/** The circle through three points: the arc's centre, which is the FAB. Null for three points in a line. */
-function circumcentre(a: Point, b: Point, c: Point): Point | null {
-  const d = 2 * (a.x * (b.y - c.y) + b.x * (c.y - a.y) + c.x * (a.y - b.y));
-  if (Math.abs(d) < 1e-6) return null;
-  const sa = a.x ** 2 + a.y ** 2;
-  const sb = b.x ** 2 + b.y ** 2;
-  const sc = c.x ** 2 + c.y ** 2;
-  return {
-    x: (sa * (b.y - c.y) + sb * (c.y - a.y) + sc * (a.y - b.y)) / d,
-    y: (sa * (c.x - b.x) + sb * (a.x - c.x) + sc * (b.x - a.x)) / d,
-  };
-}
-
 /** The label pill's box on one side of a disc, held inside the viewport the way the drawn pill is (see `labelTranslate`). */
 function labelBox(at: Point, width: number, side: RadialLabelSide, viewport: Size): Box {
-  const reach = RADIAL_DISC_PX / 2 + LABEL_GAP_PX;
+  const reach = FAB_SIZE_PX / 2 + LABEL_GAP_PX;
   let left = at.x - width / 2;
   let top = at.y - LABEL_HEIGHT_PX / 2;
   if (side === 'right') left = at.x + reach;
@@ -84,7 +64,7 @@ function labelBox(at: Point, width: number, side: RadialLabelSide, viewport: Siz
 }
 
 function discBox(at: Point): Box {
-  const half = RADIAL_DISC_PX / 2;
+  const half = FAB_SIZE_PX / 2;
   return { left: at.x - half, top: at.y - half, right: at.x + half, bottom: at.y + half };
 }
 
@@ -112,7 +92,8 @@ function preferredSides(point: Point, centre: Point): RadialLabelSide[] {
  * The assignment of a side to every item that covers the least, and how much it covers.
  *
  * Every candidate label is measured against everything it must stay off — every disc (its own too: a label
- * clamped against a wall can be pushed back over its disc), the FAB's catch, and the labels already placed —
+ * clamped against a wall can be pushed back over its disc), the FAB's catch (a press within `FAB_CATCH_PX` / 2
+ * of its centre is the FAB's, so a label standing there would be pressed instead), and the labels already placed —
  * with `LABEL_CLEARANCE_PX` of margin, and its cost is the area it covers. The search is depth-first in
  * preference order and stops at the first assignment that covers nothing, so items early in the arc keep their
  * outward side and a later item with none left makes an earlier one give way; a greedy pass in arc order
@@ -175,25 +156,21 @@ export type RadialLabelPlan = {
  * Where each item's label goes. Used by AppSwitcherRadial.
  *
  * The whole words first: each label on its outward side where it can stand clear of the discs, the FAB and
- * the other labels (`leastCovering`). Where they cannot all stand clear — a phone's corner, the longest
- * label the radial draws ("Collapse chat" and its chip, 158px), a language with long words — the words are
- * cut to `CLIPPED_TEXT_STEPS_PX`, the gentler cut first, and the arc is searched again at each; the plan that
- * covers least stands, and a cut only wins by covering LESS than the plan before it. A cut word is a visual
- * truncation only: the button's name is still the whole word.
+ * the other labels (`leastCovering`). Where they cannot all stand clear — a phone's corner, a language with
+ * long words — the words are cut to `CLIPPED_TEXT_STEPS_PX`, the gentler cut first, and the arc is searched
+ * again at each; the plan that covers least stands, and a cut only wins by covering LESS than the plan
+ * before it. A cut word is a visual truncation only: the button's name is still the whole word.
  *
- * The arc's centre, which is the FAB, is read off the points themselves (the circle through the first, middle
- * and last), so the radial needs no FAB rect: `points` is all it is given.
+ * `centre` is the arc's centre, the FAB's own: "outward" is away from it, and it is what a label keeps clear
+ * of. It is handed in and never worked out from the points, which fix a circle only from three of them up
+ * and stand off it wherever a wall has moved a centre.
  */
 export function planRadialLabels(
   points: Point[],
   labels: Array<{ label: string; shortcut: string | null }>,
   viewport: Size,
+  centre: Point,
 ): RadialLabelPlan {
-  const count = points.length;
-  const centre =
-    count >= 3 ? circumcentre(points[0], points[Math.floor(count / 2)], points[count - 1]) : null;
-  if (centre === null) return { sides: points.map(() => 'right'), textClip: null };
-
   let best: RadialLabelPlan & { cost: number } = {
     ...leastCovering(points, labels.map((entry) => estimateLabelWidth(entry.label, entry.shortcut)), centre, viewport),
     textClip: null,
@@ -216,13 +193,13 @@ export function planRadialLabels(
  *
  * The pill is absolutely positioned at its disc's centre, so the translate is measured from there, and
  * `%` in a translate is the pill's own size — which is how one string places a pill whose width nobody
- * measured. `clamp()` then holds it inside the viewport: the disc's centre stands 44px from a wall, so a
- * pill centred on it (above or below) would run off the screen for any pill wider than 88px. The centre
- * is the disc's own viewport point, so the wall is `100vw - x` away and the clamp is exact with no
- * measurement and no resize listener.
+ * measured. `clamp()` then holds it inside the viewport: a disc's centre stands only a few tens of pixels
+ * from a wall, so a pill centred on it (above or below) would run off the screen for any pill wider than
+ * twice that. The centre is the disc's own viewport point, so the wall is `100vw - x` away and the clamp is
+ * exact with no measurement and no resize listener.
  */
 export function labelTranslate(side: RadialLabelSide, at: Point): string {
-  const reach = RADIAL_DISC_PX / 2 + LABEL_GAP_PX;
+  const reach = FAB_SIZE_PX / 2 + LABEL_GAP_PX;
   const across = (preferred: string) =>
     `clamp(${LABEL_EDGE_PX - at.x}px, ${preferred}, calc(100vw - ${LABEL_EDGE_PX + at.x}px - 100%))`;
   const down = (preferred: string) =>

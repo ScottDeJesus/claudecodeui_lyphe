@@ -2159,3 +2159,20 @@ measured 2026-09-30 by chain chain-app-drawer-chat--whole-20260930-040206-0899, 
 probe-key: 081f20c7642fd50a5f29f72f8e615e48aea6120e
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/whole-check-inpage-legs.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/whole-check-kit.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/whole-check-window-legs.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/simple-list-deep-link.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/whole-check.mjs
+
+## INV-6057 — radial at 100px on a narrow phone — five items near the screen's centre put a label on another item's disc
+
+`RADIAL_RADIUS_PX` (100) and `RADIAL_STEP_DEG` (34°) were measured over 1440×900 and 390×844 only. Narrower phones are unmeasured, and five items with the FAB near the screen's centre fail there.
+
+| viewport | five items, FAB positions that put a label on another item's disc or the FAB's catch (2026-09-30) |
+| --- | --- |
+| 336×746 (the operator's 360×800 phone read as a 1.072 zoom; inferred, not read off the device) | 90 of 51,744 at a 2px step; x 150–186, y 354–392 |
+| 320×568 | 182 in a 29×29 window round the centre; x 134–186, y 254–314 |
+| 360×800 | 10; x 174–186, y 396–404 |
+
+- Two items: clean everywhere swept.
+- Cause: near the centre "faces the viewport's centre" has no open side, the arc lands sideways, and about 68px is left between the FAB and the wall for a label.
+- A larger radius clears it and brings the reach back up (170px cut every word instead, 2026-09-30).
+- Before changing `RADIAL_RADIUS_PX` or `RADIAL_STEP_DEG`, re-measure at 336×746 and 320×568 as well as the two measured viewports. Sweep tooling is not saved in `.verify/`.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/utils/radialLabels.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/utils/radialLayout.ts

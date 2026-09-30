@@ -15,8 +15,8 @@ import { formatShortcut } from '@/shared/utils';
  * written twice.
  *
  * Chat and Applications are always available. Reload, Close and Open in a new tab are about the
- * application in FRONT (`frontSide`'s pane) and are disabled while none is up, so a reader who has
- * the workspace showing sees the same five items greyed rather than a shorter list.
+ * application in FRONT (`frontSide`'s pane) and are `disabled` while none is up. The palette keeps them in
+ * place, greyed; the radial leaves a `disabled` act out and draws the rest.
  *
  * Exported through the module's barrel for project-workspace's command palette; the FAB and the
  * radial, inside the module, call it too. `chatDoor` comes from the caller because only the

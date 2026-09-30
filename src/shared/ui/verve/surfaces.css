@@ -12,9 +12,9 @@
  * board.css, so where it loads between them decides nothing.
  *
  * ONE departure from "the className carries size": the FAB's size is a custom property,
- * `--vv-fab-size`, because two things read it — the box, and the inline `clamp()` that keeps a
- * stored point on screen (DockableFab.tsx). Spelt as a Tailwind class it would be two spellings
- * of one number, and they would drift.
+ * `--vv-fab-size`, because three things read it — the box, the inline `clamp()` that keeps a
+ * stored point on screen (DockableFab.tsx), and the switcher's radial discs (`.vv-fab-disc`).
+ * Spelt as a Tailwind class it would be several spellings of one number, and they would drift.
  *
  * Imported once, for side effect, from src/shared/ui/index.ts — after feedback.css and before
  * board.css, which keeps the last word.
@@ -62,17 +62,23 @@
  *
  * The seventh is a sibling more than a neighbour: the switcher's radial (AppSwitcherRadial.tsx), a
  * `fixed inset-0` layer in this same container at `z-[60]`, THIS FAB'S OWN LEVEL, and later in the tree so
- * it draws over the FAB it opened from (its items stand 170px off, so they never overlap it). It has to be
+ * it draws over the FAB it opened from (its items stand clear of the FAB's catch, so they never overlap it). It has to be
  * at 60 and not below: an act drawn under the application it acts on, or under the floating chat's panel
  * (`z-[45]`, ChatHostPanel.tsx), could not be pressed. It is `pointer-events: none` between its items, so
  * the FAB, the panel and the application stay live around it. Dialogs and menus portal to body and stay
  * above it. */
-.vv-fab {
-  /* 28px drawn, at every width, docked or floating — the size the design draws
-   * it. It is a way in and out, never the screen's subject, so it stays the
-   * smallest thing in the rail beside the wordmark; the 44px catch below is what a finger needs. */
+/* THE FAB'S SIZE, ONE SOURCE. 28px drawn, at every width, docked or floating — the size the design
+ * draws it. It is a way in and out, never the screen's subject, so it stays the smallest thing in the
+ * rail beside the wordmark; the 44px catch is what a finger needs. The radial's discs stand at the
+ * FAB's own size and keep its catch, so they read these same three numbers instead of restating them
+ * (FAB_SIZE_PX and FAB_CATCH_PX in shared/constants.ts are the JS twins). */
+.vv-fab,
+.vv-fab-disc {
   --vv-fab-size: 28px;
   --vv-fab-glyph: 12px;
+  --vv-fab-catch: 44px;
+}
+.vv-fab {
   /* Elevation as a property, so the docked, hover and active rules below change one rung
    * without restating each other's shadows. Floating it is the scale's second rung. */
   --vv-fab-elev: var(--shadow-hover);
@@ -105,14 +111,23 @@
  * DockableFab's grab offset, viewport clamp and dock-snap centre (all read off that live rect)
  * keep measuring the circle the reader sees. Round, so the corners of a 44px square never steal
  * a press meant for the rail beside it: docked, the catch reaches 8px past the box — exactly the
- * `gap-2` between the dock slot and the wordmark. */
-.vv-fab::before {
+ * `gap-2` between the dock slot and the wordmark. A radial disc keeps the very same catch. */
+.vv-fab::before,
+.vv-fab-disc::before {
   content: '';
   position: absolute;
   /* Less 1px: an absolute child is placed against the PADDING box, inside the 1px border above. */
-  inset: calc((var(--vv-fab-size) - 44px) / 2 - 1px);
+  inset: calc((var(--vv-fab-size) - var(--vv-fab-catch)) / 2 - 1px);
   border-radius: var(--radius-pill);
 }
+/* A radial disc (AppSwitcherRadial.tsx): the FAB's own circle, so the arc it opens reads as more of the
+ * same button and not as a second, larger control. The caller draws the border, ground, ink and position;
+ * this is the size and the glyph's size. Its icons are svg, so the glyph rule is the FAB's. */
+.vv-fab-disc {
+  width: var(--vv-fab-size);
+  height: var(--vv-fab-size);
+}
+.vv-fab-disc > svg { width: var(--vv-fab-glyph); height: var(--vv-fab-glyph); }
 /* Docked it keeps the same 28px — the rail's other controls are 30px, and the design's button was
  * 28px everywhere — and its shadow drops to the resting rung, so it reads as a control of the rail
  * and not an object floating over it. The class still names the state: the probe and the drag read

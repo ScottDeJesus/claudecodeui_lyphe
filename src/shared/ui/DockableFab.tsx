@@ -9,6 +9,7 @@ import {
   useState,
 } from 'react';
 
+import { FAB_SIZE_PX } from '@/shared/constants';
 import { usePointerDrag } from '@/shared/ui/usePointerDrag';
 import { cn } from '@/shared/utils';
 
@@ -34,10 +35,6 @@ const VIEWPORT_EDGE_PX = 8;
 
 /** How close a release must land to the dock's centre to be taken as a drop back into it. */
 const DOCK_SNAP_RADIUS_PX = 64;
-
-/** The FAB's drawn size (`--vv-fab-size` in surfaces.css), for the clamp on a node whose own box
- *  cannot be measured yet. The 44px catch around it is a pseudo-element and never part of the box. */
-const FAB_SIZE_PX = 28;
 
 /**
  * How far in from one side of the viewport the FAB may sit: the side's safe-area inset plus the edge

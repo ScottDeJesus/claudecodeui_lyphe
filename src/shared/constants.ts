@@ -321,3 +321,28 @@ export const LANE_WALL_GRID = `grid grid-cols-[repeat(auto-fill,minmax(min(100%,
  * (the hotkey itself); one value, so what is printed is what is heard.
  */
 export const CHAT_TOGGLE_KEY = '.';
+
+// ---------------------------
+
+//----------------- FLOATING ACTION BUTTON ------------
+
+/**
+ * The FAB's drawn width and height, the JS twin of `--vv-fab-size` in the kit's surfaces.css: the size the
+ * kit clamps a FAB it cannot measure yet to, the size the switcher's radial draws each disc and works out
+ * its label geometry from, and the size the floating chat's rest anchor stands as. The stylesheet's variable
+ * is what draws; keep the two equal (the radial's proof measures a disc against the FAB itself).
+ *
+ * Used by the DockableFab kit piece, the app-switcher module's radial layout and labels, and the chat-host
+ * module's floating panel.
+ */
+export const FAB_SIZE_PX = 28;
+
+/**
+ * How wide the FAB's catch is: a transparent round area centred on the button, so a press up to half of this
+ * from its centre is the FAB's while its drawn box stays `FAB_SIZE_PX`. Every radial disc keeps the same
+ * catch, so a finger lands on either. The JS twin of `--vv-fab-catch` in surfaces.css.
+ *
+ * Used by the app-switcher module's radial layout (the room an item is given) and label plan (what a label
+ * keeps clear of).
+ */
+export const FAB_CATCH_PX = 44;

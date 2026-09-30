@@ -1049,15 +1049,15 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/Fl
 
 ## MAN-7475 — app-switcher radial — AppSwitcherRadial, radialLabels and the fixture that photographs them
 
-The switcher's radial: five acts drawn on an arc around the FAB, each a disc with an icon and a label pill, and the plan that puts each label on a side of its disc. A FAB tap opens it; a press on an item runs its act and closes it. Arc geometry (`radialLayout`): MAN-491. The FAB's press, drag and dot: MAN-486. The unread rule behind the dot: MAN-7464. The proof that presses the live FAB: MAN-7481.
+The switcher's radial: the acts that can run drawn on an arc around the FAB, each a disc the size of the FAB with an icon and a label pill, and the plan that puts each label on a side of its disc. Nothing up: Chat and Applications, two items together beside the FAB. An application up: all five. An act whose `disabled` is true is not drawn. A FAB tap opens it; a press on an item runs its act and closes it. Arc geometry (`radialLayout`): MAN-491. The FAB's press, drag and dot: MAN-486. The unread rule behind the dot: MAN-7464. The proof that presses the live FAB: MAN-7481.
 
 ## Files
 
 | file | what |
 | --- | --- |
-| `AppSwitcherRadial.tsx` | `AppSwitcherRadial({ open, acts: SwitcherAction[], points: {x,y}[], onClose, openedByKeyboard?: boolean })` — `points[i]` is the centre of `acts[i]`; an act with no point draws nothing. `openedByKeyboard` (default false): the first item takes focus in the commit that opens it |
-| `utils/radialLabels.ts` | `RADIAL_DISC_PX` (48), `estimateLabelWidth(label, shortcut, textClip = Infinity)`, `planRadialLabels(points, labels, viewport)` → `RadialLabelPlan` (`{ sides, textClip }`), `labelTranslate(side, point)`, type `RadialLabelSide` (`right` \| `left` \| `above` \| `below`) |
-| `AppSwitcherFab.tsx` | mounts the radial as a sibling of `DockableFab`, never its parent: the FAB is one node for life, and a radial inside it would unmount it and the drag's pointer capture. Owns `radialOpenedBy: 'pointer' \| 'keyboard' \| null` (the input that opened it), `acts = useSwitcherActions(chatDoor)`, `points = radialLayout(fabRect, viewport, acts.length)` from the rect the kit reports, and `open = radialOpenedBy !== null && !chatDoor.floating` |
+| `AppSwitcherRadial.tsx` | `AppSwitcherRadial({ open, acts: SwitcherAction[], points: {x,y}[], origin: {x,y} | null, onClose, openedByKeyboard?: boolean })` — `acts` is what to draw (no `disabled` act); `points[i]` is the centre of `acts[i]`; an act with no point draws nothing; `origin` is the FAB's centre, which the label plan reads. `openedByKeyboard` (default false): the first item takes focus in the commit that opens it |
+| `utils/radialLabels.ts` | `estimateLabelWidth(label, shortcut, textClip = Infinity)`, `planRadialLabels(points, labels, viewport, centre)` → `RadialLabelPlan` (`{ sides, textClip }`), `labelTranslate(side, point)`, type `RadialLabelSide` (`right` \| `left` \| `above` \| `below`) |
+| `AppSwitcherFab.tsx` | mounts the radial as a sibling of `DockableFab`, never its parent: the FAB is one node for life, and a radial inside it would unmount it and the drag's pointer capture. Owns `radialOpenedBy: 'pointer' \| 'keyboard' \| null` (the input that opened it), `acts = useSwitcherActions(chatDoor)` less its `disabled` acts, `drawnActs` (those acts as last drawn while open; the close fades from them, so Close app, which takes the application down in the press that closes the radial, leaves the fading arc as it was), `points = radialLayout(fabRect, viewport, drawn count)` and `origin` from the rect the kit reports, and `open = radialOpenedBy !== null && !chatDoor.floating` |
 
 ## Open and close
 
@@ -1067,23 +1067,23 @@ The switcher's radial: five acts drawn on an arc around the FAB, each a disc wit
 4. Escape: window capture listener, `preventDefault()`, `OWNS_ESCAPE` spread while open, focus back to the FAB. why: ChatInterface's Escape stops a running turn and reads `defaultPrevented`; a running turn survives it.
 5. A `pointerdown` on the FAB is excluded from the outside press. why: the FAB's own press toggles; closing on the pointerdown lets the click reopen it. The radial finds the FAB with `FAB_SELECTOR = '.vv-fab'` (React 18 has no ref-as-prop; there is one FAB).
 6. Focus into a frame: window `blur` with `document.activeElement.tagName === 'IFRAME'`. why: a cross-origin frame never sends this page a `pointerdown`.
-7. Item `onClick`: `if (!open || act.disabled) return;`, then `act.run()`, `onClose()`; a keyboard click (`event.detail === 0`) gives the FAB its focus back. why `!open`: items stay hit-testable through the close fade (`visibility` waits `FADE_MS`), and a second click ran Reload and Open in a new tab twice. why FAB focus: the item is about to hide, and the drawer's close restores focus to what held it when it opened.
-8. Keyboard: items found with `querySelectorAll('[role="menuitem"]')` on the container ref, no per-item refs. ArrowDown/ArrowRight forward, ArrowUp/ArrowLeft back, over the enabled items only, wrapping; from focus off an item, forward starts at the first and back at the last. Enter and Space are the focused item's click; a repeat of either (`event.repeat`) is ignored. why: a held Enter on the first item toggled Chat over and over.
+7. Item `onClick`: `if (!open) return;`, then `act.run()`, `onClose()`; a keyboard click (`event.detail === 0`) gives the FAB its focus back. why `!open`: items stay hit-testable through the close fade (`visibility` waits `FADE_MS`), and a second click ran Reload and Open in a new tab twice. why FAB focus: the item is about to hide, and the drawer's close restores focus to what held it when it opened.
+8. Keyboard: items found with `querySelectorAll('[role="menuitem"]')` on the container ref, no per-item refs. ArrowDown/ArrowRight forward, ArrowUp/ArrowLeft back, over the drawn items, wrapping; from focus off an item, forward starts at the first and back at the last. Enter and Space are the focused item's click; a repeat of either (`event.repeat`) is ignored. why: a held Enter on the first item toggled Chat over and over.
 
 ## `AppSwitcherRadial` rules
 
 1. Shell: `div[data-app-switcher-radial=open|closed]`, `pointer-events-none fixed inset-0 z-[60]`. Items are `pointer-events-auto`, so the FAB, the chat panel and the application stay pressable between them.
 2. `z-[60]` is the FAB's own level, later in the tree: over the application layer (40) and the floating chat's panel (45); dialogs and menus portal above it. Seventh neighbour in the note above `.vv-fab` in `src/shared/ui/verve/surfaces.css`.
 3. Shell is ALWAYS mounted, so the close can animate. `role="menu"` and `aria-label` = `applications.radialLabel` are spread only while `open`; closed it carries `aria-hidden` and no role, name or Escape claim. `OWNS_ESCAPE` spreads the same way. why: a claim on Escape is honest only while the radial is up. Never mount and unmount the radial.
-4. Item: `button[role="menuitem"][data-act=<key>]`, `tabIndex={-1}` (one Tab stop for the FAB, arrows inside the radial), `RADIAL_DISC_PX` square, centred on its point. `aria-keyshortcuts` from `act.shortcut` (`Ctrl+` → `Control+`, `⌘` → `Meta+`).
-5. A greyed act (`act.disabled`) keeps `aria-disabled`, never `disabled`: the arrow keys and a screen reader still reach it. Look: dashed border, canvas ground, `text-ink-faint`, `cursor-not-allowed`, opaque. The click still fires and the item's `onClick` skips it.
+4. Item: `button[role="menuitem"][data-act=<key>]`, `tabIndex={-1}` (one Tab stop for the FAB, arrows inside the radial), class `vv-fab-disc` (surfaces.css): `--vv-fab-size` square, glyph `--vv-fab-glyph`, a 44px round `::before` catch like the FAB's (`--vv-fab-catch`); JS twins `FAB_SIZE_PX`, `FAB_CATCH_PX` in `shared/constants.ts`. Centred on its point. `aria-keyshortcuts` from `act.shortcut` (`Ctrl+` → `Control+`, `⌘` → `Meta+`).
+5. No greyed look: a `disabled` act is not handed to the radial, so there is no `aria-disabled`, dashed ring or `cursor-not-allowed`; the palette (MAN-7483) still greys it.
 6. Enabled acts are surface discs; `chat` (not disabled) is the one accent disc.
 7. Label: `span[data-radial-label=<side>]` INSIDE the button, so a press on either is the item's press and the item's name is the label. An opaque pill on the card ground (the radial floats over an application of any colour). The shortcut is a `kbd[aria-hidden]` chip after the word; `[@media(pointer:coarse)]:hidden`, and dropped from the plan when `(pointer: coarse)` matches.
 8. Motion: while `open`, item `i` waits `i × 35ms` (`BLOOM_STAGGER_MS`) to fade and grow, over `FADE_MS` 200ms; press (`transform`) and hover (`background-color`) take `FEEDBACK_MS` 150ms with no wait. `visibility` is on its own clock: flips at once on open, waits `FADE_MS` on close. why: a delayed `visibility` would hold the first item unfocusable until its stagger ran. `motion-reduce:transition-none` clears every transition.
 
 ## Label plan — `planRadialLabels`
 
-1. Centre of the arc = circumcircle of the first, middle and last point. Fewer than 3 points → every side `right`, `textClip: null`.
+1. `centre` (the FAB's centre, from the caller) is the arc's centre: "outward" is away from it and the labels keep clear of its 44px catch. No points → no sides.
 2. Side order per item: outward on the axis it leans along most, then the other axis (its own direction, then opposite), then the far side of the first axis.
 3. Search: depth-first over the sides, cost = area a label (plus `LABEL_CLEARANCE_PX` 4px) covers of any disc (its own too), the FAB's 44px catch and the labels already placed; stops at the first plan that covers nothing, else the least-covering stands.
 4. Widths are estimated, not measured: Latin 6.4px a character, CJK / Hangul / fullwidth 12px, +18px padding; the chip adds `chars × 6.4 + 18`. `LABEL_HEIGHT_PX` 24, `LABEL_GAP_PX` 6, `LABEL_EDGE_PX` 8.
@@ -1096,13 +1096,10 @@ Keys under `applications` in `src/modules/i18n/locales/<lang>/common.json`, all 
 
 ## Proof — `node .verify/radial-fab-chrome.mjs`
 
-Mounts the real `AppSwitcherRadial` and the kit `DockableFab` over the running :5183 page (`.verify/lib/mountReact.mjs`) with fake props; `points` = `radialLayout` of the real FAB's rect, `acts` = `useSwitcherActions` inside the real `AppSwitcherProvider` (nothing up: three greyed; "an application up" = the same acts with `disabled` cleared). The framed application is an iframe of `http://127.0.0.1:8005/` in the main region's `absolute inset-0 z-40` layer, a stand-in chat panel at z-45. Needs :5183 and :8005 up. Exit 1 lists failures. Shots: `.verify/shots/radial-fab-*`.
-Covers, at 1440×900 and 390×844, light and dark: radial in each stance (docked top-left and floating bottom-right at 1440; resting corner and floated top-left at 390), nothing up and an application up; no overlap between discs, labels, the FAB's catch or the viewport edge; discs on `radialLayout`'s points; hit tests through the layers; label ≥ 4.5:1 (greyed 3:1) and icon ≥ 3:1 (greyed 2.5:1); focus ring; first frame of an open under normal motion (first item focused, all five visible, a press on the last answers within 80ms); the open under `reducedMotion: 'reduce'`; closed shell exposes nothing; the four corners with "Collapse chat" and with German words on a stand-in FAB; the dot on and off (one FAB node through its life); the live FAB's press opens the radial and its Applications item opens the drawer; no console errors.
-Measured 2026-09-30 on :5183: 368 of 368 checks pass, exit 0.
-
+Mounts the real `AppSwitcherRadial` and the kit `DockableFab` over the running :5183 page (`.verify/lib/mountReact.mjs`); `points` = `radialLayout` of the real FAB's rect for the drawn count, `acts` = `useSwitcherActions` inside the real `AppSwitcherProvider` less the `disabled` ones (nothing up: two drawn; "an application up" = `disabled` cleared: five). Iframe of `http://127.0.0.1:8005/` at z-40, stand-in chat panel at z-45. Needs :5183 and :8005. Shots: `.verify/shots/radial-fab-*`.
+Covers, at 1440×900 and 390×844, light and dark, in each stance, nothing up and application up: every disc's box equals the FAB's box, keeps its 44px catch and 12px glyph; no `aria-disabled` inside the radial; no overlap of discs, labels, the FAB's catch or the viewport edge; discs on `radialLayout`'s points; hit tests through the layers, and 20px outward of each disc; label ≥ 4.5:1, icon ≥ 3:1; the arrow run covers exactly the drawn items; focus ring; first frame of an open; reduced motion; closed shell exposes nothing; a grid of stand-in FAB positions (walls and corners at the FAB's own extremes) for two items, five items and German words (light only); the dot; the live FAB's press. `fab-radial-door.mjs` (MAN-7481) covers the real FAB, including the close fade.
 Open:
-- 0.5–2.5% of phone FAB positions near a wall can still leave a label touching a disc after the 48px cut; how much the cut removes is unmeasured. Known cases: `ru` at FAB (138,242) and (138,268), where the 8px wall clamp pushes a label 5px onto its own disc; one label-on-label at (268,8).
-- The fixture does not walk the four walls at a 26px FAB step; `cornerBoard` is where that goes.
+- Docked top-left with five items the corner arc reaches about 167px; open arcs reach 100px, two items always 100px. About 4% of the phone's FAB positions cut a word short. Narrower phones, five items near the screen's centre: INV-6057.
 - `.verify/` is gitignored; force-add to commit.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/AppSwitcherFab.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/AppSwitcherRadial.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/utils/radialLabels.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/radial-fab-chrome.mjs
@@ -1206,15 +1203,16 @@ One run on the real app at :5183 (`lib/console.mjs` `openConsole`), 1440×900 th
 
 | leg | holds |
 | --- | --- |
-| radial | a FAB tap opens five items in order (chat, applications, reload, close, open-in-tab), three greyed with nothing up; a press on a greyed act leaves the radial up; a second tap closes it; Applications opens the drawer; a press outside closes it |
-| keyboard | Escape closes and focus is on the FAB; Enter on the FAB opens with Chat focused; arrows skip greyed items and wrap; Enter on Applications opens the drawer and its close returns focus to the FAB |
+| radial | a FAB tap with nothing up opens two items (chat, applications), none greyed; with an application up, five in order, and through Close's fade they keep their places; a second tap closes it; Applications opens the drawer; a press outside closes it |
+| keyboard | Escape closes and focus is on the FAB; Enter on the FAB opens with Chat focused; arrows wrap over the drawn items; Enter on Applications opens the drawer and its close returns focus to the FAB |
 | drag and chat | a drag moves the FAB and closes the open radial, and its click does not reopen it; Chat floats the chat and the label reads Collapse chat; the next tap collapses it and opens no radial |
-| application acts | Reload re-requests the frame's `src`; Open in a new tab opens the resolved url as a new page and the frame stays; Close takes the pane down and the three acts grey again |
+| application acts | Reload re-requests the frame's `src`; Open in a new tab opens the resolved url as a new page and the frame stays; Close takes the pane down and the radial draws just Chat and Applications again |
 | dual | with the right frame focused, Close takes the right pane and the left stays |
 | dot (one real Haiku turn, scratch project under /tmp) | EIS App framed while the turn runs, no dot; the dot arrives after `complete`; the label says why; Chat from the radial floats the chat and clears the dot; Escape with the radial open leaves the turn's `complete` not aborted |
 | frames (injected through the route) | another conversation's `complete`, an aborted `complete`, stream and status frames light nothing; a `permission_request` lights the dot; floating clears it; a reply while the chat floats lights nothing; a reply while the chat is collapsed behind an application lights it; taking the application down, or changing conversation, clears it |
 
-Measured 2026-09-30 on :5183: 82 of 82 checks pass, exit 0; the scratch chat is deleted at the end; the 2 console errors while signed in are the empty scratch chat's own 404 on `/api/providers/sessions/:id/token-usage`.
+The scratch chat is deleted at the end; the 2 console errors while signed in (measured 2026-09-30) are the empty scratch chat's own 404 on `/api/providers/sessions/:id/token-usage`.
+Not run against the 28px discs and the 34° step (its dot leg sends one Haiku turn): the two-item opening and the close-fade check, which compares each item's `left`/`top` style, since the drawn box shrinks by design, have no live reading.
 Not proven live: a `permission_request` raised by a real permission-asking run (the frame is injected through the real socket client); the Escape check has no control run without the radial.
 
 `.verify/lib/switcher.mjs` exports `FAB` (`button.vv-fab`; its label says what a press does, so it is never the selector) and `openDrawerFromFab(page)` (tap the FAB, then the Applications item). Every probe that wants the drawer goes through it: `app-drawer-link-project`, `app-row-project-link`, `app-rows-thin`, `app-rows-escape`, `chat-floats-panel`.
@@ -1246,7 +1244,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-host/hooks/useU
 
 ## MAN-7483 — command palette — the Applications group: the switcher's five acts
 
-The command palette draws the application switcher's five acts as an `Applications` group. The list is the radial's (`useSwitcherActions`, MAN-491; the radial: MAN-7475), so a label, the order and which acts are greyed are written once.
+The command palette draws the application switcher's five acts as an `Applications` group. The list is the radial's (`useSwitcherActions`, MAN-491; the radial: MAN-7475), so a label and the order are written once; the palette greys a `disabled` act in place, and the radial does not draw it.
 
 ## Files
 
@@ -1261,7 +1259,7 @@ The command palette draws the application switcher's five acts as an `Applicatio
 
 | rule | why |
 |---|---|
-| A disabled act stays in its place, greyed, as in the radial | cmdk never selects a disabled row |
+| A disabled act stays in its place, greyed | cmdk never selects a disabled row |
 | `run(act.run)` is synchronous: never put a promise or timer between the press and `act.run` | the Chat act floats a Document Picture-in-Picture window, which the browser allows only inside the keypress or click that asked |
 | `createSwitcherFilter` gives the five acts a score floor of 0.5 (`SWITCHER_ACT_MATCH_FLOOR`) and leaves every other row at cmdk's own `defaultFilter` score | cmdk's match is fuzzy; a greyed act is skipped by the selection and Enter falls to the next match, so `reload` with nothing framed floated the chat |
 | The group's `value` and the filter's act set both come from `switcherActValue` | one function, so the two cannot drift |
@@ -1420,7 +1418,7 @@ Needs: the client on :5183, the API on :3011, EIS App on :8004 and ArchPulse on 
 | door | PiP present | with the scratch row "Whole check" (`http://{host}:8005`, linked to ArchPulse through Link project…) framed, each in its own visit: the radial's Chat, Ctrl+. in the tab, and the palette's Chat row float the chat onto ArchPulse's most recent conversation (read from the API by the door's own rule); Ctrl+. in the window and in the tab, and the palette's Chat row (reading `Collapse chat`), collapse it; the palette's Applications group lists the five acts |
 | dot | PiP present | a Haiku turn runs while EIS App (no project) covers the chat; when `complete` arrives the FAB carries `.vv-fab__dot`; floating the chat clears it |
 | panel | PiP deleted | the press opens the panel 12px off the FAB, no window; dragging the FAB moves it; the grip resizes it across a framed application (`vv-drag-resize` mid-drag); `localStorage['chat-host']` holds the size; a reload keeps it |
-| radial | PiP deleted | five items, three greyed with nothing up; the palette lists the same five; Applications opens the drawer; Reload re-requests the frame, Open in a new tab opens its url, Close takes it down; Chat floats the panel and the FAB's next tap collapses it without a radial; a focused right pane is the one Close takes; a second tap closes the radial; a drag moves the FAB |
+| radial | PiP deleted | two items with nothing up, five with an application up; the palette lists the same five; Applications opens the drawer; Reload re-requests the frame, Open in a new tab opens its url, Close takes it down; Chat floats the panel and the FAB's next tap collapses it without a radial; a focused right pane is the one Close takes; a second tap closes the radial; a drag moves the FAB |
 
 The two modes are told apart by an init script reading `sessionStorage['probe:no-pip']`; a page with it set has `documentPictureInPicture` deleted before its scripts run.
 

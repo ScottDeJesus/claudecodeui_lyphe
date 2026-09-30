@@ -26,8 +26,9 @@ function sameRect(a: DOMRect, b: DOMRect): boolean {
  * its parent: the FAB is one node for its whole life (DockableFab.tsx), and a radial drawn inside it would
  * unmount it — and the pointer capture of a drag — whenever the radial changed.
  *
- * A TAP COLLAPSES A FLOATING CHAT, or else opens the radial of five acts (`useSwitcherActions`); a second tap
- * closes it. The drawer is one of the five — Applications — so it stays reachable from the FAB at every moment,
+ * A TAP COLLAPSES A FLOATING CHAT, or else opens the radial of the acts that can run (`useSwitcherActions`, less
+ * any it marks `disabled`): Chat and Applications with no application up, all five with one up; a second tap
+ * closes it. The drawer is one of them — Applications — so it stays reachable from the FAB at every moment,
  * and the FAB reads as pressed while either the radial or the drawer is up. The radial closes when a drag
  * starts (the button is about to move out from under its arc) and when the chat starts floating (the reader's
  * attention has moved to the chat, and its Chat act has become Collapse). The label says what a tap will do,
@@ -50,6 +51,9 @@ export function AppSwitcherFab({
   const { t } = useTranslation();
   const { fabPosition, dockRect, drawerOpen, moveFab } = useAppSwitcher();
   const acts = useSwitcherActions(chatDoor);
+  // The acts the radial draws: the ones that can run, and no others, so nothing in the arc is a dead press and
+  // the arc is laid out for exactly what it shows. (The command palette draws the whole list, `disabled` and all.)
+  const runnableActs = useMemo(() => acts.filter((act) => !act.disabled), [acts]);
 
   // How the radial is open, or null while it is closed. State because only the FAB draws the radial, and the
   // FAB's tap, its drag and the chat's float are what open and close it. The input that opened it is kept in
@@ -59,6 +63,13 @@ export function AppSwitcherFab({
   // chat that is already out. Dropped in the render that finds the chat floating, so no frame draws both.
   if (chatDoor.floating && radialOpenedBy !== null) setRadialOpenedBy(null);
   const radialOpen = radialOpenedBy !== null && !chatDoor.floating;
+  // The acts as the radial last drew them while open. State because they must outlive the render that closes it:
+  // pressing Close app takes the application down in the same event, which would pull three items out of the
+  // arc, and move the two that stay, in the middle of the close's fade. The radial follows the live acts only
+  // while it is open, and is drawn from these while it fades.
+  const [drawnActs, setDrawnActs] = useState(runnableActs);
+  if (radialOpen && drawnActs !== runnableActs) setDrawnActs(runnableActs);
+  const radialActs = radialOpen ? runnableActs : drawnActs;
 
   // The FAB's rect as the kit last measured it. State because the radial's arc is drawn around it and must
   // follow it (a resize, or the docked FAB's row moving); the same rect goes to the chat's host.
@@ -76,12 +87,17 @@ export function AppSwitcherFab({
   // Read at the render, as the radial reads them: the arc is fitted to the viewport as it is now.
   const viewportWidth = window.innerWidth;
   const viewportHeight = window.innerHeight;
-  const actCount = acts.length;
+  const actCount = radialActs.length;
   // Worked out whether the radial is open or not: a close is drawn, so the items keep their points through
   // the fade. Empty until the kit has measured the FAB once.
   const points = useMemo(
     () => (fabRect === null ? [] : radialLayout(fabRect, { width: viewportWidth, height: viewportHeight }, actCount)),
     [fabRect, viewportWidth, viewportHeight, actCount],
+  );
+  // The arc's centre, which the radial hangs its labels around.
+  const origin = useMemo(
+    () => (fabRect === null ? null : { x: fabRect.left + fabRect.width / 2, y: fabRect.top + fabRect.height / 2 }),
+    [fabRect],
   );
 
   function handleRectChange(rect: DOMRect) {
@@ -127,8 +143,9 @@ export function AppSwitcherFab({
       <AppSwitcherRadial
         open={radialOpen}
         openedByKeyboard={radialOpenedBy === 'keyboard'}
-        acts={acts}
+        acts={radialActs}
         points={points}
+        origin={origin}
         onClose={() => setRadialOpenedBy(null)}
       />
       <AppDrawer />

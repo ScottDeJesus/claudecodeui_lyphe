@@ -1,29 +1,39 @@
+import { FAB_CATCH_PX } from '@/shared/constants';
+
 type Rect = { left: number; top: number; width: number; height: number };
 type Size = { width: number; height: number };
 type Point = { x: number; y: number };
 type Bounds = { minX: number; maxX: number; minY: number; maxY: number };
 
 /**
- * The angle the whole arc spans, first item's centre to last item's centre. 110° puts five items about 81px
- * apart on the arc at RADIAL_RADIUS_PX: 33px of air between neighbouring discs, which is the room a label
- * beside each disc needs.
+ * The angle between neighbouring items on the open arc, centre to centre. An arc of N items spans (N - 1) of
+ * these, so the switcher's five acts spread over 136° and its two, with no application up, sit one step apart
+ * beside the FAB instead of at the ends of a five-item arc. 34° puts neighbours 58px apart at RADIAL_RADIUS_PX.
+ * A wider step lets the radius come in until the fan itself meets the walls. Compared on one coarser grid of FAB
+ * positions (every 9px across 1440x900, every 4px across 390x844), the radius that clears is 115px at 27.5°,
+ * 102px at 31°, 95px at 34° and back up at 36° (100px) and 38° (101px); the finer grid RADIAL_RADIUS_PX
+ * describes puts 34° at 100px, the step's own share of that comparison being the point, not the pixels.
  */
-const RADIAL_SWEEP_DEG = 110;
+const RADIAL_STEP_DEG = 34;
 /**
- * How far each item's centre stands from the FAB's centre; well clear of the FAB's 44px catch. It is the
- * radius at which the switcher's five labelled items stop colliding — measured over a grid of FAB positions
- * at 1440x900 and 390x844 with the labels' real widths: 160px still leaves two labels meeting on a run of
- * items, and 170px leaves nothing overlapping anywhere the FAB can stand.
+ * How far each item's centre stands from the FAB's centre: the smallest radius at which the switcher's
+ * labelled items — two with nothing up, five with an application up — collide with nothing and leave the
+ * viewport nowhere the FAB can stand. Measured over the FAB's whole range at 1440x900 (every 3px) and
+ * 390x844 (every 2px), and pixel by pixel across a 44px band along every wall, with the labels' real widths
+ * (the phone's without the shortcut chip, which a coarse pointer never draws): 99px still lets Chat's label
+ * touch the FAB's catch at six positions along the bottom wall of the desktop viewport, and 100px leaves
+ * nothing overlapping anywhere. The plan cuts a word short where a phone's corner leaves no other way; at
+ * 100px that is about 4% of the phone's positions.
  */
-const RADIAL_RADIUS_PX = 170;
+const RADIAL_RADIUS_PX = 100;
 /**
- * The room an item is given: its 48px disc (`RADIAL_DISC_PX`, drawn by the radial) and the air around it. Half
- * of it is how far a centre must stay from a viewport edge, and it is the spacing a tight corner holds between
- * neighbours when the sweep has to narrow — at the disc's own 48px, an arc squeezed against a wall stood its
- * discs edge to edge with no room for the labels beside them. 72px leaves that room at every position the
- * grid measured.
+ * The room an item is given: the 44px catch a finger presses in (`FAB_CATCH_PX`), which the disc keeps around
+ * its own 28px, and 16px of air. Half of it is how far a centre must stay from a viewport edge, and it is the
+ * spacing a tight corner holds between neighbours when the arc has to narrow. At the catch alone, or 8px over
+ * it, a corner's arc leaves a label on the disc beside it until the radius reaches 148px; from 56px to 68px the
+ * radius that clears stays within a few pixels of 100px, and 60px is the middle of that.
  */
-const RADIAL_ITEM_PX = 72;
+const RADIAL_ITEM_PX = FAB_CATCH_PX + 16;
 /** The gap left between an item's edge and the viewport's edge. */
 const RADIAL_EDGE_PX = 8;
 
@@ -35,7 +45,11 @@ const FIT_TOLERANCE_PX = 1e-6;
 const ROTATION_STEP_DEG = 1;
 /** The resolution of the scan that fits an arc into the room a corner leaves. */
 const SCAN_STEP_DEG = 0.5;
-/** How far past RADIAL_RADIUS_PX a tight corner may push the arc outward to keep its items apart. */
+/**
+ * How far past RADIAL_RADIUS_PX a tight corner may push the arc outward to keep its items apart. Over the 9px/4px
+ * grid at RADIAL_RADIUS_PX a budget of 60px still clears every position and 40px does not (five items collide at
+ * some, on both viewports); it is twice an item's room, so a viewport narrower than the two measured has headroom.
+ */
 const RADIAL_GROWTH_PX = 2 * RADIAL_ITEM_PX;
 /** How much the radius grows per try in a tight corner. */
 const GROWTH_STEP_PX = 1;
@@ -103,6 +117,11 @@ function nearestClearPoint(ideal: Point, origin: Point, bounds: Bounds): Point {
   );
 }
 
+/** The angle an arc of this many items spans, first item's centre to last item's, in radians: one step between neighbours. */
+function sweepFor(count: number): number {
+  return Math.max(count - 1, 0) * RADIAL_STEP_DEG * RADIANS_PER_DEGREE;
+}
+
 /** Each item's angle about the arc's middle, in radians: equal steps, first and last at the sweep's edges. */
 function itemOffsets(count: number, sweep: number): number[] {
   if (count <= 1) return [0];
@@ -123,13 +142,13 @@ function neighbourSpacing(radius: number, sweep: number, count: number): number 
 }
 
 /**
- * The arc as designed — the full sweep at RADIAL_RADIUS_PX — turned to the nearest angle at which every
- * item stands inside the bounds, or null when no turn of it fits (a corner leaves less than the sweep).
+ * The arc as designed — every neighbour one step apart at RADIAL_RADIUS_PX — turned to the nearest angle at
+ * which every item stands inside the bounds, or null when no turn of it fits (a corner leaves less than the sweep).
  * Tries in order of distance from the facing direction: 0, +1°, -1°, +2°, ... so the first fit is the
  * nearest one.
  */
 function fitFullSweep(origin: Point, bounds: Bounds, facing: number, count: number): Point[] | null {
-  const offsets = itemOffsets(count, RADIAL_SWEEP_DEG * RADIANS_PER_DEGREE);
+  const offsets = itemOffsets(count, sweepFor(count));
   const step = ROTATION_STEP_DEG * RADIANS_PER_DEGREE;
   for (let turn = 0; turn * step <= Math.PI; turn += 1) {
     for (const direction of turn === 0 ? [1] : [1, -1]) {
@@ -143,8 +162,8 @@ function fitFullSweep(origin: Point, bounds: Bounds, facing: number, count: numb
 }
 
 /**
- * The widest sweep, up to the designed one, whose two ends and everything between stand inside the
- * bounds on a circle of this radius, centred as near the facing direction as that width allows.
+ * The widest sweep, up to the designed one for `count` items, whose two ends and everything between stand
+ * inside the bounds on a circle of this radius, centred as near the facing direction as that width allows.
  * Null when no two neighbouring angles on the circle stand inside.
  *
  * The circle is sampled every SCAN_STEP_DEG; a sample is inside when its point is. From each inside
@@ -156,6 +175,7 @@ function widestArcFacing(
   bounds: Bounds,
   facing: number,
   radius: number,
+  count: number,
 ): { middle: number; sweep: number } | null {
   const samples = Math.round(360 / SCAN_STEP_DEG);
   const step = SCAN_STEP_DEG * RADIANS_PER_DEGREE;
@@ -164,7 +184,7 @@ function widestArcFacing(
     { length: samples },
     (_, index) => overflowOf(pointAt(origin, radius, index * step), bounds) <= FIT_TOLERANCE_PX,
   );
-  const fullReach = Math.round(RADIAL_SWEEP_DEG / 2 / SCAN_STEP_DEG);
+  const fullReach = Math.round(sweepFor(count) / 2 / step);
   const facingIndex = Math.round(facing / step);
 
   let best: { index: number; reach: number } | null = null;
@@ -186,21 +206,22 @@ function widestArcFacing(
  * Item centres on an arc around the FAB, facing the viewport's open space, every item clear of the
  * FAB's 44px catch and inside the viewport.
  *
- * Used by the switcher's radial, which draws its five acts at these points. Asked for no items it
- * answers none.
+ * Used by the switcher's radial, which draws the acts that can run at these points: `count` is how many it
+ * draws, so two acts sit one step apart beside the FAB and five spread over the whole arc. Asked for no
+ * items it answers none.
  *
  * The arc is centred on the FAB and faces the viewport's centre, so a FAB docked top-left fans down and
  * right and one floating bottom-right fans up and left. Where a wall leaves no room for the arc where
  * it faces, the WHOLE arc is turned to the nearest angle that fits it (the items keep their equal steps
  * and their radius).
  *
- * A CORNER leaves less room than the sweep needs — a FAB standing at its resting inset in the
- * bottom-right corner has about 82° for a 110° sweep — and no turn of the arc fits. There the sweep
- * narrows to the room the walls leave and the radius GROWS, a pixel at a time, until neighbouring items
- * stand as far apart as the open arc's own neighbours do (or as far as an item is wide, if that is
- * less): the fan opens outward where it cannot open sideways. Every centre still stands at least
- * RADIAL_RADIUS_PX from the FAB's centre. A viewport too small to hold any of that falls back to
- * clamping each centre in and sliding it along the wall until it is a full radius from the FAB.
+ * A CORNER leaves less room than the arc needs — a FAB standing at its resting inset in the bottom-right
+ * corner has less than the 136° five items span — and no turn of the arc fits. There the sweep narrows to
+ * the room the walls leave and the radius GROWS, a pixel at a time, until neighbouring items stand as far
+ * apart as the open arc's own neighbours do (or as far as an item's room is wide, if that is less): the
+ * fan opens outward where it cannot open sideways. Every centre still stands at least RADIAL_RADIUS_PX
+ * from the FAB's centre. A viewport too small to hold any of that falls back to clamping each centre in
+ * and sliding it along the wall until it is a full radius from the FAB.
  */
 export function radialLayout(fab: Rect, viewport: Size, count: number): Point[] {
   // `!(count >= 1)` rather than `count < 1` so that NaN is asked-for-nothing as well.
@@ -208,7 +229,7 @@ export function radialLayout(fab: Rect, viewport: Size, count: number): Point[] 
 
   const origin: Point = { x: fab.left + fab.width / 2, y: fab.top + fab.height / 2 };
   const bounds = centreBounds(viewport);
-  const sweep = RADIAL_SWEEP_DEG * RADIANS_PER_DEGREE;
+  const sweep = sweepFor(count);
 
   // Toward the viewport's centre; a FAB standing exactly on it has no open side, so it faces up.
   const towardX = viewport.width / 2 - origin.x;
@@ -221,7 +242,7 @@ export function radialLayout(fab: Rect, viewport: Size, count: number): Point[] 
   const spacingWanted = Math.min(RADIAL_ITEM_PX, neighbourSpacing(RADIAL_RADIUS_PX, sweep, count));
   let bestFit: { points: Point[]; spacing: number } | null = null;
   for (let radius = RADIAL_RADIUS_PX; radius <= RADIAL_RADIUS_PX + RADIAL_GROWTH_PX; radius += GROWTH_STEP_PX) {
-    const arc = widestArcFacing(origin, bounds, facing, radius);
+    const arc = widestArcFacing(origin, bounds, facing, radius, count);
     if (arc === null) continue;
     const spacing = neighbourSpacing(radius, arc.sweep, count);
     if (bestFit === null || spacing > bestFit.spacing) {

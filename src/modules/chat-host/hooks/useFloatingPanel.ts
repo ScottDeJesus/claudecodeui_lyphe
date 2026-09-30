@@ -4,9 +4,8 @@ import { useChatHostMechanics } from '@/modules/chat-host/context/ChatHostContex
 import { usePanelViewport } from '@/modules/chat-host/hooks/usePanelViewport';
 import { clampPanelSize, defaultPanelSize, panelPlacement } from '@/modules/chat-host/utils/panelGeometry';
 import { readPanelSize, writePanelSize } from '@/modules/chat-host/utils/chatHostStorage';
+import { FAB_SIZE_PX } from '@/shared/constants';
 
-/** The FAB's drawn size (`--vv-fab-size` in surfaces.css), the size of the rect it rests as. */
-const RESTING_FAB_PX = 28;
 /** How far the kit's resting corner stands from the right and from the bottom (`RESTING_CORNER` in DockableFab). */
 const RESTING_RIGHT_PX = 16;
 const RESTING_BOTTOM_PX = 56;
@@ -14,10 +13,10 @@ const RESTING_BOTTOM_PX = 56;
 /** Where the FAB rests when no rect has been reported for it: the kit's own bottom-right corner, spelt in this viewport. */
 function restingAnchor(viewport: { width: number; height: number }) {
   return {
-    left: viewport.width - RESTING_FAB_PX - RESTING_RIGHT_PX,
-    top: viewport.height - RESTING_FAB_PX - RESTING_BOTTOM_PX,
-    width: RESTING_FAB_PX,
-    height: RESTING_FAB_PX,
+    left: viewport.width - FAB_SIZE_PX - RESTING_RIGHT_PX,
+    top: viewport.height - FAB_SIZE_PX - RESTING_BOTTOM_PX,
+    width: FAB_SIZE_PX,
+    height: FAB_SIZE_PX,
   };
 }
 
