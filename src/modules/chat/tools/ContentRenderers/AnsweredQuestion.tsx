@@ -3,10 +3,9 @@ import { useTranslation } from 'react-i18next';
 import { Check, ChevronDown } from 'lucide-react';
 
 import type { Question } from '@/shared/types';
-import { Badge } from '@/shared/ui';
+import { Badge, QuestionOptionRow } from '@/shared/ui';
 import { cn } from '@/shared/utils';
 import { QuestionText } from '@/modules/chat/tools/ContentRenderers/QuestionText';
-import { QuestionOptionRow } from '@/modules/chat/tools/InteractiveRenderers/QuestionOptionRow';
 
 /** The separator AskUserQuestionPanel joins a multi-select answer with — chosen labels, then the typed note. */
 const ANSWER_SEPARATOR = ', ';

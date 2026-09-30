@@ -13,13 +13,16 @@
  *
  * The report's own composition is a file beside this one (`update-check.report.ts`) — that half
  * changes when the client's contract does, this half when the policy does.
+ *
+ * The tick is also the automatic install's clock: after each tick's check, `afterTick` runs, so the
+ * install rides the same five minutes rather than arming a timer of its own.
  */
 
-import type { ClaudeUpdateJob, ClaudeUpdatesReport } from '@/shared/claude-update-types.js';
+import type { ClaudeUpdateJob } from '@/shared/claude-update-types.js';
 
 import { packageRow, readSdkVersionOnDisk } from './packages.js';
 import { buildReport } from './update-check.report.js';
-import type { InstalledCliReading } from './update-check.report.js';
+import type { InstalledCliReading, ReportReadings } from './update-check.report.js';
 import { readCliUpdatableForCheck, readPackageCheck } from './update-check.reader.js';
 import { readStoredCheck, writeStoredCheck } from './update-check.store.js';
 import type { StoredCheck } from './update-check.store.js';
@@ -54,6 +57,12 @@ type UpdateCheckDependencies = {
    * than none at all).
    */
   readInstalledCli: () => Promise<InstalledCliReading>;
+  /**
+   * Run after every tick's check has finished — the automatic install's turn. It is awaited, so the
+   * install decides on the report THIS tick's check produced. It reports its own failures; a rejection
+   * that escapes it is still caught by the tick and journaled as one line.
+   */
+  afterTick: () => Promise<void>;
 };
 
 /** An error's own words, for the two places a failure becomes a sentence here. */
@@ -62,12 +71,12 @@ function messageOf(error: unknown): string {
 }
 
 export function createUpdateCheckService(dependencies: UpdateCheckDependencies): {
-  report: (job: ClaudeUpdateJob | null, supervised: boolean) => Promise<ClaudeUpdatesReport>;
+  report: (job: ClaudeUpdateJob | null, supervised: boolean) => Promise<ReportReadings>;
   checkNow: () => Promise<void>;
   start: () => void;
   stop: () => void;
 } {
-  const { dir, appRoot, readInstalledCli } = dependencies;
+  const { dir, appRoot, readInstalledCli, afterTick } = dependencies;
 
   // Read ONCE, here, at build time — which for the server entrypoint is process start. Every report
   // is answered from this, so a request never waits on a file; a check replaces what is here and on
@@ -152,20 +161,33 @@ export function createUpdateCheckService(dependencies: UpdateCheckDependencies):
   }
 
   /**
-   * One tick: a check only when one is due, or when none has ever run in this file's lifetime.
+   * One tick's check: one only when it is due, or when none has ever run in this file's lifetime.
+   * Resolves when that check is done, or at once when none was due.
    *
    * A NEGATIVE gap is the same stamp-from-the-future the store refuses on read, seen by a process that
    * was already running when the clock stepped back: the check in memory is now dated ahead of this
    * clock, and `>=` alone would hold the cadence until real time passed it. Checking is what
    * re-stamps it.
    */
-  function checkIfDue(): void {
-    if (stored.checkedAt === null) {
-      void checkNow();
-      return;
-    }
+  function checkIfDue(): Promise<void> {
+    if (stored.checkedAt === null) return checkNow();
     const sinceLastCheck = Date.now() - stored.checkedAt;
-    if (sinceLastCheck >= CHECK_INTERVAL_MS || sinceLastCheck < 0) void checkNow();
+    if (sinceLastCheck >= CHECK_INTERVAL_MS || sinceLastCheck < 0) return checkNow();
+    return Promise.resolve();
+  }
+
+  /**
+   * The whole tick: the check when one is due, then the install's turn on whatever it found. Caught
+   * here because a timer is what calls it — a rejection from a timer is an unhandled one, and a tick
+   * that failed is one journal line and a next tick in five minutes.
+   */
+  async function runTick(): Promise<void> {
+    try {
+      await checkIfDue();
+      await afterTick();
+    } catch (error) {
+      console.error(`[claude-updates] tick failed: ${messageOf(error)}`);
+    }
   }
 
   /**
@@ -179,9 +201,9 @@ export function createUpdateCheckService(dependencies: UpdateCheckDependencies):
     if (firstTick !== null || tick !== null) return;
     firstTick = setTimeout(() => {
       firstTick = null;
-      checkIfDue();
+      void runTick();
     }, FIRST_TICK_DELAY_MS);
-    tick = setInterval(checkIfDue, TICK_INTERVAL_MS);
+    tick = setInterval(() => void runTick(), TICK_INTERVAL_MS);
     firstTick.unref();
     tick.unref();
   }
@@ -203,7 +225,7 @@ export function createUpdateCheckService(dependencies: UpdateCheckDependencies):
    * The report, as the route answers it: the two readings taken fresh, the stored check, and the two
    * facts that belong to the module — the current job, and whether this API can hand itself over.
    */
-  async function report(job: ClaudeUpdateJob | null, supervised: boolean): Promise<ClaudeUpdatesReport> {
+  async function report(job: ClaudeUpdateJob | null, supervised: boolean): Promise<ReportReadings> {
     const cli = await readCliReading();
     return buildReport({
       check: stored,

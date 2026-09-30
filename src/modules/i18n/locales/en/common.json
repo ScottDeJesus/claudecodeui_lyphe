@@ -31,6 +31,7 @@
     "kanban": "Kanban",
     "universe": "Universe",
     "schedules": "Schedules",
+    "notes": "Notes",
     "project": "This project",
     "house": "The house",
     "more": "More views"
@@ -814,6 +815,8 @@
   "runner": {
     "title": "Runner",
     "empty": "Nothing is running",
+    "waiting_one": "{{count}} waiting for you",
+    "waiting_other": "{{count}} waiting for you",
     "stop": "Stop",
     "resume": "Resume",
     "start": "Start",
@@ -845,6 +848,18 @@
     }
   },
   "dispatcher": {
+    "ask": {
+      "waiting": "Waiting for your word",
+      "open": "Open",
+      "answered": "Answered — waiting for the dispatcher",
+      "notes": "Your notes — sent word for word",
+      "sendNotes": "Send notes",
+      "cancel": "Cancel",
+      "other": "Other…",
+      "otherPlaceholder": "Type your answer…",
+      "sendAnswers": "Send answers",
+      "word": "Answer"
+    },
     "status": {
       "live": "LIVE",
       "paused": "PAUSED",
@@ -919,6 +934,7 @@
     },
     "waitsOn": "waits on {{names}}",
     "dismissDone": "Dismiss done · {{count}}",
+    "plannersOut": "planners {{out}} of {{lanes}} out",
     "dismiss": "Dismiss plan",
     "dismissArc": "Dismiss arc",
     "dismissDonePlans": "Dismiss done plans · {{count}}",
@@ -1244,6 +1260,9 @@
       "open": "Open the page in a new tab",
       "rejected": "That is not an http:// or https:// address"
     },
+    "notes": {
+      "title": "Notes"
+    },
     "open": "Open {{name}}",
     "collapse": "Collapse",
     "dragHint": "Drag to either side",
@@ -1253,6 +1272,17 @@
     },
     "fullscreen": "Fullscreen",
     "exitFullscreen": "Leave fullscreen"
+  },
+  "notes": {
+    "title": "Notes",
+    "reading": "reading…",
+    "unreachable": "Your notes could not be read right now.",
+    "retry": "Try again",
+    "empty": { "title": "No notes yet", "message": "Write the first one in the card above." },
+    "form": { "title": "Title", "description": "Description", "descriptionPlaceholder": "Write a note…", "add": "Add note", "save": "Save", "cancel": "Cancel" },
+    "card": { "edit": "Edit {{title}}", "delete": "Delete {{title}}" },
+    "delete": { "title": "Delete this note?", "message": "\"{{title}}\" will be gone for good.", "confirm": "Delete", "cancel": "Keep it" },
+    "toast": { "saveFailed": "That note could not be saved", "deleteFailed": "That note could not be deleted" }
   },
   "applications": {
     "fabLabelMenu": "Open the menu",

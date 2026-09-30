@@ -351,6 +351,9 @@
       "open": "Seite in neuem Tab öffnen",
       "rejected": "Das ist keine http:// oder https:// Adresse"
     },
+    "notes": {
+      "title": "Notizen"
+    },
     "open": "{{name}} öffnen",
     "collapse": "Einklappen",
     "dragHint": "Auf eine Seite ziehen",

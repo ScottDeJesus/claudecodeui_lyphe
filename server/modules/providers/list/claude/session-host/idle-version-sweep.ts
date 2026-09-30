@@ -58,8 +58,11 @@ import type { LiveHost } from './hosts.js';
  * registry could not see does not merely end a process, it destroys the work in flight and its only
  * record. `readoptHost` gets `turnCompleteSent` for exactly this case; the sweep must honour it
  * rather than retire the host the boot step was about to hand back its turn.
+ *
+ * consumer: this file's sweep, and the claude-activity module — which asks the same question of the
+ * same hosts to decide whether a Claude update may install, and so must get the same answer.
  */
-function busyReason(host: LiveHost): string | null {
+export function busyReason(host: LiveHost): string | null {
   if (chatRunRegistry.isProcessing(host.appSessionId)) return 'a turn is running in this process';
   if (!host.turnCompleteSent) return 'a turn was in flight';
   if (host.heldForBackgroundWork || host.deferredTools.length > 0) return 'background work is outstanding';

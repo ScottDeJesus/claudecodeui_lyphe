@@ -3,6 +3,7 @@ import { useLayoutEffect, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import {
+  anyOwesWord,
   byArc,
   DispatchArcDecks,
   doneDismiss,
@@ -10,6 +11,8 @@ import {
   landFocusInHome,
   LoosePlannerBadges,
   PlanCard,
+  PlannerLanesReadout,
+  owesWord,
   planPutAway,
   SessionPin,
   useDispatcherPlans,
@@ -43,13 +46,24 @@ function scrollViewportOf(element: HTMLElement | null): HTMLElement | null {
 }
 
 /**
- * The lane as the widget's list, the open chat's first. The base order is the tab's own — the arcs in
- * the lane's order, then the plans of no arc in `byArc`'s urgency order — and the items holding a plan
- * this chat opened are lifted to the front of it, keeping that order among themselves. An arc holds
- * the chat's plan when ANY plan of it does: the deck is the item, and it pins that plan's row inside
- * (`SessionPin`), while the arc's own walk order inside the deck is left alone.
+ * The lane as the widget's list: the items that owe a word first, then the open chat's, then the
+ * rest. The base order is the tab's own — the arcs in the lane's order, then the plans of no arc in
+ * `byArc`'s urgency order — and each of the three parts keeps it.
+ *
+ * AN OWED WORD LEADS, ABOVE THE CHAT'S OWN (`owesWord`): a prompt waiting on the operator is the one
+ * thing in this column he has to answer, so it comes up in the home he is looking at while the chat
+ * is open — which is the whole point of drawing the lane beside the transcript at all. An arc item is
+ * asking when ANY plan of its group is: the deck is the item, and its prompt stands on the deck.
+ *
+ * THE CHAT'S OWN COME NEXT: the items holding a plan this chat opened, keeping that order among
+ * themselves, so the card a person was just working in is under the asks and above the rest. An arc
+ * holds the chat's plan when ANY plan of it does — the deck is the item, and it pins that plan's row
+ * inside (`SessionPin`), while the arc's own walk order inside the deck is left alone.
  */
 function widgetItemsOf(split: DispatcherArcSplit, sessionId: string | null): WidgetItem[] {
+  const asking = (item: WidgetItem) => (item.kind === 'arc'
+    ? anyOwesWord(item.group.plans)
+    : owesWord(item.plan));
   const holdsMine = (item: WidgetItem) => (item.kind === 'arc'
     ? item.group.plans.some((plan) => openedBy(plan, sessionId))
     : openedBy(item.plan, sessionId));
@@ -57,7 +71,11 @@ function widgetItemsOf(split: DispatcherArcSplit, sessionId: string | null): Wid
     ...split.groups.map((group): WidgetItem => ({ kind: 'arc', group })),
     ...split.rest.map((plan): WidgetItem => ({ kind: 'plan', plan })),
   ];
-  return [...items.filter(holdsMine), ...items.filter((item) => !holdsMine(item))];
+  return [
+    ...items.filter(asking),
+    ...items.filter((item) => !asking(item) && holdsMine(item)),
+    ...items.filter((item) => !asking(item) && !holdsMine(item)),
+  ];
 }
 
 /**
@@ -72,9 +90,10 @@ function widgetItemsOf(split: DispatcherArcSplit, sessionId: string | null): Wid
  * list of plans instead"). A chat switch returns that scroll to the top, where the new chat's own
  * items stand.
  *
- * THE ITEMS ARE THE TAB'S SPLIT, LIFTED FOR THIS CHAT (`widgetItemsOf`). An arc is the SAME deck the tab
- * draws (`DispatchArcDecks`' `home="gutter"`), its plans still swiped one card per view in its own
- * strip; a plan of no arc is its `PlanCard`, wearing this chat's `SessionPin` when the chat opened it.
+ * THE ITEMS ARE THE TAB'S SPLIT, LIFTED FOR THIS CHAT (`widgetItemsOf`): the asks first, then the open
+ * chat's own, then the rest. An arc is the SAME deck the tab draws (`DispatchArcDecks`'
+ * `home="gutter"`), its plans still swiped one card per view in its own strip; a plan of no arc is its
+ * `PlanCard`, wearing this chat's `SessionPin` when the chat opened it.
  *
  * THE FOLDS ARE THE TAB'S FOLDS, AND THIS BODY PRUNES THE SAME MEMORY. `useLaneFoldPrune` hands the
  * fold store what this widget draws AND what it has hidden, so a card folded here is folded on the tab,
@@ -133,6 +152,9 @@ export function RunnerWidgetBody({ sessionId }: { sessionId: string | null }) {
   return (
     // `tabIndex={-1}`: the last place a press that emptied the board hands the keyboard (`landFocusInHome`).
     <div ref={widgetRef} tabIndex={-1} data-runner-widget className="flex min-w-0 flex-col gap-4 outline-none">
+      {/* How full the planner lane is — the tab header's own readout. Not drawn when the frame states
+          no dial (an older dispatcher). */}
+      <PlannerLanesReadout />
       {nothingDrawn ? (
         <EmptyState icon={ActivityIcon} title={t(hidden.length > 0 ? 'dispatcher.hidden.allHidden' : 'runner.empty')} />
       ) : (

@@ -269,13 +269,14 @@ The live frontend half of the Claude update pipeline (the wire contract is MAN-7
 install/restart backend is MAN-7402/MAN-7403): `src/modules/claude-updates/`, composed from Verve
 primitives, wired into Settings and the sidebar. All three surfaces read the one module-scope report
 in `hooks/useClaudeUpdates.ts`, and every call goes out through `src/shared/api.ts`'s `claudeUpdates`
-group — `GET /api/claude-updates`, `POST /api/claude-updates/{check,apply,restart}`.
+group — `GET /api/claude-updates`, `POST /api/claude-updates/{check,apply,restart}`, `PUT /api/claude-updates/auto-install`.
 
 | file | owns |
 |---|---|
 | `index.ts` | the module's whole export surface: `ClaudeUpdatesSettingsTab`, `ClaudeUpdateFooterRow`, `ClaudeUpdateRailButton` |
-| `hooks/useClaudeUpdates.ts` | the client contract: `{ report, refresh, check, apply, restart }`; `isUpdateJobActive(job)` — true on `installing`/`installed`/`restarting`/`rolling-back`; and the one module-scope report with its poller |
-| `ClaudeUpdatesSettingsTab.tsx` | Settings → Updates: title (drawn even before the first report, with the one Try again press), clock line + Check now, one `PackageUpdateCard` per package, the actions row, `UpdateJobPanel`, the last press's refusal |
+| `hooks/useClaudeUpdates.ts` | the client contract: `{ report, refresh, check, apply, restart, setAutoInstall }`; `isUpdateJobActive(job)` — true on `installing`/`installed`/`restarting`/`rolling-back`; and the one module-scope report with its poller |
+| `ClaudeUpdatesSettingsTab.tsx` | Settings → Updates: title (drawn even before the first report, with the one Try again press), clock line + Check now, `AutoInstallRow` (left out when `report.autoInstall` is absent), one `PackageUpdateCard` per package, the actions row, `UpdateJobPanel`, the last press's refusal |
+| `AutoInstallRow.tsx` | the automatic-install switch + its `Not installed yet — <waiting>` status line (MAN-7516); composes `SettingRow` + the library `Switch`, not `SettingsToggle` (the settings module already imports this tab) |
 | `PackageUpdateCard.tsx` | one package: state line, `reason`, SDK `loaded` line, CLI mid-turn plural line, Roll back |
 | `PatchNotes.tsx` | the notes list under a card |
 | `UpdateJobPanel.tsx` | the four steps with icon + `from → to` + detail, `logTail` folded |
@@ -303,9 +304,10 @@ on its own, answering true/false.
   no fallback copy for "nothing on offer".
 - The CLI card's mid-turn count is `useCliVersion().staleSessionIds.size` — this module never reads
   `/api/cli-version` itself (MAN-503).
-- `en/settings.json` carries no `updates.*` keys; every string in this module ships its own English
-  `defaultValue` (`updateWording.ts`'s own note) — do not add a parallel `updates` i18n block
-  without moving these off `defaultValue` at the same time.
+- `en/settings.json` carries only `updates.autoInstall.{label,description,waiting}` (the auto-install
+  row); every other string in this module ships its own English `defaultValue` (`updateWording.ts`'s
+  own note) — do not add a parallel `updates` i18n block for them without moving them off
+  `defaultValue` at the same time.
 
 **Wired into (additive, no renames)**: `src/shared/types.ts` (`SettingsMainTab` gains `'updates'`),
 `src/shared/constants.ts` (`SETTINGS_MAIN_TABS` — the command **palette's** own ordered list; it is
@@ -1023,10 +1025,10 @@ Types in `src/shared/types.ts`, group `SIDEBAR`: `SessionPickerStatus` (`'ready'
 
 | when | do |
 | --- | --- |
-| `useSimpleChatListPreferences().enabled` | groups = `groupsFromSimpleList(list.rows, marks)`; `list` = `useSimpleChatList(selectedSessionId, enabled)`, rows in the server's order for the reader |
+| `useSimpleChatListPreferences().enabled` | groups = `groupsFromSimpleList(list.rows, marks)`; `list` = `useSimpleChatList(selectedSessionId, enabled)`, whose `rows` is `flattenChats(items)` — every chat of the feed's tree, a folder's chats in its place (MAN-7524) |
 | preference off | groups = `groupsFromProjects(sortProjects(withResolvedStarState(projects, starOverrides), sortOrder), marks, nameOf)`; `starOverrides` = `useProjectStarOverrides()`; `sortOrder` = `useSyncExternalStore(subscribeToUserPreferences, readProjectSortOrder)`, so it follows the preference live |
 | marks | `useBusySessionIdSet`, `useAwaitingInputSessionIdSet`, `useSubagentRunningSessionIdSet` |
-| `status` | simple list with no rows: `list.hasError` → `'error'`, else `list.isLoading` → `'loading'`; otherwise `'ready'`, always `'ready'` in the tree. why: `reload` sets `isLoading` on every `session_upserted`; mapping it straight would blank the drawn list for a skeleton each time |
+| `status` | simple list with no rows: `list.hasError` → `'error'`, else `list.isLoading` → `'loading'`; otherwise `'ready'`, always `'ready'` in the tree. why: `reload` sets `isLoading` on every `session_upserted` and `simple_list_changed`; mapping it straight would blank the drawn list for a skeleton each time |
 | `hasMore` | `enabled && list.hasMore`; false in the tree |
 | `loadMore` | `list.loadMore()` in the simple list; no-op in the tree |
 | `pick(row)`, project found by `row.projectId` | `onProjectSelect(project)`, then `onSessionSelect({ ...session, __projectId: project.projectId })` |
@@ -1318,7 +1320,7 @@ Rules of the picker's view: the panel's mechanics and the trigger and row it dra
 2. Row heights: 32px under a heading, 38px standalone, 44px under `(pointer: coarse)`; New chat 36px, 44px coarse.
 3. The row is `<a href="/session/<id>">`: an unmodified primary press calls `preventDefault()` then `onPick`; a modified press opens a tab. Space also activates. `draggable={false}`.
 4. Ink is pinned `hover:text-foreground focus-visible:text-foreground`. why: the global `a:hover` turns a link the accent green, the app's word for healthy.
-5. Marks, in order: awaiting an answer (`bg-warn-ink` pulsing dot; hides running), running (spinner), subagents (purple dot), unread (`bg-primary` dot; hidden on the open row and on running or awaiting rows). Labels `simpleList.awaitingInput`, `.running`, `.subagentsRunning`, `.unread`.
+5. Marks, drawn from `chatMarks` with `isSelected: isCurrent` (MAN-7522), in order: awaiting an answer (`bg-warn-ink` pulsing dot; hides running), running (spinner), subagents (purple dot), unread (`bg-primary` dot; hidden on the open row and on running or awaiting rows). Labels `simpleList.awaitingInput`, `.running`, `.subagentsRunning`, `.unread`.
 6. The open conversation: `aria-current="true"`, `bg-primary/10`, `font-medium` and a `Check` tick, so it survives greyscale.
 7. States, each with New chat still pinned: loading (three `vv-skeleton` rows in `role="status"`, `chatHost.pickerLoading`); error (`Banner tone="warn"`, `chatHost.pickerError`); no groups, or the simple list's one empty block (paragraph `chatHost.pickerEmpty`).
 8. Show more (`simpleList.loadMore`, "Show more") draws only when `status === 'ready'`, the list is not empty and `hasMore`; it calls `onLoadMore` and keeps the panel open.
@@ -1462,7 +1464,438 @@ Two module-level stores keep the sidebar (`useSidebarController`, `SidebarSimple
 
 ## Feed removals — `src/modules/sidebar/hooks/useSimpleChatList.ts`
 - Module-level `removalListeners` holds one `dropRow` per mounted `useSimpleChatList` instance.
-- `removeLocal(sessionId)` on any instance calls every listener. An instance drops the row and lowers its `total` only when its own rows hold it. why: an instance that never paged the row in must keep its total.
-- An archive or a delete sends no `session_upserted`, the only other refresh of the feed. why: without the fan-out the picker keeps the row until an unrelated upsert.
+- `removeLocal(sessionId)` on any instance calls every listener. An instance drops the chat (`removeChat`) only when its own tree holds it, and lowers its `total` only when that chat was a top-level row (`wasTopLevel`). why: an instance that never paged the row in must keep its total; a chat inside a folder was never one of the rows `total` counts.
+- `dropRow` writes `itemsRef.current = landed.items` before `setItems(landed.items)`. why: a second removal in the same tick must read the first's result; from the render-time snapshot React applies the second `setItems` over the first and resurrects the chat while both `setTotal` decrements land.
+- Not covered: a mixed same-tick pair (`moveLocal` then `removeLocal`) can lose the optimistic write until the next feed reload. No live caller does it.
+- An archive or a delete sends neither `session_upserted` nor `simple_list_changed`, the two frames that refresh the feed. why: without the fan-out the picker keeps the row until an unrelated frame.
+- The hook's whole contract: MAN-7524.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/hooks/useSimpleChatList.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/utils/projectStarOverrides.ts
+
+## MAN-7522 — The marks rule — `simpleChatMarks.ts`, `chatMarks` and `folderDot`
+
+One home for which marks a chat draws and which one a folder's dot wears: `src/modules/sidebar/utils/simpleChatMarks.ts`. No other file spells the conditions out. Simple list: MAN-661. Picker row: MAN-7484.
+
+## Readers
+
+| reader | uses |
+| --- | --- |
+| `SidebarSimpleListRow.tsx` | `chatMarks`; draws `marks.awaitingInput`, `.running`, `.subagents`, `.unread`, each `&& !isEditing` |
+| `SidebarSessionPickerRow.tsx` | `chatMarks` with `isSelected: isCurrent` (the open conversation) |
+| `SidebarSimpleListItems.tsx` | `folderDot(folder.chats.map(chatMarks))`, facts from the three id sets, each chat's `unread` and the open chat's id |
+
+Type `SimpleChatMark` = `'awaitingInput' | 'unread' | 'running' | 'subagents'`, in `src/shared/types.ts`.
+
+## `chatMarks(facts)` → `Record<SimpleChatMark, boolean>`
+
+`facts`: `unread`, `isSelected`, `isRunning`, `isAwaitingInput`, `isSubagentRunning`.
+
+| mark | drawn when |
+| --- | --- |
+| `awaitingInput` | `isAwaitingInput`, selected or not |
+| `unread` | `unread && !isSelected && !isRunning && !isAwaitingInput` |
+| `running` | `isRunning && !isAwaitingInput` |
+| `subagents` | `isSubagentRunning`, beside any other mark |
+
+## `folderDot(marks[])` → `SimpleChatMark | null`
+
+First of `awaitingInput`, `unread`, `running`, `subagents` that any entry carries; `null` when none does. An empty array is `null`.
+
+## Proof
+
+`node .verify/probe-simple-marks.mjs` — bare Chromium page on `http://127.0.0.1:5183/`, no sign-in, nothing written; imports `/src/modules/sidebar/utils/simpleChatMarks.ts` from the dev server. Ends `SIMPLE-MARKS PASS` (exit 0), else exit 1.
+- Four pairs (waiting beside unread, unread beside running, running beside subagents, no marks) and `folderDot` over each.
+- M6: all 32 combinations of the five facts give the verdicts the two rows' old expressions gave. 2026-09-30: 0 differ.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/SidebarSimpleListRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/utils/simpleChatMarks.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-simple-marks.mjs
+
+## MAN-7523 — The simple list's folder scaffold — `SidebarSimpleListItems`, `SidebarSimpleFolderRow`, `SidebarSimpleFolderPicker`
+
+The folder tree's three presentational components and the chat row's two new props, all in `src/modules/sidebar/`. Each is a function of its props: no fetch, no hook, no DOM read. The list: MAN-661. Types: MAN-7514. Tree functions: MAN-7520. Marks: MAN-7522. Words: MAN-7512.
+
+## Wiring
+- 2026-09-30: live. `SidebarSimpleList.tsx` mounts `SidebarSimpleListItems` (one block per top-level row; `SidebarSimpleFolderRow` is its folder header) and `SidebarSimpleFolderPicker`; `.verify/probe-simple-folder-composer.mjs` walks the mounted tree end to end (MAN-7528).
+- The live list draws the tree: `onMoveToFolder` is null exactly while the list holds no folder, so no row offers "Move to folder…" until one exists.
+- `// FILL: <name>` comments sit on the behaviour each marker names, already written. Wiring the tree into `SidebarSimpleList.tsx` does not rewrite them.
+
+## `SidebarSimpleListItems.tsx`
+Draws the tree as a fragment inside `SidebarSimpleList`'s `simple-chat-list-rows` container; it draws no container of its own.
+
+| Prop | Is |
+| --- | --- |
+| `items` | `SimpleListItem[]`, server order |
+| `selectedSessionId`, `failedSessionId`, `freshFolderId` | `string \| null` each |
+| `busySessionIds`, `awaitingInputSessionIds`, `subagentRunningSessionIds` | `ReadonlySet<string>` |
+| `dragging` | `SimpleListItemRef \| null` |
+| `dropTarget` | `SimpleListDropTarget \| null` |
+| `dragProps(ref)` | the carry's pointer props for one row; chat rows and folder headers both spread it; `useSimpleChatDrag` returns it (MAN-7525) |
+| `onSelectChat`, `onArchiveChat`, `onDeleteChat`, `onChooseIcon` | `(chat) => void` |
+| `onRenameChat(sessionId, title)` | |
+| `onMoveToFolder` | `((chat) => void) \| null`; `null` = no "Move to folder…" entry on any row |
+| `onToggleFolder`, `onDeleteFolder` | `(folder) => void` |
+| `onRenameFolder(folderId, name)`, `onFreshShown()`, `t` | |
+
+- One `data-testid="simple-chat-block"` per top-level item, `relative flex flex-col gap-1`, carrying `data-item-kind` (`chat` \| `folder`) and `data-item-id`. The block, not the row, carries them: a carried folder lands beside a block.
+- A folder's block = header + its chats' rows (`isNested` true), the rows only while `!folder.collapsed`; a folded folder mounts no chat row.
+- The folder's dot = `folderDot(folder.chats.map(chatMarks))` (MAN-7522).
+- `holdsSelected` = folder folded and one of its chats is the open chat.
+- Rhythm is uniform on purpose: a folder's chats sit `gap-1` from the header, the same air as between blocks; the indent carries the grouping. The block's `gap-1` is the one knob.
+- Fade: a carried chat fades as its own row; a carried folder fades as its whole block (`opacity-50`).
+- `simple-chat-drop-end` (`h-0.5` accent line) is drawn whenever `dropTarget.at === 'end'`.
+
+### Drop marks
+| Carried | `dropTarget` | Mark, on |
+| --- | --- | --- |
+| chat | `row`, a chat | `dropEdge` = that edge, on that chat's row |
+| chat | `row`, a folder, `before` | `dropEdge='before'`, on the folder header's top edge |
+| chat | `row`, a folder, `after` | none |
+| chat | `into` F | accent ring (`isDropInto`), on F's header |
+| folder | `row` X, X a top-level item | line at the top (`before`) or bottom (`after`) of X's block |
+| any | `end` | `simple-chat-drop-end` |
+
+## `SidebarSimpleFolderRow.tsx`
+The header. Props: `folder`, `dot`, `holdsSelected`, `isFresh`, `onFreshShown`, `onToggle`, `onRename(name)`, `onDelete`, `dragProps` (nullable), `isDragging`, `dropEdge` (`'before' \| null`), `isDropInto`, `t`.
+
+| Part | Rule |
+| --- | --- |
+| root | `data-testid="simple-chat-folder"`, `data-folder-id`, `data-collapsed` (`'true' \| 'false'`), `data-dragging`; spreads `dragProps` |
+| height | compact sidebar: `min-h-11`; otherwise `py-2` (the chat row's rule) |
+| glyph | `Folder` icon in a `data-drag-handle` span: the touch carry waits for it |
+| toggle | ONE element, `role="button"` span, `tabIndex={0}`, `data-testid="simple-chat-folder-toggle"`, `aria-expanded`; press, Enter and Space call `onToggle`; `title` = `runner.collapse` / `runner.expand`, ns `common`; `FoldChevron` + name |
+| rename | input `simple-chat-folder-rename-input`: Enter saves, Escape cancels; blank or unchanged name calls nothing |
+| dot | drawn only when `dot !== null`: `simple-chat-folder-dot`, `data-mark`, `role="img"`, label and title = the mark's word; `awaitingInput` adds `vv-pulse` |
+| menu | `ActionMenu` labelled `simpleList.folderOptions` with `{ name }`; entries Rename (`simple-chat-folder-rename`), divider, Delete folder (`simple-chat-folder-delete`, danger) |
+| selected wash | `holdsSelected`: `bg-primary/10` |
+| ring | `isDropInto`: `ring-2 ring-primary` |
+| line | `dropEdge='before'`: `h-0.5` accent line on the top edge |
+| fade | none of its own; `data-dragging` only says it is the carried header |
+
+- The name is not a `<button>`: the carry turns away any press inside a `button`, so a mouse picks the folder up by its name.
+- Fresh effect (`isFresh`): opens the name for typing, selects it whole on first focus, `scrollIntoView({ block: 'nearest' })`, calls `onFreshShown()`; the list clears its fresh id there, so it runs once per fresh turn.
+
+| Mark | Word key (`simpleList.`) | Disc ink |
+| --- | --- | --- |
+| `awaitingInput` | `awaitingInput` | `bg-warn-ink` |
+| `unread` | `unread` | `bg-primary` |
+| `running` | `running` | `bg-muted-foreground animate-pulse` |
+| `subagents` | `subagentsRunning` | `bg-purple-500 dark:bg-purple-400 animate-pulse` |
+
+## `SidebarSimpleFolderPicker.tsx`
+Props: `open`, `folders: SimpleListFolder[]`, `currentFolderId: string \| null`, `onPick(folderId \| null)`, `onCancel`, `t`.
+
+- `Dialog` `simple-chat-folder-dialog`, titled `simpleList.folderPickerTitle`; closing it calls `onCancel`.
+- One `simple-chat-folder-option` per folder, `data-folder-id` = its id, in given order.
+- The current folder's option: `disabled`, `aria-pressed`, `ring-2 ring-primary`. A press on another calls `onPick(folderId)`.
+- A last option `data-folder-id="none"` (`simpleList.noFolder`) only when `currentFolderId !== null`; a press calls `onPick(null)`.
+- Cancel = `simple-chat-folder-cancel`, label `actions.cancel` (`sidebar.json`).
+
+## `SidebarSimpleListRow.tsx` — two props
+| Prop | Effect |
+| --- | --- |
+| `isNested: boolean` | `ml-8` and `data-nested="true"` (attribute absent otherwise) |
+| `onMoveToFolder: (() => void) \| null` | non-null adds `simple-chat-move-to-folder` (`simpleList.moveToFolder`, `FolderInput`) between Change icon and Archive; null draws no entry |
+
+- `ml-8` = 32px = the row's icon box (`w-6`) + `gap-2`: a nested glyph starts in the folder header's chevron column and the title starts past the folder's name. Anything that moves the chevron moves this indent.
+
+## Gate — `.verify/probe-simple-folders.mjs`
+- `node .verify/probe-simple-folders.mjs` (dev server on `127.0.0.1:5183`, signed in through `openConsole`); `ONLY=1440-light|1440-dark|390-light|390-dark` runs one combination. Gitignored; not a `phase-*.mjs`, so `all.mjs` does not run it.
+- Mounts fixture props over the signed-in page through `lib/mountReact.mjs`: 17 states × 4 combinations (1440×900 and 390×844, light and dark). States: header with each of the four dots and none, folded and open, holding the open chat, renaming, as a drop target; picker with and without a current folder; tree with a loose chat, an open and a folded folder, a carried folder's block, the end line.
+- Fixture host: `position:fixed`, `z-index:60` (under `ActionMenu`'s `z-[70]`, over the app), background `var(--canvas)` (`--background` is not defined); the picker's host is `display:contents` so its body-portalled Dialog shows. Frame width = the app's own sidebar width at that viewport.
+- Shots: `.verify/shots/simple-folders-<state>-<width>-<light|dark>.png`; artifact `.verify/artifacts/simple-folders.json`.
+- Checks: dot count, mark and label; `data-collapsed`; nested count, indent and column alignment; block count and kinds; rename value; line, ring and wash; fades (carried chat's row, carried folder's block, the header itself never); end line; picker rows and disabled state; height rule; name not a `<button>`. Seam 7: press, Enter and Space on the toggle each call `onToggle`; a press on the glyph calls nothing; the carry props arrive under the folder's ref; the picker's three answers (`onPick(id)`, `onPick(null)`, `onCancel`).
+- Live check, last in each combination: the list is turned on for the probe's own context by `pinPreferences(… { simpleChatList: true }, { writes: 'drop' })` then a reload; it draws no folder chrome, every row is flush left, no row menu offers "Move to folder…". It runs last because the fixture checks read the whole document and a pinned page draws live rows.
+- Account: nothing is created on the server and no turn is sent. `openConsole`'s park PATCHes `simpleChatList: false`; the probe reads the stored value before it and restores it after `browser.close()`.
+- Ends `<n> states photographed, every check passed` (exit 0), else `FAILED (<n>)` (exit 1).
+- 2026-09-30: 266 `[ok]`, 0 FAIL, 70 shots (68 fixture + 2 live), on the version before the live check moved to a pin. The pinned version is `node --check`ed, not run.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/SidebarSimpleFolderPicker.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/SidebarSimpleFolderRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/SidebarSimpleListItems.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/SidebarSimpleListRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/SidebarSimpleList.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-simple-folders.mjs
+
+## MAN-7524 — The simple list's feed hook — useSimpleChatList holds the tree
+
+`src/modules/sidebar/hooks/useSimpleChatList.ts`: the paginated, server-tagged feed behind `SidebarSimpleList` and `SidebarSessionPicker`. Signature `useSimpleChatList(selectedSessionId: string | null, enabled = true)`. The list: MAN-661. Feed route and frame: MAN-7519. Types: MAN-7514. Tree functions: MAN-7520. Removal fan-out: MAN-7507.
+
+## State
+- `items: SimpleListItem[]` is the one piece of feed state; every local edit goes through a `simpleChatTree` function (MAN-7520). why: one home per edit, no second list to disagree.
+- `rows` = `useMemo(() => flattenChats(items), [items])`: every chat, flat, in drawn order, a folder's chats in the folder's place. The picker lists it; "is the open chat loaded" asks it.
+- `total`, `hasMore`, `isLoading`, `hasError`: server's counts and fetch flags.
+- `total`, `loadMore`'s offset and `items.length` are in TOP-LEVEL rows: a folder counts once however many chats it holds.
+- `enabled` false: no page fetched, no websocket subscription, no open-chat reload. Turning it on fetches page one.
+
+## Return — twelve members
+| Member | Is |
+| --- | --- |
+| `items` | top-level rows, server order: a loose chat, or a folder with its chats whole |
+| `rows` | `flattenChats(items)` |
+| `total`, `hasMore`, `isLoading`, `hasError` | as above; `isLoading` is true only while a non-append fetch is in flight |
+| `reload()`, `loadMore()` | see Paging |
+| `patchLocal(sessionId, { sessionTitle?, icon? })` | `patchChat`; `unread` is outside the patch type: the server's answer to a finished run, never a guess |
+| `patchFolderLocal(folderId, { name?, collapsed? })` | `patchFolder` |
+| `removeLocal(sessionId)` | fan-out to every mounted instance (MAN-7507) |
+| `moveLocal(item: SimpleListItemRef, position: SimpleListPosition)` | `moveItem`; the same tree when the row, folder or anchor is not in it, so a missing anchor never means "the top" |
+
+## Paging
+Request: `api.recentConversations({ limit, offset, simpleList: true })`; answer `{ conversations, layout, total, hasMore }`; page = `treeFromFeed(conversations, layout ?? [])`.
+
+| Call | `offset`, `limit` | Effect on `items` |
+| --- | --- | --- |
+| first fetch (mount, or `enabled` turning on) | `0`, `PAGE_SIZE` = 20 | replaces |
+| `reload()` | `0`, `Math.min(MAX_RELOAD_ROWS, Math.max(PAGE_SIZE, items.length))` | replaces |
+| `loadMore()` | `items.length`, `PAGE_SIZE` | `appendPage(previous, page)` |
+
+- `MAX_RELOAD_ROWS = 100`: the feed route bounds `limit` at 1–100 and answers 400 above it. A list paged past 100 top-level rows reloads its first 100; the rest is one `loadMore` away.
+- A replace discards every local write made since: re-reading the server's list is what settles them.
+- `requestSeqRef`: a response older than the latest request is dropped.
+
+## Reload triggers
+| Trigger | Rule |
+| --- | --- |
+| `session_upserted` or `simple_list_changed` frame | one `reload()`, debounced `RELOAD_DEBOUNCE_MS` = 500 |
+| open chat missing from `rows` | one `reload()` per `selectedSessionId` (`attemptedForRef`). why: a session outside the feed would loop forever |
+
+## Optimistic writes
+- `patchLocal`, `patchFolderLocal`, `moveLocal` show the change at once; the `session_upserted` / `simple_list_changed` reload confirms it.
+- `useSimpleChatFolders.move(item, position)` (the composer's folder hook, `SidebarSimpleList.tsx`) calls `moveLocal(item, position)`, then `api.simpleList.move` (MAN-7514); a refusal or a failure is logged and answered with `reload()`.
+- The live list draws the tree through `SidebarSimpleListItems`, with the folder verbs in `useSimpleChatFolders` (MAN-7528).
+
+## Gate — `.verify/probe-simple-feed.mjs`
+- `node .verify/probe-simple-feed.mjs` (dev app `127.0.0.1:5183`, dev API `127.0.0.1:3011`, Chromium through `openConsole`). Zero model turns. Gitignored; a `probe-*.mjs`, so `all.mjs` does not run it.
+- Pins the list ON for its own page: `pinPreferences(… { simpleChatList: true }, { writes: 'drop' })`, then reloads. Reads the account's `simpleChatList` BEFORE `openConsole` (its park PATCHes `false`) and restores it AFTER `browser.close()`. why: a live page holds a local-first copy that would overwrite an earlier restore.
+- Setup: one `probe-feed-<HHMMSS>` chat through the real `POST /api/providers/sessions`; the folder and the move go through the page's own `src/shared/api.ts` (`api.simpleList`).
+- Counts every `recent?…simpleList=true` request the page makes.
+
+| Gate | Proves |
+| --- | --- |
+| C1 | the chat's creation drew its row and moved a feed re-read (`session_upserted`) |
+| C2 | `api.simpleList.createFolder('probe-folder')` → 201 with the minted id |
+| C3 | the folder write moved a feed re-read (`simple_list_changed`) |
+| C4 | `api.simpleList.move` of the chat into the folder → 200 echoing `item`, `folderId`, `after: null` |
+| C5 | the move moved a feed re-read (`simple_list_changed`) |
+| C6 | the feed's `layout` holds the folder with the chat's id in it |
+| C7 | `[data-testid="simple-chat-row"]` ids equal the feed's `conversations` ids, the folder's chat among them |
+
+- Cleanup in `finally`: `deleteFolder` (200 `{ released: 1 }`), `DELETE …/sessions/<id>?force=true` (200), browser closed, `simpleChatList` restored.
+- Ends `SIMPLE-LIST-FEED PASS`, else `SIMPLE-LIST-FEED FAIL (<n>)` and exit 1.
+- 2026-09-30: seven gates green; folder write → reload 528 ms, move → reload 663 ms; 9 drawn rows = 9 feed rows.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/hooks/useSimpleChatList.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-simple-feed.mjs
+
+## MAN-7525 — The simple list's carry — `useSimpleChatDrag` and the pointer's reading of the drawn list
+
+`src/modules/sidebar/hooks/useSimpleChatDrag.ts`: pointer-event carry for the simple list's folder tree. Press a chat row or a folder header, carry it, drop it; on release one `onMove(item, position)`. Module-private: no barrel export. The list: MAN-661. Tree functions and `positionForDrop`: MAN-7520. Types (`SimpleListItemRef`, `SimpleListDropTarget`, `SimpleListPosition`): MAN-7514. The components that draw the marks and spread `dragProps`: MAN-7523.
+
+## Wiring
+- 2026-09-30: live. `SidebarSimpleList.tsx` calls `useSimpleChatDrag({ items, onMove: move })`, `move` being `useSimpleChatFolders`' (MAN-7528); `.verify/probe-simple-folder-composer.mjs` drives the carry on the mounted tree, `.verify/probe-simple-drag.mjs` at the hook level.
+- Why pointer events, not the browser's drag-and-drop: DnD never fires from a touch screen and this list is used on a phone.
+- Size: 300 LOC against the 300 default. The next addition wants an extraction, not an append.
+
+## Signature
+`useSimpleChatDrag({ items, onMove })`
+
+| In | Is |
+| --- | --- |
+| `items: SimpleListItem[]` | the tree; read through a ref at release |
+| `onMove(item: SimpleListItemRef, position: SimpleListPosition)` | read through a ref at release |
+
+| Out | Is |
+| --- | --- |
+| `dragging` | `SimpleListItemRef \| null`: the carried row, set once the press passes the threshold |
+| `dropTarget` | `SimpleListDropTarget \| null`: where the pointer says it would land; re-rendered only when the target changes |
+| `dragProps(ref)` | `Pick<HTMLAttributes<HTMLElement>, 'onPointerDown' \| 'onClickCapture' \| 'onDragStart'>`; spread on every chat row and folder header (assigns to `SidebarSimpleListItems`' `dragProps`) |
+
+## Gesture
+| Rule | Is |
+| --- | --- |
+| threshold | `DRAG_THRESHOLD_PX = 5`: less travel is a click |
+| press guards | primary button only; a press inside `button, input, [data-no-drag]` stays that control's; a touch starts only inside `[data-drag-handle]` |
+| one press | a press while another is armed is ignored |
+| carry start | the text selection is cleared (`removeAllRanges`) |
+| listeners | four on `window` per press (`pointermove`, `pointerup`, `pointercancel`, `keydown`), removed at press end and on unmount |
+| release | `pointerup` of the armed pointer id ends the press and commits |
+| abandon | `Escape` or `pointercancel` ends the press and commits nothing |
+| click | a carry's release is followed by a swallowed click (`onClickCapture`: `preventDefault` + `stopPropagation`); a keyboard click (`detail === 0`) passes; the next `pointerdown` disarms the swallow before its guards run |
+| native drag | `onDragStart` is `preventDefault`ed |
+
+## Commit
+- On release after a carry: `positionForDrop(itemsRef.current, press.item, target)` (MAN-7520); `onMove` fires only for a non-null answer. A drop that changes nothing prints nothing.
+- No target is never a move.
+
+## DOM contract (selectors the hook reads)
+| Selector | Is |
+| --- | --- |
+| `[data-testid="simple-chat-list"]` | list root; absent ⇒ no target |
+| `[data-testid="simple-chat-row"]` + `data-session-id` | a chat row → `{ kind: 'chat' }` |
+| `[data-testid="simple-chat-folder"]` + `data-folder-id` | a folder header → `{ kind: 'folder' }` |
+| `[data-testid="simple-chat-block"]` + `data-item-kind` (`chat` \| `folder`) + `data-item-id` | one top-level row's block |
+
+- The target comes from the boxes the list draws, never from the tree: drawn order is what the reader sees.
+
+## Target — carrying a chat (`chatTargetAt`)
+Scan: every row and header under the root, in document order, carried row included. `over` = the last whose top edge is at or above the pointer (the gap between two rows belongs to the row above). `drawnBelow` = some row begins below the pointer.
+
+| Pointer | `dropTarget` |
+| --- | --- |
+| above the first drawn row | `{ at: 'row', item: <first drawn>, edge: 'before' }` |
+| `over` is the carried row, and not (`!drawnBelow` and pointer below the list root's box bottom) | `{ at: 'row', item: <carried>, edge: 'before' }` ⇒ `positionForDrop` null ⇒ no move |
+| `over` is the carried row, `!drawnBelow`, pointer below the list root's bottom | `{ at: 'end' }` |
+| `!drawnBelow` and pointer below `over`'s bottom | `{ at: 'end' }` |
+| `over` a chat row | `{ at: 'row', item, edge }`: `before` above the row's middle, else `after` |
+| `over` a folder header | top quarter: `{ at: 'row', item: folder, edge: 'before' }`; the rest: `{ at: 'into', folderId }` |
+
+- Own place is named by the carried row's own `before` edge. why: `positionForDrop`'s `refAbove` skips the carried row and answers the row above it in its own container, which is the position the row holds now. Dropping the carried row from the scan hands the pointer to the next row, a top-level one when the carried row is a folder's last chat, and a press-release inside it reads as a lift out of the folder.
+- The end boundary for a carried last drawn row is the list root's box bottom, not the row's bottom edge. The row's own box, the gap under it and the list's padding tail all stay own place; past the root the row can be carried to `end` (the last chat of a last open folder reaches `{ folderId: null, after: <last top-level row> }`). Moving the boundary to the row's edge breaks drag 8 of the gate.
+
+## Target — carrying a folder (`folderTargetAt`)
+- Candidates: every `simple-chat-block` except the carried folder's own, in document order; none ⇒ no target.
+- Chosen: the first whose bottom edge is at or below the pointer; the last when the pointer is past all.
+- `{ at: 'row', item: <block's ref>, edge }`: `before` above the block's middle, else `after`.
+- Never `end`, never `into`: a folder lives at the top level, and past the last block the last block with `after` maps to the same place as `end`.
+
+## Gate — `.verify/probe-simple-drag.mjs`
+- `node .verify/probe-simple-drag.mjs` (dev server `127.0.0.1:5183`, signed in through `openConsole`, 1440×900). Gitignored; not a `phase-*.mjs`, so `all.mjs` does not run it. Zero model turns; creates nothing on the server.
+- Fixture: `lib/mountReact.mjs` mounts a component that calls the hook over a literal tree (loose `a1`, `a2`; open `f1[c1, c2]`; open `f2[e1]`), drawn as plain elements with the test ids and data attributes above, `dragProps` spread on every row and header. Drags are real (`page.mouse.down` / `move` / `up`). The hook's own `dragging` / `dropTarget` are rendered into the host and read while the button is still down.
+- Account: reads `simpleChatList` through the API BEFORE `openConsole` (its park PATCHes `false`), restores it AFTER `browser.close()`.
+- Artifact: `.verify/artifacts/simple-drag.json`.
+
+| Drag | Carried → aim | `dropTarget` | `onMove` |
+| --- | --- | --- | --- |
+| 1 | `a1` → header `f1`, 60% down | `into` `f1` | `{ folderId: 'f1', after: null }` |
+| 2 | `a2` → header `f2`, 5% down | `row` `f2` `before` | `{ folderId: null, after: folder f1 }` |
+| 3 | `a1` → row `c1`, 95% down | `row` `c1` `after` | `{ folderId: 'f1', after: chat c1 }` |
+| 4 | `c1` → 30px below `e1` | `end` | `{ folderId: null, after: folder f2 }` |
+| 5 | `a2` → its own row, 95% down | `row` `a2` `before` | none |
+| 6 | folder `f1` → block `f2`, 95% down | `row` `f2` `after` | `{ folderId: null, after: folder f2 }` |
+| 7 | `c2` (last of an open folder) → inside its own row | `row` `c2` `before` | none |
+| 8 | `c2` → 3px below its own box | `row` `c2` `before` | none |
+| 9 | `e1` (last of the last folder) → inside its own row | `row` `e1` `before` | none |
+
+- Each drag also checks `dragging` and `dropTarget` are `null` after release.
+- Ends `SIMPLE-DRAG PASS`, else `SIMPLE-DRAG FAIL` (exit 1); a signed-in console error also fails.
+- 2026-09-30: 9 of 9 PASS, exit 0.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/hooks/useSimpleChatDrag.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-simple-drag.mjs
+
+## MAN-7528 — The simple list's folder verbs — `useSimpleChatFolders`, the composer `SidebarSimpleList` and its walk
+
+`src/modules/sidebar/hooks/useSimpleChatFolders.ts` owns the simple list's folder verbs; `src/modules/sidebar/SidebarSimpleList.tsx` composes it with the feed, the carry, the disposals and the tree. Module-private: no barrel export. The list: MAN-661. Feed hook: MAN-7524. Carry: MAN-7525. Tree components and their test ids: MAN-7523. Types and `api.simpleList`: MAN-7514.
+
+## `useSimpleChatFolders` — signature
+`useSimpleChatFolders({ items, reload, patchFolderLocal, moveLocal, t })`
+
+| In | Is |
+| --- | --- |
+| `items: SimpleListItem[]` | the tree as the feed holds it: which folders exist, where a chat sits now |
+| `reload: () => Promise<void>` | `useSimpleChatList`'s re-read; the floor every refused or failed write falls back to |
+| `patchFolderLocal(folderId, { name?, collapsed? })` | the optimistic write behind rename and fold |
+| `moveLocal(item, position)` | the optimistic write behind a move |
+| `t: TFunction` | a new folder is born named `t('simpleList.newFolder')` |
+
+| Out | Is |
+| --- | --- |
+| `freshFolderId`, `onFreshShown()` | the folder just made, or null; the header opens its rename input once, then calls `onFreshShown` (MAN-7523) |
+| `pickerChat`, `pickerFolderId` | the chat whose "Move to folder…" dialog is open (null = closed); the folder that chat sits in, derived from `items` by `useMemo` (null = top level) |
+| `pendingDeleteFolder` | the folder whose delete waits on a yes, or null |
+| `createFolder()` | `api.simpleList.createFolder(t('simpleList.newFolder'))`; on `ok` reads `data.folderId`, `await reload()`, then sets `freshFolderId`. why: the fresh header must be mounted before the id is named. A failure is logged and answered with `reload()` |
+| `renameFolder(folderId, name)` | `patchFolderLocal` then `api.simpleList.updateFolder(folderId, { name })` |
+| `toggleFolder(folder)` | `patchFolderLocal` then `updateFolder(folderId, { collapsed: !folder.collapsed })` |
+| `requestDelete(folder)` | `folder.chats.length === 0` ⇒ deleted at once; else sets `pendingDeleteFolder` |
+| `confirmDelete()`, `cancelDelete()` | delete `pendingDeleteFolder` (clearing it first) / clear it |
+| `openFolderPicker(chat)`, `closeFolderPicker()` | set / clear `pickerChat` |
+| `moveToFolder(folderId \| null)` | the picker's answer; see Picker answers |
+| `move(item, position)` | the carry's `onMove`: `moveLocal(item, position)` then `api.simpleList.move(item, position)` |
+
+## Write rule
+- `renameFolder`, `toggleFolder`, `move`: optimistic. The route is asked after the local write; a non-`ok` answer or a throw is logged (`[SidebarSimpleList] Failed to …`) and followed by `reload()`.
+- `createFolder`, folder delete: not optimistic. The route first, then `reload()` (a delete always reloads, a failure logged first).
+- A `reload()` replaces `items` (MAN-7524 §Paging), so it undoes every local write the server did not take.
+
+## Picker answers — `moveToFolder`
+Closes the dialog first, then:
+
+| Pick | Write |
+| --- | --- |
+| folder F | `move({ kind: 'chat', id }, { folderId: F, after: null })`: first in F, under its header |
+| none, chat in folder G | `move(ref, { folderId: null, after: { kind: 'folder', id: G } })`: top level, directly under G |
+| none, chat already top level | no write |
+
+## `SidebarSimpleList` — wiring
+- Props: `projects`, `selectedProject`, `selectedSession`, `onProjectSelect`, `onSessionSelect`, `onNewSession`, `onSessionRemoved`, `onRenameSession`, `t`.
+- `useSimpleChatFolders({ items, reload, patchFolderLocal, moveLocal, t })`; `useSimpleChatDrag({ items, onMove: move })`: a drop and a "Move to folder…" are one write path.
+- `confirmDelete` / `cancelDelete` from the folder hook are aliased `confirmFolderDelete` / `cancelFolderDelete`: `useSimpleChatRemove` returns the same names.
+- `folders` = the `kind: 'folder'` items of `items`, drawn order; it feeds `SidebarSimpleFolderPicker`.
+- `onMoveToFolder` = `null` while `folders.length === 0`, else `openFolderPicker` (no row offers "Move to folder…" until a folder exists).
+
+| State | Draws |
+| --- | --- |
+| `hasError && items.length === 0` | the load-failed text and Try again; no New folder |
+| `!isLoading && items.length === 0` | `simple-chat-empty`, the New chat pill, New folder |
+| otherwise | `simple-chat-list-rows` (`select-none` while `dragging !== null`): `SidebarSimpleListItems`, the New chat pill, New folder, `simple-chat-load-more` when `hasMore` |
+
+- New folder = `simple-chat-new-folder`, `t('simpleList.newFolder')`: the one way a folder is born.
+- Five dialogs: stop, delete, icon picker, `SidebarSimpleFolderPicker`, and a `ConfirmDialog` for a folder delete (`simpleList.folderDeleteTitle`, `simpleList.folderDeleteBody`; Cancel `actions.cancel`, destructive `simpleList.folderDelete`).
+- Size: 2026-09-30, `SidebarSimpleList.tsx` 298 LOC and `useSimpleChatFolders.ts` 220 LOC against the 300 default; the next addition to the composer wants an extraction, not an append.
+
+## Gate — `.verify/probe-simple-folder-composer.mjs`
+- `node .verify/probe-simple-folder-composer.mjs` (dev app `127.0.0.1:5183`, dev API `127.0.0.1:3011`, Chromium through `openConsole`); `DARK=1` runs the same walk in the dark theme. Zero model turns. Gitignored (`.verify/`); not a `phase-*.mjs`, so `all.mjs` does not run it.
+- Fixture: three chats through `POST /api/providers/sessions` (`simpleList: true`), named `probe-list-1..3`; the app is told `probe-list-1` waits on the reader (a `/sessions/running` stub with `awaitingInputSessionIds`), so the folder's dot has one possible mark. The list is pinned on for the page (`pinPreferences(… { simpleChatList: true }, { writes: 'drop' })`), PATCHed on, reloaded. Every gesture is `page.mouse` or a real click; the folder is made by the page's own New folder button, named `probe-list-folder`.
+- Account: `simpleChatList` is read BEFORE `openConsole` (its park PATCHes `false`) and restored AFTER `browser.close()`. why: a live page holds a local-first copy that would overwrite an earlier restore.
+- Cleanup in `finally`: each chat `DELETE …/sessions/<id>?force=true`, any leftover folder deleted by id, browser closed, preference restored.
+- Artifact `.verify/artifacts/simple-folder-composer.json` (`-dark.json` under `DARK=1`): `{ sessionIds, folderId }`, rewritten as each is created. Shots `.verify/shots/simple-folder-composer-{1440,390,delete-dialog}-<light|dark>.png`.
+
+| Step | Gate |
+| --- | --- |
+| S1 New folder | click `simple-chat-new-folder`; the folder is the first block, open (`data-collapsed="false"`), no dot; its `simple-chat-folder-rename-input` opens with the whole name selected (`selectionStart === 0`, `selectionEnd === length > 0`); the app's own `scrollIntoView({ block: 'nearest' })` fires on the `simple-chat-folder` root (the probe wraps `Element.prototype.scrollIntoView` before the click); typed name + Enter ⇒ POST `…/simple-list/folders` 201, PATCH `…/folders/<id>` 200 carrying `"name":"probe-list-folder"` |
+| S2 drag in | `probe-list-1`'s row carried to 60% down the header; the header wears `ring-2` while held; released, the row sits inside the folder's block; PUT `…/simple-list/position` 200 carrying `item` chat id, `folderId`, `after: null` |
+| S3 fold | press `simple-chat-folder-toggle`; `data-collapsed="true"`, the nested row leaves the page; exactly one `simple-chat-folder-dot`, `data-mark="awaitingInput"`; PATCH 200 carrying `"collapsed":true` |
+| S4 reload | the folder first, same id, folded, dot `awaitingInput`; chats 2 and 3 drawn |
+| S5 photographs | 1440 and 390 shots; at 390 the drawer is opened (`button[aria-label="Open menu"]`) if the header is hidden; the header is visible at 390 and again at 1440 |
+| S6 delete | folder menu ⇒ "Delete folder" ⇒ `[role="dialog"][aria-modal="true"]` shot ⇒ its destructive "Delete folder"; the folder block is gone, `probe-list-1` is the first top-level block, and `GET …/sessions/recent?simpleList=true&limit=100` `layout` holds no entry for the folder |
+
+- A failing step prints `[FAIL] Sn <reason with the observed value>`; later steps print "not reached".
+- Ends `SIMPLE-FOLDER-COMPOSER PASS` (exit 0), else `SIMPLE-FOLDER-COMPOSER FAIL` (exit 1).
+- 2026-09-30: 6 of 6 PASS, exit 0, light and dark, before the S1 selection and `scrollIntoView` gates were added; the probe with them is `node --check`ed, not run.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/hooks/useSimpleChatFolders.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/SidebarSimpleList.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-simple-folder-composer.mjs
+
+## MAN-7539 — Gate — .verify/probe-whole-folders.mjs: the folders' whole journey on :5184
+
+The folders' whole journey on the operator's own surface. Parts: MAN-7536 (folders), MAN-7528 (the composer walk `probe-simple-folder-composer.mjs`).
+
+## Gate — `.verify/probe-whole-folders.mjs`
+- `node .verify/probe-whole-folders.mjs > /tmp/<dir>/run.log 2>&1` — redirect OUTSIDE `server`, `src`, `.verify`. why: W9 echoes the four old-door symbols; a transcript under those three is found by W9's own grep and turns it red.
+- Target `http://127.0.0.1:5184` (`vite preview` of `.prod-client/builds/<stamp>`), not the dev client `:5183`. Precondition, the caller's check: `find src -newer .prod-client/.built -print -quit` prints nothing and `.prod-client/.building` is absent.
+- Gitignored; not a `phase-*.mjs`, so `all.mjs` does not run it. Zero model turns, so the Haiku-probe rule binds nothing.
+- One Playwright session, one context, two pages: desktop 1440×900 and phone 390×844 (drawer opened). The context pin `pinPreferences(… { simpleChatList: true }, { writes: 'drop' })` serves both; the phone's `/sessions/running` answer rides `context.route`, the same `runningStub()` as the desktop page's. The phone's main-frame navigation count is W1's "no reload" proof. Keep both properties in any edit.
+- Fixture: four chats `probe-whole-1..4` through `POST /api/providers/sessions`; `-1` waits on the reader (`awaitingInputSessionIds`), `-2` carries a subagent; one folder born by the page's own New folder button, named `probe-whole-folder`, renamed `probe-whole-folder-two` in W8.
+- Account: `simpleChatList` read BEFORE `openConsole`, restored AFTER `browser.close()` (MAN-7528's rule).
+- Cleanup in `finally`: each chat `DELETE …/sessions/<id>?force=true`, the folder `DELETE` when `folderId` is still set, browser closed, preference restored. `.verify/artifacts/whole-folders.json` `{ sessionIds, folderId }` is the sweep list of an interrupted run.
+- Shots `.verify/shots/whole-folders-{1-fresh,2-carried-in,3-carried-out,4-picker-in,4-under-folder,5-folder-moved,6-folded-1440,6-folded-390,7-picker-flat,8-reloaded,8-delete-ask,8-deleted}-light.png`.
+
+| Step | Gate |
+| --- | --- |
+| W1 new folder | folder is the top block with its rename input open; typed name ⇒ POST 201, PATCH 200; the phone draws the name with 0 main-frame navigations |
+| W2 two in by carry | PUT `…/simple-list/position` 200 into the folder (header middle), then `after` a nested chat; the folder's one dot is `awaitingInput` |
+| W3 one out by carry | PUT 200 after a top-level row; the dot becomes `subagents` |
+| W4 "Move to folder…" | picker in: PUT 200 `after: null`; picker out: PUT 200 `after` the folder; the chat lands directly under the folder; the way out is pressed+disabled on the folder's option |
+| W5 folder carried | PUT 200 with `item.kind: 'folder'`; a folder's landing line is a plain `blockLine`, no `data-drop-edge`, and only the header wears `ring-2` for "into" — never gate a folder carry on those |
+| W6 folded | BEFORE the fold the phone must draw the nested row inside the folder's block (count 1); PATCH 200 `collapsed:true`; the chat leaves both pages; one dot `subagents` |
+| W7 picker flat | `session-picker-flat` lists every probe chat in the feed's own order, the folded folder's chat among them |
+| W8 reload, rename, delete | reloaded folded, pathname still ends `/session/<id>`; rename PATCH 200; confirm dialog ⇒ DELETE 200; the held chat sits at the folder's old position; `layout` holds no entry for the folder |
+| W9 old door | `PUT /api/providers/sessions/<id>/<old route>` ⇒ 404 `API_ROUTE_NOT_FOUND`; `grep -rn "<four symbols>" server src .verify` ⇒ stdout empty, exit 1 |
+
+- The four symbols are built from parts (`OLD_SYMBOLS`); none appears as a literal in the file. Keep that in any edit to `stepOldDoor`.
+- The fresh folder is found as "top block, a folder, rename input open", never `locator(FOLDER).first()`. why: a leftover folder would be taken.
+- W8's `folderId` names the folder only until the wire shows the app's own `DELETE …/folders/<id>` answered 200; it is then nulled so `cleanup` does not re-DELETE (no spurious `HTTP 404`), and the later checks read `goneId`. Keep the two roles apart.
+- The end prints `404 responses: [...]` by `METHOD path` for both pages.
+- A failing step prints `[FAIL] Wn <reason with the observed value>`; later steps print "not reached".
+- Ends `WHOLE-FOLDERS PASS` (exit 0), else `WHOLE-FOLDERS FAIL` (exit 1).
+
+## Console 404 on a fresh chat
+- `GET /api/providers/sessions/<id>/token-usage` answers 404 for a chat with no usage row; one fresh chat opened ⇒ one such 404 and one console error. Measured 2026-09-30 (`/tmp/heph-whole/see-404.mjs`, not kept).
+- `chat-window-bindings-home.mjs` forgives exactly this shape for a scratch chat. A chat with usage showed 0.
+
+## Record
+- 2026-09-30: 9 of 9 PASS at 15:14, exit 0, against `.prod-client/builds/20260930-145821`. That run predates two gates: W6's phone before-picture and W8's pathname check. The standing file has not run.
+- 2026-09-30: `node --check` OK on the standing file. Two page console 404s in that run: one is the mechanism above; the second is not attributed.
+- Size: 940 lines, over the 800 ceiling; the split shape is by stage (setup, steps, cleanup plus wire helpers).
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-whole-folders.mjs

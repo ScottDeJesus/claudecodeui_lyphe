@@ -380,6 +380,9 @@
       "open": "새 탭에서 페이지 열기",
       "rejected": "http:// 또는 https:// 주소가 아닙니다"
     },
+    "notes": {
+      "title": "메모"
+    },
     "open": "{{name}} 열기",
     "collapse": "접기",
     "dragHint": "양쪽 중 한쪽으로 드래그",

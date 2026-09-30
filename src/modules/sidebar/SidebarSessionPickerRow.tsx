@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { cn } from '@/shared/utils';
 import type { SessionPickerRow } from '@/shared/types';
 import { SimpleChatIconGlyph } from '@/modules/sidebar/SidebarSessionIcon';
+import { chatMarks } from '@/modules/sidebar/utils/simpleChatMarks';
 
 // File-local: read only by SidebarSessionPickerMenu, which renders one of these per conversation.
 type SidebarSessionPickerRowProps = {
@@ -34,7 +35,16 @@ type SidebarSessionPickerRowProps = {
  */
 export default function SidebarSessionPickerRow({ row, standalone, isCurrent, onPick }: SidebarSessionPickerRowProps) {
   const { t } = useTranslation('sidebar');
-  const showsUnread = row.unread && !isCurrent && !row.isRunning && !row.isAwaitingInput;
+  // Which of the four marks this conversation draws, from the row's own facts — the simple list's
+  // rule (`chatMarks`), with the open conversation standing in for "selected", so a row the reader
+  // is looking at is never dotted unread.
+  const marks = chatMarks({
+    unread: row.unread,
+    isSelected: isCurrent,
+    isRunning: row.isRunning,
+    isAwaitingInput: row.isAwaitingInput,
+    isSubagentRunning: row.isSubagentRunning,
+  });
 
   return (
     <a
@@ -77,7 +87,7 @@ export default function SidebarSessionPickerRow({ row, standalone, isCurrent, on
         )}
       </span>
 
-      {row.isAwaitingInput && (
+      {marks.awaitingInput && (
         <span
           role="img"
           aria-label={t('simpleList.awaitingInput')}
@@ -88,7 +98,7 @@ export default function SidebarSessionPickerRow({ row, standalone, isCurrent, on
         </span>
       )}
 
-      {row.isRunning && !row.isAwaitingInput && (
+      {marks.running && (
         <span
           role="img"
           aria-label={t('simpleList.running')}
@@ -99,7 +109,7 @@ export default function SidebarSessionPickerRow({ row, standalone, isCurrent, on
         </span>
       )}
 
-      {row.isSubagentRunning && (
+      {marks.subagents && (
         <span
           role="img"
           aria-label={t('simpleList.subagentsRunning')}
@@ -110,7 +120,7 @@ export default function SidebarSessionPickerRow({ row, standalone, isCurrent, on
         </span>
       )}
 
-      {showsUnread && (
+      {marks.unread && (
         <span
           role="img"
           aria-label={t('simpleList.unread')}

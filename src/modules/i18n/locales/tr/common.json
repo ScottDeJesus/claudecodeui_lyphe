@@ -381,6 +381,9 @@
       "open": "Sayfayı yeni sekmede aç",
       "rejected": "Bu bir http:// veya https:// adresi değil"
     },
+    "notes": {
+      "title": "Notlar"
+    },
     "open": "{{name}} aç",
     "collapse": "Daralt",
     "dragHint": "İki yandan birine sürükleyin",

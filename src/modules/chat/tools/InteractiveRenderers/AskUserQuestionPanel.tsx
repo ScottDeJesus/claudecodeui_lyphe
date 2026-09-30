@@ -4,10 +4,9 @@ import { ChevronDown, ChevronLeft } from 'lucide-react';
 
 import { useHostWindow } from '@/shared/context/HostWindowContext';
 import type { PermissionPanelProps, Question } from '@/shared/types';
-import { Badge, Button, Card } from '@/shared/ui';
+import { Badge, Button, Card, QuestionOptionRow } from '@/shared/ui';
 import { cn, isElementLike } from '@/shared/utils';
 import { QuestionText } from '@/modules/chat/tools/ContentRenderers/QuestionText';
-import { QuestionOptionRow } from '@/modules/chat/tools/InteractiveRenderers/QuestionOptionRow';
 import { QuestionTextField } from '@/modules/chat/tools/InteractiveRenderers/QuestionTextField';
 
 /** Stable fallback so the memoized handlers below are not invalidated on every

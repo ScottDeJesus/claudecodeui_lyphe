@@ -56,12 +56,14 @@ import { createSchedulesModule } from './modules/schedules/index.js';
 import browserUseRoutes from './modules/browser-use/browser-use.routes.js';
 import { assetsRoutes } from './modules/assets/index.js';
 import { createAccountsModule } from './modules/accounts/index.js';
+import { readClaudeActivity } from './modules/claude-activity/index.js';
 import { createClaudeUpdatesModule } from './modules/claude-updates/index.js';
 import { createCliVersionModule } from './modules/cli-version/index.js';
 import { createDeepseekModule } from './modules/deepseek/index.js';
 import { createKanbanModule } from './modules/kanban/index.js';
 import { createKanbanMetisModule, kanbanMetisSecretGuard } from './modules/kanban-metis/index.js';
 import { createMemoryIntakeModule, listMemoryCandidates } from './modules/memory-intake/index.js';
+import { createNotesModule } from './modules/notes/index.js';
 import { createDispatchSoulsModule } from './modules/dispatch-souls/index.js';
 import { createHealModule } from './modules/heal/index.js';
 import { createAgentLaunchModule } from './modules/agent-launch/index.js';
@@ -208,6 +210,10 @@ const claudeUpdates = createClaudeUpdatesModule({
     isListening: () => server.listening,
     requestReboot,
     onRebootFailed,
+    // The automatic install's gate: no Claude work in flight anywhere on this machine. Composed here
+    // because the answer spans the run registry, the session hosts, Metis and the process list, none
+    // of which the updates module may name.
+    readClaudeActivity,
 });
 app.use('/api/system', authenticateToken, systemRoutes);
 app.use('/api/claude-updates', authenticateToken, claudeUpdates.router);
@@ -256,6 +262,11 @@ app.use('/api/kanban-metis', authenticateToken, createKanbanMetisModule());
 // kanban mount a board Metis can reach cannot see it. Its proposals wait on a person's approval here,
 // and nothing reaches a shelf or a project's memory directory until one is given.
 app.use('/api/memory', authenticateToken, createMemoryIntakeModule());
+
+// One account's cards (protected), at this ONE address and on no other router: the notes lane, whose
+// four verbs are the whole of it. Every write here sends one `notes_changed` to the open sockets, and
+// the frame names neither a note nor an account — a client that hears it reads its own list again.
+app.use('/api/notes', authenticateToken, createNotesModule());
 
 // The SAME board router behind a second door, for the `kanban-pm` MCP child and nothing else —
 // no verb is duplicated here, and there is deliberately NO `authenticateToken`: a Metis is not a

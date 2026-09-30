@@ -36,6 +36,13 @@ import { cn } from '@/shared/utils';
  * and the model switch above the fold made a folded unstarted deck 164px against 86px for a started
  * one — a "collapsed" row that had not collapsed.
  *
+ * AN ARC'S ASKS ARE THE THIRD LAYER, BETWEEN THE HEAD AND THE BODY (`asks`, MAN-5706, MAN-7537): the plans
+ * still owing an answer, drawn on the deck rather than on each card, because one lock names every
+ * plan of the arc that still owes its Accept and the same prompt drawn on ten cards is ten presses of
+ * one door. The slot is OUTSIDE the fold, beside the head — a fold takes the strip and leaves the
+ * word the arc is waiting on where the reader put it (MAN-5412) — and the caller that passes no asks
+ * gets the deck exactly as it was: no slot, no gap, nothing drawn.
+ *
  * THE FOLD IS THE HOUSE'S OWN BODY SLOT, NEVER THE RAW CLIP (`CardFoldBody`, never
  * `CollapsibleContent`): a clip hides a body but leaves its controls in the tab order and in the
  * accessibility tree — on a folded lane card that is every verb of the arc, a keyboard press away and
@@ -59,6 +66,7 @@ export function DeckFrame({
   foldKey,
   flow,
   bodyTop = null,
+  asks = null,
   stripLabel,
   focusIndex,
   cardCount,
@@ -76,6 +84,14 @@ export function DeckFrame({
   flow: LaneFlow;
   /** The arc's `ActionBar`: the body's first row, so the fold takes it with the cards. */
   bodyTop?: ReactNode;
+  /**
+   * The arc's open asks, one `PlanAsk` each — drawn OUTSIDE the fold, directly under the head
+   * (MAN-5706: the asks slot sits between the head and the strip), because an owed word folds to its bar and
+   * never away (MAN-5412). Kept on the deck through a fold rather than inside the body the fold
+   * takes. `null` — the default — draws nothing at all, so a deck whose caller passes none is the
+   * deck exactly as it was.
+   */
+  asks?: ReactNode;
   /** What a screen reader hears for the strip of cards. */
   stripLabel: string;
   /** The card the strip opens on, and returns to when the arc moves. */
@@ -102,6 +118,11 @@ export function DeckFrame({
             gap to the body while the deck is open and the deck's own bottom padding once it folds —
             which is why the root carries none at the bottom. */}
         <header data-arc-header className="min-w-0 pb-3">{head}</header>
+        {/* BETWEEN THE HEAD AND THE FOLD'S BODY, on purpose: the asks are the arc's own layer — the
+            same one the head is on — so folding the deck away is not folding an owed answer away, and
+            the body's fold takes the strip and leaves this. The slot carries its own bottom gap
+            (`pb-3`, the head's own rule) and is simply not drawn when the caller passes none. */}
+        {asks !== null && <div data-arc-asks className="flex min-w-0 flex-col gap-2 pb-3">{asks}</div>}
         <CardFoldBody>
           {/* The body's spacing lives on this wrapper, never on `CardFoldBody`: that slot is a GRID
               whose row goes 1fr → 0fr, so a `flex`/`gap` passed to it would be overridden by its own

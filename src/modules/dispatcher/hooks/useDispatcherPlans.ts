@@ -1,9 +1,10 @@
 import { useEffect, useMemo } from 'react';
 
+import { askIdentity } from '@/modules/dispatcher/askState';
 import { epochOf } from '@/modules/dispatcher/dispatcherState';
 import { noteLaneClock, usePutAwayEntries } from '@/modules/dispatcher/hiddenPlans';
 import { DISPATCHER_ALL_TOPIC, useLiveTopic } from '@/modules/live-bus';
-import type { DispatcherArc, DispatcherDaemon, DispatcherLanePicture, DispatcherPlan, DispatcherPlanner, DispatcherRoute } from '@/shared/types';
+import type { DispatcherArc, DispatcherAsk, DispatcherDaemon, DispatcherLanePicture, DispatcherPlan, DispatcherPlanner, DispatcherRoute } from '@/shared/types';
 
 /**
  * The lane's read side: every plan the dispatcher's store holds, every planner outing of it and
@@ -44,6 +45,16 @@ export function useDispatcherPlans(): {
   arcs: DispatcherArc[];
   /** How many plans are DRAWN: the tab's badge and the pane's own count. A hidden or dismissed plan is not counted. */
   count: number;
+  /**
+   * How many prompts the DRAWN plans are waiting on — the distinct open asks, by `askIdentity`
+   * (`askState.ts`), across the plans this screen draws.
+   *
+   * COUNTED BY IDENTITY, NOT BY CARD: a lock names every plan of its arc still owing an Accept, and
+   * the operator owes that ONE answer however many cards carry it — so the amber mark on the Runner
+   * tab and the warn tone on the widget's badge count questions, not plans. Asked of the drawn plans
+   * alone, like `count`, because a plan the operator has put away draws no card his word could reach.
+   */
+  waiting: number;
   /**
    * Whether the Runner tab belongs on the bar: a plan is drawn, or one is hidden. A hidden plan is an
    * unfinished one, so a lane whose every card is put away but one of them still walks keeps its tab,
@@ -101,6 +112,11 @@ export function useDispatcherPlans(): {
 
     const planners = Array.isArray(picture?.planners) ? picture.planners : [];
 
+    // THE PROMPTS STILL OWED, by identity — one ask is ONE question however many cards carry it (a
+    // lock names every plan of its arc), and only the drawn ones count: a plan the operator has put
+    // away shows no card his word could reach.
+    const waiting = new Set(plans.map(planAsking).filter((ask): ask is DispatcherAsk => ask !== null).map(askIdentity)).size;
+
     return {
       plans,
       arcs,
@@ -111,6 +127,7 @@ export function useDispatcherPlans(): {
       loosePlanners: plannersWithNoHome(planners, plans, arcs),
       hidden,
       count: plans.length,
+      waiting,
       laneOpen: plans.length > 0 || hidden.length > 0,
       route: picture?.route ?? null,
       daemon: picture?.daemon ?? null,
@@ -132,12 +149,18 @@ export function useDispatcherPlans(): {
  * - A plan that ENDED after the press comes back as a card: an ending the operator never saw is news.
  *   One that has not ended, cannot be dated, or ended at or before the press (he had that ending in
  *   front of him) stays put away.
+ * - A plan whose ASK is newer than the press comes back too: a prompt is news beside an ending, and
+ *   the louder of the two, because a plan that owes the operator a word cannot move without him and a
+ *   card he cannot see is a card he cannot answer. The press it respects is the one made AFTER the ask
+ *   (`newestMoment`): a Hide with that prompt already on the screen was a decision about a plan he had
+ *   just read, and it holds.
  * - Held, a plan that is not complete is HIDDEN, because unfinished work must stay reachable. That
  *   covers a done plan re-cut and walking again under its dismissal: it waits in `Hidden` while it
  *   walks, and comes back as a card at the new ending.
  *
  * - An entry an ARC's corner wrote reads the arc's news instead of its own plan's: the newest
- *   creation or ending across every plan of that arc the lane carries (`arcNewsOf`).
+ *   creation, ending or ask across every plan of that arc the lane carries (`arcNewsOf`), so an arc
+ *   pressed away returns whole the moment one plan of it is asked.
  *
  * Every side is epoch SECONDS: `at` as `putAwayPlans` stamps it, the stamps through `epochOf`, so an
  * entry and this reading compare one number and not two spellings of one moment.
@@ -156,16 +179,33 @@ function putAwayReading(
 }
 
 /**
- * The newest moment the plan itself has on record, epoch seconds: its creation or its latest ending,
- * whichever is later, or `null` when neither can be dated. Either one after a press is news (the two
- * gates above), and a creation is never later than an ending, so the later of the two answers both.
+ * The ask this plan is waiting on, or `null` — `undefined` too, for a frame from a server older than
+ * the `asking` key. One place decides that a plan without one is simply not waiting, so the count of
+ * prompts and the lane's bell can read the same plans the same way.
+ */
+function planAsking(plan: DispatcherPlan): DispatcherAsk | null {
+  return plan.asking ?? null;
+}
+
+/**
+ * The newest moment the plan itself has on record, epoch seconds: its creation, its latest ending or
+ * the moment its open ask was ASKED, whichever is later — or `null` when none of the three can be
+ * dated. Any of them after a press is news (the gates above), and the later of the three answers all
+ * of them.
+ *
+ * THE ASK IS THE ONE MOMENT THAT IS NOT THE PLAN MOVING. A creation means a different plan under a
+ * reused name, and an ending means work the operator never saw; an ask means the plan is STUCK on
+ * him, and it is the only one of the three that can be dated after a plan has already ended. Read
+ * from the store's own `asked` stamp, never from a client clock: it is the ask's identity everywhere
+ * else (`askIdentity`), and a moment the store wrote cannot drift with a browser.
  */
 function newestMoment(plan: DispatcherPlan): number | null {
-  const moments = [epochOf(plan.created_at), latestEnding(plan)].filter((moment): moment is number => moment !== null);
+  const moments = [epochOf(plan.created_at), latestEnding(plan), epochOf(plan.asking?.asked.at ?? null)]
+    .filter((moment): moment is number => moment !== null);
   return moments.length > 0 ? Math.max(...moments) : null;
 }
 
-/** Each arc's newest moment across every plan of it the lane carries, drawn or put away: what an arc press reads. */
+/** Each arc's newest moment across every plan of it the lane carries, drawn or put away — its newest creation, ending or ask: what an arc press reads. */
 function arcNewsOf(lane: readonly DispatcherPlan[]): Map<string, number> {
   const news = new Map<string, number>();
   for (const plan of lane) {

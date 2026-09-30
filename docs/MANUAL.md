@@ -1339,6 +1339,7 @@ Pipeline depth: MAN-7401 (check), MAN-7402 (runner), MAN-7403 (API side), MAN-74
 | part | says |
 | --- | --- |
 | header | `Claude updates`; `Checked <relative> · next check <relative>` (`Not checked yet` before the first check); `Check now`, disabled with a spinner while `report.checking` |
+| auto-install row (`AutoInstallRow.tsx`) | directly under the header, drawn only when the report carries `autoInstall` (an older server's does not): `SettingRow` + the library `Switch`, labelled `Install updates automatically`, helper `Only when no Claude session is working. Checked every 5 minutes.`; the switch is `report.autoInstall.enabled` and a press PUTs the opposite (§"Claude updates — the automatic install"); while `report.autoInstall.waiting` is set, one `role="status"` line under it: `Not installed yet — <waiting>` |
 | `checkError` | warn `Banner` above the cards |
 | package card (`PackageUpdateCard.tsx`) | `Up to date · <installed>`; `<installed> → <latest> available` when `updateAvailable && updatable`; plain `<installed> → <latest>` when an update exists that is not `updatable`; then `reason` |
 | SDK card | `This server is running <loaded>; it loads <installed> at its next restart` — only when `loaded !== installed` |
@@ -1353,7 +1354,7 @@ Pipeline depth: MAN-7401 (check), MAN-7402 (runner), MAN-7403 (API side), MAN-74
 
 - Job active = `installing`, `installed`, `restarting` or `rolling-back` (`isUpdateJobActive`).
 - Step labels and job sentences: `updateWording.ts` (`UPDATE_STEP_LABELS`, `JOB_STATE_SENTENCES`), read by the job panel and the sidebar row.
-- Strings ship their own English `defaultValue`; `en/settings.json` holds only `mainTabs.updates`.
+- Strings ship their own English `defaultValue`; `en/settings.json` holds `mainTabs.updates` and the auto-install row's three strings (`updates.autoInstall.label`, `.description`, `.waiting`).
 
 ## Sidebar row — `ClaudeUpdateFooterRow.tsx`
 
@@ -1374,7 +1375,7 @@ Pipeline depth: MAN-7401 (check), MAN-7402 (runner), MAN-7403 (API side), MAN-74
 - why: MAN-504 — "a button in the sidebar would be one click ending work the person cannot see."
 - The pipeline aborts no turn either. A CLI install restarts idle conversations through the existing idle sweep (MAN-502). The SDK restart is a handover, which a turn in flight survives (MAN-676 case A: "the turn's own reply still arrives — once").
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/claude-updates/ClaudeUpdateFooterRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/claude-updates/ClaudeUpdatesSettingsTab.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/claude-updates/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/claude-updates/PackageUpdateCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/claude-updates/PatchNotes.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/claude-updates/UpdateJobPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/claude-updates/updateWording.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/claude-updates/AutoInstallRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/claude-updates/ClaudeUpdateFooterRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/claude-updates/ClaudeUpdatesSettingsTab.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/claude-updates/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/claude-updates/PackageUpdateCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/claude-updates/PatchNotes.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/claude-updates/UpdateJobPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/claude-updates/updateWording.ts
 
 ## MAN-7409 — Claude updates — the report and its contract
 section: claude-updates/001
@@ -1391,13 +1392,15 @@ section: claude-updates/001
 | `POST /check` | awaits `checkNow()`, 200 report |
 | `POST /apply` `{ targets }` | 202 report, or 400/409 `ClaudeUpdateRefusal` (§"Claude updates — the pipeline") |
 | `POST /restart` | 202 `{ requested: true }`, or 409 `ClaudeUpdateRefusal` (§"Claude updates — the reboot request, the commit and rollback") |
+| `GET /auto-install` | 200 `ClaudeAutoInstall` (`{ enabled, waiting }`) |
+| `PUT /auto-install` `{ enabled: boolean }` | 200 `ClaudeAutoInstall` read back after the write, or 400 `bad-request` when `enabled` is not a real boolean (§"Claude updates — the automatic install") |
 
 ## Where the contract lives
 
 - Declared in `server/shared/claude-update-types.ts`; mirrored field for field in `src/shared/claude-update-types.ts`. The two are edited together, always.
 - Both open with `//----------------- CLAUDE UPDATE CONTRACTS ------------`. Read the fields there; no copy is kept here.
 - Both are siblings of the over-ceiling `types.ts` (the `app-types.ts` / `kanban-types.ts` pattern).
-- Types: `ClaudeUpdatePackageKey`, `ClaudeUpdateNote`, `ClaudeUpdatePackage`, `ClaudeUpdateStepKey`, `ClaudeUpdateStepState`, `ClaudeUpdateStep`, `ClaudeUpdateJobState`, `ClaudeUpdateJob`, `ClaudeUpdatesReport`, `ClaudeUpdateApplyRequest`, `ClaudeUpdateRefusal`.
+- Types: `ClaudeUpdatePackageKey`, `ClaudeUpdateNote`, `ClaudeUpdatePackage`, `ClaudeUpdateStepKey`, `ClaudeUpdateStepState`, `ClaudeUpdateStep`, `ClaudeUpdateJobState`, `ClaudeUpdateJob`, `ClaudeAutoInstall`, `ClaudeUpdatesReport`, `ClaudeUpdateApplyRequest`, `ClaudeUpdateRefusal`.
 - Times are epoch milliseconds. A null version means "not known", never `0.0.0`.
 
 ## What fills the report
@@ -1408,6 +1411,7 @@ section: claude-updates/001
 | `supervised` | `supervised-boot.ts`'s `supervised`: this API can hand itself over |
 | `packages` | always `[cli, sdk]`, in that order |
 | `job` | `job.json` plus `logTail` (the last 40 lines of `job.log`, read per answer, never stored); the current job, or the last |
+| `autoInstall` | the switch in `app_config` plus what an update on offer is waiting for — decided from the rest of the report, so added after it (§"Claude updates — the automatic install") |
 
 Per package, three versions from three places, none inferred from another:
 
@@ -1421,14 +1425,14 @@ Per package, three versions from three places, none inferred from another:
 | `notes` | stored sections with `installed < v <= latest`, newest first | same |
 | `notesReason` | only while `updateAvailable` | same |
 
-- `buildReport` (`update-check.report.ts`) is pure; `claude-updates.module.ts` reads the job and its log tail for every answer.
+- `buildReport` (`update-check.report.ts`) is pure and answers `ReportReadings` — the report WITHOUT `autoInstall`; `claude-updates.module.ts` reads the job and its log tail for every answer and adds the `autoInstall` block from `update-auto-install.service.ts`.
 - `updateAvailable` is decided once, on the server. The client compares no versions.
 
 ## Client read — `hooks/useClaudeUpdates.ts`
 
 - One module-scope store, one poller: every 60 s, every 1.5 s while `job.state` is `installing`, `installed`, `restarting` or `rolling-back`.
 - Publishes only on a changed body; answers are taken in token order; a failed read keeps the last picture.
-- Returns `{ report, refresh, check, apply, restart }`. Each action resolves `{ ok: true }` or `{ ok: false, message }` (the refusal's message), then forces a read. `refresh()` resolves true or false.
+- Returns `{ report, refresh, check, apply, restart, setAutoInstall }`. A report without `autoInstall` (an older server's) is still drawn — the tab leaves out only the row, so the cards and the manual press stay. Each action resolves `{ ok: true }` or `{ ok: false, message }` (the refusal's message), then forces a read. `refresh()` resolves true or false.
 - Requests go through the `claudeUpdates` group of `src/shared/api.ts`.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/claude-updates/claude-updates.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/claude-updates/claude-updates.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/claude-updates/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/claude-updates/update-check.report.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/claude-update-types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/claude-updates/hooks/useClaudeUpdates.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/claude-update-types.ts
@@ -1472,6 +1476,7 @@ Files: `update-check.service.ts` (cadence, memory, journal line), `update-check.
 | `nextCheckAt` | `checkedAt + 30 min` |
 | `checkNow()` | shares one in-flight promise; never throws; `POST /check` awaits it |
 | `checking` | true while a check is in flight in this process |
+| after each tick's check | `afterTick()`, awaited: the automatic install's turn, deciding on the report that check produced (§"Claude updates — the automatic install"). A tick that throws is one `[claude-updates] tick failed: <error>` line |
 | timers | unref'd; `stop()` (shutdown) leaves a check in flight to finish |
 | a job ended | the reconciler calls `runCheck()` (§"Claude updates — the pipeline") |
 
@@ -1738,6 +1743,79 @@ Sep 28 15:32:48 [supervisor] reboot failed — told pid 4155946
 - The same grep also returns two earlier probe requests (pids 4151385 and 4155298) and one earlier `boot failed`.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/artifacts/claude-updates-final/record.md, /home/lyphe/.claude/claudecodeui_lyphe/.verify/claude-updates-final.mjs
+
+## MAN-7516 — Claude updates — the automatic install
+section: claude-updates/007
+
+The app presses "Update and restart" itself — but only when no Claude work is in flight anywhere on
+this machine. It is the button's own path: the same targets (the report's `latest` for every package
+that is `updateAvailable && updatable`) through the same `applyUpdate`, refusals and all. The manual
+button is unchanged and ungated. Files: `update-auto-install.service.ts` (the gate, the switch, the
+journal), `update-held-versions.ts` (the versions earlier jobs said to leave alone),
+`server/modules/claude-activity/` (the reading). The reading is injected into the module from
+`server/index.ts`; the module names no other module but through `claude-updates.module.ts`.
+
+## The clock
+
+- No timer of its own. `update-check.service.ts` runs `afterTick()` after every 5-minute tick's check (§"Claude updates — the check"), so the install decides on the report that check just produced.
+- The first tick is 5 s after `listen`; an update already on offer at boot installs then, if the machine is idle.
+- Toggling the switch on does not kick a tick: the next one takes it.
+
+## The gate — in order, every tick
+
+| # | must hold | when it does not |
+| --- | --- | --- |
+| 1 | the switch is on (absent means on) | nothing; the waiting line resets |
+| 2 | no job is `installing`, `installed`, `restarting` or `rolling-back` (`APPLY_ACTIVE_STATES`) | nothing waiting: it is already installing |
+| 3 | some package is `updateAvailable && updatable` | nothing to do, nothing waiting |
+| 4 | no earlier job holds this package's `latest` back (below); held packages drop out, the rest go on | waits, with the held reasons joined by `; `, when every package on offer is held |
+| 5 | `readClaudeActivity()` says idle — read fresh, the last await before the install | waits: the reasons joined with `; ` |
+| 6 | the switch is read once more after the reading | an operator who turned it off mid-reading is obeyed |
+
+Then `applyUpdate(targets)`. A refusal (`stale-target`, `job-active`, …) is one `warn` line, not a retry loop.
+
+**A job's word outlives the job.** `job.json` holds only the LAST job, so what a job says is written down the first time a tick or a report sees it (`update-held-versions.ts`): `app_config` key `claude_updates_held_versions`, `{"sdk": {"version", "why"}}`, one entry per package, read once per process and kept. An `update` that ended `failed`, `rolled-back` or `interrupted` holds its target; a `rollback` holds the version it moved AWAY from. A held `latest` is left for a human, with the reason as `waiting`. Without the memory, a failing install would repeat (and possibly restart the server) every five minutes, and a deliberate rollback would be undone as soon as any other job — the next Claude Code release, say — replaced the file. A newer release is a new question; a version the package has been moved to by hand is released. It is recorded before the switch is consulted, so a rollback made with the switch off is still remembered. The other packages on offer still install.
+
+## The activity reading — `readClaudeActivity()` → `{ busy, reasons }`
+
+| leg | counts | source |
+| --- | --- | --- |
+| conversations | a chat run in flight with provider `claude`; a live session host that `busyReason()` calls busy — counted once per app session id | `chatRunRegistry.listRunningRuns()`, `listLiveHosts()` + `busyReason` (the idle sweep's own test, exported through the session-host and providers barrels) |
+| Metis | a running board Metis session | `countRunningMetisSessions()` (kanban-metis barrel) |
+| other processes | every `claude` CLI process that is not a live host's own CLI: dispatch souls, plan-runner phases, terminal and shell-tab sessions | `ps -eo pid=,args=`, argv[0] basename `claude` or `claude.exe`, minus `LiveHost.cliPid` |
+
+- **Fails closed.** A leg that throws contributes a reason saying it could not be read (`the process list could not be read: …`, `the Metis sessions could not be counted yet`). Never installs on an unknown.
+- An idle keepalive host does not count: after a CLI install the idle-version sweep (MAN-502) winds it down and its next message starts on the new binary.
+- The bundled-tool helpers (`ugrep` exec'd through `claude.exe` with argv[0] rewritten) are not sessions and are excluded by the argv[0] rule.
+- Gap, by design of the rule: a plan chain BETWEEN two phases has no `claude` process for a moment.
+
+## The switch
+
+- `app_config` key `claude_updates_auto_install`, value `{"enabled": boolean}`; absent means ON. A value that is present but malformed reads as OFF and says so once in the journal; the next press rewrites it well-formed.
+- Read and written through `GET/PUT /api/claude-updates/auto-install` (§"Claude updates — the report and its contract"); the UI row reads it from `report.autoInstall`.
+
+## What `waiting` says
+
+`report.autoInstall.waiting` is non-null only while the switch is on and an update is on offer and no job is running: the gate's reason (Claude work, or the held version's reason), or `no Claude work is running — the next 5-minute check installs it` when nothing holds it. The activity reading behind the report path is shared for 10 s, so a few open tabs cost one reading.
+
+## The journal
+
+| when | line |
+| --- | --- |
+| an install starts | `[claude-updates] auto-install: installing <label> <from> → <to> [and …] — no Claude work is running` |
+| an update begins to wait | `[claude-updates] auto-install waiting: <reasons>` — only when the reason CHANGES; counts are blanked for the comparison, so "2 conversations" → "3" is silence |
+| apply refused | `[claude-updates] auto-install: <moves> was not started — <refusal message>` |
+| a failure | `[claude-updates] auto-install failed: <error>` |
+
+A process start forgets what it last said, so each new process says its wait once.
+
+## Seeing it
+
+- `GET /api/claude-updates` → `autoInstall: { enabled, waiting }`; `~/.cloudcli/claude-updates/job.json` appears when an install starts.
+- The idle path for real: the Updates tab's status line drops its `Not installed yet — …` sentence, `journalctl -u cloudcli-server-dev` shows the `auto-install: installing …` line, then the job panel takes over.
+- Proof: `.verify/claude-updates-auto-install.mjs` (desktop/mobile × dark/light, the switch flipped through the UI with each PUT read off the wire).
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/claude-activity/, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/claude-updates/update-auto-install.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/claude-updates/update-held-versions.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/claude-updates/AutoInstallRow.tsx
 
 ## MAN-501 — The CLI version report
 section: cli-version/000
@@ -2992,7 +3070,7 @@ governs: /home/lyphe/.claude/hooks/skill_router.py, /home/lyphe/.claude/skills/h
 ## MAN-1498 — The dispatcher lane
 section: dispatcher/000
 
-A polled lane on this server: fourteen routes under `/api/dispatcher`, behind `authenticateToken` in `server/index.ts` (`createDispatcherModule()`, the mount, and its `start()`/`stop()` after `listen` and on shutdown), wired in `dispatcher.module.ts`, plus one websocket frame pushed to every open `/ws` socket whenever the picture changes — `kind:
+A polled lane on this server: sixteen routes under `/api/dispatcher` (fifteen in `dispatcher.routes.ts`, plus the card's `POST /answer`, MAN-7534), behind `authenticateToken` in `server/index.ts` (`createDispatcherModule()`, the mount, and its `start()`/`stop()` after `listen` and on shutdown), wired in `dispatcher.module.ts`, plus one websocket frame pushed to every open `/ws` socket whenever the picture changes — `kind:
 'dispatcher_state'` — and one notification for each plan ending. A plan that lands owing the OPERATOR's word has its prompt put up in its owning chat's question panel — the Accept prompt or the designer's questions, raised by this lane itself through `dispatcher ask <name>` and answered back through `dispatcher accept` and `dispatcher tell` (MAN-7400) — and still not a word of it is this lane's composition: the census, the options and the questions are the dispatcher's. A path under `/api` that no lane names answers 404 JSON (MAN-5437).
 
 The dispatcher is a separate program. It owns a SQLite store under `~/.claude/state/dispatcher`
@@ -3045,7 +3123,7 @@ store's report already made that join and a second one would be a second answer 
 readings the arc's header is drawn by: `walking`, `stopped`, `schedule`); `dispatcher-planner.reader.ts`
 reads one planner OUTING — the row the card's and the deck header's badge is drawn from, `plannerOf`, and
 the two TOLERANT reads `plannerSince` / `plannersOf` for `planner` and `planners`, because those are keys
-a dispatcher build older than them never wrote; the transport file holds the
+a dispatcher build older than them never wrote (`route.planners`, the planner lane's dial and census, is tolerant the same way in `dispatcher-state.service.ts`: absent is no readout, a malformed one is refused by name); the transport file holds the
 vocabulary — and a field this build cannot read is refused BY NAME. AN ABSENT KEY IS NOT A MALFORMED
 ONE: the values read through the transport's `…Since` readers (a count, a text, a flag) take the
 shape's own empty when the key is missing, so a frame from a dispatcher build that predates a field
@@ -3158,7 +3236,7 @@ section: dispatcher/010 The plan card/001 The frame. `Card` with `data-dispatche
 probe scopes every reading and every press to ONE plan — the live plan walking beside it must never be
 pressed). Its head is `LaneCardHead` (`LaneCardHead.tsx`), the arc deck's own head too: row one is the mono `plan.name`, `PlanStatusBadge`, `PlanClock` and `done/total` phases (`phaseProgress`, `data-lane-progress`) in a wrapping group floored at the title's longest word (INV-4449), beside the corner — `⋯` while the plan is droppable (§"Delete asks first"), Dismiss on a complete plan (`X`, `data-dispatcher-dismiss`, "Dismiss plan") or Hide on any other (`EyeOff`, `data-dispatcher-hide`, "Hide plan"), by `putAwayVerb` (§"The put-away store"), and the fold; row two is the plan's description (`cardDescription` in `dispatcherState.ts`, `data-card-description`) — the first non-empty line of its design's `delivers`, read as plain text (a code span keeps its contents and loses its fence, `**` and `__` outside one go, whitespace collapses), or the goal's first non-empty line as written where `delivers` yields nothing — an arc's judgment plan before its own design loads (it carries the arc's goal), or a first line of markers alone; a plan being designed carries neither and draws no lead; a description is drawn whole — it wraps and no line of it is cut — then, where the document gives the plan an outing — `PlannerBadge` (§"Who is out on this
 plan" below) and `waits on` (`data-plan-waits-on`); row three is the plan's total as `SpendPills` (§"The spend pills" below), counting under the key
-`plan:<plan name>`. The body (`CardFoldBody`) is `PlanControls` — the card's `ActionBar` (`ActionBar.tsx`, `data-action-bar`): ONE wrapping row directly under the head, the verbs its status allows and then the model switch at `ml-auto`, every control in it 32px tall, and nothing at all when it has neither — then `PlanFace`. Props `{ plan, waitsOn?, onPutAway, headingLevel? }`, `onPutAway` being the caller's `planPutAway(plan, carriedNames)`; `headingLevel` is the title's heading — `3`, or `4` for a plan inside an arc deck (`ArcDeck.tsx` passes it) — NO `defaultOpen`.
+`plan:<plan name>`. Between the head and the body, OUTSIDE the fold, sits the ask band (`PlanAsk`, `data-plan-ask`; MAN-7537) — drawn when `plan.asking` is set and `showAsk` is true, nothing otherwise, keyed `askIdentity(plan.asking)` so a new ask starts empty. The body (`CardFoldBody`) is `PlanControls` — the card's `ActionBar` (`ActionBar.tsx`, `data-action-bar`): ONE wrapping row directly under the head, the verbs its status allows and then the model switch at `ml-auto`, every control in it 32px tall, and nothing at all when it has neither — then `PlanFace`. Props `{ plan, waitsOn?, onPutAway, headingLevel?, showAsk? }`, `showAsk` defaulting to `true` — `false` on every card inside an arc deck, whose prompts draw once on the deck (MAN-5706); `onPutAway` being the caller's `planPutAway(plan, carriedNames)`; `headingLevel` is the title's heading — `3`, or `4` for a plan inside an arc deck (`ArcDeck.tsx` passes it) — NO `defaultOpen`.
 
 The description's standing proof: `node .verify/probe-card-description.mjs` (the Runner tab at 1440 and 390, light and dark, on the dev client). It judges one plan card and one arc head — `--plan <name>` and `--arc <name>`, each of which must be drawn; else `claude-update-pipeline` while the lane carries it and the first plan card drawn once it does not (a `[NOTE]`), and the first arc deck drawn (a tab with no arc is a `[NOTE]`, the arc half skipped). exit 0 = each one's `data-card-description` text equals `cardDescription(delivers, goal)` over the row `dispatcher status --json` prints (the helper imported from the source), differs from the goal's first line where `delivers` is written, is drawn whole — computes `-webkit-line-clamp: none`, paints one or more lines, and hides none of them (its `scrollHeight` equals its `clientHeight`, its `scrollWidth` fits its `clientWidth`, and no ancestor up to the card's root clips it; a card whose helper reading is empty draws no lead at all); every lead on the tab equals the helper's reading; 0 console errors. It presses no card control and writes nothing: the page reads a copy of the preferences with an empty put-away list, and every preference write is answered in the browser. Measured 2026-09-29, 5183: `agent-launch-config`'s 1,008 characters paint on 13 lines at 1440 and 20 at 390, and the arc `restorly`'s head (1,367 characters) on 11 and 25, none clamped.
 
@@ -3190,7 +3268,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/, /home/l
 ## MAN-6785 — The plan card — The card folds
 section: dispatcher/010 The plan card/005 The card folds
 
-**The card folds** (MAN-5412): a `CardFoldToggle` in the head's corner, key `plan:<plan name>` — the plan's own name and nothing else: a fold carries no moment the way a hide does (`{ name, at }`), so a plan cut and walked again is still folded. Folded, the card keeps its whole head — the title, the status, the clock, `done/total`, the description, the planner badge, `waits on`, the total's pills and the corner; the action bar and the face go, out of the tab order with them. The description is drawn whole, so a folded card is as tall as its description is long: a fold does not make the card compact.
+**The card folds** (MAN-5412): a `CardFoldToggle` in the head's corner, key `plan:<plan name>` — the plan's own name and nothing else: a fold carries no moment the way a hide does (`{ name, at }`), so a plan cut and walked again is still folded. Folded, the card keeps its whole head — the title, the status, the clock, `done/total`, the description, the planner badge, `waits on`, the total's pills and the corner; the action bar and the face go, out of the tab order with them. The description is drawn whole, so a folded card is as tall as its description is long: a fold does not make the card compact. A card that owes an answer keeps the ask band's one-line bar when folded: the band is outside the fold's body, and the bar opens the card (MAN-7537).
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-arc-nest.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-arc-strip-return.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dispatch-arc-start.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dispatch-card-phases.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dispatch-card-version-word.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dispatch-model-word.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dispatch-resume-3am.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-planner-card.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-planner-card-write.py
 
@@ -3408,7 +3486,7 @@ count below). The head is `LaneCardHead`, the plan card's own; its corner is `�
 deck's BODY holds this lane's own first row — `DispatchArcControls`, ONE `ActionBar`: Pause, or Start and Schedule start, then the model switch —
 then the arc's flow (`StatusFlow`, one node a plan, MAN-643 → "The flow"), and then the cards: `ol[data-arc-strip]`, ONE CARD PER VIEW, in the tab as in the gutter — operator, 2026-09-26: "please bring back the swipable plan cards if it's under an arc"; an arc's plans are paged and only the plans NO arc holds are the wall's. Each plan of the arc is ONE ITEM
 (`li[data-dispatch-plan-row]`, a `DeckItem`, with `data-plan-name`, `data-pinned` and `data-arc-layer`) holding that plan's own `PlanCard`, WHOLE: its word, its phases, its bar
-and its corner, exactly as a plan of no arc has them. The gutter's strip opens on the plan whose turn it is
+and its corner, exactly as a plan of no arc has them, except the ask band: each card is drawn `showAsk={false}`, and the arc's prompts draw once in `DeckFrame`'s `asks` slot above the strip, one `PlanAsk` per `askIdentity` (`arcAsks`; MAN-5706, MAN-7537). The gutter's strip opens on the plan whose turn it is
 (`deckFocusIndex`: the first member that has not finished, or the last once all of them have) and, with more than one card, carries the deck's two arrows and its `Card N of M` line — the same strip in both homes, so the deck opens on that plan wherever it is drawn. `data-dispatch-arc`,
 `data-arc-name`, `data-arc-status` and `data-collapsed` sit on the DECK's root — `data-dispatch-arc` and `data-arc-name` are the deck's own handles, so a probe reads one arc's state and its plans' states from one
 element.
@@ -3436,6 +3514,8 @@ store no longer carries falls to `rest` with the arc-less ones. `RunnerPanel` an
 call it once and neither has a grouping of its own. `DispatchArcDecks` draws the list: `data-dispatch-arcs`
 on the group, `home` (`tab`/`gutter`) written on it so a reading is always taken from ONE home, one deck per arc (`home` picks NO layout — an arc is one strip in both homes (MAN-643) — and decides only the width each home gives it: the tab's deck spanning the pane, the gutter's being the widget card's flush width, each card taking the strip's whole width). An arc card is never empty — `useDispatcherPlans` drops an arc with no plan left on the lane — so
 `byArc` never draws a deck standing over nothing.
+
+**THE ASK LEADS, IN BOTH HALVES OF THE SPLIT** (`owesWord`/`anyOwesWord`, `askState.ts` — MAN-7532). `rest` is sorted by `byUrgencyThenNewest`: a plan that owes the operator a word first, above EVERY status (`STATUS_ORDER` then decides only among the plans that do not), newest-first inside each rank. `groups` are lifted too, and the arc's own order is what both halves keep: an arc holding any plan that owes a word comes up whole, ahead of the arcs that owe nothing — an arc's prompt stands over a sequence of plans that cannot move until the operator answers, and a deck is the item he presses. Both homes read this split and neither sorts, so the tab and the gutter cannot disagree about what comes first; the widget's regroup on top of it (the asks, then the open chat's, MAN-642) is the only other hand laid on this order.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-arc-nest.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-arc-strip-return.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dispatch-arc-start.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dispatch-card-phases.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dispatch-card-version-word.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dispatch-model-word.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dispatch-resume-3am.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-planner-card.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-planner-card-write.py
 
@@ -3493,7 +3573,7 @@ section: dispatcher/010 The plan card/022 The fold takes the cards AND the verbs
 **The fold takes the cards AND the verbs, and what it hides is inert.** The deck folds (`useCardFold`, key `darc:<arc name>` — the arc's own name):
 what stays is the whole head — which arc this is, its word, its armed hour, `done/total`, its description, its books and the corner — and what
 goes is the body: the `ActionBar` (`DispatchArcControls`: Pause/Start and the model switch) together with the flow and the
-cards. The verbs ride `bodyTop`: they are VERBS, the same layer a plan card's own controls fold, and keeping them in the header made a folded deck 164px against 86px — a "collapsed" row that had not collapsed (measured 2026-09-25). The fold hides through the house's body slot (`CardFoldBody`, `inert` + `aria-hidden` while
+cards. The deck's asks slot (`data-arc-asks`, MAN-7537) stays with the head and folds to each ask's one-line bar (MAN-5711). The verbs ride `bodyTop`: they are VERBS, the same layer a plan card's own controls fold, and keeping them in the header made a folded deck 164px against 86px — a "collapsed" row that had not collapsed (measured 2026-09-25). The fold hides through the house's body slot (`CardFoldBody`, `inert` + `aria-hidden` while
 closed) and never a raw clip: the hidden body of a dispatch arc is every plan of the arc with its own verbs
 (188 focusable controls behind a 0px clip, measured 2026-09-25), and a fold is remembered per card, so it
 would survive reloads. The two standing verb probes below scope their controls under
@@ -3519,7 +3599,7 @@ section: dispatcher/010 The plan card/023 The put-away store.
 
 **The put-away store.** A card's corner puts its plan away into a per-user list (`hiddenPlans.ts`: `hiddenPlans` under the `dispatcher` preference key, named for the one press it first held, written by ENTRY PATCH — INV-4406 — and capped at 200, newest kept) of `{ name: <plan name>, at: <epoch seconds of the press>, arc?: <arc name> }`, one entry per name. `at` is never earlier than the server clock of the newest lane frame the page has received (`noteLaneClock`, fed by `useDispatcherPlans` from the bus value's `at`; `pressMoment`): a browser clock running behind stamped a Dismiss before the ending it dismissed, and the card stayed. A clock running ahead still stamps late. Dismiss and Hide write the SAME entry, and the plan, never the press, decides how it reads: so every done plan that sat in `Hidden` before Dismiss existed left that list with no migration (operator, 2026-09-28: "when its done i want to dismiss it off the board, and not show that its hidden"). `usePutAwayEntries()` reads it; `showPlans(names, onLane)` and the file-private `putAwayPlans(names, onLane, arc?)` are each ONE patch: the pressed names, plus a `null` for every entry this client holds whose plan `onLane` (the caller's `carriedNames` — the UNFILTERED lane, put-away plans included, or the prune would drop every earlier entry) no longer names. An entry the patch does not name stands, so a press made on another client survives this one's write. The lane carries a finished plan for a day, so a dismissal is pruned soon after its plan leaves.
 
-`useDispatcherPlans` reads every plan as ONE of three (`putAwayReading`). DRAWN when no entry names it, when it was CREATED after `at` (a plan dropped and opened again under the name is a different plan, never born put away; a `created_at` nothing can parse holds the entry), or when it ENDED after `at` (news the operator never saw): one comparison, its `newestMoment` against `at`. AN ARC'S CORNER IS ONE PRESS: its entries carry `arc` and one `at`, read the newest moment across every plan of that arc on the lane (`arcNewsOf`), and `showPlans` nulls every entry of the same `arc` and `at` as a plan it shows. So a mixed arc's Hide (unfinished plans to `Hidden`, done ones dismissed) comes back whole on a `Show` or on news, never as a deck missing its done cards; a plan's own press and both `Dismiss done` presses carry no `arc`. Otherwise HIDDEN when it is not `complete` (unfinished work stays reachable) and DISMISSED when it is (on no list, in no count). Its ending (`latestEnding`) is `completed_at` for a plan that is not complete and the newest phase `done_at` for one that is: the store stamps `completed_at` once and never moves it, so only the phases date a re-cut plan's second ending — a done plan re-cut under its dismissal waits in `Hidden` while it walks, and comes back as a card at the new ending. It returns `plans` (drawn), `hidden` (unfinished only), `count` (drawn) and `laneOpen` (`plans` or `hidden` non-empty, so a lane whose every card is dismissed closes the tab). The presses live beside the store: `putAwayVerb(plans)` (`dismiss` when every plan is `complete`, else `hide`), `planPutAway(plan, carriedNames)`, `arcPutAway(arc, plans, carriedNames)` (every plan of a deck, one write, one press) and `doneDismiss(plans, carriedNames)` (every drawn `complete` plan, one write; `null` at zero). No dialog guards any of them: nothing is deleted, and the dispatcher keeps the plan. `HiddenPlans` (`Hidden · N`, a closed disclosure: each hidden plan's name, word and `Show`, then `Show all`; handles `data-hidden-plans`, `data-show-plan`, `data-show-all`) is the way back from a Hide, at the foot of both homes and under their EmptyState; a dismissal needs none. Proof: `node .verify/probe-dismiss-done.mjs` (the tab at 1440 and 390, the widget at 1920, dark and light; the operator's own stored row; a done-only lane closing the tab; two clients).
+`useDispatcherPlans` reads every plan as ONE of three (`putAwayReading`). DRAWN when no entry names it, when it was CREATED after `at` (a plan dropped and opened again under the name is a different plan, never born put away; a `created_at` nothing can parse holds the entry), when it ENDED after `at`, or when its open ASK was ASKED after `at` (news the operator never saw — an ending or a prompt, and the ask the louder of the two, since a plan that owes a word cannot move and a card he cannot see is a card he cannot answer; a Hide pressed with that prompt already on the screen holds): one comparison, its `newestMoment` against `at`. AN ARC'S CORNER IS ONE PRESS: its entries carry `arc` and one `at`, read the newest creation, ending or ask across every plan of that arc on the lane (`arcNewsOf`), and `showPlans` nulls every entry of the same `arc` and `at` as a plan it shows. So a mixed arc's Hide (unfinished plans to `Hidden`, done ones dismissed) comes back whole on a `Show` or on news, never as a deck missing its done cards; a plan's own press and both `Dismiss done` presses carry no `arc`. Otherwise HIDDEN when it is not `complete` (unfinished work stays reachable) and DISMISSED when it is (on no list, in no count). Its ending (`latestEnding`) is `completed_at` for a plan that is not complete and the newest phase `done_at` for one that is: the store stamps `completed_at` once and never moves it, so only the phases date a re-cut plan's second ending — a done plan re-cut under its dismissal waits in `Hidden` while it walks, and comes back as a card at the new ending. It returns `plans` (drawn), `hidden` (unfinished only), `count` (drawn) and `laneOpen` (`plans` or `hidden` non-empty, so a lane whose every card is dismissed closes the tab). The presses live beside the store: `putAwayVerb(plans)` (`dismiss` when every plan is `complete`, else `hide`), `planPutAway(plan, carriedNames)`, `arcPutAway(arc, plans, carriedNames)` (every plan of a deck, one write, one press) and `doneDismiss(plans, carriedNames)` (every drawn `complete` plan, one write; `null` at zero). No dialog guards any of them: nothing is deleted, and the dispatcher keeps the plan. `HiddenPlans` (`Hidden · N`, a closed disclosure: each hidden plan's name, word and `Show`, then `Show all`; handles `data-hidden-plans`, `data-show-plan`, `data-show-all`) is the way back from a Hide, at the foot of both homes and under their EmptyState; a dismissal needs none. Proof: `node .verify/probe-dismiss-done.mjs` (the tab at 1440 and 390, the widget at 1920, dark and light; the operator's own stored row; a done-only lane closing the tab; two clients).
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-arc-nest.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-arc-strip-return.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dispatch-arc-start.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dispatch-card-phases.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dispatch-card-version-word.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dispatch-model-word.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dispatch-resume-3am.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-planner-card.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-planner-card-write.py
 
@@ -3538,8 +3618,8 @@ there and is not a list is refused like every other field. The bus topic is `dis
 (`DispatcherLanePicture`) with the frame's `at` as its clock; no per-plan topic exists. `home` and `generated_at` are left out on purpose: `generated_at` is
 restamped every poll, so republishing the frame whole wakes every reader twice a second (2026-09-24: the four
 keys byte-identical across two reads 4 s apart, zero publishes). `useDispatcherPlans` reads that topic —
-`{ plans, hidden, arcs, planners, loosePlanners, count, laneOpen, route, daemon, offpeakAt, carriedNames }` — and every piece of the card reads the
-hook or `dispatcherState.ts`. The document's times are ISO-8601 UTC strings end to end: the server converts
+`{ plans, hidden, arcs, planners, loosePlanners, count, waiting, laneOpen, route, daemon, offpeakAt, carriedNames }` — and every piece of the card reads the
+hook or `dispatcherState.ts`. The feed also mounts `DispatcherAskBell` beside its children: it draws nothing and reads `dispatcher:all` for asks it has not heard (MAN-7540). The document's times are ISO-8601 UTC strings end to end: the server converts
 nothing, and `epochOf` (`Date.parse / 1000`) is the ONE edge where a string becomes the card's seconds.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-arc-nest.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-arc-strip-return.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dispatch-arc-start.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dispatch-card-phases.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dispatch-card-version-word.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dispatch-model-word.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dispatch-resume-3am.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-planner-card.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-planner-card-write.py
@@ -3551,7 +3631,13 @@ section: dispatcher/010 The plan card/025 The verbs' door.
 `stop|resume|park|unpark|drop(name)`, `schedule(name, when)`, `model(name, choice)` over
 `/api/dispatcher/plans…`, and `arcModel(name, choice)`, `arcStop(name)`, `arcResume(name)`,
 `arcSchedule(name, when)` over `/api/dispatcher/arcs/:name/…` — four routes, one per verb an arc's own
-name reaches (MAN-1498). The verbs return the
+name reaches (MAN-1498). `answer(ask, answers, notes?)` is no verb: it is `POST /api/dispatcher/answer`, the
+prompts' own door (MAN-7400), carrying the ask exactly as the card drew it, the chosen label (or typed words)
+by question, and a Rework's notes by question. `useDispatcherVerbs.answer` is the ONE press that reports
+back: it resolves `true` on a 2xx, `false` on a refusal or a request that never completed, and the card draws its
+answered state from that `true`; the eight verbs resolve `void`. `busy` is `'answer'` while it is out, and a
+control disables itself on it. `'answer'` lives in the hook's own `DispatcherPress` and never joins
+`DispatcherVerb`, the set the server spawns. The verbs return the
 raw `Response`: a refusal is a RESULT on a 409 with the dispatcher's line on `stdout`, which
 `useDispatcherVerbs` reads before `stderr`. `api.dispatcher` never throws on `!response.ok`.
 
@@ -3708,7 +3794,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/ArcDeck.t
 ## MAN-5706 — The arc deck's frame — What the frame owns.
 section: dispatcher/015 The arc deck's frame/002 What the frame owns.
 
-**What the frame owns.** The root (`data-arc-status`, `data-collapsed`, and the caller's own handles through `rootAttributes` — `data-dispatch-arc`, `data-arc-name`), the `Collapsible` whose trigger is the header's fold (`CardFoldToggle`, `data-card-fold`), the header (`data-arc-header`, holding the `head` the caller hands in — a `LaneCardHead`, the plan card's own head: title, word, clock and `done/total` in a WRAPPING group whose title is floored at its own longest word, INV-4449, beside the corner — `⋯` while its menu holds an item, Dismiss or Hide by `putAwayVerb`, the fold; then the lead and the pills — and, first in its title, the arc's mark, below), the body slot (`CardFoldBody`, `data-arc-deck-body`), top to bottom: the caller's `bodyTop` — its `ActionBar` — then the strip. The root rises once, `motion-safe:animate-shape-rise`, on the first mount of the page session that draws its `foldKey`, claimed by the copy whose rise plays and gone when it ends (`useRiseOnce`; the root carries its `className`, `onAnimationStart` and `onAnimationEnd` — MAN-1557 → "The rise").
+**What the frame owns.** The root (`data-arc-status`, `data-collapsed`, and the caller's own handles through `rootAttributes` — `data-dispatch-arc`, `data-arc-name`), the `Collapsible` whose trigger is the header's fold (`CardFoldToggle`, `data-card-fold`), the header (`data-arc-header`, holding the `head` the caller hands in — a `LaneCardHead`, the plan card's own head: title, word, clock and `done/total` in a WRAPPING group whose title is floored at its own longest word, INV-4449, beside the corner — `⋯` while its menu holds an item, Dismiss or Hide by `putAwayVerb`, the fold; then the lead and the pills — and, first in its title, the arc's mark, below), the asks slot (`asks?: ReactNode`, default `null`; `data-arc-asks`, `pb-3`; MAN-7537) — drawn only when the caller passes one, outside the fold — the body slot (`CardFoldBody`, `data-arc-deck-body`), top to bottom: the caller's `bodyTop` — its `ActionBar` — then the strip. The root rises once, `motion-safe:animate-shape-rise`, on the first mount of the page session that draws its `foldKey`, claimed by the copy whose rise plays and gone when it ends (`useRiseOnce`; the root carries its `className`, `onAnimationStart` and `onAnimationEnd` — MAN-1557 → "The rise").
 
 **The arc's mark is the one thing in the head a plan card never has** (operator, 2026-09-28: "can we also have a special indicator for arcs on arc cards please"). `DispatchArcDeck` hands the head a title that LEADS with `ArcMark` (`ArcDeck.tsx`) — the kit's `Badge` in its OUTLINE shape, the lucide `Layers` glyph and `dispatcher.arcMark` ("Arc"), handle `data-arc-mark` — then the arc's bare name (`data-arc-title`, mono). It REPLACED the `.arc` ending the name carried, so the head says "arc" once; the `<name>.arc` door still names the flow and the strip for a screen reader. Outline because it is a KIND, not a state: every state word on a lane card is a filled, toned badge, so the one outlined pill never argues with the arc's status tone beside it, and the glyph and the word carry it without colour. No count in it: the head already binds `done/total` plans to the arc's word. It sits INSIDE the heading, so heading navigation hears "Arc restorly" and the mark and the name wrap as words do. The mark costs the title's line about 72px, so at 390px (and in the 1920px widget, ~202px of group) a name of up to 14 characters shares the mark's line and a longer one breaks at its hyphen — measured 2026-09-28: `dispatcher-refit`, `agent-launch-config` and `runner-card-makeover` read two lines where they read one without the mark; at 320px the mark stands over the name. Every break is by word and none leaves the card (INV-4449); the live arcs, `restorly` and `docstore`, are 8 characters and read one line. A fold keeps it (the head is outside the fold's body), and no plan card draws it, loose or in the strip: `PlanCard` hands its head a bare name.
 
@@ -3760,14 +3846,14 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/ArcDeck.t
 ## MAN-5711 — The arc deck's frame — The fold hides through `CardFoldBody`, never a raw clip (MAN-5412): while a deck is closed, its body
 section: dispatcher/015 The arc deck's frame/007 The fold hides through `CardFoldBody`, never a raw clip (MAN-5412): while a deck is closed, its body
 
-**The fold** hides through `CardFoldBody`, never a raw clip (MAN-5412): while a deck is closed, its body slot carries `inert` and `aria-hidden` and the browser REFUSES focus inside it — on a dispatch arc that is thirteen plans and 188 controls behind a 0px clip (measured 2026-09-25). A folded deck keeps its whole head — door, word, armed hour, `done/total`, description, planner, pills and the corner — and loses its whole body: the `ActionBar` (`bodyTop`; the model switch and Start/Pause are VERBS, the same layer a plan card's own controls fold) and the strip. Its memory is the card fold's: `useCardFold` key `darc:<arc name>`, so a fold survives a reload and is shared by the tab and the gutter.
+**The fold** hides through `CardFoldBody`, never a raw clip (MAN-5412): while a deck is closed, its body slot carries `inert` and `aria-hidden` and the browser REFUSES focus inside it — on a dispatch arc that is thirteen plans and 188 controls behind a 0px clip (measured 2026-09-25). A folded deck keeps its whole head — door, word, armed hour, `done/total`, description, planner, pills and the corner — and its asks slot (`data-arc-asks`, MAN-7537: an owed word folds to its bar, never away), and loses its whole body: the `ActionBar` (`bodyTop`; the model switch and Start/Pause are VERBS, the same layer a plan card's own controls fold) and the strip. Its memory is the card fold's: `useCardFold` key `darc:<arc name>`, so a fold survives a reload and is shared by the tab and the gutter.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/ArcDeck.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/DeckFrame.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/DeckStrip.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/hooks/useDeckStrip.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-arc-strip-return.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-deck-height.mjs
 
 ## MAN-5712 — The arc deck's frame — The body's spacing lives on the inner wrapper, never on `CardFoldBody`.
 section: dispatcher/015 The arc deck's frame/008 The body's spacing lives on the inner wrapper, never on `CardFoldBody`.
 
-**The body's spacing lives on the inner wrapper, never on `CardFoldBody`.** That slot is a GRID whose row goes 1fr → 0fr, so a `flex`/`gap` passed to it is overridden by its own `grid`. The wrapper (`data-arc-deck-body`) carries `gap-3 pb-3`; the root carries no bottom padding, so the gap under the head is the header's own `pb-3`, OUTSIDE the clip, and a folded deck keeps 12px under its head where an open one has 12px above the strip and 12px under it. The root's own padding is `px-3 pt-3` and nothing else: a strip's cards are paged, never jumped to, and no card wears a halo, so no outer room is kept for one.
+**The body's spacing lives on the inner wrapper, never on `CardFoldBody`.** That slot is a GRID whose row goes 1fr → 0fr, so a `flex`/`gap` passed to it is overridden by its own `grid`. The wrapper (`data-arc-deck-body`) carries `gap-3 pb-3`; the root carries no bottom padding, so the gap under the head is the header's own `pb-3` (the asks slot, when drawn, brings its own `pb-3` beneath it), OUTSIDE the clip, and a folded deck keeps 12px under its head where an open one has 12px above the strip and 12px under it. The root's own padding is `px-3 pt-3` and nothing else: a strip's cards are paged, never jumped to, and no card wears a halo, so no outer room is kept for one.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/ArcDeck.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/DeckFrame.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/DeckStrip.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/hooks/useDeckStrip.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-arc-strip-return.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-deck-height.mjs
 
@@ -3806,33 +3892,35 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/ArcDeck.t
 ## MAN-642 — The Runner tab
 section: dispatcher/020 The Runner tab
 
-`RunnerPanel` is where every plan the dispatcher carries is drawn: a plan of an arc is nested INSIDE that arc's own deck (`DispatchArcDecks`, MAN-643), and a plan of no arc is a `PlanCard` (MAN-1557) in the wall's grid beneath the decks. `RunnerPanel` and `RunnerWidgetBody` (the chat gutter's Runner widget) live in `src/modules/runner-tab`, a host module that imports the dispatcher through its barrel (`@/modules/dispatcher`); nothing in the dispatcher module imports it back. They read `useDispatcherPlans` (`plans`, `hidden`, `arcs`, `loosePlanners`, `carriedNames`, and the tab's `count`) and nothing else — no fetch on mount and no state of their own — so selecting the tab paints on the FIRST render with whatever the bus was already holding rather than blanking until the dispatcher next moves. Every card they draw folds (MAN-5412), and both hand the drawn plans, the hidden plans and the arcs to `useLaneFoldPrune`, so a card that leaves the lane takes its remembered fold with it, a hidden card keeps its own, and a dismissed card's goes.
+`RunnerPanel` is where every plan the dispatcher carries is drawn: a plan of an arc is nested INSIDE that arc's own deck (`DispatchArcDecks`, MAN-643), and a plan of no arc is a `PlanCard` (MAN-1557) in the wall's grid beneath the decks. `RunnerPanel` and `RunnerWidgetBody` (the chat gutter's Runner widget) live in `src/modules/runner-tab`, a host module that imports the dispatcher through its barrel (`@/modules/dispatcher`); nothing in the dispatcher module imports it back. They read `useDispatcherPlans` (`plans`, `hidden`, `arcs`, `loosePlanners`, `carriedNames`, and the tab's `count`) and nothing else (plus `PlannerLanesReadout`, from its `route`; the tab alone also reads `useLiveTopic(DISPATCHER_ALL_TOPIC)` for whether the bus has spoken, MAN-7531) — no fetch on mount and no state of their own — so selecting the tab paints on the FIRST render with whatever the bus was already holding rather than blanking until the dispatcher next moves. Every card they draw folds (MAN-5412), and both hand the drawn plans, the hidden plans and the arcs to `useLaneFoldPrune`, so a card that leaves the lane takes its remembered fold with it, a hidden card keeps its own, and a dismissed card's goes.
 
 **Nothing renders over the transcript.** Operator ruling 2026-09-09: not a card, not a strip, not a chip, not a banner. The Runner widget sits BESIDE the transcript in the desktop gutter (`src/modules/chat-gutters`), the tab is its own pane, and the chat view keeps the whole height the composer and the CLI banner leave it. why: a card once pinned above the transcript took half a 390px screen and left one visible line with the keyboard open.
 
-**The gate rule is the memory tab's, and the Runner tab is the second tab to take it.** `useWorkspaceTabGates` computes `shouldShowRunnerTab: laneOpen || activeTab === 'runner'`, where `laneOpen` is `useDispatcherPlans().laneOpen` — a plan is drawn, or one is hidden (always an unfinished one, so a walking plan the operator hid keeps the road to its `Show`) — and the pill's `runnerCount` is `count`, the plans on screen, an arc's own plans among them. That ONE reading is what the three call sites share: `WorkspaceMain`, `ProjectSidebarRegion` and `ProjectCommandPalette` each pass their own `activeTab` and none recomputes the rule. The tab therefore appears while the lane is open, and is STICKY: it holds while it is the selected tab even after the last card is put away, so a plan finishing under someone reading its phases empties the panel instead of taking the tab out from under them. There is consequently **no snap-back effect** for it in `WorkspaceMain` — the three effects there belong to the PREFERENCE-gated tabs, whose gates really can turn off mid-act; a data-gated tab's gate is written never to. `VALID_TABS` names `runner`, so a restored `runner` tab lands on the panel rather than an empty pane; switching session returns to chat from it as from every tab (`handleSessionSelect`).
+**The gate rule is the memory tab's, and the Runner tab is the second tab to take it.** `useWorkspaceTabGates` computes `shouldShowRunnerTab: laneOpen || activeTab === 'runner'`, where `laneOpen` is `useDispatcherPlans().laneOpen` — a plan is drawn, or one is hidden (always an unfinished one, so a walking plan the operator hid keeps the road to its `Show`) — and the pill's `runnerCount` is `count`, the plans on screen, an arc's own plans among them. That ONE reading is what the three call sites share: `WorkspaceMain`, `ProjectSidebarRegion` and `ProjectCommandPalette` each pass their own `activeTab` and none recomputes the rule. The tab therefore appears while the lane is open, and is STICKY: it holds while it is the selected tab even after the last card is put away, so a plan finishing under someone reading its phases empties the panel instead of taking the tab out from under them. There is consequently **no snap-back effect** for it in `WorkspaceMain` (MAN-601). `VALID_TABS` names `runner`, so a restored `runner` tab lands on the panel rather than an empty pane; switching session returns to chat from it as from every tab (`handleSessionSelect`).
 
-**The badge.** `runnerCount` travels to `WorkspaceTabs` as a prop — the strip never reads the lane itself, which would be a second source for a decision already made — and is drawn only above zero. The workspace tabs are icon-only, so the number does not reach a `.vv-tabs__count` pill at all: `Tabs` renders that pill for word tabs only, and marks an icon tab with a `.vv-tabs__dot` while carrying the count in words in the tab's `title` (`Runner (2)`). Anything reading this strip's count reads the title.
+**The badge.** `runnerCount` travels to `WorkspaceTabs` as a prop (the strip never reads the lane: a second source for a decided fact) and is drawn only above zero. The workspace tabs are icon-only: `Tabs` renders the `.vv-tabs__count` pill for word tabs only and marks an icon tab with a `.vv-tabs__dot`, carrying the count in the tab's `title` (`Runner (2)`). `runnerWaiting` (`useDispatcherPlans().waiting`) rides along as the tab's `attention`: amber dot, title `Runner (5) · 4 waiting for you` (MAN-7540). Anything reading this strip's count reads the `(N)` in the title.
 
-**The panel is a wall for the plans of no arc, and an ARC is not a row of it** (`data-runner-panel` on the root — a probe scopes every reading to THIS pane). The pane's FULL width, no centred column: the glance face makes a loose card short and alike, and short alike cards read best side by side (MAN-643 → "AN ARC'S PLANS ARE SWIPED, NOT WALLED"). A plan OF an arc is not one of those: it is paged one card per view inside its arc's own strip — operator, 2026-09-26: "please bring back the swipable plan cards if it's under an arc" — so this pane draws two shapes, the decks' strips and the loose plans' wall, and only the second is a wall. A header carrying `runner.title` and the count, with no badge at zero, inset `px-4 lg:px-6`. Then, in one scroll whose body is `flex flex-col gap-6 px-4 py-5 lg:px-6` — ONE inset for everything in it, the decks carrying none of their own:
+**The tab is the landing's destination** (MAN-7531): `RunnerPanel` takes `revealPlan` / `onRevealed` and scrolls that plan's card (an arc's plan: its deck) into view; nothing unfolded, nothing un-hidden.
+
+**The panel is a wall for the plans of no arc, and an ARC is not a row of it** (`data-runner-panel` on the root — a probe scopes every reading to THIS pane). The pane's FULL width, no centred column: the glance face makes a loose card short and alike, and short alike cards read best side by side (MAN-643 → "AN ARC'S PLANS ARE SWIPED, NOT WALLED"). A plan OF an arc is not one of those: it is paged one card per view inside its arc's own strip — operator, 2026-09-26: "please bring back the swipable plan cards if it's under an arc" — so this pane draws two shapes, the decks' strips and the loose plans' wall, and only the second is a wall. A header carrying `runner.title`, the count (no badge at zero) and `PlannerLanesReadout` (`planners <out> of <lanes> out`, from `route.planners`; absent, not drawn), inset `px-4 lg:px-6`. Then, in one scroll whose body is `flex flex-col gap-6 px-4 py-5 lg:px-6` — ONE inset for everything in it, the decks carrying none of their own:
 
 1. `LoosePlannerBadges` — the planner outings with no card and no deck to ride (`loosePlanners`: an arc's design, written before the arc's own file has loaded); nothing when there are none.
 2. `DispatchArcDecks` — one deck per arc, all read off ONE split (`byArc(plans, arcs)`, `dispatcherState.ts`), each arc's plans in the ARC's own order, paged one card per view in that arc's own strip (`home` `tab`; MAN-643 → "The strip").
-3. One `PlanCard` per plan NO arc holds, in the list's urgency order (live, scheduled, queued, paused, parked, idle, complete; newest `updated_at` first inside each), in the tab's OWN wall (`ul[data-runner-loose-plans]`, `LANE_WALL_GRID`, `src/shared/constants.ts` — columns of at least 22rem, one card a row on a phone), which is the layout for the plans NO arc holds and for nothing else: a deck's cards are strip pages, each as wide as the deck. A card is passed no `defaultOpen`: a plan card's phases are shown in every home it has, so the tab and the gutter cannot disagree about what it shows.
+3. One `PlanCard` per plan NO arc holds, in the list's urgency order (live, scheduled, queued, paused, parked, idle, complete; newest `updated_at` first inside each), in the tab's OWN wall (`ul[data-runner-loose-plans]`, `LANE_WALL_GRID`, `src/shared/constants.ts` — columns of at least 22rem, one card a row on a phone). A card is passed no `defaultOpen`: a plan card's phases are shown in every home it has, so the tab and the gutter cannot disagree about what it shows.
 4. `HiddenPlans`, in a left-aligned `max-w-2xl` measure and only when something is hidden: its rows put a plan's name and its `Show` at either end of a line, and across the wall the two would be a screen apart.
 
-Every press passes the lane's `carriedNames`: a card's corner is `planPutAway(plan, carriedNames)` at either depth, and the tab's header ends in `Dismiss done · N` (`data-dismiss-done`, `doneDismiss`, one write, nothing added to `Hidden`) at `ml-auto` whenever a drawn plan is complete. `HiddenPlans` closes the tab's wall and the widget's list, and sits under each one's EmptyState too, because a lane whose every unfinished plan is hidden must still offer the way back. `EmptyState` shows only when the count is zero AND `arcs` is empty AND no loose planner is out; its words are `runner.empty` at nothing hidden and `dispatcher.hidden.allHidden` ("Every unfinished plan is hidden") as soon as anything is, since a hidden plan may still be walking — a soul at work on the lane with no card of its own is still something on this screen, and "nothing here" over it would be the pane lying. It is reachable precisely because the tab is sticky.
+Every press passes the lane's `carriedNames`: a card's corner is `planPutAway(plan, carriedNames)` at either depth, and the tab's header ends in `Dismiss done · N` (`data-dismiss-done`, `doneDismiss`, one write, nothing added to `Hidden`) at `ml-auto` whenever a drawn plan is complete. `HiddenPlans` closes the tab's wall and the widget's list, and sits under each one's EmptyState too, because a lane whose every unfinished plan is hidden must still offer the way back. `EmptyState` shows only when the count is zero AND `arcs` is empty AND no loose planner is out; its words are `runner.empty` at nothing hidden and `dispatcher.hidden.allHidden` ("Every unfinished plan is hidden") as soon as anything is, since a hidden plan may still be walking — a soul at work with no card of its own is still something on this screen.
 
 **The gutter.** `RunnerWidgetBody` (`src/modules/runner-tab/RunnerWidgetBody.tsx`) draws the lane as ONE vertical list, every item at once — operator, 2026-09-28: "please remove the arrows and show a list of plans instead". There are no arrows, no `n of total` and no paging: the widget frame's body scrolls the list (`src/modules/chat-gutters`), and the widget holds no state of its own. A chat switch re-renders the body in place (the route changes, the widget stays mounted), so a layout effect on `sessionId` returns the frame's scroll viewport to the top before paint, where the new chat's own items stand; otherwise the last chat's offset would open the new chat on another chat's item.
 
-- **The items** are the tab's split (`byArc`): one item per arc in the lane's order, then one per plan of no arc in urgency order; the items holding a plan this chat opened (`session_app_id === sessionId`) are lifted to the front, keeping that order among themselves (`widgetItemsOf`). An arc item is `<DispatchArcDecks groups={[group]} home="gutter" />` — the SAME component the tab calls, its plans still swiped one card per view in its own strip (MAN-643), its pin on the ROW (`li[data-dispatch-plan-row]`); a plan item is its `PlanCard` (`planPutAway(plan, carriedNames)`) in `div[data-testid=runner-widget-plan]` carrying `data-plan-name` and `data-pinned` (`true` for the open chat's, with `SessionPin`). Each item is an `li[data-widget-item=<key>]`, the key `darc:<arc name>` or `plan:<plan name>`.
+- **The items** are the tab's split (`byArc`), regrouped (`widgetItemsOf`): the asking items first (`owesWord`; an arc's own when any plan of it is, `anyOwesWord`), then those holding a plan this chat opened (`session_app_id === sessionId`), then the rest, each part in the split's order. An arc item is `<DispatchArcDecks groups={[group]} home="gutter" />` — the SAME component the tab calls, its plans still swiped one card per view in its own strip (MAN-643), its pin on the ROW (`li[data-dispatch-plan-row]`); a plan item is its `PlanCard` (`planPutAway(plan, carriedNames)`) in `div[data-testid=runner-widget-plan]` carrying `data-plan-name` and `data-pinned` (`true` for the open chat's, with `SessionPin`). Each item is an `li[data-widget-item=<key>]`, the key `darc:<arc name>` or `plan:<plan name>`.
 - **The spacing** is the tab's: two cards stand `LANE_CARD_GAP` apart, the gap `LANE_WALL_GRID` also reads (`src/shared/constants.ts`), and a deck stands 24px from its neighbours, the tab's deck gap (`gap-6`), as the list's gap plus `mt-2` on every item beside a deck. The list stays flat and keyed by item, so a poll that re-sorts it moves cards and remounts none.
-- **Top to bottom**: `LoosePlannerBadges` (flush in both homes), then `Dismiss done · N` (`data-dismiss-done`, `doneDismiss`, every drawn complete plan, one write) at the column's right edge whenever a drawn plan is complete, then the list, then `HiddenPlans`. `Dismiss done · N` takes itself away, so on the next frame focus goes where `landFocusInHome` finds — the tab header's own hand-off.
-- **The standing proof**: `node .verify/probe-runner-widget-list.mjs --when after` (1920, dark and light, in the chat that opened a loose plan): no ‹ › button and no `n of m` outside the cards, the list's items and their order held to the record in `artifacts/runner-widget-list-before.json` (a snapshot of 2026-09-28, so that one check reads true only while the lane carries the same top-level items), the pinned card first, the items stacked at the tab wall's gap, the arc's strip moving one card on ArrowRight, and 0 console errors; every non-GET request the page makes is answered locally. Measured 2026-09-28 on 5183: 3 items (`plan:archpulse-estimate-flow`, `darc:restorly`, `plan:agent-launch-config`), 7 plan cards.
+- **Top to bottom**: `PlannerLanesReadout`, `LoosePlannerBadges` (flush in both homes), then `Dismiss done · N` (`data-dismiss-done`, `doneDismiss`, every drawn complete plan, one write) at the column's right edge whenever a drawn plan is complete, then the list, then `HiddenPlans`. `Dismiss done · N` takes itself away, so on the next frame focus goes where `landFocusInHome` finds — the tab header's own hand-off.
+- **The standing proof**: `node .verify/probe-runner-widget-list.mjs --when after` (1920, dark and light, from a chat that opened a loose plan; the preferences PINNED over the answer, never written — `.verify/lib/prefs-pin.mjs`): no ‹ › and no `n of m` outside the cards, the list in the TAB's own item order (computed in the run), this chat's plan leading everything that asks nothing with its pin on every plan of that chat, the items at the tab wall's gap, the arc's strip moving one card on ArrowRight (noted when there is no arc), and 0 console errors; every non-GET request is answered locally.
 
-The widget's `EmptyState` shows only when there is no plan, no arc and no loose planner, with the same two words, `HiddenPlans` under it. Its badge in `ChatGutterLayout` is `useDispatcherPlans().count`. Its cards fold on the same memory as the tab's: a fold pressed in one home is folded in the other.
+The widget's `EmptyState` shows only when there is no plan, no arc and no loose planner, with the same two words, `HiddenPlans` under it. Its badge in `ChatGutterLayout` is `useDispatcherPlans().count`, `warn`-toned while `waiting > 0`. Its cards fold on the same memory as the tab's: a fold pressed in one home is folded in the other.
 
-**The palette.** `CommandPalette`'s `NAV_TABS` carries a `Go to Runner` row, and the Navigate group filters that static list through `visibleTabs` — which `ProjectCommandPalette` builds from the same gate. The row therefore appears exactly when the tab does, and never while the gate is off.
+**The palette.** `CommandPalette`'s `NAV_TABS` carries a `Go to Runner` row, and the Navigate group filters that static list through `visibleTabs` — which `ProjectCommandPalette` builds from the same gate. The row appears exactly when the tab does.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/hooks/useWorkspaceTabGates.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/runner-tab/RunnerPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/runner-tab/RunnerWidgetBody.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-runner-widget-list.mjs
 
@@ -5986,8 +6074,8 @@ button press and re-render all four.
 section: memory-intake/001 Where the tab is, and when
 
 The tab sits on the workspace's house row in the sidebar — the second of its two rows, the one for
-surfaces that read the same whichever project is open — after the board, the sky and the schedules,
-before the Runner and Heal tabs (MAN-642) and any plugin
+surfaces that read the same whichever project is open — after the board, the sky, the schedules and
+the notes, before the Runner and Heal tabs (MAN-642) and any plugin
 tab, and it carries the pending count. The strip's built-in tabs are icon-only, so that count never reaches
 Verve's `.vv-tabs__count` pill — `Tabs` draws that for word tabs only. The glyph wears a bare accent
 dot instead, and the number is spelled out in the tab's `title` (`Memory (2)`), which is what
@@ -6376,7 +6464,7 @@ owns the fan-out:
 2. **Dedupe.** The same event key inside 20 seconds is dropped (`isDuplicate`).
 3. **Wording.** `buildNotificationPayload` resolves the session's display name and takes the title
    and body from `buildNotificationText` — see §"The wording". Every channel sends those same two
-   strings.
+   strings. It also sets `data.path` to `landingPathOf(event)` — where a tap opens (MAN-7530).
 4. **Fan-out.** Each channel is asked `isEnabled(preferences, userId)`, and each enabled channel's
    `send` is started without being awaited. A rejection is logged and the next channel is
    unaffected.
@@ -6514,8 +6602,8 @@ section: notifications/004 The ntfy channel/007 What gets pushed, and how loud
 | `stop` | 2 (low) | `white_check_mark` |
 | Anything else | 3 (default) | `bell` |
 
-A tap opens `<appUrl>/session/<sessionId>`, or `<appUrl>/` when the event has no session. With
-no app URL stored, the push carries no link.
+A tap opens `<appUrl><landing path>` (MAN-7530): the event's session, the root with none, and a
+plan's prompt on that plan's Runner card. With no app URL stored, the push carries no link.
 
 **A finished run is pushed only when it ran long.** `run.stopped` goes to ntfy only when the
 event's `meta.durationMs` is at least `longRunMinutes`; an event without a duration is never
@@ -6568,7 +6656,7 @@ and a tap makes the phone send `POST <appUrl>/api/ntfy/act?t=<token>`:
 
 | Request | Buttons | What a tap does |
 | --- | --- | --- |
-| `AskUserQuestion` with one single-select question of 1–3 options | One per option, labelled with it | Answers with that option, exactly as the in-app question panel does — except an option marked `needsNote` (a plan prompt's Rework), whose answer is not complete without the operator's own words: its button is an ntfy `view` action that opens the session, where the panel takes the note, and it carries no token |
+| `AskUserQuestion` with one single-select question of 1–3 options | One per option, labelled with it | Answers with that option, exactly as the in-app question panel does — except an option marked `needsNote` (a plan prompt's Rework), whose answer is not complete without the operator's own words: its button is an ntfy `view` action that opens the push's landing (MAN-7530: the session, with a plan's prompt on that plan's Runner card), where the note is taken, and it carries no token |
 | `AskUserQuestion` of any other shape | None | Answer it in the app |
 | `ExitPlanMode` | Approve · Revise | Approves the plan, or declines it with "User asked to revise the plan" |
 | Any other tool | Approve · Deny | Allows the tool, or denies it with "User denied tool use" |
@@ -6918,7 +7006,7 @@ scratch file, a `realpath`'d destination, an atomic `rename`, the scratch unlink
 for the identical reason: another process reads this file while this one writes it.
 
 **One client surface:** Settings → Agents → Claude, a second row in `RunnerModelContent.tsx` beneath
-the DeepSeek one, wearing the swarm mark (the Lucide `Network` glyph) with a `Stepper` whose `Unlimited` is the TOP of its scale rather than
+the DeepSeek one (the planner-lanes row follows it), wearing the swarm mark (the Lucide `Network` glyph) with a `Stepper` whose `Unlimited` is the TOP of its scale rather than
 a dead state: `−` on it chooses the first ceiling (two lanes, `SWARM_FIRST_CEILING` in `src/shared/constants.ts`, shared with the plan card's swarm control, the
 smallest count that runs phases beside each other), `+` on it is refused because nothing is wider,
 `+` on any count raises it with no upper bound, `−` stops at one lane, and the `Unlimited` action
@@ -7127,7 +7215,7 @@ read that came back with nothing — neither is OFF, because a row drawing off f
 would promise an Accept that walks inside the peak.
 
 **The row.** `src/modules/settings/tabs/agents-settings/sections/content/RunnerParkAtPeakRow.tsx`, its own
-file as `RunnerHealModelRow.tsx` is, drawn by `RunnerModelContent.tsx` directly below the swarm row
+file as `RunnerHealModelRow.tsx` is, drawn by `RunnerModelContent.tsx` below the swarm row and the planner-lanes row that follows it
 (Settings → Agents → Claude → Account, the plan-runner card). It wears lucide's `Moon` (`flex-none`, so it
 keeps its 16px at 360px), a `SettingsToggle` over `useParkAtPeakSwitch`, and two sentences under
 `agents.runnerParkAtPeak` in `settings.json` (`en`, and `fr` — the operator's language):
@@ -7138,7 +7226,7 @@ Accept walks now." With no position the row says so in words — Loading while t
 place of the toggle.
 
 **THE KICK. Every switch write on this server ends with `dispatcher kick`.** `setDeepseekFlash`,
-`setSwarm` and `setParkAtPeak` each hand the flip to the dispatcher once the file has settled
+`setSwarm`, `setParkAtPeak` and `setPlannerLanes` each hand the flip to the dispatcher once the file has settled
 (`server/modules/settings/dispatcher-kick.ts`: `dispatcher kick` spawned with a ten-second bound and
 never awaited). The flip IS the event — a daemon holding a phase for want of a lane, or an hour to arm,
 acts on it now rather than at the next session event. The kick's own answer is one line in the server's
@@ -7167,7 +7255,7 @@ section: schedules/001 What the tab is, and where it sits
 
 Third of the house row (`HOUSE_BASE_TABS` in `src/modules/project-workspace/WorkspaceTabs.tsx`) —
 the second of the workspace's two rows, the one for surfaces that do not depend on the open
-project: after the board and the sky, before the data-gated Memory, Runner and Heal tabs — id
+project: after the board and the sky, before the Notes tab (MAN-7518) and the data-gated Memory, Runner and Heal tabs — id
 `'schedules'`, label from the i18n key
 `tabs.schedules` (`"Schedules"`, `src/modules/i18n/locales/en/common.json`), glyph the lucide
 `Clock`. Like the board and the sky it carries **no gate**: the registry describes the box itself,
@@ -7461,17 +7549,17 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/schedules/schedul
 ## MAN-661 — The simple chat list
 section: simple-chat-list/000
 
-An alternative sidebar for someone who does not think in projects: no tree, no search chips, and a
-flat feed of the chats they started from this view — a new chat lands at the top and a row stays where it is dragged — ending in a New chat row (a
-`+` pill shaped like a chat, `SidebarNewChatButton.tsx`). The project a new chat starts in is picked
+An alternative sidebar for someone who does not think in projects: no project tree, no search chips, and a
+feed of the chats they started from this view — loose chats and folders that hold chats; a new chat lands at the top and a row stays where it is dragged, into a folder or out of one — ending in a New chat row (a
+`+` pill shaped like a chat, `SidebarNewChatButton.tsx`) and a New folder button. The project a new chat starts in is picked
 on the new-chat screen, beside the model, and saved as the list's project for new chats;
 `openProjectChat` (project-workspace) saves it the same way before any new chat it opens.
-`src/modules/sidebar/SidebarSimpleList.tsx` composes it from four module-private
+`src/modules/sidebar/SidebarSimpleList.tsx` composes it from five module-private
 hooks (`hooks/useSimpleChatList.ts`, `hooks/useSimpleChatProject.ts`, `hooks/useSimpleChatRemove.ts`,
-`hooks/useSimpleChatReorder.ts`) and is rendered by
+`hooks/useSimpleChatDrag.ts`, `hooks/useSimpleChatFolders.ts`) and is rendered by
 `Sidebar.tsx` in a slot `SidebarContent` never imports, so the tree's own code carries no
 knowledge of this view. Settings stays reachable either way — this replaces the tree, not the
-whole sidebar. The list has a second reader: `SidebarSessionPicker` (MAN-7493) lists the same feed (`useSimpleChatList`) as the floating chat's compact conversation picker while this view is on, and picks by `handleRowSelect`'s shape — the project, then the session tagged with it.
+whole sidebar. The folder tree's three components (`SidebarSimpleListItems`, `SidebarSimpleFolderRow`, `SidebarSimpleFolderPicker`) and the row's `isNested` / `onMoveToFolder` props: MAN-7523. The feed hook — `useSimpleChatList` holds the folder tree as `items` and derives the flat `rows` the picker draws: MAN-7524. The tree's carry, `useSimpleChatDrag`: MAN-7525. The folder verbs, `useSimpleChatFolders`, and the composer's wiring: MAN-7528. The list has a second reader: `SidebarSessionPicker` (MAN-7493) lists the same feed (`useSimpleChatList`) as the floating chat's compact conversation picker while this view is on, and picks by `handleRowSelect`'s shape — the project, then the session tagged with it.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/hooks/useOpenProjectChat.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/SidebarSimpleList.tsx
 
@@ -7484,8 +7572,8 @@ from the project tree and a timestamp for one made here. The list's sort key is 
 `sessions.simple_list_rank`, and the only thing that moves it is a drag — see §"Order" below. On
 the client, [src/shared/types.ts](../src/shared/types.ts)'s `RecentConversationListItem` carries
 `icon` and `unread` beside the row, and
-[src/shared/api.ts](../src/shared/api.ts) reaches the two routes as `setSessionIcon` and
-`moveSimpleListSession`. The client is the only thing that knows which composer a send came
+[src/shared/api.ts](../src/shared/api.ts) reaches the icon route as `setSessionIcon` and the four
+folder and move routes as `api.simpleList` (MAN-7514). The client is the only thing that knows which composer a send came
 from, so it is the client that asks to be tagged:
 `useSimpleChatListPreferences().enabled` rides along as `simpleList` on the same
 `POST /api/providers/sessions` every composer already makes. A conversation is never re-tagged
@@ -7493,8 +7581,10 @@ after creation — turning simple mode off does not detag a chat it made, and ba
 not retroactively tag one it did not.
 
 `GET /api/providers/sessions/recent?simpleList=true` is the same recents query the project tree's
-own sidebar already calls, narrowed by one clause rather than answered by a second endpoint — the
-route table, its exact query shape and its response contract live in
+own sidebar already calls, narrowed by one clause — its answer is the feed's own page: `layout`
+(the top-level rows, each folder whole), `conversations` (the chats those rows draw, in drawn
+order), `total` and `hasMore` over top-level rows. The route table, its exact query shape and its
+response contract live in
 [server/modules/providers/MANUAL.md (README)](../server/modules/providers/MANUAL.md), not here.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts
@@ -7529,13 +7619,12 @@ section: simple-chat-list/004 Order
 A tagged chat's place is `sessions.simple_list_rank`, never its creation time: the column is
 written when the chat is created, so a new chat always lands on top, and only a drag moves it
 afterwards. A **mouse** press may start anywhere on the row; a **touch** press starts a drag only
-from the leading icon (`data-drag-handle`), so a touch on the title still scrolls the list. What
-travels is the id the row should sit *after* (`afterSessionId`, `null` for the top) — the browser
-decides only which row and which side of it. The server does the arithmetic: it takes the midpoint
-between the neighbours' ranks, and when no room is left between them it renumbers the whole tagged
-list instead, so two rows never share a rank. The route is `PUT
-/api/providers/sessions/:sessionId/simple-list-position`; its table and contract are at
-[server/modules/providers/MANUAL.md (README)](../server/modules/providers/MANUAL.md).
+from the leading icon (`data-drag-handle`), so a touch on the title still scrolls the list. What travels is `{ item, folderId, after }` — the item moved, the container it lands in (`null` = top level) and the item it sits *after* (`null` = first in that container) — the browser
+decides only which row and which side of it. The server does the arithmetic, in `server/modules/database/repositories/simple-list-ladder.db.ts`:
+it takes the midpoint between the neighbours' ranks, and when no room is left between them it
+renumbers the whole ladder instead, so two items never share a rank. The ladder is every tagged
+chat (`sessions.simple_list_rank`) and every folder (`simple_list_folders.rank`) in one number
+space; `simpleListDb.moveItem` (MAN-7515) passes it the item and the anchor. The route is `PUT /api/providers/simple-list/position`; its table and contract are MAN-7519.
 
 ## MAN-666 — Icons
 section: simple-chat-list/005 Icons
@@ -7594,7 +7683,8 @@ unread dot — lit by a finished run's own `session_upserted` broadcast, never a
 injected frame, and cleared the moment the chat is opened or was already on screen when it ended.
 `.verify/probe-simple-reorder.mjs` covers the order itself, through the real event path —
 `page.mouse` on desktop, CDP `Input.dispatchTouchEvent` on a 390 px phone, never a synthetic
-`PointerEvent`. Each drop sends the server the exact `afterSessionId` the drop bar implied and
+`PointerEvent`. Each drop sends `PUT /api/providers/simple-list/position` the exact
+`{ item, folderId: null, after }` the drop bar implied and
 persists through a reload and the server's own order, including to the very top and downward past
 a row already moved; a drop back onto its own position sends nothing, a plain click still opens
 the chat, a new chat still lands on top after a drag, and the click a drag swallows never eats the
@@ -7603,7 +7693,79 @@ very next press on a row's "Chat options" trigger.
 it reads the four state columns over HTTP and drives the read rule through a real `chat.presence`
 frame on a chat socket. See [docs/MANUAL.md (verification)](MANUAL.md).
 
+- A4 sends `PUT /api/providers/simple-list/position` and expects the repository's verdict order: a self anchor and an untagged anchor → 409 `SIMPLE_LIST_POSITION_REFUSED`; an untagged item → 404 `SIMPLE_LIST_ITEM_NOT_FOUND`.
+- A7/A8 read `unread` from the DB by the server's own rule (`SESSION_UNREAD_SQL`), not from a feed. `why:` `shared/hidden-project-paths.ts` hides `/tmp`, where the watched chat lives.
+
+## `probe-simple-reorder.mjs` — the phone gate (C7)
+- `drawerShows` tests the row's box (`x >= 0`). `why:` a drawer parked at `x = -323.5` still answers `isVisible()` true, and a touch aimed there lands on nothing.
+- `openPhoneDrawer` holds the drawer open across a sustained on-screen window. `why:` in simple-list mode the drawer closes itself about 3 s after it opens (`SidebarSimpleList`'s effect calls `onProjectSelect`, and `handleProjectSelect` closes the mobile drawer).
+- `boxesFor` scrolls the list back to its top before reading, and `topQuarterOf` clamps the drop point into the viewport. `why:` the first half's touch is a real scroll; R5 sat at `y = -38` and the carry dropped after R5, not at the top.
+
 governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-17.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-18.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-sidebar-state-api.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-simple-icons-unread.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-simple-reorder.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-simple-settings.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-simple-view.mjs
+
+## MAN-7536 — Folders
+section: simple-chat-list/009 Folders
+
+The simple list's folders: one table, one ladder, one feed, four routes and one frame. The list that draws them: MAN-661. Storage and ladder: MAN-7511. Client contract: MAN-7514. Repository: MAN-7515. Feed, routes and frame: MAN-7519. Tree: MAN-7520. Marks: MAN-7522. Components: MAN-7523. Feed hook: MAN-7524. Carry: MAN-7525. Folder verbs: MAN-7528. The whole journey on the production client: MAN-7539.
+
+## The table and the column
+| Item | Where |
+| --- | --- |
+| folder | `simple_list_folders` (`SIMPLE_LIST_FOLDERS_TABLE_SCHEMA_SQL`, `schema.ts`): `folder_id TEXT PRIMARY KEY`, `name`, `rank REAL NOT NULL`, `collapsed INTEGER DEFAULT 0`, `created_at` |
+| a chat's folder | `sessions.simple_list_folder_id TEXT`, `NULL` = in no folder; index `idx_sessions_simple_list_folder` |
+| applied by | `addSimpleListFolders` (`migrations.ts`), after `addSessionUserStateColumns`; nothing backfilled |
+
+A chat whose `simple_list_folder_id` names no live folder row reads as in no folder (MAN-7511).
+
+## The one ladder
+- Tagged chats (`sessions.simple_list_rank`) and folders (`simple_list_folders.rank`) are one number space, a higher rank nearer the top; the one union is `SIMPLE_LIST_LADDER_SQL` in `repositories/simple-list-ladder.db.ts`.
+- A new chat and a new folder are stamped `NEXT_TOP_SIMPLE_LIST_RANK_SQL`; afterwards a rank is written only by `placeInLadder`'s move arithmetic or by the renumber a folder's delete leaves behind (MAN-7515).
+- A move lands at the midpoint to the neighbour below, and renumbers the ladder when no room is left; `simpleListDb` is the ladder's one caller (MAN-7515).
+
+## The feed's `layout`
+- `GET /api/providers/sessions/recent?simpleList=true` answers `simpleListService.readFeed(limit, offset)`: one page of top-level rows, a folder counting once however many chats it holds.
+- `layout` is the page as ids — `{ kind: 'chat', sessionId }` or `{ kind: 'folder', folderId, name, collapsed, sessionIds }`; `conversations` is every chat of the page in drawn order, a folder's chats in its place; `total` counts top-level rows; `hasMore` the rest (MAN-7519).
+- A chat the recents query cannot see — archived, in an archived project, in a scratch folder — is dropped from the page.
+
+## The four routes
+| Verb, path | Body | Answers |
+| --- | --- | --- |
+| `POST /api/providers/simple-list/folders` | `{ name }` | 201 `{ folderId, name, collapsed }` |
+| `PATCH /api/providers/simple-list/folders/:folderId` | `{ name?, collapsed? }` | `{ folderId, name, collapsed }` |
+| `DELETE /api/providers/simple-list/folders/:folderId` | none | `{ folderId, released }` |
+| `PUT /api/providers/simple-list/position` | `{ item: { kind, id }, folderId, after }` | the three fields back |
+
+- Refusals: a 400 `INVALID_SIMPLE_LIST_FOLDER_NAME`, `_FOLDER_ID`, `_FOLDER` or `_POSITION`; a 404 `SIMPLE_LIST_FOLDER_NOT_FOUND` or `SIMPLE_LIST_ITEM_NOT_FOUND`; a 409 `SIMPLE_LIST_POSITION_REFUSED` (MAN-7519).
+- The client reaches all four as `api.simpleList` — `createFolder`, `updateFolder`, `deleteFolder`, `move` (MAN-7514).
+
+## The frame
+- Every write that succeeds sends one `{ kind: 'simple_list_changed', at }` on the chat websocket; the frame names nothing, so a reader re-reads the feed (MAN-7519, MAN-723).
+- `useSimpleChatList` hears it and re-reads, debounced; a removal that broadcasts nothing drops the row through the module-level fan-out instead (MAN-7524, MAN-7507).
+
+## The dot's rule
+- One dot per folder header, drawn folded or open, never a spinner, never more than one: `folderDot` over its chats' `chatMarks` (`utils/simpleChatMarks.ts`) answers the first of `awaitingInput`, `unread`, `running`, `subagents` any of them draws, or null (MAN-7522).
+
+## The drop rule
+- What travels is a position, never a rank: the container (`folderId`, `null` = top level) and the row to sit after (`after`, `null` = first) — `SimpleListPosition` (MAN-7514).
+- The pointer's reading is `positionForDrop` (`utils/simpleChatTree.ts`) — a row's edge, a folder's header (`into`), or past the last row (`end`) — null when it asks for where the row already sits; `useSimpleChatDrag` carries the pointer (MAN-7520, MAN-7525).
+- The server owns the arithmetic (MAN-7511); `useSimpleChatFolders.move` writes the tree first and follows a refusal with `reload()` (MAN-7528).
+
+## The files that hold each
+| File | Holds |
+| --- | --- |
+| `server/modules/database/repositories/simple-list-ladder.db.ts` | the ladder: the union, the top rank, the midpoint, the renumber |
+| `server/modules/database/repositories/simple-list.db.ts` | `simpleListDb`: the folders table, `moveItem` and its verdicts |
+| `server/modules/providers/services/simple-list.service.ts` | `readFeed`, the four writes, the `simple_list_changed` fan-out |
+| `server/modules/providers/simple-list.routes.ts` | the transport contract: shapes, lengths, ids |
+| `src/modules/sidebar/utils/simpleChatTree.ts` | the tree functions; `positionForDrop` |
+| `src/modules/sidebar/utils/simpleChatMarks.ts` | `chatMarks`, `folderDot` |
+| `src/modules/sidebar/hooks/useSimpleChatDrag.ts` | the pointer carry |
+| `src/modules/sidebar/hooks/useSimpleChatFolders.ts` | the folder verbs: optimistic write, reload fallback |
+| `src/modules/sidebar/SidebarSimpleListItems.tsx` | the drawn blocks and the drop line |
+| `src/modules/sidebar/SidebarSimpleFolderRow.tsx` | the folder header: glyph, toggle, one dot, menu |
+| `src/modules/sidebar/SidebarSimpleFolderPicker.tsx` | the `simpleList.moveToFolder` dialog |
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/simple-list.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/simple-list-ladder.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/simple-list.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/simple-list.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/hooks/useSimpleChatDrag.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/hooks/useSimpleChatFolders.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/SidebarSimpleFolderPicker.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/SidebarSimpleFolderRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/SidebarSimpleListItems.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/utils/simpleChatMarks.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/utils/simpleChatTree.ts
 
 ## MAN-670 — Verifying a change in this fork
 section: verification/000
@@ -8062,7 +8224,12 @@ against a dot. `.verify/probe-simple-icons-unread.mjs` ends `SIMPLE-ICONS-UNREAD
 `[PASS] B1` … `[PASS] B8`, reading the picker's 25 options and the dot each run's own
 `session_upserted` broadcast lit. `.verify/probe-simple-reorder.mjs` ends `SIMPLE-REORDER PASS`
 over `[PASS] C1` … `[PASS] C7`, dragging a row with `page.mouse` on desktop and with CDP
-`Input.dispatchTouchEvent` on a 390 px phone rather than any synthetic `PointerEvent`. None of the
+`Input.dispatchTouchEvent` on a 390 px phone rather than any synthetic `PointerEvent`. Both its
+contexts, desktop page and phone, are pinned with `pinPreferences(… { simpleChatList: true },
+{ writes: 'drop' })`: the account's stored value is shared with every other probe (each
+`openConsole` parks it `false`, and the stored `userLanguage` can make English drawer selectors
+miss), and a page that reloads mid-run lands on the project tree and draws no rows; the pin writes
+nothing to the account. None of the
 three is in `all.mjs`, which collects `phase-<n>.mjs` alone, so each is run by hand like every
 other `probe-*.mjs`; their contract is at [docs/MANUAL.md (simple-chat-list)](MANUAL.md).
 
@@ -9967,7 +10134,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/AppDraw
 `DispatcherPlan`,
 `DispatcherArc`, `DispatcherArcStatus`, `DispatcherRoute`, `DispatcherDaemon`, `DispatcherStateEvent`,
 `DispatcherVerb`, `DispatcherVerbResult`, `DispatcherModelChoice` and `DispatcherOffpeak` are declared in the DISPATCHER block of `src/shared/types.ts` and `server/shared/types.ts` — ONE TEXT IN BOTH FILES, so the copies cannot
-drift; a change belongs in both at once. Field detail lives there, not here.
+drift; a change belongs in both at once.
 
 They mirror `hooks/dispatcher/report.py::snapshot` — what `dispatcher status --json [NAME]` prints —
 key for key. The emitted document is the source of the shape.
@@ -10061,7 +10228,7 @@ key for key. The emitted document is the source of the shape.
   `cacheRead`, the document's `tokens_cache_read` handed through, which `cachePercent` words) is client-only: it
   sits in its own SPEND block after the client-only picture's, never inside the DISPATCHER block, because that block must
   stay text-identical with the server's copy.
-- `DispatcherAnswerOutcome` (`took`, `already-answered`, `refused`) is in `server/shared/types.ts` ONLY (`DISPATCHER ANSWERS` block): `carryReply`'s verdict on one answer; `dispatcher accept` exit 3 is `already-answered`. Not on the wire.
+- `DispatcherAnswerOutcome` (`took`, `already-answered`, `refused`) is in `server/shared/types.ts` ONLY (`DISPATCHER ANSWERS` block): `carryReply`'s verdict; `dispatcher accept` exit 3 is `already-answered`. On the wire only as `DispatcherCardAnswer.outcome` (the card door's reply, MAN-7534).
 - `LaneFlowNode` (`key`, `mark`, `tone`, `label`, `live`) and `LaneFlow` (`nodes`, `doneCount`, `ariaLabel`) are client-only, in their own FLOW block after the SPEND block: a lane card's progress track as its caller hands it to the frame that draws it (`StatusFlow`; `DeckFrame`, `DeckStrip`). A plan card's track is built by `PlanFace`, an arc deck's by `DispatchArcDeck`, one node per drawn plan and a node's `key` the plan's name (MAN-643 → "The flow").
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts
@@ -10082,11 +10249,11 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts
 
 THE RAISE (`dispatcher-raise.service.ts`). For the two events a landing is — `design-loaded`, `phases-loaded` — it runs `dispatcher ask <name>` (`dispatcher-ask.transport.ts`, `hooks/dispatcher/ask.py`, MAN-7399), which records the ask in the STORE (`prompted_at` and an `asked` event) and prints it in the document's `asking` shape; the prompt goes up at once (`asks.show`), on the tick that saw the landing (measured 2026-09-29: 0.7 s from a probe plan's landing to its `permission_request` frame, the lane polling every 2 s). The owning session is checked FIRST (`plan.session_app_id` through `sessionsDb`): an ask recorded for a chat this server cannot show would stand the `Stop` hold down over a prompt nobody sees, so such a plan is `unreachable` and its debt stays on the hold, as does one the verb refuses (no Eupalinos to take a Rework's notes or a round's answers). THE MARK IS A MAP: `dispatcher_raised_through` in `app_config` holds one entry PER PLAN, the highest landing id already answered, because a landing whose answer is still coming must stay DUE while every other plan's mark advances — a single watermark (the endings' `dispatcher_announced_through`, MAN-5639) would swallow it. It stays due while the writer is still OUT (`store.live_for`'s outing, read off the FRAME's `planners` list) and when the verb did not answer at all; it is read again before it is written, for the handover reason MAN-5639 states, and a double raise across that window costs nothing — the dispatcher checks and records an ask in one write transaction, so the second `ask` waits on the first and hears nothing. BOOTSTRAP, the first sight of a store this database never raised through: every plan in `questions`, or `loaded` with `prompted_at` null, is asked once through the same verb, and every plan is then marked at its own newest landing.
 
-THE PANEL (`dispatcher-asks.service.ts`) is a PROJECTION of every plan's `asking` key, kept in a book of what THIS process has put up, and nothing else: each distinct ask is put up in its plan's owning chat exactly as an `AskUserQuestion` is — a `permission_request` frame to every socket, marked `standalone: true`; a `permission.required` push with the runtime's own meta (`toolName: 'AskUserQuestion'`, `toolInput`, `requestId`, `promptKey`) plus `plan` and `askKind`, so the phone gets its buttons (MAN-618); and a place in `chat_subscribed`'s `pendingPermissions` and the sidebar's waiting mark through a permission gateway registered with the provider registry (`registerPermissionGateway`, MAN-332). An ask's NAME is the ask — its `asked` event, with an Accept's lock token (`dispatcher:lock:<token>:<id>-<stamp>`, the id its LEAD plan's) and a questions round's plan (`dispatcher:questions:<plan>:<id>-<stamp>`); the panel's request id is the same name under the panel's prefix (`dispatcher:ask:lock:<token>:<id>-<stamp>`, `dispatcher:ask:questions:<plan>:<id>-<stamp>`), and both are DERIVED from the store's record in `dispatcher-ask-names.service.ts`, never minted, so they are the same in every process; the `asked` event's stamp (whole epoch seconds) is in the name because `events.id` has no `AUTOINCREMENT` — after `dispatcher drop` frees the tail a re-loaded plan is born under the same ids, and the same plan file asked again would otherwise be taken for the first life's ask (no buzz, no bell) — so one arc's lock carried on every plan it names is ONE prompt, and every landing is a new one: a re-cut after a Rework rewrites phase goals the token does not digest, and its fresh prompt buzzes the phone and rings the tab like the first, and a restart or a handover's second server reads the same asks back off the store without buzzing the phone again. A picture generated no later than an ask's own second cannot retract it (both stamps are the store's second-grained UTC); an answered ask stays down for `ANSWER_GRACE_MS` (30 s) while the store's own close of it reaches the picture, and one whose answer the dispatcher did not take goes straight back up. A PLAN IS APPROVED ONCE PER LOAD (`store.approve`), so a second Accept — a double answer, two servers hearing one tap, a terminal Accept that got there first — is refused by the store whichever server sends it: `dispatcher accept` exits 3 (`accept.ALREADY_APPROVED_EXIT`, apart from every other refusal's 2) and `carryReply` answers `already-answered` (`DispatcherAnswerOutcome`) instead of `refused`. That prompt is NOT put back: it stays down for the grace like a taken one, and the journal says the answer was already answered. For the PANEL's door alone, as `tellNotCarried`, the tabs also get a `permission_cancelled` with `answerNotCarried: true` and `alreadyAnswered: true`, shown as an "Already answered" toast only by the tab that SENT the answer: a tab that answers lets the request go from its own pending list at the click, so the server's `permission_resolved` that finds it gone marks the tab as the answerer (`answeredHereRef`), and a bystander that still holds the request is told nothing (`answer` retracts the prompt as resolved before the verb runs, so `heardItClose` cannot tell them apart). A phone tap has no card and is answered in its own HTTP reply, which is sent before the verb runs: the tap hears `Answered` and only the journal hears the truth.
+THE PANEL (`dispatcher-asks.service.ts`) is a PROJECTION of every plan's `asking` key, kept in a book of what THIS process has put up, and nothing else: each distinct ask is put up in its plan's owning chat exactly as an `AskUserQuestion` is — a `permission_request` frame to every socket, marked `standalone: true`; a `permission.required` push with the runtime's own meta (`toolName: 'AskUserQuestion'`, `toolInput`, `requestId`, `promptKey`) plus `plan` and `askKind`, so the phone gets its buttons (MAN-618); and a place in `chat_subscribed`'s `pendingPermissions` and the sidebar's waiting mark through a permission gateway registered with the provider registry (`registerPermissionGateway`, MAN-332). An ask's NAME is the ask — its `asked` event, with an Accept's lock token (`dispatcher:lock:<token>:<id>-<stamp>`, the id its LEAD plan's) and a questions round's plan (`dispatcher:questions:<plan>:<id>-<stamp>`); the panel's request id is the same name under the panel's prefix (`dispatcher:ask:lock:<token>:<id>-<stamp>`, `dispatcher:ask:questions:<plan>:<id>-<stamp>`), and both are DERIVED from the store's record in `dispatcher-ask-names.service.ts`, never minted, so they are the same in every process; the `asked` event's stamp (whole epoch seconds) is in the name because `events.id` has no `AUTOINCREMENT` — after `dispatcher drop` frees the tail a re-loaded plan is born under the same ids, and the same plan file asked again would otherwise be taken for the first life's ask (no buzz, no bell) — so one arc's lock carried on every plan it names is ONE prompt, and every landing is a new one: a re-cut after a Rework rewrites phase goals the token does not digest, and its fresh prompt buzzes the phone and rings the tab like the first, and a restart or a handover's second server reads the same asks back off the store without buzzing the phone again. A picture generated no later than an ask's own second cannot retract it (both stamps are the store's second-grained UTC); an answered ask stays down for `ANSWER_GRACE_MS` (30 s) while the store's own close of it reaches the picture, and one whose answer the dispatcher did not take goes straight back up. A PLAN IS APPROVED ONCE PER LOAD (`store.approve`), so a second Accept — a double answer, two servers hearing one tap, a terminal Accept that got there first — is refused by the store whichever server sends it: `dispatcher accept` exits 3 (`accept.ALREADY_APPROVED_EXIT`, apart from every other refusal's 2) and `carryReply` answers `already-answered` (`DispatcherAnswerOutcome`) instead of `refused`. That prompt is NOT put back: it stays down for the grace like a taken one, and the journal says the answer was already answered. For the PANEL's door alone, as `tellNotCarried`, the tabs also get a `permission_cancelled` with `answerNotCarried: true` and `alreadyAnswered: true`, shown as an "Already answered" toast only by the tab that SENT the answer: a tab that answers lets the request go from its own pending list at the click, so the server's `permission_resolved` that finds it gone marks the tab as the answerer (`answeredHereRef`), and a bystander that still holds the request is told nothing (`answer` retracts the prompt as resolved before the verb runs, so `heardItClose` cannot tell them apart). A phone tap has no panel and is answered in its own HTTP reply, which is sent before the verb runs: the tap hears `Answered` and only the journal hears the truth.
 
-THE ANSWER (`dispatcher-answer.service.ts`), from the panel (it names the ask by its request id) or the phone (by its prompt key): Accept runs `dispatcher accept --lock <token> --by app:panel|app:phone <plans…>`, Queue the same with `--paused` — the verb re-checks the token and a stale one approves NOTHING, after which the current prompt is up again; Rework (its notes typed in the panel, `needsNote`; the phone's Rework button opens the chat instead) runs `dispatcher tell <target> --brief -` with the notes verbatim once per designer target; a questions round runs `dispatcher tell <target> --brief -` with the answers as `Q:`/`A:` pairs in the designer's own words. A decision that carries no answer — a skip, a label the prompt never offered, a Rework with no notes — keeps the prompt up. Every verb an answer runs is one journal line: the command, its exit, and the dispatcher's own first line. The lane's child environment drops `CLAUDE_CODE_SESSION_ID` and `DISPATCHER_SESSION` (`laneEnv`): the server is nobody's Claude session, `accept` refuses inside one, and `tell` would write a stray id onto the outing it queues.
+THE ANSWER (`dispatcher-answer.service.ts`), from the panel (it names the ask by its request id), the phone (by its prompt key) or the plan's card (by the ask it drew: MAN-7534): Accept runs `dispatcher accept --lock <token> --by app:panel|app:card|app:phone <plans…>`, Queue the same with `--paused` — the verb re-checks the token and a stale one approves NOTHING, after which the current prompt is up again; Rework (its notes typed in the panel, `needsNote`; the phone's Rework button opens the chat instead) runs `dispatcher tell <target> --brief -` with the notes verbatim once per designer target; a questions round runs `dispatcher tell <target> --brief -` with the answers as `Q:`/`A:` pairs in the designer's own words. A decision that carries no answer — a skip, a label the prompt never offered, a Rework with no notes — keeps the prompt up. Every verb an answer runs is one journal line: the command, its exit, and the dispatcher's own first line. The lane's child environment drops `CLAUDE_CODE_SESSION_ID` and `DISPATCHER_SESSION` (`laneEnv`): the server is nobody's Claude session, `accept` refuses inside one, and `tell` would write a stray id onto the outing it queues.
 
-ANY PROCESS ANSWERS (`dispatcher-asks.service.ts`; measured 2026-09-28 18:59:54 on the dev unit's restart). An answer names an ask, and the process that hears it need not be the one that raised it: a click made while the socket was down waits in the tab's outbox and is flushed onto the successor's first frame, before its first picture has been read — the old server had minted the id, the new one had never heard of it, and the answer was dropped as an unknown request — and a phone tap can beat the successor's first raise the same way. So a key of the lane's own that the book does not hold is CLAIMED, not reported unknown, and settled from the STORE: `catchUp` reads it now (`readDispatcherState`, about 0.7 s on a 25-plan store) and runs `observe` on that picture, then the answer is looked up again. An ask the store holds open is in the book by then — the key carries the `asked` event's id and an Accept's lock token, so an id that names the current ask is exactly one the store derives — and is carried like any other, its token re-checked by the verb itself. A key no open ask derives — a re-cut's new `asked` event, an ask already answered or being carried, nothing owed — runs NOTHING (a re-cut's notes or answers would reach a designer for a question no longer asked, and the store refuses a second approval of an approved plan in any case), says so in the journal, and — for the panel's door; a phone tap is answered in its own HTTP reply — broadcasts `permission_cancelled` with `answerNotCarried: true` naming the ask by both its names (and the chat, when the picture in hand can say which), which a tab that was told about that ask and never heard it close shows as an "Answer not applied" toast; the same read has already put up whatever prompt IS current. A store that cannot be read leaves the answer uncarried with one journal line and the SAME notice, and the prompt comes back on the next picture that reads. THE READ IS COALESCED, because the phone's route is public and a genuine token replays for hours: a caller that finds a read out waits for the ONE read queued behind it (a read already out may predate the caller's ask), so a burst of taps costs two reads, and a key a successful read did not carry is remembered as closed for `CLOSED_MEMO_MS` (5 s) so a replay answers 410 without another (`raise` forgets the memo of a key it puts up; a failed read is never memoised). THE PHONE asks the same question before its token is spent: `unregisteredPromptOf` (`ntfy-action-token.service.ts`) names the prompt of a genuine token this process never registered buttons for, `recallApproval` (each gateway's optional `recall`) reads it from the store, and `ntfy-action.routes.ts` registers what the store says — so a tap is 200 while the ask is open and 410 `no longer pending` once it is not, whichever process serves it. Each door leaves one journal line when the store served it: `… named an ask this process had not raised — read from the store` (panel), `a tap on … named a prompt this process had not raised — read from the store` (phone).
+ANY PROCESS ANSWERS (`dispatcher-asks.service.ts`; measured 2026-09-28 18:59:54 on the dev unit's restart). An answer names an ask, and the process that hears it need not be the one that raised it: a click made while the socket was down waits in the tab's outbox and is flushed onto the successor's first frame, before its first picture has been read — the old server had minted the id, the new one had never heard of it, and the answer was dropped as an unknown request — and a phone tap can beat the successor's first raise the same way. So a key of the lane's own that the book does not hold is CLAIMED, not reported unknown, and settled from the STORE: `catchUp` (same file) reads it now (`readDispatcherState`, about 0.7 s on a 25-plan store) and runs `observe` on that picture, then the answer is looked up again. An ask the store holds open is in the book by then — the key carries the `asked` event's id and an Accept's lock token, so an id that names the current ask is exactly one the store derives — and is carried like any other, its token re-checked by the verb itself. A key no open ask derives — a re-cut's new `asked` event, an ask already answered or being carried, nothing owed — runs NOTHING (a re-cut's notes or answers would reach a designer for a question no longer asked, and the store refuses a second approval of an approved plan in any case), says so in the journal, and — for the panel's door; a phone tap is answered in its own HTTP reply — broadcasts `permission_cancelled` with `answerNotCarried: true` naming the ask by both its names (and the chat, when the picture in hand can say which), which a tab that was told about that ask and never heard it close shows as an "Answer not applied" toast; the same read has already put up whatever prompt IS current. A store that cannot be read leaves the answer uncarried with one journal line and the SAME notice, and the prompt comes back on the next picture that reads. THE READ IS COALESCED (`createAskReads`, `dispatcher-ask-reads.service.ts`), because the phone's route is public and a genuine token replays for hours: a caller that finds a read out waits for the ONE read queued behind it (a read already out may predate the caller's ask), so a burst of taps costs two reads, and a key a successful read did not carry is remembered as closed for `CLOSED_MEMO_MS` (5 s) so a replay answers 410 without another (`raise` forgets the memo of a key it puts up; a failed read is never memoised). THE PHONE asks the same question before its token is spent: `unregisteredPromptOf` (`ntfy-action-token.service.ts`) names the prompt of a genuine token this process never registered buttons for, `recallApproval` (each gateway's optional `recall`) reads it from the store, and `ntfy-action.routes.ts` registers what the store says — so a tap is 200 while the ask is open and 410 `no longer pending` once it is not, whichever process serves it. Each door leaves one journal line when the store served it: `… named an ask this process had not raised — read from the store` (panel), `a tap on … named a prompt this process had not raised — read from the store` (phone).
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/ntfy-action.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/services/ntfy-action-token.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/provider.registry.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/provider-runtime.service.ts
 
@@ -10648,3 +10815,878 @@ Rename, delete, star and reorder.
 - `getAllSessions`, `getSessionDate`, `getSessionProvider` and the two timestamp readers live in `src/shared/sessionRecency.ts`; `sidebarProjectFormatting.ts` imports them (INV-5889).
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/SidebarSessionPicker.tsx
+
+## MAN-7509 — The planner-lane dial — the Settings row, the route, the kick and the Runner readout
+
+The operator's planner-lane dial, CloudCLI's half. The file is `~/.claude/state/planners.flag` — one bare integer, at least 1, default 2 when absent — owned by the dispatcher (`hooks/dispatcher/planner_lanes.py`, `dispatcher planners <N>`; the dispatcher's own `planner_lanes` row holds the grammar and the rule). CloudCLI is a second hand on the same file, in the shape of the swarm and park-at-peak switches.
+
+**The server.** `server/modules/settings/planner-lanes.ts` reads and writes the file (`DISPATCHER_PLANNERS_FLAG_PATH` moves it for a probe, made absolute at every call, as the dispatcher's reader makes it). The read agrees with `planner_lanes.parse` clause for clause: ASCII digits only, at least 1, at most 64 bytes, else the default 2; a run of digits past `Number.isSafeInteger` reads as `Number.MAX_SAFE_INTEGER`, not as the default. The write goes through `writeFlagText` in `deepseek-flash-switch.ts` — the scratch-file-and-rename every host-wide flag here shares. `GET`/`PUT /api/settings/planner-lanes` answer `{"lanes": n}`, always READ BACK off the file; a `PUT` whose `lanes` is not a whole number of at least 1 (a string, a float, 0, past the safe integers) is 400 `INVALID_PLANNER_LANES` and writes nothing. A `PUT` that wrote ends with `void kickDispatcher()` (MAN-1497 §"THE KICK"): the kick wakes the daemon, which takes up what a wider lane now has room for. The spawn is `dispatcher kick`, not `dispatcher planners <N>` — by the time a spawn could run, the server has written the value, and the verb writes and kicks only on a change.
+
+**The row.** `RunnerPlannerLanesRow.tsx` beside `RunnerModelContent.tsx`, drawn directly beneath the swarm row: `PencilRuler`, label "Planner lanes", a `Stepper` (`1 lane`, `N lanes`; `−` stops at 1; NO "All"/unlimited, unlike the swarm ceiling) over `src/modules/settings/hooks/usePlannerLanes.ts` (`lanes: number | null`, `unreadable`, `saving`, `setLanes`, `refresh`; a press while a write is in flight is folded into the next write, so two quick `+` are two lanes; a read asked before a write is dropped). Strings under `agents.plannerLanes` (`settings.json`, `en` and `fr`).
+
+**The readout.** `route.planners` — `{lanes, out}` from `dispatcher status --json` — rides the `dispatcher_state` frame (`DispatcherRoute.planners`, optional; `dispatcher-state.service.ts` reads it tolerantly: absent from an older daemon is no readout, a malformed one is refused by name). `PlannerLanesReadout` (`src/modules/dispatcher`) draws `planners <out> of <lanes> out` in the Runner tab's header and at the top of the chat gutter's widget; `out` above `lanes` is a true reading after the dial is lowered, since an outing already out is never stopped.
+
+**The standing proof.** `node .verify/probe-planner-lanes.mjs` (dev server on :5183, desktop and mobile, dark and light): opens Settings → Agents, presses `+`, reads the file, the served frame, the panel's and the widget's readout, presses `−`, restores what the file held, screenshots to `.verify/out/`, zero console errors. It moves the LIVE dial by one for a few seconds, so it first reads the served frame's planner rows and declines (`[SKIPPED]`, exit 0) while any is `queued`, at the start and before every pass — a wider dial would launch it. A dial someone else moves mid-run is left where they put it: the `−` press and the restore are withheld (`[LEFT]`).
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/settings/planner-lanes.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/PlannerLanesReadout.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/hooks/usePlannerLanes.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/agents-settings/sections/content/RunnerPlannerLanesRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-planner-lanes.mjs
+
+## MAN-7510 — The notes table
+
+## `notes` — schema
+
+`notes` holds one account's cards, one row per card. Declared in `server/modules/database/notes-schema.ts`
+(`NOTES_SCHEMA_SQL`), exec'd from `runMigrations` in `migrations.ts` right after
+`migrateProvenanceColumnToLegacyId(db)`, beside `MEMORY_SCHEMA_SQL`. Lives in `~/.cloudcli/auth.db`.
+
+| Column | Type | Rule |
+|---|---|---|
+| `id` | TEXT PK | `randomUUID()`, minted by the repository |
+| `user_id` | INTEGER NOT NULL | FK `users(id)` `ON DELETE CASCADE` |
+| `title`, `description` | TEXT NOT NULL | |
+| `created_at` | TEXT NOT NULL | ISO-8601 UTC with ms; orders the list; never moves |
+| `updated_at` | TEXT NOT NULL | ISO-8601 UTC with ms; last save; equals `created_at` on a fresh row |
+
+Index: `ix_notes_user_created` on `(user_id, created_at)` — the one read, an account's notes newest first.
+References `users` only: no `board_id`, not a kanban table, not a preference document.
+
+## `notes` — changing a column
+
+- Every statement is `IF NOT EXISTS`; there is no version counter. Once a database has the table,
+  editing `notes-schema.ts`'s body changes nothing on it.
+- Add, rename or retype a column only with `addColumnToTableIfNotExists` (or an explicit `ALTER TABLE`)
+  in `migrations.ts`.
+- `why:` a scratch database is created empty and builds the new shape, so a bare edit passes every
+  scratch check and fails only on a real database that has the old one.
+- `NOTE_COLUMNS` in `notes.db.ts` is the one column spelling every `SELECT` and `RETURNING` uses; re-spell it with the column.
+
+## `notesDb` — `repositories/notes.db.ts`
+
+Exported with `NoteRow` from `@/modules/database/index.js`. Each method takes `getConnection()` inside
+itself, opens no transaction, is parameterized, and is scoped to the account.
+
+| Method | Answers | Account binding |
+|---|---|---|
+| `listForUser(userId)` | `NoteRow[]`, `created_at DESC, rowid DESC` | `WHERE user_id = ?` |
+| `create({ userId, title, description })` | the row as stored | `user_id` in `VALUES` |
+| `update(userId, id, { title, description })` | `NoteRow` read back, or `null` | `WHERE id = ? AND user_id = ?` |
+| `remove(userId, id)` | `true` if a row of that account was deleted, else `false` | `WHERE id = ? AND user_id = ?` |
+
+- An id of another account reads as no row: `update` answers `null`, `remove` answers `false`.
+- `update` answers exactly `NoteRow | null`; never `undefined` (a row deleted between write and read-back is `null`).
+- `rowid DESC` in `listForUser` keeps two notes made in one millisecond in a stable order.
+- `NoteRow` is the stored shape, `user_id` included; camelCase mapping is the caller's.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/migrations.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/notes-schema.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/notes.db.ts
+
+## MAN-7511 — The simple list's ladder and its folders table
+
+One ladder orders the simple list: tagged chats and folders share one rank number space, a higher
+rank nearer the top.
+
+## Storage
+| Item | Table.column |
+| --- | --- |
+| chat | `sessions.simple_list_rank` (tagged = `simple_list_at IS NOT NULL`) |
+| folder | `simple_list_folders.rank` |
+| chat's folder | `sessions.simple_list_folder_id` (`TEXT`, NULL = in no folder) |
+
+- `simple_list_folders` = `SIMPLE_LIST_FOLDERS_TABLE_SCHEMA_SQL` in `schema.ts`: `folder_id TEXT PRIMARY KEY`, `name`, `rank REAL NOT NULL`, `collapsed INTEGER DEFAULT 0`, `created_at`.
+- Applied by `addSimpleListFolders` in `migrations.ts`; index `idx_sessions_simple_list_folder`. Nothing backfilled.
+- A chat whose `simple_list_folder_id` names no live folder row reads as in no folder (`folderId` null).
+
+## `repositories/simple-list-ladder.db.ts`
+| Export | Does |
+| --- | --- |
+| `SIMPLE_LIST_LADDER_SQL` | the one union of tagged chats and folders: `kind`, `id`, `rank`, `folder_id` |
+| `NEXT_TOP_SIMPLE_LIST_RANK_SQL` | rank above every item and never below now; used by `createAppSession` in `sessions.db.ts`, by `createFolder` in `simple-list.db.ts` and by `placeInLadder` (move to top) |
+| `readLadder(db)` | every entry, highest rank first, id breaks a tie |
+| `readLadderEntry(db, item)` | one entry or `null` (unknown id, untagged chat) |
+| `placeInLadder(db, item, after)` | `after` null = top; else midpoint between the anchor and the next rank down; tie or no room = `renumberLadder` repair |
+| `renumberLadder(db, order)` | rewrites ranks `top - index * 0.000001` from the order given |
+
+- Types: `SimpleListLadderItem` (`{ kind: 'chat' | 'folder'; id }`), `SimpleListLadderEntry` (+ `rank`, `folderId`).
+- `folderId` is mapped from the SQL's `folder_id` in one private `toEntry`; every read goes through it.
+- `placeInLadder` with an anchor absent from the ladder is a no-op: order stands, no hoist to the top.
+- The caller validates item and anchor and holds the transaction: the read decides the rank written.
+- Caller: `simpleListDb` (`simple-list.db.ts`, MAN-7515) alone — folders and container moves; `sessions.db.ts` takes only `NEXT_TOP_SIMPLE_LIST_RANK_SQL`.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/session-user-state.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/simple-list-ladder.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/schema.ts
+
+## MAN-7512 — The simple list's folder words — simpleList keys in all 11 locales
+
+Words of the simple list's folders (ladder and storage: MAN-7511; the list: MAN-661). All in the `simpleList` block of `src/modules/i18n/locales/<lang>/sidebar.json`, all 11 locales (`en de es fr it ja ko ru tr zh-CN zh-TW`); each block holds the same 32 keys in `en`'s order.
+
+## Keys
+
+| key | English |
+| --- | --- |
+| `newFolder` | `New folder` |
+| `folderNamePlaceholder` | `Folder name` |
+| `folderOptions` | `Options for folder {{name}}` |
+| `folderDelete` | `Delete folder` |
+| `folderDeleteTitle` | `Delete this folder?` |
+| `folderDeleteBody` | `Its chats stay in the list, in the folder's place.` |
+| `moveToFolder` | `Move to folder…` (U+2026) |
+| `folderPickerTitle` | `Move to folder` |
+| `noFolder` | `No folder` |
+
+- New keys are appended at the end of each block. The five chat-delete keys sit where `en` has them: `archive`, `delete`, `deleteTitle`, `deleteBody`, `deleteBodyRunning`; they were English-only until 2026-09-30 and are translated in all ten other locales. Their call sites: `SidebarSimpleListRow.tsx`, `SidebarSimpleDeleteDialog.tsx`.
+- `folderOptions` keeps `{{name}}` in every locale: the folder's name reaches the label through it.
+- Outside `en`, a value equal to the English sentence is a skipped translation: `t()` falls back to English through the caller's `defaultValue`, so the gap does not show.
+- `newFolder` outside `en` repeats the app's existing `fileOperations.newFolder` phrase in `common.json`, so the file UI and the sidebar say the same thing. `en` is `New folder` here and `New Folder` there.
+- Question strings: `ja`, `zh-CN`, `zh-TW` use fullwidth `？` (`stopBody` included); `ko` ASCII `?`; `fr` keeps its plain space before `?`.
+- Callers pass a `defaultValue` with `t()`; the real words exist in all 11 locales, so the fallback never shows.
+
+## Words outside `simpleList`
+
+| folder part | key |
+| --- | --- |
+| cancel button of each dialog | `sidebar.json` `actions.cancel` |
+| header chevron fold words | `common.json` `runner.collapse`, `runner.expand` |
+
+## Gate — `.verify/simple-list-folders-words.py`
+
+- `python3 .verify/simple-list-folders-words.py`: one line per locale; exit 1 lists what is missing, left as the English sentence, blank, without `{{name}}`, or a reused word absent.
+- Checks: the locale set is exactly the 11; `en` holds the nine folder sentences and the five delete sentences as designed; every locale holds all of `en`'s `simpleList` keys as non-empty strings; the 14 written keys differ from English outside `en`; the `REUSED` keys exist in every locale.
+- 2026-09-30: `ALL 11 LOCALES CARRY ALL 32 simpleList KEYS; NONE OF THE 14 WRITTEN KEYS IS THE ENGLISH SENTENCE`.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/de/sidebar.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/sidebar.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/es/sidebar.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/fr/sidebar.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/it/sidebar.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/ja/sidebar.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/ko/sidebar.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/ru/sidebar.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/tr/sidebar.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/zh-CN/sidebar.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/zh-TW/sidebar.json, /home/lyphe/.claude/claudecodeui_lyphe/.verify/simple-list-folders-words.py
+
+## MAN-7513 — Notes — the wire shapes and the locale keys
+
+## `Note`, `NoteInput` — one text in two files
+
+Declared in the NOTES block of `src/shared/types.ts` and `server/shared/types.ts`, member for member.
+A change to either shape belongs in both files at once. Field detail lives in the declarations' comments.
+
+| Type | Members | Rule |
+|---|---|---|
+| `Note` | `id`, `title`, `description`, `createdAt`, `updatedAt` (all `string`) | `createdAt` orders the list and never moves; `updatedAt` is the last save; both ISO-8601 UTC with ms |
+| `NoteInput` | `title`, `description` | the whole of both fields on both writes, never a patch; also the shape of a draft |
+
+- The owning account never appears on the wire (`NoteRow.user_id` stays server-side, MAN-7510).
+- `title` and `description` are the writer's own text: a client draws them as text nodes, never as markup.
+- `NotesChangedEvent` (`{ kind: 'notes_changed'; at: number }`, `at` epoch ms) is declared in `server/shared/types.ts` only; it is not part of the NOTES block. Who sends it, and when: MAN-7517.
+
+## Notes — locale keys
+
+`gutters.notes.title` is in all eleven `src/modules/i18n/locales/*/common.json`, after each file's `embed` block.
+
+| Locale | `gutters.notes.title` |
+|---|---|
+| en | Notes |
+| de | Notizen |
+| es | Notas |
+| fr | Notes |
+| it | Note |
+| ja | メモ |
+| ko | 메모 |
+| ru | Заметки |
+| tr | Notlar |
+| zh-CN | 笔记 |
+| zh-TW | 筆記 |
+
+`en/common.json` alone also carries:
+
+- `tabs.notes` = `Notes`, after `tabs.schedules`.
+- Top-level `notes`, after `gutters` (20 leaves): `title`, `reading`, `unreachable`, `retry`,
+  `empty.{title,message}`, `form.{title,description,descriptionPlaceholder,add,save,cancel}`,
+  `card.{edit,delete}`, `delete.{title,message,confirm,cancel}`, `toast.{saveFailed,deleteFailed}`.
+- Interpolation: `card.edit` and `card.delete` take `{{title}}`; `delete.message` takes `{{title}}`.
+
+The ten other locales carry no `tabs.notes` and no `notes` block; those keys fall back to English.
+`why:` the gutters block is whole in every locale, so one missing title would be the only English
+word in a translated row of widget titles; `tabs.*` and the lane blocks (`memory`, `heal`,
+`dispatcher`) are English-only by the same practice.
+
+- A translation pass adds keys to a locale file; it never restructures the `notes` block.
+- The `notes` block keeps its nested one-liners (`empty`, `form`, `card`, `delete`, `toast`); a formatter that explodes them makes every line a diff.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/de/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/es/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/fr/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/it/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/ja/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/ko/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/ru/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/tr/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/zh-CN/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/zh-TW/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts
+
+## MAN-7514 — The simple list's client contract — `api.simpleList` and its seven types
+
+The browser's four calls for the simple list's folders and row moves, and the types they and the list share. Storage and ladder: MAN-7511. The list: MAN-661.
+
+## `api.simpleList` (`src/shared/api.ts`)
+| Call | Verb, route | JSON body |
+| --- | --- | --- |
+| `createFolder(name)` | `POST /api/providers/simple-list/folders` | `{ name }` |
+| `updateFolder(folderId, change)` | `PATCH /api/providers/simple-list/folders/:folderId` | `change` = `{ name?, collapsed? }` |
+| `deleteFolder(folderId)` | `DELETE /api/providers/simple-list/folders/:folderId` | none |
+| `move(item, position)` | `PUT /api/providers/simple-list/position` | `{ item, folderId: position.folderId, after: position.after }` |
+
+- `folderId` is passed through `encodeURIComponent`.
+- Built on the file's own `post` / `put` / `patch` / `del` (`withBody`): `del` sends no body, so a handler reads none.
+- The feed is not in this group: `api.recentConversations` reads it (its `simpleList` query flag).
+- `simpleList.move` takes an item ref of either kind plus a container; it is the only call that moves a chat.
+
+## Types (`src/shared/types.ts`, SIDEBAR group, after `RecentConversationListItem`)
+| Type | Shape |
+| --- | --- |
+| `SimpleChatMark` | `'awaitingInput' \| 'unread' \| 'running' \| 'subagents'` |
+| `SimpleListLayoutItem` | feed's `layout` row: `{ kind: 'chat'; sessionId }` or `{ kind: 'folder'; folderId; name; collapsed; sessionIds }` |
+| `SimpleListFolder` | `{ folderId; name; collapsed; chats: RecentConversationListItem[] }` |
+| `SimpleListItem` | sidebar's top-level row: `{ kind: 'chat'; chat }` or `{ kind: 'folder'; folder }` |
+| `SimpleListItemRef` | `{ kind: 'chat' \| 'folder'; id }` — chat by session id, folder by folder id |
+| `SimpleListPosition` | `{ folderId: string \| null; after: SimpleListItemRef \| null }` — `folderId` null = top level; `after` null = first in that container |
+| `SimpleListDropTarget` | pointer's landing before it becomes a position: `{ at: 'row'; item; edge: 'before' \| 'after' }`, `{ at: 'into'; folderId }`, `{ at: 'end' }` |
+
+All are `export type`.
+
+## Gate — `.verify/probe-simple-list-contract.mjs`
+- `node .verify/probe-simple-list-contract.mjs` (dev server on `127.0.0.1:5183`). Gitignored; a `probe-*.mjs`, so `all.mjs` does not run it.
+- Opens a bare page, imports `/src/shared/api.ts` from the dev server, answers every `**/api/providers/simple-list/**` request in the page: `201` for `POST /folders`, `200` for the other three, body `{ success: true, data: {} }`. No sign-in, no server handler reached, nothing lands on the operator's list.
+- Checks: C1 exactly four requests left; C2–C5 each one's verb, path and JSON body; C6 each call read back its status (create 201, the rest 200).
+- Prints each request as `[NOTE]`, then `SIMPLE-LIST-CONTRACT PASS` last, else exit 1.
+- The bare page still boots the app unauthenticated: its own read-only requests (`/api/auth/status` and others) reach the real API as 401s. Only the four simple-list requests are intercepted.
+- Asserts the route table's statuses, not the stub's: replacing the stub with real routes needs no edit to C6.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-simple-list-contract.mjs
+
+## MAN-7515 — The simple list's folder repository — `simpleListDb` and its six methods
+
+The simple list's folders table and every move of a chat or folder into a container. Storage and ladder primitives: MAN-7511.
+
+## `repositories/simple-list.db.ts`
+- `simpleListDb`, exported from `@/modules/database/index.js` with types `SimpleListFolderRow` (`{ folder_id; name; collapsed: number }`) and `SimpleListMoveVerdict` (`'moved' | 'unknown-item' | 'unknown-folder' | 'refused'`); the barrel also re-exports `SimpleListLadderEntry`, `SimpleListLadderItem` from `simple-list-ladder.db.ts`.
+- Reads the ladder and writes ranks only through `simple-list-ladder.db.ts`; never restates its union.
+- Every method takes `getConnection()` itself.
+- Never reads `isArchived`: the ladder holds every tagged chat; the feed's filtering belongs to the caller.
+- Callers: `simpleListService` (`services/simple-list.service.ts`, MAN-7519) — `listFolders` and `readLadder` for the feed, the other four for the writes.
+
+| Method | Answers | Does |
+| --- | --- | --- |
+| `listFolders()` | `SimpleListFolderRow[]` | `rank DESC, folder_id DESC` |
+| `readLadder()` | `SimpleListLadderEntry[]` | the ladder file's `readLadder` on `getConnection()` |
+| `createFolder(folderId, name)` | `SimpleListFolderRow` | one `INSERT … RETURNING`; `rank = NEXT_TOP_SIMPLE_LIST_RANK_SQL`, `collapsed = 0`; throws on an empty read-back |
+| `updateFolder(folderId, change)` | row or `null` | `change` = `{ name?; collapsed? }`; `SET` only the keys carried, `collapsed` as 1/0; empty `change` writes nothing and answers the row; one transaction |
+| `deleteFolder(folderId)` | released count or `null` | one transaction; `null` = no such folder |
+| `moveItem(item, folderId, after)` | `SimpleListMoveVerdict` | one transaction whatever it answers |
+
+## `deleteFolder` order
+1. Read the ladder; no folder entry with that id → `null`.
+2. `members` = chat entries whose ladder `folderId` is this folder, in ladder order.
+3. New order = the ladder with the folder's entry replaced by `members` and their own entries removed.
+4. `UPDATE sessions SET simple_list_folder_id = NULL` for the folder; `DELETE` the folder row.
+5. `renumberLadder` only when `members` is non-empty, so an empty folder's delete leaves every rank untouched.
+
+- Answer is `members.length`, never the `UPDATE`'s `changes`: a chat whose folder row is gone reads as loose and is not a member.
+
+## `moveItem` checks
+`folderId` = destination folder id, `null` = top level; `after` = anchor item or `null` (first place in the container).
+
+| # | Condition | Verdict |
+| --- | --- | --- |
+| 1 | `readLadderEntry(db, item)` is `null` (unknown id, untagged chat) | `unknown-item` |
+| 2 | `item.kind === 'folder'` and `folderId !== null` | `refused` (a folder lives at the top level) |
+| 3 | `folderId !== null` and no such folder row | `unknown-folder` |
+| 4 | `after` is the item itself, is not in the ladder, or sits outside the destination container | `refused` |
+
+- Container of an anchor, from its ladder entry's `folderId`: top level holds folders and chats with `folderId` null; a folder holds only its own chats.
+- After the checks: a chat gets `sessions.simple_list_folder_id = folderId` (a folder has no column to write), then `placeInLadder(db, item, after)`; answer `moved`.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/simple-list.db.ts
+
+## MAN-7517 — Notes — the API at /api/notes and the notes_changed frame
+
+## `/api/notes` — mount and layers
+
+Mount: `app.use('/api/notes', authenticateToken, createNotesModule())` in `server/index.ts`, directly after `/api/memory`.
+One address, no second router. A request with no token is 401 at the mount.
+
+| File | Owns |
+|---|---|
+| `notes.routes.ts` | `createNotesRoutes(service: NotesService): Router` — transport shape only: the caller is an account, `title` and a present `description` are strings, `:id` is a path parameter |
+| `notes.service.ts` | `notesService` (`list`, `create`, `update`, `remove`) and `NotesService = typeof notesService` — normalise, then judge, then write; module-private `toNote` and `broadcastNotesChanged` |
+| `notes.module.ts` | `createNotesModule(): Router` — one `notesService` instance handed to `createNotesRoutes` |
+| `index.ts` | barrel: `createNotesModule` only |
+
+`NoteRow` and `notesDb` come through `@/modules/database/index.js` (MAN-7510); `connectedClients` and `WS_OPEN_STATE` through `@/modules/websocket/index.js`. `Note` and `NoteInput`: MAN-7513.
+
+## Routes
+
+Success: `{ success: true, data }`. Failure: `{ success: false, error: { code, message } }`, status from the `AppError`.
+
+| Route | Body | Answers |
+|---|---|---|
+| `GET /api/notes` | — | 200 `Note[]`, newest first |
+| `POST /api/notes` | `NoteInput`; `description` optional, absent is `''` | 201 `Note`, `createdAt === updatedAt` |
+| `PUT /api/notes/:id` | `NoteInput`, whole, never a patch | 200 `Note` as saved |
+| `DELETE /api/notes/:id` | — | 200 `{ deleted: true }` |
+
+## Refusals
+
+| Code | Status | Raised in | When | `message` |
+|---|---|---|---|---|
+| `USER_REQUIRED` | 401 | routes | `request.user.id` is not an integer above 0 | Authenticated user is required. |
+| `INVALID_REQUEST_BODY` | 400 | routes | `title` not a string; `description` present and not a string (`null` included) | `title must be a string.` / `description must be a string.` |
+| `TITLE_REQUIRED` | 400 | service | the normalised title holds nothing the eye can see — empty, or nothing left once whitespace, format and control characters are stripped | A note needs a title. |
+| `TITLE_TOO_LONG` | 400 | service | normalised title over 200 characters | A title can be 200 characters at most. |
+| `DESCRIPTION_TOO_LONG` | 400 | service | normalised description over 20,000 characters | A description can be 20,000 characters at most. |
+| `NOTE_NOT_FOUND` | 404 | service | `PUT`/`DELETE`: no row of this account carries the id (another account's id answers the same) | That note is no longer there. |
+
+- `why:` the routes judge whether a field is text; the service judges whether the text is usable, so every caller gets the same refusal.
+- A `null` description is refused, not coerced to `''`; only an absent key is the empty string.
+
+## Normalisation
+
+| Field | Stored as | Limit (after normalising) |
+|---|---|---|
+| `title` | `replace(/\s+/g, ' ').trim()` — runs of whitespace become one space | `TITLE_MAX = 200` |
+| `description` | `trimEnd()` — leading indent and interior breaks stay | `DESCRIPTION_MAX = 20_000` |
+
+- `TITLE_MAX` and `DESCRIPTION_MAX` are mirrored by `TITLE_MAX_LENGTH` and `DESCRIPTION_MAX_LENGTH` in `NoteForm.tsx` (MAN-7518); the client build cannot import from `server/`. Change one, change both.
+- A title of only characters that draw as nothing — whitespace, format characters (U+200B ZERO WIDTH SPACE and its family, which `\s` misses; U+200C/U+200D included), control characters — answers 400 `TITLE_REQUIRED`: the check strips those classes and refuses when nothing is left. The stored text is never rewritten, so a ZWJ inside an emoji and the ZWNJ of Persian, Arabic and Indic text survive it; `NoteForm.tsx`'s blank check is the mirror (MAN-7518).
+
+## `readUserId` — the account reader
+
+- Module-local in `notes.routes.ts`: same shape and same 401 `USER_REQUIRED` as `scheduled-messages.routes.ts`, but it REFUSES where that one coerces.
+- Accepts a `number` that `Number.isInteger` and is above 0. Refused: `'1'`, `null`, `true`, `[]`, `1.5`, `0`, no `user`.
+- `why:` `Number(null)`, `Number([])` and `Number('')` are `0`; a coercing reader would act for account 0.
+- `authenticateToken` sets `request.user` from a `users` row, so no live session sends anything this refuses.
+- A reader copied from this file inherits the stricter rule.
+
+## `notes_changed` — the frame
+
+- Shape: `NotesChangedEvent` = `{ kind: 'notes_changed'; at: number }`, `at` epoch ms; declared in `server/shared/types.ts` and a member of `GatewayEventKind`.
+- No `seq`, no `sessionId`: it never becomes a transcript row, so `useChatRealtimeHandlers` needs no edit.
+- Sent once per write that landed — create, update, delete — after the write. A refused write (400, 404) and a read send none.
+- Goes to every client in `connectedClients` whose `readyState` is `WS_OPEN_STATE`; `JSON.stringify` once, a catch per client. It copies `broadcastKanbanEvent`.
+- No per-account filter: the frame names no note and no account. A client that hears it reads its own list again.
+- `broadcastNotesChanged` and `toNote` are module-private; export one at its declaration when a second file needs it.
+- 2026-09-30, live: 6 landed writes sent 6 frames; a blank title, an unknown id and 2 reads sent none.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notes/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notes/notes.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notes/notes.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notes/notes.service.ts
+
+## MAN-7518 — Notes — the screen: component map, keyboard, focus and wall rules
+
+## Notes screen — component map
+
+All in `src/modules/notes/`. Wire types `Note`, `NoteInput`: MAN-7513. Locale keys `notes.*`: MAN-7513. Context values `NotesValue`, `NoteDraftsValue`, their provider, reads and writes: MAN-7521.
+
+| File | Export | Props | Reads |
+|---|---|---|---|
+| `NoteForm.tsx` | `NoteForm` | `draft`, `onChange`, `onSubmit`, `onCancel?`, `submitLabel`, `busy`, `titleRef?` | no context; owner holds the draft |
+| `NoteCard.tsx` | `NoteCard` | `note`, `onDelete` | `NotesValue`: `setEdit`, `saveEdit`; `NoteDraftsValue`: `edits`, `writing` |
+| `NotesList.tsx` | `NotesList` | none | `NotesValue`: `notes`, `unreachable`, `refresh`, `setComposer`, `add`, `remove`; `NoteDraftsValue`: `composer`, `adding`, `writing`; own state `deleting: Note \| null`, initial `null` |
+| `NotesPanel.tsx` | `NotesPanel` | none | `NotesValue`: `notes` (the count) |
+| `NotesWidgetBody.tsx` | `NotesWidgetBody` | none | none; mounts `NotesList` |
+
+- `NotesList` is the one list in both homes: `NotesPanel` (the Notes tab's pane) and `NotesWidgetBody` (the chat gutter's widget).
+- Every reader takes `useNotes()` / `useNoteDrafts()` from `@/modules/notes/context/NotesContext` by path.
+- `NoteCard` reads both values: `setEdit`/`saveEdit` come from `NotesValue`, `edits`/`writing` from `NoteDraftsValue`.
+- The gutter's Notes widget: `GutterWidgetId` member `'notes'` (`src/shared/types.ts`); `DEFAULT_PLACEMENTS.notes` = `{ side: 'right', order: 2, open: false }` (`useGutterPlacements.ts`), under embed and folded; `ChatGutterLayout`'s widget table entry `notes` = title `gutters.notes.title`, `count` = `useNotes().notes?.length ?? 0`, icon `StickyNoteIcon`, `Body: NotesWidgetBody`; not `flush`, no header action.
+- A stored arrangement without `notes` gains it at its default: `parsePlacements` is seeded from `DEFAULT_PLACEMENTS`; no stored value is rewritten.
+
+## Notes screen — the Notes tab wiring
+
+| Piece | Where | Fact |
+|---|---|---|
+| tab id | `src/shared/types.ts` `AppTab` | member `'notes'` |
+| persisted tab | `src/modules/project-workspace/hooks/useProjectsState.ts` `VALID_TABS` | contains `'notes'`; a reload restores the tab |
+| house-row entry | `src/modules/project-workspace/WorkspaceTabs.tsx` `HOUSE_BASE_TABS` | `{ id: 'notes', labelKey: 'tabs.notes', icon: StickyNote }`, fourth after Schedules; no gate, no count dot |
+| pane | `src/modules/project-workspace/WorkspaceMain.tsx` | `activeTab === 'notes'` → `<NotesPanel />` in `div.h-full.overflow-hidden`, after Schedules; no gate |
+| barrel | `src/modules/notes/index.ts` | `NotesPanel` = `lazy(() => import(...))`; own chunk, loads on the tab's first open. `NotesWidgetBody` is a plain re-export, not lazy |
+| palette rows | `src/modules/command-palette/CommandPalette.tsx` `NAV_TABS` | `{ id: 'notes', label: 'Go to Notes', keywords: 'notes note cards jot write memo' }`, after Schedules |
+| palette tab list | `src/modules/project-workspace/ProjectCommandPalette.tsx` `visibleTabs` | `'notes'` in the base list, after `'schedules'` |
+
+- No gate. `why:` the notes belong to the account, not the project; a tab a person opens to write in stays on the row whatever the gates say.
+- House row with all three gates on holds 8 glyphs: `8 × 36 + 7 × 2 = 302px` of the 304px strip; a narrower strip hands the trailing tabs to the More trigger (`overflowLabel`).
+- `2026-09-30`: at 1440 the eight tabs draw 36.25px each (`flex: 1 1 auto` spreads the 2px slack) and the More trigger is not drawn.
+- `2026-09-30`: a reload on the Notes tab restores it; Ctrl+K → `Go to Notes` selects it.
+
+## Notes screen — keyboard and focus
+
+| Where | Key | Does |
+|---|---|---|
+| `NoteForm` title | Enter | submits |
+| `NoteForm` description | Enter | new line |
+| `NoteForm` description | Ctrl+Enter / ⌘+Enter | submits |
+| either field | no Escape | the fullscreen widget's Escape belongs to the gutter layout |
+
+- Submit is disabled while the title holds nothing the eye can see — whitespace, format (U+200B and family) and control characters stripped, nothing left — or while `busy`; the button and both Enter keys ask that one `canSubmit` (the service's mirror, MAN-7517).
+- Both `onKeyDown` handlers return first on `event.nativeEvent.isComposing`. `why:` an IME's committing Enter would submit the title; `useChatComposerState.ts` and `KanbanMetisConversation.tsx` guard the same way. A composing keystroke is not `preventDefault`ed.
+- `maxLength` on the fields: `TITLE_MAX_LENGTH = 200`, `DESCRIPTION_MAX_LENGTH = 20000`, mirroring the service limits (MAN-7517).
+
+| Event | Keyboard goes to |
+|---|---|
+| Edit pressed | the form's title inside the card |
+| Save landed, Cancel pressed | that card's Edit button |
+| Add landed, delete landed | the blank card's title (`composerTitleRef`) |
+
+- A save or add that did not land leaves the form standing with the draft and the keyboard in it.
+
+## Notes screen — wall and card rules
+
+- Wall: `NOTES_WALL_GRID` = `grid grid-cols-[repeat(auto-fill,minmax(min(100%,18rem),1fr))] items-start gap-4`; the blank card is the first `<li data-note-composer>`.
+- `min-w-0` on every grid item and every `Card`. `why:` `min-width: auto` lets one unbroken URL widen a track; `break-words` on the card then splits it.
+- Read mode: `title` and `description` are text nodes; description `whitespace-pre-wrap break-words`; nothing clamped.
+- Edit mode is `edits[note.id] !== undefined`; `NoteCard` holds no edit flag.
+- Card verbs (Edit, Delete): `h-10 w-10` until `sm`, `sm:h-8 sm:w-8`. `why:` the house corner-button floor (`LaneCardHead` `CORNER_BUTTON`, `CardFold`); these are the card's only controls on a phone.
+- `NotesPanel`'s `Badge` draws only when `notes.length > 0`; `notes === null` draws none.
+
+| `NotesList` state | Draws |
+|---|---|
+| `notes === null`, `unreachable` | `EmptyState` with `notes.retry` → `refresh()` |
+| `notes === null`, not `unreachable` | `Spinner` |
+| `notes` answered | the wall, blank card first |
+| `notes.length === 0` | wall plus `EmptyState` under it |
+
+- Both the `null` branch and the empty `EmptyState` sit in `flex items-center justify-center px-4 py-10`. `why:` a bare `EmptyState` stretches its dashed frame across the pane; same wrapper as `MemoryIntakePanel`, `RunnerPanel`, `KanbanPanel`, `ShellEmptyState`.
+- A failed read after a good one keeps the list (`unreachable` is true only while no read ever answered).
+- Delete: a card's Delete calls `onDelete(note)` → `setDeleting(note)`; nothing is written. `deleting` holds the note itself (the dialog message draws its title) and lives in `NotesList`, so the question outlives the card that asked it. `ConfirmDialog` actions: `notes.delete.cancel` (`outline`) then `notes.delete.confirm` (`destructive`, `busy` while `writing[deleting.id]`). Cancel, backdrop and Escape clear `deleting`. A delete that did not land leaves the dialog up; `remove` has already raised the `warn` toast (`2026-09-30`: a note deleted behind the open dialog → Delete → dialog stays, toast `That note could not be deleted`, Keep it closes the dialog).
+
+## Notes screen — selectors
+
+| Attribute | On |
+|---|---|
+| `data-notes-panel` | `NotesPanel` root |
+| `data-notes-widget` | `NotesWidgetBody` root |
+| `data-notes-list` | the wall `<ul>` |
+| `data-note-composer` | the blank card's `<li>` |
+| `data-note-id` | each note's `<li>` |
+| `data-note-form`, `data-note-title`, `data-note-description`, `data-note-submit`, `data-note-cancel` | `NoteForm` parts |
+| `data-note-edit`, `data-note-delete` | the card's two verbs |
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/notes/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/notes/NoteCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/notes/NoteForm.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/notes/NotesList.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/notes/NotesPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/notes/NotesWidgetBody.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/hooks/useProjectsState.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/WorkspaceMain.tsx
+
+## MAN-7520 — The simple list's tree — `simpleChatTree.ts` and its ten functions
+
+The simple list's tree as pure functions: `src/modules/sidebar/utils/simpleChatTree.ts`. No React, no state, no fetch; imports only types from `@/shared/types`. Module-private: no barrel export. The list: MAN-661. The types: MAN-7514.
+
+## Terms
+- Container = where rows sit. Top level holds loose chats and folders; a folder holds its chats.
+- `SimpleListPosition` = `{ folderId, after }`: container (`folderId` null = top level) plus the row the moved one sits directly after in it (`after` null = first).
+- `positionOf` reads a row's place in those terms; `moveItem` writes it; they agree by construction.
+
+## Exports
+| Function | Answers |
+| --- | --- |
+| `treeFromFeed(conversations, layout)` | `SimpleListItem[]`: `layout` in order, each id replaced by its row of `conversations`; an id with no row is dropped |
+| `refOf(item)` | `SimpleListItemRef` of a top-level row |
+| `flattenChats(items)` | every chat, flat, in drawn order; a folder's chats in its place, folded or not |
+| `appendPage(previous, page)` | `previous` + the `page` rows it does not hold; `previous` itself when nothing is new |
+| `patchChat(items, sessionId, patch)` | that chat's `sessionTitle` / `icon` replaced, at top level or inside a folder; unnamed rows keep identity |
+| `patchFolder(items, folderId, patch)` | that folder's `name` / `collapsed` replaced; unnamed rows keep identity |
+| `removeChat(items, sessionId)` | `{ items, wasTopLevel }`; `null` when the tree holds no such chat |
+| `positionOf(items, ref)` | `SimpleListPosition`; `null` when the tree holds no such row |
+| `moveItem(items, ref, position)` | the tree with the row at `position`; the SAME array (`===`) when refused |
+| `positionForDrop(items, carried, target)` | `SimpleListPosition`, or `null` when the drop asks for nothing |
+
+- `appendPage` keys rows `chat:<sessionId>` / `folder:<folderId>`: a folder id never passes for a session id. A folder already held keeps its own chats.
+
+## `moveItem` refusals (answer `items` itself)
+- The row is not in the tree.
+- A chat: `position.folderId` names no folder in the tree.
+- A chat: `position.after` is not a chat of the target folder, or not a top-level row when the target is top level.
+- A folder: `position.folderId` is not null (a folder lives at the top level).
+- A folder: `position.after` is not a top-level row.
+- The anchor is judged against the tree AFTER the row is lifted out: a row anchored on itself is refused, and a chat already in the target folder leaves it before it is put back.
+- A moved folder keeps its chats.
+
+## `positionForDrop` — what a drop asks for
+`SimpleListDropTarget` (MAN-7514) over the carried ref:
+
+| Carried | Target | Asks for |
+| --- | --- | --- |
+| any | `end` | `{ folderId: null, after: last top-level row that is not the carried one }` (null when none) |
+| chat | `into` F | `{ folderId: F, after: null }`; F is not looked up in the tree |
+| folder | `into` | `null` |
+| any | `row` X, `after` | `{ folderId: X's container, after: X }` |
+| any | `row` X, `before` | `{ folderId: X's container, after: the row above X in its container, skipping the carried one }` (null when none) |
+| folder | `row` X inside a folder | `null` |
+| any | `row` X not in the tree | `null` |
+
+- No-op rule, applied last: `null` when the carried ref is not in the tree, or when the asked position equals `positionOf(items, carried)`.
+- Why: a write the server would refuse (MAN-7515 `moveItem` verdicts) is never sent.
+
+## Gate — `.verify/probe-simple-tree.mjs`
+- `node .verify/probe-simple-tree.mjs` (dev server on `127.0.0.1:5183`). Gitignored; a `probe-*.mjs`, so `all.mjs` does not run it.
+- Bare Chromium page, no sign-in, no API reached: imports the module from `/src/modules/sidebar/utils/simpleChatTree.ts` through Vite.
+- One literal tree: loose `a1`, `a2`; open `f1[c1, c2]`; `f2[e1]`.
+- Prints `positionOf` for every row, every `positionForDrop` case with its expected answer, three `moveItem` trees, five refusal cases, all as JSON (a null and a container both visible).
+- 23 checks: 15 `positionForDrop` cases (every row of the table above, several twice, plus the no-op rule), 3 `moveItem` trees, 5 `===` refusals.
+- `SIMPLE-LIST-TREE PASS` last, else exit 1. 2026-09-30: 23 of 23.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/utils/simpleChatTree.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-simple-tree.mjs
+
+## MAN-7521 — Notes — the client provider: contexts, reads, writes, drafts
+
+## Notes provider — files, mount, barrel
+
+| File | Exports |
+|---|---|
+| `src/modules/notes/context/NotesContext.ts` | `NotesContext`, `NoteDraftsContext`, types `NotesValue`, `NoteDraftsValue`, hooks `useNotes`, `useNoteDrafts` — no component |
+| `src/modules/notes/context/NotesProvider.tsx` | `NotesProvider` only |
+| `src/modules/notes/index.ts` | `NotesProvider` (App mounts it), `useNotes` (the chat gutter's widget count), `NotesPanel` (`lazy`; the Notes tab's pane, mounted by `WorkspaceMain`: MAN-7518), `NotesWidgetBody` (the gutter widget's body, mounted by `ChatGutterLayout`) |
+
+- Mount in `src/App.tsx`: `<NotesProvider>` inside `<MemoryIntakeProvider>`, wrapping `<HealProvider>`; inside the auth gate, below `WebSocketProvider`. `why:` `api.notes` is authenticated and must not fire against the login screen; both re-read frames arrive on the one socket.
+- Both hooks throw outside the provider (`useNotes must be used within a NotesProvider`); both contexts default to `null`.
+- The barrel does not export `useNoteDrafts`, the contexts, `NoteCard`, `NotesList` or `NoteForm`; module files import siblings by path, never through the barrel.
+- `ChatGutterLayout` (`src/modules/chat-gutters`) reads `useNotes()` at its top level for the widget's badge and mounts `NotesWidgetBody`; it is the one consumer outside `src/modules/notes/` (MAN-7518).
+- `NoteCard.tsx`, `NotesList.tsx`, `NotesPanel.tsx` read `useNotes()` / `useNoteDrafts()` from `@/modules/notes/context/NotesContext` by path.
+
+## Notes provider — the two values
+
+Two contexts. `why:` the list changes when a read lands, a draft on every keystroke; a letter typed into the blank card must not re-render the wall.
+
+| `NotesValue` member | Meaning |
+|---|---|
+| `notes: Note[] \| null` | newest first; `null` = no read has ever answered |
+| `unreachable: boolean` | true only while `notes` is `null` and the last read failed |
+| `refresh(): Promise<void>` | one read; also the Try again press |
+| `setComposer(draft)` | replaces the blank card's draft |
+| `setEdit(id, draft \| null)` | `null` deletes the entry and leaves edit mode |
+| `add(draft)`, `saveEdit(id, draft)`, `remove(id)` | each `Promise<boolean>`: `true` = the write landed; `false` = it did not, and the toast is already raised |
+
+| `NoteDraftsValue` member | Meaning |
+|---|---|
+| `composer: NoteInput` | the blank card's draft |
+| `edits: Record<string, NoteInput>` | drafts over notes by id; a card is in edit mode exactly while it has an entry |
+| `adding: boolean` | the blank card's add is in flight |
+| `writing: Record<string, true>` | note ids with a save or delete in flight |
+
+- Write `edits` only through `setEdit`, `composer` only through `setComposer`; no consumer keeps a second draft.
+- The six verbs (`refresh`, `setComposer`, `setEdit`, `add`, `saveEdit`, `remove`) keep one identity for the app's life; a consumer may memoise on them.
+- The translator is read through `tRef`, set in `useLayoutEffect`; a verb never lists `t` in its deps, so a language switch rebuilds nothing. A new verb follows the same pattern. `why:` a render-time ref write trips the `react(refs)` lint ratchet.
+
+## Notes provider — reads
+
+`api.notes.list()` = `GET /api/notes` (MAN-7517).
+
+| Answer | Effect |
+|---|---|
+| `response.ok` and `data` an array | `notes` replaced whole, never merged; `unreachable` false; `edits` entries for ids absent from the list dropped |
+| not ok, `data` not an array, or a throw | list kept; `unreachable` set true only while `notes` is `null` |
+
+| Read trigger | Source |
+|---|---|
+| mount | the provider's effect |
+| `notes_changed` | `useWebSocket().subscribe` |
+| `websocket_reconnected` | the same subscription; client-synthetic, dispatched on socket open |
+| own landed write | the re-read inside `add` / `saveEdit` / `remove` |
+| Try again | `refresh()` |
+
+- The effect subscribes before the first read. `why:` a frame landing between the two starts its own read instead of being missed.
+- Tickets: a read takes `++newestReadRef`; an answer with a ticket below `newestAnswerRef` is dropped, every trigger alike. `why:` a read that left before a write's re-read must not land after it and restore the pre-write list.
+- State is set and toasts are raised only while mounted (`mountedRef`).
+- `2026-09-30`, dev: boot makes 2–4 `GET /api/notes` (StrictMode's double mount, plus one or two reconnect frames); a production build loses the StrictMode duplicate. Designed; the reconnect trigger stays.
+- `2026-09-30`: one press costs two reads under real frame traffic (the write's re-read, the broadcast's read). A client-side de-dup needs an origin the frame lacks (no per-account filter, MAN-7517); the cure is server-side origin tagging or client caching, each its own design.
+
+## Notes provider — writes
+
+| `api.notes` | Request |
+|---|---|
+| `list()` | `GET /api/notes` |
+| `create(input: NoteInput)` | `POST /api/notes` |
+| `update(id, input: NoteInput)` | `PUT /api/notes/<encodeURIComponent(id)>` |
+| `remove(id)` | `DELETE /api/notes/<encodeURIComponent(id)>` |
+
+- No write's response body is read. The verdict is `response.ok`; the list on screen comes from the re-read that follows. A consumer never draws from a write's answer.
+- One write per target: `writesInFlightRef` maps the target (`'composer'`, or a note id) to its in-flight promise. A second press on a target returns the held promise and starts no second write. The entry leaves when the promise settles.
+- The busy mark goes up synchronously at the press and stays until the re-read after a landed write has returned.
+
+| Verb | Target | Mark | Toast title key on failure | Cleared after the landed write's re-read |
+|---|---|---|---|---|
+| `add` | `composer` | `adding` | `notes.toast.saveFailed` | `composer` ← blank, only while it still holds the sent draft; `adding` off |
+| `saveEdit` | note id | `writing[id]` | `notes.toast.saveFailed` | `edits[id]` dropped, only while it still holds the sent draft; `writing[id]` off |
+| `remove` | note id | `writing[id]` | `notes.toast.deleteFailed` | `edits[id]` dropped; `writing[id]` off |
+
+- A write that did not land answers `false`, turns its mark off, touches no draft, and raises one `warn` toast: `title` = `t(key)`; `message` = the server's own sentence, `errorMessage(error) ?? errorMessage(details)` from the refusal body, omitted when the body carries none or is not JSON.
+- A write that landed is silent and answers `true`.
+- Drafts clear only after the re-read has returned, whichever way the re-read went — and only the draft the write SENT, only while it is still that text: typing that began while the write was in flight is newer than the write and is left standing. `why:` a card never shows the text it just replaced, and no keystroke is ever eaten.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/App.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/notes/context/NotesContext.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/notes/context/NotesProvider.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/notes/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts
+
+## MAN-7527 — Notes
+
+The **Notes** tab in the workspace: one account's cards — a sticky note each, a title and a description — read and written in two homes and stored one row at a time. The tab's pane and the chat gutter's widget draw the same `NotesList` over the same provider, so a card written in either is in both.
+
+| Depth | Row |
+|---|---|
+| the table and the repository | MAN-7510 |
+| the wire shapes and the locale keys | MAN-7513 |
+| the API at `/api/notes` and the `notes_changed` frame | MAN-7517 |
+| the screen — components, keyboard, focus, wall rules | MAN-7518 |
+| the provider — contexts, reads, writes, drafts | MAN-7521 |
+
+## The tab
+- Fourth on the house row (`HOUSE_BASE_TABS`, `src/modules/project-workspace/WorkspaceTabs.tsx`), after Schedules, ahead of the data-gated Memory, Runner and Heal tabs and the API tab — so it never moves and is never a trailing tab.
+- `{ id: 'notes', labelKey: 'tabs.notes', icon: StickyNote }`; the label is `tabs.notes` (`"Notes"`, `src/modules/i18n/locales/en/common.json`). **No gate and no count** — `why:` a note is not something waiting to be read, and the cards belong to the account, not to the open project.
+- `Go to Notes` (`NAV_TABS`, `src/modules/command-palette/CommandPalette.tsx`, after Schedules; keywords `notes note cards jot write memo`), offered while the tab is on the row: `'notes'` sits in `ProjectCommandPalette.tsx`'s base `visibleTabs` list.
+- `'notes'` is a valid persisted tab (`VALID_TABS`, `hooks/useProjectsState.ts`; read back by `readPersistedTab`). A reload at `/` lands on "Choose Your Project" — no project is restored; the workspace returns with Notes selected and its list drawn once a project row is picked. 2026-09-30, live: stored tab `"notes"`, workspace back on Notes after the row click. A probe of the persisted tab clicks `PROJECT_ROW` (`.verify/lib/console.mjs`) after the reload.
+- The pane is `NotesPanel`, mounted by `WorkspaceMain.tsx` while the tab is active: the header the Runner and Memory panes wear (icon tile, `notes.title` in an `h2`, a count `Badge` — Notes and Runner draw theirs above zero only; the Memory pane's badge shows its count whenever the intake queue is reachable) over a `ScrollArea` holding `NotesList`.
+
+## The widget
+- The fifth chat-gutter widget: `GutterWidgetId` member `'notes'` (`src/shared/types.ts`).
+- Default place: `DEFAULT_PLACEMENTS.notes` = `{ side: 'right', order: 2, open: false }` (`src/modules/chat-gutters/hooks/useGutterPlacements.ts`) — right, under Embed, folded. `why:` the cards are the same in every chat, and a folded widget costs a chat nothing.
+- Its badge is the number of notes: `ChatGutterLayout.tsx`'s widget table draws `count: useNotes().notes?.length ?? 0`, title `gutters.notes.title`, icon `StickyNoteIcon`, `Body: NotesWidgetBody`.
+- A stored arrangement that predates it gains it through the parser's own repair (`parsePlacements` is seeded from `DEFAULT_PLACEMENTS`); no stored value is rewritten.
+
+## One list, two homes
+- `NotesList` is mounted by `NotesPanel` (the tab) and by `NotesWidgetBody` (the gutter) — one list, one provider, so a note added in either home is in both and neither holds a copy the other cannot see.
+- One auto-fill grid, and it is what makes the list a wall in the tab and a stack in a gutter: `NOTES_WALL_GRID` = `grid grid-cols-[repeat(auto-fill,minmax(min(100%,18rem),1fr))] items-start gap-4` (`NotesList.tsx`): each column is 18rem wide unless its container is narrower, in which case it is the container — the wall's cards are 18rem and up, and a gutter card is its column.
+
+## The drafts
+- `NotesProvider` holds the drafts on the second context (`NoteDraftsContext`): `composer`, what is typed in the blank card, and `edits` by note id — a card is in edit mode exactly while it has an entry.
+- They outlive the pane and a folded widget: the provider is mounted once above both homes. They end at sign-out — the provider unmounts with the auth gate — and on a reload; nothing writes them anywhere.
+- `App.tsx` mounts `NotesProvider` inside the auth gate and below `WebSocketProvider`, the socket that carries the frame re-reading the list.
+
+## The table, the routes and the frame
+- Table `notes` (`server/modules/database/notes-schema.ts`; `notesDb` in `repositories/notes.db.ts` — MAN-7510): per account, newest first (`created_at DESC`, then `rowid DESC`), and an edit never moves a card (`created_at` never moves, `updated_at` is the last save). Every statement carries `user_id = ?`, so an id of another account reads as no row.
+- Four routes on one mount, `/api/notes` (`server/index.ts`, behind `authenticateToken`; MAN-7517): `GET` → 200 `Note[]`; `POST` → 201 `Note`; `PUT /:id` → 200 `Note`; `DELETE /:id` → 200 `{ deleted: true }`.
+- Refusals: 401 `USER_REQUIRED` (the account is not an integer above 0); 400 `INVALID_REQUEST_BODY` (`title`, or a present `description`, is not a string); after normalising, 400 `TITLE_REQUIRED` (empty title — nothing the eye can see), `TITLE_TOO_LONG` (over 200), `DESCRIPTION_TOO_LONG` (over 20,000); 404 `NOTE_NOT_FOUND` for an id no row of the account carries.
+- `notes_changed` — `{ kind: 'notes_changed', at }` — goes to every open `/ws` socket after each write that landed, through `connectedClients` (MAN-315). It names no note and no account, so the only answer to it is "read this account's own list again".
+- The reads it triggers: `NotesProvider` reads on mount, on a `notes_changed` frame, on `websocket_reconnected`, and after each of its own writes. A socket of another account learns only that something moved.
+
+## The files
+| File | Holds |
+|---|---|
+| `server/modules/notes/notes.service.ts` | the four verbs — normalise, judge, write — and the frame |
+| `server/modules/notes/notes.routes.ts` | the four routes and their transport refusals |
+| `server/modules/notes/notes.module.ts` | `createNotesModule`: the one router, mounted at `/api/notes` and nowhere else |
+| `server/modules/notes/index.ts` | the barrel: `createNotesModule` |
+| `server/modules/database/notes-schema.ts` | `NOTES_SCHEMA_SQL`: the table and its one index |
+| `server/modules/database/repositories/notes.db.ts` | `notesDb` and `NoteRow` |
+| `src/modules/notes/context/NotesContext.ts` | the two contexts, `NotesValue` and `NoteDraftsValue`, `useNotes` and `useNoteDrafts` |
+| `src/modules/notes/context/NotesProvider.tsx` | the reads, the writes, the drafts |
+| `src/modules/notes/NotesList.tsx` | the wall and its grid, the blank card, the delete question |
+| `src/modules/notes/NoteForm.tsx` | the controlled form and the two length limits |
+| `src/modules/notes/NoteCard.tsx` | one card: read mode, edit mode, Edit and Delete |
+| `src/modules/notes/NotesPanel.tsx` | the tab's pane: header and `ScrollArea` |
+| `src/modules/notes/NotesWidgetBody.tsx` | the gutter's body: `NotesList` and nothing else |
+| `src/modules/notes/index.ts` | the barrel: `NotesProvider`, `useNotes`, lazy `NotesPanel`, `NotesWidgetBody` |
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/notes-schema.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/notes.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notes/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notes/notes.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notes/notes.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notes/notes.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/notes/context/NotesContext.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/notes/context/NotesProvider.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/notes/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/notes/NoteCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/notes/NoteForm.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/notes/NotesList.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/notes/NotesPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/notes/NotesWidgetBody.tsx
+
+## MAN-7530 — Where a tap lands
+
+`landingPathOf(event)` in `server/modules/notifications/services/notification-landing.service.ts`
+decides where a tap on a push opens. It returns a PATH, never a URL; each opener joins it to its own origin.
+
+| Event | Path |
+| --- | --- |
+| Has a `sessionId` | `/session/<sessionId>` |
+| No session | `/` |
+| `permission.required` whose `meta.plan` is a non-empty string (a plan's prompt) | the path above plus `?runner=<plan>` — the workspace's `useRunnerLanding` opens the Runner tab on that plan's card (MAN-7531) |
+| Any other event | the first two rows only; `meta.plan` on any other code is ignored |
+
+- Both values go through `encodeURIComponent`.
+- A value it refuses (a lone surrogate) costs only its own part: an unspellable plan drops `?runner=`, an unspellable session id falls to `/`. `landingPathOf` never throws. why: the payload build calls it; a throw loses the push.
+
+| Opener | Reads | What it does |
+| --- | --- | --- |
+| `buildNotificationPayload` (`notification-orchestrator.service.js`) | the event | puts the path on `data.path` for web push and the desktop channel |
+| ntfy channel (`ntfy-channel.service.ts`) | the event | click = `<appUrl><path>`; the same URL is `landingUrl`, the `view` button of a `needsNote` option (MAN-618). No app URL stored: no click |
+| Service worker (`public/sw.js`, `notificationclick`) | `data.path` | a window of this origin is focused and told `notification:navigate` with `urlPath`, which the page's `ProjectEffects` navigates to (MAN-7531); none open: `clients.openWindow(urlPath)` |
+| Desktop app (`electron/desktopNotifications.js` passes `path: payload.data?.path \|\| null`; `electron/main.js` `openNotificationTarget`) | `path` | `new URL(path, environmentUrl)` in the active view |
+
+An opener given no usable path falls back to `/session/<sessionId>`, or `/` with no session: a payload built before `data.path` existed lands as it always did.
+
+Probe the function alone with `npx tsx --tsconfig=server/tsconfig.json -e '<code>'` from the repo root. why: the space form `--tsconfig server/tsconfig.json -e` exits 0 and runs nothing (tsx 4.21.0 drops the `-e` code).
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/electron/desktopNotifications.js, /home/lyphe/.claude/claudecodeui_lyphe/electron/main.js, /home/lyphe/.claude/claudecodeui_lyphe/public/sw.js, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/services/notification-landing.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/services/notification-orchestrator.service.js, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/services/ntfy-action-decisions.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/services/ntfy-channel.service.ts
+
+## MAN-7531 — The Runner landing — `?runner=<plan>` brings the plan's card into view
+
+The workspace's half of a tap on a plan's prompt. The server's half (`landingPathOf`, what a push opens) is MAN-7530; the pane that scrolls is `RunnerPanel` (MAN-642).
+
+| Part | File | Does |
+| --- | --- | --- |
+| `ProjectEffects` | `src/modules/project-workspace/controllers/ProjectEffects.tsx` | on the service worker's `notification:navigate`: `setActiveTab('chat')`, then `navigate(message.urlPath)` when `urlPath` is a string starting with `/`, verbatim |
+| `useRunnerLanding` | `src/modules/project-workspace/hooks/useRunnerLanding.ts` | reads `?runner=`, holds the name as `revealPlan`, brings the Runner tab forward, strips the param |
+| `WorkspaceMain` | `src/modules/project-workspace/WorkspaceMain.tsx` | calls `useRunnerLanding({ selectedProject, setActiveTab })`; renders `<RunnerPanel revealPlan={revealPlan} onRevealed={clearReveal} />` |
+| `RunnerPanel` | `src/modules/runner-tab/RunnerPanel.tsx` | scrolls the named card into view, then calls `onRevealed` |
+
+- A `urlPath` not starting with `/` (a message from a worker older than the field) falls through to `/session/<sessionId>`, else `/`. No `?runner=` then; no landing.
+- `ProjectEffects` sets `chat` first; the landing's `setActiveTab('runner')` follows from the URL it navigated to.
+
+## `useRunnerLanding` — rules
+1. The name is held from the commit that first sees it, NOT from the commit a project exists. why: at `/` no tab strip is drawn until a project is picked, and the pick (`handleProjectSelect`) rewrites the location to bare `/`, so a read that waited for `selectedProject` finds the param gone.
+2. An empty or whitespace `runner` moves nothing: no tab, no strip, no `localStorage.activeTab` write, URL left as typed.
+3. The param is stripped (`setSearchParams(…, { replace: true })`, rebuilt so other keys survive) only once `selectedProject` is non-null. With no project it stays in the URL, so a reload during the wait re-lands. why: `replace`, so Back never returns to a URL that re-lands.
+4. `setActiveTab('runner')` runs when `revealPlan` and `selectedProject` are both set. The effect keys on the HELD name, never on the param.
+5. `revealPlan` is state, not a live read of the URL. why: the pane mounts a render after the strip, so a URL read there finds nothing.
+6. `clearReveal` is a stable `useCallback`. why: the pane's effect lists it; a fresh identity would re-run a retired reveal.
+
+## `RunnerPanel` — the reveal effect
+- Props: `revealPlan?: string | null` (default `null`), `onRevealed: () => void`.
+- Waits until `useLiveTopic(DISPATCHER_ALL_TOPIC) !== undefined` ("the bus has spoken"). `undefined` is nothing retained yet; `useDispatcherPlans` folds it into an empty lane, so the pane reads the topic itself. why: a lookup on a cold board retires a request that had nothing to find; an empty board dealt is an answer, and a pending request would scroll the pane later with no URL to explain it.
+- Then scopes to its own `data-runner-panel` root and looks for:
+  - a plan of no arc: `[data-runner-loose-plans] [data-dispatcher-card][data-plan-name="<name>"]`;
+  - a plan of a drawn arc (the arc read off `plans` from `useDispatcherPlans()`): `[data-dispatch-arc][data-arc-name="<arc>"]`, the deck, since the deck's strip pages its plans.
+- Both names go through `CSS.escape`. A found target gets `scrollIntoView({ block: 'start' })`.
+- `onRevealed()` runs found or not: a plan put away since the push, or a name the lane does not carry, retires the request.
+- It scrolls. It unfolds nothing and un-hides nothing.
+- Only the pane retires a reveal; the workspace never does.
+
+## The standing proof
+`node .verify/probe-runner-landing.mjs` on the dev client `:5183`, 390×844, five pages, exit 0 and `PASS` when clean; artifact `.verify/shots/runner-landing.png`; no non-GET request goes out (preferences pinned with `pinPreferences(…, { writes: 'drop' })`, the rest answered in-page and listed).
+
+| Page | Holds |
+| --- | --- |
+| `/session/<id>?runner=<plan>`, persisted tab `chat` | Runner tab selected, target top inside the viewport, `location.search` without `runner` |
+| session chat with no param, handed the worker's `notification:navigate` message on `navigator.serviceWorker` | lands the same way (`ProjectEffects`' half; no push sent) |
+| `/?runner=<plan>`, no project picked | nothing lands, the param stays |
+| control: persisted tab `runner`, no param | pane `scrollTop: 0` |
+
+- The target is the last card of `[data-runner-loose-plans]` as the live tab draws it; with no loose plan, the last `[data-dispatch-arc]`'s first plan.
+- 2026-09-30: live lane 8 plans, 0 arcs, so the arc arm (`[data-dispatch-arc][data-arc-name]`) is unexercised by the probe; target at 463 px of 844 (3378 px unscrolled).
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/controllers/ProjectEffects.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/hooks/useRunnerLanding.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-runner-landing.mjs
+
+## MAN-7532 — The plan card — the ask vocabulary (`askState.ts`)
+
+**`src/modules/dispatcher/askState.ts`** — pure functions of the `DispatcherAsk` the server sends on a plan's `asking` key. No React; its only import is `import type … from '@/shared/types'`. Server name for an ask is `keyOf`; nothing here computes it.
+
+| export | returns |
+|---|---|
+| `askIdentity(ask)` | `<asked.id>-<asked.at>`, the same on every plan one lock names |
+| `lockOptions(ask)` | `{ accept, queue, rework }`, each `{ label, description }` verbatim from `intent_lock.OPTIONS`, read by position 0, 1, 2 |
+| `arcAsks(plans)` | every distinct open ask across the plans, arc order, first plan carrying an identity places it |
+| `askHeadline(ask)` | a lock's first non-blank `question` line; a round's first question's first non-blank line |
+| `owesWord(plan)` | whether the plan's `asking` is set — the one reading of "this card is waiting on the operator" |
+| `anyOwesWord(plans)` | the same one level up: whether ANY plan of the set does — an arc's deck is asking when a plan of it is |
+
+Rules:
+1. `lockOptions` takes only `kind: 'accept'`.
+2. `askHeadline` keeps its own three-line first-line reader, and the two PREDICATES live here by the same rule — `dispatcherState.ts` is at 300 lines and takes no addition: the lane's two orders (`byUrgencyThenNewest`, `byArc`) and the widget's regroup (`widgetItemsOf`) read `owesWord`/`anyOwesWord` from here, so ONE place decides what a card waiting on the operator is. An owed word is the most urgent state a card can be in, above every status: live means the work is moving, an ask means it will not move until he answers.
+3. Shared pieces the ask surfaces draw with: `QuestionOptionRow` from `@/shared/ui`, `QuestionText` from `@/modules/chat` — never a deep path (INV-205).
+4. The answer door and its press: MAN-6805 (`api.dispatcher.answer`, `useDispatcherVerbs.answer`). The `dispatcher.ask` keys (ten, `en/common.json` only; other locales fall back) carry `word`, which names the `answer` press.
+
+Proof: `node .verify/probe-card-ask-machinery.mjs` — imports `askState.ts` and `api.ts` inside the dev client's page (`:5183`, no sign-in) by their served URLs; real lock prompt from `dispatcher question <plan>` (pure read); the answer request is intercepted in the browser and answered `409 not-open`, so the live store is never written. Exits 1 with the failed checks. 2026-09-30: ALL PASS.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/askState.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-card-ask-machinery.mjs
+
+## MAN-7534 — The dispatcher lane — THE CARD'S DOOR. `POST /api/dispatcher/answer` answers a plan's prompt from its card
+
+**THE CARD'S DOOR.** `POST /api/dispatcher/answer`: the plan's own card (Runner tab, Runner widget; client MAN-6805) answers the prompt a plan owes, without the chat. Behind the lane mount's `authenticateToken`. Third door beside the panel and the phone (MAN-7400); it carries through the same `carryEntry`, so the dispatcher's verbs, the book and the grace are shared.
+
+Wiring:
+- `createDispatcherAnswerRouter` (`dispatcher-answer.routes.ts`) — only reads and validates the body, maps the outcome to a status.
+- `dispatcher.module.ts` mounts it with `router.use(...)` on the lane's router, handed `answer: prompts.answer`.
+- `dispatcher-prompts.module.ts` returns `answer: asks.answer`; `asks.answer` is `answerFromCard` in `dispatcher-asks.service.ts`, which owns the naming, the book lookup and the carry.
+
+Request `{ ask, answers, notes? }`:
+| field | rule | 400 body |
+|---|---|---|
+| `ask` | the plan's `asking` record exactly as the frame drew it; read by `askingSince(body.ask, 'answer.ask')` (`dispatcher-ask.reader.ts`) | the reader's message naming the field it refused; `ask is required` when absent |
+| `answers` | object of strings, by question text | `answers must be an object of strings, by question` |
+| `notes` | optional, same shape: a Rework's notes by question | `notes must be an object of strings, by question` |
+
+The decision built is `{ allow: true, updatedInput: { answers, notes? } }` — the panel's shape, read by `readReply`.
+
+Reply `DispatcherCardAnswer { outcome, stdout }` (`server/shared/types.ts`, mirrored in `src/shared/types.ts`; `stdout` is the one line the card toasts):
+| outcome | status | when |
+|---|---|---|
+| `took` | 200 | every verb exited 0 |
+| `already-answered` | 409 | the Accept reached a plan the store had approved (`dispatcher accept` exit 3) |
+| `refused` | 409 | a verb refused, failed or never answered, or the carry threw |
+| `not-open` | 409 | no open ask carries the name the ask derives (answered, re-cut or changed since drawn), an answer to it is being carried, or it was answered inside `ANSWER_GRACE_MS` |
+| `no-answer` | 400 | `readReply` read none: no offered option, or a Rework without notes |
+| `unread` | 503 | the store could not be read to find the ask |
+
+`answerFromCard`, in order:
+1. `key = keyOf(ask)`; in `answering` → `not-open` "an answer to this prompt is already being carried".
+2. in `answered` → `not-open` "this prompt was already answered".
+3. not in the book and `reads.knownClosed(key)` → `closedToCard`, no read.
+4. not in the book → `reads.catchUp(...)`; a failed read → `unread`; the book is looked up again.
+5. still absent → `reads.rememberClosed(key)` and `closedToCard` ("this prompt is no longer open — answered, re-cut or changed since it was drawn; nothing was carried").
+6. `readReply(entry.ask, decision)` is `null` → `no-answer`.
+7. `carryEntry(entry, reply, 'card')`, awaited.
+8. answers `{ outcome, stdout: said }`.
+
+Rules:
+- The carry runs on the BOOK entry's ask, never the request's: the request's ask only derives the key, so no request string reaches an argv and a census the card never drew is never approved.
+- The door is written to `approved_by` as `app:card`: `AnswerDoor` is `'panel' | 'card' | 'phone'`, and `dispatcher accept --by` takes `cli|app:panel|app:card|app:phone` (`hooks/dispatcher/cmd/run.py`, MAN-6048).
+- `carryReply` returns `CarriedAnswer { outcome, said }`; `said` is the refusing run's first line, else the last run's, `''` when nothing printed. Every run still journals its own line.
+- Panel and phone void the `carryEntry` promise (their frames and HTTP reply tell the operator); the card awaits it.
+- `tellAlreadyAnswered` broadcasts `permission_cancelled` for the panel only; the card hears `already-answered` in its reply.
+- Every non-`took` outcome is exactly one journal line, `[Dispatcher] <plan>: the card's answer carried nothing — <why>`; `unread`'s line is `catchUp`'s own (`the store could not be read`), so `answerFromCard` adds none.
+- Every door that writes the closed-key memo reads it (`answerFromStore`, `recall`, `answerFromCard`): a replayed press inside `CLOSED_MEMO_MS` (5 s) costs no second `dispatcher status --json`. A memo hit does not refresh the window; `raise` forgets the memo of a key it puts up.
+- `AnswerDoor` keeps `'panel'`, and the CLI keeps `app:panel`, until the chat stops asking.
+
+Proof: `npx tsx --tsconfig server/tsconfig.json .verify/probe-card-door.ts` (scratch home `/tmp/card-door-*`, real `git init` repo, the `rework_key.sh` fixture, real `dispatcher` CLI; queues only — no daemon kick, no `tell`). Four prints: Queue → `took`; the same ask again → `not-open`; the live door with an ask the live store does not hold → 409 `not-open`; the live door with no ask → 400. 2026-09-30: exit 0. The live-door print leaves one journal line on the running server and moves no plan.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-answer.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-card-door.ts
+
+## MAN-7537 — The plan card — the ask band (`PlanAsk`, `LockAnswer`, `RoundAnswer`)
+
+**The ask band: the prompt a plan owes, drawn as one band — a lock's answer form, or a round's.** Files in `src/modules/dispatcher/`. Reads the `DispatcherAsk` of a plan's `asking` key through `askState.ts` (MAN-7532); answers through `useDispatcherVerbs(ask.plan).answer` (MAN-6805, door MAN-7534).
+
+Mounted live: `PlanCard` draws the band by default (`showAsk`) for any plan whose `asking` is set — between the head and the fold body, keyed `askIdentity(plan.asking)` so a different ask starts empty. `DispatchArcDeck` draws the deck's asks through `DeckFrame`'s `asks` slot above the strip, one per `askIdentity` (`arcAsks`), so a lock naming several plans of an arc is drawn once (MAN-5706), and every plan card of an arc is drawn `showAsk={false}`. Presses reach the door through `useDispatcherVerbs(ask.plan).answer`; a `true` marks the band answered.
+
+| file | draws |
+|---|---|
+| `PlanAsk.tsx` | the band root, head line, folded bar, answered line; mounts the form by `ask.kind`. Exports `PlanAsk({ ask, folded, onUnfold })`, `AskAnsweredLine` |
+| `LockAnswer.tsx` | `kind: 'accept'`: the census, three buttons, Rework's notes field |
+| `RoundAnswer.tsx` | `kind: 'questions'`: every question stacked, one `Send answers` |
+
+Handles (reading surface for a probe):
+| handle | where |
+|---|---|
+| `data-plan-ask`, `data-ask-kind` (`accept`\|`questions`), `data-ask-plan`, `data-ask-state` (`folded`\|`open`\|`answered`) | band root |
+| `data-ask-bar`, `data-ask-headline` | folded bar button, its one-line prompt |
+| `data-ask-form` | the form wrapper; `hidden` while folded |
+| `data-ask-region` | the bounded, focusable census / questions region |
+| `data-ask-accept`, `-queue`, `-rework`, `-notes`, `-send` | lock buttons, notes textarea, `Send notes` / `Send answers` |
+| `data-ask-question`, `data-ask-other` | a round's question block, its `Other…` field |
+
+Rules:
+1. The form is never unmounted. A fold sets `display:none` (`hidden`) on `data-ask-form`; notes and picks live in `LockAnswer` / `RoundAnswer` state, and the wrapper is keyed by `askIdentity(ask)`, so the same ask folded and unfolded keeps its words and a different ask starts empty. `why:` a clip leaves controls in the tab order (MAN-5412).
+2. A folded band is ONE button (`data-ask-bar`): head line, `askHeadline(ask)` truncated to one line, `dispatcher.ask.open`. It answers nothing.
+3. Head line: amber `vv-pulse` dot, `dispatcher.ask.waiting`, neutral `Badge` — `ask.header` for a lock, `ask.plan` for a round. Phrasing content only (`span`), because it sits inside a `button`.
+4. `answered` is reached only by `onAnswered` → `setAnswered(true)`, called when `answer(...)` resolves `true`. The answered band is `AskAnsweredLine` alone, no controls.
+5. A lock's census is drawn whole through `QuestionText` in one `max-h-[50dvh]` focusable `region` (`aria-label` = `ask.header`): no clamp, no excerpt. `why:` the last line is `lock:<digest>`, and the press approves what is drawn (MAN-7400). A round's region is labelled `ask.plan`.
+6. Lock buttons are `lockOptions(ask)` labels verbatim, each description as its `title`; the label IS the answer sent. Accept primary, Queue secondary, Rework outline, all `h-8`.
+7. Rework swaps the three buttons for the `vv-input` textarea, `Send notes` (disabled until words) and Cancel; Cancel keeps the notes.
+8. A round: `QuestionOptionRow` with `choice="radio"` and no `keyHint`, inside `role="radiogroup"`; the dashed `Other…` row sits OUTSIDE the group and opens an `Input` (the only `autoFocus`; it follows the press). Picking a label closes Other; opening Other clears the pick; typed words are kept on both. `Send answers` sits under the region, enabled once any question has an answer.
+9. Answer keys: a lock's by `ask.question` — Accept and Queue send their label; `Send notes` sends the Rework label plus `notes: { [ask.question]: notes.trim() }`; a round's by each answered question's own text.
+10. `busy` (one `const` per form) is read by the lock's Accept, Queue, Rework and `Send notes`, and the round's `Send answers`. The compose-only controls — the lock's notes field and Cancel, the round's rows, `Other…` row and field — stay live on purpose: none sends. Gating the round's rows needs a `disabled` prop on `QuestionOptionRow` (shared component, own review).
+11. Nothing calls `focus()` on mount and no key is bound outside the controls.
+
+Proof: `node .verify/probe-card-ask.mjs` — the Runner tab of the live client (`:5183`), its lane rewritten in both of the page's ways in (`.verify/lib/ask-lane.mjs`: the REST seed and every `dispatcher_state` frame), around the real census (`dispatcher question coi-backend-conformance`, a pure read), in four combos (1440×900 and 390×844 at root font 1.072×, light and dark). Reads the design's seven seam-3 groups off the DOM: the loose card's census whole in its bounded region; the deck's round above the strip, no plan card drawing an ask; the folded bar (form `display:none`, the bar reopening the card); Rework's Send disabled until the notes hold real words, Cancel giving the three answers back; Queue on the wire — the ask byte-identical to the fixture's, the label as its answer — refused by the live door (409 `not-open`) with the prompt still standing; every other non-GET answered in the page and listed; 0 console errors. Shots `.verify/shots/card-ask-<combo>-<theme>.png` (4). Exits 1 with the failed checks. 2026-09-30: 220 `[OK]`, 0 `[FAIL]`, ALL READINGS HELD. Its `--surfacing` mode (seam 4, 1920×1080, dark and light, the Chat tab pressed so the gutter is drawn) ADDS three fixtures to the same lane — an asking loose plan that is the lane's OLDEST and `idle`, an arc holding an asking plan placed LAST of the frame's `arcs`, and a plan of that arc put away an hour BEFORE the ask it carries — and reads them off the DOM: the asking plan is the FIRST loose card in the tab's wall, the asking arc the FIRST of the decks, the widget's first two items are that arc and that plan (the lane's own cards under them), and the put-away plan is DRAWN in both homes, on no `Hidden` list (`newestMoment` counts the ask). Seam 3's two fixtures stay out of this mode, so "the asking plan" is ONE plan. Nothing is pressed in it (no ask answered, no card hidden, no fold stored), and every other non-GET the page makes is answered in the page. No ask is raised, so nothing is pushed to the operator's phone; every press that reaches the live door carries an `asked.id` above 900000, which no store has held — it can only refuse, and writes nothing. `installAskLane` registers AFTER any catch-all `context.route` (Playwright tries the newest route first). Phone readings select the project at desktop width, then resize: below 768px the project row matches nothing (`lib/console.mjs`). Its `--retired` mode (seam 6a) reads the lane's bell and the amber tab and widget marks off pictures pushed into the page's socket (`pushPicture`): MAN-7540. A new mode adds its fixtures to `ask-lane.mjs`, never a real press.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/LockAnswer.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/PlanAsk.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/RoundAnswer.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/ask-lane.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-card-ask.mjs
+
+## MAN-7540 — The plan card — the ask's bell and the Runner's amber mark (`DispatcherAskBell`, `waiting`, `TabItem.attention`)
+
+**What says, outside the card, that the lane owes the operator a word: a chime, an amber tab mark, an amber widget badge.** All three read the `asking` key of the lane's plans (MAN-7532); none draws a question panel (`[data-question-card]` is absent from the chat).
+
+| piece | file | does |
+|---|---|---|
+| `DispatcherAskBell` | `src/modules/dispatcher/DispatcherAskBell.tsx` | mounted by `DispatcherFeed` beside `{children}`; returns `null`; calls `playNotificationSound()` (tones 740 Hz then 988 Hz) |
+| `useDispatcherPlans().waiting` | `src/modules/dispatcher/hooks/useDispatcherPlans.ts` | distinct open asks, by `askIdentity`, across the DRAWN plans |
+| `TabItem.attention` | `src/shared/ui/Tabs.tsx` | a sentence; while set, the tab's mark takes `data-tone="warn"` and the title carries it |
+| `TabsMore` / `MoreFace` `warn` | `src/shared/ui/TabsMore.tsx` | the trigger's dot takes `data-tone="warn"`; `Tabs` passes `collapsed.some(attention)` |
+| `.vv-tabs__dot[data-tone="warn"]` | `src/shared/ui/verve/feedback.css` | `background: var(--warn-dot)`; the ring is untouched |
+| `runnerWaiting` | `useWorkspaceTabGates` → `ProjectSidebarRegion` → `WorkspaceTabs` | `attentionFor('runner')` = `t('runner.waiting', { count })` while `runnerWaiting > 0` |
+| `GutterWidgetFrame.countTone` | `src/modules/chat-gutters/GutterWidgetFrame.tsx` | the header badge's tone, default `info`; `ChatGutterLayout` passes `warn` for `runner` while `waiting > 0` |
+
+Rules:
+1. One ring per picture carrying at least one identity the mount has not heard, however many are new. The chime never says how many.
+2. The first picture that lands is remembered, never rung: a page opened onto a waiting prompt and a dev-server handover stay silent.
+3. `useLiveTopic` returning `undefined` touches no memory. why: `DispatcherFeed` seeds in its own effect and a child's effect runs first, so the bell's first commit sees no picture; read as "no asks" it made the seed ring. 2026-09-30: 2 tones (740, 988) at every load before the gate, 0 after.
+4. A re-cut is a new `asked` event, so a new identity: it rings. A model press re-words the census under the SAME `asked`: no ring.
+5. The bell reads the bus picture's `plans[].asking`, not `useDispatcherPlans`. why: a plan put away still owes a word; the bell knows no Hide list.
+6. Memory is a ref array. A re-seen identity moves to the new end; past `HEARD_LIMIT` (200) the oldest leaves. why: a standing ask is never pushed out by churn and rung twice.
+7. `waiting` counts questions, not cards: a lock names every plan of its arc and is ONE. `count` stays plans. Both read drawn plans only.
+8. `attention` decides a mark's tone, never whether a mark exists: `count > 0` still draws the dot (icon tab) or the pill (word tab).
+9. Title with attention: `<label> (<count>) · <attention>` (`tabTitle`), e.g. `Runner (5) · 4 waiting for you` (five plans, four questions). A tab without attention draws and titles as before.
+10. `runner.waiting_one` / `_other` are in `en/common.json` only; other locales fall back.
+
+Proof: `node .verify/probe-card-ask.mjs --retired` (`:5183`; dark and light at 1440×900 and 390×844, the widget read at 1920×1080 on the Chat tab). It reads everything the default mode reads, then pushes whole pictures into the page's lane socket with `pushPicture(socket, { plans, arcs })` (`.verify/lib/ask-lane.mjs`; socket from `installAskLane({ onSocket })`, posture `route`/`daemon`/`offpeak_at` from `lastPosture()`, rows from `planRow`), so no store is touched and no phone rings. An `AudioContext` spy, `window.__bell`, counts tones and frequencies.
+
+| reading | holds |
+|---|---|
+| the mounted picture | 0 tones |
+| a picture with a re-cut lock plus a newcomer plan owing its own | 1 ring, tones 740 then 988 |
+| a picture re-wording the census under the same `asked` | the loose card draws the new words, 0 new tones |
+| Runner tab (1440×900) | dot `data-tone="warn"`; title `Runner (5) · 4 waiting for you` |
+| Runner widget (1920×1080) | count badge `data-tone="warn"` |
+| chat | no `[data-question-card]` |
+
+The title reading pushes its picture once more and waits for the title: a live frame can land after the pushed picture and put the lane back. Shots: `.verify/shots/card-ask-desktop-1440x900-{dark,light}-amber-tab.png`, `…-amber-widget.png`. 2026-09-30: 248 `[OK]`, 0 `[FAIL]`. Unread: the More trigger's amber dot; at both widths the Runner tab stays in the live row.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/DispatcherAskBell.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/TabsMore.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Tabs.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/verve/feedback.css

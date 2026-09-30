@@ -52,7 +52,9 @@ type QuestionTextProps = {
  * The words of an AskUserQuestion question, through the same markdown renderer as every tool
  * body: lists are real lists with a hanging indent, inline code is code, and each line the model
  * wrote stays its own line. Used by chat's AskUserQuestionPanel (pending) and AnsweredQuestion
- * (answered), so a question reads the same before and after it is answered.
+ * (answered), and — through this module's barrel — by the dispatcher module's `LockAnswer` and
+ * `RoundAnswer`, so a question reads the same before and after it is answered and on both modules'
+ * cards.
  */
 export const QuestionText: React.FC<QuestionTextProps> = ({ text, className }) => {
   const markdown = useMemo(() => separateListBoundaries(text), [text]);

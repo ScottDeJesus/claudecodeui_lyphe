@@ -8,6 +8,7 @@ import { ToastStack } from '@/shared/ui';
 import { AuthProvider, ProtectedRoute } from '@/modules/auth';
 import { TaskMasterProvider,TasksSettingsProvider } from '@/modules/task-master';
 import { MemoryIntakeProvider } from '@/modules/memory-intake';
+import { NotesProvider } from '@/modules/notes';
 import { HealProvider } from '@/modules/heal';
 import { LiveBusProvider } from '@/modules/live-bus';
 import { DispatcherFeed } from '@/modules/dispatcher';
@@ -147,6 +148,11 @@ export default function App() {
                     <UniverseFeed>
                     {/* Inside the auth gate, so the memory poll never fires against the login screen. */}
                     <MemoryIntakeProvider>
+                      {/* The notes: the account's cards, read once for every home that draws them.
+                          Inside the auth gate like its neighbours, so the read never fires against
+                          the login screen, and below WebSocketProvider, whose one socket carries
+                          the `notes_changed` frame that re-reads it. */}
+                      <NotesProvider>
                       {/* Above the Router, so every route under it reads ONE 60-second poll of the
                           reflex's summary — the workspace's own tab-gate hook included, which weighs
                           the ledger's live count for the Heal tab's badge. */}
@@ -158,6 +164,7 @@ export default function App() {
                         </Routes>
                       </Router>
                       </HealProvider>
+                      </NotesProvider>
                     </MemoryIntakeProvider>
                     </UniverseFeed>
                     </SoulLaunchFeed>

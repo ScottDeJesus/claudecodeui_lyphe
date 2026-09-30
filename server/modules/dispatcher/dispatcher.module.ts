@@ -7,6 +7,7 @@ import type { DispatcherStateEvent, DispatcherVerb } from '@/shared/types.js';
 import { userFacingEnv } from '@/shared/child-env.js';
 import { expandHome } from '@/shared/utils.js';
 
+import { createDispatcherAnswerRouter } from './dispatcher-answer.routes.js';
 import { createDispatcherEndingsNotifier } from './dispatcher-endings.service.js';
 import type { DispatcherEnding } from './dispatcher-endings.service.js';
 import { createOffpeakClock } from './dispatcher-offpeak.service.js';
@@ -210,6 +211,10 @@ export function createDispatcherModule(): DispatcherModule {
     // moment this box will really start a plan.
     offpeak: createOffpeakClock({ bin, timeoutMs: VERB_TIMEOUT_MS }),
   });
+  // The card's own door, beside the verbs and the reads: `POST /api/dispatcher/answer`. Mounted on
+  // the lane's router rather than written into it because it answers through the PROMPTS root, whose
+  // book owns the ask, and because that router is at its size ceiling already.
+  router.use(createDispatcherAnswerRouter({ answer: prompts.answer }));
 
   return {
     router,

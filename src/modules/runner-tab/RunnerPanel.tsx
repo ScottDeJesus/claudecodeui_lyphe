@@ -1,5 +1,5 @@
 import { ActivityIcon } from 'lucide-react';
-import { useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import {
@@ -10,13 +10,16 @@ import {
   landFocusInHome,
   LoosePlannerBadges,
   PlanCard,
+  PlannerLanesReadout,
   planPutAway,
   useDispatcherPlans,
 } from '@/modules/dispatcher';
+import { DISPATCHER_ALL_TOPIC, useLiveTopic } from '@/modules/live-bus';
 import { useLaneFoldPrune } from '@/modules/runner-tab/hooks/useLaneFoldPrune';
 import { LANE_WALL_GRID } from '@/shared/constants';
 import { Badge, Button, EmptyState, ScrollArea } from '@/shared/ui';
 import { cn } from '@/shared/utils';
+import type { DispatcherLanePicture } from '@/shared/types';
 
 /**
  * The Runner tab's pane: every plan the dispatcher is carrying, each as a whole card.
@@ -67,10 +70,29 @@ import { cn } from '@/shared/utils';
  * only when nothing is DRAWN — no plan, no arc and no loose planner outing: an arc whose plans have all
  * been put away draws no deck at all (`useDispatcherPlans` drops it). `HiddenPlans` rides under it,
  * because a lane whose every unfinished plan is hidden must still offer the way back.
+ *
+ * IT IS ALSO THE LANDING'S DESTINATION (`revealPlan` / `onRevealed`). A tap on a plan's prompt opens
+ * the page on `?runner=<plan>` (`useRunnerLanding`), and that plan's card has to be somewhere a
+ * person can see it, however far down the wall or the deck stack it sits. The pane does that and
+ * NOTHING ELSE: it scrolls, it unfolds nothing, it un-hides nothing, and it retires the request the
+ * moment the bus has SPOKEN — a board that has been dealt and holds nothing is an answer, and a
+ * request left pending over it would move the pane long after the tap, with no `?runner=` in the URL
+ * left to explain why.
  */
-export function RunnerPanel() {
+type RunnerPanelProps = {
+  /** The plan a `?runner=` landing named, held by `useRunnerLanding` until this pane has tried to bring its card into view. `null` on every ordinary visit to the tab. */
+  revealPlan?: string | null;
+  /** Called once the reveal has run, whether or not a card was found, so the workspace retires the request. */
+  onRevealed: () => void;
+};
+
+export function RunnerPanel({ revealPlan = null, onRevealed }: RunnerPanelProps) {
   const { t } = useTranslation();
   const { plans, hidden, arcs, loosePlanners, count, carriedNames } = useDispatcherPlans();
+  // The topic's own value, for the one fact `useDispatcherPlans` folds away on purpose: `undefined` is
+  // "nothing retained yet", which a board that has been dealt and drawn empty is NOT. Same topic, so
+  // the two reads agree within one render. The reveal effect below is the only reader.
+  const retained = useLiveTopic<DispatcherLanePicture>(DISPATCHER_ALL_TOPIC);
   const split = useMemo(() => byArc(plans, arcs), [plans, arcs]);
   useLaneFoldPrune(plans, hidden, arcs);
   const done = doneDismiss(plans, carriedNames);
@@ -87,12 +109,40 @@ export function RunnerPanel() {
     });
   };
 
+  // THE LANDING'S OTHER HALF: bring the named plan's card into this pane's view. It waits until the
+  // bus has SPOKEN — on a cold page nothing is retained when this pane mounts (the pane paints off
+  // that same value), so a lookup run on the first frames would read a board the feed has not filled
+  // yet and retire a request that had nothing to find. An empty lane is not that case: the
+  // bus spoke, the board was dealt, and it holds no card, so the request is retired there rather than
+  // left pending to move the pane whenever a plan next appears. A plan of an arc reveals its ARC'S
+  // DECK rather than the card: an arc pages its plans one per view in its strip (`DeckStrip`), so the
+  // deck is the thing that moves. `onRevealed` is called either way, so a plan the operator has put
+  // away since the push — or a name the lane does not carry at all — retires the request instead of
+  // re-scrolling on every frame.
+  useEffect(() => {
+    if (revealPlan === null) return;
+    if (retained === undefined) return;
+    const root = panelRef.current;
+    if (root !== null) {
+      // The arc comes off the lane's own drawn plan (`useDispatcherPlans`), never parsed out of a
+      // selector: a name no drawn plan carries falls to the loose arm, finds nothing, and says so by
+      // drawing nothing. `CSS.escape` because a plan name is a word from the store, and a wall is
+      // not the place to find out what a `"` in it does.
+      const arc = plans.find((plan) => plan.name === revealPlan)?.arc ?? null;
+      const target = arc !== null
+        ? `[data-dispatch-arc][data-arc-name="${CSS.escape(arc)}"]`
+        : `[data-runner-loose-plans] [data-dispatcher-card][data-plan-name="${CSS.escape(revealPlan)}"]`;
+      root.querySelector(target)?.scrollIntoView({ block: 'start' });
+    }
+    onRevealed();
+  }, [revealPlan, retained, plans, onRevealed]);
+
   return (
     // `tabIndex={-1}`: the last place a press that emptied the board hands the keyboard (`landFocusInHome`).
     <div ref={panelRef} tabIndex={-1} className="flex h-full flex-col outline-none" data-runner-panel>
       {/* The header spans the pane, inset as the wall under it is, so the icon stands over the
           wall's left edge and `Dismiss done · N` over its right. */}
-      <div className="flex items-center gap-2 border-b border-border px-4 py-3 lg:px-6">
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 border-b border-border px-4 py-3 lg:px-6">
         <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg border border-primary/25 bg-primary/10 text-primary">
           <ActivityIcon className="h-4 w-4" aria-hidden="true" />
         </span>
@@ -100,6 +150,10 @@ export function RunnerPanel() {
         {/* No badge at zero: the EmptyState below already says "nothing", and a "0" over it would
             say it a second time in a shape that reads like a count worth checking. */}
         {count > 0 && <Badge tone="neutral">{count}</Badge>}
+        {/* How full the planner lane is, beside the count of the cards it feeds. Not drawn when the
+            frame states no dial (an older dispatcher). The header wraps so a phone-wide one drops the
+            phrase to a second line whole rather than cutting it. */}
+        <PlannerLanesReadout />
         {/* Every drawn plan that is done, off the board in ONE write, with nothing added to
             `Hidden`. Not drawn when none is, so the button never offers to dismiss nothing. No
             dialog: it deletes nothing, and the dispatcher keeps every plan. `-my-1` lets the 36px

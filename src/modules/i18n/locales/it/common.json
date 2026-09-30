@@ -382,6 +382,9 @@
       "open": "Apri la pagina in una nuova scheda",
       "rejected": "Non è un indirizzo http:// o https://"
     },
+    "notes": {
+      "title": "Note"
+    },
     "open": "Apri {{name}}",
     "collapse": "Comprimi",
     "dragHint": "Trascina su un lato",

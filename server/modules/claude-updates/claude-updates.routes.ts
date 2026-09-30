@@ -1,9 +1,10 @@
 /**
- * The four routes of `/api/claude-updates`.
+ * The six routes of `/api/claude-updates`.
  *
  * They parse, call and format, and nothing else. A report is one call and one `json`, a check is that
- * call awaited, and the two actions are the body's SHAPE plus the service's answer — whose refusal
- * already carries the status this route sends. Everything behind them — the reading, the cadence, the
+ * call awaited, the two actions are the body's SHAPE plus the service's answer — whose refusal
+ * already carries the status this route sends — and the automatic-install switch is a read and a
+ * write of one boolean. Everything behind them — the reading, the cadence, the
  * job file, the runner, the journal lines — belongs to the services; a route that reached for a file
  * or a subprocess would be a second place that knows how an update works.
  */
@@ -11,6 +12,7 @@
 import express from 'express';
 
 import type {
+  ClaudeAutoInstall,
   ClaudeUpdatePackageKey,
   ClaudeUpdatesReport,
   ClaudeUpdateRefusal,
@@ -28,6 +30,10 @@ type ClaudeUpdatesRoutes = {
   applyUpdate: (targets: Partial<Record<ClaudeUpdatePackageKey, string>>) => Promise<UpdateActionResult>;
   /** Asks the supervisor to boot this server's code again. */
   restartServer: () => Promise<UpdateActionResult>;
+  /** The automatic-install switch, and what an update on offer is waiting for. */
+  readAutoInstall: () => Promise<ClaudeAutoInstall>;
+  /** Writes the automatic-install switch. */
+  setAutoInstall: (enabled: boolean) => void;
 };
 
 /** The one refusal this file owns: a body that is not a request at all never reaches a service, so
@@ -36,6 +42,20 @@ const BAD_REQUEST: ClaudeUpdateRefusal = {
   error: 'bad-request',
   message: 'the request must carry a targets object naming cli, sdk, or both',
 };
+
+/** The other refusal this file owns, for the switch's write: a body without a boolean `enabled`. */
+const BAD_AUTO_INSTALL_REQUEST: ClaudeUpdateRefusal = {
+  error: 'bad-request',
+  message: 'the request must carry { "enabled": true } or { "enabled": false }',
+};
+
+/** The switch's position out of a request body, or null when the body does not carry one. A string
+ *  "false" is not a position — only a real boolean is, so a mistyped client is refused, not obeyed. */
+function readEnabledFlag(body: unknown): boolean | null {
+  if (typeof body !== 'object' || body === null) return null;
+  const enabled = (body as { enabled?: unknown }).enabled;
+  return typeof enabled === 'boolean' ? enabled : null;
+}
 
 /** The targets out of a request body, or null when the body is not that shape. Only the SHAPE is
  *  read here — which keys may be in it, and whether their values are versions, is the service's. */
@@ -98,6 +118,30 @@ export function createClaudeUpdatesRouter(routes: ClaudeUpdatesRoutes): express.
         return;
       }
       response.status(202).json({ requested: true });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Both answer the same block the report carries, so a client that just flipped the switch reads the
+  // position back from the server's own mouth, `waiting` included.
+  router.get('/auto-install', async (_request, response, next) => {
+    try {
+      response.json(await routes.readAutoInstall());
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  router.put('/auto-install', async (request, response, next) => {
+    try {
+      const enabled = readEnabledFlag(request.body);
+      if (enabled === null) {
+        response.status(400).json(BAD_AUTO_INSTALL_REQUEST);
+        return;
+      }
+      routes.setAutoInstall(enabled);
+      response.json(await routes.readAutoInstall());
     } catch (error) {
       next(error);
     }

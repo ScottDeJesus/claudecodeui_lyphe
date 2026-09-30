@@ -98,6 +98,7 @@ export type {
   PromptInputButtonProps,
   PromptInputSubmitProps,
 } from '@/shared/ui/PromptInput';
+export { QuestionOptionRow } from '@/shared/ui/QuestionOptionRow';
 export { ScrollArea } from '@/shared/ui/ScrollArea';
 export { Select } from '@/shared/ui/Select';
 export { SettingRow } from '@/shared/ui/SettingRow';

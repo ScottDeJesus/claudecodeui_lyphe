@@ -380,6 +380,9 @@
       "open": "ページを新しいタブで開く",
       "rejected": "http:// または https:// のアドレスではありません"
     },
+    "notes": {
+      "title": "メモ"
+    },
     "open": "{{name}} を開く",
     "collapse": "折りたたむ",
     "dragHint": "どちらかの側へドラッグ",

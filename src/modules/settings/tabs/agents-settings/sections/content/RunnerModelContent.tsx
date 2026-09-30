@@ -9,11 +9,13 @@ import { Button, LLMProviderLogo, SettingRow, Stepper } from '@/shared/ui';
 import SettingsToggle from '@/modules/settings/SettingsToggle';
 import RunnerHealModelRow from '@/modules/settings/tabs/agents-settings/sections/content/RunnerHealModelRow';
 import RunnerParkAtPeakRow from '@/modules/settings/tabs/agents-settings/sections/content/RunnerParkAtPeakRow';
+import RunnerPlannerLanesRow from '@/modules/settings/tabs/agents-settings/sections/content/RunnerPlannerLanesRow';
 
 /**
  * Rendered by AgentCategoryContentSection under Claude's "account" panel: which model the plan
  * runner's hands — the builder, his fix-pass and Athena — actually dispatch on, whether the runner
- * runs several phases of one plan at once, and whether the heal reflex may launch a heal at all.
+ * runs several phases of one plan at once, how many planners run at once, and whether the heal reflex
+ * may launch a heal at all.
  *
  * It sits beside the Claude connection rather than in a tab of its own because that is the
  * question it answers: this account's souls, or DeepSeek's. Every switch it writes is a file the
@@ -207,6 +209,10 @@ export default function RunnerModelContent() {
           </div>
         )}
       </SettingRow>
+
+      {/* HOW MANY PLANNERS RUN AT ONCE — the swarm row's sibling for the other kind of worker; its own
+          file and its own hook, like the two rows around it. */}
+      <RunnerPlannerLanesRow />
 
       <RunnerParkAtPeakRow />
 

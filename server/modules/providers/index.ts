@@ -18,6 +18,12 @@ export { closeSessionsWatcher } from './services/sessions-watcher.service.js';
 // the API its registry run back, before the server starts listening (D-11).
 export { readoptKeepaliveSessions, releaseKeepaliveOwnership } from './list/claude/session-host/index.js';
 
+// busyReason, listLiveHosts: used by the claude-activity module to ask every live Claude session host
+// the one question the idle sweep asks — is a turn or background work in flight? — and to know which
+// `claude` processes on the box are a host's own CLI.
+export { busyReason, listLiveHosts } from './list/claude/session-host/index.js';
+export type { LiveHost } from './list/claude/session-host/index.js';
+
 // readClaudeTranscriptBySessionId: used by the dispatch-souls module to read a launched soul's own
 // Claude transcript from the session id its launch recorded. A soul has no app session row, so its
 // provider session id is the only handle on the file, and this module is the one that knows where

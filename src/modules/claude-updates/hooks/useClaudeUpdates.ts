@@ -213,11 +213,14 @@ function subscribe(listener: () => void): () => void {
 const getSnapshot = () => report;
 
 /**
- * The update report, and the three presses the tab offers.
+ * The update report, the three presses the tab offers, and the automatic-install switch.
  *
  * `report` is null until the first reading lands and stays at the last good one through a failed
  * read; `refresh()` resolves on a reading no older than the call — TRUE when one was obtained — so a
  * caller can tell an answer from having failed to ask.
+ *
+ * The switch has no state here: its position is the report's `autoInstall.enabled`, and `setAutoInstall`
+ * is a write followed by the same forced read every action does.
  *
  * Every action resolves `{ ok: true }` or `{ ok: false, message }`, and never rejects: the tab calls
  * them without awaiting, and an unhandled rejection is not how a refusal should arrive.
@@ -228,6 +231,7 @@ export function useClaudeUpdates(): {
   check(): Promise<ClaudeUpdateActionResult>;
   apply(request: ClaudeUpdateApplyRequest): Promise<ClaudeUpdateActionResult>;
   restart(): Promise<ClaudeUpdateActionResult>;
+  setAutoInstall(enabled: boolean): Promise<ClaudeUpdateActionResult>;
 } {
   const current = useSyncExternalStore(subscribe, getSnapshot);
 
@@ -246,5 +250,8 @@ export function useClaudeUpdates(): {
   /** Hands this process over to the supervisor so the SDK on disk is the one that loads. */
   const restart = useCallback(() => act(() => api.claudeUpdates.restart()), []);
 
-  return { report: current, refresh, check, apply, restart };
+  /** Turns the app's own installing of updates on or off; the server keeps the position. */
+  const setAutoInstall = useCallback((enabled: boolean) => act(() => api.claudeUpdates.setAutoInstall(enabled)), []);
+
+  return { report: current, refresh, check, apply, restart, setAutoInstall };
 }

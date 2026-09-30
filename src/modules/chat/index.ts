@@ -24,3 +24,7 @@ export { SubagentTranscriptView } from '@/modules/chat/subagents/SubagentTranscr
 // module, so exporting them would be a door nobody walks through.
 export { EmbedWidgetBody } from '@/modules/chat/embeds/EmbedWidgetBody';
 export { useEmbedWidgetState } from '@/modules/chat/embeds/embedSource';
+// The words of a question, through the chat's own markdown renderer. Consumer: the dispatcher
+// module's `LockAnswer` and `RoundAnswer`, so a plan's prompt reads in the same words and markdown
+// as a question in the chat.
+export { QuestionText } from '@/modules/chat/tools/ContentRenderers/QuestionText';

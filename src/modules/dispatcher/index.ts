@@ -27,12 +27,19 @@ export {
   waitsOnSiblings,
 } from '@/modules/dispatcher/dispatcherState';
 export type { DispatchDeckLayer, DispatcherArcGroup, DispatcherArcSplit } from '@/modules/dispatcher/dispatcherState';
+// The ask readings both homes' orders take: a plan that owes the operator a word comes up in every
+// list — the lane's own order and the widget's lift — because an ask is the one state that waits on
+// him and will not move until he answers.
+export { anyOwesWord, owesWord } from '@/modules/dispatcher/askState';
 // The plan's card — head, action bar, glance face, the fold — and the arc's deck: the arc's head over
 // its plans, paged one card per view in a strip, in the tab and in the gutter alike. `DispatchArcDecks`
 // is the stack of decks, given the split that says which plans go under which arc. Drawn by both homes
 // in `src/modules/runner-tab`: the Runner tab and the chat gutter's widget.
 export { PlanCard } from '@/modules/dispatcher/PlanCard';
 export { DispatchArcDecks } from '@/modules/dispatcher/ArcDeck';
+// How full the planner lane is — `planners <out> of <lanes> out` — drawn from the frame's own route by
+// the Runner tab's header and the chat gutter's widget, and by neither when the frame states none.
+export { PlannerLanesReadout } from '@/modules/dispatcher/PlannerLanesReadout';
 // The presses that put a card away, each one write to the put-away store: one plan's corner, an arc
 // deck's and `Dismiss done · N`. A done card's is Dismiss and an unfinished card's Hide.
 export { doneDismiss, planPutAway } from '@/modules/dispatcher/hiddenPlans';

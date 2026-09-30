@@ -3,6 +3,7 @@ import { RefreshCw } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { AutoInstallRow } from '@/modules/claude-updates/AutoInstallRow';
 import {
   isUpdateJobActive,
   useClaudeUpdates,
@@ -24,6 +25,7 @@ import { formatRelativeTime } from '@/shared/utils';
  * takes the offer.
  *
  * THE ORDER IS THE DECISION. The header first — what was last checked and what is on offer — then
+ * the automatic-install row, which decides whether the press below is needed at all, then
  * one card per package, each carrying its own versions, its own reasons and its own changelog, so
  * the reader never has to hold two packages in their head at once; the acts, named for what they do
  * ("Update and restart", not "Update"), with one line saying what pressing it means for work in
@@ -76,7 +78,7 @@ function offeredPackages(report: ClaudeUpdatesReport): OfferedPackage[] {
 
 export function ClaudeUpdatesSettingsTab() {
   const { t } = useTranslation('settings');
-  const { report, refresh, check, apply, restart } = useClaudeUpdates();
+  const { report, refresh, check, apply, restart, setAutoInstall } = useClaudeUpdates();
 
   // The conversations still mid-turn on an older Claude Code — the size of the set the CLI version
   // store keeps, never a second reading of `/api/cli-version` (MAN-503).
@@ -126,6 +128,11 @@ export function ClaudeUpdatesSettingsTab() {
   /** Hands this process over to the supervisor so the SDK on disk is the one that loads next. */
   const onRestartServer = () => {
     showResult(restart());
+  };
+
+  /** Turns the automatic install on or off; a refusal is drawn under the buttons like any other. */
+  const onAutoInstallChange = (enabled: boolean) => {
+    showResult(setAutoInstall(enabled));
   };
 
   /** Rolls one package back to the version the finished job moved it from. */
@@ -181,6 +188,13 @@ export function ClaudeUpdatesSettingsTab() {
           {t('updates.checkNow', { defaultValue: 'Check now' })}
         </Button>
       </header>
+
+      {/* A server that has not restarted onto this build answers a report with no `autoInstall` block.
+          The row is the only part that needs one, so it alone is left out: the cards and the manual
+          press beside them are not something a missing switch may take away. */}
+      {report.autoInstall !== undefined && (
+        <AutoInstallRow autoInstall={report.autoInstall} onChange={onAutoInstallChange} />
+      )}
 
       {/* The last check's own failure: what could not be read, and what stands from before it. */}
       {report.checkError !== null && <Banner tone="warn">{report.checkError}</Banner>}

@@ -2,6 +2,7 @@ import { Layers, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 import { DispatchArcControls } from '@/modules/dispatcher/ArcControls';
+import { arcAsks, askIdentity } from '@/modules/dispatcher/askState';
 import {
   cardDescription,
   deckFocusIndex,
@@ -15,11 +16,12 @@ import { DeckFrame, DeckItem } from '@/modules/dispatcher/DeckFrame';
 import type { DispatcherArcGroup } from '@/modules/dispatcher/dispatcherState';
 import { arcPutAway, doneDismiss, planPutAway, putAwayVerb } from '@/modules/dispatcher/hiddenPlans';
 import { LaneCardHead } from '@/modules/dispatcher/LaneCardHead';
+import { PlanAsk } from '@/modules/dispatcher/PlanAsk';
 import { PlanCard } from '@/modules/dispatcher/PlanCard';
 import { PlannerBadge } from '@/modules/dispatcher/PlannerBadge';
 import { SessionPin } from '@/modules/dispatcher/SessionPin';
 import { SpendPills } from '@/modules/dispatcher/SpendPills';
-import { dispatchArcFoldKey } from '@/shared/hooks/useCardFold';
+import { dispatchArcFoldKey, useCardFold } from '@/shared/hooks/useCardFold';
 import { spendParts } from '@/shared/spend';
 import { Badge } from '@/shared/ui';
 import type { ActionMenuItem } from '@/shared/ui';
@@ -136,6 +138,12 @@ function ArcMark() {
  * under it. So `done/total`, the flow and the strip's `Card N of M` all count `plans` — the group's
  * drawn members, exactly the cards the deck drew.
  *
+ * THE ARC'S PROMPTS ARE THE DECK'S, NOT ITS CARDS'. A plan of an arc that owes a word is drawn with
+ * `showAsk={false}`: what the arc is waiting on goes up to `DeckFrame`'s `asks` slot in one band per
+ * distinct ask (`arcAsks`, deduped by `askIdentity`), because one lock names every plan of the arc
+ * that owes its Accept and the same prompt on ten cards is ten presses of one door (MAN-5706). They
+ * ride the deck's own fold, so a folded deck keeps its bar and a new ask re-mounts the band.
+ *
  * `data-dispatch-arc` and `data-arc-name` are the root's handles (with `data-arc-status` and
  * `data-collapsed`, both written by the frame), and `data-dispatch-plan-row` marks one plan's item in
  * the deck with `data-plan-name`, `data-pinned` and `data-arc-layer`, so a probe counts and names
@@ -183,6 +191,12 @@ export function DispatchArcDeck({
   const menuItems: ActionMenuItem[] = done
     ? [{ key: 'dismiss-done', label: t('dispatcher.dismissDonePlans', { count: done.count }), icon: X, onSelect: done.dismiss }]
     : [];
+  // THE ARC'S PROMPTS, ONCE FOR THE WHOLE DECK: one lock names every plan of the arc that still owes
+  // its Accept, so `arcAsks` dedupes them by identity and the deck draws the band the cards would
+  // otherwise repeat card for card. The fold is the DECK'S own — `DeckFrame` reads the same store
+  // under the same key — so the asks and the deck fold as one card, and a fold leaves the bar.
+  const asks = arcAsks(plans);
+  const { collapsed, toggle } = useCardFold(dispatchArcFoldKey(arc.name));
 
   return (
     <DeckFrame
@@ -224,6 +238,11 @@ export function DispatchArcDeck({
       foldKey={dispatchArcFoldKey(arc.name)}
       flow={{ nodes, doneCount, ariaLabel: t('dispatcher.flow.arc', { arc: door }) }}
       bodyTop={<DispatchArcControls arc={arc} />}
+      asks={asks.length > 0
+        ? asks.map((ask) => (
+          <PlanAsk key={askIdentity(ask)} ask={ask} folded={collapsed} onUnfold={toggle} />
+        ))
+        : null}
       stripLabel={t('runner.arcStrip', { title: door })}
       focusIndex={deckFocusIndex(plans)}
       cardCount={plans.length}
@@ -241,7 +260,7 @@ export function DispatchArcDeck({
             className={cn('flex flex-col gap-1', layer === 'done' && 'opacity-60')}
           >
             {mine && <SessionPin />}
-            <PlanCard plan={plan} waitsOn={waitsOnSiblings(plan, plans)} onPutAway={planPutAway(plan, carriedNames)} headingLevel={4} />
+            <PlanCard plan={plan} waitsOn={waitsOnSiblings(plan, plans)} onPutAway={planPutAway(plan, carriedNames)} headingLevel={4} showAsk={false} />
           </DeckItem>
         );
       })}

@@ -26,6 +26,7 @@ function ProjectSidebarRegion({
     memoryPendingCount,
     shouldShowRunnerTab,
     runnerCount,
+    runnerWaiting,
     shouldShowHealTab,
     healCount,
   } = useWorkspaceTabGates(activeTab);
@@ -51,6 +52,7 @@ function ProjectSidebarRegion({
       memoryPendingCount={memoryPendingCount}
       shouldShowRunnerTab={shouldShowRunnerTab}
       runnerCount={runnerCount}
+      runnerWaiting={runnerWaiting}
       shouldShowHealTab={shouldShowHealTab}
       healCount={healCount}
       onTabChange={handleTabChange}

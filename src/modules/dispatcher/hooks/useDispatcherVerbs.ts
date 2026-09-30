@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 
 import { api } from '@/shared/api';
 import { useToast } from '@/shared/context/ToastContext';
-import type { DispatcherModelChoice, DispatcherSwarmChoice, DispatcherVerb } from '@/shared/types';
+import type { DispatcherAsk, DispatcherModelChoice, DispatcherSwarmChoice, DispatcherVerb } from '@/shared/types';
 
 /** The dispatcher's answer, as much of it as this hook reads. Both fields are free text it wrote. */
 type VerbBody = { stdout?: unknown; stderr?: unknown };
@@ -33,6 +33,14 @@ async function readBody(response: Response): Promise<VerbBody | null> {
   }
 }
 
+/**
+ * The verb a press is relaying: the dispatcher's own eight, plus the card's `answer`. The answer is
+ * a door of its own (`POST /api/dispatcher/answer`, never one of the verb routes), and the union
+ * stays LOCAL to this hook — `DispatcherVerb` remains exactly the set the server spawns, so no
+ * route or service is ever read against a word the dispatcher's binary does not know.
+ */
+type DispatcherPress = DispatcherVerb | 'answer';
+
 /** What a plan card may press. */
 export type DispatcherPlanVerbs = {
   stop(): Promise<void>;
@@ -43,7 +51,13 @@ export type DispatcherPlanVerbs = {
   drop(): Promise<void>;
   setModel(choice: DispatcherModelChoice): Promise<void>;
   setSwarm(choice: DispatcherSwarmChoice): Promise<void>;
-  busy: DispatcherVerb | null;
+  /**
+   * The operator's word on the prompt this plan's card is drawing: the chosen label (or typed
+   * words) by question, and a Rework's notes by question. The one press here that REPORTS BACK —
+   * `true` exactly when the lane took it (2xx) — because the card draws its answered state from it.
+   */
+  answer(ask: DispatcherAsk, answers: Record<string, string>, notes?: Record<string, string>): Promise<boolean>;
+  busy: DispatcherPress | null;
 };
 
 /**
@@ -56,12 +70,12 @@ export type DispatcherArcVerbs = {
   resume(): Promise<void>;
   schedule(when: string): Promise<void>;
   setModel(choice: DispatcherModelChoice): Promise<void>;
-  busy: DispatcherVerb | null;
+  busy: DispatcherPress | null;
 };
 
 /**
- * Stop, Resume, Schedule, Park, Unpark, Model, Swarm and Drop for one plan — or Stop, Resume, Schedule
- * and Model for one dispatch ARC — and what to say about each.
+ * Stop, Resume, Schedule, Park, Unpark, Model, Swarm, Drop and Answer for one plan — or Stop, Resume,
+ * Schedule and Model for one dispatch ARC — and what to say about each.
  *
  * ONE HOOK, TWO DOORS, because the two are the same act on the same store through the same verbs:
  * `scope` decides which route a press is relayed through (`POST /api/dispatcher/plans/:name/…` or
@@ -93,6 +107,12 @@ export type DispatcherArcVerbs = {
  * queued or scheduled plan's button says Start, a stopped plan's says Resume, and a refusal headed
  * with the other would name a verb the operator never saw. It is `resume` that runs either way.
  *
+ * ANSWER IS THE ONE PRESS THAT REPORTS BACK, and the only one whose outcome a control reads: the
+ * card draws its answered state from a `true`, so `send` resolves whether the lane took the word
+ * (2xx) and the other eight resolve `void`, their outcome nobody's but the next frame's. It travels
+ * the plan door alone (`POST /api/dispatcher/answer`, never one of the verb routes) and is not a
+ * `DispatcherVerb` — that set is exactly what the server spawns.
+ *
  * NOTHING OPTIMISTIC: the control re-draws from the next `dispatcher_state` frame, which is the
  * store read back — the armed hour, the pause flag and the state word are the dispatcher's, never
  * this hook's.
@@ -118,8 +138,9 @@ export function useDispatcherVerbs(
 
   // The verb in flight, so every control refuses a second press while one is out. Essential: these
   // verbs arm and disarm systemd timers and move the plan's state, and a double-press would race
-  // two dispatcher processes at the same store.
-  const [busy, setBusy] = useState<DispatcherVerb | null>(null);
+  // two dispatcher processes at the same store. The answer rides the same flag — its form disables
+  // while `answer` is out — so the card cannot carry one word twice.
+  const [busy, setBusy] = useState<DispatcherPress | null>(null);
 
   // A verb that resolves after the card is gone must not set state or raise a toast about a plan
   // nobody is looking at any more. `drop` alone still speaks (`speaks`): its card leaving IS what a
@@ -136,7 +157,7 @@ export function useDispatcherVerbs(
   // park words and the delete word are the card's own (`dispatcher.park` / `dispatcher.unpark` /
   // `dispatcher.delete.word`), so the button and the toast that names it cannot drift.
   const word = useCallback(
-    (verb: DispatcherVerb): string => {
+    (verb: DispatcherPress): string => {
       if (verb === 'stop') return t('runner.stop');
       if (verb === 'park') return t('dispatcher.park');
       if (verb === 'unpark') return t('dispatcher.unpark');
@@ -144,6 +165,7 @@ export function useDispatcherVerbs(
       if (verb === 'schedule') return t('runner.schedule.refused');
       if (verb === 'model') return t('runner.model.refused');
       if (verb === 'swarm') return t('dispatcher.swarm.refused');
+      if (verb === 'answer') return t('dispatcher.ask.word');
       return resumeWord ?? t('runner.resume');
     },
     [resumeWord, t],
@@ -151,13 +173,14 @@ export function useDispatcherVerbs(
 
   /**
    * The word a SUCCESS is headed with when the dispatcher's body arrived empty. Every verb but
-   * `model` and `swarm` is headed by its own name either way (`Stop`, `Resume`, `Park`); a word
-   * press that worked is not headed "Model not set", which is what its refusal word says.
+   * `model`, `swarm` and `answer` is headed by its own name either way (`Stop`, `Resume`, `Park`);
+   * a word press that worked is not headed "Model not set", which is what its refusal word says.
    */
   const doneWord = useCallback(
-    (verb: DispatcherVerb): string => {
+    (verb: DispatcherPress): string => {
       if (verb === 'model') return t('runner.toast.model');
       if (verb === 'swarm') return t('dispatcher.swarm.done');
+      if (verb === 'answer') return t('dispatcher.ask.word');
       return word(verb);
     },
     [t, word],
@@ -167,17 +190,21 @@ export function useDispatcherVerbs(
    * Relay one press. `call` is the whole of what `scope` decides — which door of the API this verb
    * goes through — written at each callback below rather than in a table, so the route a given
    * button presses is readable at the button.
+   *
+   * It resolves `true` exactly when the response was 2xx and `false` on a refusal or a request that
+   * never completed. Only `answer` hands that back (its card draws its answered state from it); the
+   * eight verbs discard it at their callbacks — the toast above is what a human reads.
    */
   const send = useCallback(
-    async (verb: DispatcherVerb, call: () => Promise<Response>): Promise<void> => {
-      if (!mountedRef.current) return;
+    async (verb: DispatcherPress, call: () => Promise<Response>): Promise<boolean> => {
+      if (!mountedRef.current) return false;
       setBusy(verb);
       const speaks = () => mountedRef.current || verb === 'drop';
 
       try {
         const response = await call();
         const body = await readBody(response);
-        if (!speaks()) return;
+        if (!speaks()) return response.ok;
 
         // Read before the status, because a 409 carries the very same shape — and because the
         // dispatcher's successes are sentences too (`PARKED dispatcher-ready`), not empty bodies.
@@ -188,15 +215,17 @@ export function useDispatcherVerbs(
           // (`MODEL <name> model=claude`, `RESUMED dr-arc.arc — 2 plan(s)`). `doneWord` is the
           // fallback for a dispatcher build that answered with an empty body.
           toast({ tone: 'positive', title: said || doneWord(verb) });
-          return;
+          return true;
         }
 
         toast({ tone: 'warn', title: word(verb), message: said || t('messages.operationFailed') });
+        return false;
       } catch (error) {
         // The request never completed — the API is down, or the deadline passed. That is the
         // network's word, not the dispatcher's, and it is said as such.
         console.warn(`[useDispatcherVerbs] the ${verb} request did not complete:`, error);
         if (speaks()) toast({ tone: 'warn', title: t('messages.networkError') });
+        return false;
       } finally {
         if (mountedRef.current) setBusy(null);
       }
@@ -204,36 +233,58 @@ export function useDispatcherVerbs(
     [doneWord, t, toast, word],
   );
 
+  // The eight verbs are one-way presses: each awaits `send` and returns `void`, because nothing
+  // reads their outcome — the card redraws from the next frame. `answer`, below, is the one that
+  // hands the boolean back.
   const stop = useCallback(
-    () => send('stop', () => (scope === 'arc' ? api.dispatcher.arcStop(name) : api.dispatcher.stop(name))),
+    async () => {
+      await send('stop', () => (scope === 'arc' ? api.dispatcher.arcStop(name) : api.dispatcher.stop(name)));
+    },
     [name, scope, send],
   );
   const resume = useCallback(
-    () => send('resume', () => (scope === 'arc' ? api.dispatcher.arcResume(name) : api.dispatcher.resume(name))),
+    async () => {
+      await send('resume', () => (scope === 'arc' ? api.dispatcher.arcResume(name) : api.dispatcher.resume(name)));
+    },
     [name, scope, send],
   );
   const schedule = useCallback(
-    (when: string) => send('schedule', () => (scope === 'arc'
-      ? api.dispatcher.arcSchedule(name, when)
-      : api.dispatcher.schedule(name, when))),
+    async (when: string) => {
+      await send('schedule', () => (scope === 'arc'
+        ? api.dispatcher.arcSchedule(name, when)
+        : api.dispatcher.schedule(name, when)));
+    },
     [name, scope, send],
   );
   const setModel = useCallback(
-    (choice: DispatcherModelChoice) => send('model', () => (scope === 'arc'
-      ? api.dispatcher.arcModel(name, choice)
-      : api.dispatcher.model(name, choice))),
+    async (choice: DispatcherModelChoice) => {
+      await send('model', () => (scope === 'arc'
+        ? api.dispatcher.arcModel(name, choice)
+        : api.dispatcher.model(name, choice)));
+    },
     [name, scope, send],
   );
 
   // The plan card's own four, which no arc header draws and no arc route exists for.
-  const park = useCallback(() => send('park', () => api.dispatcher.park(name)), [name, send]);
-  const unpark = useCallback(() => send('unpark', () => api.dispatcher.unpark(name)), [name, send]);
-  const drop = useCallback(() => send('drop', () => api.dispatcher.drop(name)), [name, send]);
+  const park = useCallback(async () => { await send('park', () => api.dispatcher.park(name)); }, [name, send]);
+  const unpark = useCallback(async () => { await send('unpark', () => api.dispatcher.unpark(name)); }, [name, send]);
+  const drop = useCallback(async () => { await send('drop', () => api.dispatcher.drop(name)); }, [name, send]);
   const setSwarm = useCallback(
-    (choice: DispatcherSwarmChoice) => send('swarm', () => api.dispatcher.swarm(name, choice)),
+    async (choice: DispatcherSwarmChoice) => {
+      await send('swarm', () => api.dispatcher.swarm(name, choice));
+    },
     [name, send],
   );
 
+  // The card's own press: the operator's word on the prompt it is drawing, relayed to the lane's
+  // answer door rather than a verb route — and handed on, because the card draws its answered
+  // state from it.
+  const answer = useCallback(
+    (ask: DispatcherAsk, answers: Record<string, string>, notes?: Record<string, string>) =>
+      send('answer', () => api.dispatcher.answer(ask, answers, notes)),
+    [send],
+  );
+
   if (scope === 'arc') return { stop, resume, schedule, setModel, busy };
-  return { stop, resume, schedule, park, unpark, drop, setModel, setSwarm, busy };
+  return { stop, resume, schedule, park, unpark, drop, setModel, setSwarm, answer, busy };
 }

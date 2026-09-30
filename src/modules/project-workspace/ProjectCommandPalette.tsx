@@ -60,7 +60,7 @@ function ProjectCommandPalette({ chatDoor }: { chatDoor: ChatDoor }) {
   // Plugin tabs remain the one exclusion — they are discovered at runtime and the palette has no
   // rows for them at all. Memoised because a fresh array on every render would defeat the memo().
   const visibleTabs = useMemo<AppTab[]>(() => {
-    const tabs: AppTab[] = ['chat', 'files', 'git', 'kanban', 'universe', 'schedules', 'api'];
+    const tabs: AppTab[] = ['chat', 'files', 'git', 'kanban', 'universe', 'schedules', 'notes', 'api'];
     if (shouldShowShellTab) tabs.push('shell');
     if (shouldShowTasksTab) tabs.push('tasks');
     if (shouldShowBrowserTab) tabs.push('browser');

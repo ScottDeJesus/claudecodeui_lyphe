@@ -657,20 +657,6 @@ probe-key: 9c5a0b10a091733a3a774a77800310216aaa0ef5
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-model-catalog.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-model-options.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/utils/modelLabels.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-claude-catalog-picker.mjs
 
-## INV-5692 — probe — `server/modules/database/schema.ts:188-189` still says predefined models are source-controlled in each `-models.provider.ts`
-
-`server/modules/database/schema.ts:188-189` still says predefined models are source-controlled in each `-models.provider.ts`
-
-```probe
-grep -n "remain source-" -A1 /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/schema.ts
-expect: no output (today: line 188 "Predefined models remain source-" / 189 "controlled in each provider's `-models.provider.ts` adapter …")
-```
-
-measured 2026-09-28 by chain chain-claude-model-catalog-20260928-173328-cec2, finding L3, LOW
-probe-key: 583edec4be7c8403338cefaa55b8de2de143e403
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/schema.ts
-
 ## INV-5693 — probe — The dispatcher stores a swarm count that CloudCLI's reader refuses, and one such plan freezes the entire Runner board
 
 The dispatcher stores a swarm count that CloudCLI's reader refuses, and one such plan freezes the entire Runner board
@@ -2049,7 +2035,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/ho
 
 ## INV-6043 — A cold `/session/<id>` in simple-list mode is replaced by `/` when the projects list lands before the session lookup, so the chat opens the new-chat screen on the saved project
 
-`SidebarSimpleList.tsx`'s effect "keeps Files/Git/Shell on the saved project whenever no chat is open" and fires whenever `selectedSession` is null. On a cold deep link `selectedSession` IS null until `useProjectsState`'s URL effect finishes its lookup (`api.sessionDetails`, one lookup per URL id). If the projects list has loaded first, `useSimpleChatProject` answers a project, the effect calls `onProjectSelect(saved project)`, and `handleProjectSelect` ends in `navigate('/')`. The URL loses the session; the lookup then answers into "the user navigated elsewhere while the lookup was in flight" and is discarded. Nothing re-runs: `sessionLookupRef` allows one lookup per id, and the effect's deps do not change.
+`SidebarSimpleList.tsx`'s effect "Keeps Files/Git/Shell pointed at the saved project whenever no chat is open" and fires whenever `selectedSession` is null. On a cold deep link `selectedSession` IS null until `useProjectsState`'s URL effect finishes its lookup (`api.sessionDetails`, one lookup per URL id). If the projects list has loaded first, `useSimpleChatProject` answers a project, the effect calls `onProjectSelect(saved project)`, and `handleProjectSelect` ends in `navigate('/')`. The URL loses the session; the lookup then answers into "the user navigated elsewhere while the lookup was in flight" and is discarded. Nothing re-runs: `sessionLookupRef` allows one lookup per id, and the effect's deps do not change.
 
 What a reader sees: reloading (or opening a link to) a conversation lands on `/`, the new-chat screen, on the saved project; the floating chat's header reads "New Session" beside that project. Tree mode has no such effect and keeps the deep link. With a fast lookup (the box idle) the lookup wins and nothing shows, which is why it looks intermittent: measured 2026-09-30 in the whole-check runs at 390x844, two misses in about eight cold loads, then reproduced on demand by holding ONLY the lookup back 2.5s (tree kept the link; simple lost it, header "New Session .claude").
 
@@ -2176,3 +2162,448 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/whole-check-inpage-l
 - Before changing `RADIAL_RADIUS_PX` or `RADIAL_STEP_DEG`, re-measure at 336×746 and 320×568 as well as the two measured viewports. Sweep tooling is not saved in `.verify/`.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/utils/radialLabels.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/utils/radialLayout.ts
+
+## INV-6058 — probe — MED — the probe widens the LIVE dial with no look at the queue, so one run can launch a real planner outing on Opus
+
+MED — the probe widens the LIVE dial with no look at the queue, so one run can launch a real planner outing on Opus
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe && grep -c -i "queued" .verify/probe-planner-lanes.mjs
+expect: a count above 0 — the probe reads the frame's planner rows and declines to widen the live dial over a queued one (today: 0; its `+` launched eupalinos `tell coi-send-switch` on opus, launch dispatch-eupalinos-20260930-103743-6e23)
+```
+
+measured 2026-09-30 by chain chain-planner-lanes-dial-20260930-102233-3f63, finding M1, MEDIUM
+probe-key: 86c8b4a67472b7e879259416e084e8ed82b73f38
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-planner-lanes.mjs, /home/lyphe/.claude/hooks/dispatcher/planner_lanes.py, /home/lyphe/.claude/skills/arc/SKILL.md
+
+## INV-6059 — probe — LOW — `planner_lanes.width_of` has no length bound, so `dispatcher planners <64+ digits>` writes a flag the dispatcher itself ignores, and `width_of` does raise
+
+LOW — `planner_lanes.width_of` has no length bound, so `dispatcher planners <64+ digits>` writes a flag the dispatcher itself ignores, and `width_of` does raise
+
+```probe
+D=$(mktemp -d /tmp/athena-w-XXXXXX) || exit 1; case "$D" in /tmp/athena-w-*) DISPATCHER_PLANNERS_FLAG_PATH="$D/planners.flag" DISPATCHER_HOME="$D/home" ~/.claude/scripts/dispatcher planners "$(python3 -c 'print("9"*70)')" | cut -c1-30; DISPATCHER_PLANNERS_FLAG_PATH="$D/planners.flag" DISPATCHER_HOME="$D/home" ~/.claude/scripts/dispatcher planners; rm -r "$D";; esac
+expect: a `REFUSED planners '…'` line for the 70-digit word, then `PLANNERS lanes=2` (today: `PLANNERS lanes=99999999999999999999999…` exit 0, a 71-byte file, then `PLANNERS lanes=2`; a 5000-digit word today ends in a ValueError line, exit 1)
+```
+
+measured 2026-09-30 by chain chain-planner-lanes-dial-20260930-102233-3f63, finding L1, LOW
+probe-key: 558664d07bfe8d30ef15ff40745f5a8dd0a2a866
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-planner-lanes.mjs, /home/lyphe/.claude/hooks/dispatcher/planner_lanes.py, /home/lyphe/.claude/skills/arc/SKILL.md
+
+## INV-6060 — probe — LOW — the probe's `-` press and its final restore overwrite a change the operator (or another session) made during the run
+
+LOW — the probe's `-` press and its final restore overwrite a change the operator (or another session) made during the run
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe && [ "$(../scripts/dispatcher status --json | python3 -c 'import json,sys; print(sum(1 for p in json.load(sys.stdin)["planners"] if p["state"]=="queued"))')" = 0 ] && { node .verify/probe-planner-lanes.mjs >/dev/null 2>&1 & P=$!; until [ "$(tr -d '\n' < ../state/planners.flag)" = 3 ]; do sleep 0.05; done; ../scripts/dispatcher planners 5 >/dev/null; wait $P; tr -d '\n' < ../state/planners.flag; echo; ../scripts/dispatcher planners 2; }
+expect: `5` — the probe leaves a mid-run change alone (today: `2`)
+```
+
+measured 2026-09-30 by chain chain-planner-lanes-dial-20260930-102233-3f63, finding L2, LOW
+probe-key: 9159d350d908ed93e2c655fde217aa30f513bfd4
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-planner-lanes.mjs, /home/lyphe/.claude/hooks/dispatcher/planner_lanes.py, /home/lyphe/.claude/skills/arc/SKILL.md
+
+## INV-6061 — probe — `update` can answer `undefined`, a third state its declared type and its docblock both exclude
+
+`update` can answer `undefined`, a third state its declared type and its docblock both exclude
+
+```probe
+DIR=$(mktemp -d); case "$DIR" in /tmp/tmp.*) ;; *) echo "refusing: $DIR"; exit 1;; esac
+sqlite3 ~/.cloudcli/auth.db ".backup '$DIR/auth.db'"
+cd /home/lyphe/.claude/claudecodeui_lyphe
+DATABASE_PATH=$DIR/auth.db TSX_TSCONFIG_PATH=server/tsconfig.json node --import tsx -e 'import("@/modules/database/index.js").then(async (m) => { await m.initializeDatabase(); const db = m.getConnection(); db.exec("CREATE TRIGGER probe_vanishing AFTER UPDATE ON notes BEGIN DELETE FROM notes WHERE id = NEW.id; END"); const a = m.notesDb.create({ userId: 1, title: "probe-vanish", description: "" }); const r = m.notesDb.update(1, a.id, { title: "edited", description: "edited" }); console.log("returned:", r, "| undefined:", r === undefined, "| null:", r === null); });'
+cd /tmp && rm -rf "$DIR"
+expect: `returned: undefined | undefined: true | null: false` — the UPDATE matched (its `changes` was 1) and the read-back found nothing.
+```
+
+measured 2026-09-30 by chain chain-simple-notes--store-20260930-104837-cb87, finding L1, LOW
+probe-key: 1da15b7a807b88e93d4c921913d9b11a49c005db
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/migrations.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/notes-schema.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/notes.db.ts
+
+## INV-6062 — probe — three pre-existing values were rewritten: `simpleList.stopBody` in ja, zh-CN, zh-TW. [LOW]
+
+three pre-existing values were rewritten: `simpleList.stopBody` in ja, zh-CN, zh-TW. [LOW]
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe && python3 -c '
+import json, subprocess
+for l in ["ja","zh-CN","zh-TW"]:
+    p = "src/modules/i18n/locales/%s/sidebar.json" % l
+    old = json.loads(subprocess.run(["git","show","HEAD:"+p], capture_output=True, text=True).stdout)["simpleList"]
+    new = json.load(open(p))["simpleList"]
+    print(l, [(k, old[k], new[k]) for k in old if old[k] != new.get(k)])
+'
+```
+
+measured 2026-09-30 by chain chain-simple-chat-folders--words-20260930-104836-bc61, finding L1, LOW
+probe-key: d7ede4d01b23de65dbe1d9355479b60613e50a8a
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/de/sidebar.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/sidebar.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/es/sidebar.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/fr/sidebar.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/it/sidebar.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/ja/sidebar.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/ko/sidebar.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/ru/sidebar.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/tr/sidebar.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/zh-CN/sidebar.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/zh-TW/sidebar.json, /home/lyphe/.claude/claudecodeui_lyphe/.verify/simple-list-folders-words.py
+
+## INV-6063 — probe — the report's own count of its `types.ts` hunk is one high (report accuracy, not the build)
+
+the report's own count of its `types.ts` hunk is one high (report accuracy, not the build)
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe && git diff HEAD -U0 -- src/shared/types.ts | grep -n '^@@ -2213,0'; printf 'hunk lines=%s\n' "$(git diff HEAD -U0 -- src/shared/types.ts | sed -n '/^@@ -2213,0/,/^@@ -24/p' | grep -c '^+[^+]')" ; printf 'blank added lines=%s\n' "$(git diff HEAD -U0 -- src/shared/types.ts | sed -n '/^@@ -2213,0/,/^@@ -24/p' | grep -c '^+$')"
+```
+
+measured 2026-09-30 by chain chain-simple-notes--contract-20260930-104837-0a18, finding L1, LOW
+probe-key: 6e6c997d5ea86ba47d757da883492a08e838562f
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/de/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/es/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/fr/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/it/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/ja/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/ko/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/ru/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/tr/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/zh-CN/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/zh-TW/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts
+
+## INV-6064 — probe — `npm run typecheck` reads exit 2; both errors are another chain's files, timestamped after this build's run
+
+`npm run typecheck` reads exit 2; both errors are another chain's files, timestamped after this build's run
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe && npx tsc --noEmit -p tsconfig.json; echo "client exit:$?"; npx tsc --noEmit -p server/tsconfig.json; echo "server exit:$?"
+expect: client exit:0, then the two claude-updates errors above and server exit:2 — no error names src/shared/api.ts or src/shared/types.ts
+```
+
+measured 2026-09-30 by chain chain-simple-chat-folders--contract-20260930-104835-68a5, finding M1, MEDIUM
+probe-key: c40e78bb262cc99351787404e1bf0197ad44d1da
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-simple-list-contract.mjs
+
+## INV-6065 — probe — `npm run lint` reads exit 1 (three errors, 175 warnings); same foreign files, target files clean
+
+`npm run lint` reads exit 1 (three errors, 175 warnings); same foreign files, target files clean
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe && npm run lint 2>&1 | sed 's/\x1b\[[0-9;]*m//g' | grep -E ': error ' | sed 's/:.*//' | sort -u; npm run lint:client >/dev/null 2>&1; echo "client lint exit:$?"; npm run lint 2>&1 | sed 's/\x1b\[[0-9;]*m//g' | grep -cE '^src/shared/(api|types)\.ts'
+expect: exactly the three files above; `client lint exit:0`; and `0` lines naming either target file
+```
+
+measured 2026-09-30 by chain chain-simple-chat-folders--contract-20260930-104835-68a5, finding M2, MEDIUM
+probe-key: 8e9f1db80c3fdab48bd771bceb87943211425938
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-simple-list-contract.mjs
+
+## INV-6066 — probe — the standing proof reds on the POST status the route table promises
+
+the standing proof reds on the POST status the route table promises
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe && python3 - <<'PY'
+src = open('.verify/probe-simple-list-contract.mjs').read()
+old = """    await route.fulfill({
+      status: 200,"""
+new = """    await route.fulfill({
+      status: request.method() === 'POST' ? 201 : 200,"""
+assert src.count(old) == 1
+open('.verify/athena-probe-copy-201.mjs', 'w').write(src.replace(old, new))
+PY
+node .verify/athena-probe-copy-201.mjs | tail -3; rm .verify/athena-probe-copy-201.mjs
+expect: C1–C5 PASS, then `[FAIL] C6 all four calls read their answer back — {"createFolder":201,…}` and `SIMPLE-LIST-CONTRACT FAIL (1)`; delete the copy in the same breath
+```
+
+measured 2026-09-30 by chain chain-simple-chat-folders--contract-20260930-104835-68a5, finding L1, LOW
+probe-key: 16268f4bbdc480b0583367a1e96ba7064fac5fd1
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-simple-list-contract.mjs
+
+## INV-6069 — probe — The last-job hold forgets the moment any later job replaces `job.json`: a rolled-back (or failed) release is reinstalled automatically
+
+The last-job hold forgets the moment any later job replaces `job.json`: a rolled-back (or failed) release is reinstalled automatically
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe && F=$(mktemp /tmp/athena-probe-cascade-XXXXXX.mts) && cat > "$F" <<'X'
+import { createAutoInstall } from '/home/lyphe/.claude/claudecodeui_lyphe/server/modules/claude-updates/update-auto-install.service.ts';
+const pkg = (key: string, label: string, installed: string, latest: string) => ({ key, label, name: key, installed, loaded: null, latest, updateAvailable: installed !== latest, updatable: true, reason: null, notes: [], notesReason: null, changelogUrl: '' });
+const job = (kind: string, state: string, key: string, from: string, to: string) => ({ id: 'j', kind, state, steps: [{ key, from, to, state: 'done' }], logTail: [] });
+let last: any = job('rollback', 'done', 'sdk', '0.3.285', '0.3.284'); let cli = '2.1.285'; const calls: unknown[] = []; console.log = () => {};
+const svc = createAutoInstall({ config: { get: () => null, set: () => {} }, readActivity: async () => ({ busy: false, reasons: [] }),
+  readReadings: async () => ({ checkedAt: 1, checking: false, checkError: null, nextCheckAt: 2, supervised: true, job: last, packages: [pkg('cli', 'Claude Code', cli, '2.1.286'), pkg('sdk', 'Claude Agent SDK', '0.3.284', '0.3.285')] }) as any,
+  applyUpdate: async (t) => { calls.push(t); if ((t as any).cli) { last = job('update', 'done', 'cli', '2.1.285', '2.1.286'); cli = '2.1.286'; } return { ok: true } as any; } });
+await svc.tick(); await svc.tick(); process.stdout.write(JSON.stringify(calls) + '\n'); process.exit(0);
+X
+timeout 60 node_modules/.bin/tsx --tsconfig server/tsconfig.json "$F"; case "$F" in /tmp/athena-probe-cascade-*) rm -f "$F";; esac
+expect: [{"cli":"2.1.286"}] only — the rolled-back SDK 0.3.285 must not be offered again; measured: [{"cli":"2.1.286"},{"sdk":"0.3.285"}]
+```
+
+measured 2026-09-30 by chain chain-claude-updates-auto-install-20260930-110043-48df, finding M1, MEDIUM
+probe-key: 8a8701ac557bab28972d95adecfe31cf7329fc20
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/claude-activity/claude-activity.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/claude-updates/update-auto-install.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/claude-updates/update-held-versions.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/claude-activity-types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/claude-updates/ClaudeUpdatesSettingsTab.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/claude-updates/hooks/useClaudeUpdates.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/claude-updates-auto-install.mjs
+
+## INV-6070 — probe — A report without `autoInstall` blanks the whole Updates tab: permanent spinner, and the manual "Update and restart" is gone
+
+A report without `autoInstall` blanks the whole Updates tab: permanent spinner, and the manual "Update and restart" is gone
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe && F=$(mktemp /tmp/athena-probe-old-XXXXXX.mjs) && cat > "$F" <<'X'
+import { chromium } from '/home/lyphe/.claude/claudecodeui_lyphe/node_modules/playwright/index.mjs';
+import { HARNESS_PREFERENCES, pinPreferences } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/prefs-pin.mjs';
+const token = (await (await fetch('http://127.0.0.1:3011/api/auth/login', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ username: 'verve', password: 'verve-dev-2026' }) })).json()).token;
+const browser = await chromium.launch(); const context = await browser.newContext({ viewport: { width: 1280, height: 900 }, serviceWorkers: 'block' });
+await context.addInitScript((v) => localStorage.setItem('auth-token', v), token);
+await pinPreferences(context, { ...HARNESS_PREFERENCES, theme: 'light', themeFollowsSun: false }, { writes: 'abort' });
+const page = await context.newPage(); await page.route(/api\.github\.com/, (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{}' }));
+await page.route((u) => u.pathname === '/api/claude-updates', async (route) => { if (route.request().method() !== 'GET') return route.fallback(); const r = await route.fetch(); const b = await r.json(); delete b.autoInstall; await route.fulfill({ response: r, body: JSON.stringify(b) }); });
+await page.goto('http://localhost:5183', { waitUntil: 'domcontentloaded' });
+const s = page.locator('button[aria-label="Settings"]:visible, button:has-text("Settings"):visible').first(); await s.waitFor({ state: 'visible', timeout: 45000 }); await s.click();
+await page.getByRole('button', { name: 'Updates', exact: true }).click(); await page.waitForTimeout(4000);
+const text = await page.locator('.modal-backdrop').innerText();
+console.log(JSON.stringify({ updateAndRestartButton: /Update and restart/.test(text), stuckOnSpinner: /Reading the update report/.test(text) })); await browser.close(); process.exit(0);
+X
+timeout 120 node "$F"; case "$F" in /tmp/athena-probe-old-*) rm -f "$F";; esac
+expect: {"updateAndRestartButton":true,"stuckOnSpinner":false} — measured: {"updateAndRestartButton":false,"stuckOnSpinner":true}
+```
+
+measured 2026-09-30 by chain chain-claude-updates-auto-install-20260930-110043-48df, finding L1, LOW
+probe-key: 4315f9fdb9d338748c32a9bf073de83aea1dc40c
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/claude-activity/claude-activity.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/claude-updates/update-auto-install.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/claude-updates/update-held-versions.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/claude-activity-types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/claude-updates/ClaudeUpdatesSettingsTab.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/claude-updates/hooks/useClaudeUpdates.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/claude-updates-auto-install.mjs
+
+## INV-6071 — probe — `.verify/claude-updates-auto-install.mjs` leaves the operator's LIVE switch OFF when a cell fails between its two presses, and its header says it does not
+
+`.verify/claude-updates-auto-install.mjs` leaves the operator's LIVE switch OFF when a cell fails between its two presses, and its header says it does not
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe && grep -n "finally" .verify/claude-updates-auto-install.mjs
+expect: a restore of the switch on every exit path — measured: one `finally`, and it only runs `browser.close()`
+```
+
+measured 2026-09-30 by chain chain-claude-updates-auto-install-20260930-110043-48df, finding L2, LOW
+probe-key: ee261bd85314737e61744922604d0d610f5fa454
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/claude-updates-auto-install.mjs
+
+## INV-6073 — probe — one press costs two reads under the app's real frame traffic
+
+one press costs two reads under the app's real frame traffic
+
+```probe
+node /tmp/athena-prov.EWQzOh/press.mjs
+expect: `(a) one press: POSTs=1 GETs=2 resolved=true` — the press's own post-write re-read plus the read the server's own broadcast provokes when its frame arrives.
+```
+
+measured 2026-09-30 by chain chain-simple-notes--provider-20260930-112739-1ce0, finding L2, LOW
+probe-key: 7fd9e84a057d5fba1f3c54ea1d3a8000a2e5a4b1
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/App.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/notes/context/NotesContext.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/notes/context/NotesProvider.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/notes/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts
+
+## INV-6074 — probe — two `removeLocal` calls in one tick lose the first removal, while both `total` decrements land
+
+two `removeLocal` calls in one tick lose the first removal, while both `total` decrements land
+
+```probe
+node /tmp/athena-feed-probe.TVw6LK/athena-feed-hook5.mjs   # dev app on 5183 + API on 3011; mounts two live instances of the real hook
+expect: "[NOTE] two removeLocal calls in one tick: <id> still held: true; <id> still held: false" and "(before: a held true, b held true; total 11 -> 9)" — the first chat survives its own removal while both total decrements stand.
+```
+
+measured 2026-09-30 by chain chain-simple-chat-folders--feed-20260930-115952-45b5, finding L1, LOW
+probe-key: 7175afb920515f8679c505c592a216f802f3b0e3
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/hooks/useSimpleChatList.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/SidebarSimpleList.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-simple-feed.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-simple-reorder.mjs
+
+## INV-6075 — probe — MEDIUM — the last drawn chat cannot be dropped at the end: a release past every row is read as its own place and prints nothing
+
+MEDIUM — the last drawn chat cannot be dropped at the end: a release past every row is read as its own place and prints nothing
+
+```probe
+node .verify/athena-carry-endzone.mjs
+expect: `END-ZONE: the last chat of the last open folder, released below the last block -> target={"at":"end"} endLine=true edge=[] moves=[{"item":{"kind":"chat","id":"e1"},"position":{"folderId":null,"after":{"kind":"folder","id":"f2"}}}]` — today it prints `target={"at":"row","item":{"kind":"chat","id":"e1"},"edge":"before"} endLine=false edge=["e1:before"] moves=[]`, and the same probe's controls (`R1`/`R2`/`G2` quiet, `R4` end + one move, `G3` the top-level slot after the first folder reachable) must keep holding
+```
+
+measured 2026-09-30 by chain chain-simple-chat-folders--carry-20260930-115952-5297, finding M1, MEDIUM
+probe-key: cf07cd9ea7e3e39fdbdbc5a2917648fe4c002018
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/hooks/useSimpleChatDrag.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-simple-drag.mjs
+
+## INV-6076 — probe — `.verify/probe-simple-folders.mjs`'s live-list chrome gate is stale, and no brief item schedules it
+
+`.verify/probe-simple-folders.mjs`'s live-list chrome gate is stale, and no brief item schedules it
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe && node .verify/probe-simple-folders.mjs 2>&1 | tail -4
+expect: FAILED (1): - [live@1440-light] the live list draws no folder chrome — no header, no block — {"folders":0,"blocks":8}; exit 1
+```
+
+measured 2026-09-30 by chain chain-simple-chat-folders--list-20260930-124502-46be, finding M1, MEDIUM
+probe-key: c8ac595b52a14b2ade074b1f1490fa92f995dae5
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-simple-folders.mjs
+
+## INV-6078 — probe — the phase's "part 2" evidence is vacuous by construction (copy taken after the fills)
+
+the phase's "part 2" evidence is vacuous by construction (copy taken after the fills)
+
+```probe
+stat -c '%y %n' /tmp/heph-p11/iris.aJ8IGZ/*.tsx src/modules/sidebar/SidebarSimpleFolderRow.tsx src/modules/sidebar/SidebarSimpleFolderPicker.tsx src/modules/sidebar/SidebarSimpleListItems.tsx src/modules/sidebar/SidebarSimpleListRow.tsx
+diff -q /tmp/heph-p11/iris.aJ8IGZ/SidebarSimpleListItems.tsx src/modules/sidebar/SidebarSimpleListItems.tsx
+expect: copy 12:45:07 vs sources 11:26–12:23 (all before the 12:45:02 dispatch); diff quiet
+```
+
+measured 2026-09-30 by chain chain-simple-chat-folders--list-20260930-124502-46be, finding L2, LOW
+probe-key: bda06115c0a506556bba83f48348409debe638ce
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/hooks/useSimpleChatDrag.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/hooks/useSimpleChatFolders.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/SidebarSimpleList.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-simple-folder-composer.mjs
+
+## INV-6079 — probe — the walk probe prints its selection claim but never gates it, and never observes the app's `scrollIntoView`
+
+the walk probe prints its selection claim but never gates it, and never observes the app's `scrollIntoView`
+
+```probe
+sed -n '275,281p;307,310p' .verify/probe-simple-folder-composer.mjs
+node /tmp/athena-folders-verbs/verbs.mjs   # S8, same ground
+expect: sed shows the print at 281 and the pass at 307-310 with no selectionStart/End in it; S8 PASS — `selected 0…10 of 10`, one scrollIntoView (block nearest), first keystroke replaces the name
+```
+
+measured 2026-09-30 by chain chain-simple-chat-folders--list-20260930-124502-46be, finding L3, LOW
+probe-key: 8bd45923c90a0a792d9f584ef06d5cb7dca43e1a
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/hooks/useSimpleChatDrag.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/hooks/useSimpleChatFolders.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/SidebarSimpleList.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-simple-folder-composer.mjs
+
+## INV-6082 — A push payload's landing path is untrusted at every opener
+
+Every opener of a push's `data.path` opens it only when it is a rooted, same-origin path: a string matching `/^\/(?!\/)[^\s\\]*$/`. Anything else falls back to `/session/<sessionId>`, or `/` with no session.
+
+- Refused: a non-string, an absolute `https://…`, a protocol-relative `//host/x`, a backslash escape `/\host/x`, any whitespace the URL parser would strip into a separator.
+- Openers that hold the guard: `public/sw.js` `notificationclick`; `electron/main.js` `openNotificationTarget`. A new opener adds the same guard.
+- why: a payload can come from a remote environment's box, and the desktop app navigates its view to whatever URL it is handed. `landingPathOf` output always passes: it emits a rooted path with every value encoded (`%20`, `%5C`).
+- `src/modules/project-workspace/controllers/ProjectEffects.tsx` checks `startsWith('/')` only, which accepts `//host/x`. It is fed by the worker's validated `urlPath`; feed it from anywhere else and it needs the same regex.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/electron/main.js, /home/lyphe/.claude/claudecodeui_lyphe/public/sw.js, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/services/notification-landing.service.ts
+
+## INV-6084 — probe — `/?runner=<plan>` at the root never lands after the project is picked (scenario S6)
+
+`/?runner=<plan>` at the root never lands after the project is picked (scenario S6)
+
+```probe
+node /tmp/pipeline-reviews/prompts-in-cards--reveal/athena-probes/landing-attacks-2.mjs   # dev client on 127.0.0.1:5183
+expect: [FAIL] S6 the pick never lands: the tab stays Chat and the landing URL is gone (navigate('/') in handleProjectSelect) — rootPick.after `/ | tab Chat | stored chat | pane no cards 0 | target false`, while beforePick the same page holds `/?runner=coi-backend-conformance | tab null | tabs []`; S6b prints [OK] on the already-picked page
+```
+
+measured 2026-09-30 by chain chain-prompts-in-cards--reveal-20260930-133613-4585, finding M1, MEDIUM
+probe-key: 7176ac370388533667b3d08cf94c59333e01a442
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/controllers/ProjectEffects.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/hooks/useRunnerLanding.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/WorkspaceMain.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/runner-tab/RunnerPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-runner-landing.mjs
+
+## INV-6085 — probe — an empty `?runner=` is read as a plan name (scenario S7)
+
+an empty `?runner=` is read as a plan name (scenario S7)
+
+```probe
+node /tmp/pipeline-reviews/prompts-in-cards--reveal/athena-probes/landing-attacks-2.mjs
+expect: [FAIL] S7 an EMPTY `?runner=` lands on the Runner tab and strips the param — emptyParam.series[1] `/session/e609dd36-… | tab Runner | stored runner | pane no cards 0`, and the param is gone from the URL
+```
+
+measured 2026-09-30 by chain chain-prompts-in-cards--reveal-20260930-133613-4585, finding L1, LOW
+probe-key: 9b3a969a5eb2d2c04c66bf5e0ab83ac50dba5aa1
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/controllers/ProjectEffects.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/hooks/useRunnerLanding.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/WorkspaceMain.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/runner-tab/RunnerPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-runner-landing.mjs
+
+## INV-6086 — probe — the reveal is not retired over an empty lane; it stays pending and fires late (scenario S21)
+
+the reveal is not retired over an empty lane; it stays pending and fires late (scenario S21)
+
+```probe
+node /tmp/pipeline-reviews/prompts-in-cards--reveal/athena-probes/landing-attacks-2.mjs
+expect: [FAIL] S21 the reveal was still PENDING over the empty lane: after the lane drew 8 cards the pane moved to 2970px (target top 464px) with no landing
+```
+
+measured 2026-09-30 by chain chain-prompts-in-cards--reveal-20260930-133613-4585, finding L2, LOW
+probe-key: 63ba668cb176b779e21f795140b570dba7b1d7cb
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/controllers/ProjectEffects.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/hooks/useRunnerLanding.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/WorkspaceMain.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/runner-tab/RunnerPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-runner-landing.mjs
+
+## INV-6090 — probe — a title of two ZERO WIDTH SPACEs is accepted: a card that draws as nothing
+
+a title of two ZERO WIDTH SPACEs is accepted: a card that draws as nothing
+
+```probe
+T=$(curl -s -X POST http://127.0.0.1:3011/api/auth/login -H 'content-type: application/json' -d '{"username":"verve","password":"verve-dev-2026"}' | jq -r .token)
+BODY=$(python3 -c "import json;print(json.dumps({'title':chr(0x200b)*2,'description':''}))")   # a title of two U+200B ZERO WIDTH SPACEs
+curl -s -w ' <- %{http_code}\n' -X POST -H "Authorization: Bearer $T" -H 'content-type: application/json' -d "$BODY" http://127.0.0.1:3011/api/notes
+# with the id the answer carries: curl -s -o /dev/null -w '%{http_code}\n' -X DELETE -H "Authorization: Bearer $T" http://127.0.0.1:3011/api/notes/<id>
+expect: `201 {"success":true,"data":{"id":"…","title":"<two U+200B>","description":"","createdAt":"…","updatedAt":"…"}} <- 201` — a card whose title is two invisible characters; the cleanup DELETE answers 200 and leaves no row behind.
+```
+
+measured 2026-09-30 by chain chain-simple-notes--whole-20260930-134952-8535, finding L1, LOW
+probe-key: ac54f2f112f88267d461c10e585dd21b1fe97d12
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/shots/p9-page-a-step2-light.png, /home/lyphe/.claude/claudecodeui_lyphe/.verify/shots/p9-page-b-step3-light.png
+
+## INV-6091 — probe — a draft typed during its own add's flight is discarded when the write lands
+
+a draft typed during its own add's flight is discarded when the write lands
+
+```probe
+node /tmp/athena-p9-ui-b.mjs
+expect: the line `[!!] S39 a draft typed during its own add: typed during the flight "typed while the save was in flight" → after the write landed ""` — the field is emptied although the person typed after the press. The script deletes every note it made and ends with the account holding 0 cards.
+```
+
+measured 2026-09-30 by chain chain-simple-notes--whole-20260930-134952-8535, finding L2, LOW
+probe-key: 8cf24c6327736f004c14f6df80e827895b99764a
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/shots/p9-page-a-step2-light.png, /home/lyphe/.claude/claudecodeui_lyphe/.verify/shots/p9-page-b-step3-light.png
+
+## INV-6093 — probe — the ladder's two consumer lists are still short, in the same class this phase fixed
+
+the ladder's two consumer lists are still short, in the same class this phase fixed
+
+```probe
+grep -n "NEXT_TOP_SIMPLE_LIST_RANK_SQL\|renumberLadder" server/modules/database/repositories/simple-list.db.ts server/modules/database/repositories/simple-list-ladder.db.ts
+expect: consumers at simple-list.db.ts:77 (createFolder) and :148 (deleteFolder) — neither named by the ladder's docblocks at :41 and :174
+```
+
+measured 2026-09-30 by chain chain-simple-chat-folders--old-door-20260930-133741-c3a2, finding L2, LOW
+probe-key: 9deb5ad49393aee36e155aeb108c00c231a5044c
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/session-user-state.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/simple-list-ladder.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/session-user-state.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/session-user-state.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-sidebar-state-api.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-simple-reorder.mjs
+
+## INV-6094 — probe — the A7/A8 repair is justified, but it steps aside from the suite's only feed-unread gate, and that gate cannot pass
+
+the A7/A8 repair is justified, but it steps aside from the suite's only feed-unread gate, and that gate cannot pass
+
+```probe
+node .verify/probe-simple-icons-unread.mjs
+expect: "[FAIL] setup the simple list never drew C (<id>) within 20 s", "gates passed 0/8", "SIMPLE-ICONS-UNREAD FAIL", exit 1 — measured 2026-09-30 21:25Z; its cleanup still removes its 3 chats and leaves the preference at false
+```
+
+measured 2026-09-30 by chain chain-simple-chat-folders--old-door-20260930-133741-c3a2, finding L3, LOW
+probe-key: 5ab6902890cacb730a984a344dc7b77ec75aa07b
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/session-user-state.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/simple-list-ladder.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/session-user-state.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/session-user-state.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-sidebar-state-api.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-simple-reorder.mjs
+
+## INV-6095 — probe — the card's door writes the closed-key memo and never consults it: every replay of a press for an ask the book does not hold pays a full store read
+
+the card's door writes the closed-key memo and never consults it: every replay of a press for an ask the book does not hold pays a full store read
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe && TSX_TSCONFIG_PATH=server/tsconfig.json node --import tsx --input-type=module -e "
+const { createDispatcherAsks } = await import('./server/modules/dispatcher/dispatcher-asks.service.ts');
+let reads = 0;
+const ask = { kind: 'accept', plan: 'athena-h', plans: ['athena-h'], header: 'athena-h', question: 'q', token: 't', options: [{ label: 'Accept', description: '' }, { label: 'Queue', description: '' }, { label: 'Rework', description: '' }], rework: [], asked: { id: 1, at: '2026-09-30T10:00:00Z' } };
+const asks = createDispatcherAsks({ chatFor: () => ({ sessionId: 's', provider: 'c', sessionName: 'n' }), broadcast() {}, push() {}, forgetButtons() {}, carry: async () => ({ outcome: 'took', said: '' }), read: async () => { reads += 1; return { plans: [{ name: 'athena-h', asking: null, session_app_id: null }], generated_at: '2026-09-30T10:00:00Z' }; }, log() {} });
+const d = { allow: true, updatedInput: { answers: { q: 'Accept' } } };
+const a = await asks.answer(ask, d), b = await asks.answer(ask, d);
+console.log('outcomes', a.outcome, b.outcome, 'reads=' + reads);
+"
+expect: outcomes not-open not-open reads=1 (the 5s memo spares the second read) — measured `reads=2`
+```
+
+measured 2026-09-30 by chain chain-prompts-in-cards--door-20260930-135345-1a23, finding M1, MEDIUM
+probe-key: 6c7d528f38708dd266b3081431a4286b52d3cd8a
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-answer.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-answer.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-asks.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-prompts.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-card-door.ts, /home/lyphe/.claude/hooks/dispatcher/accept.py, /home/lyphe/.claude/hooks/dispatcher/cmd/run.py, /home/lyphe/.claude/hooks/dispatcher/store_write.py
+
+## INV-6110 — probe — `.verify/probe-plan-ask-scaffold.mjs` is stale by construction, and no longer inert
+
+`.verify/probe-plan-ask-scaffold.mjs` is stale by construction, and no longer inert
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe && for f in PlanAsk LockAnswer RoundAnswer; do printf '%s %s\n' "$f" "$(grep -c '^[ \t]*// FILL: ' src/modules/dispatcher/$f.tsx)"; done
+expect: PlanAsk 0 / LockAnswer 0 / RoundAnswer 0 — while `.verify/probe-plan-ask-scaffold.mjs:658` demands 1 / 4 / 2
+```
+
+measured 2026-09-30 by chain chain-prompts-in-cards--fill-20260930-145432-20c1, finding M1, MEDIUM
+probe-key: bfa2d7be2ebac6322ccd9574bcda7afb113b1ae4
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-plan-ask-scaffold.mjs

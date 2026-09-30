@@ -296,6 +296,11 @@ session broadcasts nothing, so a tab's 30 s heartbeat writes and sends nothing.
 and `last_read_at` through the one unread expression
 (`SESSION_UNREAD_SQL`), never by re-deriving the comparison here.
 
+8. `modules/notes/notes.service.ts`
+Broadcasts `kind: notes_changed` after a note is created, replaced or deleted, reaching this set through `modules/websocket/index.js`. The frame names no note and no account (MAN-7517).
+9. `modules/providers/services/simple-list.service.ts`
+Broadcasts `kind: simple_list_changed` after a simple-list folder is made, renamed, folded or deleted, or a chat or folder is moved, reaching this set through `modules/websocket/index.js`. The frame names no folder and no chat (MAN-7519).
+
 This design centralizes cross-module realtime fanout without requiring route-local references to WebSocket internals.
 
 ## MAN-724 — Writer Adapter (`WebSocketWriter`)

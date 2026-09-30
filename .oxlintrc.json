@@ -80,6 +80,7 @@
           "server/shared/kanban-types.ts",
           "server/shared/app-types.ts",
           "server/shared/claude-update-types.ts",
+          "server/shared/claude-activity-types.ts",
           "server/shared/version-order.ts"
         ],
         "mode": "file"

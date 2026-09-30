@@ -100,9 +100,15 @@ self.addEventListener('push', event => {
 self.addEventListener('notificationclick', event => {
   event.notification.close();
 
-  const sessionId = event.notification.data?.sessionId;
-  const provider = event.notification.data?.provider || null;
-  const urlPath = sessionId ? `/session/${sessionId}` : '/';
+  // The payload's own landing path when it carries one — a plan's prompt opens the Runner on that
+  // plan's card — and the session otherwise, for a push from before the payload had a landing.
+  // Only a rooted path is opened: a payload built by another box is not trusted with an absolute or
+  // protocol-relative URL (`//host/x`, `/\host/x`), which would leave this origin.
+  const data = event.notification.data || {};
+  const sessionId = data.sessionId;
+  const provider = data.provider || null;
+  const path = typeof data.path === 'string' && /^\/(?!\/)[^\s\\]*$/.test(data.path) ? data.path : null;
+  const urlPath = path || (sessionId ? `/session/${sessionId}` : '/');
 
   event.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(async clientList => {

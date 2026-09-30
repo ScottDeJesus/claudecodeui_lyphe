@@ -1,5 +1,6 @@
 import { useEffect, type ReactNode } from 'react';
 
+import { DispatcherAskBell } from '@/modules/dispatcher/DispatcherAskBell';
 import { DISPATCHER_ALL_TOPIC, useLiveBus } from '@/modules/live-bus';
 import { api } from '@/shared/api';
 import { useWebSocket } from '@/shared/context/WebSocketContext';
@@ -15,10 +16,11 @@ import type { DispatcherArc, DispatcherDaemon, DispatcherLanePicture, Dispatcher
  * `*Feed.tsx` in ITS own module and never as a line in `live-bus/`. That is what keeps the bus from
  * growing a switch over frame kinds it has no business knowing.
  *
- * It renders `children` unchanged and owns no state, so mounting it costs one subscription and one
- * render of whatever it wraps. `App` mounts it once, inside `LiveBusProvider` (it publishes into
- * it), inside the auth gate (its seed must never fire against the login screen) and below
- * `WebSocketProvider` (it subscribes to the one socket, and never opens a second).
+ * It renders `children` unchanged, with the lane's bell (`DispatcherAskBell`, which draws nothing)
+ * beside them, and owns no state of its own, so mounting it costs one subscription, one silent
+ * listener and one render of whatever it wraps. `App` mounts it once, inside `LiveBusProvider` (it
+ * publishes into it), inside the auth gate (its seed must never fire against the login screen) and
+ * below `WebSocketProvider` (it subscribes to the one socket, and never opens a second).
  *
  * ONE TOPIC, BECAUSE ONE PICTURE. The dispatcher has no reader for a single plan — every card is
  * drawn from the same census, which is also where the count and the route come from — so it
@@ -105,7 +107,16 @@ export function DispatcherFeed({ children }: { children: ReactNode }) {
     // `subscribe` is memoised on nothing, and the bus's identity never changes.
   }, [subscribe, bus]);
 
-  return <>{children}</>;
+  return (
+    <>
+      {/* THE LANE'S BELL SITS HERE BECAUSE THE LANE DOES. It rings for an ask this mount has not
+          heard before, so it has to live exactly as long as the page does and beside the one
+          subscription that fills the bus — a bell inside a card would be remounted by every fold
+          and would forget what it had already rung for. It draws nothing. */}
+      <DispatcherAskBell />
+      {children}
+    </>
+  );
 }
 
 /**

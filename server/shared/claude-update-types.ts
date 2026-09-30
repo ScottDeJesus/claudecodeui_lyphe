@@ -126,6 +126,21 @@ export type ClaudeUpdateJob = {
   logTail: string[];
 };
 
+/**
+ * Whether the app installs updates itself, and — while one is on offer — why it has not yet.
+ *
+ * `enabled` is the operator's switch, stored on the server and ON until turned off. `waiting` is the
+ * plain reason an available update has not been installed yet: Claude work in flight ("2 Claude
+ * conversations are working"), a last attempt at these very versions that did not finish, or simply
+ * that the next five-minute check will take it. It is null when nothing is waiting — no update on
+ * offer, an install already running, or the switch off — so a non-null `waiting` always means an
+ * update is on offer and the app intends to install it.
+ */
+export type ClaudeAutoInstall = {
+  enabled: boolean;
+  waiting: string | null;
+};
+
 /** What `GET /api/claude-updates` answers, and what every action answers with in turn. */
 export type ClaudeUpdatesReport = {
   /** Epoch milliseconds of the last attempt, or null when none has run yet. */
@@ -142,6 +157,8 @@ export type ClaudeUpdatesReport = {
   packages: ClaudeUpdatePackage[];
   /** The current job, or the last one. */
   job: ClaudeUpdateJob | null;
+  /** The automatic install: its switch, and what an update on offer is waiting for. */
+  autoInstall: ClaudeAutoInstall;
 };
 
 /** What `POST /api/claude-updates/apply` carries: the versions the caller saw on screen. */

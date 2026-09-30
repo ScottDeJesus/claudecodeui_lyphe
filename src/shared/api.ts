@@ -3,7 +3,7 @@ import {
   getStoredAuthToken,
   storeAuthToken,
 } from '@/shared/authToken';
-import type { AuthTraceEvent, DeepseekRange, DispatcherModelChoice, DispatcherSwarmChoice, FileLinePatch, JevRange, NtfySettingsInput, SubagentTranscriptResult } from '@/shared/types';
+import type { AuthTraceEvent, DeepseekRange, DispatcherAsk, DispatcherModelChoice, DispatcherSwarmChoice, FileLinePatch, JevRange, NoteInput, NtfySettingsInput, SimpleListItemRef, SimpleListPosition, SubagentTranscriptResult } from '@/shared/types';
 import type { AgentLaunchDefaultsChange, AgentLaunchRowChange } from '@/shared/agent-launch-types';
 import type { ClaudeUpdateApplyRequest } from '@/shared/claude-update-types';
 import { IS_PLATFORM } from '@/shared/utils';
@@ -354,12 +354,17 @@ export const api = {
   // the default glyph.
   setSessionIcon: (sessionId: string, icon: string | null) =>
     put(`/api/providers/sessions/${encodeURIComponent(sessionId)}/icon`, { icon }),
-  // Moves a chat in the simple list to sit directly below `afterSessionId`, or
-  // to the top of the list when that is null.
-  moveSimpleListSession: (sessionId: string, afterSessionId: string | null) =>
-    put(`/api/providers/sessions/${encodeURIComponent(sessionId)}/simple-list-position`, {
-      afterSessionId,
-    }),
+
+  // The simple list's folders and the place of its rows. The feed keeps its own
+  // helper (`recentConversations`) above.
+  simpleList: {
+    createFolder: (name: string) => post('/api/providers/simple-list/folders', { name }),
+    updateFolder: (folderId: string, change: { name?: string; collapsed?: boolean }) =>
+      patch(`/api/providers/simple-list/folders/${encodeURIComponent(folderId)}`, change),
+    deleteFolder: (folderId: string) => del(`/api/providers/simple-list/folders/${encodeURIComponent(folderId)}`),
+    move: (item: SimpleListItemRef, position: SimpleListPosition) =>
+      put('/api/providers/simple-list/position', { item, folderId: position.folderId, after: position.after }),
+  },
 
   // Scheduled messages: send a message to a session at a future time.
   scheduledMessages: {
@@ -607,6 +612,12 @@ export const api = {
     saveSwarmSwitch: (state: { enabled: boolean; lanes: number | null }) =>
       put('/api/settings/swarm', state),
 
+    // The dispatcher's planner-lane dial — how many planners (designs, cuts, judgments) may be out at
+    // once. A fifth flag file on this host, in the same host-wide shape and with the same read-back
+    // answer: `lanes` is the whole number the file holds, at least 1, with no "all" above it.
+    plannerLanes: () => get('/api/settings/planner-lanes'),
+    savePlannerLanes: (state: { lanes: number }) => put('/api/settings/planner-lanes', state),
+
     // The dispatcher's park-at-peak switch — the fourth flag file on this host, and the same shape
     // as the three above for the same reason: a file the dispatcher's own process re-reads, not a
     // preference the browser owns. On, an Accept during DeepSeek's peak window queues the plan and
@@ -721,8 +732,10 @@ export const api = {
 
   // The Claude update pipeline (MAN-7401–MAN-7404 are the check, the install/restart backend and this
   // client's own row; MAN-7408–MAN-7414 are the reference form): what the two Claude
-  // packages are on, what npm has, and the two presses that move them. The report is also what every
-  // action answers with, so one read serves the tab, the cards and the sidebar row.
+  // packages are on, what npm has, the two presses that move them, and the switch that makes the app
+  // press the first itself when no Claude work is running. The report is also what every action
+  // answers with, so one read serves the tab, the cards and the sidebar row — `setAutoInstall`
+  // included: its position comes back in the report's own `autoInstall` block.
   //
   // `check` opts out of the request ceiling for the same reason `system.update` does: it waits out
   // however long npm takes to answer, and a ceiling here would report a check that is still running
@@ -736,6 +749,7 @@ export const api = {
     check: () => post('/api/claude-updates/check', undefined, { timeoutMs: NO_REQUEST_TIMEOUT }),
     apply: (request: ClaudeUpdateApplyRequest) => post('/api/claude-updates/apply', request),
     restart: () => post('/api/claude-updates/restart'),
+    setAutoInstall: (enabled: boolean) => put('/api/claude-updates/auto-install', { enabled }),
   },
 
   // The Claude account switcher and its usage meter, served by the server's own accounts module.
@@ -766,6 +780,17 @@ export const api = {
     reject: (id: string) => post(`/api/memory/${encodeURIComponent(id)}/reject`, {}),
   },
 
+  // The notes lane (docs/MANUAL.md MAN-7517): one account's cards, read whole. The read answers the
+  // list, newest first, which is exactly the shape the wall draws; the three writes answer the note
+  // they wrote, and NOBODY reads that body — the list on screen comes from the read that follows
+  // the write, so a card is never drawn from an answer the server has already moved past.
+  notes: {
+    list: () => get('/api/notes'),
+    create: (input: NoteInput) => post('/api/notes', input),
+    update: (id: string, input: NoteInput) => put(`/api/notes/${encodeURIComponent(id)}`, input),
+    remove: (id: string) => del(`/api/notes/${encodeURIComponent(id)}`),
+  },
+
   // The dispatcher lane (docs/MANUAL.md (dispatcher)): the plans in the dispatcher's own store, and the
   // seven verbs the plan cards and the arc header press. The picture is `dispatcher status --json`
   // relayed whole, and the verbs are relayed to the dispatcher's own binary by argv, never by a shell.
@@ -785,6 +810,11 @@ export const api = {
     // A plan out of the store for good (`dispatcher drop <plan>`): `DROPPED <name>`, or the
     // dispatcher's REFUSED line while a phase walks or a planner outing is live, as a 409.
     drop: (name: string) => post(`/api/dispatcher/plans/${encodeURIComponent(name)}/drop`, {}),
+    // The operator's answer to a plan's prompt, from its card: the ask exactly as the card drew
+    // it, the chosen label (or typed words) by question, and a Rework's notes by question. A
+    // refusal is a RESULT (409), as for every verb.
+    answer: (ask: DispatcherAsk, answers: Record<string, string>, notes?: Record<string, string>) =>
+      post('/api/dispatcher/answer', { ask, answers, ...(notes ? { notes } : {}) }),
     // A plan's own DeepSeek / Claude word (`dispatcher model <plan> <word>`). The plan card's
     // control relays it; nothing is optimistic, and the next `dispatcher_state` frame reads the
     // word back. Restarts nothing — the word is read when a chain is LAUNCHED.

@@ -18,6 +18,12 @@ export type WorkspaceTabGates = {
   shouldShowRunnerTab: boolean;
   /** How many plans the lane DRAWS, for the tab's count pill. Paused and queued plans are counted: they are still plans. A hidden one is not. */
   runnerCount: number;
+  /**
+   * How many prompts the drawn plans are waiting on (`useDispatcherPlans.waiting`), for the tab's
+   * attention mark: the strip draws the Runner tab's dot amber and says the count in words while
+   * this is above zero. Zero leaves the tab exactly as it was.
+   */
+  runnerWaiting: number;
   /** True while the Heal tab belongs on the bar — the same sticky, data-gated rule the Memory and Runner tabs take. */
   shouldShowHealTab: boolean;
   /** How much live friction the ledger holds, for the tab's count pill. */
@@ -71,8 +77,9 @@ export function useWorkspaceTabGates(activeTab: AppTab): WorkspaceTabGates {
   const { pendingCount } = useMemoryIntake();
   // The dispatcher's plans ARE the Runner tab's list — the arcs' decks and the cards they hold. The
   // pill counts the cards drawn; the gate also stays open for a hidden plan that is still walking,
-  // because the tab is the only road to its `Show`.
-  const { count: runnerCount, laneOpen } = useDispatcherPlans();
+  // because the tab is the only road to its `Show`. `waiting` rides alongside as the tab's ATTENTION:
+  // the asks those cards owe the operator, which the pill (a count of plans) cannot say.
+  const { count: runnerCount, laneOpen, waiting: runnerWaiting } = useDispatcherPlans();
   // The live count off the Heal tab's own context — the one poll of the ledger, read here in the
   // sidebar, the main region and the palette as well as in the panel. Zero until a read has landed
   // AND while one is failing, so the pill and the gate can never disagree; an unreadable ledger is
@@ -88,6 +95,7 @@ export function useWorkspaceTabGates(activeTab: AppTab): WorkspaceTabGates {
     memoryPendingCount: pendingCount,
     shouldShowRunnerTab: laneOpen || activeTab === 'runner',
     runnerCount,
+    runnerWaiting,
     shouldShowHealTab: healCount > 0 || activeTab === 'heal',
     healCount,
     // The literal true, never a reading: the Universe tab is global, the way the kanban board is.

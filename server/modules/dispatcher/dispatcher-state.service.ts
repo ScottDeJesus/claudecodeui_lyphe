@@ -4,7 +4,7 @@ import type { DispatcherArc, DispatcherDaemon, DispatcherPlan, DispatcherPlanner
 import { arcsOf } from './dispatcher-arc.reader.js';
 import { planOf, type DocumentPlan } from './dispatcher-plan.reader.js';
 import { plannersOf } from './dispatcher-planner.reader.js';
-import { each, field, isCountOrNull, isFlag, isRecord, isText, isTextOrNull, need, oneOf, readDispatcherDocument } from './dispatcher-state.transport.js';
+import { each, field, isCount, isCountOrNull, isFlag, isRecord, isText, isTextOrNull, need, oneOf, readDispatcherDocument } from './dispatcher-state.transport.js';
 
 /**
  * The dispatcher's one document, validated into the types the card draws (`server/shared/types.ts`,
@@ -79,10 +79,27 @@ export type DispatcherStateDependencies = {
 /** The document as it validates — the picture before this server's two acts on it. */
 type DocumentPicture = Omit<DispatcherPicture, 'plans'> & { plans: DocumentPlan[] };
 
+/**
+ * The planner lane's dial and its census (`route.planners`, `planner_lanes.census`): the width the
+ * operator set and how many planner rows are `out` against it. A dispatcher build older than the
+ * field sends none, and that is ANOTHER BUILD TALKING and not a torn document — so an absent key reads
+ * as `undefined` and the readout is simply not drawn — while a key that IS there and is not two counts
+ * is refused by name, like every other field of the route.
+ */
+function plannerLanesOf(raw: unknown): DispatcherRoute['planners'] {
+  if (raw === undefined) return undefined;
+  const planners = need(raw, isRecord, 'route.planners');
+  return {
+    lanes: need(field(planners, 'lanes'), isCount, 'route.planners.lanes'),
+    out: need(field(planners, 'out'), isCount, 'route.planners.out'),
+  };
+}
+
 /** This box's posture. `word` is the whole posture in one phrase; `ceiling` is the most phases that may walk at once. */
 function routeOf(raw: unknown): DispatcherRoute {
   const route = need(raw, isRecord, 'route');
   const swarm = need(field(route, 'swarm'), isRecord, 'route.swarm');
+  const planners = plannerLanesOf(field(route, 'planners'));
   return {
     provider: oneOf(field(route, 'provider'), PROVIDERS, 'route.provider'),
     swarm: {
@@ -93,6 +110,9 @@ function routeOf(raw: unknown): DispatcherRoute {
     word: need(field(route, 'word'), isText, 'route.word'),
     park_at_peak: need(field(route, 'park_at_peak'), isFlag, 'route.park_at_peak'),
     peak_until: need(field(route, 'peak_until'), isTextOrNull, 'route.peak_until'),
+    // Left off the object entirely when the build sent none, so the frame of an older dispatcher is
+    // byte-for-byte what it was and the client's `planners?.` reads it as absent.
+    ...(planners === undefined ? {} : { planners }),
   };
 }
 

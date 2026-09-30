@@ -83,6 +83,7 @@ const NAV_TABS: Array<{ id: AppTab; label: string; keywords: string }> = [
   { id: 'kanban', label: 'Go to Kanban', keywords: 'kanban board lanes cards backlog' },
   { id: 'universe', label: 'Go to Universe', keywords: 'universe galaxy stars repos map graph' },
   { id: 'schedules', label: 'Go to Schedules', keywords: 'schedules cron jobs registry scheduled prompts sync' },
+  { id: 'notes', label: 'Go to Notes', keywords: 'notes note cards jot write memo' },
   { id: 'tasks', label: 'Go to Tasks', keywords: 'tasks taskmaster' },
   { id: 'memory', label: 'Go to Memory', keywords: 'memory intake pending' },
   { id: 'runner', label: 'Go to Runner', keywords: 'runner plan run live phases' },

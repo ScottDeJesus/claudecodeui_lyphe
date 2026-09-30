@@ -647,7 +647,7 @@ function findEnvironmentByUrl(environmentUrl) {
   }) || null;
 }
 
-async function openNotificationTarget({ environmentUrl, sessionId = null }) {
+async function openNotificationTarget({ environmentUrl, sessionId = null, path = null }) {
   const window = desktopWindow?.getMainWindow();
   if (window) {
     if (window.isMinimized()) window.restore();
@@ -667,7 +667,13 @@ async function openNotificationTarget({ environmentUrl, sessionId = null }) {
     });
   }
 
-  const targetUrl = new URL(sessionId ? `/session/${encodeURIComponent(sessionId)}` : '/', environmentUrl).toString();
+  // The push's own landing path when it carries one, and only when it is ROOTED: this app talks to
+  // remote environments, so a payload from another box is not trusted with an absolute or
+  // protocol-relative URL (`https://…`, `//host/x`, `/\host/x`) that would move the view off the
+  // environment's origin. Today's session URL otherwise.
+  const localPath = typeof path === 'string' && /^\/(?!\/)[^\s\\]*$/.test(path) ? path : null;
+  const targetPath = localPath || (sessionId ? `/session/${encodeURIComponent(sessionId)}` : '/');
+  const targetUrl = new URL(targetPath, environmentUrl).toString();
   await desktopWindow.navigateActiveView(targetUrl);
   return getDesktopState();
 }

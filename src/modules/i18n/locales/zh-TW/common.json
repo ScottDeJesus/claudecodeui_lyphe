@@ -380,6 +380,9 @@
       "open": "在新分頁中開啟頁面",
       "rejected": "這不是 http:// 或 https:// 網址"
     },
+    "notes": {
+      "title": "筆記"
+    },
     "open": "開啟 {{name}}",
     "collapse": "收合",
     "dragHint": "拖曳到任一側",

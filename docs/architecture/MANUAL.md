@@ -627,12 +627,15 @@ flowchart TD
     SET --> E1["loading_progress"]
     SET --> E2["session_upserted"]
     SET --> E3["taskmaster frames"]
+    SET --> E10["kanban_event"]
     
     SET --> E11["dispatcher_state"]
     SET --> E6["soul_launch_state"]
     SET --> E7["universe_map"]
     SET --> E8["universe_activity"]
     SET --> E9["kanban_metis_state"]
+    SET --> E12["notes_changed"]
+    SET --> E13["simple_list_changed"]
   end
   subgraph PerRun["Per-run, this run's audience only"]
     W["ChatSessionWriter connections set"]
@@ -640,17 +643,17 @@ flowchart TD
   end
 ```
 
-There are seven broadcasters over that set: `loading_progress`, `session_upserted`, the Task Master frames, and FOUR STATE LANES — the launcher-souls lane (`server/modules/dispatch-souls/`) over `~/.claude/state/dispatch-souls/`, a board's own Metis sessions (`server/modules/kanban-metis/`) over `~/.claude/state/kanban-metis/`, the dispatcher's plans (`server/modules/dispatcher/`) over its `status --json` document, and the universe lane
+There are ten broadcasters over that set: `loading_progress`, `session_upserted`, the Task Master frames, the board's `kanban_event`, the notes lane's `notes_changed` (MAN-7517), the simple-list lane's `simple_list_changed` (MAN-7519), and FOUR STATE LANES — the launcher-souls lane (`server/modules/dispatch-souls/`) over `~/.claude/state/dispatch-souls/`, a board's own Metis sessions (`server/modules/kanban-metis/`) over `~/.claude/state/kanban-metis/`, the dispatcher's plans (`server/modules/dispatcher/`) over its `status --json` document, and the universe lane
 (`server/modules/universe/`), which watches the registered repos' `.git` HEADs and reads two live
-feeds of the estate, the systemd journal and the Claude transcripts. The first three poll every two seconds and put a frame on the wire only when the picture actually changed. The dedup records a picture as
+feeds of the estate, the systemd journal and the Claude transcripts. The three polled lanes — the launcher-souls lane, a board's own Metis sessions and the dispatcher's plans — tick every two seconds and put a frame on the wire only when the picture actually changed, and the universe lane is the exception, below. `notes_changed` and `simple_list_changed` go out once per write that landed and name no row and no account: a client that hears one reads its own list again. The dedup records a picture as
 sent only AFTER the send returns, so a broadcast that throws part-way is re-sent on the next tick
 instead of being suppressed as unchanged — the frame carries the whole picture, so a client
 receiving it twice receives it once. All of them reach `connectedClients` through the websocket
 module's own barrel, never a deep import.
 
 That loop is written once, in `server/shared/polled-lane.service.ts` (`createPolledLane`); each lane
-supplies only its own `snapshot` and `frame`. The universe lane is the one broadcaster over
-`connectedClients` that runs through NEITHER that shape NOR a single kind — it sends `universe_map`
+supplies only its own `snapshot` and `frame`. The universe lane is the one STATE LANE that runs through NEITHER that shape NOR a single
+kind — it sends `universe_map`
 and `universe_activity`, and the reason differs for each.
 
 `universe_map` is the HEAD watcher. Reconciling a HEAD change means shelling a crawler child and
@@ -673,13 +676,13 @@ than a picture of state that persists between ticks, so there is nothing cheap o
 against a previous snapshot — an empty window is silence, not an unchanged picture, and a lane that sent
 it anyway would be ten frames a second saying nothing.
 
-Reasoning that belongs to polling-rather-than-watching for the five polled lanes lives at
+Reasoning that belongs to polling-rather-than-watching for the three polled lanes lives at
 `polled-lane.service.ts`, not in any lane. The launcher lane's own half — what it reads off a launch
 directory, how it classifies a soul and which provider its pin paints — is
 [docs/MANUAL.md (dispatch-souls)](../MANUAL.md). A board's own Metis lane has no write-up of its own yet.
 
 A socket joins `connectedClients` when `handleChatConnection` runs
-(`chat-websocket.service.ts:589`) and leaves on close (`:632`) — closing a tab removes a
+(`chat-websocket.service.ts`) and leaves on close — closing a tab removes a
 listener and nothing more; the run keeps going. Broadcast consumers filter by session id
 themselves, which is why the sidebar can react to sessions the user is not looking at.
 
@@ -1694,7 +1697,7 @@ Three details worth pinning:
 - **This describes the project tree.** The flat simple chat list is a second front door onto
   the same `POST /api/providers/sessions` (see [docs/MANUAL.md (simple-chat-list)](../MANUAL.md))
   and has no optimistic row at all: `useSimpleChatList` only reloads once the server's own
-  `session_upserted` reaches it, debounced 500 ms.
+  `session_upserted` or `simple_list_changed` reaches it, debounced 500 ms.
 
 Navigation happens once. `ChatInterface.handleSessionEstablished` sets `currentSessionId`,
 calls `onSessionEstablished` (which registers the optimistic row) and then
@@ -4477,7 +4480,7 @@ section: 07-live-widgets/002 The pieces
 | `src/modules/chat/embeds/collectEmbedTargets.ts` | `collectEmbedTargets` — every embed a chat has declared, read out of its own messages through the one classifier |
 | `src/modules/chat/embeds/embedSource.ts` | `publishEmbedSource`, `useChatEmbedTargets`, `useEmbedWidgetState` — the chat's list, published for the widget that draws it, and whether it has arrived at all |
 | `src/modules/chat/embeds/EmbedWidgetBody.tsx` | `EmbedWidgetBody` — the gutter widget: the follow latch, the one-row dropdown (house presets, the chat's addresses, `Type an address…`), the way out, and `EmbedUrlFrame` filling the card |
-| `src/modules/chat-gutters/GutterWidgetFrame.tsx` | The gutter card, and its `fullscreen` / `onToggleFullscreen` / `flush` / `headerAction` props |
+| `src/modules/chat-gutters/GutterWidgetFrame.tsx` | The gutter card, and its `fullscreen` / `onToggleFullscreen` / `flush` / `headerAction` / `countTone` props |
 | `src/modules/widgets/embedUrl.ts` | `isLoopbackHost` and `resolveEmbedUrl` — a loopback address moved onto the host that reached this page, because an `src` is resolved by the reader's browser |
 | `src/modules/widgets/docspaceOrigin.ts` | `DOCSPACE_EMBED_DEFAULT_PORT`, `resolveDocSpaceOrigin`, `docspaceEmbedUrl`, `docspaceStudioUrl`, and `isForeignOrigin` — the gate on `allow-same-origin` |
 | `src/modules/widgets/DocSpaceFrame.tsx` | `DOCSPACE_SANDBOX`, `DOCSPACE_READY_TIMEOUT_MS` and `DocSpaceFrame` — the second frame: a `src` on ArchPulse's origin, the latched theme, the ready timer, and the `framed` prop that drops its own border where a card already draws one |
@@ -4970,7 +4973,7 @@ area — a live iframe scrolls itself), and the `flex-1` that goes with it, beca
 peeking through a slot. It KEEPS a floor while it grows — a taller one, 16rem or 45% of the column —
 because growth and a floor do not conflict and dropping the floor (`min-h-0`) let a taller neighbour
 crush the card to 2px, header and switches clipped out of reach, with nothing left to reopen it
-(Athena's review, memory 658 / embed 2 in a 700px column). The other three widgets stay
+(Athena's review, memory 658 / embed 2 in a 700px column). The other widgets stay
 content-sized.
 
 ## MAN-422 — Fullscreen
@@ -6465,6 +6468,7 @@ section: README/003 The protocol, in two tables/004 Server → client: the `kind
 | `session_upserted` | gateway | Sidebar delta. Owned by the projects state, not by chat. |
 | `loading_progress` | gateway | Project scan progress. |
 | `soul_launch_state` | gateway | The launcher souls a session started by hand, pushed on change. Feeds the soul pins in the strip above the composer when the desktop chat gutters are not showing, and in the gutter's Subagents widget while they are ([docs/MANUAL.md (dispatch-souls)](../MANUAL.md)). |
+| `simple_list_changed` | gateway | The simple chat list's shape changed: a folder was made, renamed, folded or deleted, or a chat changed place or folder. `{ kind, at }` only; names nothing, so a client that hears it re-reads the feed. Never a transcript row (MAN-7519). |
 | `universe_map` | gateway | The estate map was rebuilt because a tracked repo's HEAD moved; carries the `mapId` a client refetches `GET /api/universe/map` for. Excused from the chat reducer beside `soul_launch_state`. |
 | `universe_activity` | gateway | Coalesced estate activity — journal lines and Claude transcript edits resolved onto map stars. At most ten frames a second, and none at all while the estate is quiet; carries the held `mapId`, a `rows` array and a `dropped` count. Excused from the chat reducer. See [docs/architecture/MANUAL.md (01-websocket-transport)](MANUAL.md) §"Fan-out: who receives what". |
 | `protocol_error` | gateway | The request was rejected or never started. No `complete` follows. |
@@ -6567,3 +6571,32 @@ how the pieces fit together.
 - `server/modules/websocket/MANUAL.md (README)` — the gateway's service map.
 - `server/modules/providers/MANUAL.md (README)` — the provider abstraction.
 - `src/modules/chat/tools/MANUAL.md (README)` — the tool config registry, from the module's side.
+
+## MAN-7526 — Chat gutters — widget ids, default places, adding a widget
+
+## Gutter widgets — ids and default places
+
+`GutterWidgetId` (`src/shared/types.ts`) = `'runner' | 'memory' | 'subagents' | 'embed' | 'notes'`. The ids are the DOM's `data-widget` and the keys of the stored record.
+
+| id | default side | order | open | table entry in `ChatGutterLayout` |
+|---|---|---|---|---|
+| `runner` | left | 0 | no | badge `useDispatcherPlans().count`, `countTone: 'warn'` while `waiting > 0` (MAN-7540) |
+| `subagents` | left | 1 | yes | `HeaderAction: SubagentWidgetClearCompleted` |
+| `memory` | right | 0 | no | |
+| `embed` | right | 1 | no | `flush: true` |
+| `notes` | right | 2 | no | badge `notes?.length ?? 0`, `Body: NotesWidgetBody`; not `flush`, no header action (MAN-7518) |
+
+Defaults live in `DEFAULT_PLACEMENTS` (`src/modules/chat-gutters/hooks/useGutterPlacements.ts`).
+
+## Gutter widgets — adding one
+
+1. Add the id to `GutterWidgetId`.
+2. Give it a place in `DEFAULT_PLACEMENTS` (`Record<GutterWidgetId, …>`; a missing key fails typecheck). `GUTTER_WIDGET_ORDER` is read off that record's keys.
+3. Add its entry to the `widgets` table in `ChatGutterLayout` (`Record<GutterWidgetId, …>`; also compiler-checked): `title`, `count`, `icon`, `Body`, optional `countTone` (a `Tone`, default `info`), `flush`, `HeaderAction`.
+4. Add `gutters.<id>.title` to every locale's `common.json`.
+
+- No stored placement is migrated. `parsePlacements` is seeded from `DEFAULT_PLACEMENTS`, so a stored arrangement without the new id gains it at its default; stored values are never rewritten.
+- `GutterWidgetFrame`, `GutterColumn` and the server's preference merge are id-generic: no edit.
+- `count` is the badge and `countTone` its colour; a widget counting something other than a list length changes its own table line.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-gutters/ChatGutterLayout.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-gutters/hooks/useGutterPlacements.ts

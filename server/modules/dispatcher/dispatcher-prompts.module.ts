@@ -1,7 +1,7 @@
 import { appConfigDb, sessionsDb, userDb } from '@/modules/database/index.js';
 import { createNotificationEvent, forgetPendingAction, notifyUserIfEnabled } from '@/modules/notifications/index.js';
 import { registerPermissionGateway } from '@/modules/providers/index.js';
-import type { DispatcherPlan, DispatcherStateEvent } from '@/shared/types.js';
+import type { DispatcherAsk, DispatcherCardAnswer, DispatcherPlan, DispatcherStateEvent, ProviderPermissionDecision } from '@/shared/types.js';
 
 import { carryReply } from './dispatcher-answer.service.js';
 import { runDispatcherAsk, runDispatcherCommand } from './dispatcher-ask.transport.js';
@@ -52,10 +52,13 @@ export type DispatcherPromptsDependencies = {
   log: (message: string) => void;
 };
 
-// Used by `dispatcher.module.ts`, which hands it every picture the lane broadcasts and stops it with the lane.
+// Used by `dispatcher.module.ts`, which hands it every picture the lane broadcasts, mounts its answer
+// door on the lane's router, and stops it with the lane.
 export function createDispatcherPrompts(dependencies: DispatcherPromptsDependencies): {
   observe(frame: DispatcherStateEvent): void;
   stop(): void;
+  /** The card's own door — the ask as the card drew it, and the operator's decision (`DispatcherAsks.answer`). */
+  answer(ask: DispatcherAsk, decision: ProviderPermissionDecision): Promise<DispatcherCardAnswer>;
 } {
   const { commands, log } = dependencies;
 
@@ -178,5 +181,8 @@ export function createDispatcherPrompts(dependencies: DispatcherPromptsDependenc
       }
     },
     stop: unregisterAsks,
+    // The card's answer, straight off the asks service: this root owns the composition, the book owns
+    // the lookup and the carry.
+    answer: asks.answer,
   };
 }

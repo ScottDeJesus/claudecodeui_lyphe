@@ -29,6 +29,16 @@ const SDK = packageRow('sdk');
 /** The installed CLI as this module reads it — the reading's own words included. */
 export type InstalledCliReading = { version: string | null; reason: string | null };
 
+/**
+ * The report before its `autoInstall` block: everything the check, the two readings and the job can
+ * say. The block is decided FROM these — whether an update is on offer, whether a job is running —
+ * so it is added after, by the module that owns the switch, never inside the check service.
+ *
+ * consumer: update-check.service.ts (what `report` answers), update-actions.service.ts (the packages a
+ * request is compared against) and update-auto-install.service.ts (what it decides from).
+ */
+export type ReportReadings = Omit<ClaudeUpdatesReport, 'autoInstall'>;
+
 /** Everything one report is built from: the stored check, the readings taken for THIS answer, and
  *  the two facts the module knows and the check service does not. */
 type ReportInput = {
@@ -168,7 +178,7 @@ function sdkPackage(input: ReportInput): ClaudeUpdatePackage {
  * what lets the same stored check be rendered against two different readings without either of them
  * being cached here.
  */
-export function buildReport(input: ReportInput): ClaudeUpdatesReport {
+export function buildReport(input: ReportInput): ReportReadings {
   return {
     checkedAt: input.check.checkedAt,
     checking: input.checking,

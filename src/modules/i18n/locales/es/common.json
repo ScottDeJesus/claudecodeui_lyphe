@@ -382,6 +382,9 @@
       "open": "Abrir la página en una pestaña nueva",
       "rejected": "Esa no es una dirección http:// o https://"
     },
+    "notes": {
+      "title": "Notas"
+    },
     "open": "Abrir {{name}}",
     "collapse": "Contraer",
     "dragHint": "Arrastra a cualquier lado",

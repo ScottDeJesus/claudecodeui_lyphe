@@ -21,6 +21,7 @@
  * dev server's handovers boot, and each of them would otherwise buzz the phone.
  */
 
+import { landingPathOf } from '@/modules/notifications/services/notification-landing.service.js';
 import { buildNtfyActions } from '@/modules/notifications/services/ntfy-action-decisions.service.js';
 import { getAppUrl, getNtfyConfig } from '@/modules/notifications/services/ntfy-config.service.js';
 import type { NtfyConfig } from '@/modules/notifications/services/ntfy-config.service.js';
@@ -153,12 +154,6 @@ function tagsFor(event: ChannelEvent): string[] {
   }
 }
 
-/** Where a tap opens: the session when both are known, the app root when only the URL is. */
-function clickFor(appUrl: string | null, sessionId: string | null | undefined): string | undefined {
-  if (!appUrl) return undefined;
-  return sessionId ? `${appUrl}/session/${sessionId}` : `${appUrl}/`;
-}
-
 /**
  * A finished run earns a push only when it ran at least the user's threshold.
  * An unknown duration never does: "it finished" without "how long" is noise.
@@ -182,11 +177,13 @@ function promptKeyOf(event: ChannelEvent): string | null {
 }
 
 /**
- * The tap-to-answer buttons, only for a permission request that names its prompt, and only when
- * the phone has an app URL to send the tap to. Building them also REGISTERS the prompt, which is
- * how a successor re-registers the question a predecessor's push still points at — so this runs
- * before EVERY skip in `send`, and a push this channel does not send still leaves its buttons
- * answerable on the push that did go out.
+ * The tap-to-answer buttons, only for a permission request that names its prompt, and only when the
+ * phone has an app URL to send the tap to. That URL is the event's own landing (`landingPathOf`), so
+ * an option that takes words opens the same path the push's click carries.
+ *
+ * Building them also REGISTERS the prompt, which is how a successor re-registers the question a
+ * predecessor's push still points at — so this runs before EVERY skip in `send`, and a push this
+ * channel does not send still leaves its buttons answerable on the push that did go out.
  * A failure here (say, the signing secret cannot be stored) costs the buttons, never the push:
  * the most urgent push still says "look".
  */
@@ -205,6 +202,7 @@ function actionsFor(
       toolName: typeof event.meta?.toolName === 'string' ? event.meta.toolName : '',
       toolInput: event.meta?.toolInput,
       appUrl,
+      landingUrl: `${appUrl}${landingPathOf(event)}`,
     });
   } catch (error) {
     console.warn('[ntfy] answer buttons skipped', error instanceof Error ? error.message : error);
@@ -258,7 +256,8 @@ export const ntfyChannel = {
       if (event.sessionId && isSessionWatched(presenceUserId(userId), event.sessionId)) return null;
       if (event.code === 'run.stopped' && !ranLongEnough(event, config.longRunMinutes)) return null;
 
-      const click = clickFor(appUrl, event.sessionId);
+      // Where a tap opens, on the app URL this push is for; without one there is nowhere to send it.
+      const click = appUrl ? `${appUrl}${landingPathOf(event)}` : undefined;
       // The phone has this question already: a successor re-issues the prompt it inherited, and
       // one ask is one push. Its `permission_request` still reaches the chat — that door is the
       // runtime's — and the buttons built above still answer the push that did go out.

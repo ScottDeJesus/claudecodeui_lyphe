@@ -8,6 +8,7 @@ import type { HealModel } from './heal-model-switch.js';
 import { readHealCycle, writeHealCycle } from './heal-cycle-switch.js';
 import { readHealCap, readHealMaster, writeHealCap, writeHealMaster } from './heal-switch.js';
 import { getParkAtPeakState, setParkAtPeakState } from './park-at-peak-switch.js';
+import { getPlannerLanesState, setPlannerLanesState } from './planner-lanes.js';
 import { readSwarmSwitch, writeSwarmSwitch } from './swarm-switch.js';
 
 /**
@@ -288,6 +289,23 @@ export function createSettingsService(dependencies: SettingsDependencies) {
       // The flip is the event: on, the next Accept has an hour to arm, and the dispatcher can act on
       // a plan that is already queued. A refused input has thrown by now and nothing was written, so
       // no kick rides on a press that never moved the file.
+      void kickDispatcher();
+      return state;
+    },
+    /**
+     * The dispatcher's planner-lane dial: how many planners (designs, cuts, judgments) may be out at
+     * once. Both bodies live in `planner-lanes.ts`, beside the file's own reader and writer, for the
+     * reason the park-at-peak pair above does; what belongs here is the line that hands a press to
+     * the dispatcher.
+     */
+    async getPlannerLanes() {
+      return getPlannerLanesState();
+    },
+    async setPlannerLanes(lanesInput: unknown) {
+      const state = await setPlannerLanesState(lanesInput);
+      // The press is the event: a wider dial frees queued planners the rule was holding, and they are
+      // taken up on the kick rather than at the next session event. A refused input has thrown by now
+      // and nothing was written, so no kick rides on a press that never moved the file.
       void kickDispatcher();
       return state;
     },

@@ -9,7 +9,9 @@ import { providerSkillsService } from '@/modules/providers/services/skills.servi
 import { sessionConversationsSearchService } from '@/modules/providers/services/session-conversations-search.service.js';
 import { listSubagentRunningSessionIds } from '@/modules/providers/services/session-subagent-runs.service.js';
 import { sessionsService, type RunningSessionListItem } from '@/modules/providers/services/sessions.service.js';
+import { simpleListService } from '@/modules/providers/services/simple-list.service.js';
 import { sessionUserStateRoutes } from '@/modules/providers/session-user-state.routes.js';
+import { simpleListRoutes } from '@/modules/providers/simple-list.routes.js';
 import { subagentTranscriptService } from '@/modules/providers/services/subagent-transcript.service.js';
 import type {
   CustomProviderModelInput,
@@ -768,7 +770,7 @@ router.get(
     const limit = parseBoundedIntegerQuery(req.query.limit, 'limit', 40, 1, 100);
     const offset = parseBoundedIntegerQuery(req.query.offset, 'offset', 0, 0);
     const simpleListOnly = parseOptionalBooleanQuery(req.query.simpleList, 'simpleList') ?? false;
-    const page = sessionsService.listRecentSessions(limit, offset, { simpleListOnly });
+    const page = simpleListOnly ? simpleListService.readFeed(limit, offset) : sessionsService.listRecentSessions(limit, offset);
     res.json(createApiSuccessResponse(page));
   }),
 );
@@ -853,6 +855,7 @@ router.put(
 );
 
 router.use(sessionUserStateRoutes);
+router.use(simpleListRoutes);
 
 router.get(
   '/sessions/:sessionId/messages',

@@ -2,12 +2,14 @@ import { Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { askIdentity } from '@/modules/dispatcher/askState';
 import { DeletePlanDialog } from '@/modules/dispatcher/DeletePlanDialog';
 import { cardDescription, phaseProgress, planDroppable } from '@/modules/dispatcher/dispatcherState';
 import { putAwayVerb } from '@/modules/dispatcher/hiddenPlans';
 import { useDispatcherPlans } from '@/modules/dispatcher/hooks/useDispatcherPlans';
 import { useRiseOnce } from '@/modules/dispatcher/hooks/useFirstSight';
 import { LaneCardHead } from '@/modules/dispatcher/LaneCardHead';
+import { PlanAsk } from '@/modules/dispatcher/PlanAsk';
 import { PlanControls } from '@/modules/dispatcher/PlanControls';
 import { PlanClock, PlanFace, PlanStatusBadge } from '@/modules/dispatcher/PlanFace';
 import { PlannerBadge } from '@/modules/dispatcher/PlannerBadge';
@@ -40,6 +42,11 @@ import { cn } from '@/shared/utils';
  * plan's verbs and its detail, and does not make the card compact. The bar and the face fold: a fold
  * that left verbs on screen would be a card that had not collapsed. The body is the house's
  * `CardFoldBody`, so a folded card's verbs leave the tab order too.
+ *
+ * AN OWED WORD FOLDS TO ITS BAR, AND NEVER AWAY (MAN-5412). The ask band is drawn OUTSIDE that body,
+ * between the head and it, so folding a card that owes an answer leaves the one-line bar standing —
+ * the prompt folds with the card and is never taken off the screen with the verbs. A fold is not an
+ * answer, and the only thing that ends a band is the frame that stops carrying the ask.
  *
  * THE CORNER PUTS THE CARD AWAY, NOT THE PLAN, and the dispatcher is never told (`hiddenPlans.ts`). A
  * COMPLETE plan's corner is Dismiss: the card leaves the board, and no list or count keeps it. Any
@@ -83,6 +90,7 @@ export function PlanCard({
   waitsOn = [],
   onPutAway,
   headingLevel = 3,
+  showAsk = true,
 }: {
   plan: DispatcherPlan;
   /** The plan names of this plan's own arc that it waits on, as the document spells them; `[]` for a plan of no arc. */
@@ -91,6 +99,14 @@ export function PlanCard({
   onPutAway: () => void;
   /** The title's heading level: 4 inside an arc deck, whose own title is the 3 its plans sit under. */
   headingLevel?: 3 | 4;
+  /**
+   * Whether a prompt this plan owes is drawn on ITS OWN card. `true` wherever a card stands for
+   * itself — the tab's wall, the widget's list — so a plan holding a prompt shows it where the plan
+   * shows. `false` inside a dispatch arc's deck, whose caller draws the arc's prompts ONCE on the
+   * deck (`DispatchArcDeck` → `DeckFrame`'s `asks`): one lock names every plan of the arc that owes
+   * its Accept, and the same prompt on ten cards is ten presses of one door (MAN-5706).
+   */
+  showAsk?: boolean;
 }) {
   const { t } = useTranslation();
   const description = cardDescription(plan.delivers, plan.goal);
@@ -152,6 +168,18 @@ export function PlanCard({
             headingLevel={headingLevel}
           />
         </CardHeader>
+
+        {/* THE PROMPT THE PLAN OWES, between the head and the fold's body: OUTSIDE the body, so a fold
+            takes the verbs and the detail and leaves this standing as its one-line bar (MAN-5412). It
+            is keyed by the ask's identity, so an answered form lasts exactly as long as the ask the
+            frame carries and a NEW ask — a re-cut, a fresh round — mounts a fresh one rather than
+            inheriting an answer. Nothing at all on a plan that owes nothing, and nothing when the
+            caller draws the arc's prompts on the deck (`showAsk`). */}
+        {showAsk && plan.asking && (
+          <div className="px-3 pb-3">
+            <PlanAsk key={askIdentity(plan.asking)} ask={plan.asking} folded={collapsed} onUnfold={toggle} />
+          </div>
+        )}
 
         <CardFoldBody>
           <CardContent className="flex min-w-0 flex-col gap-3 p-3 pt-0">

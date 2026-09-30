@@ -1,6 +1,7 @@
 /**
  * The Claude updates module: the report at `/api/claude-updates`, the check behind it, the two
- * actions in front of the pipeline, and the reconciler that finishes a job somebody else started.
+ * actions in front of the pipeline, the automatic install that presses the first of them when no
+ * Claude work is running, and the reconciler that finishes a job somebody else started.
  *
  * The composition root, and the only file here that names a directory or a module outside this one.
  * It exists as a module rather than a mount because two of its parts are ARMED rather than called:
@@ -12,6 +13,9 @@
  * than read here: the entrypoint is where the repository root is resolved once
  * (`findApplicationRoot`), where `server.listening` is a fact only it holds, and where
  * `supervised-boot.ts` is already the one voice on whether this process can hand itself over.
+ * `readClaudeActivity` is handed in for the same reason — the question "is any Claude work running?"
+ * is answered from the run registry, the session hosts, Metis and the process list, and this module
+ * knows none of them.
  */
 
 import { execFile } from 'node:child_process';
@@ -19,11 +23,15 @@ import { execFile } from 'node:child_process';
 import type { Router } from 'express';
 
 import { readInstalledCliVersion } from '@/modules/cli-version/index.js';
-import type { ClaudeUpdateJob } from '@/shared/claude-update-types.js';
+import { appConfigDb } from '@/modules/database/index.js';
+import type { ClaudeActivity } from '@/shared/claude-activity-types.js';
+import type { ClaudeUpdateJob, ClaudeUpdatesReport } from '@/shared/claude-update-types.js';
 
 import { createClaudeUpdatesRouter } from './claude-updates.routes.js';
 import { LOADED_SDK_VERSION } from './packages.js';
 import { createUpdateActions } from './update-actions.service.js';
+import { createAutoInstall } from './update-auto-install.service.js';
+import type { ReportReadings } from './update-check.report.js';
 import { createUpdateCheckService } from './update-check.service.js';
 import type { GitResult } from './update-git.js';
 import { claudeUpdatesDir, readJob, readLogTail, spawnUpdateRunner } from './update-job.js';
@@ -43,6 +51,8 @@ export function createClaudeUpdatesModule(dependencies: {
   requestReboot: (reason: string) => boolean;
   /** Registers the listener the supervisor's answer to a failed reboot lands on. */
   onRebootFailed: (listener: (detail: string) => void) => void;
+  /** Whether any Claude work is in flight on this machine, failing closed — see `claude-activity`. */
+  readClaudeActivity: () => Promise<ClaudeActivity>;
 }): {
   router: Router;
   start: () => void;
@@ -50,7 +60,7 @@ export function createClaudeUpdatesModule(dependencies: {
   startReconciler: () => void;
 } {
   const dir = claudeUpdatesDir();
-  const { appRoot, supervised, isListening, requestReboot, onRebootFailed } = dependencies;
+  const { appRoot, supervised, isListening, requestReboot, onRebootFailed, readClaudeActivity } = dependencies;
 
   const check = createUpdateCheckService({
     dir,
@@ -58,6 +68,10 @@ export function createClaudeUpdatesModule(dependencies: {
     // The cli-version module's own reading, through its barrel: one cache for the whole server, so
     // this report and the chat runtime's decision to retire an old process never disagree.
     readInstalledCli: readInstalledCliVersion,
+    // The automatic install rides the check's own tick. It is built below because it needs the check
+    // and the actions, and they need nothing of it — the tick only calls this after the server has
+    // started, long after `autoInstall` exists.
+    afterTick: () => autoInstall.tick(),
   });
 
   /**
@@ -119,12 +133,31 @@ export function createClaudeUpdatesModule(dependencies: {
     return job === null ? null : { ...job, logTail: readLogTail(dir, LOG_TAIL_LINES) };
   }
 
+  /** The report before its `autoInstall` block: the stored check, the readings, and the job as above. */
+  const readReadings = (): Promise<ReportReadings> => check.report(currentJob(), supervised);
+
+  const autoInstall = createAutoInstall({
+    // `app_config` is where the switch lives: server-side, so every browser and the tick read one answer.
+    config: appConfigDb,
+    readActivity: readClaudeActivity,
+    readReadings,
+    applyUpdate: actions.applyUpdate,
+  });
+
+  /** The report as the routes answer it: the readings, and what the automatic install says about them. */
+  async function readReport(): Promise<ClaudeUpdatesReport> {
+    const readings = await readReadings();
+    return { ...readings, autoInstall: await autoInstall.describe(readings) };
+  }
+
   return {
     router: createClaudeUpdatesRouter({
-      report: () => check.report(currentJob(), supervised),
+      report: readReport,
       checkNow: () => check.checkNow(),
       applyUpdate: actions.applyUpdate,
       restartServer: actions.restartServer,
+      readAutoInstall: async () => (await readReport()).autoInstall,
+      setAutoInstall: autoInstall.setEnabled,
     }),
     start: () => check.start(),
     // The reconciler stops with the check: a shutdown owes nothing to a job the runner is holding,

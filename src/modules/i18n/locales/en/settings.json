@@ -134,6 +134,13 @@
     "updates": "Updates",
     "about": "About"
   },
+  "updates": {
+    "autoInstall": {
+      "label": "Install updates automatically",
+      "description": "Only when no Claude session is working. Checked every 5 minutes.",
+      "waiting": "Not installed yet — {{reason}}"
+    }
+  },
   "notifications": {
     "title": "Notifications",
     "description": "Control which notification events you receive.",
@@ -413,6 +420,16 @@
       "label": "Park new plans at DeepSeek peak hours",
       "description": "An Accept during DeepSeek’s peak window (01:00–04:00 and 06:00–10:00 UTC, weekdays) queues the plan and starts it when the window lifts. Off: Accept walks now.",
       "unreadable": "The switch could not be read from the server, so its position is unknown — this is not the same as off. It is retried whenever this page regains focus."
+    },
+    "plannerLanes": {
+      "label": "Planner lanes",
+      "description": "How many planners (designs, cuts, judgments) run at once — {{count}} at a time. Lowering it stops no planner already out; the lane takes no new one until it has room. Takes effect at once.",
+      "lane": "1 lane",
+      "lanes": "{{count}} lanes",
+      "lanesDown": "One lane fewer",
+      "lanesUp": "One lane more",
+      "lanesLabel": "Planners run at once",
+      "unreadable": "The dial could not be read from the server, so its position is unknown. It is retried whenever this page regains focus."
     },
     "jev": {
       "master": {

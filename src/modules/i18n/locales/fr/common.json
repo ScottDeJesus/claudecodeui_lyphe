@@ -382,6 +382,9 @@
       "open": "Ouvrir la page dans un nouvel onglet",
       "rejected": "Ce n'est pas une adresse http:// ou https://"
     },
+    "notes": {
+      "title": "Notes"
+    },
     "open": "Ouvrir {{name}}",
     "collapse": "Réduire",
     "dragHint": "Glisser vers un côté",

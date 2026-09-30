@@ -1,4 +1,4 @@
-import { ActivityIcon, BotIcon, BrainIcon, GlobeIcon, type LucideIcon } from 'lucide-react';
+import { ActivityIcon, BotIcon, BrainIcon, GlobeIcon, StickyNoteIcon, type LucideIcon } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ComponentType, ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -16,9 +16,10 @@ import { GutterColumn } from '@/modules/chat-gutters/GutterColumn';
 import { GutterWidgetFrame } from '@/modules/chat-gutters/GutterWidgetFrame';
 import { useDispatcherPlans } from '@/modules/dispatcher';
 import { MemoryWidgetBody, useMemoryIntake } from '@/modules/memory-intake';
+import { NotesWidgetBody, useNotes } from '@/modules/notes';
 import { RunnerWidgetBody } from '@/modules/runner-tab';
 import { useHostWindow } from '@/shared/context/HostWindowContext';
-import type { GutterSide, GutterWidgetId } from '@/shared/types';
+import type { GutterSide, GutterWidgetId, Tone } from '@/shared/types';
 import { otherOverlayHoldsEscape } from '@/shared/ui/overlayEscape';
 import { cn } from '@/shared/utils';
 
@@ -46,7 +47,7 @@ const GUTTER_MIN_PX = 300;
 const MIN_REGION_PX = CHAT_COLUMN_PX + 2 * (GUTTER_MIN_PX + GUTTER_GAP_PX);
 
 /**
- * The desktop chat's side gutters: the runner, memory, subagents and embed widgets beside the
+ * The desktop chat's side gutters: the runner, memory, subagents, embed and notes widgets beside the
  * transcript, each of them draggable into either side's stack, at any place in it, and any one of
  * them able to take the whole viewport for as long as the reader wants it.
  *
@@ -87,10 +88,15 @@ export function ChatGutterLayout({
   // The Runner widget lists the arcs as decks and the plans no arc holds as cards, so its badge
   // counts the plans alone: an arc's own plans are already counted, and the arc's deck is a
   // heading over cards the count has counted — the tab's own rule (`useDispatcherPlans.count`).
-  const { count: runnerCount } = useDispatcherPlans();
+  // `waiting` is the badge's TONE, not its number: the count stays what it always was, and turns
+  // amber while any of those plans owes the operator a word — the same amber the tab's dot wears.
+  const { count: runnerCount, waiting: runnerWaiting } = useDispatcherPlans();
   const { pendingCount } = useMemoryIntake();
   const subagentCount = useSubagentWidgetCount(sessionId);
   const { count: embedCount, newest: newestEmbed, known: embedsKnown } = useEmbedWidgetState(sessionId);
+  // The notes belong to the account, not to the chat: there is no per-session reading to make, and
+  // the badge is simply how many cards the list holds — zero until the provider's first read lands.
+  const { notes } = useNotes();
 
   const rootRef = useRef<HTMLDivElement | null>(null);
 
@@ -258,6 +264,8 @@ export function ChatGutterLayout({
       count: number;
       icon: LucideIcon;
       Body: ComponentType<{ sessionId: string | null }>;
+      /** The tone of the frame's count badge; absent means the badge's own `info` register. */
+      countTone?: Tone;
       /** Set by a widget whose body is itself a frame: the card gives it its whole inside. */
       flush?: boolean;
       /** A widget's own control for the frame's header row, drawn beside the fullscreen switch. */
@@ -267,6 +275,9 @@ export function ChatGutterLayout({
     runner: {
       title: t('gutters.runner.title'),
       count: runnerCount,
+      // Amber while a prompt on the lane is waiting on the operator — the badge is the widget's
+      // only mark that says so, and the tab it mirrors wears the same tone at the same moment.
+      countTone: runnerWaiting > 0 ? 'warn' : undefined,
       icon: ActivityIcon,
       Body: RunnerWidgetBody,
     },
@@ -294,16 +305,23 @@ export function ChatGutterLayout({
       // where the fullscreen switch earns its keep — a dashboard in a 300px column is a thumbnail.
       flush: true,
     },
+    notes: {
+      title: t('gutters.notes.title'),
+      count: notes?.length ?? 0,
+      icon: StickyNoteIcon,
+      Body: NotesWidgetBody,
+    },
   };
 
   const renderWidget = (widget: GutterWidgetId): ReactNode => {
-    const { title, count, icon, Body, flush, HeaderAction } = widgets[widget];
+    const { title, count, countTone, icon, Body, flush, HeaderAction } = widgets[widget];
 
     return (
       <GutterWidgetFrame
         widget={widget}
         title={title}
         count={count}
+        countTone={countTone}
         icon={icon}
         open={placements[widget].open}
         onToggle={() => toggleWidget(widget)}

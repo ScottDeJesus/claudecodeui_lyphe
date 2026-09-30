@@ -25,7 +25,8 @@ type QuestionOptionRowProps = {
  * One option of an AskUserQuestion question, as a Verve row: the surface's own ground and edge at
  * rest, the accent's soft wash and ring once chosen — the selected chip's language, so the choice
  * reads in greyscale too. Used by chat's AskUserQuestionPanel as the control and by
- * AnsweredQuestion as the record of what was chosen, so the option looks the same before and after.
+ * AnsweredQuestion as the record of what was chosen, and by the dispatcher module's RoundAnswer for
+ * a round's options, so the option looks the same before and after and in both modules' cards.
  */
 export const QuestionOptionRow: React.FC<QuestionOptionRowProps> = ({
   label,

@@ -419,3 +419,16 @@ export function setLiveMetisRegistry(registry: MetisRegistry): void {
 export function getLiveMetisRegistry(): MetisRegistry | null {
   return live;
 }
+
+/**
+ * How many Metis sessions are running right now — each one a live `claude` CLI building a board — or
+ * `null` before the module is composed, which a caller that must not act on an unknown has to read as
+ * "cannot tell" rather than as zero.
+ *
+ * consumer: the claude-activity module, through this module's barrel, so a Claude update never
+ * installs under a board's Metis.
+ */
+export function countRunningMetisSessions(): number | null {
+  if (live === null) return null;
+  return live.list().filter((session) => session.state === 'running').length;
+}

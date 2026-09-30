@@ -1,3 +1,4 @@
+import { anyOwesWord, owesWord } from '@/modules/dispatcher/askState';
 import type { DispatcherArc, DispatcherPhase, DispatcherPlan, DispatcherPlanStatus, DispatcherPlanner, Tone } from '@/shared/types';
 
 /**
@@ -91,7 +92,13 @@ export function phaseProgress(plan: DispatcherPlan): { done: number; total: numb
 /**
  * Where a plan is ranked in the list, and it is a reading of URGENCY rather than of recency.
  *
- * LIVE first because something is happening to it right now. SCHEDULED next because it is the one
+ * NO STATUS IS RANKED HERE AT ALL, BECAUSE AN ASK IS NOT ONE. A plan that owes the operator a word
+ * outranks every entry below (`owesWord`), whatever its status: a live plan walks whether or not
+ * anyone is watching, and a parked or complete one can wait forever, but an ask is the one state
+ * that cannot move until the operator answers — so it is the FIRST key of the order, and the status
+ * ranks below decide only among the plans that do not owe one.
+ *
+ * LIVE first among those, because something is happening to it right now. SCHEDULED next because it is the one
  * plan that will move WITHOUT the operator — the hour is armed and a timer will press Start — so it
  * outranks the two parks below it (the document's own precedence, `DispatcherPlanStatus`). QUEUED
  * above PAUSED because a queued plan has not started at all and its Start is the
@@ -119,9 +126,24 @@ function touchedAt(plan: DispatcherPlan): number {
   return epochOf(plan.updated_at) ?? 0;
 }
 
-/** Status first, then newest first inside each status. */
+/**
+ * The plans that owe a word first, then status, then newest first inside each status — the lane's
+ * own order for the plans no arc holds, read by the tab's wall and the widget's list alike.
+ *
+ * THE FIRST KEY IS `owesWord` AND NOT `STATUS_ORDER`, for the reason stated over those ranks: an
+ * ask is the one state that is waiting on the operator, so a plan carrying one comes up whatever it
+ * is — a done one, a parked one, and one nothing has touched in months, which is exactly the card
+ * nobody would find again by reading the lane in urgency order.
+ */
 export function byUrgencyThenNewest(a: DispatcherPlan, b: DispatcherPlan): number {
-  return STATUS_ORDER[a.status] - STATUS_ORDER[b.status] || touchedAt(b) - touchedAt(a);
+  return askingRank(a) - askingRank(b)
+    || STATUS_ORDER[a.status] - STATUS_ORDER[b.status]
+    || touchedAt(b) - touchedAt(a);
+}
+
+/** `owesWord` as a sort key: 0 for the plans that come first, 1 for the rest. */
+function askingRank(plan: DispatcherPlan): number {
+  return owesWord(plan) ? 0 : 1;
 }
 
 /** One arc of the lane with the plans of it, in the arc's own order (`DispatcherArc.plans`) — one card's worth. */
@@ -145,6 +167,13 @@ export type DispatcherArcSplit = { groups: DispatcherArcGroup[]; rest: Dispatche
  * live one at the top and undo the sequence the operator designed. A plan the arc's list does not
  * name (a member that pre-dated its arc, or a frame an older server built) still belongs to its arc
  * and is drawn after those, by urgency, so no plan is ever lost between the two orders.
+ *
+ * AN ARC HOLDING A PLAN THAT OWES A WORD IS FIRST (`anyOwesWord`), and the order inside it is
+ * exactly what it was: the deck is the item the operator presses, so a deck he owes an answer on
+ * comes up whole, and the decks that owe nothing — like the plans of no arc beside them — keep the
+ * lane's own order. An owed word is the most urgent state a card can be in, and it is more urgent
+ * still for an arc, whose prompt stands over a sequence of plans that cannot move until it is
+ * answered.
  *
  * NOTHING IS DROPPED EITHER WAY, which is the property the whole screen rests on: every plan given
  * comes back exactly once — under its arc when the lane carries that arc, in `rest` when it belongs
@@ -173,7 +202,14 @@ export function byArc(plans: DispatcherPlan[], arcs: DispatcherArc[]): Dispatche
     return { arc, plans: mine };
   });
 
-  return { groups, rest: rest.sort(byUrgencyThenNewest) };
+  // AN ARC THAT OWES A WORD COMES UP WHOLE (`anyOwesWord`), and STABLY: the answering decks keep the
+  // lane's own arc order, and the quiet ones follow in it. An arc is not a card that can be lifted on
+  // its own — its plans are swiped one per view inside its strip — so the whole deck moves, and a plan
+  // that has put its arc in the operator's debt brings the deck he has to press.
+  const owing = groups.filter((group) => anyOwesWord(group.plans));
+  const quiet = groups.filter((group) => !anyOwesWord(group.plans));
+
+  return { groups: [...owing, ...quiet], rest: rest.sort(byUrgencyThenNewest) };
 }
 
 /** The layer a plan's card wears in the arc's strip: three words, over a plan's status. */

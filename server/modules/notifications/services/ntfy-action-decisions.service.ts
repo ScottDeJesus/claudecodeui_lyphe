@@ -75,10 +75,10 @@ function buttonChoicesFor(toolName: string, toolInput: unknown): ButtonChoice[] 
 
 /**
  * The buttons for one `permission.required` push, each answering one carrying its own signed
- * single-use token — and an option that takes the operator's note opening the session instead,
- * since a tap cannot carry words. Consumed by the ntfy channel. Registers the prompt with
- * the token service first — only when it gets at least one button — because a
- * token expires with its prompt.
+ * single-use token — and an option that takes the operator's note opening the app at that push's
+ * own landing (`landingUrl`) instead, since a tap cannot carry words. Consumed by the ntfy channel.
+ * Registers the prompt with the token service first — only when it gets at least one button —
+ * because a token expires with its prompt.
  *
  * Keyed by the prompt and not by the ask that carried it: the channel builds
  * these again on every re-issue, including the ones whose push it skips, so a
@@ -91,6 +91,8 @@ export function buildNtfyActions(input: {
   toolName: string;
   toolInput: unknown;
   appUrl: string;
+  /** The event's own app path (`landingPathOf`), on the app URL: where a button that needs words opens. */
+  landingUrl: string;
 }): NtfyAction[] {
   const choices = buttonChoicesFor(input.toolName, input.toolInput);
   if (choices.length === 0) return [];
@@ -109,7 +111,7 @@ export function buildNtfyActions(input: {
     ? {
       action: 'view',
       label: choice.label,
-      url: input.sessionId ? `${input.appUrl}/session/${input.sessionId}` : `${input.appUrl}/`,
+      url: input.landingUrl,
       clear: true,
     }
     : {

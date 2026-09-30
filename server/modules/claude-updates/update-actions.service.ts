@@ -27,7 +27,7 @@ import type {
 } from '@/shared/claude-update-types.js';
 
 import { readSdkVersionOnDisk } from './packages.js';
-import type { InstalledCliReading } from './update-check.report.js';
+import type { InstalledCliReading, ReportReadings } from './update-check.report.js';
 import type { RunGit } from './update-git.js';
 import { PACKAGE_FILES, createJob, readJob, stepOf, writeJob } from './update-job.js';
 
@@ -40,8 +40,9 @@ export type UpdateActionResult =
  * The states in which a job owns this host's `node_modules` and a second one may not be started: the
  * two the runner process writes, plus the two the API is midway through — `installed` owes a restart,
  * and `restarting` is waiting for one. Every other state is history, and a new job replaces it.
+ * consumer: update-auto-install.service.ts, for which a job in one of these states is an install under way.
  */
-const APPLY_ACTIVE_STATES: readonly ClaudeUpdateJobState[] = ['installing', 'installed', 'restarting', 'rolling-back'];
+export const APPLY_ACTIVE_STATES: readonly ClaudeUpdateJobState[] = ['installing', 'installed', 'restarting', 'rolling-back'];
 
 /** The states a restart may not interrupt: exactly the two the RUNNER owns, where an install or a
  *  rollback is halfway through writing the tree a reboot would load. */
@@ -62,7 +63,7 @@ type UpdateActionsDependencies = {
   /** Where `job.json` lives — this module's own directory. */
   dir: string;
   /** The check service, for the current report. */
-  check: { report: (job: ClaudeUpdatesReport['job'], supervised: boolean) => Promise<ClaudeUpdatesReport> };
+  check: { report: (job: ClaudeUpdatesReport['job'], supervised: boolean) => Promise<ReportReadings> };
   /** The tick to wake once a job is on disk. */
   reconciler: { kick: () => void };
   /** Starts the detached runner. */
@@ -87,7 +88,7 @@ function refuse(
 }
 
 /** The package row of a report by key. A report always carries both rows, in order. */
-function packageOf(report: ClaudeUpdatesReport, key: ClaudeUpdatePackageKey): ClaudeUpdatePackage {
+function packageOf(report: ReportReadings, key: ClaudeUpdatePackageKey): ClaudeUpdatePackage {
   const row = report.packages.find((entry) => entry.key === key);
   if (row === undefined) throw new Error(`the report carries no ${key} package`);
   return row;
@@ -129,7 +130,7 @@ function targetRecord(named: NamedTarget[]): Partial<Record<ClaudeUpdatePackageK
  */
 function selectKind(
   named: NamedTarget[],
-  report: ClaudeUpdatesReport,
+  report: ReportReadings,
   job: ClaudeUpdatesReport['job'],
 ): 'update' | 'rollback' | null {
   if (named.every((target) => packageOf(report, target.key).latest === target.version)) return 'update';

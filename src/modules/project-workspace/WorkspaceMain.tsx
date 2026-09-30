@@ -18,10 +18,12 @@ import { ApiPanel } from '@/modules/api-tab';
 import { TaskMasterPanel, useTaskMasterProjectSync } from '@/modules/task-master';
 import { UniversePanel } from '@/modules/universe';
 import { SchedulesPanel } from '@/modules/schedules';
+import { NotesPanel } from '@/modules/notes';
 import type { AppTab, GitRepository, Project, ProjectChoice, ProjectSession, SessionEstablishedContext, SessionNavigationOptions, SettingsMainTab } from '@/shared/types';
 import { api } from '@/shared/api';
 import { useUiPreferences } from '@/shared/context/UiPreferencesContext';
 import { useFileOpenResolver } from '@/modules/project-workspace/hooks/useFileOpenResolver';
+import { useRunnerLanding } from '@/modules/project-workspace/hooks/useRunnerLanding';
 import { useWorkspaceTabGates } from '@/modules/project-workspace/hooks/useWorkspaceTabGates';
 import WorkspaceHeader from '@/modules/project-workspace/WorkspaceHeader';
 import WorkspaceStateView from '@/modules/project-workspace/WorkspaceStateView';
@@ -115,6 +117,9 @@ function WorkspaceMain({
     shouldShowHealTab,
     preferencesSettled,
   } = useWorkspaceTabGates(activeTab);
+
+  // A `?runner=<plan>` landing: the Runner tab comes forward and its pane brings that plan into view.
+  const { revealPlan, clearReveal } = useRunnerLanding({ selectedProject, setActiveTab });
 
   useTaskMasterProjectSync(selectedProject);
 
@@ -426,7 +431,7 @@ function WorkspaceMain({
 
           {shouldShowRunnerTab && activeTab === 'runner' && (
             <div className="h-full overflow-hidden">
-              <RunnerPanel />
+              <RunnerPanel revealPlan={revealPlan} onRevealed={clearReveal} />
             </div>
           )}
 
@@ -465,6 +470,14 @@ function WorkspaceMain({
           {activeTab === 'schedules' && (
             <div className="h-full overflow-hidden">
               <SchedulesPanel />
+            </div>
+          )}
+
+          {/* No gate, for the same reason again: the notes belong to the account and not to the
+              project, so nothing here changes with the selection. */}
+          {activeTab === 'notes' && (
+            <div className="h-full overflow-hidden">
+              <NotesPanel />
             </div>
           )}
 
