@@ -151,9 +151,17 @@ export const DialogContent = React.forwardRef<HTMLDivElement, DialogContentProps
       if (open) {
         previousFocusRef.current ??= hostWindow.document.activeElement as HTMLElement | null;
       } else if (previousFocusRef.current) {
-        // Prefer the trigger, fall back to whatever was focused before
-        const restoreTarget = triggerRef.current || previousFocusRef.current;
-        restoreTarget?.focus();
+        // Focus that already sits on a live element is a choice made in this same commit — the
+        // command palette's Chat row closes it and floats the chat, whose composer takes focus in a
+        // layout effect that runs BEFORE this passive one — and restoring over it undoes that. The
+        // dialog's own removal drops focus to `body`, which is the one case that still restores.
+        const active = hostWindow.document.activeElement;
+        const focusMovedOn = active !== null && active !== hostWindow.document.body;
+        if (!focusMovedOn) {
+          // Prefer the trigger, fall back to whatever was focused before
+          const restoreTarget = triggerRef.current || previousFocusRef.current;
+          restoreTarget?.focus();
+        }
         previousFocusRef.current = null;
       }
     }, [open, triggerRef, hostWindow]);

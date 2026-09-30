@@ -18,6 +18,7 @@ import type {
 } from '@/shared/types';
 import { subscribeToUserPreferences } from '@/shared/userSettings';
 import { useSimpleChatList } from '@/modules/sidebar/hooks/useSimpleChatList';
+import { useProjectStarOverrides, withResolvedStarState } from '@/modules/sidebar/utils/projectStarOverrides';
 import { groupsFromProjects, groupsFromSimpleList } from '@/modules/sidebar/utils/sessionPickerGroups';
 import { sortProjects } from '@/modules/sidebar/utils/sidebarProjectFormatting';
 import { readProjectSortOrder } from '@/modules/sidebar/utils/sidebarStoredPreferences';
@@ -90,11 +91,15 @@ export function useSessionPicker({
     [running, awaitingInput, subagentRunning],
   );
 
-  // The tree's order is a sort of every project by its newest session, so it is kept until the projects
-  // or the reader's order move — not redone for a mark changing.
+  // The stars the reader toggled that `projects[].isStarred` has not caught up with — the same map the
+  // sidebar's own order reads, so a project starred there is first here too.
+  const starOverrides = useProjectStarOverrides();
+
+  // The tree's order is a sort of every project by its newest session, so it is kept until the projects,
+  // their stars or the reader's order move — not redone for a mark changing.
   const sortedProjects = useMemo(
-    () => (simpleListEnabled ? [] : sortProjects(projects, sortOrder)),
-    [simpleListEnabled, projects, sortOrder],
+    () => (simpleListEnabled ? [] : sortProjects(withResolvedStarState(projects, starOverrides), sortOrder)),
+    [simpleListEnabled, projects, starOverrides, sortOrder],
   );
   const groups = useMemo(
     () => (simpleListEnabled

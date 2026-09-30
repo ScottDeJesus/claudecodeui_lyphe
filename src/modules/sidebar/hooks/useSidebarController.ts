@@ -7,6 +7,12 @@ import { subscribeToUserPreferences } from '@/shared/userSettings';
 import { usePaletteOps } from '@/modules/command-palette';
 import type { ArchivedProjectListItem, ArchivedSessionListItem, ConversationProjectResult, ConversationSearchResults, LLMProvider, Project, ProjectSession, ProjectSortOrder, RecentConversationListItem, RunningSessionListItem, SearchProgress, ActiveSidebarRename, PendingSidebarDeletion, SessionTitleSearchResult, SessionWithProvider, SidebarSearchMode } from '@/shared/types';
 import {
+  reconcileProjectStarOverrides,
+  setProjectStarOverride,
+  useProjectStarOverrides,
+  withResolvedStarState,
+} from '@/modules/sidebar/utils/projectStarOverrides';
+import {
   filterProjects,
   sortProjects,
 } from '@/modules/sidebar/utils/sidebarProjectFormatting';
@@ -112,7 +118,7 @@ export function useSidebarController({
   const [isLoadingMoreRecentConversations, setIsLoadingMoreRecentConversations] = useState(false);
   const [recentConversationsError, setRecentConversationsError] = useState(false);
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
-  const [optimisticStarByProjectId, setOptimisticStarByProjectId] = useState<Map<string, boolean>>(new Map());
+  const optimisticStarByProjectId = useProjectStarOverrides();
   const [loadingMoreProjects, setLoadingMoreProjects] = useState<Set<string>>(new Set());
   const searchSeqRef = useRef(0);
   const recentConversationsSeqRef = useRef(0);
@@ -333,30 +339,7 @@ export function useSidebarController({
   }, [fetchArchivedSessions, searchMode]);
 
   useEffect(() => {
-    setOptimisticStarByProjectId((previous) => {
-      if (previous.size === 0) {
-        return previous;
-      }
-
-      const next = new Map(previous);
-      let changed = false;
-
-      for (const [projectId, optimisticValue] of previous.entries()) {
-        const project = projects.find((candidate) => candidate.projectId === projectId);
-        if (!project) {
-          next.delete(projectId);
-          changed = true;
-          continue;
-        }
-
-        if (Boolean(project.isStarred) === optimisticValue) {
-          next.delete(projectId);
-          changed = true;
-        }
-      }
-
-      return changed ? next : previous;
-    });
+    reconcileProjectStarOverrides(projects);
   }, [projects]);
 
   // Debounce search text updates so both project filtering and conversation
@@ -528,11 +511,7 @@ export function useSidebarController({
     const latestSequence = (starToggleSequenceByProjectRef.current.get(projectId) ?? 0) + 1;
     starToggleSequenceByProjectRef.current.set(projectId, latestSequence);
 
-    setOptimisticStarByProjectId((previous) => {
-      const next = new Map(previous);
-      next.set(projectId, optimisticStarState);
-      return next;
-    });
+    setProjectStarOverride(projectId, optimisticStarState);
 
     const updateStar = async () => {
       try {
@@ -555,22 +534,14 @@ export function useSidebarController({
           return;
         }
 
-        setOptimisticStarByProjectId((previous) => {
-          const next = new Map(previous);
-          next.set(projectId, Boolean(payload.isStarred));
-          return next;
-        });
+        setProjectStarOverride(projectId, Boolean(payload.isStarred));
       } catch (error) {
         const isLatestSequence = starToggleSequenceByProjectRef.current.get(projectId) === latestSequence;
         if (!isLatestSequence) {
           return;
         }
 
-        setOptimisticStarByProjectId((previous) => {
-          const next = new Map(previous);
-          next.set(projectId, previousStarState);
-          return next;
-        });
+        setProjectStarOverride(projectId, previousStarState);
         console.error('[Sidebar] Failed to toggle project star:', error);
         alert(t('messages.updateProjectError'));
       }
@@ -621,28 +592,10 @@ export function useSidebarController({
     }
   }, [onLoadMoreSessions, t]);
 
-  const projectsWithResolvedStarState = useMemo(() => {
-    if (optimisticStarByProjectId.size === 0) {
-      return projects;
-    }
-
-    return projects.map((project) => {
-      const optimisticStarState = optimisticStarByProjectId.get(project.projectId);
-      if (optimisticStarState === undefined) {
-        return project;
-      }
-
-      const currentStarState = Boolean(project.isStarred);
-      if (currentStarState === optimisticStarState) {
-        return project;
-      }
-
-      return {
-        ...project,
-        isStarred: optimisticStarState,
-      };
-    });
-  }, [optimisticStarByProjectId, projects]);
+  const projectsWithResolvedStarState = useMemo(
+    () => withResolvedStarState(projects, optimisticStarByProjectId),
+    [optimisticStarByProjectId, projects],
+  );
 
   const sortedProjects = useMemo(
     () => sortProjects(projectsWithResolvedStarState, projectSortOrder),

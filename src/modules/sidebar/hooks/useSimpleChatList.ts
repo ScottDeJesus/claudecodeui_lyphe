@@ -24,6 +24,14 @@ const PAGE_SIZE = 20;
 const RELOAD_DEBOUNCE_MS = 500;
 
 /**
+ * Every mounted instance of the feed, told of a row taken out of it. The sidebar's list and the floating
+ * picker each hold their own rows, and an archive or a delete sends no `session_upserted` (the only other
+ * thing that refreshes them): a removal made through one instance would otherwise stay listed in the other
+ * until an unrelated upsert arrived.
+ */
+const removalListeners = new Set<(sessionId: string) => void>();
+
+/**
  * The paginated, server-tagged feed behind SidebarSimpleList and SidebarSessionPicker: `api.recentConversations`
  * called with `simpleList: true`, which is the ONLY source that knows which sessions were started from
  * this view — the tree's `projects[].sessions` arrays never carry the tag.
@@ -166,9 +174,23 @@ export function useSimpleChatList(selectedSessionId: string | null, enabled = tr
     [],
   );
 
-  const removeLocal = useCallback((sessionId: string) => {
+  // What an instance does when a row leaves the feed: only an instance that holds the row loses it, so
+  // the total of one that never paged it in is left alone.
+  const dropRow = useCallback((sessionId: string) => {
+    if (!rowsRef.current.some((row) => row.sessionId === sessionId)) return;
     setRows((previous) => previous.filter((row) => row.sessionId !== sessionId));
     setTotal((previous) => Math.max(0, previous - 1));
+  }, []);
+
+  useEffect(() => {
+    removalListeners.add(dropRow);
+    return () => {
+      removalListeners.delete(dropRow);
+    };
+  }, [dropRow]);
+
+  const removeLocal = useCallback((sessionId: string) => {
+    removalListeners.forEach((listener) => listener(sessionId));
   }, []);
 
   // The optimistic write behind a drag: the row lands where it was dropped at once, and the

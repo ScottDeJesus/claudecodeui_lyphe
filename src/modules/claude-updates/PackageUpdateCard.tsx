@@ -97,8 +97,9 @@ export function PackageUpdateCard({
           </p>
         )}
 
-        {/* The CLI: a conversation mid-turn keeps the build it started on until the turn ends. */}
-        {pkg.key === 'cli' && staleCount > 0 && (
+        {/* The CLI: a conversation mid-turn keeps the build it started on until the turn ends. Withheld while
+            the report has no installed version (the CLI did not answer `--version`): the sentence names it. */}
+        {pkg.key === 'cli' && staleCount > 0 && pkg.installed !== null && (
           <p className="text-xs text-muted-foreground">
             {t('updates.card.midTurn', {
               count: staleCount,
