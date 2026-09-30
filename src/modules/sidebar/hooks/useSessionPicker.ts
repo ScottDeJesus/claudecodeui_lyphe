@@ -45,12 +45,12 @@ type SessionPickerInput = {
  * controller listens to), each with its loaded sessions newest first. The feed is only fetched and
  * subscribed to while its shape is the one on screen.
  *
- * TWO LIMITS, both because the sidebar's own state is private to the sidebar. The tree is ordered over the
- * workspace's `projects`, whose `isStarred` is that of the last full project refresh: a star toggled in the
- * sidebar reorders the sidebar at once (its resolved-star map lives inside `useSidebarController`) and this
- * list at the next refresh. The picker's feed is its own instance of `useSimpleChatList`, so a row the
- * sidebar archives or deletes (`removeLocal` on the sidebar's instance) leaves this list at its next
- * `session_upserted` reload, and the server broadcasts nothing for an archive or a delete.
+ * TWO STORES SHARED WITH THE SIDEBAR, so the two lists cannot disagree. The tree is ordered over
+ * `projects` with the reader's toggled stars applied (`projectStarOverrides`, the map the sidebar's own
+ * order reads): `projects[].isStarred` is that of the last full project refresh, and `toggle-star`
+ * broadcasts nothing. The picker's feed is its own instance of `useSimpleChatList`, and `removeLocal` on
+ * any instance drops the row from every mounted one, because an archive or a delete sends no
+ * `session_upserted`.
  *
  * THE STATUS follows the sidebar's simple list: the first fetch in flight is 'loading' and a failed
  * one is 'error' only while there are no rows to show. A reload behind rows already drawn (every

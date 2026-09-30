@@ -2005,34 +2005,6 @@ probe-key: 30bfc02ef14eeebc4cd0bf43ccbd0e69e4244d80
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-host/ChatHostWindow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-host/context/ChatHostContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-host/hooks/usePictureInPicture.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/chat-floats-window.mjs
 
-## INV-6023 — probe — The picker orders projects by `projects`, so after a star toggle in the sidebar it disagrees with the sidebar until the next full refresh
-
-The picker orders projects by `projects`, so after a star toggle in the sidebar it disagrees with the sidebar until the next full refresh
-
-```probe
-cd /tmp/pipeline-reviews/app-drawer-chat--picker-fill/athena-probes && node star-order.mjs
-expect: prints "sidebar first: hub | picker first: .claude" then "orders DIFFER" and exits 1; after a fix it prints "orders agree" and exits 0
-```
-
-measured 2026-09-30 by chain chain-app-drawer-chat--picker-fill-20260930-021128-e83a, finding M1, MEDIUM
-probe-key: e4bed96f9a1869591558f586caaa6cabd715bc73
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/FloatingChatHeader.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/hooks/useSessionPicker.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/header-picker.mjs
-
-## INV-6024 — probe — In simple-list mode the floating picker keeps a conversation that was archived or deleted in the sidebar until some unrelated `session_upserted` arrives
-
-In simple-list mode the floating picker keeps a conversation that was archived or deleted in the sidebar until some unrelated `session_upserted` arrives
-
-```probe
-cd /tmp/pipeline-reviews/app-drawer-chat--picker-fill/athena-probes && node archived-row.mjs
-expect: prints "6s after the archive, the picker lists it: 1" then "after one unrelated upsert, the picker lists it: 0" and exits 1; after a fix the 6 s line reads 0 and it exits 0
-```
-
-measured 2026-09-30 by chain chain-app-drawer-chat--picker-fill-20260930-021128-e83a, finding L1, LOW
-probe-key: b3d14a7d0270871fddb722dc0f86a2c9d2316a4f
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/FloatingChatHeader.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/hooks/useSessionPicker.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/header-picker.mjs
-
 ## INV-6025 — probe — (MEDIUM) — the forget effect fires on a transient `null` while an application is still up, so a press re-routes inside a visit that never ended
 
 (MEDIUM) — the forget effect fires on a transient `null` while an application is still up, so a press re-routes inside a visit that never ended
