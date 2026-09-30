@@ -10,6 +10,7 @@ import type { ServerEvent,
   ProjectSession,IsSessionProcessing } from '@/shared/types';
 import { mergeProjectSelectionMetadata } from '@/modules/project-workspace/utils/projectSelectionMetadata';
 import { readSelectedProvider } from '@/shared/selectedProvider';
+import { getSessionProvider } from '@/shared/sessionRecency';
 
 type UseProjectsStateArgs = {
   sessionId?: string;
@@ -78,16 +79,7 @@ type SessionDetailsApiPayload = {
 
 type ProjectSessionPage = Pick<Project, 'sessions' | 'sessionMeta'>;
 
-const DEFAULT_PROVIDER: LLMProvider = 'claude';
-
 const serialize = (value: unknown) => JSON.stringify(value ?? null);
-
-const getSessionProvider = (session: ProjectSession): LLMProvider => {
-  const provider = session.__provider ?? session.provider;
-  return typeof provider === 'string' && provider.trim()
-    ? provider as LLMProvider
-    : DEFAULT_PROVIDER;
-};
 
 const normalizeSessionProvider = (session: ProjectSession): ProjectSession => ({
   ...session,

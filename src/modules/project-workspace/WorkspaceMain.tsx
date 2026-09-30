@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 
 import { ChatInterface, type ChatExportSurface, type TokenUsageSurface } from '@/modules/chat';
 import { ChatGutterLayout } from '@/modules/chat-gutters';
+import { ChatHostSlot, useChatHost } from '@/modules/chat-host';
 import { FileManager } from '@/modules/file-manager';
 import { StandaloneShell } from '@/modules/standalone-shell';
 import { GitRepositoriesPanel } from '@/modules/git-panel';
@@ -116,6 +117,10 @@ function WorkspaceMain({
   } = useWorkspaceTabGates(activeTab);
 
   useTaskMasterProjectSync(selectedProject);
+
+  // While the chat floats it is live outside this tab: it counts as the active chat whichever tab is open,
+  // and the gutters stand down — the floating chat draws its own pinned subagent strip.
+  const floating = useChatHost().placement !== 'home';
 
   // The one path-opening capability three caller families share — the chat's Edit/Write cards and
   // bare links, the git panel's changed-file rows, and the tree beside the file manager. It lives
@@ -328,31 +333,33 @@ function WorkspaceMain({
                 their own column untouched. The boundary is handed down rather than imported
                 there: each widget body gets its own, and a crashing widget cannot blank the
                 chat tab. */}
-            <ChatGutterLayout enabled={!isMobile} sessionId={selectedSession?.id ?? null}
+            <ChatGutterLayout enabled={!isMobile && !floating} sessionId={selectedSession?.id ?? null}
               boundary={WorkspaceErrorBoundary}>
-              <ChatInterface
-                isActive={activeTab === 'chat'}
-                selectedProject={selectedProject}
-                selectedSession={selectedSession}
-                ws={ws}
-                sendMessage={sendMessage}
-                onFileOpen={handleFileOpen}
-                onNavigateToSession={onNavigateToSession}
-                onSessionEstablished={onSessionEstablished}
-                onShowSettings={onShowSettings}
-                showRawParameters={showRawParameters}
-                showThinking={showThinking}
-                showWork={showWork}
-                showCompactSummary={showCompactSummary}
-                projectChoices={projectChoices}
-                onSelectProject={onSelectProject}
-                sendByCtrlEnter={sendByCtrlEnter}
-                externalMessageUpdate={externalMessageUpdate}
-                newSessionTrigger={newSessionTrigger}
-                onTokenUsageSurface={setTokenUsageSurface}
-                onChatExportSurface={setChatExportSurface}
-                onShowAllTasks={shouldShowTasksTab ? showAllTasks : null}
-              />
+              <ChatHostSlot sessionId={selectedSession?.id ?? null} showing={activeTab === 'chat'}>
+                <ChatInterface
+                  isActive={activeTab === 'chat' || floating}
+                  selectedProject={selectedProject}
+                  selectedSession={selectedSession}
+                  ws={ws}
+                  sendMessage={sendMessage}
+                  onFileOpen={handleFileOpen}
+                  onNavigateToSession={onNavigateToSession}
+                  onSessionEstablished={onSessionEstablished}
+                  onShowSettings={onShowSettings}
+                  showRawParameters={showRawParameters}
+                  showThinking={showThinking}
+                  showWork={showWork}
+                  showCompactSummary={showCompactSummary}
+                  projectChoices={projectChoices}
+                  onSelectProject={onSelectProject}
+                  sendByCtrlEnter={sendByCtrlEnter}
+                  externalMessageUpdate={externalMessageUpdate}
+                  newSessionTrigger={newSessionTrigger}
+                  onTokenUsageSurface={setTokenUsageSurface}
+                  onChatExportSurface={setChatExportSurface}
+                  onShowAllTasks={shouldShowTasksTab ? showAllTasks : null}
+                />
+              </ChatHostSlot>
             </ChatGutterLayout>
           </WorkspaceErrorBoundary>
         </div>

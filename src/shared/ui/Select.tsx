@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 
+import { useHostWindow } from '@/shared/context/HostWindowContext';
 import { OWNS_ESCAPE } from '@/shared/ui/overlayEscape';
 import { cn } from '@/shared/utils';
 
@@ -44,6 +45,7 @@ type SelectProps = {
  * has already chosen where to go.
  */
 export function Select({ options, value, onChange, placeholder = 'Choose…', ariaLabel, size = 'md', action }: SelectProps) {
+  const hostWindow = useHostWindow();
   // Whether the overlay list is showing. It cannot be derived: `value` is the choice already
   // made, and the list is open precisely while the reader is reconsidering it.
   const [open, setOpen] = useState(false);
@@ -62,13 +64,16 @@ export function Select({ options, value, onChange, placeholder = 'Choose…', ar
       triggerRef.current?.focus();
     };
 
-    document.addEventListener('pointerdown', closeOnOutsidePointer);
-    document.addEventListener('keydown', closeOnEscape);
+    // The host window's document: a panel opened in the floating window hears that window's pointer
+    // and keys, not the opener's.
+    const hostDocument = hostWindow.document;
+    hostDocument.addEventListener('pointerdown', closeOnOutsidePointer);
+    hostDocument.addEventListener('keydown', closeOnEscape);
     return () => {
-      document.removeEventListener('pointerdown', closeOnOutsidePointer);
-      document.removeEventListener('keydown', closeOnEscape);
+      hostDocument.removeEventListener('pointerdown', closeOnOutsidePointer);
+      hostDocument.removeEventListener('keydown', closeOnEscape);
     };
-  }, [open]);
+  }, [open, hostWindow]);
 
   const selected = options.find((option) => option.value === value);
 

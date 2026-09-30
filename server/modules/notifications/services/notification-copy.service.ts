@@ -50,7 +50,15 @@ const WINDOW_LABELS: Record<string, string> = {
 };
 
 /** Codes about the account's usage windows: their title names the window, never a session. */
-const ACCOUNT_LIMIT_CODES = new Set(['limit.reached', 'limit.reset', 'limit.warning', 'limit.overage', 'limit.out_of_credits']);
+const ACCOUNT_LIMIT_CODES = new Set([
+  'limit.reached',
+  'limit.reset',
+  'limit.warning',
+  'limit.overage',
+  'limit.out_of_credits',
+  // The dispatcher's one push for every plan a usage limit paused: it speaks for the account, not for the first plan.
+  'dispatcher.limit_paused',
+]);
 
 /** Tools whose approval body is the path they touch. */
 const FILE_PATH_TOOLS = new Set(['Edit', 'Write', 'Read', 'MultiEdit', 'NotebookEdit']);
@@ -111,6 +119,20 @@ function resetsAtText(resetsAt: unknown, rateLimitType: unknown): string {
   const today = date.toDateString() === new Date().toDateString();
   const weekly = typeof rateLimitType === 'string' && WEEK_WINDOWS.has(rateLimitType);
   return weekly || !today ? `${date.toLocaleDateString('en-US', { weekday: 'short' })} ${time}` : time;
+}
+
+/**
+ * A usage-limit pause's lift time, for a sentence: the time alone when it is today, else the DATE
+ * beside it (`Oct 3, 8:12 PM`). Never a weekday alone — a lift a full week out would read as
+ * today's weekday.
+ */
+function limitLiftText(resetsAt: unknown): string {
+  const epoch = readNumber(resetsAt);
+  if (epoch === null || epoch <= 0) return 'soon';
+  const date = new Date(epoch < 1e12 ? epoch * 1000 : epoch);
+  const time = date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+  if (date.toDateString() === new Date().toDateString()) return time;
+  return `${date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}, ${time}`;
 }
 
 /**
@@ -304,7 +326,9 @@ const COPY_BY_CODE = new Map<string, CodeCopy>([
    * `dispatcher.paused` is the lane's stop-and-look: the dispatcher pauses a walk for its own
    * reasons (a spent ladder, a budget, the pause verb) and the phone is where the operator finds
    * out, since the Runner tab is only read when he opens it. The remedy is named because it is the
-   * least obvious part: the plan is not retried by anything, it is resumed.
+   * least obvious part: the plan is not retried by anything, it is resumed. A pause the dispatcher
+   * itself held carries its cause in `meta.detail` (an API error line, the storm guard's), and the
+   * body says it.
    */
   ['dispatcher.finished', ({ meta }) => {
     return {
@@ -317,7 +341,20 @@ const COPY_BY_CODE = new Map<string, CodeCopy>([
   }],
   ['dispatcher.paused', ({ meta }) => ({
     headline: 'Plan paused',
-    body: `${dispatcherPhaseText(meta)} · Resume from the Runner tab`,
+    body: [dispatcherPhaseText(meta), readText(meta.detail), 'Resume from the Runner tab']
+      .filter((part): part is string => part !== null)
+      .join(' · '),
+  })],
+  // ONE push for a usage limit however many plans it paused (`dispatcher-endings.service.ts`): the
+  // limit is the account's, the time is when the dispatcher's own armed Resume fires, and an early
+  // Resume after an account switch is the operator's.
+  ['dispatcher.limit_paused', ({ meta }) => ({
+    headline: 'Claude usage limit',
+    // A limit that named no reset time carries the dispatcher's own GUESS: it says so, and does not
+    // promise the hour as though the API had given it.
+    body: `${meta.limitGuess === true
+      ? `Plans paused — no reset time named, retrying at ${limitLiftText(meta.resetsAt)}`
+      : `Plans paused until ${limitLiftText(meta.resetsAt)}`} · Resume from the Runner tab`,
   })],
   ['dispatcher.relaunched', ({ meta }) => {
     const phase = readText(meta.phase);

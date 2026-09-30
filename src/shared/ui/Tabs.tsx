@@ -1,9 +1,10 @@
 import { useCallback, useLayoutEffect, useRef, useState } from 'react';
 import type { ComponentType, KeyboardEvent } from 'react';
 
+import { useHostWindow } from '@/shared/context/HostWindowContext';
 import { MoreFace, TabsMore } from '@/shared/ui/TabsMore';
 import { useTabsOverflow } from '@/shared/ui/useTabsOverflow';
-import { cn } from '@/shared/utils';
+import { cn, resizeObserverIn } from '@/shared/utils';
 
 /**
  * `count` is a capability of the strip, not a prop every caller needs: a measured site
@@ -147,6 +148,7 @@ type TabsProps = TabsBaseProps & (
  * tablist owns tabs and a menu button is not one.
  */
 export function Tabs({ tabs, active, onChange, ariaLabel, variant = 'segmented', equal = false, overflowLabel }: TabsProps) {
+  const hostWindow = useHostWindow();
   const isUnderline = variant === 'underline';
   const overflows = isUnderline && !equal && overflowLabel !== undefined;
   const { rowRef, ghostRef, shown, collapsed } = useTabsOverflow(tabs, active, overflows);
@@ -188,15 +190,17 @@ export function Tabs({ tabs, active, onChange, ariaLabel, variant = 'segmented',
     measure();
 
     const list = listRef.current;
-    if (!list || typeof ResizeObserver === 'undefined') return undefined;
+    if (!list) return undefined;
 
     // Every tab, not just the strip: a label that grows changes ITS box, and the strip's own
-    // width may not move at all when the row has room to absorb it.
-    const observer = new ResizeObserver(measure);
+    // width may not move at all when the row has room to absorb it. Built by the host window's own
+    // constructor: a strip in the transcript's tabbed code is drawn in the floating window too.
+    const observer = resizeObserverIn(hostWindow, measure);
+    if (!observer) return undefined;
     observer.observe(list);
     for (const tab of list.querySelectorAll('[role="tab"]')) observer.observe(tab);
     return () => observer.disconnect();
-  }, [isUnderline, measure, active, tabs, shownKey]);
+  }, [isUnderline, measure, active, tabs, shownKey, hostWindow]);
 
   const strip = (
     <div

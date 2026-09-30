@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import oneDark from 'react-syntax-highlighter/dist/esm/styles/prism/one-dark';
 import oneLight from 'react-syntax-highlighter/dist/esm/styles/prism/one-light';
 
+import { useHostWindow } from '@/shared/context/HostWindowContext';
 import { copyTextToClipboard } from '@/shared/utils';
 import { SyntaxHighlighter } from '@/shared/syntaxHighlighter';
 import { MermaidDiagram } from '@/modules/markdown-preview';
@@ -109,8 +110,19 @@ type FenceBlockProps = {
  */
 function FenceBlock({ raw, language, clamp }: FenceBlockProps) {
   const { t } = useTranslation('chat');
+  // The window the block is drawn in: the copy goes through its clipboard and the tick is timed on it.
+  const hostWindow = useHostWindow();
   // Whether the last copy landed, so the button can show a tick for a moment.
   const [copied, setCopied] = useState(false);
+  // The tick clears itself. An effect keyed on the window, not a timer armed once in the handler: a
+  // timer armed on a floating window dies with that window, and chat-host closes the window to bring
+  // the chat home — the tick would then stay until the next click. A move changes `hostWindow`, so
+  // the effect re-arms on the window the row now stands in.
+  useEffect(() => {
+    if (!copied) return;
+    const timer = hostWindow.setTimeout(() => setCopied(false), 2000);
+    return () => hostWindow.clearTimeout(timer);
+  }, [copied, hostWindow]);
   const languageLabel = language.charAt(0).toUpperCase() + language.slice(1);
 
   return (
@@ -121,10 +133,9 @@ function FenceBlock({ raw, language, clamp }: FenceBlockProps) {
         <button
           type="button"
           onClick={() =>
-            copyTextToClipboard(raw).then((success) => {
+            copyTextToClipboard(raw, hostWindow).then((success) => {
               if (success) {
                 setCopied(true);
-                setTimeout(() => setCopied(false), 2000);
               }
             })
           }
@@ -216,6 +227,10 @@ const syntaxTheme = buildSyntaxTheme(oneLight as PrismStyleSheet, oneDark as Pri
 // component body it would run on every mounted fence, and moved out of the module graph entirely
 // it would never run at all. `Markdown.tsx` statically imports the dispatcher, which statically
 // imports this file, so it still executes at the same point in the load it always did.
+//
+// AN OPENER FACT, and it stays on the global `document`: the tag lives in the opener's head, and
+// chat-host's `mirrorDocument` clones every head `<style>` into the picture-in-picture window and
+// keeps the copy live, so the tokens repaint there without this line knowing the window exists.
 const SYNTAX_THEME_STYLE_ELEMENT_ID = 'cc-syntax-theme';
 if (!document.getElementById(SYNTAX_THEME_STYLE_ELEMENT_ID)) {
   const styleElement = document.createElement('style');

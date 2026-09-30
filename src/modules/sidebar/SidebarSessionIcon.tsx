@@ -64,7 +64,8 @@ export const SIMPLE_CHAT_ICONS: Readonly<Record<string, LucideIcon>> = {
 /**
  * One chat icon glyph: the named icon, or MessageSquare when the name is null or not in the map
  * (an own-key check, so a stored name like "constructor" never reaches the prototype). Decorative;
- * the caller carries the text. Read by SidebarSimpleListRow.tsx and SidebarSimpleIconPicker.tsx.
+ * the caller carries the text. Read by SidebarSimpleListRow.tsx, SidebarSimpleIconPicker.tsx and
+ * SidebarSessionPickerRow.tsx.
  */
 export function SimpleChatIconGlyph({ icon, className }: { icon: string | null; className?: string }) {
   const Glyph = icon !== null && Object.prototype.hasOwnProperty.call(SIMPLE_CHAT_ICONS, icon)

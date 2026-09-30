@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
+import { useHostWindow } from '@/shared/context/HostWindowContext';
 import type { ComposerMenuAnchor } from '@/shared/types';
-
 
 const VIEWPORT_MARGIN = 8;
 const MENU_GAP = 8;
@@ -29,6 +29,9 @@ export function useComposerMenuAnchor(
   preferredWidth = 320,
   getExternalTrigger?: () => HTMLElement | null,
 ) {
+  // The menu is measured against, and listens on, the window the composer is drawn in: in a
+  // picture-in-picture window the opener's viewport and keys are not the reader's.
+  const hostWindow = useHostWindow();
   const triggerRef = useRef<HTMLButtonElement | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
   const [anchor, setAnchor] = useState<ComposerMenuAnchor | null>(null);
@@ -44,16 +47,16 @@ export function useComposerMenuAnchor(
     // `maxWidth` floor below (200) cannot rescue that, because a 200px-wide panel anchored 295px
     // from the right still starts at -105. Same defect MessageCopyControl carried.
     const right = Math.min(
-      Math.max(VIEWPORT_MARGIN, window.innerWidth - rect.right),
-      Math.max(VIEWPORT_MARGIN, window.innerWidth - MIN_MENU_WIDTH - VIEWPORT_MARGIN),
+      Math.max(VIEWPORT_MARGIN, hostWindow.innerWidth - rect.right),
+      Math.max(VIEWPORT_MARGIN, hostWindow.innerWidth - MIN_MENU_WIDTH - VIEWPORT_MARGIN),
     );
     setAnchor({
       right,
-      bottom: window.innerHeight - rect.top + MENU_GAP,
+      bottom: hostWindow.innerHeight - rect.top + MENU_GAP,
       maxHeight: Math.max(160, rect.top - MENU_GAP - VIEWPORT_MARGIN),
-      maxWidth: Math.max(200, Math.min(preferredWidth, window.innerWidth - right - VIEWPORT_MARGIN)),
+      maxWidth: Math.max(200, Math.min(preferredWidth, hostWindow.innerWidth - right - VIEWPORT_MARGIN)),
     });
-  }, [preferredWidth, getExternalTrigger]);
+  }, [preferredWidth, getExternalTrigger, hostWindow]);
 
   useEffect(() => {
     if (!isOpen) {
@@ -78,19 +81,20 @@ export function useComposerMenuAnchor(
       (getExternalTrigger?.() ?? triggerRef.current)?.focus();
     };
 
-    document.addEventListener('pointerdown', handlePointerDown);
-    window.addEventListener('resize', updateAnchor);
-    window.addEventListener('scroll', updateAnchor, true);
-    window.addEventListener('keydown', handleKeyDown, { capture: true });
+    const hostDocument = hostWindow.document;
+    hostDocument.addEventListener('pointerdown', handlePointerDown);
+    hostWindow.addEventListener('resize', updateAnchor);
+    hostWindow.addEventListener('scroll', updateAnchor, true);
+    hostWindow.addEventListener('keydown', handleKeyDown, { capture: true });
     updateAnchor();
 
     return () => {
-      document.removeEventListener('pointerdown', handlePointerDown);
-      window.removeEventListener('resize', updateAnchor);
-      window.removeEventListener('scroll', updateAnchor, true);
-      window.removeEventListener('keydown', handleKeyDown, { capture: true });
+      hostDocument.removeEventListener('pointerdown', handlePointerDown);
+      hostWindow.removeEventListener('resize', updateAnchor);
+      hostWindow.removeEventListener('scroll', updateAnchor, true);
+      hostWindow.removeEventListener('keydown', handleKeyDown, { capture: true });
     };
-  }, [isOpen, onClose, updateAnchor, getExternalTrigger]);
+  }, [isOpen, onClose, updateAnchor, getExternalTrigger, hostWindow]);
 
   return { triggerRef, menuRef, anchor, updateAnchor };
 }

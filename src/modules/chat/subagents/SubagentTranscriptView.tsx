@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowLeftIcon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
+import { useHostWindow } from '@/shared/context/HostWindowContext';
 import type { SubagentTranscriptTarget } from '@/shared/types';
 import { Badge, Button, Spinner } from '@/shared/ui';
 import { useSubagentTranscript } from '@/modules/chat/hooks/useSubagentTranscript';
@@ -73,15 +74,19 @@ export function SubagentTranscriptView({
   const atEnd = useRef(true);
   const hasTimeline = result !== null && result.found;
 
+  // The observer is built by the constructor of the window the view is drawn in: it reports on that
+  // window's frames, and a hidden opener draws none. A move builds a new one.
+  const hostWindow = useHostWindow();
   useEffect(() => {
     const node = endRef.current;
-    if (!hasTimeline || node === null || typeof IntersectionObserver === 'undefined') return;
-    const observer = new IntersectionObserver((entries) => {
+    const HostIntersectionObserver = (hostWindow as Window & typeof globalThis).IntersectionObserver;
+    if (!hasTimeline || node === null || typeof HostIntersectionObserver === 'undefined') return;
+    const observer = new HostIntersectionObserver((entries) => {
       for (const entry of entries) atEnd.current = entry.isIntersecting;
     });
     observer.observe(node);
     return () => observer.disconnect();
-  }, [hasTimeline]);
+  }, [hasTimeline, hostWindow]);
 
   // A step arrived and the sentinel moved with it: a reader who was at the bottom is taken back
   // down to the newest one, and a reader who scrolled up to read something is left where they are.

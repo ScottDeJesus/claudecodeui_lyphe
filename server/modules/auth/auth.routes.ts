@@ -49,6 +49,11 @@ export function createAuthRouter(
     res.json(service.refreshSession((req as AuthenticatedRequest).user));
   });
 
+  router.post('/client-events', authenticateToken, (req, res) => {
+    const body = req.body as { events?: unknown };
+    res.json(service.recordClientAuthEvents((req as AuthenticatedRequest).user, body?.events));
+  });
+
   router.post('/logout', authenticateToken, (_req, res) => {
     res.json(service.logout());
   });

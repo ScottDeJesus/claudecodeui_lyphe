@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { WidgetErrorCard } from '@/modules/widgets/WidgetErrorCard';
 import { docspaceEmbedUrl, isForeignOrigin, resolveDocSpaceOrigin } from '@/modules/widgets/docspaceOrigin';
 import { useWidgetHost } from '@/modules/widgets/hooks/useWidgetHost';
+import { useHostWindow } from '@/shared/context/HostWindowContext';
 import { useTheme } from '@/shared/context/ThemeContext';
 import type { DocSpaceBlockRef } from '@/shared/types';
 
@@ -87,6 +88,9 @@ export function DocSpaceFrame({
 }: DocSpaceBlockRef & { framed?: boolean; fill?: boolean }) {
   const frameRef = useRef<HTMLIFrameElement>(null);
   const { isDarkMode } = useTheme();
+  // The window the block is drawn in: the deadline below paces the error card the reader is looking
+  // at, so it runs on that window's clock (a hidden opener throttles its timers).
+  const hostWindow = useHostWindow();
 
   // The theme of the instant this frame mounted, LATCHED in a ref rather than read per render.
   // The URL carries `?theme=` so the embed's first paint is already right and the reader never
@@ -105,8 +109,9 @@ export function DocSpaceFrame({
   const [timedOut, setTimedOut] = useState(false);
 
   // The armed timer, held in a ref so `onReady` and the unmount cleanup can both reach the same
-  // handle without either being re-created when this component re-renders.
-  const readyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // handle without either being re-created when this component re-renders. It carries the window
+  // that armed it: a timer id means something only to the window that issued it.
+  const readyTimerRef = useRef<{ id: number; armedOn: Window } | null>(null);
 
   // Origin and URL are derived TOGETHER and memoised on the ids alone, exactly as the latch
   // above requires. The origin is kept as well as the URL because the timeout message names it:
@@ -120,8 +125,9 @@ export function DocSpaceFrame({
   const foreign = isForeignOrigin(url);
 
   const clearReadyTimer = useCallback(() => {
-    if (readyTimerRef.current === null) return;
-    clearTimeout(readyTimerRef.current);
+    const pending = readyTimerRef.current;
+    if (pending === null) return;
+    pending.armedOn.clearTimeout(pending.id);
     readyTimerRef.current = null;
   }, []);
 
@@ -141,12 +147,15 @@ export function DocSpaceFrame({
   // would only replace one error card with another.
   useEffect(() => {
     if (!foreign) return undefined;
-    readyTimerRef.current = setTimeout(() => {
-      readyTimerRef.current = null;
-      setTimedOut(true);
-    }, DOCSPACE_READY_TIMEOUT_MS);
+    readyTimerRef.current = {
+      id: hostWindow.setTimeout(() => {
+        readyTimerRef.current = null;
+        setTimedOut(true);
+      }, DOCSPACE_READY_TIMEOUT_MS),
+      armedOn: hostWindow,
+    };
     return clearReadyTimer;
-  }, [foreign, clearReadyTimer]);
+  }, [foreign, clearReadyTimer, hostWindow]);
 
   if (!foreign) {
     return <WidgetErrorCard reason="the DocSpace origin must differ from this app's origin" />;

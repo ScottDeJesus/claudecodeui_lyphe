@@ -6,11 +6,11 @@ import { AppDrawerHeader } from '@/modules/app-switcher/AppDrawerHeader';
 import { AppDrawerRow } from '@/modules/app-switcher/AppDrawerRow';
 import { useAppSwitcher } from '@/modules/app-switcher/context/AppSwitcherContext';
 import { useDrawerLayout } from '@/modules/app-switcher/hooks/useDrawerLayout';
-import type { PaneSide, PaneSlot } from '@/modules/app-switcher/context/AppSwitcherContext';
 import { NewApplicationForm } from '@/modules/app-switcher/NewApplicationForm';
 import { addRegistryApp, removeRegistryApp } from '@/modules/app-switcher/utils/registryRequests';
 import type { AppEntry } from '@/shared/app-types';
 import { useTheme } from '@/shared/context/ThemeContext';
+import type { PaneSide, PaneSlot } from '@/shared/types';
 import {
   Banner,
   Button,

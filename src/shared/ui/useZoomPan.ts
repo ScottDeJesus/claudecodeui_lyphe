@@ -1,5 +1,8 @@
 import { type PointerEvent as ReactPointerEvent, useCallback, useEffect, useRef, useState } from 'react';
 
+import { useHostWindow } from '@/shared/context/HostWindowContext';
+import { resizeObserverIn } from '@/shared/utils';
+
 /** Fit-to-screen is the floor: a viewer that zooms OUT past fit only shows more backdrop. */
 const MIN_SCALE = 1;
 /** Eight times fit: enough to read the smallest label of a large diagram on a laptop. */
@@ -62,6 +65,7 @@ function clamp(value: number, low: number, high: number): number {
  * measured on demand, never cached; a resize only has to re-clamp the view it leaves behind.
  */
 export function useZoomPan() {
+  const hostWindow = useHostWindow();
   const surfaceRef = useRef<HTMLDialogElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
@@ -130,11 +134,13 @@ export function useZoomPan() {
     const stage = stageRef.current;
     const content = contentRef.current;
     if (!stage || !content) return undefined;
-    const observer = new ResizeObserver(() => transform(1, CENTRE, 0, 0, false));
+    // Built by the host window's own constructor, so it keeps delivering while the opener is hidden.
+    const observer = resizeObserverIn(hostWindow, () => transform(1, CENTRE, 0, 0, false));
+    if (!observer) return undefined;
     observer.observe(stage);
     observer.observe(content);
     return () => observer.disconnect();
-  }, [transform]);
+  }, [transform, hostWindow]);
 
   // Wheel and trackpad pinch. Bound natively and NON-passive: React's own `onWheel` is passive, and a
   // passive listener cannot stop the page from scrolling or the browser from zooming the whole page
@@ -151,9 +157,11 @@ export function useZoomPan() {
     };
     surface.addEventListener('wheel', handleWheel, { passive: false });
     return () => surface.removeEventListener('wheel', handleWheel);
-  }, [transform, toStagePoint]);
+    // `hostWindow` is not read here: the viewer is portalled to the host window's body, so a move
+    // between windows draws a NEW dialog element, and this listener must bind to that one.
+  }, [transform, toStagePoint, hostWindow]);
 
-  // Pointer moves and releases are heard on the window, never on the element with pointer capture:
+  // Pointer moves and releases are heard on the HOST window, never on the element with pointer capture:
   // capture retargets the `click` that ends a press to the capturing element, and the overlay needs
   // the click's real target to tell the backdrop from the content. The window still hears a drag
   // that leaves the browser, and a touch's implicit capture keeps its events flowing.
@@ -219,17 +227,23 @@ export function useZoomPan() {
     // A window that loses focus mid-gesture (an alert, a tab switch) never sends the release.
     const handleBlur = () => pointers.current.clear();
 
-    window.addEventListener('pointermove', handleMove);
-    window.addEventListener('pointerup', handleRelease);
-    window.addEventListener('pointercancel', handleRelease);
-    window.addEventListener('blur', handleBlur);
+    // The same Map for the life of the hook; held here so the cleanup names it without reading a ref.
+    const heldPointers = pointers.current;
+    hostWindow.addEventListener('pointermove', handleMove);
+    hostWindow.addEventListener('pointerup', handleRelease);
+    hostWindow.addEventListener('pointercancel', handleRelease);
+    hostWindow.addEventListener('blur', handleBlur);
     return () => {
-      window.removeEventListener('pointermove', handleMove);
-      window.removeEventListener('pointerup', handleRelease);
-      window.removeEventListener('pointercancel', handleRelease);
-      window.removeEventListener('blur', handleBlur);
+      hostWindow.removeEventListener('pointermove', handleMove);
+      hostWindow.removeEventListener('pointerup', handleRelease);
+      hostWindow.removeEventListener('pointercancel', handleRelease);
+      hostWindow.removeEventListener('blur', handleBlur);
+      // A press still down when the chat moves is released on a window this effect no longer hears,
+      // so its id would stay in the map and make the next press in the new window read as a second
+      // finger of a pinch (which is never a tap, so a plain click on the backdrop would stop closing).
+      heldPointers.clear();
     };
-  }, [transform, toStagePoint, commit]);
+  }, [transform, toStagePoint, commit, hostWindow]);
 
   const onPointerDown = useCallback((event: ReactPointerEvent<HTMLElement>) => {
     // Only the primary button pans; a right-click opens the browser's menu and sends no release.

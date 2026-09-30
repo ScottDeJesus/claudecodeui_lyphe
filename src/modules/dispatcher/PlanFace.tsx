@@ -4,7 +4,7 @@ import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { PlanNow } from '@/modules/dispatcher/PlanNow';
-import { phaseWord } from '@/modules/dispatcher/phaseWord';
+import { currentPhaseKey, phaseWord } from '@/modules/dispatcher/phaseWord';
 import { PlanPhaseRow } from '@/modules/dispatcher/PlanPhaseRow';
 import { StatusFlow } from '@/modules/dispatcher/StatusFlow';
 import { clockOf, epochOf, phaseProgress, planStatusTone, scheduleClock } from '@/modules/dispatcher/dispatcherState';
@@ -68,7 +68,8 @@ export function PlanClock({ plan }: { plan: DispatcherPlan }) {
  * COST is not here: the head carries the plan's total as pills (`PlanCard`), so the face does not
  * state it a second time.
  *
- * THE TRACK IS EVERY PHASE AT ONCE: one node a phase on one row (`StatusFlow`), marked `✓` done,
+ * THE TRACK IS EVERY PHASE AT ONCE: one node a phase on one row (`StatusFlow`, which scrolls sideways
+ * when the row is too narrow for them and opens on the phase in hand), marked `✓` done,
  * `▶︎` walking, `…` settling and by its position while not started, toned the way its row is
  * (`phaseWord`), filled as far as `phaseProgress` has got. A node pressed opens that phase's row
  * under the track with its stages open — the receipt — and pressed again closes it.
@@ -122,6 +123,7 @@ export function PlanFace({ plan }: { plan: DispatcherPlan }) {
           nodes={nodes}
           doneCount={progress.done}
           selected={receipt?.key ?? null}
+          current={currentPhaseKey(plan.phases)}
           onSelect={(key) => setSelected((current) => (current === key ? null : key))}
           ariaLabel={t('dispatcher.flow.name', { plan: plan.name })}
         />

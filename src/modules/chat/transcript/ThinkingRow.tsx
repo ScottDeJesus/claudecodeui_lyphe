@@ -1,8 +1,9 @@
-import { useState, type KeyboardEvent, type MouseEvent } from 'react';
+import { useEffect, useState, type KeyboardEvent, type MouseEvent } from 'react';
 import { Brain, Check, Copy } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 import { MARKDOWN_CARDS_CLASS } from '@/shared/constants';
+import { useHostWindow } from '@/shared/context/HostWindowContext';
 import { cn, copyTextToClipboard } from '@/shared/utils';
 import { useIsExportingTranscript } from '@/modules/chat/context/TranscriptRenderContext';
 import { Markdown, TRANSCRIPT_PROSE } from '@/modules/chat/transcript/Markdown';
@@ -35,19 +36,29 @@ function firstLineOf(content: string): string {
  */
 export function ThinkingRow({ content }: { content: string }) {
   const { t } = useTranslation('chat');
+  // The window the row is drawn in: the copy goes through its clipboard and the tick is timed on it.
+  const hostWindow = useHostWindow();
   const isExporting = useIsExportingTranscript();
   const [openState, setOpen] = useState(false);
   const open = openState || isExporting;
   const [copied, setCopied] = useState(false);
+  // The tick clears itself. An effect keyed on the window, not a timer armed once in the handler: a
+  // timer armed on a floating window dies with that window, and chat-host closes the window to bring
+  // the chat home — the tick would then stay until the next click. A move changes `hostWindow`, so
+  // the effect re-arms on the window the row now stands in.
+  useEffect(() => {
+    if (!copied) return;
+    const timer = hostWindow.setTimeout(() => setCopied(false), 2000);
+    return () => hostWindow.clearTimeout(timer);
+  }, [copied, hostWindow]);
   const preview = firstLineOf(content);
 
   const toggle = () => setOpen((previous) => !previous);
 
   const handleCopy = async (event: MouseEvent) => {
     event.stopPropagation();
-    if (!(await copyTextToClipboard(content))) return;
+    if (!(await copyTextToClipboard(content, hostWindow))) return;
     setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
   };
 
   return (

@@ -4,6 +4,7 @@ import { ArrowDownIcon } from 'lucide-react';
 
 import { useTasksSettings } from '@/modules/task-master';
 import { useWebSocket } from '@/shared/context/WebSocketContext';
+import { useHostWindow } from '@/shared/context/HostWindowContext';
 import PermissionContext from '@/modules/chat/context/PermissionContext';
 import type { TokenUsageSurface } from '@/modules/chat/composer/TokenUsageSummary';
 import type { ChatExportSurface } from '@/modules/chat/transcript/ChatExportMenu';
@@ -15,6 +16,7 @@ import type {
   ProjectSession,
   SessionEstablishedContext,
   SessionNavigationOptions,
+  StreamFlushTimer,
 } from '@/shared/types';
 import { useChatProviderState } from '@/modules/chat/hooks/useChatProviderState';
 import { useToolPermissionState } from '@/modules/chat/hooks/useToolPermissionState';
@@ -24,6 +26,7 @@ import { useChatRealtimeHandlers } from '@/modules/chat/hooks/useChatRealtimeHan
 import { useChatComposerState } from '@/modules/chat/hooks/useChatComposerState';
 import { useSessionPresence } from '@/modules/chat/hooks/useSessionPresence';
 import { useSessionStore } from '@/modules/chat/hooks/useSessionStore';
+import { clearStreamFlush } from '@/modules/chat/utils/streamFlushTimer';
 import {
   useProcessingSessions,
   useSessionProtectionActions,
@@ -103,6 +106,7 @@ function ChatInterface({
 }: ChatInterfaceProps) {
   const { tasksEnabled, isTaskMasterInstalled } = useTasksSettings();
   const { subscribe, isConnected } = useWebSocket();
+  const hostWindow = useHostWindow();
   // The transcript assembles what an export needs; two surfaces draw the button from it. On a phone
   // that is the workspace header (published upward, as before); on a desktop it is the composer,
   // beside the model and the edit mode, which is why it is also kept here.
@@ -120,7 +124,7 @@ function ChatInterface({
   } = useSessionProtectionActions();
 
   const sessionStore = useSessionStore();
-  const streamTimerRef = useRef<number | null>(null);
+  const streamTimerRef = useRef<StreamFlushTimer | null>(null);
   const accumulatedStreamRef = useRef('');
   // When each session's `chat.subscribe` was last sent; idle acks older than
   // a later local request are discarded as stale.
@@ -131,10 +135,7 @@ function ChatInterface({
   const lastSeqRef = useRef(new Map<string, number>());
 
   const resetStreamingState = useCallback(() => {
-    if (streamTimerRef.current) {
-      clearTimeout(streamTimerRef.current);
-      streamTimerRef.current = null;
-    }
+    clearStreamFlush(streamTimerRef);
     accumulatedStreamRef.current = '';
   }, []);
 
@@ -371,6 +372,7 @@ function ChatInterface({
     setPendingPermissionRequests,
     streamTimerRef,
     accumulatedStreamRef,
+    scrollContainerRef,
     lastSeqRef,
     statusCheckSentAtRef,
     onSessionProcessing,
@@ -394,11 +396,15 @@ function ChatInterface({
       handleAbortSession();
     };
 
-    document.addEventListener('keydown', handleGlobalEscape, { capture: true });
+    // The host document, not the opener's: a key pressed in the floating window never reaches the
+    // opener's document. Still a document CAPTURE listener, so a panel that owns Escape (marked from
+    // a window capture listener, which runs first) keeps the key through `defaultPrevented`.
+    const hostDocument = hostWindow.document;
+    hostDocument.addEventListener('keydown', handleGlobalEscape, { capture: true });
     return () => {
-      document.removeEventListener('keydown', handleGlobalEscape, { capture: true });
+      hostDocument.removeEventListener('keydown', handleGlobalEscape, { capture: true });
     };
-  }, [canAbortSession, handleAbortSession]);
+  }, [canAbortSession, handleAbortSession, hostWindow]);
 
   useEffect(() => {
     return () => {

@@ -167,6 +167,7 @@
     "rename": "Rinomina",
     "renamePlaceholder": "Nome chat",
     "running": "In esecuzione",
+    "awaitingInput": "In attesa della tua risposta",
     "stopTitle": "Questa chat è ancora in esecuzione",
     "stopBody": "Interromperla e rimuoverla?",
     "stopConfirm": "Interrompi e rimuovi",

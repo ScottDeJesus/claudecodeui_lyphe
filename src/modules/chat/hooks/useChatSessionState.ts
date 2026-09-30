@@ -12,6 +12,13 @@ import { normalizedToChatMessages } from '@/modules/chat/hooks/useChatMessages';
 import { findSearchTargetIndex, resolveSearchWindowSize } from '@/modules/chat/utils/searchTargetLocator';
 import { mergeSoulLaunchIds, readSoulLaunchIds } from '@/modules/chat/utils/soulLaunchAnchors';
 import { readSelectedProvider } from '@/shared/selectedProvider';
+import { useHostWindow } from '@/shared/context/HostWindowContext';
+import {
+  captureScrollRestoreState,
+  restoreScroll,
+  useHostMoveScroll,
+} from '@/modules/chat/hooks/useHostMoveScroll';
+import type { ScrollRestoreState } from '@/modules/chat/hooks/useHostMoveScroll';
 import type { SearchTarget } from '@/modules/chat/utils/searchTargetLocator';
 
 const INITIAL_VISIBLE_MESSAGES = 100;
@@ -110,13 +117,6 @@ type UseChatSessionStateArgs = {
   sessionStore: SessionStore;
 };
 
-type ScrollRestoreState = {
-  height: number;
-  top: number;
-  anchor: HTMLElement | null;
-  anchorOffset: number | null;
-};
-
 type PendingScrollRestore = ScrollRestoreState & {
   /**
    * The oldest rendered message when a page load armed this restore. The restore waits
@@ -125,22 +125,6 @@ type PendingScrollRestore = ScrollRestoreState & {
    */
   armedOldest?: ChatMessage | null;
 };
-
-function captureScrollRestoreState(container: HTMLDivElement): ScrollRestoreState {
-  const containerBounds = container.getBoundingClientRect();
-  const anchor = Array.from(container.querySelectorAll<HTMLElement>('.chat-message'))
-    .find((element) => element.getBoundingClientRect().bottom >= containerBounds.top)
-    ?? null;
-
-  return {
-    height: container.scrollHeight,
-    top: container.scrollTop,
-    anchor,
-    anchorOffset: anchor
-      ? anchor.getBoundingClientRect().top - containerBounds.top
-      : null,
-  };
-}
 
 /* ------------------------------------------------------------------ */
 /*  Helper: Convert a ChatMessage to a NormalizedMessage for the store */
@@ -216,6 +200,14 @@ export function useChatSessionState({
   lastSeqRef,
   sessionStore,
 }: UseChatSessionStateArgs) {
+  const hostWindow = useHostWindow();
+  // The same window as of the latest commit, for a follow-up timer armed from an async continuation
+  // or an effect that a move must not re-run (a re-run of the external-update effect would fetch the
+  // transcript again). A ref because those callers read it when they fire, not when they render.
+  const hostWindowRef = useRef(hostWindow);
+  useLayoutEffect(() => {
+    hostWindowRef.current = hostWindow;
+  }, [hostWindow]);
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(selectedSession?.id || null);
   const [isLoadingSessionMessages, setIsLoadingSessionMessages] = useState(false);
   const [isLoadingMoreMessages, setIsLoadingMoreMessages] = useState(false);
@@ -708,12 +700,33 @@ export function useChatSessionState({
     if (pending) return;
 
     if (becameActive) {
-      container.scrollTop = isUserScrolledUp
-        ? scrollPositionRef.current.top
-        : container.scrollHeight;
+      restoreScroll(container, {
+        following: !isUserScrolledUp,
+        top: scrollPositionRef.current.top,
+        height: container.scrollHeight,
+        anchor: null,
+        anchorOffset: null,
+      });
     }
   // `visibleMessageCount`: a prepend can reach the screen by widening the window alone.
   }, [chatMessages.length, isActive, isUserScrolledUp, visibleMessageCount]);
+
+  // A move of the chat between hosts is a scroller that was away and is back, so it restores by the
+  // same rule as the became-active branch above. `isFollowing` and `fallback` read refs: they answer
+  // for the moment of the move, which the render's closure can be a step behind.
+  const isFollowingAtMove = useCallback(() => !isUserScrolledUpRef.current, []);
+  const restoreStateAtMove = useCallback(() => ({
+    following: !isUserScrolledUpRef.current,
+    top: scrollPositionRef.current.top,
+    height: scrollContainerRef.current?.scrollHeight ?? 0,
+    anchor: null,
+    anchorOffset: null,
+  }), []);
+  useHostMoveScroll({
+    scrollContainerRef,
+    isFollowing: isFollowingAtMove,
+    fallback: restoreStateAtMove,
+  });
 
   // Reset scroll/pagination state on session change
   useEffect(() => {
@@ -786,7 +799,7 @@ export function useChatSessionState({
       }
       frame++;
       if (stableCount < 3 && frame < 60) {
-        rafId = requestAnimationFrame(tick);
+        rafId = hostWindow.requestAnimationFrame(tick);
       } else {
         pendingInitialScrollRef.current = false;
         // Settled at the bottom: the chat can appear.
@@ -795,11 +808,13 @@ export function useChatSessionState({
     };
     tick();
     return () => {
-      if (rafId) cancelAnimationFrame(rafId);
+      if (rafId) hostWindow.cancelAnimationFrame(rafId);
     };
   // `visibleMessageCount` re-runs the loop when a fill widens the window over rows the
   // slot already held (no length change); it is a no-op unless the pending flag is set.
-  }, [chatMessages.length, isActive, isLoadingSessionMessages, scrollToBottom, visibleMessageCount]);
+  // `hostWindow`: the loop is requested and cancelled on the window the chat is drawn in, so a
+  // move re-arms it there instead of leaving it on a window that no longer paints the chat.
+  }, [chatMessages.length, hostWindow, isActive, isLoadingSessionMessages, scrollToBottom, visibleMessageCount]);
 
   // Session replay/subscription remains active regardless of which main tab is
   // visible. Only persisted-history HTTP traffic is visibility-gated below.
@@ -957,7 +972,8 @@ export function useChatSessionState({
           await requestLatestMessages(selectedSession.id);
 
           if (shouldStickToBottom) {
-            setTimeout(() => {
+            // The follow is what the reader watches for, so it runs on the window they watch in.
+            hostWindowRef.current.setTimeout(() => {
               if (!isUserScrolledUpRef.current) {
                 scrollToBottom();
               }
@@ -1141,7 +1157,9 @@ export function useChatSessionState({
     if (searchScrollActiveRef.current) return;
 
     if (!isUserScrolledUp) {
-      setTimeout(() => {
+      // Follows new messages: the timer the reader feels when a reply lands, so it runs on the
+      // window they are reading in, where a hidden opener would hold it back up to a second.
+      hostWindowRef.current.setTimeout(() => {
         if (!isUserScrolledUpRef.current) {
           scrollToBottom();
         }

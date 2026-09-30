@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Braces, Download, FileCode2, FileText, Loader2 } from 'lucide-react';
 
+import { useHostWindow } from '@/shared/context/HostWindowContext';
 import { ActionMenu } from '@/shared/ui';
 import type { ChatMessage, DiffLine, LLMProvider, Project } from '@/shared/types';
 import {
@@ -54,6 +55,8 @@ export default function ChatExportMenu({
   onLoadFullTranscript,
 }: ChatExportMenuProps) {
   const { t } = useTranslation('chat');
+  // The download is made in the document the menu is drawn in.
+  const hostWindow = useHostWindow();
   // Building a large transcript takes long enough to notice, and the download
   // only appears at the end — without this the button looks unresponsive.
   const [busyFormat, setBusyFormat] = useState<TranscriptExportFormat | null>(null);
@@ -73,7 +76,7 @@ export default function ChatExportMenu({
         selectedProject,
         createDiff,
         resolveModelLabel,
-      });
+      }, hostWindow.document);
     } catch (error) {
       console.error('Failed to export conversation:', error);
     } finally {

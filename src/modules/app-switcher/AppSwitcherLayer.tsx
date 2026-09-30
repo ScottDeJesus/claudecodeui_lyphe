@@ -2,8 +2,8 @@ import { useTranslation } from 'react-i18next';
 
 import { AppPane } from '@/modules/app-switcher/AppPane';
 import { useAppSwitcher } from '@/modules/app-switcher/context/AppSwitcherContext';
-import type { PaneSlot } from '@/modules/app-switcher/context/AppSwitcherContext';
 import type { AppEntry } from '@/shared/app-types';
+import type { PaneSlot } from '@/shared/types';
 import { SplitPane } from '@/shared/ui';
 
 /** An app on screen: the registry row, its resolved url, and the nonce its frame is keyed on. */
@@ -67,6 +67,7 @@ export function AppSwitcherLayer() {
             key={`${paneApps.left.app.id}:${paneApps.left.reloadNonce}`}
             src={paneApps.left.src}
             title={paneApps.left.app.name}
+            side="left"
           />
         }
         right={
@@ -75,6 +76,7 @@ export function AppSwitcherLayer() {
               key={`${paneApps.right.app.id}:${paneApps.right.reloadNonce}`}
               src={paneApps.right.src}
               title={paneApps.right.app.name}
+              side="right"
             />
           ) : null
         }

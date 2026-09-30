@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { useHostWindow } from '@/shared/context/HostWindowContext';
+
 /** Below this many seconds the reader wants seconds; above it, minutes. */
 const ONE_MINUTE = 60;
 /** And above this many minutes, hours — the point where a seconds figure stops carrying meaning. */
@@ -30,6 +32,7 @@ const ONE_HOUR_IN_MINUTES = 60;
  */
 export function useElapsed(sinceEpochSeconds: number | null, tickMs = 1000): string {
   const { t } = useTranslation('chat');
+  const hostWindow = useHostWindow();
 
   // The clock's own reading. It is essential and cannot be derived: nothing else in the app
   // re-renders when a second passes, and a run's elapsed changes for no other reason.
@@ -46,9 +49,12 @@ export function useElapsed(sinceEpochSeconds: number | null, tickMs = 1000): str
     // changes once a minute at best, and a per-second interval on every finished card would
     // re-render a pane of them sixty times a minute for up to a day. Coarsened, never stopped —
     // a reading taken once said "ended 2s ago" an hour later.
-    const timer = window.setInterval(read, tickMs);
-    return () => window.clearInterval(timer);
-  }, [sinceEpochSeconds, tickMs]);
+    // The tick paces a label the reader looks at, so it runs on the window the reader is in: a hidden
+    // opener throttles its timers to about one a minute, and a seconds clock would stutter. Cleared
+    // on the window that armed it, and re-armed on the new one when the chat moves.
+    const timer = hostWindow.setInterval(read, tickMs);
+    return () => hostWindow.clearInterval(timer);
+  }, [sinceEpochSeconds, tickMs, hostWindow]);
 
   if (sinceEpochSeconds === null) return '';
 

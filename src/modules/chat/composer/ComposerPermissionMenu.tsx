@@ -2,6 +2,7 @@ import { memo, useCallback, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 
+import { useHostWindow } from '@/shared/context/HostWindowContext';
 import type { PermissionMode } from '@/shared/types';
 import { Chip } from '@/shared/ui';
 import { permissionMark } from '@/modules/chat/utils/permissionMarks';
@@ -36,6 +37,8 @@ function ComposerPermissionMenu({
   onSelectPermissionMode,
 }: ComposerPermissionMenuProps) {
   const { t } = useTranslation('chat');
+  // The menu is portalled into the window the composer is drawn in, not the opener's body.
+  const hostWindow = useHostWindow();
   const [isOpen, setIsOpen] = useState(false);
   const close = useCallback(() => setIsOpen(false), []);
   const { triggerRef, menuRef, anchor, updateAnchor } = useComposerMenuAnchor(isOpen, close, 22 * 16);
@@ -98,7 +101,7 @@ function ComposerPermissionMenu({
             />
           ))}
         </ComposerMenuSurface>,
-        document.body,
+        hostWindow.document.body,
       )}
     </>
   );

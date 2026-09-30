@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import type { Dispatch, ReactNode, SetStateAction } from 'react';
 
 import { api } from '@/shared/api';
+import { useAuth } from '@/modules/auth';
 import {
   readUserPreference,
   subscribeToUserPreferences,
@@ -80,8 +81,14 @@ export const TasksSettingsProvider = ({ children }: { children: ReactNode }) => 
     setTasksEnabled(readUserPreference('tasksEnabled', TASKS_ENABLED_DEFAULT));
   }), []);
 
-  // Check TaskMaster installation status asynchronously on component mount
+  // The check needs a session (the route is authenticated), and this provider sits above the login
+  // gate: run at mount it went out with no token and was refused. It runs once a session exists.
+  const { user } = useAuth();
+  const signedIn = Boolean(user);
+
+  // Check TaskMaster installation status asynchronously once signed in
   useEffect(() => {
+    if (!signedIn) return;
     const checkInstallation = async () => {
       try {
         const response = await api.taskmaster.installationStatus();
@@ -114,7 +121,7 @@ export const TasksSettingsProvider = ({ children }: { children: ReactNode }) => 
 
     // Run check asynchronously without blocking initial render
     setTimeout(checkInstallation, 0);
-  }, []);
+  }, [signedIn]);
 
   const toggleTasksEnabled = useCallback(() => {
     chooseTasksEnabled(prev => !prev);

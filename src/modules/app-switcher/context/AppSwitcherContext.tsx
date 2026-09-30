@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import type { ReactNode } from 'react';
 
 import { useAppRegistry } from '@/modules/app-switcher/hooks/useAppRegistry';
+import { useFrontPane } from '@/modules/app-switcher/hooks/useFrontPane';
 import {
   fabPositionOf,
   fabRecordOf,
@@ -9,22 +10,10 @@ import {
   writeAppSwitcherRecord,
 } from '@/modules/app-switcher/utils/appSwitcherStorage';
 import { dockableRect, sameRect } from '@/modules/app-switcher/utils/dockRect';
+import { EMPTY_SLOT, loneAppOnTheLeft } from '@/modules/app-switcher/utils/paneSlots';
 import type { AppEntry, RegistryRow } from '@/shared/app-types';
+import type { PaneSide, PaneSlot, ProjectChoice } from '@/shared/types';
 import type { DockableFabPosition } from '@/shared/ui';
-
-/** One half of the layer. With dual screen off only `left` is ever drawn. */
-export type PaneSide = 'left' | 'right';
-
-/**
- * One of the layer's two slots: the app it shows (or nothing), the url that app is framed at, and the
- * nonce a Reload bumps.
- *
- * The URL IS RESOLVED AT THE OPEN SITE and travels with the slot. Resolving `{host}` needs the page's
- * own address, and this module has exactly one place that reads it — the drawer's rows, which is also
- * the place that has to decide whether a row is this app looking at itself. Doing it again in the
- * layer would be a second reader of the same fact and a second answer to disagree with it.
- */
-export type PaneSlot = { appId: string | null; src: string | null; reloadNonce: number };
 
 type AppSwitcherValue = {
   /** The registry, in file order. A failed read keeps the last good list beside the error. */
@@ -71,14 +60,22 @@ type AppSwitcherValue = {
   setRatio: (next: number) => void;
   /** Remounts one side's pane by bumping its slot's nonce. A row finds its side in `panes`. */
   reload: (side: PaneSide) => void;
+  /**
+   * Every project the sidebar knows, in the sidebar's order: the one outside list the switcher reads.
+   * The drawer's Link project… picker offers them, and a row's linked path is matched against their
+   * `fullPath` to be named. It arrives as a prop, so this module never reaches into another one for it.
+   */
+  projects: ProjectChoice[];
+  /** The side whose frame last took focus — the application the reader's acts are about. See `useFrontPane`. */
+  frontSide: PaneSide;
+  /** Takes one pane down, and a survivor moves left. See `useFrontPane`. */
+  closePane: (side: PaneSide) => void;
   moveFab: (next: DockableFabPosition) => void;
   registerDock: (rect: DOMRect | null) => void;
   chooseSide: (side: PaneSide) => void;
   /** Opening re-reads the registry, so the list is at most one open old. */
   setDrawerOpen: (open: boolean) => void;
 };
-
-const EMPTY_SLOT: PaneSlot = { appId: null, src: null, reloadNonce: 0 };
 
 const AppSwitcherContext = createContext<AppSwitcherValue | null>(null);
 
@@ -93,30 +90,19 @@ const AppSwitcherContext = createContext<AppSwitcherValue | null>(null);
 const RATIO_SETTLE_MS = 250;
 
 /**
- * A LONE APPLICATION IS A LEFT APPLICATION — the invariant that keeps the state, the pane and the
- * layer saying one thing.
- *
- * `SplitPane` draws its left child whether or not it has a right one, so a single application always
- * FILLS the layer. An app left holding the right slot alone would therefore be drawn in the left half
- * while `panes.right` said otherwise — and the next application the reader chose would remount it into
- * the half it was already occupying. Moving the survivor left closes both at once, and it costs no
- * remount the clear had not already forced: an application coming down takes its frame with it either
- * way.
- */
-function loneAppOnTheLeft(panes: Record<PaneSide, PaneSlot>): Record<PaneSide, PaneSlot> {
-  if (panes.left.appId !== null || panes.right.appId === null) return panes;
-  return { left: panes.right, right: EMPTY_SLOT };
-}
-
-/**
  * The switcher's one state home, mounted by the project-workspace module around the whole shell
  * so the dock (in the sidebar header), the FAB, its drawer and the layer (over the main region)
  * read one truth from four places in the tree.
  *
  * Every action is stable for the life of the provider except where its dependency list says
  * otherwise; the dock re-measures on `registerDock`'s identity, so that one must never change.
+ *
+ * `projects` is THE ONE OUTSIDE LIST THE SWITCHER READS: the shell hands it in (from the workspace's
+ * project choices, which keep one identity until a project is added, renamed or removed), and the
+ * drawer reads it back through `useAppSwitcher().projects`. Nothing in this module imports another
+ * feature's state to learn it.
  */
-export function AppSwitcherProvider({ children }: { children: ReactNode }) {
+export function AppSwitcherProvider({ children, projects }: { children: ReactNode; projects: ProjectChoice[] }) {
   const { apps, rows, selfPorts, icons, error: registryError, registryRead, refresh } = useAppRegistry();
   // The stored record, read once: only the first render's initial values come from it.
   const initial = useMemo(() => readAppSwitcherRecord(), []);
@@ -135,6 +121,26 @@ export function AppSwitcherProvider({ children }: { children: ReactNode }) {
   const [nextSide, setNextSide] = useState<PaneSide>('left');
   // Whether the drawer is open. Owned here, not by the FAB, so the FAB's pressed state and the sheet agree.
   const [drawerOpenValue, setDrawerOpenValue] = useState(false);
+  // Which pane is in front, and the act of taking one down; `useFrontPane` says why it is a hook of its own.
+  const { frontSide, closePane } = useFrontPane(panes, setPanes);
+
+  // A pane whose application the registry no longer holds comes down, in the render that sees it. The
+  // registry is a file other writers edit (a second tab, the MCP, a hand edit), and the drawer's own
+  // Remove is not the only way a row leaves it. A slot left naming a vanished row would stay in the
+  // state while the layer drew the OTHER slot's application in its place, leaving `frontSide` on a
+  // side nothing answers for and every act over the visible application greyed. Only once a read has
+  // landed: before it `apps` is empty because it is unmeasured, and a failed read keeps the last good
+  // list (see `useAppRegistry`), so a refusal never empties a pane. Adjusting state during render is
+  // the pattern for state that follows other state; the condition is false again the moment it lands.
+  const vanished = (slot: PaneSlot) => slot.appId !== null && !apps.some((entry) => entry.id === slot.appId);
+  if (registryRead && (vanished(panes.left) || vanished(panes.right))) {
+    setPanes((current) =>
+      loneAppOnTheLeft({
+        left: vanished(current.left) ? EMPTY_SLOT : current.left,
+        right: vanished(current.right) ? EMPTY_SLOT : current.right,
+      }),
+    );
+  }
 
   const open = useCallback((appId: string, src: string) => {
     // With dual screen off there is one pane and one side; with it on, the side the drawer's Opens-in
@@ -261,6 +267,7 @@ export function AppSwitcherProvider({ children }: { children: ReactNode }) {
       registryError,
       registryRead,
       refresh,
+      projects,
       panes,
       dual,
       ratio,
@@ -274,15 +281,17 @@ export function AppSwitcherProvider({ children }: { children: ReactNode }) {
       openInDualScreen,
       setRatio,
       reload,
+      frontSide,
+      closePane,
       moveFab,
       registerDock,
       chooseSide,
       setDrawerOpen,
     }),
     [
-      apps, rows, selfPorts, icons, registryError, registryRead, refresh, panes, dual, ratio, fabPosition, dockRect,
-      nextSide, drawerOpenValue, open, close, toggleDual, openInDualScreen, setRatio, reload, moveFab,
-      registerDock, chooseSide, setDrawerOpen,
+      apps, rows, selfPorts, icons, registryError, registryRead, refresh, projects, panes, dual, ratio, fabPosition, dockRect,
+      nextSide, drawerOpenValue, open, close, toggleDual, openInDualScreen, setRatio, reload, frontSide,
+      closePane, moveFab, registerDock, chooseSide, setDrawerOpen,
     ],
   );
 

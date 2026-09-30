@@ -99,10 +99,11 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/main.tsx, /home/lyphe/.claud
 ## MAN-740 — The library those tokens paint
 section: README/002 The library those tokens paint
 
-Twenty-four components carry Verve paint today — Phase 2's twelve, then Phase 3's six new and
+Twenty-five components carry Verve paint today — Phase 2's twelve, then Phase 3's six new and
 three restyled, then DockableFab and SplitPane for the application switcher's kit scaffold,
 admitted on the barrel's *mechanism* test rather than its two-module rule (`index.ts`'s own
-header), then `ConfirmDialog` for the files editor's and file manager's unsaved-changes guards —
+header), then `ResizeGrip` for chat-host's floating panel, admitted on that same mechanism test
+(its one consumer is `ChatHostPanel`), then `ConfirmDialog` for the files editor's and file manager's unsaved-changes guards —
 admitted on the ordinary two-module rule (the file-editor and file-manager modules both render it)
 and painting nothing of its own: it is `Dialog` and `Button` underneath, both already painted.
 What they share is the contract every later one joins:
@@ -127,9 +128,9 @@ What they share is the contract every later one joins:
    Phase 3's paint went into `feedback.css` beside `controls.css`; the board's paint went into a
    THIRD file, `board.css` — the `.vv-lane`, `.vv-lane__head` and `.vv-lane-card` rules and their
    variants; and the application switcher's kit scaffold opened a FOURTH,
-   [`surfaces.css`](surfaces.css) — DockableFab's and SplitPane's own paint, plus the
-   `body.vv-dragging` / `vv-drag-fab` / `vv-drag-split` classes a drag of either sets for its
-   length (why a new file rather than a squeeze is that stylesheet's own header). Each is imported
+   [`surfaces.css`](surfaces.css) — DockableFab's, SplitPane's and ResizeGrip's own paint, plus the
+   `body.vv-dragging` / `vv-drag-fab` / `vv-drag-split` / `vv-drag-resize` classes a drag of any
+   one sets for its length (why a new file rather than a squeeze is that stylesheet's own header). Each is imported
    from the barrel exactly as the ones before it, and the order is load-bearing at both ends:
    `surfaces.css` shares no selector with its neighbours, so it only has to land before
    `board.css`, which stays LAST because a lane card composes `.vv-card`'s ground and overrides

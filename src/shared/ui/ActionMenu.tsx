@@ -2,6 +2,7 @@ import * as React from 'react';
 import { createPortal } from 'react-dom';
 import { ChevronDown, Loader2, type LucideIcon } from 'lucide-react';
 
+import { useHostWindow } from '@/shared/context/HostWindowContext';
 import { cn } from '@/shared/utils';
 import { Button } from '@/shared/ui/Button';
 import { OWNS_ESCAPE } from '@/shared/ui/overlayEscape';
@@ -36,7 +37,7 @@ type ActionMenuProps = {
   disabled?: boolean;
   iconOnly?: boolean;
   /**
-   * Render the menu into a portal on `document.body` instead of in place beside its trigger.
+   * Render the menu into a portal on the host window's `body` instead of in place beside its trigger.
    *
    * ON by default, because in place is not a neutral choice: the menu is clipped by the first
    * ancestor with `overflow: hidden` and painted inside the first ancestor that makes a stacking
@@ -77,6 +78,7 @@ export function ActionMenu({
   header,
   onOpenChange,
 }: ActionMenuProps) {
+  const hostWindow = useHostWindow();
   const [isOpen, setIsOpen] = React.useState(false);
   const [portalPosition, setPortalPosition] = React.useState<{ top: number; left: number } | null>(null);
   /** Horizontal correction that pulls a non-portal menu back inside the viewport. */
@@ -123,13 +125,14 @@ export function ActionMenu({
       }
     };
 
-    document.addEventListener('mousedown', closeOnOutsideClick);
-    document.addEventListener('keydown', closeOnEscape);
+    const hostDocument = hostWindow.document;
+    hostDocument.addEventListener('mousedown', closeOnOutsideClick);
+    hostDocument.addEventListener('keydown', closeOnEscape);
     return () => {
-      document.removeEventListener('mousedown', closeOnOutsideClick);
-      document.removeEventListener('keydown', closeOnEscape);
+      hostDocument.removeEventListener('mousedown', closeOnOutsideClick);
+      hostDocument.removeEventListener('keydown', closeOnEscape);
     };
-  }, [isOpen, setMenuOpen]);
+  }, [isOpen, setMenuOpen, hostWindow]);
 
   React.useEffect(() => {
     if (!isOpen || !portal) {
@@ -137,13 +140,13 @@ export function ActionMenu({
     }
 
     const closeOnViewportChange = () => setMenuOpen(false);
-    window.addEventListener('resize', closeOnViewportChange);
-    window.addEventListener('scroll', closeOnViewportChange, true);
+    hostWindow.addEventListener('resize', closeOnViewportChange);
+    hostWindow.addEventListener('scroll', closeOnViewportChange, true);
     return () => {
-      window.removeEventListener('resize', closeOnViewportChange);
-      window.removeEventListener('scroll', closeOnViewportChange, true);
+      hostWindow.removeEventListener('resize', closeOnViewportChange);
+      hostWindow.removeEventListener('scroll', closeOnViewportChange, true);
     };
-  }, [isOpen, portal, setMenuOpen]);
+  }, [isOpen, portal, setMenuOpen, hostWindow]);
 
   // Move focus into the menu on open and back to the trigger on a keyboard or
   // selection close, so keyboard and screen-reader navigation match the menu role.
@@ -220,12 +223,12 @@ export function ActionMenu({
       // Below when the whole menu fits there, above when it does not. A menu too tall for either
       // side keeps its bottom inside the viewport instead: overlapping the trigger is survivable,
       // running off the screen is not.
-      top: trigger.bottom + gap + height <= window.innerHeight - margin
+      top: trigger.bottom + gap + height <= hostWindow.innerHeight - margin
         ? trigger.bottom + gap
-        : Math.max(margin, Math.min(trigger.top - gap - height, window.innerHeight - margin - height)),
-      left: Math.max(margin, Math.min(anchor, window.innerWidth - width - margin)),
+        : Math.max(margin, Math.min(trigger.top - gap - height, hostWindow.innerHeight - margin - height)),
+      left: Math.max(margin, Math.min(anchor, hostWindow.innerWidth - width - margin)),
     };
-  }, [align]);
+  }, [align, hostWindow]);
 
   const toggleMenu = () => {
     if (isOpen) {
@@ -241,7 +244,7 @@ export function ActionMenu({
       const anchor = align === 'left' ? rect.left : rect.right - menuWidth;
       setPortalPosition({
         top: rect.bottom + 6,
-        left: Math.max(8, Math.min(anchor, window.innerWidth - menuWidth - 8)),
+        left: Math.max(8, Math.min(anchor, hostWindow.innerWidth - menuWidth - 8)),
       });
     }
     setMenuOpen(true);
@@ -288,10 +291,10 @@ export function ActionMenu({
     const right = box.right - edgeShift;
     const margin = 8;
     let next = 0;
-    if (right > window.innerWidth - margin) next = window.innerWidth - margin - right;
+    if (right > hostWindow.innerWidth - margin) next = hostWindow.innerWidth - margin - right;
     if (left + next < margin) next = margin - left;
     if (next !== edgeShift) setEdgeShift(next);
-  }, [isOpen, portal, edgeShift, items.length]);
+  }, [isOpen, portal, edgeShift, items.length, hostWindow]);
 
   const menu = isOpen && (!portal || portalPosition) && (
     <div
@@ -379,7 +382,7 @@ export function ActionMenu({
         )}
       </Button>
 
-      {portal && typeof document !== 'undefined' ? createPortal(menu, document.body) : menu}
+      {portal ? createPortal(menu, hostWindow.document.body) : menu}
     </div>
   );
 }

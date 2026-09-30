@@ -12,6 +12,8 @@ type BuildTranscriptHtmlInput = {
   resolveModelLabel?: (modelId: string) => string | null;
   sessionTitle: string;
   exportedAt: Date;
+  /** The document whose theme and stylesheets the file carries — the caller's host document. */
+  sourceDocument: Document;
 };
 
 /**
@@ -23,10 +25,10 @@ type BuildTranscriptHtmlInput = {
  * is styled by definition with the same rules the user was looking at —
  * including every CSS variable the theme is built from.
  */
-function collectDocumentStyles(): string {
+function collectDocumentStyles(sourceDocument: Document): string {
   const blocks: string[] = [];
 
-  for (const sheet of Array.from(document.styleSheets)) {
+  for (const sheet of Array.from(sourceDocument.styleSheets)) {
     try {
       const rules = sheet.cssRules;
       if (!rules) continue;
@@ -75,12 +77,14 @@ export async function buildTranscriptHtml(input: BuildTranscriptHtmlInput): Prom
     }),
   );
 
-  const styles = dropUnresolvableUrls(collectDocumentStyles());
+  const styles = dropUnresolvableUrls(collectDocumentStyles(input.sourceDocument));
   const title = escapeHtml(input.sessionTitle);
-  const isDark = document.documentElement.classList.contains('dark');
+  const isDark = input.sourceDocument.documentElement.classList.contains('dark');
   const exportedAt = escapeHtml(input.exportedAt.toLocaleString());
   const messageCount = input.messages.length;
 
+  // The theme toggle's inline `onclick` below runs inside the SAVED file: its `document` is that
+  // file's own, not any window of the app, so it is named here and stays as written.
   return `<!DOCTYPE html>
 <html lang="en" class="${isDark ? 'dark' : ''}">
 <head>

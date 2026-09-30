@@ -309,3 +309,15 @@ export const LANE_CARD_GAP = 'gap-4';
  * Used by the runner-tab module's `RunnerPanel`, for the plans of no arc.
  */
 export const LANE_WALL_GRID = `grid grid-cols-[repeat(auto-fill,minmax(min(100%,22rem),1fr))] items-start ${LANE_CARD_GAP}`;
+
+// ---------------------------
+//----------------- CHAT HOTKEY ------------
+
+/**
+ * The key that, held with Ctrl (⌘ on a Mac), floats the chat or brings it home again. It is printed
+ * beside the switcher's Chat act through `formatShortcut`, and it is the key `useChatHotkey` listens for.
+ *
+ * Used by the app-switcher module (the Chat act's printed shortcut) and the project-workspace module
+ * (the hotkey itself); one value, so what is printed is what is heard.
+ */
+export const CHAT_TOGGLE_KEY = '.';

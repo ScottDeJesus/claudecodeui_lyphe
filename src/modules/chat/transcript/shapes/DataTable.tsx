@@ -3,6 +3,7 @@ import type { ReactElement, ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ArrowDownIcon, ArrowUpDownIcon, ArrowUpIcon, CheckIcon, CopyIcon } from 'lucide-react';
 
+import { useHostWindow } from '@/shared/context/HostWindowContext';
 import { Meter } from '@/shared/ui';
 import { cn, copyTextToClipboard } from '@/shared/utils';
 import { ChipsSuppressedContext } from '@/modules/chat/transcript/shapes/chipContext';
@@ -115,6 +116,9 @@ function BarCell({ percent, ariaLabel, children }: { percent: number; ariaLabel:
  */
 export function DataTable({ data, barColumn, collapseKey, children }: DataTableProps) {
   const { t } = useTranslation('chat');
+  // The window the table is drawn in: the CSV goes through its clipboard and the "copied" tick is
+  // timed on it.
+  const hostWindow = useHostWindow();
   // False inside a transcript export, where no handler can ever run. Every control below is drawn
   // only when this is true; the table itself, its rows and its bars are drawn either way.
   const interactive = useShapeInteractive();
@@ -127,9 +131,9 @@ export function DataTable({ data, barColumn, collapseKey, children }: DataTableP
 
   useEffect(() => {
     if (!copied) return;
-    const timer = window.setTimeout(() => setCopied(false), 1600);
-    return () => window.clearTimeout(timer);
-  }, [copied]);
+    const timer = hostWindow.setTimeout(() => setCopied(false), 1600);
+    return () => hostWindow.clearTimeout(timer);
+  }, [copied, hostWindow]);
 
   const headerCells = useMemo(() => headerCellsOf(children), [children]);
   const bodyRows = useMemo(() => bodyRowsOf(children), [children]);
@@ -180,7 +184,7 @@ export function DataTable({ data, barColumn, collapseKey, children }: DataTableP
     <button
       type="button"
       data-copy-csv
-      onClick={() => void copyTextToClipboard(csv).then((didCopy) => didCopy && setCopied(true))}
+      onClick={() => void copyTextToClipboard(csv, hostWindow).then((didCopy) => didCopy && setCopied(true))}
       title={t('shapes.copyCsv')}
       className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 transition-colors hover:bg-muted hover:text-foreground"
     >

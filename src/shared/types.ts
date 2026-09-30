@@ -1,7 +1,9 @@
 import type { EditorState } from '@codemirror/state';
 import type { TFunction } from 'i18next';
-import type { ReactNode } from 'react';
+import type { ComponentType, ReactNode } from 'react';
 import type { NavigateFunction } from 'react-router-dom';
+
+import type { AppEntry } from '@/shared/app-types';
 
 //----------------- LLM PROVIDER MODEL CATALOG ------------
 
@@ -131,8 +133,12 @@ export type Project = {
  */
 export type GitRepository = Pick<Project, 'projectId' | 'fullPath' | 'displayName'>;
 
-/** A project a new chat can start in, as the new-chat screen's project picker lists it. */
-export type ProjectChoice = Pick<Project, 'projectId' | 'displayName'>;
+/**
+ * A project a chat can be pointed at, as the new-chat screen's project picker lists it: its id, its
+ * name, and its `fullPath` — the absolute path of the repository, which is how an application
+ * registered against a project (`AppEntry.project`) is matched to it.
+ */
+export type ProjectChoice = Pick<Project, 'projectId' | 'displayName' | 'fullPath'>;
 
 /** Progress payload streamed while the backend enumerates projects, used to drive the sidebar loading bar. */
 export type LoadingProgress = {
@@ -789,6 +795,13 @@ export type VoiceSnapshot = { state: VoicePlayState; error: string | null };
 
 /** Playback state of a text-to-speech utterance: 'idle', 'loading' or 'playing'. */
 export type VoicePlayState = 'idle' | 'loading' | 'playing';
+
+// ---------------------------
+
+//----------------- CHAT STREAM FLUSH ------------
+
+/** The one pending stream flush of a live chat: the timer's id, the window it was armed on (a timer id means something only to the window that issued it, so it must be cleared there), and the timer's own body, kept so a move of the chat between hosts can run it at once instead of losing it with a closing window. Held in a ref by the chat interface and read by the realtime handlers through `armStreamFlush`, `clearStreamFlush` and `flushStreamNow`. */
+export type StreamFlushTimer = { id: number; armedOn: Window; flush: () => void };
 
 // ---------------------------
 
@@ -1836,6 +1849,53 @@ export type SettingsProject = {
   path?: string;
 };
 
+/** How the session picker's list stands: `ready` draws its rows, `loading` draws placeholders while the simple list's first page is in flight, `error` says the list could not be read. The project tree is always `ready`. */
+export type SessionPickerStatus = 'ready' | 'loading' | 'error';
+
+/**
+ * One conversation as the session picker draws it, whichever list it came from. The picker's rows
+ * are built from this and never from a `ProjectSession` or a `RecentConversationListItem`, so the
+ * two lists the sidebar holds (the project tree and the simple list) reach the same row.
+ * `title` is already named by the sidebar's own rule; the marks are the three session-id sets the
+ * sidebar's rows read, resolved for this one row.
+ */
+export type SessionPickerRow = {
+  sessionId: string;
+  title: string;
+  provider: LLMProvider;
+  projectId: string | null;
+  /** The project's name, drawn under the title where the row stands alone (the simple list); null under a project heading, which already says it. */
+  projectName: string | null;
+  /** The simple list's chosen icon name; null draws the default glyph. */
+  icon: string | null;
+  isRunning: boolean;
+  /** A question or permission prompt waits on the reader. */
+  isAwaitingInput: boolean;
+  isSubagentRunning: boolean;
+  /** The last run finished while the chat was out of sight; only the simple list's server feed knows it. */
+  unread: boolean;
+};
+
+/**
+ * One block of the session picker's list, in the reader's order. The simple list is a single block
+ * with no heading; the project tree is one block per project, headed by the project's name, with
+ * its loaded sessions newest first. A project with no sessions is a block with no rows, and the
+ * picker says so under its heading.
+ */
+export type SessionPickerGroup = {
+  key: string;
+  /** The project's display name; null for the simple list's one block. */
+  heading: string | null;
+  rows: SessionPickerRow[];
+};
+
+/** The session ids that wear a mark in the picker's rows: running, waiting on an answer, subagents still running. The sidebar reads the same three sets from SessionProtectionContext for its own rows. */
+export type SessionPickerMarks = {
+  running: ReadonlySet<string>;
+  awaitingInput: ReadonlySet<string>;
+  subagentRunning: ReadonlySet<string>;
+};
+
 // ---------------------------
 
 //----------------- SIDEBAR SEARCH ------------
@@ -2718,6 +2778,106 @@ export type CronRegistrySnapshot = {
   readAt: string;
   jobs: CronJob[];
   lastSync: CronSyncReport | null;
+};
+
+// ---------------------------
+//----------------- CHAT HOST ------------
+
+/** Where the live chat is drawn: `'home'` is the chat tab, `'panel'` the floating panel beside the switcher's FAB, `'window'` a picture-in-picture window. Held by chat-host's provider, read by its slot and hosts and, through `useChatHost`, by the modules that wire it. Never stored — every load opens with the chat home. */
+export type ChatPlacement = 'home' | 'panel' | 'window';
+
+/** A move of the live chat between hosts, as its window-bound code hears it. `phase` is 'before' while the chat's node still sits in the host it is leaving (flush what a closing window would lose) and 'after' once it stands in the new one; `floating` says whether the host it lands in is a floating one (the panel or the picture-in-picture window) rather than the chat tab. Read through `useHostMove`. */
+export type HostMove = { phase: 'before' | 'after'; floating: boolean };
+
+/** What `HostWindowProvider` hands its subtree: the window the subtree is drawn in (the opener's own `window`, or a picture-in-picture window), and a subscription to every move of the chat between hosts. Built by chat-host's provider and read by `src/shared/context/HostWindowContext.tsx`, so it lives here rather than in either file. */
+export type HostWindowValue = {
+  hostWindow: Window;
+  subscribeMove: (listener: (move: HostMove) => void) => () => void;
+};
+
+/** The FAB's drawn rect held outside React's state, in the shape `useSyncExternalStore` reads (`subscribe` and `getSnapshot`) plus the one write, `set`. Built by chat-host's `createAnchorStore` and held by its provider, whose `reportAnchor` writes it and whose floating panel is the only reader — so a drag of the FAB re-renders the panel and nothing else. An unchanged rect keeps the old object, which is what lets the snapshot be compared by identity. */
+export type AnchorStore = {
+  subscribe: (listener: () => void) => () => void;
+  getSnapshot: () => DOMRect | null;
+  set: (rect: DOMRect | null) => void;
+};
+
+/** Where the floating panel stands and how big it is, in viewport pixels, as `panelPlacement` computes it from the FAB's rect. `grip` is the panel's corner farthest from the FAB, where the resize handle goes. Named by both the geometry (chat-host's `panelGeometry.ts`) and the panel component that draws it, so it lives here. */
+export type PanelPlacement = {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+  grip: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
+};
+
+// ---------------------------
+//----------------- APPLICATION SWITCHER ------------
+
+/** One half of the switcher's layer. With dual screen off only `left` is ever drawn. Read by the switcher's context, its front-pane hook, its layer and its pane; `AppPane` writes it onto the frame as `data-pane-side`. */
+export type PaneSide = 'left' | 'right';
+
+/**
+ * One of the layer's two slots: the app it shows (or nothing), the url that app is framed at, and the
+ * nonce a Reload bumps.
+ *
+ * The URL IS RESOLVED AT THE OPEN SITE and travels with the slot. Resolving `{host}` needs the page's
+ * own address, and this module has exactly one place that reads it — the drawer's rows, which is also
+ * the place that has to decide whether a row is this app looking at itself. Doing it again in the
+ * layer would be a second reader of the same fact and a second answer to disagree with it.
+ */
+export type PaneSlot = { appId: string | null; src: string | null; reloadNonce: number };
+
+/** The application in front of the switcher's layer, with the url its pane frames. Answered by the switcher's `useCurrentApplication`; read by whoever needs to know what the reader is looking at (the chat door asks it for the application's project). */
+export type CurrentApplication = { app: AppEntry; src: string };
+
+/** The chat's one door, as the FAB, the radial, the palette and the hotkey use it. Built by project-workspace's `useChatDoor`, the one place that knows which conversation an application brings; handed to the switcher's `useSwitcherActions` and its FAB. */
+export type ChatDoor = {
+  /** Whether the live chat is floating (the panel or the picture-in-picture window) rather than home. */
+  floating: boolean;
+  /** Collapses a floating chat; else floats it and brings the front application's project. MUST run inside the press. */
+  toggle: () => void;
+  /** Brings a floating chat home. */
+  collapse: () => void;
+};
+
+/** One of the switcher's five acts, as data: drawn as the radial's items and as the palette's Applications group, from one list. Built by `useSwitcherActions` in the order the operator reads them. */
+export type SwitcherAction = {
+  key: 'chat' | 'applications' | 'reload' | 'close' | 'open-in-tab';
+  /** The words the item shows, already translated. */
+  label: string;
+  /** Short English search words the palette matches, as its `NAV_TABS` rows carry. */
+  keywords: string;
+  icon: ComponentType<{ className?: string }>;
+  /** True when the act has nothing to act on (no application up); the item stays in place, greyed. */
+  disabled: boolean;
+  /** The key the act answers to, as printed beside it — the chat's hotkey; null for the rest. */
+  shortcut: string | null;
+  run: () => void;
+};
+
+// ---------------------------
+//----------------- AUTH TRACE: why a page ended, or refused to end, its session ------------
+
+/** One record of an auth decision, kept in localStorage by authTrace.ts and handed to the server's journal (POST /api/auth/client-events) by AuthContext once a session is up again. It holds the SHAPE of the token involved (age, time to expiry) and never the token, and its url is a path with no query string. `outcome` is `signed-out` when the page dropped the session, `ignored` when a verdict was set aside because it was about a different token than the one now stored, or a refreshed token was refused because it was expired, older than the stored one (a replay from the browser's HTTP cache) or arrived with no session held (either way the stored session, if any, is untouched), `followed` when the page adopted a change another tab made to the shared session. */
+export type AuthTraceEvent = {
+  at: string;
+  trigger: string;
+  outcome: 'signed-out' | 'ignored' | 'followed';
+  url: string | null;
+  method: string | null;
+  status: number | null;
+  authError: string | null;
+  /** `none` when the request carried no token, else `token`. */
+  sent: 'none' | 'token';
+  /** How the token now in storage relates to the one the verdict is about. */
+  stored: 'none' | 'same' | 'different';
+  tokenAgeHours: number | null;
+  tokenExpiresInHours: number | null;
+  page: 'visible' | 'hidden';
+  pageAgeMinutes: number;
+  /** How many identical decisions in a row this record stands for; a burst of refusals is one record, so it cannot push the cause out of the ring. */
+  count: number;
 };
 
 // ---------------------------

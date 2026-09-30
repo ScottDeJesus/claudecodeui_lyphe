@@ -161,6 +161,7 @@
     "rename": "이름 바꾸기",
     "renamePlaceholder": "채팅 이름",
     "running": "실행 중",
+    "awaitingInput": "답변을 기다리는 중",
     "stopTitle": "이 채팅은 아직 실행 중입니다",
     "stopBody": "중지하고 제거할까요?",
     "stopConfirm": "중지하고 제거",

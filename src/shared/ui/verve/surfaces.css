@@ -1,6 +1,6 @@
-/* Verve surface paint — every colour, size, radius, shadow and cursor rule for the two kit pieces
- * that are mechanism rather than appearance: DockableFab and SplitPane, plus the body classes a
- * drag of either one sets for its length.
+/* Verve surface paint — every colour, size, radius, shadow and cursor rule for the three kit pieces
+ * that are mechanism rather than appearance: DockableFab, SplitPane and ResizeGrip, plus the body
+ * classes a drag of any one sets for its length.
  *
  * The fourth paint file, opened rather than squeezed in: controls.css is past its stated ceiling,
  * feedback.css is at it, and board.css belongs to the board. README rule 6: the next file opens
@@ -58,7 +58,15 @@
  * fullscreen view. Accepted with one consequence: an application launched from the FAB draws on
  * AppSwitcherLayer (z-40), behind the opaque card, until the reader leaves fullscreen. The number
  * cannot be both above this FAB and below Dialog, and staying below Dialog is the one that matters:
- * above it, a dialog opened from fullscreen comes up invisibly and keeps the keyboard. */
+ * above it, a dialog opened from fullscreen comes up invisibly and keeps the keyboard.
+ *
+ * The seventh is a sibling more than a neighbour: the switcher's radial (AppSwitcherRadial.tsx), a
+ * `fixed inset-0` layer in this same container at `z-[60]`, THIS FAB'S OWN LEVEL, and later in the tree so
+ * it draws over the FAB it opened from (its items stand 170px off, so they never overlap it). It has to be
+ * at 60 and not below: an act drawn under the application it acts on, or under the floating chat's panel
+ * (`z-[45]`, ChatHostPanel.tsx), could not be pressed. It is `pointer-events: none` between its items, so
+ * the FAB, the panel and the application stay live around it. Dialogs and menus portal to body and stay
+ * above it. */
 .vv-fab {
   /* 28px drawn, at every width, docked or floating — the size the design draws
    * it. It is a way in and out, never the screen's subject, so it stays the
@@ -138,6 +146,36 @@
   -webkit-user-drag: none;
 }
 
+/* The dot: it is the reader's turn (an answer finished, a run waiting on them). 10px, hung on the rim at
+ * the top right — its corner 2px past the button's corner, measured from the padding box inside the 1px
+ * border, puts its centre on the circle's 45° point, 14px from the FAB's centre — inside the one button, so it is part of the node the pointer is captured on. The colour is the warning dot, the
+ * house's "pending": the FAB is the accent, and an accent dot on an accent circle is no dot at all. The
+ * amber fill alone is 2.2:1 against the light surface, under the 3:1 a mark of state needs, so its edge is
+ * the warning INK (a 1px border, 5:1 on the light surface and 9:1 on the dark one) and the fill stays the
+ * colour the reader knows as "pending". A 2px ring in the surface colour parts it from the FAB and from
+ * whatever the FAB is floating over, in both themes. The pop on arrival is the only motion; under reduced
+ * motion it simply appears. */
+.vv-fab__dot {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  box-sizing: border-box;
+  width: 10px;
+  height: 10px;
+  border: 1px solid var(--warn-ink);
+  border-radius: var(--radius-pill);
+  background: var(--warn-dot);
+  box-shadow: 0 0 0 2px var(--surface);
+  pointer-events: none;
+  animation: vv-fab-dot-in 0.25s var(--ease-spring) both;
+}
+@keyframes vv-fab-dot-in { from { opacity: 0; transform: scale(0.4); } to { opacity: 1; transform: none; } }
+/* Forced colours flattens both fills to the canvas, so the dot would vanish; it takes the system's
+ * highlight and a canvas ring, which is what forced colours draws for a mark of state. */
+@media (forced-colors: active) {
+  .vv-fab__dot { forced-color-adjust: none; background: Highlight; box-shadow: 0 0 0 2px Canvas; }
+}
+
 /* ---------------------------------------------------------------- SplitPane */
 /* `isolation` keeps the divider's z-index inside the split: its focus ring and hover cue only have to
  * draw over the two panes' edges, never over anything else on the page. */
@@ -204,6 +242,7 @@ body.vv-drag-split .vv-split__divider::before {
 @media (prefers-reduced-motion: reduce) {
   .vv-fab,
   .vv-split__divider::before { transition: none; }
+  .vv-fab__dot { animation: none; }
 }
 
 /* ---------------------------------------------------------------- The drag, for its length */
@@ -218,3 +257,91 @@ body.vv-dragging iframe { pointer-events: none; }
 body.vv-drag-fab,
 body.vv-drag-fab .vv-fab { cursor: grabbing; }
 body.vv-drag-split { cursor: col-resize; }
+/* A resize shows the corner the reader took hold of for its whole length, even once the pointer has
+ * left the grip: the body's cursor is what the pointer wears over the frames (inert, so they no longer
+ * set their own) and over the app around it. The grip carries its corner and its drag on its own
+ * attributes, so `:has()` reads the live grip and the body needs no class per corner. The two rules
+ * are the two diagonals: top-left and bottom-right share one, the other pair the other. */
+body.vv-drag-resize:has(.vv-resize-grip[data-dragging][data-corner='top-left']),
+body.vv-drag-resize:has(.vv-resize-grip[data-dragging][data-corner='bottom-right']) { cursor: nwse-resize; }
+body.vv-drag-resize:has(.vv-resize-grip[data-dragging][data-corner='top-right']),
+body.vv-drag-resize:has(.vv-resize-grip[data-dragging][data-corner='bottom-left']) { cursor: nesw-resize; }
+
+/* ---------------------------------------------------------------- ResizeGrip */
+/* The grip PAINTS and never places: the caller stands it at its corner (a component paints, a layout
+ * positions). A 16px hit area (24px under a finger) drawn as a small diagonal-lines glyph in
+ * `--ink-faint`, which holds 3:1 on the header ground and on the canvas ground in both themes (measured
+ * on the painted colours, .verify/chat-host-chrome.mjs). The glyph is three strokes in an inline SVG
+ * that ResizeGrip renders, drawn for the bottom-right corner and flipped here for the other three, so
+ * it reads as the panel's own corner and not as a stray mark; crisp at any zoom, where a hard-stop
+ * gradient stripes into hairlines. `touch-action: none` because the browser pans on a touch drag unless
+ * told the gesture is the page's.
+ *
+ * IT SITS IN A CORNER OF A CLIPPED, ROUNDED FRAME, which decides three things. The hit box is a small
+ * rounded square, not the house's 10px radius (which turns a 16px box into a circle that pokes past a
+ * rounded corner). The cue on hover is a wash of the ink over whatever ground the corner has (a
+ * translucent `color-mix`, so it reads on the header's ground and the canvas alike, in both themes)
+ * as well as a darker glyph: the hit area is small and a glyph that only changes colour hides how
+ * much of the corner is the handle. And the focus ring is drawn INSIDE the box (`outline-offset:
+ * -2px`): the house ring is 2px OUTSIDE, which at a corner is cut off by the frame's `overflow:
+ * hidden`, so a focused grip would show half a ring, or none, exactly where the reader is looking. */
+.vv-resize-grip {
+  --vv-grip-size: 16px;
+  display: block;
+  width: var(--vv-grip-size);
+  height: var(--vv-grip-size);
+  padding: 0;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--ink-faint);
+  touch-action: none;
+  -webkit-tap-highlight-color: transparent;
+  transition: color var(--dur-quick), background-color var(--dur-quick);
+}
+@media (pointer: coarse) {
+  .vv-resize-grip { --vv-grip-size: 24px; }
+}
+.vv-resize-grip[data-corner='top-left'],
+.vv-resize-grip[data-corner='bottom-right'] { cursor: nwse-resize; }
+.vv-resize-grip[data-corner='top-right'],
+.vv-resize-grip[data-corner='bottom-left'] { cursor: nesw-resize; }
+.vv-resize-grip > svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  /* The press lands on the button, never on a stroke of the glyph. */
+  pointer-events: none;
+}
+/* The glyph is drawn for bottom-right. Turned half a circle it is top-left (still "/"); mirrored
+ * across the horizontal it is top-right, across the vertical bottom-left (both "\"). */
+.vv-resize-grip[data-corner='top-left'] > svg { transform: rotate(180deg); }
+.vv-resize-grip[data-corner='top-right'] > svg { transform: scaleY(-1); }
+.vv-resize-grip[data-corner='bottom-left'] > svg { transform: scaleX(-1); }
+@media (hover: hover) {
+  .vv-resize-grip:hover {
+    background: color-mix(in srgb, var(--ink) 8%, transparent);
+    color: var(--ink-mid);
+  }
+}
+/* Two selectors on the ring so it outranks the house's `button:focus-visible` (tokens.css, which lands
+ * later in the cascade) on specificity and not on order. */
+.vv-resize-grip:focus-visible { outline-offset: -2px; }
+/* While it is held, the accent as TEXT ink (the accent fill is 2.8:1 on the canvas, under the graphics
+ * floor) on the accent's own wash: the reader's hand is on it, and it says so. */
+.vv-resize-grip[data-dragging],
+.vv-resize-grip[data-dragging]:hover {
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+}
+/* Forced colours drops the washes and flattens `color`, so the held grip takes the system's highlight. */
+@media (forced-colors: active) {
+  .vv-resize-grip[data-dragging] { color: Highlight; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .vv-resize-grip { transition: none; }
+}

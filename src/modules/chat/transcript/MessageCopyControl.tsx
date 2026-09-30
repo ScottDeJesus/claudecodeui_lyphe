@@ -3,6 +3,7 @@ import type { CSSProperties } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 
+import { useHostWindow } from '@/shared/context/HostWindowContext';
 import { copyTextToClipboard } from '@/shared/utils';
 
 const COPY_SUCCESS_TIMEOUT_MS = 2000;
@@ -51,16 +52,23 @@ const MessageCopyControl = ({
   messageType: 'user' | 'assistant';
 }) => {
   const { t } = useTranslation('chat');
+  // The window the row is drawn in: the menu is measured against its viewport, portalled into its
+  // body and closed by events on it, the copy goes through its clipboard, and the "copied" tick is
+  // timed on it (a hidden opener throttles its timers).
+  const hostWindow = useHostWindow();
   const canSelectCopyFormat = messageType === 'assistant';
   const defaultFormat: CopyFormat = canSelectCopyFormat ? 'markdown' : 'text';
   const [selectedFormat, setSelectedFormat] = useState<CopyFormat>(defaultFormat);
-  const [copied, setCopied] = useState(false);
+  // When the last copy landed, or null: the tick shows while it is set, and the effect below clears it
+  // after `COPY_SUCCESS_TIMEOUT_MS`. A stamp rather than a boolean so a second copy inside the window
+  // restarts the tick instead of inheriting the first one's deadline.
+  const [copiedAt, setCopiedAt] = useState<number | null>(null);
+  const copied = copiedAt !== null;
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [menuStyle, setMenuStyle] = useState<CSSProperties>({});
   const dropdownRef = useRef<HTMLDivElement | null>(null);
   const triggerRef = useRef<HTMLButtonElement | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
-  const copyFeedbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // The dropdown is rendered in a portal, not inside the row: `position: fixed` is only
   // viewport-anchored while no ancestor between the menu and the root becomes its containing
@@ -77,16 +85,16 @@ const MessageCopyControl = ({
       // x=75, which put the panel's left edge at -49. Capping `right` at
       // `innerWidth - width - margin` keeps that edge on screen without moving the common case.
       const MENU_MIN_WIDTH = 144;
-      const openUp = rect.bottom + ESTIMATED_MENU_HEIGHT + 8 > window.innerHeight;
+      const openUp = rect.bottom + ESTIMATED_MENU_HEIGHT + 8 > hostWindow.innerHeight;
       setMenuStyle({
         position: 'fixed',
         right: Math.min(
-          Math.max(8, window.innerWidth - rect.right),
-          Math.max(8, window.innerWidth - MENU_MIN_WIDTH - 8),
+          Math.max(8, hostWindow.innerWidth - rect.right),
+          Math.max(8, hostWindow.innerWidth - MENU_MIN_WIDTH - 8),
         ),
         zIndex: 1000,
         ...(openUp
-          ? { bottom: window.innerHeight - rect.top + 4 }
+          ? { bottom: hostWindow.innerHeight - rect.top + 4 }
           : { top: rect.bottom + 4 }),
       });
     }
@@ -139,36 +147,32 @@ const MessageCopyControl = ({
     // detach from the trigger.
     const closeOnScroll = () => setIsDropdownOpen(false);
 
-    window.addEventListener('mousedown', closeOnOutsideClick);
-    window.addEventListener('scroll', closeOnScroll, true);
-    window.addEventListener('resize', closeOnScroll);
+    hostWindow.addEventListener('mousedown', closeOnOutsideClick);
+    hostWindow.addEventListener('scroll', closeOnScroll, true);
+    hostWindow.addEventListener('resize', closeOnScroll);
     return () => {
-      window.removeEventListener('mousedown', closeOnOutsideClick);
-      window.removeEventListener('scroll', closeOnScroll, true);
-      window.removeEventListener('resize', closeOnScroll);
+      hostWindow.removeEventListener('mousedown', closeOnOutsideClick);
+      hostWindow.removeEventListener('scroll', closeOnScroll, true);
+      hostWindow.removeEventListener('resize', closeOnScroll);
     };
-  }, [isDropdownOpen]);
+  }, [isDropdownOpen, hostWindow]);
 
+  // The tick clears itself. An effect keyed on the window, not a timer armed once in the handler: a
+  // timer armed on a floating window dies with that window, and chat-host closes the window to bring
+  // the chat home — the tick would then stay until the next click. A move changes `hostWindow`, so
+  // the effect re-arms on the window the row now stands in.
   useEffect(() => {
-    return () => {
-      if (copyFeedbackTimerRef.current) {
-        clearTimeout(copyFeedbackTimerRef.current);
-      }
-    };
-  }, []);
+    if (copiedAt === null) return;
+    const timer = hostWindow.setTimeout(() => setCopiedAt(null), COPY_SUCCESS_TIMEOUT_MS);
+    return () => hostWindow.clearTimeout(timer);
+  }, [copiedAt, hostWindow]);
 
   const handleCopyClick = async () => {
     if (!copyPayload.trim()) return;
-    const didCopy = await copyTextToClipboard(copyPayload);
+    const didCopy = await copyTextToClipboard(copyPayload, hostWindow);
     if (!didCopy) return;
 
-    setCopied(true);
-    if (copyFeedbackTimerRef.current) {
-      clearTimeout(copyFeedbackTimerRef.current);
-    }
-    copyFeedbackTimerRef.current = setTimeout(() => {
-      setCopied(false);
-    }, COPY_SUCCESS_TIMEOUT_MS);
+    setCopiedAt(Date.now());
   };
 
   const handleFormatChange = (format: CopyFormat) => {
@@ -261,7 +265,7 @@ const MessageCopyControl = ({
                 );
               })}
             </div>,
-            document.body,
+            hostWindow.document.body,
           )}
         </>
       )}

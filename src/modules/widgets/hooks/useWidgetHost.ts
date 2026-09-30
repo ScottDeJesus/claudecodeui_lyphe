@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { RefObject } from 'react';
 
 import { readVerveTokens } from '@/modules/widgets/readVerveTokens';
+import { useHostWindow } from '@/shared/context/HostWindowContext';
 import { useTheme } from '@/shared/context/ThemeContext';
 import type { WidgetHostHandlers, WidgetHostMessage } from '@/shared/types';
 
@@ -15,6 +16,56 @@ import type { WidgetHostHandlers, WidgetHostMessage } from '@/shared/types';
  */
 const MIN_WIDGET_HEIGHT = 24;
 const MAX_WIDGET_HEIGHT = 2000;
+
+/**
+ * One poster per window, made in that window's own realm — see `postAsHostWindow`.
+ * Module-private: `postToFrame` below is the only caller.
+ */
+const postersByWindow = new WeakMap<Window, (target: Window, message: WidgetHostMessage) => void>();
+
+/**
+ * Posts `message` to `target` (a widget frame's window) AS `hostWindow`, so the frame sees its own
+ * `parent` as the sender.
+ *
+ * WHY THIS IS NOT JUST `target.postMessage(...)`. A message's `event.source` is the window whose
+ * SCRIPT made the call, and every line of this app runs in the opener's realm — even while the chat
+ * is drawn in a picture-in-picture window. The widget bridge accepts a message only when
+ * `event.source === window.parent` (`widgetBridgeScript.ts`), and for a frame in the floating window
+ * that parent is the floating window. A post made straight from here arrives from the OPENER, and the
+ * bridge drops it in silence: no `theme` applied, no `data`, not even the host's refusal of a topic
+ * (measured 2026-09-29: the frame's own listener saw the message, `live.theme` stayed null). So the
+ * call is made by a function CREATED in `hostWindow`'s realm, whose realm is then the caller.
+ *
+ * At home `hostWindow` is the global window and the call is the direct one it always was. If the
+ * window refuses to build the function, the direct post is the fallback and the refusal is logged —
+ * the widget then hears nothing, and that has to be findable rather than silent.
+ */
+function postAsHostWindow(hostWindow: Window, target: Window, message: WidgetHostMessage): void {
+  if (hostWindow === window) {
+    target.postMessage(message, '*');
+    return;
+  }
+  let poster = postersByWindow.get(hostWindow);
+  if (!poster) {
+    try {
+      poster = new (hostWindow as Window & typeof globalThis).Function(
+        'target',
+        'message',
+        'target.postMessage(message, "*");',
+      ) as (target: Window, message: WidgetHostMessage) => void;
+    } catch (error) {
+      console.warn('Widget host: the floating window would not build a poster; posting from the opener, which a widget drops', error);
+      poster = (frameWindow, payload) => frameWindow.postMessage(payload, '*');
+    }
+    postersByWindow.set(hostWindow, poster);
+  }
+  try {
+    poster(target, message);
+  } catch (error) {
+    // A window that closed under a delivery: the frame went with it, and the chat is on its way home.
+    console.warn('Widget host: could not post to a frame in a window that is going away', error);
+  }
+}
 
 /**
  * The page's half of the widget protocol: one message listener per frame, and the two things the
@@ -59,6 +110,11 @@ export function useWidgetHost(
   handlers: WidgetHostHandlers,
 ): { height: number; postToFrame: (message: WidgetHostMessage) => void; onFrameLoad: () => void } {
   const { isDarkMode } = useTheme();
+  // The window the frame is drawn in. A widget posts to its `parent`, and in a picture-in-picture
+  // window that parent is THAT window, so the `message` listener below binds to it and every post to
+  // the frame is made as it (`postAsHostWindow`). The theme message's tokens are NOT read from it:
+  // they come from the opener's document, for the reason `postTheme` gives.
+  const hostWindow = useHostWindow();
 
   // The frame's own reported height, clamped. It is state because it is the iframe's rendered
   // height: a widget that grows after load (a chart drawing, a list filling in) has no other way
@@ -104,13 +160,21 @@ export function useWidgetHost(
       // is never posted into again. The payload is the theme flag and the app's CSS token values
       // — nothing addressed to a widget is a secret. If either of those ever stops being true,
       // this is where the DocSpace frame's real origin has to start being named.
-      frameRef.current?.contentWindow?.postMessage(message, '*');
+      const target = frameRef.current?.contentWindow;
+      if (target) postAsHostWindow(hostWindow, target, message);
     },
-    [frameRef],
+    [frameRef, hostWindow],
   );
 
+  // The tokens are read from the OPENER's document, on purpose, and not from the window's copy of
+  // `<html>`. `ThemeProvider` writes the theme there in a layout effect, so this passive effect reads
+  // the theme that was just chosen; the window's copy is kept by chat-host's mirror through a
+  // MutationObserver, which runs AFTER this effect on a click-driven flip — reading it here posted the
+  // new `dark` flag with the PREVIOUS theme's tokens, one flip behind on every flip (measured
+  // 2026-09-29). The tokens are theme values, and the window's sheets are clones of the opener's, so
+  // once the mirror catches up the window computes the same ones. An opener fact, named.
   const postTheme = useCallback(() => {
-    postToFrame({ type: 'theme', dark: isDarkMode, tokens: readVerveTokens() });
+    postToFrame({ type: 'theme', dark: isDarkMode, tokens: readVerveTokens(document) });
   }, [isDarkMode, postToFrame]);
 
   // `postTheme` changes identity on every theme flip. The message listener below reaches it
@@ -176,11 +240,12 @@ export function useWidgetHost(
       }
     };
 
-    window.addEventListener('message', onMessage);
-    return () => window.removeEventListener('message', onMessage);
-    // Both dependencies are stable for the life of the frame, so this listener is added once and
-    // removed once — never re-installed underneath a message already in flight.
-  }, [frameRef, postToFrame]);
+    hostWindow.addEventListener('message', onMessage);
+    return () => hostWindow.removeEventListener('message', onMessage);
+    // The first two dependencies are stable for the life of the frame and the window changes only
+    // when the chat moves between hosts, so this listener is added once per window and removed once
+    // — never re-installed underneath a message already in flight.
+  }, [frameRef, postToFrame, hostWindow]);
 
   // A theme flip re-posts into the living document rather than rebuilding it. Rebuilding would
   // reload every widget on the screen and throw away whatever state each had built up.

@@ -161,6 +161,7 @@
     "rename": "重命名",
     "renamePlaceholder": "对话名称",
     "running": "运行中",
+    "awaitingInput": "正在等待你的回答",
     "stopTitle": "此对话仍在运行",
     "stopBody": "要停止并移除吗?",
     "stopConfirm": "停止并移除",

@@ -3,6 +3,8 @@ import type { ReactNode, RefObject } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ChevronDownIcon } from 'lucide-react';
 
+import { useHostWindow } from '@/shared/context/HostWindowContext';
+import { resizeObserverIn } from '@/shared/utils';
 import { useIsExportingTranscript } from '@/modules/chat/context/TranscriptRenderContext';
 
 /** Height a long turn folds to. */
@@ -34,15 +36,18 @@ function FoldMeasurement({
   contentRef: RefObject<HTMLDivElement | null>;
   onMeasure: (isLong: boolean) => void;
 }) {
+  // The observer is built by the constructor of the window the turn is drawn in: it delivers on
+  // that window's frames, and a hidden opener draws none. A move builds a new one.
+  const hostWindow = useHostWindow();
   useLayoutEffect(() => {
     const element = contentRef.current;
     if (!element) return undefined;
     const measure = () => onMeasure(element.scrollHeight > FOLD_OVER_PX);
     measure();
-    const observer = new ResizeObserver(measure);
-    observer.observe(element);
-    return () => observer.disconnect();
-  }, [contentRef, onMeasure]);
+    const observer = resizeObserverIn(hostWindow, measure);
+    observer?.observe(element);
+    return () => observer?.disconnect();
+  }, [contentRef, onMeasure, hostWindow]);
 
   return null;
 }

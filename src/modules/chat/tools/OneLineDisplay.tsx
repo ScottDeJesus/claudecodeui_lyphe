@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 
+import { useHostWindow } from '@/shared/context/HostWindowContext';
 import { cn, copyTextToClipboard } from '@/shared/utils';
 import { ToolStatusBadge } from '@/modules/chat/tools/ToolStatusBadge';
 import { ToolOutcomeBadge } from '@/modules/chat/tools/ToolOutcomeBadge';
@@ -70,7 +71,18 @@ export const OneLineDisplay: React.FC<OneLineDisplayProps> = ({
   outcome = null,
   detail,
 }) => {
+  // The window the row is drawn in: the copy goes through its clipboard and the tick is timed on it.
+  const hostWindow = useHostWindow();
   const [copied, setCopied] = useState(false);
+  // The tick clears itself. An effect keyed on the window, not a timer armed once in the handler: a
+  // timer armed on a floating window dies with that window, and chat-host closes the window to bring
+  // the chat home — the tick would then stay until the next click. A move changes `hostWindow`, so
+  // the effect re-arms on the window the row now stands in.
+  useEffect(() => {
+    if (!copied) return;
+    const timer = hostWindow.setTimeout(() => setCopied(false), 2000);
+    return () => hostWindow.clearTimeout(timer);
+  }, [copied, hostWindow]);
   const trimmedDetail = (detail || '').replace(/\s+$/, '');
   const canExpand = trimmedDetail.length > 0;
   const detailLineCount = canExpand ? trimmedDetail.split('\n').length : 0;
@@ -88,10 +100,9 @@ export const OneLineDisplay: React.FC<OneLineDisplayProps> = ({
   const handleAction = async (event: React.MouseEvent) => {
     event.stopPropagation();
     if (action === 'copy' && value) {
-      const didCopy = await copyTextToClipboard(value);
+      const didCopy = await copyTextToClipboard(value, hostWindow);
       if (!didCopy) return;
       setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
     } else if (onAction) {
       onAction();
     }

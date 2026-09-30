@@ -164,6 +164,7 @@
     "rename": "Yeniden adlandır",
     "renamePlaceholder": "Sohbet adı",
     "running": "Çalışıyor",
+    "awaitingInput": "Yanıtınız bekleniyor",
     "stopTitle": "Bu sohbet hâlâ çalışıyor",
     "stopBody": "Durdurulsun ve kaldırılsın mı?",
     "stopConfirm": "Durdur ve kaldır",

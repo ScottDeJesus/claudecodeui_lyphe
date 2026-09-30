@@ -64,7 +64,7 @@ function sanitizeTokenValue(value: string): string {
 /**
  * @param input.body   The fence body verbatim — the model's own HTML.
  * @param input.dark   Whether the page is currently in dark mode.
- * @param input.tokens The Verve tokens to declare on `:root`, from `readVerveTokens()`.
+ * @param input.tokens The Verve tokens to declare on `:root`, from `readVerveTokens(hostDocument)`.
  */
 export function buildWidgetDocument(input: { body: string; dark: boolean; tokens: Record<string, string> }): string {
   const declarations = Object.entries(input.tokens)

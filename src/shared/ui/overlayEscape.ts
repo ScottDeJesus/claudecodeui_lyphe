@@ -34,14 +34,15 @@ export const OWNS_ESCAPE_SELECTOR = '[data-owns-escape]';
  *    already honours ("a new one claims the key the same way", above).
  * A fullscreen surface carries the marker itself while it is up, so the surfaces are excluded by
  * their own attribute: one fullscreen card must not stand down for itself, or for the other.
+ * The document asked is the caller's host document (`useHostWindow().document`), because a panel open
+ * in a picture-in-picture window lives in that window's document, not the opener's.
  *
  * They cannot win this by `stopPropagation`: two listeners on the same `window` capture stage both
  * run, and a panel listening lower never gets the chance — so without asking, one press left
  * fullscreen and left the panel in front of it open (measured by Athena's review).
  */
-export function otherOverlayHoldsEscape(): boolean {
-  if (typeof document === 'undefined') return false;
-  return document.querySelector(
+export function otherOverlayHoldsEscape(doc: Document): boolean {
+  return doc.querySelector(
     '[role="dialog"][aria-modal="true"], [data-owns-escape]:not([data-shape-fullscreen]):not([data-fullscreen])',
   ) !== null;
 }

@@ -1,9 +1,13 @@
 import type { TFunction } from 'i18next';
 
+import {
+  getAllSessions,
+  getCreatedTimestamp,
+  getSessionDate,
+  getUpdatedTimestamp,
+} from '@/shared/sessionRecency';
 import type {
-  LLMProvider,
   Project,
-  ProjectSession,
   ProjectSortOrder,
   SessionWithProvider,
   SettingsProject,
@@ -34,25 +38,6 @@ export const formatCompactAge = (
   return hours < 24 ? `${hours}hr` : `${Math.floor(hours / 24)}d`;
 };
 
-const getCreatedTimestamp = (session: SessionWithProvider): string => {
-  return String(session.createdAt || session.created_at || '');
-};
-
-const getUpdatedTimestamp = (session: SessionWithProvider): string => {
-  return String(session.lastActivity || '');
-};
-
-const getSessionProvider = (session: ProjectSession): LLMProvider => {
-  const provider = session.__provider ?? session.provider;
-  return typeof provider === 'string' && provider.trim()
-    ? provider as LLMProvider
-    : 'claude';
-};
-
-const getSessionDate = (session: SessionWithProvider): Date => {
-  return new Date(getUpdatedTimestamp(session) || getCreatedTimestamp(session) || 0);
-};
-
 const getSessionName = (session: SessionWithProvider, t: TFunction): string => {
   return session.summary || session.name || t('projects.newSession');
 };
@@ -75,35 +60,6 @@ export const createSessionViewModel = (
     sessionTime: getSessionTime(session),
     messageCount: Number(session.messageCount || 0),
   };
-};
-
-/**
- * Cached against the project object, not its id.
- *
- * Every sidebar render asks for each project's sessions, and this builds a new
- * array of new session objects. Without the cache the array is a different
- * reference each time, which is enough on its own to defeat the memo boundary
- * on every project and session row. `useProjectsState` always replaces a
- * project rather than mutating it, so a stale entry is unreachable: a changed
- * project is a different key.
- */
-const sortedSessionsByProject = new WeakMap<Project, SessionWithProvider[]>();
-
-export const getAllSessions = (project: Project): SessionWithProvider[] => {
-  const cached = sortedSessionsByProject.get(project);
-  if (cached) {
-    return cached;
-  }
-
-  const sessions = (project.sessions || []).map((session) => ({
-    ...session,
-    __provider: getSessionProvider(session),
-  })).sort(
-    (a, b) => getSessionDate(b).getTime() - getSessionDate(a).getTime(),
-  );
-
-  sortedSessionsByProject.set(project, sessions);
-  return sessions;
 };
 
 const getProjectLastActivity = (project: Project): Date => {

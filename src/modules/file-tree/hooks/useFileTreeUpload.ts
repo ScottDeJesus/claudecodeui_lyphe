@@ -123,10 +123,11 @@ const uploadFormDataWithProgress = (
     xhr.onload = () => {
       const refreshedToken = xhr.getResponseHeader('X-Refreshed-Token');
       if (refreshedToken) {
-        storeAuthToken(refreshedToken);
+        storeAuthToken(refreshedToken, { trigger: 'refresh-header', url: api.uploadFilesUrl(projectId), method: 'POST', status: xhr.status });
       }
-      if (xhr.getResponseHeader('X-Auth-Error')) {
-        expireAuthSession();
+      const authError = xhr.getResponseHeader('X-Auth-Error');
+      if (authError) {
+        expireAuthSession({ trigger: 'upload-verdict', token: token ?? null, url: api.uploadFilesUrl(projectId), method: 'POST', status: xhr.status, authError });
       }
 
       const payload = parseUploadResponse(xhr);

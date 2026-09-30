@@ -11,7 +11,24 @@ import { readVerveTokens } from '@/modules/widgets/readVerveTokens';
 import { WidgetErrorCard } from '@/modules/widgets/WidgetErrorCard';
 import { useWidgetBridge } from '@/modules/widgets/hooks/useWidgetBridge';
 import { useWidgetHost } from '@/modules/widgets/hooks/useWidgetHost';
+import { useHostWindow } from '@/shared/context/HostWindowContext';
 import { otherOverlayHoldsEscape } from '@/shared/ui/overlayEscape';
+
+/**
+ * A small number per window, so a React key can name "the window this card is drawn in".
+ * Module-private: the one place a frame's identity is tied to its window is `WidgetFrame` below.
+ */
+const windowIds = new WeakMap<Window, number>();
+let nextWindowId = 0;
+function windowKey(win: Window): number {
+  let id = windowIds.get(win);
+  if (id === undefined) {
+    id = nextWindowId;
+    nextWindowId += 1;
+    windowIds.set(win, id);
+  }
+  return id;
+}
 
 /**
  * The raw source a widget falls back to, in the spelling `MermaidDiagram` uses for its own
@@ -127,16 +144,30 @@ export function WidgetFrame({
   // in front of it and the press is the dialog's — and so is a panel that owns the key, a menu or a
   // Select opened on top of it. It is asked for rather than out-raced — see `otherOverlayHoldsEscape`. The listener exists only while fullscreen is on, so an ordinary card never
   // touches the key at all.
+  //
+  // THE WINDOW IS THE ONE THE CHAT IS DRAWN IN. A card lives in the transcript, and the transcript can
+  // stand in a picture-in-picture window, where a key pressed reaches that window and never the opener:
+  // the listener binds to it, asks its document who holds Escape, and binds again when the chat moves.
+  const hostWindow = useHostWindow();
+  // WHICH WINDOW THE FRAMES BELOW ARE KEYED ON. A frame carried into another window's document is
+  // reloaded by the browser, and the host reads a second `load` on an element as the widget
+  // navigating itself away — revoking it for good, so a widget moved into the floating window would
+  // never hear its theme or its data again (measured 2026-09-29: 0 theme messages after the move,
+  // 1 before). Keyed on the window, a move arrives as a NEW element: one load in its life, a
+  // fresh listener on the window it stands in, fresh bus subscriptions (the reloaded document
+  // asks for its topics again, and the old element's are swept), and an srcdoc dressed by the new
+  // window's tokens. Nothing is lost that the reload had not already lost.
+  const hostKey = windowKey(hostWindow);
   useEffect(() => {
     if (!fullscreen) return undefined;
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape' || otherOverlayHoldsEscape()) return;
+      if (event.key !== 'Escape' || otherOverlayHoldsEscape(hostWindow.document)) return;
       event.stopPropagation();
       setFullscreen(false);
     };
-    window.addEventListener('keydown', onKeyDown, true);
-    return () => window.removeEventListener('keydown', onKeyDown, true);
-  }, [fullscreen]);
+    hostWindow.addEventListener('keydown', onKeyDown, true);
+    return () => hostWindow.removeEventListener('keydown', onKeyDown, true);
+  }, [fullscreen, hostWindow]);
 
   if (!mounted || streaming) {
     return <pre className={FALLBACK_CLASSES}>{code.trim()}</pre>;
@@ -163,7 +194,7 @@ export function WidgetFrame({
     // permanently, so an in-place swap would silently kill a healthy embed.
     const live = (
       <DocSpaceFrame
-        key={code}
+        key={`${hostKey}:${code}`}
         pageId={shape.ref.pageId}
         blockId={shape.ref.blockId}
         framed={framed}
@@ -223,7 +254,7 @@ export function WidgetFrame({
   // console line, the widget simply never receiving a theme flip or (under the live bus) any data
   // again, since revocation is by design never lifted. With it, an element loads exactly one
   // document in its life, so a second load can only be a navigation.
-  const live = <WidgetFrameLive key={code} code={code} framed={framed} fill={filling} />;
+  const live = <WidgetFrameLive key={`${hostKey}:${code}`} code={code} framed={framed} fill={filling} />;
   // `openUrl: null`: an HTML widget is model output composed here, not a page on another service,
   // so there is nothing outside this app to open it in. The caller reads that null as "no action".
   return frame ? frame({ kind: 'html', openUrl: null, title: null, ...fullscreenState }, live) : live;
@@ -237,6 +268,9 @@ function WidgetFrameLive({ code, framed, fill }: { code: string; framed?: boolea
   const frameRef = useRef<HTMLIFrameElement>(null);
   const handlers = useWidgetBridge();
   const { height, onFrameLoad } = useWidgetHost(frameRef, handlers);
+  // The document the card is drawn in: the theme of this instant is read where the widget is looked
+  // at, which for a chat standing in a picture-in-picture window is that window's copy of `<html>`.
+  const hostDocument = useHostWindow().document;
 
   // Built once, and deliberately not per theme: assigning a new srcdoc is a reload, so a theme
   // flip would restart every widget on screen and discard whatever state it had built up. The
@@ -245,17 +279,18 @@ function WidgetFrameLive({ code, framed, fill }: { code: string; framed?: boolea
   // under this instance — the caller's key guarantees it — so the memo holds for the frame's
   // whole life and this element's `srcdoc` is written exactly once.
   //
-  // Both inputs are therefore read from the live document at the same instant, and dark-ness is
-  // read the way the tokens are — off `<html>`, which is where ThemeProvider writes it. Taking
+  // Both inputs are therefore read from the live host document at the same instant, and dark-ness is
+  // read the way the tokens are — off `<html>`, which is where ThemeProvider writes it (a window's
+  // copy of it is kept current by chat-host's mirror). Taking
   // it from `useTheme()` instead would put a value in this closure that the dependency list
   // does not carry, which is the shape of a stale-render bug even when it happens to agree.
   const doc = useMemo(
     () => buildWidgetDocument({
       body: code,
-      dark: document.documentElement.classList.contains('dark'),
-      tokens: readVerveTokens(),
+      dark: hostDocument.documentElement.classList.contains('dark'),
+      tokens: readVerveTokens(hostDocument),
     }),
-    [code],
+    [code, hostDocument],
   );
 
   return (

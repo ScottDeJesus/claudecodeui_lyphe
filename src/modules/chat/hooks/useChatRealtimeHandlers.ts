@@ -1,12 +1,14 @@
-import { useEffect, useRef } from 'react';
-import type { Dispatch, MutableRefObject, SetStateAction } from 'react';
+import { useEffect, useLayoutEffect, useRef } from 'react';
+import type { Dispatch, MutableRefObject, RefObject, SetStateAction } from 'react';
 
-import type { ServerEvent,MarkSessionIdle,MarkSessionProcessing,PendingPermissionRequest,ProjectSession,LLMProvider,NormalizedMessage } from '@/shared/types';
+import type { ServerEvent,MarkSessionIdle,MarkSessionProcessing,PendingPermissionRequest,ProjectSession,LLMProvider,NormalizedMessage,StreamFlushTimer } from '@/shared/types';
 import { showCompletionTitleIndicator } from '@/modules/chat/utils/pageTitleNotification';
 import { useToast } from '@/shared/context/ToastContext';
+import { useHostMove, useHostWindow } from '@/shared/context/HostWindowContext';
 import { playChatCompletionSound, playNotificationSound } from '@/shared/utils';
 import type { SessionStore } from '@/modules/chat/hooks/useSessionStore';
 import { markPermissionSettled, wasPermissionSettled } from '@/modules/chat/tools/toolOutcome';
+import { armStreamFlush, clearStreamFlush, flushStreamNow } from '@/modules/chat/utils/streamFlushTimer';
 
 const isActionablePermissionRequest = (request: { toolName?: unknown } | null | undefined): boolean => {
   return request?.toolName !== 'ExitPlanMode' && request?.toolName !== 'exit_plan_mode';
@@ -74,8 +76,10 @@ type UseChatRealtimeHandlersArgs = {
   setTokenBudget: (budget: Record<string, unknown> | null) => void;
   pendingPermissionRequests: PendingPermissionRequest[];
   setPendingPermissionRequests: Dispatch<SetStateAction<PendingPermissionRequest[]>>;
-  streamTimerRef: MutableRefObject<number | null>;
+  streamTimerRef: MutableRefObject<StreamFlushTimer | null>;
   accumulatedStreamRef: MutableRefObject<string>;
+  /** The transcript's scroller: its own document names the window the chat stands in the moment a move lands. */
+  scrollContainerRef: RefObject<HTMLElement | null>;
   /**
    * Highest live `seq` observed per session. Essential for reconnect catch-up:
    * `chat.subscribe` sends this value as `lastSeq` so the server replays only
@@ -116,6 +120,7 @@ export function useChatRealtimeHandlers({
   setPendingPermissionRequests,
   streamTimerRef,
   accumulatedStreamRef,
+  scrollContainerRef,
   lastSeqRef,
   statusCheckSentAtRef,
   onSessionProcessing,
@@ -125,6 +130,27 @@ export function useChatRealtimeHandlers({
   sessionStore,
 }: UseChatRealtimeHandlersArgs) {
   const pushToast = useToast();
+
+  // The window the next stream flush is armed on. A ref rather than state because the socket
+  // listener reads it at arm time, nothing renders from it, and the context's `hostWindow` changes
+  // on the render AFTER a move: a delta landing between the move and that render would otherwise
+  // arm on the window the chat just left. The 'after' listener sets it from the transcript's own
+  // element (the truth the instant the node lands); the layout effect keeps it in step with the
+  // context whenever that changes.
+  const hostWindow = useHostWindow();
+  const armingWindowRef = useRef<Window>(hostWindow);
+  useLayoutEffect(() => {
+    armingWindowRef.current = hostWindow;
+  }, [hostWindow]);
+  useHostMove(({ phase }) => {
+    if (phase === 'before') {
+      // A flush pending on the window being left is run now, so a timer armed on a closing window
+      // is never lost with it.
+      flushStreamNow(streamTimerRef);
+      return;
+    }
+    armingWindowRef.current = scrollContainerRef.current?.ownerDocument.defaultView ?? armingWindowRef.current;
+  });
 
   // Session switches can send `chat.subscribe` before this effect has a chance
   // to rebind the websocket listener. Read the visible session id from a ref
@@ -279,12 +305,11 @@ export function useChatRealtimeHandlers({
         if (!text) return;
         accumulatedStreamRef.current += text;
         if (!streamTimerRef.current) {
-          streamTimerRef.current = window.setTimeout(() => {
-            streamTimerRef.current = null;
+          armStreamFlush(streamTimerRef, armingWindowRef.current, () => {
             if (sid) {
               sessionStore.updateStreaming(sid, accumulatedStreamRef.current, provider);
             }
-          }, 100);
+          });
         }
         // Also route to store for non-active sessions
         if (sid && sid !== activeViewSessionId) {
@@ -294,10 +319,7 @@ export function useChatRealtimeHandlers({
       }
 
       if (msg.kind === 'stream_end') {
-        if (streamTimerRef.current) {
-          clearTimeout(streamTimerRef.current);
-          streamTimerRef.current = null;
-        }
+        clearStreamFlush(streamTimerRef);
         if (sid) {
           if (accumulatedStreamRef.current) {
             sessionStore.updateStreaming(sid, accumulatedStreamRef.current, provider);
@@ -338,10 +360,7 @@ export function useChatRealtimeHandlers({
       switch (msg.kind) {
         case 'complete': {
           // Flush any remaining streaming state
-          if (streamTimerRef.current) {
-            clearTimeout(streamTimerRef.current);
-            streamTimerRef.current = null;
-          }
+          clearStreamFlush(streamTimerRef);
           if (sid && accumulatedStreamRef.current) {
             sessionStore.updateStreaming(sid, accumulatedStreamRef.current, provider);
             sessionStore.finalizeStreaming(sid);

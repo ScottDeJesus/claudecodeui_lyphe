@@ -12,6 +12,9 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 
+import { useHostWindow } from '@/shared/context/HostWindowContext';
+import { isNodeLike } from '@/shared/utils';
+
 type CommandMenuCommand = {
   name: string;
   description?: string;
@@ -90,12 +93,13 @@ const getNamespaceIcon = (namespace: string) => namespaceIcons[namespace] || nam
 const getNamespaceAccentClass = (namespace: string) =>
   namespaceAccentClasses[namespace] || namespaceAccentClasses.other;
 
-const getMenuPosition = (position: { top: number; left: number; bottom?: number }): CSSProperties => {
-  if (typeof window === 'undefined') {
-    return { position: 'fixed', top: '16px', left: '16px' };
-  }
-  const maxAnchorBottom = Math.max(MENU_EDGE_GAP, window.innerHeight - MENU_EDGE_GAP - MENU_MIN_HEIGHT);
-  if (window.innerWidth < 640) {
+/** Placed against the viewport of the window the composer is drawn in, which is `hostWindow`'s. */
+const getMenuPosition = (
+  position: { top: number; left: number; bottom?: number },
+  hostWindow: Window,
+): CSSProperties => {
+  const maxAnchorBottom = Math.max(MENU_EDGE_GAP, hostWindow.innerHeight - MENU_EDGE_GAP - MENU_MIN_HEIGHT);
+  if (hostWindow.innerWidth < 640) {
     const anchorBottom = Math.min(Math.max(MENU_EDGE_GAP, position.bottom ?? 90), maxAnchorBottom);
     return {
       position: 'fixed',
@@ -110,7 +114,7 @@ const getMenuPosition = (position: { top: number; left: number; bottom?: number 
   const anchorBottom = Math.min(Math.max(MENU_EDGE_GAP, position.bottom ?? 90), maxAnchorBottom);
   const clampedLeft = Math.max(
     MENU_EDGE_GAP,
-    Math.min(position.left, window.innerWidth - 440 - MENU_EDGE_GAP),
+    Math.min(position.left, hostWindow.innerWidth - 440 - MENU_EDGE_GAP),
   );
 
   return {
@@ -138,23 +142,25 @@ export default function CommandMenu({
 }: CommandMenuProps) {
   const menuRef = useRef<HTMLDivElement | null>(null);
   const selectedItemRef = useRef<HTMLDivElement | null>(null);
-  const menuPosition = getMenuPosition(position);
+  const hostWindow = useHostWindow();
+  const menuPosition = getMenuPosition(position, hostWindow);
 
   useEffect(() => {
     if (!isOpen) {
       return;
     }
     const handleClickOutside = (event: MouseEvent) => {
-      if (!menuRef.current || !(event.target instanceof Node)) {
+      if (!menuRef.current || !isNodeLike(event.target)) {
         return;
       }
       if (!menuRef.current.contains(event.target)) {
         onClose();
       }
     };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [isOpen, onClose]);
+    const hostDocument = hostWindow.document;
+    hostDocument.addEventListener('mousedown', handleClickOutside);
+    return () => hostDocument.removeEventListener('mousedown', handleClickOutside);
+  }, [isOpen, onClose, hostWindow]);
 
   useEffect(() => {
     if (!selectedItemRef.current || !menuRef.current) {
@@ -223,8 +229,7 @@ export default function CommandMenu({
     : ['builtin', 'skill', 'project', 'user', 'other'];
   const extraNamespaces = Object.keys(groupedCommands).filter((namespace) => !preferredOrder.includes(namespace));
   const orderedNamespaces = [...preferredOrder, ...extraNamespaces].filter((namespace) => groupedCommands[namespace]);
-  const renderInPortal = (node: ReactElement) =>
-    typeof document === 'undefined' ? node : createPortal(node, document.body);
+  const renderInPortal = (node: ReactElement) => createPortal(node, hostWindow.document.body);
 
   if (commands.length === 0) {
     return renderInPortal(

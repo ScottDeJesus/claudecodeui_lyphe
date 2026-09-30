@@ -1,13 +1,15 @@
 import { useState } from 'react';
 import type { KeyboardEvent } from 'react';
-import { Columns2, ExternalLink, MoreHorizontal, PanelRightClose, Pencil, RotateCw, Trash2 } from 'lucide-react';
+import { Columns2, ExternalLink, FolderGit2, MoreHorizontal, PanelRightClose, Pencil, RotateCw, Trash2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
+import { AppRowProjectLine, AppRowProjectPicker } from '@/modules/app-switcher/AppRowProjectLink';
 import { useAppSwitcher } from '@/modules/app-switcher/context/AppSwitcherContext';
 import { moveItems } from '@/modules/app-switcher/utils/moveItems';
-import { describeRegistryApp } from '@/modules/app-switcher/utils/registryRequests';
+import { describeRegistryApp, linkRegistryProject } from '@/modules/app-switcher/utils/registryRequests';
 import { isSelfOrigin, resolveAppUrl } from '@/modules/app-switcher/utils/resolveAppUrl';
 import type { AppEntry } from '@/shared/app-types';
+import type { ProjectChoice } from '@/shared/types';
 import { ActionMenu, Card, Input } from '@/shared/ui';
 import type { ActionMenuItem } from '@/shared/ui';
 import { OWNS_ESCAPE } from '@/shared/ui/overlayEscape';
@@ -54,6 +56,8 @@ type AppDrawerRowProps = {
  * THE SECOND LINE is the operator's description, or where the app answers when it has none. "Edit
  * description" in the kebab turns that line into a field in place: Enter or leaving the field saves,
  * Escape puts it back, and a blank one clears it.
+ * THE LINKED PROJECT rides on that line (`AppRowProjectLine`), and "Link project…" in the kebab swaps
+ * the line for a picker in place (`AppRowProjectPicker`) — both live in `AppRowProjectLink.tsx`.
  *
  * THE BODY IS ONE BUTTON — tile, name and host — and a toggle: an app already on screen reads
  * "· on screen" and comes down when it is pressed again, so `aria-pressed` carries the same fact the
@@ -71,6 +75,17 @@ export function AppDrawerRow({ app, position, onMove, onRemove, onOpenInDualScre
   // The description field's text while it is open; null while the line is just a line.
   const [draft, setDraft] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
+  // Whether the project picker stands in the row's second line. It cannot be derived: the row's
+  // project is the choice already made, and the picker is open precisely while the reader is
+  // reconsidering it. Held by the row, like `draft`. Unlike the description field it does not leave on
+  // blur (`AppRowProjectPicker` says why), so the pickers of two rows can be open at once; one Escape
+  // leaves them both.
+  const [linking, setLinking] = useState(false);
+  // The server's sentence for a refused link, printed under the picker until the next choice.
+  const [linkError, setLinkError] = useState<string | null>(null);
+  // Every project the sidebar knows, in the sidebar's order — the picker's list, and what a linked
+  // path is matched against to be named.
+  const choices: ProjectChoice[] = useAppSwitcher().projects;
   const icon = icons[app.id];
 
   // THE MODULE'S ONE PLACE THAT READS THE PAGE'S OWN ADDRESS, and both readings happen here because
@@ -172,6 +187,17 @@ export function AppDrawerRow({ app, position, onMove, onRemove, onOpenInDualScre
     icon: Pencil,
     onSelect: handleEditDescription,
   };
+  // Right after Edit description: both are the row's own facts, edited in place beside its second line.
+  const linkItem: ActionMenuItem = {
+    key: 'link-project',
+    label: t('applications.linkProject'),
+    icon: FolderGit2,
+    onSelect: () => {
+      // A refusal from the last visit is not this visit's news, as `handleEditDescription` clears its own.
+      setLinkError(null);
+      setLinking(true);
+    },
+  };
   const dualItem: ActionMenuItem = holdsSecondHalf
     ? { key: 'close-dual', label: t('applications.closeDual'), icon: PanelRightClose, onSelect: handleCloseDualScreen }
     : { key: 'open-in-dual', label: t('applications.openInDual'), icon: Columns2, onSelect: handleOpenInDualScreen };
@@ -184,6 +210,7 @@ export function AppDrawerRow({ app, position, onMove, onRemove, onOpenInDualScre
         newTabItem,
         dualItem,
         describeItem,
+        linkItem,
         ...moveItems(t, position, onMove),
         removeItem,
       ];
@@ -203,6 +230,44 @@ export function AppDrawerRow({ app, position, onMove, onRemove, onOpenInDualScre
       {icon && <img src={icon} alt="" className="h-5 w-5 object-contain" />}
     </span>
   );
+
+  if (linking) {
+    return (
+      <li>
+        <Card className="flex min-h-[44px] items-center gap-3 py-1.5 pl-3 pr-2">
+          {tile}
+          <AppRowProjectPicker
+            appName={app.name}
+            value={app.project ?? ''}
+            choices={choices}
+            error={linkError}
+            onChoose={(fullPath) => {
+              // The project the row already holds is no change: the picker leaves without a request, as the
+              // description field's unchanged save does. Compared raw, so a hand-edited whitespace-only
+              // project is still cleared by "No project".
+              if (fullPath === (app.project ?? '')) {
+                setLinking(false);
+                return;
+              }
+              // Saved, then the registry is re-read so the row's second line is what the file now holds,
+              // then the picker goes. A refusal keeps the picker open with the server's sentence under it,
+              // as the description field's does — and brings it back if the reader's other choice has
+              // already sent it away, since a refusal answered after that would be dropped unseen. A failed
+              // re-read is not caught here: `useAppRegistry` puts it in the drawer's banner and the picker leaves.
+              linkRegistryProject(app.id, fullPath)
+                .then(() => refresh())
+                .then(() => setLinking(false))
+                .catch((failure: unknown) => {
+                  setLinkError(failure instanceof Error ? failure.message : String(failure));
+                  setLinking(true);
+                });
+            }}
+            onCancel={() => setLinking(false)}
+          />
+        </Card>
+      </li>
+    );
+  }
 
   if (draft !== null) {
     return (
@@ -249,9 +314,11 @@ export function AppDrawerRow({ app, position, onMove, onRemove, onOpenInDualScre
               <span className="truncate text-[14.5px] font-medium leading-tight text-foreground">{app.name}</span>
               {isSelf && <ExternalLink className="h-3 w-3 flex-none text-ink-faint" aria-hidden="true" />}
             </span>
-            <span className="truncate text-xs leading-tight text-ink-faint">
-              {onScreen ? t('applications.hostOnScreen', { host: secondLine }) : secondLine}
-            </span>
+            <AppRowProjectLine
+              app={app}
+              choices={choices}
+              fallback={onScreen ? t('applications.hostOnScreen', { host: secondLine }) : secondLine}
+            />
           </span>
         </button>
 

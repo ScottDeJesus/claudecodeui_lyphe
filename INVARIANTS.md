@@ -1497,3 +1497,438 @@ measured 2026-09-29 by chain chain-lock-prompt-glance-20260929-110148-17f8, find
 probe-key: f96881d501a30e609e660221eb73cc93c2d093e7
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-intent-lock-prompt.mjs, /home/lyphe/.claude/hooks/dispatcher/lock_glance.py, /home/lyphe/.claude/hooks/dispatcher/lock.py, /home/lyphe/.claude/skills/plan/SKILL.md
+
+## INV-5885 — probe — the showing left its scratch id in the operator's icon cache
+
+the showing left its scratch id in the operator's icon cache
+
+```probe
+grep -c registry-project-check /home/lyphe/.claude/claudecodeui_lyphe/apps.icons.local.json
+expect: 0 once the cache has pruned it; 1 while the showing's residue is still there (measured 1 at ~00:40Z)
+```
+
+measured 2026-09-29 by chain chain-app-drawer-chat--registry-project-20260929-165635-4197, finding L1, LOW
+probe-key: 4b19fc6a219588baed3b8fe2cb269bedbf8cc72e
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/shared/app-types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/app-types.ts
+
+## INV-5887 — probe — `useHostMove` calls the listener from the render BEFORE the one that committed the move
+
+`useHostMove` calls the listener from the render BEFORE the one that committed the move
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe && node /tmp/pipeline-reviews/app-drawer-chat--host-window/athena-probe-s6.mjs
+expect: `listener closure heard (n after the change is 1): [0]` while the defect stands; `[1]` once the ref is written in a layout effect ahead of the subscription
+```
+
+measured 2026-09-29 by chain chain-app-drawer-chat--host-window-20260929-165634-a050, finding M1, MEDIUM
+probe-key: 38e830cbd0bf67fdf0635c47446420fbf936f47e
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/context/HostWindowContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/overlayEscape.ts
+
+## INV-5888 — probe — the header docblock contradicts itself and the settled design
+
+the header docblock contradicts itself and the settled design
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe && grep -nE "mount no provider|only writer|ChatHostSlot" src/shared/context/HostWindowContext.tsx | cut -c1-140
+expect: a `mount no provider` line (line 14), an `only writer` line (line 18) and the `ChatHostSlot ... around the live chat's portal` line (line 23) together, while the defect stands
+```
+
+measured 2026-09-29 by chain chain-app-drawer-chat--host-window-20260929-165634-a050, finding L1, LOW
+probe-key: 26c84f69dfdb02bc42ab9d973c7c18e116143729
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/context/HostWindowContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/overlayEscape.ts
+
+## INV-5889 — the newest conversation has one spelling — src/shared/sessionRecency.ts
+
+Which timestamp dates a session and the order a project's sessions list in are defined only in `src/shared/sessionRecency.ts`: `getCreatedTimestamp`, `getUpdatedTimestamp`, `getSessionDate`, `getSessionProvider`, `getAllSessions`. `getAllSessions(project)[0]` is "the newest conversation". Never re-derive the date, the provider default or the sort in a second file.
+
+why: the sidebar's top row and the conversation `openProjectChat` opens must be the same session; a second copy drifts.
+
+how it holds:
+- Readers import from `@/shared/sessionRecency`: `SidebarContent.tsx`, `useSidebarController.ts` (`getAllSessions`), `sidebarProjectFormatting.ts` (`getCreatedTimestamp`, `getUpdatedTimestamp`, `getSessionDate`), `useProjectsState.ts` (`getSessionProvider`), `useOpenProjectChat.ts` (`getAllSessions`).
+- `sortedSessionsByProject` is a module-private `WeakMap` keyed on the project object; `useProjectsState` replaces a project, never mutates it, so a stale entry is unreachable.
+- The cache is what keeps the sidebar's memo boundary: `getAllSessions` must return the same array reference for the same project object.
+
+```probe
+grep -rn "export const getAllSessions" src
+expect: exactly one line, src/shared/sessionRecency.ts
+```
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/hooks/useOpenProjectChat.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/hooks/useProjectsState.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/hooks/useSidebarController.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/SidebarContent.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/utils/sidebarProjectFormatting.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/sessionRecency.ts
+
+## INV-5890 — a new top-level src/shared/*.ts file must join .oxlintrc.json's frontend-shared-file list
+
+`boundaries/include` covers every `src/shared/*.ts`, but only the files named in the `frontend-shared-file` element's `pattern` array are known elements. A file in `src/shared/` outside that array is an unknown element; every importer errors `boundaries(no-unknown)`.
+
+- symptom: `npx oxlint src/` reports `error boundaries(no-unknown): Dependencies to unknown elements are not allowed` on the import line of each importer, not on the new file.
+- fix: add the file's path to the `frontend-shared-file` `pattern` array in `.oxlintrc.json` in the same change that creates it.
+- `src/shared/hooks`, `src/shared/context` and `src/shared/ui` are `frontend-shared-folder` entries: files there need no listing.
+- measured 2026-09-29: `src/shared/sessionRecency.ts` removed from a scratch copy of the config → errors on its three importers; `src/shared/authTrace` unlisted → errors at `src/shared/authToken.ts:10` and `src/modules/auth/context/AuthContext.tsx:7`.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.oxlintrc.json
+
+## INV-5891 — probe — In simple-list mode (the operator's own setting) `openProjectChat(B, 'new')` answers `true` and the workspace ends on the saved project, not B
+
+In simple-list mode (the operator's own setting) `openProjectChat(B, 'new')` answers `true` and the workspace ends on the saved project, not B
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe && node /tmp/pipeline-reviews/app-drawer-chat--projects-door/probe-door-simple-list.mjs simple
+expect: `new in ArchPulse: answered true; project .claude → .claude; url /; trigger 0→1` and `latest in keepalive-proof (no conversation): … project .claude → .claude` (a door that held reads `→ ArchPulse` and `→ keepalive-proof`, which is what `… tree` prints). Needs the verve account to list `.claude`, `ArchPulse` and one project with no sessions.
+```
+
+measured 2026-09-29 by chain chain-app-drawer-chat--projects-door-20260929-171607-249f, finding M1, MEDIUM
+probe-key: e58ba3ce7986fa70dd0c73b2c22e54aaf33ebec4
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.oxlintrc.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/context/ProjectsStateContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/hooks/useOpenProjectChat.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/hooks/useProjectsState.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/hooks/useSidebarController.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/SidebarContent.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/utils/sidebarProjectFormatting.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/sessionRecency.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/open-project-chat.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/recency-tree.mjs
+
+## INV-5892 — probe — `ProjectChatContext` has no why-comment above its declaration
+
+`ProjectChatContext` has no why-comment above its declaration
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe && grep -n -B1 "const ProjectChatContext = createContext" src/modules/project-workspace/context/ProjectsStateContext.tsx
+expect: the line above is `const ProjectActiveSessionContext = createContext…`, not a comment
+```
+
+measured 2026-09-29 by chain chain-app-drawer-chat--projects-door-20260929-171607-249f, finding L1, LOW
+probe-key: c5e4f8710c1c0b5195fc0fd14f4bd392283f37e3
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.oxlintrc.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/context/ProjectsStateContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/hooks/useOpenProjectChat.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/hooks/useProjectsState.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/hooks/useSidebarController.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/SidebarContent.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/utils/sidebarProjectFormatting.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/sessionRecency.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/open-project-chat.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/recency-tree.mjs
+
+## INV-5901 — probe — `radialLayout` crushes the first two items in every reachable FAB corner, including the FAB's default resting corner
+
+`radialLayout` crushes the first two items in every reachable FAB corner, including the FAB's default resting corner
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe && npx tsx -e "import { radialLayout as r } from './src/modules/app-switcher/utils/radialLayout.ts'; const p = r({left:1404,top:864,width:28,height:28},{width:1440,height:900},5); let m=1e9; for (let i=0;i<5;i++) for (let j=i+1;j<5;j++) m=Math.min(m,Math.hypot(p[i].x-p[j].x,p[i].y-p[j].y)); console.log(m.toFixed(2))"
+expect: 25.56 — the smallest pairwise distance between the five centres at the default bottom-right resting corner; 44px items overlap by 18px
+```
+
+measured 2026-09-29 by chain chain-app-drawer-chat--switcher-acts-20260929-172332-8408, finding M1, MEDIUM
+probe-key: a79caec385aa956db45967665e0019a4df06e74b
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/hooks/useCurrentApplication.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/hooks/useFrontPane.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/hooks/useSwitcherActions.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/utils/paneSlots.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/utils/radialLayout.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/constants.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/utils.ts
+
+## INV-5902 — probe — When the registry loses the row of the left slot, the layer draws the right application under `data-pane-side="left"`, and every act over it is greyed
+
+When the registry loses the row of the left slot, the layer draws the right application under `data-pane-side="left"`, and every act over it is greyed
+
+```probe
+node /tmp/pipeline-reviews/app-drawer-chat--switcher-acts/athena-probes/s10b.mjs
+expect: the "after delete" line reads front left, cur null, disabled [false,false,true,true,true] while the layer still draws EIS App; the run ends "registry BASELINE RESTORED"
+```
+
+measured 2026-09-29 by chain chain-app-drawer-chat--switcher-acts-20260929-172332-8408, finding M2, MEDIUM
+probe-key: c6f09bfc38b11189d453e9f377cd16d3e1ebb412
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/hooks/useCurrentApplication.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/hooks/useFrontPane.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/hooks/useSwitcherActions.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/utils/paneSlots.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/utils/radialLayout.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/constants.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/utils.ts
+
+## INV-5903 — probe — `radialLayout(fab, viewport, 0)` returns one centre
+
+`radialLayout(fab, viewport, 0)` returns one centre
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe && npx tsx -e "import { radialLayout as r } from './src/modules/app-switcher/utils/radialLayout.ts'; console.log(r({left:300,top:400,width:28,height:28},{width:1440,height:900},0).length)"
+expect: 1 — asked for zero items, got one centre (held value: 0)
+```
+
+measured 2026-09-29 by chain chain-app-drawer-chat--switcher-acts-20260929-172332-8408, finding L1, LOW
+probe-key: 29c50f047fb867b34b031760dabf9ce23c689cb8
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/hooks/useCurrentApplication.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/hooks/useFrontPane.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/hooks/useSwitcherActions.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/utils/paneSlots.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/utils/radialLayout.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/constants.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/utils.ts
+
+## INV-5914 — probe — `stop()` leaves its clones behind, so a second mirror into the same document doubles every sheet, and the orphaned first set wins the cascade
+
+`stop()` leaves its clones behind, so a second mirror into the same document doubles every sheet, and the orphaned first set wins the cascade
+
+```probe
+node --input-type=module -e 'import pw from "/opt/shadow-connector/node_modules/playwright/index.js"; const b=await pw.chromium.launch(); const p=await b.newPage(); await p.goto("http://localhost:5183/",{waitUntil:"domcontentloaded"}); await p.waitForTimeout(1500); console.log(JSON.stringify(await p.evaluate(async()=>{ const {mirrorDocument}=await import("/src/modules/chat-host/utils/mirrorDocument.ts"); const t=()=>new Promise(r=>setTimeout(r,0)); const f=document.createElement("iframe"); f.srcdoc="<!doctype html><html><head></head><body></body></html>"; document.body.append(f); await new Promise(r=>f.addEventListener("load",r,{once:true})); const hm=document.createElement("style"); hm.textContent=".zz{color:rgb(255,0,0)}"; document.head.append(hm); const a=mirrorDocument(document,f.contentDocument); a.stop(); const c=mirrorDocument(document,f.contentDocument); await c.ready; await t(); const el=f.contentDocument.createElement("div"); el.className="zz"; f.contentDocument.body.append(el); hm.textContent=".zz{color:rgb(0,0,255)}"; await t(); return {srcSheets:document.styleSheets.length,frameSheets:f.contentDocument.styleSheets.length,colorAfterRewriteToBlue:f.contentWindow.getComputedStyle(el).color}; }))); process.exit(0)'
+expect: frameSheets is exactly 2x srcSheets (e.g. 24 vs 12) and colorAfterRewriteToBlue is "rgb(255, 0, 0)"; after the fix frameSheets equals srcSheets and the colour is "rgb(0, 0, 255)"
+```
+
+measured 2026-09-29 by chain chain-app-drawer-chat--host-geometry-20260929-175650-f840, finding M1, MEDIUM
+probe-key: d244b288196319e12051131d0d289c7f2738f3bf
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-host/utils/chatHostStorage.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-host/utils/mirrorDocument.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-host/utils/panelGeometry.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-host/utils/placeNode.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/chat-host-pure-parts.mjs
+
+## INV-5915 — probe — `ready` after `stop()` is undocumented and inconsistent: it may resolve later, or never
+
+`ready` after `stop()` is undocumented and inconsistent: it may resolve later, or never
+
+```probe
+node --input-type=module -e 'import pw from "/opt/shadow-connector/node_modules/playwright/index.js"; const b=await pw.chromium.launch(); const p=await (await b.newContext({serviceWorkers:"block"})).newPage(); await p.route(/athena-hang\.css/,()=>{}); await p.route(/athena-slow\.css/,async r=>{await new Promise(x=>setTimeout(x,2500)); r.fulfill({status:200,contentType:"text/css",body:"a{}"}).catch(()=>{});}); await p.goto("http://localhost:5183/",{waitUntil:"domcontentloaded"}); await p.waitForTimeout(1500); console.log(JSON.stringify(await p.evaluate(async()=>{ const {mirrorDocument}=await import("/src/modules/chat-host/utils/mirrorDocument.ts"); const mk=async()=>{const f=document.createElement("iframe"); f.srcdoc="<!doctype html><html><head></head><body></body></html>"; document.body.append(f); await new Promise(r=>f.addEventListener("load",r,{once:true})); return f;}; const race=async(pr,ms)=>{const t0=performance.now(); const r=await Promise.race([pr.then(()=>"settled"),new Promise(x=>setTimeout(()=>x("pending"),ms))]); return [r,Math.round(performance.now()-t0)];}; const one=async(href)=>{const s=await mk(); const l=s.contentDocument.createElement("link"); l.rel="stylesheet"; l.href=href; s.contentDocument.head.append(l); const t=await mk(); const m=mirrorDocument(s.contentDocument,t.contentDocument); m.stop(); return race(m.ready,6000);}; return {stopBeforeReady_linkNeverLoads:await one("/athena-hang.css"),stopBeforeReady_linkLoadsAt2500ms:await one("/athena-slow.css")}; }))); process.exit(0)'
+expect: {"stopBeforeReady_linkNeverLoads":["pending",6000],"stopBeforeReady_linkLoadsAt2500ms":["settled",~2500]} — two different outcomes for the same call sequence
+```
+
+measured 2026-09-29 by chain chain-app-drawer-chat--host-geometry-20260929-175650-f840, finding L1, LOW
+probe-key: a78fd6925c365f37bce0cd878a9fb4ed114cf2f5
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-host/utils/chatHostStorage.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-host/utils/mirrorDocument.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-host/utils/panelGeometry.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-host/utils/placeNode.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/chat-host-pure-parts.mjs
+
+## INV-5916 — probe — the mirror rewrites the target `<body>`'s `style` and `class` wholesale, so anything else written there is dropped on the next unrelated opener change
+
+the mirror rewrites the target `<body>`'s `style` and `class` wholesale, so anything else written there is dropped on the next unrelated opener change
+
+```probe
+node --input-type=module -e 'import pw from "/opt/shadow-connector/node_modules/playwright/index.js"; const b=await pw.chromium.launch(); const p=await b.newPage(); await p.goto("http://localhost:5183/",{waitUntil:"domcontentloaded"}); await p.waitForTimeout(1500); console.log(JSON.stringify(await p.evaluate(async()=>{ const {mirrorDocument}=await import("/src/modules/chat-host/utils/mirrorDocument.ts"); const t=()=>new Promise(r=>setTimeout(r,0)); const f=document.createElement("iframe"); f.srcdoc="<!doctype html><html><head></head><body></body></html>"; document.body.append(f); await new Promise(r=>f.addEventListener("load",r,{once:true})); const m=mirrorDocument(document,f.contentDocument); await m.ready; const tb=f.contentDocument.body; tb.style.overflow="hidden"; const before=tb.style.overflow; document.documentElement.style.setProperty("--keyboard-height","1px"); await t(); const r={targetBodyOverflowBefore:before,targetBodyOverflowAfterUnrelatedOpenerChange:tb.style.overflow}; document.documentElement.style.removeProperty("--keyboard-height"); m.stop(); return r; }))); process.exit(0)'
+expect: {"targetBodyOverflowBefore":"hidden","targetBodyOverflowAfterUnrelatedOpenerChange":""}
+```
+
+measured 2026-09-29 by chain chain-app-drawer-chat--host-geometry-20260929-175650-f840, finding L2, LOW
+probe-key: ebf3e85df2a52c05a9b8ac433f8fba9c17b062ba
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-host/utils/chatHostStorage.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-host/utils/mirrorDocument.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-host/utils/panelGeometry.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-host/utils/placeNode.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/chat-host-pure-parts.mjs
+
+## INV-5917 — probe — a NaN in any input passes straight through the geometry
+
+a NaN in any input passes straight through the geometry
+
+```probe
+npx tsx -e "import('./src/modules/chat-host/utils/panelGeometry.ts').then(m=>console.log(JSON.stringify(m.panelPlacement({left:10,top:10,width:28,height:28},{width:420,height:640},{width:1440,height:NaN})), JSON.stringify(m.clampPanelSize({width:NaN,height:NaN},{width:1440,height:900}))))"
+expect: {"left":50,"top":null,"width":420,"height":null,"grip":"top-right"} {"width":null,"height":null}  (nulls are NaN)
+```
+
+measured 2026-09-29 by chain chain-app-drawer-chat--host-geometry-20260929-175650-f840, finding L3, LOW
+probe-key: 1befb393421df243160762e9a6be4eef092aa596
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-host/utils/chatHostStorage.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-host/utils/mirrorDocument.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-host/utils/panelGeometry.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-host/utils/placeNode.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/chat-host-pure-parts.mjs
+
+## INV-5918 — probe — a mouse press held on a node in the edge fade is lost (desktop, gutter)
+
+a mouse press held on a node in the edge fade is lost (desktop, gutter)
+
+```probe
+node /tmp/pipeline-reviews/flow-scroll/athena-press-edge.mjs
+expect: PRESS-OK on both edges (today: PRESS-LOST leading n7 [] and PRESS-LOST trailing n18 [], exit 1)
+```
+
+measured 2026-09-29 by chain chain-flow-scroll-20260929-170014-ed7d, finding M1, MEDIUM
+probe-key: f961cec6b22f651e36fe44ee2a19032be8e9f9c1
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/hooks/useFlowTrack.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/StatusFlow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-status-flow-scroll.mjs
+
+## INV-5919 — probe — on WebKit the track's end padding is not scrollable overflow: the last node sits flush and its ring is cut
+
+on WebKit the track's end padding is not scrollable overflow: the last node sits flush and its ring is cut
+
+```probe
+node /tmp/pipeline-reviews/flow-scroll/athena-webkit-end.mjs
+expect: roomRight px {"webkit":10,"chromium":10} (today: {"webkit":0,"chromium":10}, exit 1)
+```
+
+measured 2026-09-29 by chain chain-flow-scroll-20260929-170014-ed7d, finding M2, MEDIUM
+probe-key: 6a42b9093c77d000fb32191a3dfd2db1dfb5e172
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/hooks/useFlowTrack.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/StatusFlow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-status-flow-scroll.mjs
+
+## INV-5920 — probe — Tab into an overflowing flow throws the track back to phase 1
+
+Tab into an overflowing flow throws the track back to phase 1
+
+```probe
+node /tmp/pipeline-reviews/flow-scroll/athena-tab-jump.mjs
+expect: the current phase stays in view after the Tab (today: opened {"scrollLeft":246,"liveInView":true} → after Tab {"scrollLeft":0,"liveInView":false,"focus":"n1"}, exit 1)
+```
+
+measured 2026-09-29 by chain chain-flow-scroll-20260929-170014-ed7d, finding L1, LOW
+probe-key: 31cdb372e94bb03ea86f20eada09414242717ee4
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/hooks/useFlowTrack.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/StatusFlow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-status-flow-scroll.mjs
+
+## INV-5921 — probe — `taken` is set by touches and wheels that never scroll the track, and outlives the element
+
+`taken` is set by touches and wheels that never scroll the track, and outlives the element
+
+```probe
+node /tmp/pipeline-reviews/flow-scroll/athena-wheel-taken.mjs
+expect: the landed phase is in view (today: {"scrollLeft":0,"landedInView":false}, exit 1)
+```
+
+measured 2026-09-29 by chain chain-flow-scroll-20260929-170014-ed7d, finding L2, LOW
+probe-key: 9dda15a292bd778d5d976e2f61818e84f22dc48d
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/hooks/useFlowTrack.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/StatusFlow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-status-flow-scroll.mjs
+
+## INV-5931 — probe — (MED) — a corrupt-payload token now locks the person out instead of signing them out
+
+(MED) — a corrupt-payload token now locks the person out instead of signing them out
+
+```probe
+curl -s -o /dev/null -D - -H "Authorization: Bearer $(node -e "const b=s=>Buffer.from(s).toString('base64url');process.stdout.write(b('{\"alg\":\"HS256\",\"typ\":\"JWT\"}')+'.'+b('{\"userId\":1')+'.'+b('sig'))")" http://127.0.0.1:3011/api/auth/user | grep -iE '^HTTP|x-auth-error'
+expect: HTTP/1.1 401 and X-Auth-Error: invalid-token (measured: HTTP/1.1 503 and no X-Auth-Error)
+```
+
+measured 2026-09-29 by chain chain-signed-out-20260929-173238-19f4, finding M1, MEDIUM
+probe-key: 9626bd3fb37ee2275512044ba5c86cae05737eb4
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/auth/auth.middleware.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/auth/context/AuthContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/auth/hooks/useSharedSessionFollower.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/file-tree/hooks/useFileTreeUpload.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/authToken.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/signout-kit.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-signed-out.mjs
+
+## INV-5932 — probe — (MED) — a sign-out caused by emptied storage leaves no client trace
+
+(MED) — a sign-out caused by emptied storage leaves no client trace
+
+```probe
+node /tmp/pipeline-reviews/signed-out/athena-probes/storage-wiped-no-trace.mjs
+expect: page trace records: 1 or more, naming why the session ended (measured: 0)
+```
+
+measured 2026-09-29 by chain chain-signed-out-20260929-173238-19f4, finding M2, MEDIUM
+probe-key: 311bc0c067d615548137dc72e0fde468dc5582e2
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/auth/auth.middleware.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/auth/context/AuthContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/auth/hooks/useSharedSessionFollower.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/file-tree/hooks/useFileTreeUpload.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/authToken.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/signout-kit.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-signed-out.mjs
+
+## INV-5933 — probe — (LOW) — the 503 journal line quotes a piece of the token's payload
+
+(LOW) — the 503 journal line quotes a piece of the token's payload
+
+```probe
+curl -s -o /dev/null -H "Authorization: Bearer $(node -e "const b=s=>Buffer.from(s).toString('base64url');process.stdout.write(b('{\"alg\":\"HS256\",\"typ\":\"JWT\"}')+'.'+b('not json at all SECRETFRAGMENT')+'.'+b('sig'))")" http://127.0.0.1:3011/api/auth/user; sleep 1; journalctl -u cloudcli-server-dev.service --since "-1 min" --no-pager -o cat | grep -c 'not json at'
+expect: 0 (measured: 1 — the line carries the payload's first characters)
+```
+
+measured 2026-09-29 by chain chain-signed-out-20260929-173238-19f4, finding L1, LOW
+probe-key: f96bc8598c3ed06e28e0fec441e921263e6412ce
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/auth/auth.middleware.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/auth/context/AuthContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/auth/hooks/useSharedSessionFollower.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/file-tree/hooks/useFileTreeUpload.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/authToken.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/signout-kit.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-signed-out.mjs
+
+## INV-5934 — probe — (LOW) — the proof command dies at import about one run in ten
+
+(LOW) — the proof command dies at import about one run in ten
+
+```probe
+for i in $(seq 1 40); do sqlite3 "$HOME/.cloudcli/auth.db" "select value from app_config where key='jwt_secret'" >/dev/null 2>&1 || echo locked; done | wc -l
+expect: 0 (measured: 4 of 40 locked). A busy timeout on that read (`sqlite3 -cmd ".timeout 5000" …`) is what the kit needs.
+```
+
+measured 2026-09-29 by chain chain-signed-out-20260929-173238-19f4, finding L2, LOW
+probe-key: 743354f5b56df8b0a788ffa36d59e63e9fd8b80e
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/auth/auth.middleware.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/auth/context/AuthContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/auth/hooks/useSharedSessionFollower.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/file-tree/hooks/useFileTreeUpload.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/authToken.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/signout-kit.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-signed-out.mjs
+
+## INV-5935 — probe — . `host-window-home.mjs`: the useDeviceSettings row cannot fail
+
+. `host-window-home.mjs`: the useDeviceSettings row cannot fail
+
+```probe
+/tmp/pipeline-reviews/app-drawer-chat--seam-kit/mutants/run-mutant.sh host-window-home '[{"glob":"**/src/shared/hooks/useDeviceSettings.ts*","from":"hostWindow.innerWidth < mobileBreakpoint","to":"false"}]' | tail -1
+expect: ALL PASS (with useDeviceSettings forced to "wide" at 390px; a discriminating row prints a FAIL)
+```
+
+measured 2026-09-29 by chain chain-app-drawer-chat--seam-kit-20260929-183302-c8d1, finding M1, MEDIUM
+probe-key: 98c1cc42df5145720d91e3b31dd510aff5469a3b
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/utils.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/host-window-home.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/host-window-kit.mjs
+
+## INV-5936 — probe — . `host-window-kit.mjs`: reverting four of its subjects leaves it on ALL PASS
+
+. `host-window-kit.mjs`: reverting four of its subjects leaves it on ALL PASS
+
+```probe
+/tmp/pipeline-reviews/app-drawer-chat--seam-kit/mutants/run-mutant.sh host-window-kit '[{"glob":"**/src/shared/ui/Dialog.tsx*","from":"hostWindow.requestAnimationFrame(","to":"requestAnimationFrame("},{"glob":"**/src/shared/ui/Dialog.tsx*","from":"hostWindow.cancelAnimationFrame(","to":"cancelAnimationFrame("},{"glob":"**/src/shared/ui/Tooltip.tsx*","from":"isNodeLike(target) && ","to":"(target instanceof Node) && "},{"glob":"**/src/shared/ui/useZoomPan.ts*","from":"resizeObserverIn(hostWindow, ","to":"((cb) => new ResizeObserver(cb))("}]' | tail -1
+expect: ALL PASS (with the Dialog frame back on the global window, Tooltip's isNodeLike reverted to instanceof, and useZoomPan's observer built by the opener's constructor)
+```
+
+measured 2026-09-29 by chain chain-app-drawer-chat--seam-kit-20260929-183302-c8d1, finding M2, MEDIUM
+probe-key: 4a7f025d87c8f4d794b09113c7f4a5aaddedba01
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/utils.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/host-window-home.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/host-window-kit.mjs
+
+## INV-5937 — probe — . `useZoomPan`: a press held across a move poisons the next click
+
+. `useZoomPan`: a press held across a move poisons the next click
+
+```probe
+cd /tmp/pipeline-reviews/app-drawer-chat--seam-kit/athena-scaffold && node lightbox.mjs 2>&1 | grep '^VIOLATED L9'
+expect: a line reading VIOLATED L9 (adversarial) … {"stillThere":true}  (fixed: HELD L9 … {"stillThere":false})
+```
+
+measured 2026-09-29 by chain chain-app-drawer-chat--seam-kit-20260929-183302-c8d1, finding L3, LOW
+probe-key: f8df98b1c8786e0e6655fa9ebfafeaa4fc4c2d14
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/utils.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/host-window-home.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/host-window-kit.mjs
+
+## INV-5950 — probe — . `useChatHost`'s docblock names a consumer that does not import it
+
+. `useChatHost`'s docblock names a consumer that does not import it
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe && sed -n 142p src/modules/chat-host/context/ChatHostContext.tsx | cut -c1-70; grep -rln "useChatHost\b" src/modules/project-workspace src/modules/app-switcher; echo "exit $?"
+expect: line 142 starts "/** Used by project-workspace to read"; the grep prints nothing and exit 1
+```
+
+measured 2026-09-29 by chain chain-app-drawer-chat--chat-host-home-20260929-195616-ce23, finding L1, LOW
+probe-key: 766398768467631eea36d34c797950b4e231a0a3
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-host/ChatHostSlot.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-host/context/ChatHostContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-host/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/ProjectWorkspaceShell.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/WorkspaceFrame.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/chat-host-home.mjs
+
+## INV-5951 — probe — . `placeNode.ts` says its slot uses it; the slot does not (outside the 7 target paths)
+
+. `placeNode.ts` says its slot uses it; the slot does not (outside the 7 target paths)
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe && sed -n 23p src/modules/chat-host/utils/placeNode.ts; grep -c "placeNode" src/modules/chat-host/ChatHostSlot.tsx
+expect: line 23 ends "and its slot, which adopt the chat's node into each host."; the count is 0
+```
+
+measured 2026-09-29 by chain chain-app-drawer-chat--chat-host-home-20260929-195616-ce23, finding L2, LOW
+probe-key: 9934874776ee4750102116b99919122dbaefd7a3
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-host/ChatHostSlot.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-host/context/ChatHostContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-host/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/ProjectWorkspaceShell.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/WorkspaceFrame.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/chat-host-home.mjs
+
+## INV-5952 — probe — . Standing proof G5 no longer notices a ChatInterface remount at the gutter threshold (outside the 7 target paths)
+
+. Standing proof G5 no longer notices a ChatInterface remount at the gutter threshold (outside the 7 target paths)
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe/.verify && node --input-type=module -e "import { openConsole } from './lib/console.mjs'; import { createScratchChat, deleteScratchChat } from './lib/scratch-chat.mjs'; const s = await openConsole({ viewport: { width: 1440, height: 900 } }); const id = await createScratchChat(s); await s.page.goto(s.appUrl + '/session/' + id, { waitUntil: 'networkidle' }); await s.page.waitForSelector('textarea'); console.log(await s.page.evaluate(() => document.querySelector('[data-testid=chat-gutter-chat]').firstElementChild.hasAttribute('data-chat-host-home'))); await deleteScratchChat(s, id); await s.browser.close();"
+expect: true (the tagged element is the home div, not ChatInterface); G5 passes with the tag on it whatever ChatInterface does
+```
+
+measured 2026-09-29 by chain chain-app-drawer-chat--chat-host-home-20260929-195616-ce23, finding L3, LOW
+probe-key: ab1111a059fa88306050146402440fdd26080bf5
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-host/ChatHostSlot.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-host/context/ChatHostContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-host/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/ProjectWorkspaceShell.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/WorkspaceFrame.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/chat-host-home.mjs
+
+## INV-5953 — probe — . `chat-host-home.mjs` `before` overwrites the irreplaceable pre-change record unguarded
+
+. `chat-host-home.mjs` `before` overwrites the irreplaceable pre-change record unguarded
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe && awk '/MODE === .before.\) continue/{c=NR} /data-chat-host-node/{if(!f)f=NR} END{print c, f}' .verify/chat-host-home.mjs; grep -n "writeFileSync(RECORD" .verify/chat-host-home.mjs
+expect: "101 108" (no node check before the continue) and one unguarded `writeFileSync(RECORD` at line 141
+```
+
+measured 2026-09-29 by chain chain-app-drawer-chat--chat-host-home-20260929-195616-ce23, finding L4, LOW
+probe-key: d34f39a67bd3d3b14c18be4e72e9e4c16b52515b
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-host/ChatHostSlot.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-host/context/ChatHostContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-host/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/ProjectWorkspaceShell.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/WorkspaceFrame.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/chat-host-home.mjs
+
+## INV-5954 — probe — Two of `CommandMenu`'s three viewport reads survive a mutant in the window probe (a 420-px window cannot reach line 117)
+
+Two of `CommandMenu`'s three viewport reads survive a mutant in the window probe (a 420-px window cannot reach line 117)
+
+```probe
+cd /tmp/pipeline-reviews/app-drawer-chat--seam-chat-surfaces/athena-probes && MUT='[{"glob":"**/src/modules/chat/composer/CommandMenu.tsx*","from":"hostWindow.innerWidth - 440","to":"innerWidth - 440"}]' node --import ./preload.mjs /home/lyphe/.claude/claudecodeui_lyphe/.verify/chat-surfaces-window.mjs | grep -E "FAIL|all checks"
+expect: a "[FAIL] the command menu is placed against the window's width" line; today "all checks passed" (the same mutant against `node wide.mjs` — the probe with a 700-px window — prints that FAIL with "right":740)
+```
+
+measured 2026-09-29 by chain chain-app-drawer-chat--seam-chat-surfaces-20260929-193540-fce5, finding L1, LOW
+probe-key: 95e3498d7f6051f22800fe42cb35dc9607a8140b
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/widgets/hooks/useWidgetHost.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/utils.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/chat-surfaces-home.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/chat-surfaces-window.mjs
+
+## INV-5955 — probe — `useWidgetHost.ts:113-115` says the theme tokens are read from the window's document; the code reads the opener's — and the window probe cannot see the difference
+
+`useWidgetHost.ts:113-115` says the theme tokens are read from the window's document; the code reads the opener's — and the window probe cannot see the difference
+
+```probe
+sed -n 113,116p /home/lyphe/.claude/claudecodeui_lyphe/src/modules/widgets/hooks/useWidgetHost.ts
+expect: no sentence saying the tokens are read from the window's document (they are read from the opener's, line 176); today line 115 ends "are read from its document."
+```
+
+measured 2026-09-29 by chain chain-app-drawer-chat--seam-chat-surfaces-20260929-193540-fce5, finding L2, LOW
+probe-key: e1d729832beb76a9bf65f3fa9b1d437f5c11af3c
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/widgets/hooks/useWidgetHost.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/utils.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/chat-surfaces-home.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/chat-surfaces-window.mjs

@@ -3,7 +3,7 @@ import {
   getStoredAuthToken,
   storeAuthToken,
 } from '@/shared/authToken';
-import type { DeepseekRange, DispatcherModelChoice, DispatcherSwarmChoice, FileLinePatch, JevRange, NtfySettingsInput, SubagentTranscriptResult } from '@/shared/types';
+import type { AuthTraceEvent, DeepseekRange, DispatcherModelChoice, DispatcherSwarmChoice, FileLinePatch, JevRange, NtfySettingsInput, SubagentTranscriptResult } from '@/shared/types';
 import type { AgentLaunchDefaultsChange, AgentLaunchRowChange } from '@/shared/agent-launch-types';
 import type { ClaudeUpdateApplyRequest } from '@/shared/claude-update-types';
 import { IS_PLATFORM } from '@/shared/utils';
@@ -110,10 +110,11 @@ export const authenticatedFetch = (
   }).then((response) => {
     const refreshedToken = response.headers.get('X-Refreshed-Token');
     if (refreshedToken) {
-      storeAuthToken(refreshedToken);
+      storeAuthToken(refreshedToken, { trigger: 'refresh-header', url, method: requestInit.method ?? 'GET', status: response.status });
     }
-    if (response.headers.get('X-Auth-Error')) {
-      expireAuthSession();
+    const authError = response.headers.get('X-Auth-Error');
+    if (authError) {
+      expireAuthSession({ trigger: 'request-verdict', token, url, method: requestInit.method ?? 'GET', status: response.status, authError });
     }
     return response;
   });
@@ -279,6 +280,8 @@ export const api = {
       body: JSON.stringify({ username, password }),
     }),
     refresh: () => post('/api/auth/refresh'),
+    // The page's own record of why its session ended or was kept, for the server's journal.
+    clientEvents: (events: AuthTraceEvent[]) => post('/api/auth/client-events', { events }),
     user: (timeoutMs: number = BOOT_REQUEST_TIMEOUTS_MS[0]) => get('/api/auth/user', { timeoutMs }),
   },
 
@@ -979,14 +982,19 @@ export const api = {
   },
 
   // The application registry (docs/MANUAL.md (applications)): the rows the switcher's drawer lists, each a
-  // `{host}`-templated url this reader resolves against their own hostname. Three verbs and no
-  // more — `list` is read on mount and on every drawer open rather than polled, because the
+  // `{host}`-templated url this reader resolves against their own hostname. `list` is read on
+  // mount and on every drawer open rather than polled, because the
   // registry changes when the operator or a builder edits the file, and a row that appears a
   // minute after the edit is a row nobody is waiting for. The shapes are `@/shared/app-types`.
   apps: {
     list: () => get('/api/apps'),
-    add: (body: { id?: string; name: string; url: string; description?: string }) => post('/api/apps', body),
-    describe: (id: string, description: string) => patch(`/api/apps/${encodeURIComponent(id)}`, { description }),
+    add: (body: { id?: string; name: string; url: string; description?: string; project?: string }) =>
+      post('/api/apps', body),
+    // Sets or clears a row's description and/or project. Only the keys given are sent, and the server
+    // leaves an absent key's field alone: `{ project: '' }` unlinks, `{ description }` alone never
+    // touches the project. Named `fields` because `patch` is this module's own request helper.
+    update: (id: string, fields: { description?: string; project?: string }) =>
+      patch(`/api/apps/${encodeURIComponent(id)}`, fields),
     move: (id: string, direction: 'up' | 'down') => post(`/api/apps/${encodeURIComponent(id)}/move`, { direction }),
     addDivider: (title: string) => post('/api/apps/dividers', { title }),
     renameDivider: (id: string, title: string) => patch(`/api/apps/dividers/${encodeURIComponent(id)}`, { title }),

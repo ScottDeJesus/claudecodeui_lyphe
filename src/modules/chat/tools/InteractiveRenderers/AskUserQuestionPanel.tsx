@@ -2,9 +2,10 @@ import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ChevronDown, ChevronLeft } from 'lucide-react';
 
+import { useHostWindow } from '@/shared/context/HostWindowContext';
 import type { PermissionPanelProps, Question } from '@/shared/types';
 import { Badge, Button, Card } from '@/shared/ui';
-import { cn } from '@/shared/utils';
+import { cn, isElementLike } from '@/shared/utils';
 import { QuestionText } from '@/modules/chat/tools/ContentRenderers/QuestionText';
 import { QuestionOptionRow } from '@/modules/chat/tools/InteractiveRenderers/QuestionOptionRow';
 import { QuestionTextField } from '@/modules/chat/tools/InteractiveRenderers/QuestionTextField';
@@ -13,11 +14,18 @@ import { QuestionTextField } from '@/modules/chat/tools/InteractiveRenderers/Que
  *  render by a fresh `[]` literal when a request carries no questions. */
 const NO_QUESTIONS: Question[] = [];
 
-/** A text field: input, textarea, or anything contenteditable. */
+/**
+ * A text field: input, textarea, or anything contenteditable.
+ *
+ * Asked by `tagName` and the property rather than by a constructor test: while the chat is drawn in
+ * a picture-in-picture window its elements belong to THAT window's realm, whose constructors are
+ * not this page's, and a test against this page's constructor answers false for a real field.
+ */
 const isTextEntry = (element: Element | null): boolean =>
-  element instanceof HTMLInputElement ||
-  element instanceof HTMLTextAreaElement ||
-  (element instanceof HTMLElement && element.isContentEditable);
+  element !== null &&
+  (element.tagName === 'INPUT' ||
+    element.tagName === 'TEXTAREA' ||
+    (element as HTMLElement).isContentEditable === true);
 
 /**
  * A text field with something typed in it. The hazard of taking focus is the
@@ -26,8 +34,11 @@ const isTextEntry = (element: Element | null): boolean =>
  * an EMPTY field would leave every shortcut it advertises inert until clicked.
  */
 const holdsDraft = (element: Element | null): boolean => {
-  if (element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement) return element.value.trim().length > 0;
-  if (element instanceof HTMLElement && element.isContentEditable) return (element.textContent ?? '').trim().length > 0;
+  if (element === null) return false;
+  if (element.tagName === 'INPUT' || element.tagName === 'TEXTAREA') {
+    return (element as HTMLInputElement | HTMLTextAreaElement).value.trim().length > 0;
+  }
+  if ((element as HTMLElement).isContentEditable === true) return (element.textContent ?? '').trim().length > 0;
   return false;
 };
 
@@ -58,6 +69,9 @@ export const AskUserQuestionPanel: React.FC<PermissionPanelProps & { onCollapse?
   onCollapse,
 }) => {
   const { t } = useTranslation('chat');
+  // The window the panel is drawn in: its entrance frame and its Escape listener belong to it, not
+  // to the opener that may be hidden behind it.
+  const hostWindow = useHostWindow();
   const input = request.input as { questions?: Question[] } | undefined;
   const questions: Question[] = input?.questions ?? NO_QUESTIONS;
 
@@ -73,8 +87,9 @@ export const AskUserQuestionPanel: React.FC<PermissionPanelProps & { onCollapse?
   const otherInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    requestAnimationFrame(() => setMounted(true));
-  }, []);
+    const frame = hostWindow.requestAnimationFrame(() => setMounted(true));
+    return () => hostWindow.cancelAnimationFrame(frame);
+  }, [hostWindow]);
 
   // Focus the container for keyboard events when the panel mounts and when the step changes —
   // unless a person is mid-sentence in a text field. The panel mounts inside the transcript
@@ -85,10 +100,15 @@ export const AskUserQuestionPanel: React.FC<PermissionPanelProps & { onCollapse?
   // (`useChatSessionState`, docs/architecture/MANUAL.md (05-scrolling)). A bare focus() on a row 900px
   // down dragged the pane to it — the same silent jump the owner's own writers guard against
   // — so the pane's follow logic decides whether the new row is brought into view, never this.
+  //
+  // The focus is read from the container's OWN document, so a move of the chat between windows never
+  // re-runs this effect (and never pulls focus back from the composer the move just gave it to).
   useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
     if (otherActive.get(currentStep)) return;
-    if (holdsDraft(document.activeElement)) return;
-    containerRef.current?.focus({ preventScroll: true });
+    if (holdsDraft(container.ownerDocument.activeElement)) return;
+    container.focus({ preventScroll: true });
   }, [currentStep, otherActive]);
 
   useEffect(() => {
@@ -173,7 +193,7 @@ export const AskUserQuestionPanel: React.FC<PermissionPanelProps & { onCollapse?
   // Keyboard handler for number keys and navigation
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     // Don't capture keys when typing in a text field ("Other", or a note)
-    if (e.target instanceof HTMLInputElement) return;
+    if (isElementLike(e.target) && e.target.tagName === 'INPUT') return;
 
     const q = questions[currentStep];
     if (!q) return;
@@ -221,14 +241,15 @@ export const AskUserQuestionPanel: React.FC<PermissionPanelProps & { onCollapse?
     if (standalone) return;
     const onEscape = (event: KeyboardEvent) => {
       if (event.key !== 'Escape' || event.repeat) return;
-      if (!containerRef.current?.contains(document.activeElement)) return;
+      const focused = hostWindow.document.activeElement;
+      if (!containerRef.current?.contains(focused)) return;
       event.preventDefault();
-      if (isTextEntry(document.activeElement)) return;
+      if (isTextEntry(focused)) return;
       handleSkip();
     };
-    window.addEventListener('keydown', onEscape, { capture: true });
-    return () => window.removeEventListener('keydown', onEscape, { capture: true });
-  }, [handleSkip, standalone]);
+    hostWindow.addEventListener('keydown', onEscape, { capture: true });
+    return () => hostWindow.removeEventListener('keydown', onEscape, { capture: true });
+  }, [handleSkip, standalone, hostWindow]);
 
   if (questions.length === 0) return null;
 

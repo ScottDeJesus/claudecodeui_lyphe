@@ -157,6 +157,7 @@
     "rename": "名前を変更",
     "renamePlaceholder": "チャット名",
     "running": "実行中",
+    "awaitingInput": "回答を待っています",
     "stopTitle": "このチャットはまだ実行中です",
     "stopBody": "停止して削除しますか?",
     "stopConfirm": "停止して削除",

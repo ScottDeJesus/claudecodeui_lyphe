@@ -59,22 +59,34 @@ export function toExportFileStem(sessionTitle: string, exportedAt: Date): string
   return slug ? `${slug}-${date}` : `conversation-${date}`;
 }
 
-function downloadBlob(blob: Blob, filename: string): void {
+/**
+ * The anchor is made, attached and clicked in `hostDocument`, the document the press happened in:
+ * an anchor clicked in a document the reader is not looking at is a download the browser may
+ * discount, and a helper at module level has no window of its own to ask.
+ */
+function downloadBlob(blob: Blob, filename: string, hostDocument: Document): void {
   const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
+  const link = hostDocument.createElement('a');
   link.href = url;
   link.download = filename;
-  document.body.appendChild(link);
+  hostDocument.body.appendChild(link);
   link.click();
-  document.body.removeChild(link);
+  hostDocument.body.removeChild(link);
   URL.revokeObjectURL(url);
 }
 
-/** Builds the file's text without downloading it, so it can be asserted on. */
+/**
+ * Builds the file's text without downloading it, so it can be asserted on.
+ *
+ * `sourceDocument` is the document whose theme and stylesheets the HTML file carries: the caller's
+ * host document. The default is the page's own, for a caller that builds the text with no press
+ * behind it.
+ */
 export async function buildTranscriptExport(
   format: TranscriptExportFormat,
   input: TranscriptExportInput,
   exportedAt: Date,
+  sourceDocument: Document = document,
 ): Promise<string> {
   if (format === 'json') {
     return `${JSON.stringify(
@@ -109,16 +121,19 @@ export async function buildTranscriptExport(
     resolveModelLabel: input.resolveModelLabel,
     sessionTitle: input.sessionTitle,
     exportedAt,
+    sourceDocument,
   });
 }
 
+/** Used by chat's ChatExportMenu, which passes the document it is drawn in as `hostDocument`. */
 export async function downloadTranscriptExport(
   format: TranscriptExportFormat,
   input: TranscriptExportInput,
+  hostDocument: Document,
 ): Promise<void> {
   const exportedAt = new Date();
-  const content = await buildTranscriptExport(format, input, exportedAt);
+  const content = await buildTranscriptExport(format, input, exportedAt, hostDocument);
   const filename = `${toExportFileStem(input.sessionTitle, exportedAt)}.${EXTENSIONS[format]}`;
 
-  downloadBlob(new Blob([content], { type: MIME_TYPES[format] }), filename);
+  downloadBlob(new Blob([content], { type: MIME_TYPES[format] }), filename, hostDocument);
 }

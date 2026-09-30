@@ -17,7 +17,9 @@ import { Button } from '@/shared/ui';
  *
  * THE FLOW IS THE STRIP'S MAP. Every plan of the arc is a node on it, and the node of the card in
  * view is the selected one; pressing any node pages the strip straight to that card (`goTo`), a
- * smooth centring scroll, however far along the arc it is.
+ * smooth centring scroll, however far along the arc it is. An arc of more plans than the row holds
+ * scrolls its flow sideways (`StatusFlow`): it opens on the node of the card the strip opens on
+ * (`focusIndex`) and follows the card in view as the strip is paged.
  *
  * THE NAV ROW IS THE STRIP'S, SO IT SITS ON THE STRIP: over the cards it moves — the arrows at either
  * end, `Card N of M` between them. It is drawn only when there is more than one card to move to.
@@ -70,6 +72,7 @@ export function DeckStrip({
         nodes={flow.nodes}
         doneCount={flow.doneCount}
         selected={flow.nodes[view.index]?.key ?? null}
+        current={flow.nodes[Math.max(focusIndex, 0)]?.key ?? null}
         onSelect={(key) => goTo(flow.nodes.findIndex((node) => node.key === key))}
         ariaLabel={flow.ariaLabel}
       />

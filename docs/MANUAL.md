@@ -520,7 +520,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/console.mjs
 ## MAN-478 — The application switcher
 section: applications/000
 
-Three routes under `/api/apps`, behind `authenticateToken` on the MOUNT (`server/index.ts:207` — no
+Eight routes under `/api/apps`, behind `authenticateToken` on the MOUNT (`server/index.ts:207` — no
 route file imports the guard), wired in `createAppsModule()`. What they carry is a list of the
 operator's own applications; what the client draws from it is a small round button in the sidebar's
 logo row, a drawer of rows, and one or two framed panes over the main region. The client's half is
@@ -546,14 +546,14 @@ and its store — with nothing else in it:
 |---|---|
 | `apps.seed.ts` | `DEFAULT_APPS`: the one row the registry file is created from — this app itself — and nothing that reads them. |
 | `apps.store.ts` | The file itself: `resolveAppsFile`, `ensureAppsFile`, `readEntries`, `writeEntries`, `isDividerEntry`. |
-| `apps.service.ts` | `listApps` · `addApp` · `updateDescription` · `removeApp`, and EVERY judgement about what a caller may send. |
+| `apps.service.ts` | `listApps` · `addApp` · `updateApp` · `removeApp`, and EVERY judgement about what a caller may send. |
 | `apps.dividers.ts` | `addDivider` · `renameDivider` · `removeDivider` · `moveRow`: where rows sit (§"Dividers and order"). |
 | `apps.icons.ts` | `appIcons`: each app's own tab icon, found on the app and remembered in `apps.icons.local.json` (§"App icons"). |
 | `apps.routes.ts` | `createAppsRouter()` — thin routes that call one verb and hand anything thrown to `next`. |
 | `apps.module.ts` · `index.ts` | `createAppsModule()` and the barrel the server entrypoint imports. |
 
 `server/shared/app-types.ts` carries the two shapes that go on the wire — `AppEntry` (`{ id, name,
-url, description? }`), `DividerEntry` (`{ id, divider }`), `RegistryRow` and `AppRegistryResponse`
+url, description?, project? }`), `DividerEntry` (`{ id, divider }`), `RegistryRow` and `AppRegistryResponse`
 (`{ apps, rows, selfPorts, icons }`) — as a sibling of `server/shared/types.ts`
 rather than an addition to it, which is the pattern `kanban-types.ts` established beside the other
 ten. `src/shared/app-types.ts` is a field-for-field mirror of that file, and the two are edited
@@ -564,9 +564,18 @@ together, always: a change on one side alone is a response the drawer cannot rea
 non-alphanumerics folded to `-`, trimmed, and stepped around the ids already in the file with a
 `-2` suffix rather than refused as a duplicate). A `name` is 1–64 characters after trimming. A
 `url` must parse as an absolute `http:`/`https:` URL **after `{host}` is replaced by `localhost`**,
-so `http://{host}:8003` is a valid row and a bare word carrying no scheme is not. A duplicate `id` on create is a 409; an
+so `http://{host}:8003` is a valid row and a bare word carrying no scheme is not. A `project` is the
+absolute path of the repository the row is built from: trimmed, at most 1024 characters, stored
+`path.resolve`d so a trailing slash never makes one project two strings (the client matches a row to a
+project's `fullPath` by string equality), and absent when blank. Only its shape is judged, never the
+disk — a repository not cloned here is a valid project. A non-text or relative one is a 400
+`APPS_PROJECT_INVALID`; an over-long one is `APPS_PROJECT_TOO_LONG`. `updateApp(id, patch)` takes only
+the keys the caller sent: an absent key leaves its field alone, a present key is judged like a new
+row's and replaces the field, a blank value removes it, and a patch with neither key answers the row
+without writing the file. A bad value is a 400 whichever id it was sent to. A duplicate `id` on create is a 409; an
 unknown `id` on delete is a 404; both are `AppError`s with an explicit `statusCode`, rendered by the
-global handler as `{ success: false, error: { code, message } }`.
+global handler as `{ success: false, error: { code, message } }`. A registry row whose `description`
+or `project` is present and not a string is a broken row, and the registry read answers 500.
 
 **`selfPorts` is how the client recognizes this app's own row**, and it is the same two expressions
 the server already uses to describe itself: `SERVER_PORT || 3001` and `VITE_PORT || 5173`. On this
@@ -632,8 +641,8 @@ section: applications/003 The routes
 
 ```
 GET    /api/apps              -> { apps: AppEntry[], rows: RegistryRow[], selfPorts: number[], icons: { [id]: dataUrl } }
-POST   /api/apps              { name, url, description?, id? }   -> { app: AppEntry }
-PATCH  /api/apps/:id          { description }   -> { app: AppEntry }   (blank clears it)
+POST   /api/apps              { name, url, description?, project?, id? }   -> { app: AppEntry }
+PATCH  /api/apps/:id          { description?, project? }   -> { app: AppEntry }   (blank clears a field; an absent key leaves it)
 DELETE /api/apps/:id          -> { ok: true }
 POST   /api/apps/:id/move     { direction: 'up' | 'down' }   -> { ok: true }   (any row, app or divider)
 POST   /api/apps/dividers     { title? }   -> { divider: DividerEntry }   (appended at the end)
@@ -641,8 +650,11 @@ PATCH  /api/apps/dividers/:id { title }    -> { divider: DividerEntry }   (blank
 DELETE /api/apps/dividers/:id              -> { ok: true }
 ```
 
-The one `PATCH` sets a row's description (at most 160 characters), the only field the drawer edits
-in place; renaming or readdressing a row is a DELETE plus a POST, or one line in the file. The mount
+The one `PATCH` sets or clears a row's description (at most 160 characters) and/or project (an
+absolute path, at most 1024). Only the keys PRESENT in the body are applied, so `{ description }`
+never touches the project and `{ project: '' }` unlinks it; the client sends it as
+`api.apps.update(id, fields)`. The drawer edits the description in place; renaming or readdressing a
+row is a DELETE plus a POST, or one line in the file. The mount
 carries the guard (`app.use('/api/apps', authenticateToken, createAppsModule())`), so a route added
 to the file later cannot be the one that forgot it, and `express.json()` is already global — no
 body parser is added here.
@@ -826,7 +838,7 @@ pick, how do I add one:
   half the next choice fills. There is no on/off switch: a row's **Open in dual screen** turns it
   on and **Close dual screen** turns it off.
 - A scrolling list of cards in file order: the app's icon (or its letter), the name, and its
-  description — the resolved host when it has none — which reads **… · on screen** while the app is up (the tile turns accent then). Pressing a card puts
+  description — the resolved host when it has none — which reads **… · on screen** while the app is up (the tile turns accent then), and ends ` · <project name>` on a row linked to a project (MAN-7448). Pressing a card puts
   it in its half, or takes it down again. Until `registryRead` (the context flag `useAppRegistry.ts`
   sets once the FIRST read has answered, with rows or with a refusal) turns true, the list draws
   three skeleton rows instead — never the empty state, because an unmeasured registry is not an
@@ -837,7 +849,7 @@ pick, how do I add one:
 - A **kebab menu** per card: **Reload** (live only while that app is up), **Open in a new tab**,
   **Open in dual screen** — or **Close dual screen** on the app holding the second half —
   **Edit description**, which turns the second line into a field in place (Enter or leaving it
-  saves, Escape puts it back, blank clears it), **Move up** / **Move down** (greyed at the list's
+  saves, Escape puts it back, blank clears it), **Link project…** (framed rows; drawn, does nothing yet — MAN-7448 §"Status"), **Move up** / **Move down** (greyed at the list's
   ends), and **Remove**, which calls `removeRegistryApp` (`utils/registryRequests.ts`) — `DELETE
   /api/apps/:id` — and then `refresh()`. **Open in dual screen** turns dual screen on with THIS
   app in the second half in one update — the context's own `openInDualScreen` — because it cannot
@@ -849,8 +861,8 @@ pick, how do I add one:
   [`src/shared/ui/verve/MANUAL.md (README)`](../src/shared/ui/verve/MANUAL.md) §"The overlay half"). Removing an app that
   is UP takes its pane down first, in the render the press was made in, so a refusal then names it
   in the banner: the reader's screen changed for a removal that did not happen, and the notice has
-  to say so. A row naming this app (§"The self-origin rule") carries only Open in a new tab and
-  Remove.
+  to say so. A row naming this app (§"The self-origin rule") carries Open in a new tab, Edit description,
+  Move up / Move down and Remove.
 - Pinned below the list, a wide **Add application** button opening an inline **New application**
   form (name, web address, **Add it**) in the list's place, which calls `addRegistryApp`
   (`utils/registryRequests.ts`) — `POST /api/apps` — and then `refresh()`, so the row the list
@@ -892,8 +904,8 @@ opening or closing the second pane never remounts what the first is showing.
 **A pane is an iframe and nothing else** — no title bar, no close button, no watchdog:
 
 ```tsx
-<iframe src={resolved} title={app.name} referrerPolicy="no-referrer" allow="geolocation"
-        className="h-full w-full border-0" />
+<iframe src={resolved} title={app.name} data-pane-side={side} referrerPolicy="no-referrer"
+        allow="geolocation" className="h-full w-full border-0" />
 ```
 
 - **`allow="geolocation"`** is there for a measured reason: the hub's frames carried no `allow`
@@ -903,9 +915,17 @@ opening or closing the second pane never remounts what the first is showing.
   sandbox without `allow-same-origin` would cut the framed app's `SameSite=Lax` session cookie,
   which is the whole premise of the framing grant below. These are the operator's own applications
   on the operator's own host, not untrusted embeds.
+- **`data-pane-side`** is `left` or `right`, passed by the layer. It is how `useFrontPane` tells
+  which frame holds focus; see MAN-491.
 - **Reload** bumps a per-pane counter used in the frame's React key, which remounts the element.
-  **Open in a new tab** is `window.open(resolved, '_blank', 'noopener')`.
+  **Open in a new tab** is `window.open(resolved, '_blank', 'noopener')`. Both, and **Close**, are
+  acts of `useSwitcherActions` on the FRONT pane, not controls on the frame.
 - **The way out is the FAB**, which floats above every pane and is never covered.
+- **A pane whose row leaves the registry comes down.** The provider clears it in the render that
+  sees the row gone, and a survivor moves left, once a registry read has landed. The layer's
+  `left ?? right` fallback is a one-render defence only.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/AppPane.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/AppSwitcherLayer.tsx
 
 ## MAN-489 — What can be framed, and what cannot
 section: applications/011 What can be framed, and what cannot
@@ -943,16 +963,33 @@ which is what earns a component in this house. Every screen composes them; none 
   into whatever is on screen by then — and the drawer it opens covers it, so a drawer opened on the
   release caught its own tap on the backdrop and shut again (or pressed a row inside the sheet). The
   click that ends a drag is swallowed; Enter and Space carry `detail === 0` and always press.
+  `onRectChange(rect)` (optional) reports the button's placed rect after every placement (docked,
+  floating, each move of a drag) and on every window `resize`, because a floating position is a CSS
+  `clamp()` whose pixels exist only after layout. The rect is `getBoundingClientRect()` with the
+  button's own hover/press scale divided back out (`placedRect`): hovered, the reported width is 28
+  where the bare rect says 29.68, so a panel standing off the FAB does not twitch on hover. The latest
+  callback is read through a ref, so a new function identity each render neither re-binds the resize
+  listener nor re-reports. The node is still never remounted.
 - **`SplitPane.tsx`** — two panes and a draggable seam, or one pane filling the row. The seam is
   its own narrow gutter BESIDE the panes rather than over them: a grab area laid over a pane would
   steal the clicks of whatever that application draws flush against its edge. It carries
   `SPLIT_MIN_RATIO` and `SPLIT_MAX_RATIO` (0.15 and 0.85, the clamp the hub measured) and moves by
   0.02 per arrow key.
-- **`usePointerDrag.ts`** — the one drag mechanism both of them run on. It lives with the kit rather
+- **`usePointerDrag.ts`** — the one drag mechanism all of them run on. It lives with the kit rather
   than in `src/shared/hooks/`, and is not exported from the barrel: the frontend standard sends a
   hook used by multiple FEATURE modules to `src/shared/hooks/`, and this one has none — what binds
   it here is direction, since it writes class names whose only meaning is in the kit's own
-  stylesheet and its `PointerDragKind` names the two kit components.
+  stylesheet and its `PointerDragKind` (`'fab' | 'split' | 'resize'`) names the three kit components.
+- **`ResizeGrip.tsx`** — joined later than the three above: a button the caller stands at one corner of
+  a panel, dragged to size it; its one caller outside the kit is chat-host's `ChatHostPanel` (MAN-7467). It
+  paints and never places. Props: `label` (aria-label), `corner` (`'top-left' | 'top-right' |
+  'bottom-left' | 'bottom-right'`, which sets its cursor and glyph), `onResize({dx, dy})`,
+  `onResizeEnd({dx, dy})`. It reports raw pointer deltas since the press and never a size — the sign
+  per corner is the caller's. `onResize` is live; `onResizeEnd` fires once at release and only when
+  the drag moved, so a click cannot commit a size. It runs on `usePointerDrag` kind `'resize'`, so
+  frames are inert for the drag. Each arrow key is one whole 16px resize (`onResize` then
+  `onResizeEnd`); an arrow with Alt, Ctrl or ⌘ is ignored, and so is any arrow once a pointer drag has
+  passed its 4px threshold — a key between the press and that threshold still resizes.
 
 **The body class is the reason the drag exists in this shape.** A pane is a cross-origin iframe, and
 an iframe is its own browsing context: the moment a drag crosses into one, the frame swallows the
@@ -965,39 +1002,68 @@ handlers run, and the same release runs on unmount so a component torn down mid-
 the whole application unclickable.
 
 `src/shared/ui/verve/surfaces.css` is the fourth Verve paint file, holding `.vv-fab`, `.vv-split`,
-the divider rules and the four body classes. Colours come from tokens and nowhere else. Its import
-in `src/shared/ui/index.ts` is load-bearing: after `controls.css` and `feedback.css`, before
-`board.css`, which keeps the last word.
+the divider rules, `.vv-resize-grip` and the body classes. Colours come from tokens and nowhere else.
+Its import in `src/shared/ui/index.ts` is load-bearing: after `controls.css` and `feedback.css`,
+before `board.css`, which keeps the last word.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/verve/surfaces.css
+- **`body.vv-drag-resize` cursor** — read off the live grip with `:has()` over its `data-dragging` and
+  `data-corner`: top-left and bottom-right `nwse-resize`, top-right and bottom-left `nesw-resize`.
+- **`.vv-resize-grip`** — 16px hit area (a 5px-radius rounded square, not the house's 10px, which turns 16px into a circle that pokes past a clipped corner), 24px under a coarse pointer; an inline SVG of three strokes in
+  `--ink-faint` (3:1 on the header and canvas grounds, both themes); drawn for bottom-right and
+  flipped in CSS for the other corners. Hover, behind `(hover: hover)`: an 8% `--ink` wash and `--ink-mid`. Held (`data-dragging`): `--accent-ink` on `--accent-soft`. Focus ring drawn inside the box (`outline-offset: -2px`), because the house's outside ring is cut off by a clipped corner.
+
+**Proof: `.verify/resize-grip-fab-rect.mjs`** (`.verify/` is gitignored; force-add to commit) — logs in through
+`openConsole`, mounts through `mountReact`, prints `all checks passed`, in light and dark. It checks:
+a grip drag across the cross-origin `:8005` frame (body `vv-dragging vv-drag-resize`, frame
+`pointer-events: none`, body cursor `nwse-resize`, classes gone on release, `onResizeEnd` once and not
+at all on a press with no travel); the four arrow deltas; the four corner cursors; and the
+`onRectChange` reports (one on mount, none for a new callback identity, the last rect after a drag equals
+the button's own rect once the pointer is off it, one more on a viewport resize, same node throughout).
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/DockableFab.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/ResizeGrip.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/usePointerDrag.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/verve/surfaces.css, /home/lyphe/.claude/claudecodeui_lyphe/.verify/resize-grip-fab-rect.mjs
 
 ## MAN-491 — The switcher's own files
 section: applications/013 The switcher's own files
 
-`src/modules/app-switcher/`, whose barrel exports exactly four mounts — the provider, the dock, the
-FAB and the layer — and nothing else:
+`src/modules/app-switcher/`, whose barrel exports six things and nothing else: four mounts — the provider, the dock, the FAB and the layer — and two hooks, `useCurrentApplication` (an ANSWER: the application in front, or null) and `useSwitcherActions` (a set of VERBS: the five acts). Both hooks compute from the state hook inside the module, so which pane is in front and which row is this app are decided in one place. A third export is how a rule decided in one place starts being read in two.
 
 | File | What |
 |---|---|
-| `context/AppSwitcherContext.tsx` | The one state home: the registry, the two panes, dual, the ratio, the FAB position, the dock rect, the drawer's open flag, `openInDualScreen` (dual-on-and-filled in one update) — and `refresh()` on every drawer open. |
+| `context/AppSwitcherContext.tsx` | The one state home: the registry, the two panes, dual, the ratio, the FAB position, the dock rect, the drawer's open flag, `frontSide`, `closePane`, `openInDualScreen` (dual-on-and-filled in one update) — and `refresh()` on every drawer open. Once a registry read has landed it clears, in the render that sees it, any pane whose row the registry no longer holds; a failed read keeps the last good list, so a refusal never empties a pane. |
 | `AppSwitcherDock.tsx` | The empty 28px box in the logo row. It paints nothing; it holds the space open and reports its rect. |
 | `AppSwitcherFab.tsx` · `AppDrawer.tsx` | The kit's FAB wearing the app logo, wired to the drawer it opens. |
 | `AppDrawerHeader.tsx` | The sheet's "Your apps" heading, the count line and Close all — extracted out of `AppDrawer.tsx` at the 300-line ceiling. |
 | `AppDrawerDivider.tsx` · `hooks/useDrawerLayout.ts` · `utils/moveItems.ts` | One divider row with its in-place title; the drawer's layout acts (add/rename/remove a divider, move a row) with their one refusal banner; the kebab's shared Move up / Move down pair. |
 | `AppDrawerRow.tsx` · `NewApplicationForm.tsx` | One application's card, kebab and in-place description edit; the inline New application form (name, address, optional description) and its field checks. |
-| `AppPane.tsx` · `AppSwitcherLayer.tsx` | One framed application; the panes composed over the main region. |
+| `AppPane.tsx` · `AppSwitcherLayer.tsx` | One framed application, carrying `data-pane-side` (`left` or `right`); the panes composed over the main region. |
+| `hooks/useFrontPane.ts` | `useFrontPane(panes, setPanes)` → `{ frontSide, closePane }`, mounted by the provider. `frontSide` is the side whose frame last took focus (default `left`; resets to `left` when that side empties). `closePane(side)` empties one slot and moves a survivor left. |
+| `hooks/useCurrentApplication.ts` | `useCurrentApplication()` → `CurrentApplication` (`{ app, src }`) of `frontSide`'s slot, or null when nothing is up or the registry lacks the row. Memoised on `app` and `src`. |
+| `hooks/useSwitcherActions.ts` | `useSwitcherActions(chatDoor)` → the five `SwitcherAction`s in order: Chat, Applications, Reload, Close, Open in a new tab. Chat and Applications are always enabled; the other three are `disabled` while nothing is up and act on `frontSide`. Open in a new tab is `window.open(src, '_blank', 'noopener')`. `chatDoor` comes from the caller: only project-workspace knows which conversation an application brings. No mounted caller yet. |
 | `hooks/useAppRegistry.ts` | `GET /api/apps` on mount and on every drawer open — no polling, no websocket. A failed read keeps the last good list and raises an error beside it; `registryRead` is set once, after the first read settles either way. |
 | `utils/registryRequests.ts` | The registry's WRITE verbs — `addRegistryApp`, `describeRegistryApp`, `removeRegistryApp`, `moveRegistryRow` and the three divider verbs — and `refusalInWords`, the one reader of a refusal's sentence every registry request in this module shares. |
+| `utils/paneSlots.ts` | `EMPTY_SLOT` and `loneAppOnTheLeft(panes)`. A lone application always sits in `panes.left`, because `SplitPane` draws its left child whether or not a right one exists. Every act that takes an application down passes its result through `loneAppOnTheLeft`. It lives here, not in the context, because the context imports `useFrontPane`, which needs it. |
+| `utils/radialLayout.ts` | `radialLayout(fab, viewport, count)` → item centres for the radial's arc; imports nothing; `[]` when `count` is below 1 or NaN. Constants at the top: 92° sweep, 110px radius, 44px item, 8px edge gap. The arc is centred on the FAB and faces the viewport's centre; where a wall leaves no room it turns to the nearest angle that fits. A corner too tight for any turn narrows the sweep and grows the radius, up to 88px past 110, until neighbours stand as far apart as the open arc's (43.86px for five) or an item's width, if smaller; a viewport too small for that clamps each centre in and slides it along the wall to a full radius. Every centre is at least 110px from the FAB's centre and inside the viewport, so a drawing caller reads the returned centres and never assumes 110px. No mounted caller yet. |
 | `utils/resolveAppUrl.ts` · `utils/appSwitcherStorage.ts` · `utils/dockRect.ts` | The pure functions of §"`{host}`…", the `localStorage` record, and the two rules (`dockableRect`, `sameRect`) a measured dock rect passes before the provider believes it. |
 
-The context lives in `context/` and no file here ends in `Provider.tsx`, which is what the frontend
-standard asks for and what the ten contexts already in this repo do. The mounts are made by
-`src/modules/project-workspace/ProjectWorkspaceShell.tsx`: it wraps its tree in the provider, gives
-its main-region wrapper the `relative` the layer needs, renders the layer as that wrapper's last
-child and the FAB as the last sibling of the command palette — outside the main region, so the
-button floats over an open application instead of being covered by it.
+Types live in `src/shared/types.ts`, group `APPLICATION SWITCHER`: `PaneSide`, `PaneSlot`, `CurrentApplication`, `ChatDoor` (`{ floating, toggle, collapse }`) and `SwitcherAction` (`{ key, label, keywords, icon, disabled, shortcut, run }`).
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/ProjectWorkspaceShell.tsx
+**The front pane is read from focus.** A pane is a cross-origin iframe, so the page never hears a click that lands in it. `useFrontPane` reads `document.activeElement`'s `data-pane-side` at two moments:
+
+| When | Why |
+|---|---|
+| Window `blur` | Focus left the page for a frame. |
+| Capture-phase `pointerdown` on `window` | Focus moving from one frame straight into the other fires nothing in the page (measured 2026-09-29: no `blur`, `focus` or `focusin`, though `activeElement` changes); the next press in the page reads the frame the reader last used, before the press takes focus off it. |
+
+The context lives in `context/` and no file here ends in `Provider.tsx`, which is what the frontend
+standard asks for and what the ten contexts already in this repo do. The provider is mounted by
+`src/modules/project-workspace/ProjectWorkspaceShell.tsx`, whose tree is `ChatHostProvider` →
+`AppSwitcherProvider` → `WorkspaceFrame`. The layer and the FAB are mounted by
+`src/modules/project-workspace/WorkspaceFrame.tsx`: it gives its main-region wrapper the `relative`
+the layer needs, renders the layer as that wrapper's last child and the FAB as the last sibling of
+the command palette — outside the main region, so the button floats over an open application
+instead of being covered by it.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/hooks/useCurrentApplication.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/hooks/useFrontPane.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/hooks/useSwitcherActions.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/utils/paneSlots.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/utils/radialLayout.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/ProjectWorkspaceShell.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/WorkspaceFrame.tsx
 
 ## MAN-492 — Proving it
 section: applications/014 Proving it
@@ -1043,6 +1109,35 @@ download, already on this box. A full invocation is the whole recipe: mint a tok
 helper, boot a server against the real database, open the app in the browser, probe, stop.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/scripts/apps-probe-env.sh, /home/lyphe/.claude/claudecodeui_lyphe/scripts/apps-ui-probe.mjs
+
+## MAN-7447 — The login session — what ends it, what may not, and the trace
+section: auth-session/000
+
+How a page keeps its login, the few things that may end it, and the trace every ending leaves.
+
+**Where the session lives.** One JWT in `localStorage['auth-token']`, shared by every tab of the origin, and a second copy in each tab's `AuthContext` memory (the WebSocket reconnect and the refresh timer read that one). `useSharedSessionFollower` keeps the copies equal through the `storage` event: another tab's refresh is adopted, another tab's sign-out is followed. A token lasts 10 years (`expiresIn: '3650d'`, `auth.middleware.ts` — operator, 2026-09-29: "Can we keep it like infinite?"); the server puts a new one in `X-Refreshed-Token` on any response once the presented one is past half-life, and `AuthContext` also calls `POST /api/auth/refresh` at half-life. Origins do not share storage: `http://100.103.222.79:5183` and `http://127.0.0.1:5183` are two sessions.
+
+**What may end a session** — this list is complete, and each one leaves a trace record:
+- `stored-token-expired` — `getStoredAuthToken()` read the stored token and it is past `exp` + 60 s by the page's clock. The only ending that involves no request.
+- `request-verdict` / `upload-verdict` — the server answered a request with `X-Auth-Error`. The verdict is about the token that request CARRIED, so it ends the session only when that token is still the stored one. A verdict about a token another tab has since replaced is traced `ignored` and the session stays. A verdict about no token while storage is empty is what a signed-out page's stray requests get back, and is not recorded — unless the page HELD a session (its storage emptied underneath it by eviction or clear-site-data), in which case the page records it as one `signed-out` with `sent=none stored=none` and the URL that noticed.
+- `websocket-token-expired` — the socket URL was built from an in-memory token that has expired; same rule as a verdict.
+- `logout`, and `other-tab-signed-out` (followed, storage already empty).
+A 401 or 403 with no `X-Auth-Error`, a 200 the page cannot parse, and a 5xx are never verdicts on the session: the boot gate reports "server unreachable" and keeps the token.
+
+**What may write the token.** `storeSignedInToken` (login, registration) replaces whatever is stored. `storeAuthToken` (the refresh header of any response, the uploader's XHR, the refresh call) only ever REPLACES a session with a newer one: it refuses a token when nothing is stored (a response that outlived a sign-out must not sign the person back in), when the token is expired, and when it is not newer than the stored one, each traced `refresh-header-<no-session|expired|stale>` / `refresh-endpoint-…` as `ignored`.
+
+**The cause of the sign-outs "out of nowhere" (measured 2026-09-29).** The API sends `X-Refreshed-Token` on ordinary cacheable JSON responses (Express adds an `ETag` to every one). A browser stores such a response with all its headers and answers every LATER revalidation of that URL that returns 304 — a 304 carries no refresh header on the wire — with the STORED header, so `fetch()` hands the page a token minted days ago as though it were new. The page stored it over its good session; once that token was a week old it read as expired and the page signed out, and every sign-in was undone the same way by the first revalidated request, until the entry's body changed. The operator's own journal showed it: one 174.5-hour-old token found in storage three times in 40 seconds, each right after a sign-in. Cured twice: `authenticateToken` marks the ONE response that carries a refresh `Cache-Control: no-store`, so no cache ever holds a copy to replay; and `storeAuthToken` refuses a stale token whatever replayed it, which also makes the entries already in browsers harmless. Other tokens in flight behind the same shape (a response landing after another tab stored a newer token, or after a sign-out) are refused by the same guard.
+
+**The trace.**
+- Server: every `X-Auth-Error` 401 logs one line, never a token: `[auth] 401 <METHOD> <path> reason=<missing|expired|user-not-found|bad-signature|malformed|not-active> source=<header|query|none>` (+ `expiredSecondsAgo=` / `userId=` / a fixed-sentence `detail=`). Whatever `jwt.verify` throws is the token's (a payload that is not JSON included) and takes the 401 `malformed` path, logging only a fixed-sentence `detail` and never a fragment of the token; only a failure AFTER the token verified (a locked database in the user lookup) is `[auth] 503 … reason=lookup-error`, which carries no `X-Auth-Error` and so cannot sign a page out.
+- Client: `src/shared/authTrace.ts` keeps the last 10 decisions in `localStorage['auth-trace']` (consecutive repeats raise `count`; past the cap, `ignored` and `followed` records go before any `signed-out`). The next authenticated page load posts them to `POST /api/auth/client-events`, which writes `[auth] client-report user=<name> at=… trigger=… outcome=<signed-out|ignored|followed> url=… method=… status=… authError=… sent=<token|none> stored=<same|different|none> tokenAgeHours=… tokenExpiresInHours=… page=<visible|hidden> pageAgeMinutes=… count=…`. Read them with `journalctl -u cloudcli-server-dev.service | grep '\[auth\]'`.
+- Reading a sign-out: `trigger=stored-token-expired outcome=signed-out` with `tokenExpiresInHours` negative is a token that really went unrefreshed for its whole 10-year life, or — before the cure — a replayed one (compare `tokenAgeHours` with when that person last signed in). `request-verdict signed-out` has a matching `[auth] 401` line with the server's reason. A page that was NOT signed out shows `ignored`/`followed`.
+
+**The login form.** `LoginForm.tsx` is a real `<form>` with a submit button, `name="username"` / `name="password"`, `autocomplete="username"` / `"current-password"`, and it unmounts when the session arrives — the shape password managers look for. Its inputs are disabled while a login is in flight. The pages are served over plain http (a Tailscale address), and whether Chrome or Safari offers to save on that origin is the browser's own policy, which a headless probe cannot drive; nothing in this form hides the login from it.
+
+**Proving it.** `node .verify/probe-signed-out.mjs` (real Chromium on :5183, the dev account only, tokens signed with the dev database's own secret and never printed): scenarios 1/1b stale tab reconnecting its socket, 2 late 401 after sign-in, 3 a refresh must not re-run the boot gate, 4–6 real expiries and a revoked user (these MUST sign out), 7 a real API handover, 8 login form markup, 9 the cache replay against the current API, 9d the replay against an entry already in the browser cache (`startLegacyCachingProxy` in front of the app recreates one), 9b/9c a late refresh after a newer token or a sign-out. `PROBE_APP=<origin>` points the same scenarios at another client of the same API, `ONLY=1,2` picks scenarios, `SKIP_HANDOVER=1` leaves out 7. Scenarios 9 and 9d use no Playwright route: any route switches Chromium's HTTP cache off, which is the thing they test.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/auth/auth.middleware.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/auth/auth.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/auth/auth.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/auth/context/AuthContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/auth/hooks/useSharedSessionFollower.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/auth/LoginForm.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/file-tree/hooks/useFileTreeUpload.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/authToken.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/authTrace.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/context/WebSocketContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/signout-kit.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-signed-out.mjs
 
 ## MAN-493 — The chat contracts
 section: chat-contracts/000
@@ -2982,7 +3077,7 @@ section: dispatcher/000/007 The endings. `dispatcher-endings.service.ts` watches
 
 **The endings.** `dispatcher-endings.service.ts` watches the store's `events` for three kinds —
 `complete`, `paused`, `relaunched` — and pushes `dispatcher.finished` (kind `stop`, severity `info`),
-`dispatcher.paused` (`stop`/`info`) and `dispatcher.relaunched` (`error`/`warning`). The watermark is
+`dispatcher.paused` (`stop`/`info`; its body carries the pause's cause when the daemon held the plan — an API error line, the storm guard's), `dispatcher.limit_paused` (`stop`/`info`) and `dispatcher.relaunched` (`error`/`warning`). A `paused` event whose detail ends ` (until <UTC stamp>)` — or ` (retry at <stamp>)`, the dispatcher's own guess for a limit that named no time (`backoff.tail`) — is a USAGE-LIMIT pause and earns the fourth code, with `meta.resetsAt` (epoch seconds) and `meta.limitGuess` set: ONE push per wall. A NAMED lift speaks once per lift time (only the lowest event id of each epoch); a guessed one speaks once and stays silent while its pauses keep landing within an hour of one another (`speakingLimitPauses`), because the guess is per soul and would otherwise give every plan its own time. Read off the log itself, so it holds across the dev server's restarts and however many plans and minutes apart. Its title names the account, not a plan, and a lift that is not today names its DATE — `Claude usage limit` / `Plans paused until 6:51 PM · Resume from the Runner tab`, `… until Oct 3, 8:12 PM …`, or `Plans paused — no reset time named, retrying at 7:26 PM · …` for a guess. The watermark is
 the EVENT ID, held in the `app_config` row `dispatcher_announced_through`: the store's ids come from
 one global sequence, so a single number orders the endings of every plan, and no timestamp is trusted
 to do it. First sight on a database with no mark writes the highest id the store already holds and
@@ -3128,7 +3223,7 @@ section: dispatcher/010 The plan card/010 The face (`PlanFace`), top to bottom:
 
 **The face** (`PlanFace`), top to bottom:
 
-1. **The track** (`StatusFlow.tsx`, Verve's horizontal StatusFlow): one node per phase on ONE row at every width — equal grid columns, a node `min(100%, 1.5rem)` of its column, never a sideways scroll (`one-path`, 16 phases, sits on one line at 390px and at 1920px). Nodes are `LaneFlowNode` `{ key, mark, tone, label, live }`, built by `PlanFace` from `phaseWord`. Mark: `✓` done, `▶︎` walking, `…` settling, the phase's position while not started. The fill spans the whole row to done ÷ total, like a meter; it does not join nodes, because done phases need not be adjacent. A plan with no phases cut draws no track.
+1. **The track** (`StatusFlow.tsx`, Verve's horizontal StatusFlow): one node per phase on ONE row, every node its natural 1.5rem at every width. Where the nodes fit, they share the row in equal columns; where they do not, the row SCROLLS sideways and never shrinks them (`coi-backend-conformance`, 23 phases, is 24px nodes on a 332px row at 390px, opened on the walking phase: squeezed into that row they would be 14px, too small for a two-digit label). The scroll's own rules are `StatusFlow` rules, MAN-6791. Nodes are `LaneFlowNode` `{ key, mark, tone, label, live }`, built by `PlanFace` from `phaseWord`. Mark: `✓` done, `▶︎` walking, `…` settling, the phase's position while not started. The fill spans the whole row to done ÷ total, like a meter; it does not join nodes, because done phases need not be adjacent. A plan with no phases cut draws no track.
 2. **The caption** (`dispatcher.flow.caption`): `<done> of <total> done · <rounds> rounds · <route.word>`, `data-flow-caption`. The plan's spend is the header's pills, not said again; the route is the BOX's posture (`deepseek route, swarm on — all at once`) and it explains a plan sitting still under `one at a time`.
 3. **The receipt**: a pressed node (`aria-pressed`) opens that phase's `PlanPhaseRow` under the track with its stages open (`data-flow-receipt=<phase key>`); the same node pressed again closes it. One receipt per card; its state is `PlanFace`'s.
 4. **`PlanNow`** (`PlanNow.tsx`, `data-plan-now`): one line per running phase (walking or settling), up to three, then `+N more` (`dispatcher.now.more`). With none running on a plan not complete: the first phase not started, as `Next` (`dispatcher.now.next`). A complete plan draws nothing. A line: the node's own mark, position, the title on ONE line (truncated), the assignee capped at 25% of the line and the part that shrinks first. Handles `data-now-phase=<key>`, `data-now-next`, `data-now-more`.
@@ -3152,11 +3247,17 @@ section: dispatcher/010 The plan card/011 `StatusFlow` rules.
 **`StatusFlow` rules.**
 - Three states, three channels, so all three show on one node: SELECTED = the node's border raised to 2px (`border-2 border-current`); keyboard FOCUS = the house `outline` ring, used for nothing else; LIVE = the `vv-ring` halo (`box-shadow`, `animate-live-ring`). A deck's track keeps the same split.
 - Colour reaches a node through `badgeVariants()` (exported from `@/shared/ui`) and its `data-tone` alone; a node's classes carry no colour. Every node also carries a mark and a label, so no state is colour alone.
-- `role="toolbar"`, ONE tab stop (roving tabindex): Left, Right, Home, End walk the nodes; Enter and Space press.
+- `role="toolbar"`, ONE tab stop (roving tabindex): Left, Right, Home, End walk the nodes; Enter and Space press. Until a node is focused the stop is the selected node's, else the CURRENT node's, else the first — Tab lands where the track opened and never throws it back to phase 1.
 - Reduced motion: the live ring animation and the fill's transition are off.
 - Handles: `data-status-flow`, `data-flow-node=<key>`, `data-selected`, `data-live`.
+- THE ROW SCROLLS RATHER THAN SQUEEZES (`hooks/useFlowTrack.ts`). The row is at least `N × 1.5rem` wide inside a scroller (`[data-status-flow]`: `overflow-x-auto`, `scrollbar-thin`), so a phone swipe, a trackpad and the keyboard move it and a mouse has the thin bar. Padding and negative margins on the scroller cancel out, so the row lies where a scroll-free row did and the live halo, the focus ring and the hover lift are not clipped at its edges. The room at the START and above and below is the scroller's own padding; the room at the END is a `flex-none` spacer after the row, because Chromium counts a scroller's end padding as scrollable overflow and WebKit does not (there the last node — the walking one, on a final phase — sat flush and its halo and focus ring were cut).
+- It opens on `current` — the node walking, else the first not done, else the last (`currentPhaseKey`); on an arc's flow, the node of the card the strip opens on (`focusIndex`). `current` is centred, instantly, whenever the row has something to scroll and the reader has not touched it: first paint, a phone turned upright, a resized pane, a phase landing. It is re-centred on every resize until the reader takes it, never once at the first overflow: a resizing row passes through a layout wider than the one it settles on, and a one-shot centring against that leaves the walking phase off the edge of a phone. The reader takes the track by MOVING it: a swipe along the row (a touch that moves mostly sideways), a sideways wheel or shift+wheel, a mouse press on it, a key on a node, keyboard focus on a node, or a `selected` change. A thumb dragging the page over the row and a vertical wheel going by do not take it. Nothing then moves it on its own until the row is gone (a plan with no phases) and comes back as a new track.
+- A `selected` node that changes (a press; the arc's strip paged by its arrows, a swipe or a far node) and a node focused from the KEYBOARD (Tab; the arrows ask for it themselves) are brought into the track, smoothly, clear of the fade. A node focused by a MOUSE press is not (`:focus-visible` gates it): a smooth scroll begun at mousedown moves the node from under the pointer before mouseup, the browser clicks the common ancestor and the press is lost — every hold past 60ms on a node in the edge fade. Arrow keys focus with `preventScroll`; only the track's own `scrollTo` ever moves — never `scrollIntoView`, which would move the page and an arc's strip with it.
+- An edge fade says which side has more: a `mask-image` on the scroller reading `--fade-before` / `--fade-after`, each up to 28px and growing with the distance scrolled, written straight to the element by the scroll handler (no state).
+- A swipe on the flow stays on the flow: `overscroll-behavior-x: contain` is set while the row overflows, so a swipe reaching its end does not page an arc's strip or the page (a plan card sits inside the strip). It is set ONLY while the row overflows: a contained scroller with nothing to scroll still swallows a swipe that starts on it (measured 2026-09-29 on a 5-phase flow inside the strip), so a flow that fits lets its swipes through and a swipe anywhere else on the card pages the strip.
+- Standing proof: `node .verify/probe-status-flow-scroll.mjs` (MAN-6809).
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-arc-nest.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-arc-strip-return.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dispatch-arc-start.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dispatch-card-phases.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dispatch-card-version-word.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dispatch-model-word.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dispatch-resume-3am.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-planner-card.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-planner-card-write.py
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-arc-nest.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-arc-strip-return.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dispatch-arc-start.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dispatch-card-phases.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dispatch-card-version-word.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dispatch-model-word.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dispatch-resume-3am.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-planner-card.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-planner-card-write.py, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-status-flow-scroll.mjs
 
 ## MAN-6792 — The plan card — The phase row
 section: dispatcher/010 The plan card/012 The phase row
@@ -3488,7 +3589,14 @@ section: dispatcher/010 The plan card/029 Phases shown — the standing proof.
 - 2026-09-26, 5183: every plan card at 390 and at 1920 painted nodes = phases (6/6 … 16/16) and 0 list rows; exit 0.
 - 2026-09-28, 5183: both homes drew the same 7 plan cards, each painting nodes = phases (3/3 … 29/29) and 0 list rows; exit 0.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-arc-nest.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-arc-strip-return.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dispatch-arc-start.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dispatch-card-phases.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dispatch-card-version-word.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dispatch-model-word.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dispatch-resume-3am.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-planner-card.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-planner-card-write.py
+**Its sibling, the track's own contract** — `node .verify/probe-status-flow-scroll.mjs` (dev client 5183 for the whole run; a build reads only the live half): at 390 and 320 on every plan card with 10+ phases in the Runner tab, at 1920 in the gutter's Runner widget (its ~300px column), and on a mounted arc strip of 12 and of 29 plans with REAL touch swipes (`Input.dispatchTouchEvent`; CDP's `synthesizeScrollGesture` scrolled nothing on touch here).
+
+- exit 0 = no two nodes or labels overlap and no label pokes out past its own ring; nodes stay 24px; a row wider than its scroller scrolls, opens with its current node inside it, and paints the edge fade; a press opens the receipt and a second closes it, and a mouse press HELD 120ms on the node under each edge fade presses it (Playwright's own `click()` is instant and cannot see a lost press); the roving tab stop starts on the current node; End focuses the last node inside the track; a swipe on the flow scrolls the flow and not the strip, swiping past its end still does not page the strip, a swipe elsewhere on the card pages it, and a swipe on a flow that FITS pages it too; the arc's flow follows the card in view (a far node, then fourteen `prev` presses); the page never moves sideways; at the end of a scrolled flow the last node keeps 10px to its right in Chromium AND in Playwright's WebKit (a `[NOTE]` when WebKit will not launch); at least one flow wider than its row was scrolled (a build on a lane of small plans FAILS rather than passing over nothing); 0 console errors (the box's GitHub release-check 403 aside).
+- Screenshots: `.verify/shots/status-flow-{live,arc}-<width>-{light,dark}.png`.
+- 2026-09-29, 5183, the probe as first built (127 checks): exit 0, 0 console errors. 24px nodes, 0px overlap, 0px spill at both widths and in the gutter. Its negative control: squeeze the live cards (row `min-width` off, node `width: min(100%, 1.5rem)`) and the same reading fails — 390px: 14px nodes on the 23-phase plans, the label 0.8px past its ring's inside; 320px: 11px nodes, labels overlapping their neighbours by 2.6px.
+- 2026-09-29, 5183, the probe after the held-press, end-inset and tab-stop pass: exit 1, 145 PASS. Layout (24px, 0px overlap and spill), scroll, opening on `current`, tab stop, End, the fade, every swipe check and the 10px end inset in Chromium AND WebKit pass. FAIL: the 120ms held press on the live cards' fade nodes — 13 of 18 attempts (390, 320, gutter), 0 of 4 on the fixture flow; the gutter's `app-drawer-chat` receipt press-then-press; `card 4's flow of 29` reading 1.2px node overlap on the 29-plan fixture at 390 and 320; and the screenshot step's `page.goto` (`networkidle`, 30s) timed out. A second run stopped at its first `goto` on the same timeout. Cause not established.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-arc-nest.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-arc-strip-return.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dispatch-arc-start.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dispatch-card-phases.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dispatch-card-version-word.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dispatch-model-word.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dispatch-resume-3am.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-planner-card.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-planner-card-write.py, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-status-flow-scroll.mjs
 
 ## MAN-6810 — The plan card — An arc's plans nested inside the arc's deck — the standing proof.
 section: dispatcher/010 The plan card/030 An arc's plans nested inside the arc's deck — the standing proof.
@@ -3590,6 +3698,8 @@ section: dispatcher/015 The arc deck's frame/006 The flow (`StatusFlow`, `flow: 
 | `live` | status `live`; the node breathes |
 | `doneCount` | complete plans, counted from the left: the track's fill |
 | `ariaLabel` | `dispatcher.flow.arc`: `Plans of <name>.arc` |
+
+An arc of more plans than the row holds SCROLLS its flow (`StatusFlow` rules, MAN-6791): it opens on the node of the card the strip opens on (`focusIndex`) and follows the card in view as the strip is paged — by the arrows, a swipe, or a press on a far node — so the selected node is never left off its edge.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/ArcDeck.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/DeckFrame.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/DeckStrip.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/hooks/useDeckStrip.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-arc-strip-return.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-deck-height.mjs
 
@@ -7300,13 +7410,15 @@ section: simple-chat-list/000
 An alternative sidebar for someone who does not think in projects: no tree, no search chips, and a
 flat feed of the chats they started from this view — newest first — ending in a New chat row (a
 `+` pill shaped like a chat, `SidebarNewChatButton.tsx`). The project a new chat starts in is picked
-on the new-chat screen, beside the model, and saved as the list's project for new chats. `src/modules/sidebar/SidebarSimpleList.tsx` composes it from two module-private
+on the new-chat screen, beside the model, and saved as the list's project for new chats;
+`openProjectChat` (project-workspace) saves it the same way before any new chat it opens.
+`src/modules/sidebar/SidebarSimpleList.tsx` composes it from two module-private
 hooks (`hooks/useSimpleChatList.ts`, `hooks/useSimpleChatRemove.ts`) and is rendered by
 `Sidebar.tsx` in a slot `SidebarContent` never imports, so the tree's own code carries no
 knowledge of this view. Settings stays reachable either way — this replaces the tree, not the
 whole sidebar.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/SidebarSimpleList.tsx
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/hooks/useOpenProjectChat.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/SidebarSimpleList.tsx
 
 ## MAN-662 — The tag
 section: simple-chat-list/001 The tag
@@ -9760,13 +9872,13 @@ dropped WebSocket rather than a refused request, but it is a transient either wa
 
 ## MAN-1469 — The drawer's application row and divider — size, Escape claim, probes
 
-`AppDrawerRow.tsx` (the row), `AppDrawerDivider.tsx` (the divider among the rows) and `AppDrawer.tsx` (the list and its loading placeholder). Two lines per row: the name, then the description — the resolved host when it has none. Screen: MAN-487.
+`AppDrawerRow.tsx` (the row), `AppDrawerDivider.tsx` (the divider among the rows) and `AppDrawer.tsx` (the list and its loading placeholder). Two lines per row: the name, then the description — the resolved host when it has none — with ` · <project>` after it on a linked row. Screen: MAN-487. Project line and picker: MAN-7448.
 
 ## Measured size — 2026-09-24, identical at 1280 and 390px, dark and light
 
 | Part | Value | Class / where |
 |---|---|---|
-| Row, two lines | 47px | driven by the two lines; `min-h-[44px]` is only the floor |
+| Row, two lines | 47px, with or without a project on the line | driven by the two lines; `min-h-[44px]` is only the floor |
 | Both lines | one ratio | `leading-tight` on name and description alike |
 | Tile | 28px, letter 15px, radius 7px | `h-7 w-7` |
 | Kebab trigger | 32px, radius 9px | `h-8 w-8 rounded-[9px]` — the size and radius of the divider's kebab, so the list carries one "…" |
@@ -9781,6 +9893,7 @@ dropped WebSocket rather than a refused request, but it is a transient either wa
 - Both draft `Input`s carry `{...OWNS_ESCAPE}` (`src/shared/ui/overlayEscape.ts`). `Dialog`'s `window`-capture listener stands down for them, the press reaches the field's own handler, and the draft reverts while the sheet stands.
 - `stopPropagation` in the field's own handler cannot do this: the dialog's capture listener runs first and closes the sheet (measured both fields, 2026-09-24, before the marker: `[role="dialog"]` count 0, FAB `aria-expanded="false"`, a just-added divider gone with its draft).
 - The marker is honest only because each draft renders solely while its field is open. A field that is always mounted must not carry it.
+- The project picker carries the same marker but hears Escape on `document`, not in its own handler: MAN-7448 §"Escape".
 - Residual, both fields: while a draft's save has NOT LANDED — failed, or merely still in flight, measured at 2500 ms of delay then 200 — the field stays open with its error or its spinner and focus may have left it; the dialog is stood down and nothing handles Escape for as long as that lasts. Inert, not destructive: the backdrop still dismisses the sheet, and refocusing the field then Escape puts the draft back.
 - The divider's kebab is drawn only while its field is CLOSED, as a row's is. "Rename" opens that field in the commit the menu closes in, and `ActionMenu` hands focus back to its own trigger as it goes — so with the trigger still on the page the field blurred and closed itself ~1.3 ms after appearing (`focusin INPUT` → `focusout INPUT` → `focusin BUTTON`, 2026-09-24). Unmounting the kebab with the field takes the trigger away, and with it the blur. Before the repair this made a divider with a BLANK title (the operator's own `divider-2ec5c9` was one) impossible to title from the drawer: it renders no title button, so the kebab was its only route.
 
@@ -10117,3 +10230,82 @@ Agent Chains opens from one row in Settings → Agents → Claude → Account, i
 - 2026-09-29: 41 checks passed before the stand-ins, the error boundary, the reload `title` and the phone list anchor landed; those four are not measured in a browser, and the probe was not re-run after them.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/agent-launch/AgentLaunchPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/agent-launch/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/settings.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/agents-settings/sections/AgentCategoryContentSection.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/agents-settings/sections/content/AgentChainsContent.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/constants.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-agent-chains.mjs
+
+## MAN-7448 — The drawer row's project link — line, picker, Escape, probe
+
+`AppRowProjectLink.tsx` holds `AppRowProjectLine` (the row's second line with the linked project) and `AppRowProjectPicker` (the in-place picker). `AppDrawerRow.tsx` renders both. Screen: MAN-487. Row size and the other inline fields: MAN-1469. The linked path is `AppEntry.project` (`server/shared/app-types.ts`): an absolute path, matched to a sidebar project by `fullPath` string equality.
+
+## Status — wired
+
+| Part | State |
+|---|---|
+| `choices` in `AppDrawerRow.tsx` | `useAppSwitcher().projects`: the workspace's project choices, handed to `AppSwitcherProvider` by `ProjectWorkspaceShell` (`projects={projectChoices}`). The provider's one outside list |
+| kebab "Link project…" | on framed rows after Edit description, `FolderGit2` glyph; enters the picker (`linking` state, clears the last refusal) |
+| `AppRowProjectPicker` | a choice calls `linkRegistryProject(app.id, fullPath)` (`api.apps.update(id, { project })`, blank unlinks), then `refresh()`, then leaves; the project the row already holds sends nothing and just leaves; a refusal keeps it open with `refusalInWords`' sentence under it (and brings it back if a second choice already sent it away); a failed re-read is `useAppRegistry`'s own banner and the picker leaves; ✕ and Escape leave |
+| `AppRowProjectLine` | names the project when `app.project` equals a choice's `fullPath`; else the path in the warn tone |
+
+## `AppRowProjectLine` — the second line
+
+| `app.project` | Draws |
+|---|---|
+| unset, or whitespace only | the old single truncating span `text-xs leading-tight text-ink-faint`, node for node |
+| matches a choice | `<fallback> · <displayName>`; the fallback (description or host, with "· on screen" while up) ellipsises first; the name is `text-muted-foreground`, `max-w-[55%]` |
+| matches no choice, list not empty | `<fallback> · ▲ <path>` in `text-warn-ink`, `max-w-[65%]`, `title` = the path, `sr-only` `applications.projectUnknown`; `▲` is `aria-hidden` |
+| no choice at all (the sidebar's list has not loaded) | `<fallback> · <path>` in `text-muted-foreground`: no ▲, no warn tone, no `projectUnknown` — an empty list is "not known yet", never "no project has this path" |
+
+- An ellipsised unmatched path keeps its tail: `dir="rtl"` on the text, `<bdi>` around the path. why: the repository's own name says which project was meant.
+
+## `AppRowProjectPicker` — props `appName value choices error onChoose onCancel`
+
+- Returns a fragment for the row's `Card`, after the tile: the name column, then a ✕ `Button` (`h-8 w-8 rounded-[9px]`, `aria-label` `applications.form.cancel`) in the kebab's slot, so the row does not shift.
+- Name column: `<span data-app-row-picker {...OWNS_ESCAPE}>` holding the app name, the kit `Select size="sm"` and the refusal.
+- Options: `applications.noProject` (value `''`) first, then every choice by `displayName` in the order given. A whitespace-only `value` reads as `''`.
+- The trigger (`button[aria-haspopup="listbox"]`) takes focus on mount; Enter or Space opens the list.
+- A `value` no choice carries stands in the trigger as `▲ <path>` (the `Select` placeholder) in `text-warn-ink`, through `WARN_PLACEHOLDER_CLASS`: `[&_.vv-select\_\_placeholder]:text-warn-ink` held in `String.raw`, because Tailwind reads an unescaped `__` in an arbitrary variant as a space (a descendant element `placeholder`, which matches nothing). Not shown while the list is empty, as above.
+- Refusal: `role="alert"`, `text-warn-ink`, `▲` `aria-hidden`.
+- The open list is scrolled into view: a `MutationObserver` on the root sets `scrollMarginBottom: 12px` and calls `scrollIntoView({ block: 'nearest' })` on each `.vv-select__panel` added. why: the panel is `position: absolute` and the drawer's scroller does not follow it.
+- Words: `applications.linkProject`, `noProject`, `projectLabel` (`Project of {{name}}`, the Select's accessible name), `projectUnknown`; the ✕ reuses `applications.form.cancel`. All eleven locales.
+
+## Escape
+
+- Heard on `document`, keydown, capture phase, while the picker is mounted — not on the picker's element. why: the marker stays up while focus is elsewhere, and an element handler would leave sheet and picker both deaf.
+- Stands down when `[data-owns-escape]:not([data-app-row-picker])` exists: the open `Select` list, another row's kebab menu. Otherwise `preventDefault()` then `onCancel()`.
+- It does not stop propagation. The event reaches `window`; the sheet stays because `Dialog`'s window-capture listener stands down for a marker inside or after its content (`src/shared/ui/Dialog.tsx`).
+- Leaving by touch: the ✕. No blur-to-cancel: blur fires when the chosen option unmounts, before a refusal could show.
+
+## Measured — 2026-09-29, 1440 and 390px, light and dark, identical across themes
+
+| State | 1440 | 390 |
+|---|---|---|
+| line row, every case (unlinked, linked, on screen, long description, unmatched, long unmatched) | 47px | 47px |
+| picker row | 72px | 80px |
+| picker row with the refusal | 108px | 132px |
+| open list | 12 options (No project + 11 projects), the linked one selected; the kit caps the list (`listH` 306 of `scrollH` 378) and scrolls it | same |
+
+- No page or host horizontal overflow; no authenticated-stage console errors.
+- The live drawer's kebab reads Reload, Open in a new tab, Open in dual screen, Edit description, Link project…, Move up, Move down, Remove; pressing Link project… puts the picker in the row's second line with the sheet still up.
+
+## Probe — `node .verify/app-row-project-link.mjs` (dev client `http://127.0.0.1:5183`)
+
+- Mounts both components over fixtures with `.verify/lib/mountReact.mjs`, framed as the drawer frames its rows; the choices are the dev account's own projects from `/api/projects` (throws unless there are 11). Writes nothing to the registry or the account. `openConsole` is retried once.
+- States: `lines` (6 rows), `picker-refused`, `picker-unknown`, `picker` and its open list (`picker-open`, `picker-open-end`), then the live drawer (`live-kebab`).
+- Writes 24 shots `.verify/artifacts/app-row-project-link-<state>-<1440|390>-<light|dark>.png` and `app-row-project-link.json`: per-row card boxes, warn-tone elements, overflow flags, `checks`, `live`.
+- `checks` reads `focusedOnMount`, `ownsEscape`, `optionsWhenOpen`, `listAfterFirstEscape`, `focusBackOnTrigger`, `firstEscapeTravelledToWindow`, `secondEscapeTravelledToWindow`; both `...TravelledToWindow` read `true` by design (§"Escape").
+- Not covered: the ✕ press, Escape with focus outside the picker, the scroll-into-view inside a scrolled sheet.
+
+## Live probe — `node .verify/app-drawer-link-project.mjs` (dev client `http://127.0.0.1:5183`, 1440×900 then 390×844)
+
+- Pre-flight: throws while a row named "Link check" is already on file. why: the cleanup deletes by name, so every row of that name must be the run's own.
+- Adds a scratch row "Link check" (`http://{host}:8005`) through the drawer's Add application, links it through its kebab and picker (ArchPulse), PATCHes it to `/home/lyphe/nowhere` with a real `curl` (Bearer from `POST :3011/api/auth/login`), reopens the drawer for the warn-tone line, unlinks with No project, removes the row through its kebab, and checks `apps.local.json`'s sha256 equals the first reading. At 390×844 it opens the picker on "EIS App" and cancels by ✕ and by Escape.
+- Linked check: the second line ends in `· ArchPulse`, holds no `▲`, and the row has zero `.text-warn-ink` elements. why: the unmatched line prints the path, and the path contains "ArchPulse".
+- Stubbed leg: the refusal. No honest click makes the server refuse (the picker sends only a path its own list carries); the one honest refusal is a stale row's 404, which needs a second writer mid-click. So the leg answers the PATCH from the browser (`route.fulfill`) with the body a `curl` of `{ "project": "eis-app" }` just got from the running server, and checks the picker holds with the sentence under it. That request never reaches the server: the leg says nothing about what a refusal writes.
+- Console gate: the browser logs the stubbed 400 as a console error; the probe requires exactly one `status of 400` line and allows no other `authenticated` error.
+- Cleanup: once Add is pressed (`scratchOnFile`), `finally` runs `removeScratchRows()`: DELETE by name through the API, re-read `/api/apps`, fail the check `cleanup after a failed run removed the scratch row` if any row of the name is left; the check text carries the DELETE status codes.
+- Residue the hash does not cover: `apps.icons.local.json` keeps a `link-check` key until `appIcons` next writes the cache (it drops keys of rows no longer in the registry, only when an icon is due).
+- Shots: `.verify/artifacts/app-drawer-link-project-<list|refused|linked|unknown>-1440.png` and `app-drawer-link-project-picker-390.png`.
+
+## Gaps
+
+- Two projects with the same `displayName` list as identical options; telling them apart needs a `title` on the kit `Select`'s options (a kit change).
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/AppDrawerRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/AppRowProjectLink.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/app-drawer-link-project.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/app-row-project-link.mjs

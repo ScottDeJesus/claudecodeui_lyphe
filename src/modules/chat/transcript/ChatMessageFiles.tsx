@@ -2,6 +2,7 @@ import { DownloadIcon, FileArchiveIcon, FileCodeIcon, FileIcon, FileTextIcon } f
 import { useState } from 'react';
 
 import { api } from '@/shared/api';
+import { useHostWindow } from '@/shared/context/HostWindowContext';
 import type { ChatAttachment } from '@/shared/types';
 
 type ChatMessageFilesProps = {
@@ -25,6 +26,8 @@ const getFileIcon = (file: ChatAttachment) => {
 };
 
 function ChatMessageFile({ file }: { file: ChatAttachment }) {
+  // The anchor is made in the window the row is drawn in.
+  const hostWindow = useHostWindow();
   const [isDownloading, setIsDownloading] = useState(false);
   const name = file.name || file.path?.split(/[\\/]/).pop() || 'Attached file';
   const FileTypeIcon = getFileIcon(file);
@@ -40,11 +43,13 @@ function ChatMessageFile({ file }: { file: ChatAttachment }) {
       const response = await api.assets.file(storedName);
       if (!response.ok) return;
       const blobUrl = URL.createObjectURL(await response.blob());
-      const anchor = document.createElement('a');
+      const anchor = hostWindow.document.createElement('a');
       anchor.href = blobUrl;
       anchor.download = name;
       anchor.click();
-      window.setTimeout(() => URL.revokeObjectURL(blobUrl), 0);
+      // Not the host window's timer: this releases a URL the OPENER's realm made, and a timer armed on
+      // a floating window is cancelled if that window closes first — the blob would leak until unload.
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 0);
     } catch (error) {
       console.error(`Failed to download attachment "${name}":`, error);
     } finally {

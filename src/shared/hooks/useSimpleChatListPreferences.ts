@@ -16,8 +16,9 @@ export type SimpleChatListPreferences = {
 /**
  * The one reader of `simpleChatList` and `simpleChatProjectId` anywhere in
  * `src/`. Consumed by the sidebar (which view to render), settings (the
- * toggle and the project picker) and chat (whether a newly minted session is
- * tagged into the simple list at creation time).
+ * toggle and the project picker), chat (whether a newly minted session is
+ * tagged into the simple list at creation time) and project-workspace
+ * (`openProjectChat` saves the project a new chat opens in when the list is on).
  */
 export function useSimpleChatListPreferences(): SimpleChatListPreferences {
   const enabled = useSyncExternalStore(

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { useHostWindow } from '@/shared/context/HostWindowContext';
 import { Shimmer } from '@/shared/ui';
 import type { SessionActivity } from '@/shared/types';
 
@@ -33,6 +34,9 @@ const EXIT_ANIMATION_MS = 220;
  */
 export default function ActivityIndicator({ activity, onAbort, isInputFocused = false }: ActivityIndicatorProps) {
   const { t } = useTranslation('chat');
+  // Both timers below pace what the reader sees (the leave animation, the seconds clock), so they run
+  // on the window the reader is in: a hidden opener throttles its timers hard.
+  const hostWindow = useHostWindow();
   const [renderedActivity, setRenderedActivity] = useState<SessionActivity | null>(activity);
   const [isExiting, setIsExiting] = useState(false);
   const startedAt = renderedActivity?.startedAt ?? null;
@@ -48,21 +52,21 @@ export default function ActivityIndicator({ activity, onAbort, isInputFocused = 
     if (!renderedActivity) return;
 
     setIsExiting(true);
-    const timer = setTimeout(() => {
+    const timer = hostWindow.setTimeout(() => {
       setRenderedActivity(null);
       setIsExiting(false);
     }, EXIT_ANIMATION_MS);
 
-    return () => clearTimeout(timer);
-  }, [activity, renderedActivity]);
+    return () => hostWindow.clearTimeout(timer);
+  }, [activity, renderedActivity, hostWindow]);
 
   useEffect(() => {
     if (startedAt === null) return;
     const update = () => setElapsedSeconds(Math.max(0, Math.floor((Date.now() - startedAt) / 1000)));
     update();
-    const timer = setInterval(update, 1000);
-    return () => clearInterval(timer);
-  }, [startedAt]);
+    const timer = hostWindow.setInterval(update, 1000);
+    return () => hostWindow.clearInterval(timer);
+  }, [startedAt, hostWindow]);
 
   if (!renderedActivity) return null;
 

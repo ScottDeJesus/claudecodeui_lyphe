@@ -164,6 +164,7 @@
     "rename": "Umbenennen",
     "renamePlaceholder": "Chat-Name",
     "running": "Aktiv",
+    "awaitingInput": "Wartet auf deine Antwort",
     "stopTitle": "Dieser Chat läuft noch",
     "stopBody": "Stoppen und entfernen?",
     "stopConfirm": "Stoppen und entfernen",

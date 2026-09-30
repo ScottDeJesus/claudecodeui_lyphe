@@ -28,3 +28,17 @@ export function phaseWord(phase: DispatcherPhase): PhaseWord {
   if (phase.status === 'done') return { key: 'done', copy: 'dispatcher.phase.done', tone: phaseStatusTone(phase), mark: '✓' };
   return { key: 'notStarted', copy: 'dispatcher.phase.notStarted', tone: phaseStatusTone(phase), mark: String(phase.position) };
 }
+
+/**
+ * The phase a plan's track opens on when it has to scroll: the one WALKING now (`running`, busy), else
+ * the first that is not done — settling or not started, the next thing the plan will do — else the last
+ * once every phase is done, and `null` for a plan with none cut. Read off `phaseWord`, so it can never
+ * disagree with the marks the track draws.
+ *
+ * Used by `PlanFace`, as its track's `current`.
+ */
+export function currentPhaseKey(phases: readonly DispatcherPhase[]): string | null {
+  const walking = phases.find((phase) => phaseWord(phase).key === 'running');
+  const next = phases.find((phase) => phaseWord(phase).key !== 'done');
+  return (walking ?? next ?? phases[phases.length - 1])?.key ?? null;
+}

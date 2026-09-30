@@ -2,6 +2,7 @@ import { memo, useCallback, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 
+import { useHostWindow } from '@/shared/context/HostWindowContext';
 import type { PermissionMode, ProviderModelOption } from '@/shared/types';
 import { DEFAULT_EFFORT_VALUE } from '@/shared/constants';
 import { Chip } from '@/shared/ui';
@@ -68,6 +69,8 @@ function ComposerModelMenu({
   onSelectPermissionMode,
 }: ComposerModelMenuProps) {
   const { t } = useTranslation('chat');
+  // The menu is portalled into the window the composer is drawn in, not the opener's body.
+  const hostWindow = useHostWindow();
   const [isOpen, setIsOpen] = useState(false);
   const close = useCallback(() => setIsOpen(false), []);
   // Wide enough for two columns; the anchor clamps it to the viewport, and the columns stack
@@ -249,7 +252,7 @@ function ComposerModelMenu({
             )}
           </div>
         </ComposerMenuSurface>,
-        document.body,
+        hostWindow.document.body,
       )}
     </>
   );

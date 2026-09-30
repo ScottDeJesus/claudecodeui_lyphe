@@ -167,6 +167,7 @@
     "rename": "Renommer",
     "renamePlaceholder": "Nom du chat",
     "running": "En cours",
+    "awaitingInput": "En attente de votre réponse",
     "stopTitle": "Ce chat est toujours en cours",
     "stopBody": "Arrêter et supprimer ?",
     "stopConfirm": "Arrêter et supprimer",

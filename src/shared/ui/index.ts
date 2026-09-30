@@ -22,6 +22,11 @@
  * a dock hit-test, a clamped divider — which no arrangement of the parts here can
  * produce, so every screen that wants either composes it rather than rebuilding it.
  *
+ * ResizeGrip has one consumer, chat-host's floating panel, and came in on the same test: a resize is a
+ * pointer drag that must survive a cross-origin frame under it, which is `usePointerDrag`'s body class
+ * and its `'resize'` kind. A grip a panel wrote for itself would be a drag that dies over the
+ * application it is standing on.
+ *
  * ClaudeCodeMark came in with one consumer, the composer's DeepSeek chip, by the operator's ruling
  * that a mark is a kit glyph and never an inline one-off: a brand mark drawn inside one module is
  * the copy the next module to need it re-draws slightly differently. The chat module's transcript
@@ -65,6 +70,7 @@ export { default as DeepSeekLogo } from '@/shared/ui/DeepSeekLogo';
 export { Dialog, DialogTrigger, DialogContent, DialogTitle } from '@/shared/ui/Dialog';
 export { DockableFab } from '@/shared/ui/DockableFab';
 export type { DockableFabPosition } from '@/shared/ui/DockableFab';
+export { ResizeGrip } from '@/shared/ui/ResizeGrip';
 export { EmptyState } from '@/shared/ui/EmptyState';
 export { Field } from '@/shared/ui/Field';
 export { Input } from '@/shared/ui/Input';

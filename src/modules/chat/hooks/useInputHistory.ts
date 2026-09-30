@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef } from 'react';
 import type { KeyboardEvent, RefObject } from 'react';
 
 import { safeLocalStorage } from '@/modules/chat/utils/chatStorage';
+import { useHostWindow } from '@/shared/context/HostWindowContext';
 
 /**
  * Shell-style input history for the composer: ArrowUp in an empty textarea
@@ -94,6 +95,8 @@ type HistoryNav = {
 };
 
 export function useInputHistory({ setInput, textareaRef, scope }: UseInputHistoryOptions) {
+  // The caret is set on the window that paints the box: a hidden opener runs no frames.
+  const hostWindow = useHostWindow();
   // A ref, not state: it only changes inside key handlers and must not
   // re-render the composer.
   const navRef = useRef<HistoryNav | null>(null);
@@ -127,11 +130,11 @@ export function useInputHistory({ setInput, textareaRef, scope }: UseInputHistor
       setInput(recalled);
       // The controlled update can leave the caret at its old offset; a
       // recalled message should be ready to extend at its end.
-      requestAnimationFrame(() => {
+      hostWindow.requestAnimationFrame(() => {
         textareaRef.current?.setSelectionRange(recalled.length, recalled.length);
       });
     },
-    [setInput, textareaRef],
+    [hostWindow, setInput, textareaRef],
   );
 
   /** Returns true when the event drove history recall and needs no further handling. */

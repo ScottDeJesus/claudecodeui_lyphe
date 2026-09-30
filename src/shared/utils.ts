@@ -61,30 +61,36 @@ export function cn(...inputs: ClassValue[]) {
 /**
  * Copies text with `document.execCommand`, the only path that works in browsers or
  * contexts where the async Clipboard API is unavailable. Private to `copyTextToClipboard`.
+ *
+ * The scratch textarea is made, focused and selected in `win`'s own document: `execCommand('copy')`
+ * acts on the document that holds the selection, and a textarea appended to a document the reader
+ * is not looking at copies nothing.
  */
-function fallbackCopyToClipboard(text: string): boolean {
-  if (!text || typeof document === 'undefined') {
+function fallbackCopyToClipboard(text: string, win: Window): boolean {
+  const doc = win.document;
+  // A closed window keeps its `document` object but has no body to append to.
+  if (!text || !doc?.body) {
     return false;
   }
 
-  const textarea = document.createElement('textarea');
+  const textarea = doc.createElement('textarea');
   textarea.value = text;
   textarea.setAttribute('readonly', '');
   textarea.style.position = 'fixed';
   textarea.style.opacity = '0';
   textarea.style.pointerEvents = 'none';
 
-  document.body.appendChild(textarea);
+  doc.body.appendChild(textarea);
   textarea.focus();
   textarea.select();
 
   let copied = false;
   try {
-    copied = document.execCommand('copy');
+    copied = doc.execCommand('copy');
   } catch {
     copied = false;
   } finally {
-    document.body.removeChild(textarea);
+    doc.body.removeChild(textarea);
   }
 
   return copied;
@@ -93,8 +99,12 @@ function fallbackCopyToClipboard(text: string): boolean {
 /**
  * Copies text to the clipboard, falling back to a hidden textarea when the Clipboard API
  * is blocked. Resolves to whether the copy succeeded so callers can show copied feedback.
+ *
+ * `win` is the window the press happened in. The clipboard answers to the FOCUSED document, which
+ * for a control drawn in the chat's picture-in-picture window is that window's, not the opener's:
+ * the chat's callers pass `useHostWindow()`, and every other caller keeps the default.
  */
-export async function copyTextToClipboard(text: string): Promise<boolean> {
+export async function copyTextToClipboard(text: string, win: Window = window): Promise<boolean> {
   if (!text) {
     return false;
   }
@@ -102,16 +112,22 @@ export async function copyTextToClipboard(text: string): Promise<boolean> {
   let copied = false;
 
   try {
-    if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
-      await navigator.clipboard.writeText(text);
-      copied = true;
+    const clipboard = win.navigator?.clipboard;
+    if (clipboard?.writeText) {
+      // A CLOSED window answers `undefined` instead of a promise: the call returns, nothing is copied,
+      // and awaiting it would report a copy that never happened (measured 2026-09-29).
+      const written: Promise<void> | undefined = clipboard.writeText(text);
+      if (written) {
+        await written;
+        copied = true;
+      }
     }
   } catch {
     copied = false;
   }
 
   if (!copied) {
-    copied = fallbackCopyToClipboard(text);
+    copied = fallbackCopyToClipboard(text, win);
   }
 
   return copied;
@@ -378,4 +394,72 @@ export function formatBytes(bytes: number | null | undefined): string {
  */
 export function effectiveModelWord(stored: DispatcherModelChoice | null | undefined): DispatcherModelChoice {
   return stored ?? 'deepseek';
+}
+
+// ---------------------------
+
+//----------------- KEYBOARD SHORTCUTS ------------
+
+/**
+ * Whether the page runs on an Apple platform, where the command key (⌘) is the shortcut modifier
+ * and Ctrl is not. The one platform check the house makes for shortcuts; read it through
+ * `modifierKeyLabel` and `formatShortcut` rather than testing `navigator.platform` again. False
+ * where there is no `navigator` at all.
+ */
+export function isApplePlatform(): boolean {
+  return typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform);
+}
+
+/** The modifier a shortcut is printed with on this platform: `⌘` on Apple hardware, `Ctrl` elsewhere. */
+export function modifierKeyLabel(): '⌘' | 'Ctrl' {
+  return isApplePlatform() ? '⌘' : 'Ctrl';
+}
+
+/**
+ * A shortcut as a person reads it here: `⌘K` on a Mac, `Ctrl+K` elsewhere. Pass the key as it
+ * should print (`'K'`, `'.'`); the modifier is this platform's.
+ */
+export function formatShortcut(key: string): string {
+  return isApplePlatform() ? `⌘${key}` : `Ctrl+${key}`;
+}
+
+// ---------------------------
+
+//----------------- DOM TESTS AND OBSERVERS THAT SURVIVE A WINDOW MOVE ------------
+
+/**
+ * Whether an event target is a DOM node, by asking the node instead of its constructor.
+ *
+ * Why not `target instanceof Node`: an element created while the chat lives in a picture-in-picture
+ * window belongs to THAT window's realm, whose `Node` is not this page's — the test answers false for
+ * a real node, and the handler behind it quietly does nothing. `nodeType` is a plain number every
+ * node carries whichever window made it. Used by the kit's Tooltip.
+ */
+export function isNodeLike(target: EventTarget | null | undefined): target is Node {
+  return target != null && typeof (target as Node).nodeType === 'number';
+}
+
+/**
+ * Whether an event target is a DOM element, by its `nodeType` (1) rather than `instanceof Element`
+ * — see `isNodeLike` for why a constructor test lies about an element drawn in another window.
+ * Used by the kit's Lightbox to find the control a press began on.
+ */
+export function isElementLike(target: EventTarget | null | undefined): target is Element {
+  return target != null && (target as Node).nodeType === 1;
+}
+
+/**
+ * A ResizeObserver built by `hostWindow`'s own constructor, or null where that window has none.
+ *
+ * Why not `new ResizeObserver(...)`: an observer delivers on the frame lifecycle of the window whose
+ * constructor built it, not of the window its target is drawn in. Measured in Chromium (2026-09-29):
+ * six resizes of an element in a picture-in-picture window reached an observer built by the PiP's
+ * constructor six times, and one built by the opener's constructor NOT ONCE until the opener happened
+ * to draw frames of its own — and a hidden opener draws none, which is exactly when the reader is
+ * looking at the floating window. Build it from `useHostWindow()` and put that window in the effect's
+ * dependencies, so a move builds a new one. Used by the kit's Tabs and `useZoomPan`.
+ */
+export function resizeObserverIn(hostWindow: Window, callback: ResizeObserverCallback): ResizeObserver | null {
+  const HostResizeObserver = (hostWindow as Window & typeof globalThis).ResizeObserver;
+  return typeof HostResizeObserver === 'function' ? new HostResizeObserver(callback) : null;
 }

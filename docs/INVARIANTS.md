@@ -30,7 +30,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Collapsible.tsx, /
 
 ## INV-4356 — ActionMenu portals to body unless a mount passes portal={false}
 
-`ActionMenu` renders into a `document.body` portal (`fixed z-[70]`) unless a mount passes `portal={false}` (`absolute z-50`, in place).
+`ActionMenu` renders into a portal on the host window's `document.body` (`fixed z-[70]`; MAN-7451) unless a mount passes `portal={false}` (`absolute z-50`, in place).
 
 - why: in place, the menu is clipped by the first `overflow:hidden` ancestor and painted inside the first ancestor that makes a stacking context; a `backdrop-filter` header scopes the menu's `z-50` to its own layer, so the transcript paints over it.
 - opt-out mount: `src/modules/mcp/McpServers.tsx` only — Settings' `fixed z-[9999]` panel draws a `z-[70]` portalled menu UNDER its own content.

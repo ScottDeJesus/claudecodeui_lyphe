@@ -17,6 +17,7 @@ import { GutterWidgetFrame } from '@/modules/chat-gutters/GutterWidgetFrame';
 import { useDispatcherPlans } from '@/modules/dispatcher';
 import { MemoryWidgetBody, useMemoryIntake } from '@/modules/memory-intake';
 import { RunnerWidgetBody } from '@/modules/runner-tab';
+import { useHostWindow } from '@/shared/context/HostWindowContext';
 import type { GutterSide, GutterWidgetId } from '@/shared/types';
 import { otherOverlayHoldsEscape } from '@/shared/ui/overlayEscape';
 import { cn } from '@/shared/utils';
@@ -79,6 +80,9 @@ export function ChatGutterLayout({
   children: ReactNode;
 }) {
   const { t } = useTranslation();
+  // The gutters always live in the opener, where this answers `window`; read through the seam anyway
+  // so the Escape below asks the same window it listens on.
+  const hostWindow = useHostWindow();
   const { placements, moveWidget, toggleWidget } = useGutterPlacements(sessionId);
   // The Runner widget lists the arcs as decks and the plans no arc holds as cards, so its badge
   // counts the plans alone: an arc's own plans are already counted, and the arc's deck is a
@@ -126,13 +130,13 @@ export function ChatGutterLayout({
   useEffect(() => {
     if (fullscreen === null) return undefined;
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape' || otherOverlayHoldsEscape()) return;
+      if (event.key !== 'Escape' || otherOverlayHoldsEscape(hostWindow.document)) return;
       event.stopPropagation();
       setFullscreen(null);
     };
-    window.addEventListener('keydown', onKeyDown, true);
-    return () => window.removeEventListener('keydown', onKeyDown, true);
-  }, [fullscreen]);
+    hostWindow.addEventListener('keydown', onKeyDown, true);
+    return () => hostWindow.removeEventListener('keydown', onKeyDown, true);
+  }, [fullscreen, hostWindow]);
 
   // A NEWLY NAMED address opens the Embed widget, once. The whole point of the embed fence is that
   // the model can put a page in front of the reader, and a widget that stayed collapsed would make it

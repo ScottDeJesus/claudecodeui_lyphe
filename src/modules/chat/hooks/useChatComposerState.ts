@@ -15,6 +15,7 @@ import { api } from '@/shared/api';
 import { PROVIDER_PERMISSION_PREFERENCE_KEYS } from '@/shared/constants';
 import { readUserPreference } from '@/shared/userSettings';
 import { useSimpleChatListPreferences } from '@/shared/hooks/useSimpleChatListPreferences';
+import { useHostMove, useHostWindow } from '@/shared/context/HostWindowContext';
 import { applyPlainMode, usePlainModePreference } from '@/shared/hooks/usePlainModePreference';
 import type { CommandModalPayload, CostCommandData, HelpCommandData, MarkSessionProcessing, ModelCommandData, QueuedDraft, SessionActivityMap, StatusCommandData,QueuedSendOptions,ChatAttachment,ChatMessage,PendingPermissionRequest,PermissionMode,SessionEstablishedContext,Project,ProjectSession,LLMProvider,SlashCommand } from '@/shared/types';
 import { grantClaudeToolPermission } from '@/modules/chat/utils/chatPermissions';
@@ -224,7 +225,17 @@ export function useChatComposerState({
   const [isTextareaExpanded, setIsTextareaExpanded] = useState(false);
   const [commandModalPayload, setCommandModalPayload] = useState<CommandModalPayload | null>(null);
 
+  // The window the chat is drawn in. The deferred submits and the scroll after a send are timers the
+  // reader waits on, so they run there (a hidden opener throttles its timers to one a second); the
+  // confirm asks in the window the reader is looking at. The 5 s draft poll below stays on the
+  // opener's clock: it reconciles data and nothing the reader is waiting on.
+  const hostWindow = useHostWindow();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  // A chat that floats takes the reader's typing with it: the press that floated it had its focus
+  // in the tab, and the window it lands in has none yet.
+  useHostMove(({ phase, floating }) => {
+    if (phase === 'after' && floating) textareaRef.current?.focus();
+  });
   const inputHighlightRef = useRef<HTMLDivElement>(null);
   const textareaLineHeightRef = useRef<number | null>(null);
   const lastAutosizedInputRef = useRef<string | null>(null);
@@ -355,7 +366,7 @@ export function useChatComposerState({
     const { content, hasBashCommands } = result;
 
     if (hasBashCommands) {
-      const confirmed = window.confirm(
+      const confirmed = hostWindow.confirm(
         'This command contains bash commands that will be executed. Do you want to proceed?',
       );
       if (!confirmed) {
@@ -373,12 +384,12 @@ export function useChatComposerState({
     inputValueRef.current = commandContent;
 
     // Defer submit to next tick so the command text is reflected in UI before dispatching.
-    setTimeout(() => {
+    hostWindow.setTimeout(() => {
       if (handleSubmitRef.current) {
         handleSubmitRef.current(createFakeSubmitEvent());
       }
     }, 0);
-  }, [addMessage]);
+  }, [addMessage, hostWindow]);
 
   const executeCommand = useCallback(
     async (command: SlashCommand, rawInput?: string, options?: { preserveInput?: boolean }) => {
@@ -466,10 +477,10 @@ export function useChatComposerState({
   const compactConversation = useCallback(() => {
     setInput('/compact');
     inputValueRef.current = '/compact';
-    setTimeout(() => {
+    hostWindow.setTimeout(() => {
       handleSubmitRef.current?.(createFakeSubmitEvent());
     }, 0);
-  }, [setInput]);
+  }, [hostWindow, setInput]);
 
   const showCostModal = useCallback(() => {
     executeCommand(
@@ -535,7 +546,10 @@ export function useChatComposerState({
 
     let lineHeight = textareaLineHeightRef.current;
     if (!lineHeight) {
-      lineHeight = parseInt(window.getComputedStyle(target).lineHeight);
+      // The textarea's own window: a computed style is read from the window whose document
+      // holds the element, and the textarea may stand in a floating window.
+      const ownWindow = target.ownerDocument.defaultView ?? window;
+      lineHeight = parseInt(ownWindow.getComputedStyle(target).lineHeight);
       textareaLineHeightRef.current = Number.isFinite(lineHeight) ? lineHeight : 24;
     }
 
@@ -871,7 +885,7 @@ export function useChatComposerState({
       });
 
       setIsUserScrolledUp(false);
-      setTimeout(() => scrollToBottom(), 100);
+      hostWindow.setTimeout(() => scrollToBottom(), 100);
 
       // One message shape for every provider. The backend resolves the
       // provider, project path, and provider-native resume id from the
@@ -925,6 +939,7 @@ export function useChatComposerState({
       recordSentMessage,
       resetCommandMenuState,
       scrollToBottom,
+      hostWindow,
       selectedProject,
       sendMessage,
       sessionKey,

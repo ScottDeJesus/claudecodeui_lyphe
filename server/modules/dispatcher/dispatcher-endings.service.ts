@@ -18,7 +18,11 @@ import type { DispatcherEvent, DispatcherPlan } from '@/shared/types.js';
  * keeps the two servers of a handover from pushing one ending twice.
  */
 
-export type DispatcherEndingCode = 'dispatcher.finished' | 'dispatcher.paused' | 'dispatcher.relaunched';
+export type DispatcherEndingCode =
+  | 'dispatcher.finished'
+  | 'dispatcher.paused'
+  | 'dispatcher.limit_paused'
+  | 'dispatcher.relaunched';
 
 export type DispatcherEndingMeta = {
   /** The plan's name — what the notification's own header reads ("Plan finished · <name>"). */
@@ -38,8 +42,12 @@ export type DispatcherEndingMeta = {
   tokensOut: number;
   /** The phase the event names, by its KEY, or `null` for a plan-level event (INV-183). */
   phase: string | null;
-  /** The event's own sentence — for a relaunch, what was taken up again and by whom. `''` when it carries none. */
+  /** The event's own sentence — for a relaunch, what was taken up again and by whom; for a pause the daemon held, its cause. `''` when it carries none. */
   detail: string;
+  /** Epoch SECONDS a usage-limit pause lifts at (`dispatcher.limit_paused` only), else `null`. */
+  resetsAt: number | null;
+  /** True when that time is the dispatcher's own GUESS — the limit named none — and so not a time to promise. */
+  limitGuess: boolean;
 };
 
 export type DispatcherEnding = {
@@ -69,8 +77,9 @@ export type DispatcherEndingsNotifier = {
  *
  * `complete` is the plan's own end: the dispatcher stamps `completed_at` OUTSIDE the eligibility gate
  * (INV-188), so this is the one event that means the whole plan is over. `paused` is every way a
- * walk stops needing a hand — the pause verb, a spent ladder, a budget — and it is a stop-and-look
- * rather than a fault. `relaunched` is the only one that reads as a warning: a phase the walk had
+ * walk stops needing a hand — the pause verb, a halt on an API error, the storm guard — and it is a
+ * stop-and-look rather than a fault; a pause for a USAGE LIMIT is the same event told apart by its
+ * lift-time tail (`limitPause`) and earns its own code, one push per wall. `relaunched` is the only one that reads as a warning: a phase the walk had
  * left standing was taken up again, usually because its build came back and said the work could
  * continue, and that is news the operator wants whether or not he asked for it.
  *
@@ -83,8 +92,41 @@ const ENDING_CODES = new Map<string, DispatcherEndingCode>([
   ['relaunched', 'dispatcher.relaunched'],
 ]);
 
-/** One event, as the notification it earns. */
-function endingOf(plan: DispatcherPlan, event: DispatcherEvent, code: DispatcherEndingCode): DispatcherEnding {
+/**
+ * The tail the dispatcher writes after a usage limit's cause in a `paused` event's detail
+ * (`hooks/dispatcher/backoff.py` `tail`): ` (until <UTC stamp>)` for a time the API named, and
+ * ` (retry at <UTC stamp>)` for the dispatcher's own guess when the limit named none. Absent on every
+ * pause that is not a usage limit — the operator's own Stop, a halt, the storm guard.
+ */
+const LIMIT_TAIL = / \((until|retry at) (\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z)\)$/;
+
+type LimitPause = { id: number; at: number; resetsAt: number; guess: boolean };
+
+function limitPause(event: DispatcherEvent): LimitPause | null {
+  if (event.kind !== 'paused') return null;
+  const found = LIMIT_TAIL.exec(event.detail ?? '');
+  const resetsAt = found === null ? Number.NaN : Date.parse(found[2]) / 1000;
+  const at = Date.parse(event.at) / 1000;
+  return Number.isFinite(resetsAt) && Number.isFinite(at)
+    ? { id: event.id, at, resetsAt, guess: found?.[1] === 'retry at' }
+    : null;
+}
+
+/**
+ * How long an unnamed wall stays ONE wall: a guessed pause within this of the last guessed pause,
+ * on any plan, is the same standing limit and stays silent. The dispatcher's flat backoff is 16
+ * minutes and it stops guessing after three (`backoff.GUESS_LIMIT`), so one wall's pauses always
+ * land inside it.
+ */
+const GUESS_WALL_S = 3600;
+
+/** One event, as the notification it earns. `limit` is set only on a usage-limit pause. */
+function endingOf(
+  plan: DispatcherPlan,
+  event: DispatcherEvent,
+  code: DispatcherEndingCode,
+  limit: LimitPause | null,
+): DispatcherEnding {
   return {
     key: `${plan.name}:${event.id}`,
     eventId: event.id,
@@ -99,8 +141,43 @@ function endingOf(plan: DispatcherPlan, event: DispatcherEvent, code: Dispatcher
       tokensOut: plan.tokens_out,
       phase: event.phase,
       detail: event.detail ?? '',
+      resetsAt: limit?.resetsAt ?? null,
+      limitGuess: limit?.guess ?? false,
     },
   };
+}
+
+/**
+ * The usage-limit pauses that SPEAK — one push per wall, read off the log itself and never a memory
+ * of this process (the log is the durable fact across the dev server's restarts):
+ *
+ * - a wall that NAMED its reset speaks once per lift time: only the lowest event id of each epoch.
+ * - a wall that named none has no time to key on — the dispatcher's guess is per soul, so two plans
+ *   capped ten seconds apart carry two epochs — so it speaks once, and stays silent while its pauses
+ *   keep coming inside `GUESS_WALL_S` of one another.
+ */
+function speakingLimitPauses(plans: DispatcherPlan[]): Set<number> {
+  const pauses: LimitPause[] = [];
+  for (const plan of plans) {
+    for (const event of plan.events) {
+      const pause = limitPause(event);
+      if (pause !== null) pauses.push(pause);
+    }
+  }
+  pauses.sort((left, right) => left.id - right.id);
+  const speaking = new Set<number>();
+  const named = new Set<number>();
+  let lastGuess: number | null = null;
+  for (const pause of pauses) {
+    if (pause.guess) {
+      if (lastGuess === null || pause.at - lastGuess > GUESS_WALL_S) speaking.add(pause.id);
+      lastGuess = pause.at;
+    } else if (!named.has(pause.resetsAt)) {
+      named.add(pause.resetsAt);
+      speaking.add(pause.id);
+    }
+  }
+  return speaking;
 }
 
 export function createDispatcherEndingsNotifier(
@@ -118,11 +195,17 @@ export function createDispatcherEndingsNotifier(
    * single global sequence buys.
    */
   const dueEndings = (plans: DispatcherPlan[], mark: number): DispatcherEnding[] => {
+    const speaking = speakingLimitPauses(plans);
     const due: DispatcherEnding[] = [];
     for (const plan of plans) {
       for (const event of plan.events) {
         const code = ENDING_CODES.get(event.kind);
-        if (code !== undefined && event.id > mark) due.push(endingOf(plan, event, code));
+        if (code === undefined || event.id <= mark) continue;
+        const limit = limitPause(event);
+        // ONE push per wall, whichever plan it paused and however many minutes apart: see
+        // `speakingLimitPauses`.
+        if (limit !== null && !speaking.has(event.id)) continue;
+        due.push(endingOf(plan, event, limit === null ? code : 'dispatcher.limit_paused', limit));
       }
     }
     return due.sort((left, right) => left.eventId - right.eventId);

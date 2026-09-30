@@ -113,7 +113,7 @@ async function publishSummary(last: SuppressedPush, suppressedCount: number): Pr
 
 function priorityFor(event: ChannelEvent): NtfyMessage['priority'] {
   // A plan ends a few times a day and closes hours of work: its finish is not a chat turn's quiet stop.
-  if (event.code === 'dispatcher.finished') return 3;
+  if (event.code === 'dispatcher.finished' || event.code === 'dispatcher.limit_paused') return 3;
   switch (event.kind) {
     case 'action_required':
     case 'error':
@@ -136,6 +136,8 @@ function tagsFor(event: ChannelEvent): string[] {
   // ending's own event-id key (`dispatcher-endings.service.ts`), which a window that swallowed a second
   // event inside the same minute would break.
   if (event.code === 'dispatcher.relaunched') return ['warning'];
+  // A usage limit is a wait with a time on it, not a finish and not a crash.
+  if (event.code === 'dispatcher.limit_paused') return ['hourglass_flowing_sand'];
   switch (event.kind) {
     case 'action_required':
       return ['question'];

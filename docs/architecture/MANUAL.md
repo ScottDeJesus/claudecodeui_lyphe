@@ -167,8 +167,11 @@ call `subscribe(listener)`; they never construct a `WebSocket`.**
 
 `buildWebSocketUrl` (`WebSocketContext.tsx:36-45`) is the whole URL story: same host as the
 page, `wss:` when the page is `https:`, `/ws` with no token in platform mode, `/ws?token=`
-in OSS mode. An expired token is caught here — `expireAuthSession()` runs and the function
-returns `null`, so no socket is created at all.
+in OSS mode. An expired token is caught here — the function returns `null`, so no socket is
+created at all — and `expireAuthSession()` runs with that token as its evidence, which ends the
+session only if that token is still the one in `localStorage`. A tab whose remembered token has aged
+out while another tab holds the refreshed one leaves the newer session alone (the trace line
+reads `websocket-token-expired ignored`; MAN-7447).
 
 **The listener registry is a ref-held `Set`, dispatched synchronously** (`:56`, `:61-69`),
 not React state. The declaration says why:
@@ -1103,7 +1106,7 @@ section: 02-realtime-stream/007 Text streaming
 A provider that streams emits deltas far faster than a transcript can usefully re-render.
 The handler's answer is a leading-edge-armed, trailing-edge-fired timer:
 
-- The **first** delta appends to `accumulatedStreamRef` and arms a 100 ms `setTimeout`.
+- The **first** delta appends to `accumulatedStreamRef` and arms a 100 ms timer on the window the chat is drawn in (`armStreamFlush`, `utils/streamFlushTimer.ts`; a host move runs a pending flush at once — MAN-7452).
 - Every delta inside that window only appends to the ref. The timer is not re-armed and
   not extended.
 - When it fires, it clears itself and calls `updateStreaming(sid, wholeAccumulatedText)`.
@@ -2776,19 +2779,20 @@ section: 05-scrolling/003 The pieces
 | File | Role |
 | --- | --- |
 | `src/modules/chat/hooks/useChatSessionState.ts` | Owns the scroll position. All five writers, `isNearBottom`, `handleScroll`, every claim ref, the search jump. |
+| `src/modules/chat/hooks/useHostMoveScroll.ts` | `restoreScroll`, the one restore rule (the foot when following, else the anchor row at its recorded offset, else the saved top) shared by the tab's became-active branch and a move of the chat between hosts (the node's first adoption at mount included, MAN-7464); `captureScrollRestoreState`; `useHostMoveScroll` keeps the place across a move (MAN-7452). |
 | `src/modules/chat/transcript/ChatMessagesPane.tsx` | Renders the one scrolling element, binds the ref and the wheel/touch handlers it is handed, mounts the newest `INITIAL_MOUNTED_TAIL_ROWS` rows eagerly. |
 | `src/modules/chat/ChatInterface.tsx` | Wires the hook to the pane, passes `handleScroll` as `onWheel`/`onTouchMove`, renders the jump-to-bottom button. |
 | `src/modules/chat/hooks/useChatComposerState.ts` | `handleSubmit` clears `isUserScrolledUp` and scrolls to the bottom at +100 ms. |
 | `src/modules/chat/transcript/LoadAllMessagesOverlay.tsx` | The "load all" pill that appears when the user reaches the top. |
 | `src/modules/chat/transcript/LazyMessageRow.tsx` | Swaps a row's content for a placeholder of the same measured height, keeping an addressable wrapper. |
-| `src/modules/chat/hooks/useLazyRowObserver.ts` | One `IntersectionObserver` per pane, rooted at the scroll container, `LAZY_ROW_VIEWPORT_MARGIN_PX = 1200`. |
+| `src/modules/chat/hooks/useLazyRowObserver.ts` | One `IntersectionObserver` per pane, rooted at the scroll container, `LAZY_ROW_VIEWPORT_MARGIN_PX = 1200`; built by the host window's constructor and rebuilt on a host move, re-observing every registered row (MAN-7452). |
 | `src/modules/chat/utils/searchTargetLocator.ts` | `findSearchTargetIndex` resolves a sidebar hit against loaded data; `resolveSearchWindowSize` sizes the render window. |
 | `src/modules/chat/utils/messageKeys.ts` | `getIntrinsicMessageKey` — stable render keys, so a prepend does not remount the rows below it. |
 | `src/index.css` | Mobile `touch-action`, document-level overscroll containment, `.search-highlight-flash`. **Neither the pane nor a row carries `contain`** — containment makes the element the containing block for a fullscreen card's `position: fixed` box, which is what a card asking for the screen sized itself to (MAN-388). |
 | `src/modules/project-workspace/hooks/useVisualViewportKeyboardOffset.ts` | Publishes `--keyboard-height` so the shell shrinks above the iOS keyboard. |
 | `src/shared/ui/ScrollArea.tsx` | **Not used by chat.** Every caller is a pane outside the transcript; the component's own head comment names them, and `grep -rl "<ScrollArea" src` is the live list. The rule is the exclusion, not the roll call. Its INNER scroller is `relative`, the containing block of everything it scrolls: while it was static, every `sr-only` span in a Runner plan card escaped it to the `overflow-hidden` outer box and gave that box a scroll range (2820px over 621px at 320px), so a centring `scrollIntoView` (`block: 'center'`) on a control near the list's end scrolled the outer box and left the pane's foot drawn empty with `Show all` out of reach (2026-09-26). A focus does not reach that range: it scrolls the inner box to its end and stops. |
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/index.css, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/ChatInterface.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useChatComposerState.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useChatSessionState.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useLazyRowObserver.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/ChatMessagesPane.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/LazyMessageRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/LoadAllMessagesOverlay.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/utils/messageKeys.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/utils/searchTargetLocator.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/hooks/useVisualViewportKeyboardOffset.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/ScrollArea.tsx
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/index.css, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/ChatInterface.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useChatComposerState.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useChatSessionState.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useHostMoveScroll.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useLazyRowObserver.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/ChatMessagesPane.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/LazyMessageRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/LoadAllMessagesOverlay.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/utils/messageKeys.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/utils/searchTargetLocator.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/hooks/useVisualViewportKeyboardOffset.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/ScrollArea.tsx
 
 ## MAN-374 — Who writes `scrollTop`
 section: 05-scrolling/003 The pieces/004 Who writes `scrollTop`
@@ -3144,8 +3148,7 @@ The chat tree stays mounted behind Tailwind's `hidden` (`display: none`) when an
 workspace tab is active (`WorkspaceMain.tsx`, which also passes `isActive`). An effect with
 no dependency array records `{height, top}` into `scrollPositionRef` after every render
 while the tab is active, and the `useLayoutEffect` reactivation branch — recognised through
-`wasChatActiveRef` — restores `scrollPositionRef.current.top` when detached, or
-`container.scrollHeight` when following. Hidden tabs must not reset pagination or scroll:
+`wasChatActiveRef` — restores through `restoreScroll` (`useHostMoveScroll.ts`, the rule a move between hosts shares, MAN-7452): `container.scrollHeight` when following, else `scrollPositionRef.current.top` (no anchor is passed). Hidden tabs must not reset pagination or scroll:
 `handleScroll`, the restore branch and the settle loop all bail out on `!isActive`.
 
 ## MAN-386 — Jumping to a search hit
@@ -4463,11 +4466,11 @@ section: 07-live-widgets/002 The pieces
 | File | Role |
 | --- | --- |
 | `src/modules/widgets/index.ts` | The barrel. Exports `WidgetFrame` and nothing else |
-| `src/modules/widgets/WidgetFrame.tsx` | `WidgetFrame` — the `<pre>`/iframe decision, and the optional `frame` a caller hands it — and the private `WidgetFrameLive`, which only ever renders in a browser |
+| `src/modules/widgets/WidgetFrame.tsx` | `WidgetFrame` — the `<pre>`/iframe decision, and the optional `frame` a caller hands it — and the private `WidgetFrameLive`, which only ever renders in a browser. Both frames are keyed on the host window and the body (`windowKey`); the Escape listener binds to the host window (MAN-7443) |
 | `src/modules/widgets/buildWidgetDocument.ts` | `WIDGET_CSP` and `buildWidgetDocument` — the whole HTML document a widget lives in |
 | `src/modules/widgets/widgetBridgeScript.ts` | `WIDGET_BRIDGE_SCRIPT` — the in-frame script that becomes `window.live` |
-| `src/modules/widgets/readVerveTokens.ts` | `WIDGET_TOKEN_NAMES` (the contract) and `readVerveTokens` (the live read) |
-| `src/modules/widgets/hooks/useWidgetHost.ts` | `useWidgetHost` — the page's half: one message listener, the height, the theme post, and the `load` counter that revokes a frame which navigated itself away |
+| `src/modules/widgets/readVerveTokens.ts` | `WIDGET_TOKEN_NAMES` (the contract) and `readVerveTokens(hostDocument)` (the live read of the document handed in) |
+| `src/modules/widgets/hooks/useWidgetHost.ts` | `useWidgetHost` — the page's half: one message listener on the host window, the height, the theme post (tokens read from the opener's document), every post made as the host window (`postAsHostWindow`, MAN-416), and the `load` counter that revokes a frame which navigated itself away |
 | `src/modules/widgets/hooks/useWidgetBridge.ts` | `useWidgetBridge` — one frame's subscriptions: the two refusals, the per-frame cap, and the unmount sweep |
 | `src/modules/widgets/classifyWidgetBody.ts` | `DOCSPACE_ID_RE` and `classifyWidgetBody` — which KIND a settled fence body is. The raw path is the default |
 | `src/modules/widgets/EmbedUrlFrame.tsx` | `EMBED_SANDBOX`, `EMBED_MIN_HEIGHT` / `EMBED_MAX_HEIGHT` / `EMBED_DEFAULT_HEIGHT` and `EmbedUrlFrame` — the third frame: any address, the origin gate, a DECLARED height, and no protocol at all |
@@ -4541,7 +4544,7 @@ in front of this file's two gates: the export runs no effects, and a streaming f
 fragment still growing on every delta. `frame` is therefore called from BEHIND both of them, and
 the `<pre>` and the error card are never passed to it at all — an exported or still-streaming fence
 stays raw source with no header over it, which is also what the invalid body draws. The element the
-framer is given is the same keyed one it would have been without a framer: `key={code}` stays on
+framer is given is the same keyed one it would have been without a framer: its key (`<windowKey>:<code>`) stays on
 the inner `<DocSpaceFrame>`/`<WidgetFrameLive>`, because that key is what makes the host's revoke
 rule sound (below), and a key belongs to the element whose load count it resets rather than to
 whatever wraps it.
@@ -4588,8 +4591,8 @@ leaves by, and no shipped control closes that — it closes the CONTINUING chann
 part that is closable.
 
 That count is only trustworthy because the element loads exactly one document in its life, and
-that is structural rather than conventional: `WidgetFrame` keys `WidgetFrameLive` on the fence
-body, so a CHANGED body arrives as a new element instead of as a fresh `srcDoc` on the old one.
+that is structural rather than conventional: `WidgetFrame` keys `WidgetFrameLive` on the host window
+and the fence body (`<windowKey>:<code>`), so a CHANGED body arrives as a new element instead of as a fresh `srcDoc` on the old one, and so does a move to another window.
 The distinction matters because an in-place `srcDoc` reassignment fires a second `load` that is
 indistinguishable from a navigation — measured: one load at mount, a second on reassignment. Were
 the two conflated, an ordinary body change would revoke a healthy widget permanently and in
@@ -4597,6 +4600,8 @@ silence: no error, no console line, just a widget that never sees another theme 
 datum, since revocation is never lifted. Gate 9c holds the key in place by rebuilding a widget's
 body and requiring the host to still answer it. Do not remove the key without removing the
 counter; each is the other's premise.
+
+The window half of the key rests on the same premise. A frame carried into another window's document is reloaded by the browser, and the counter reads that second `load` as self-navigation (measured 2026-09-29: 1 `theme` message before a move into the picture-in-picture window, 0 after). Keyed on the window, a move arrives as a NEW element: one `load`, a fresh `message` listener on the window it stands in, fresh bus subscriptions (the reloaded document asks for its topics again; the old element's are swept), and a `srcDoc` dressed by the new window's tokens. `windowKey` in `WidgetFrame.tsx` numbers each window; `DocSpaceFrame` carries the same key; `EmbedUrlFrame` stays keyed on `code` alone.
 
 **The CSP.** `WIDGET_CSP` is `default-src 'none'` with `script-src` and `style-src` opened to
 `'unsafe-inline'` (the widget's own markup is inline by definition), `img-src` and `font-src`
@@ -4623,8 +4628,8 @@ makes the topic allowlist the real control on exfiltration rather than a formali
 live bus**. And a nested frame is refused, so the exit cannot be taken quietly: the widget has
 to navigate itself away to use it, and a widget that vanishes is one the reader watches vanish.
 
-**The tokens.** `readVerveTokens()` resolves every name in `WIDGET_TOKEN_NAMES` against
-`document.documentElement` and omits any that resolve to nothing, so a widget's own
+**The tokens.** `readVerveTokens(hostDocument)` resolves every name in `WIDGET_TOKEN_NAMES` against
+`hostDocument.documentElement`, through that document's own `defaultView`, and omits any that resolve to nothing, so a widget's own
 `var(--x, fallback)` still gets its fallback. The values are interpolated into the `<style>`
 block only, declared on `:root`, alongside a reset that gives the body `var(--canvas)`,
 `var(--ink)`, `var(--font-body)` and `display:flow-root` — the last so a first or last child's
@@ -4633,12 +4638,13 @@ few pixels the frame cannot show. The fence body is never interpolated into a sc
 attribute or the CSP.
 
 **The theme.** The document's opening theme is read off the `dark` class on `<html>` at build
-time, the same instant and the same source the tokens come from. Every change after that is a
+time, the same instant and the same source the tokens come from. `WidgetFrame` passes
+`useHostWindow().document` for that first build: the document the card is drawn in. Every change after that is a
 `theme` message: `useWidgetHost` posts one when the frame says `ready` and again whenever
 `useTheme().isDarkMode` changes, and the bridge toggles the `dark` class and calls
 `style.setProperty` for each token on the frame's own document element.
 
-That repost reads the tokens off `<html>` inside an ordinary effect, so it depends on the page
+That repost reads the tokens off the OPENER's `<html>` (`readVerveTokens(document)` in `postTheme`) inside an ordinary effect, so it depends on the page
 having switched already. ThemeProvider (`src/shared/context/ThemeContext.tsx`) guarantees it by
 putting `dark` on `<html>` in a LAYOUT effect, which runs before every ordinary (passive) effect of
 the same update. A plain effect there would run after the widget host's, because React runs a
@@ -4649,6 +4655,8 @@ through the app's own switch, no reload, diff against a fresh dark load). Any ot
 computed tokens gets the same guarantee only from an ordinary effect; one in its own layout effect,
 or at render time, would still read the old theme.
 
+The repost reads the opener's `<html>`, never the picture-in-picture window's copy of it. chat-host's mirror keeps that copy live through a `MutationObserver`, which runs AFTER the widget host's effect on a click-driven flip; a read there posted the new `dark` flag with the previous theme's tokens, one flip behind on every flip (measured 2026-09-29). The window's sheets are clones of the opener's, so once the mirror catches up it computes the same values.
+
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/authToken.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/context/ThemeContext.tsx
 
 ## MAN-416 — The bridge protocol
@@ -4658,6 +4666,16 @@ Both directions use `postMessage` with a target origin of `'*'`, because an opaq
 name to address. Safety comes from identity instead: the frame acts only on messages whose
 `event.source` is `window.parent`, and the host only on messages whose `event.source` is that
 frame's `contentWindow`.
+
+**The host's half runs on the window the frame is drawn in.** A widget posts to its `parent`, and for a frame in the picture-in-picture window that parent is that window: `useWidgetHost` binds its `message` listener to `useHostWindow()`, and re-binds when the chat moves. Its posts are made AS that window (`postAsHostWindow` in `src/modules/widgets/hooks/useWidgetHost.ts`). A message's `event.source` is the window whose script made the call, and every line of the app runs in the opener's realm; a post made straight from here to a frame in the floating window arrives from the opener, and the bridge drops it in silence (measured 2026-09-29: the frame's own listener saw the message, `live.theme` stayed null). So the call is made by a function built once per window in that window's realm (`new hostWindow.Function('target', 'message', 'target.postMessage(message, "*")')`, kept in a `WeakMap`).
+
+| case | does |
+| --- | --- |
+| `hostWindow === window` (home) | the direct `target.postMessage(message, '*')` |
+| the window refuses to build the function | direct post from the opener, and a `console.warn` names it: the widget then hears nothing |
+| a delivery to a window that is closing | caught, `console.warn`; the frame went with the window |
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/widgets/hooks/useWidgetHost.ts
 
 ## MAN-417 — Frame → host (`WidgetFrameMessage`)
 section: 07-live-widgets/005 The bridge protocol/006 Frame → host (`WidgetFrameMessage`)
@@ -4793,7 +4811,7 @@ each draw their own `my-3 rounded-xl border` wrapper when they stand alone, beca
 iframe itself would be taken out of the height the embed reported (border-box sizing) and leave a
 two-pixel scrollbar. Inside a card that border is the card's, so `WidgetFrame` passes
 `framed={Boolean(frame)}` and the wrapper keeps only the clipping and the fill. The sandbox, the
-`src`, the ready timer and `key={code}` are unchanged either way.
+`src`, the ready timer and the `<windowKey>:<code>` key are unchanged either way. The ready deadline runs on the host window and is cleared on the window that armed it (`{ id, armedOn }`).
 
 **The embed probes are not the unframed path.** `phase-22`, `phase-28` and `phase-29` mount through
 `MarkdownBody`, the app's own transcript renderer, so `CodeBlock` hands them `EmbedFrame` exactly as
@@ -4884,7 +4902,7 @@ What the card carries instead is the address itself as an `a[data-embed-open]` `
 which is why `openUrl` on this kind is not a convenience — it is the reader's only recourse when
 the frame shows nothing.
 
-`EmbedUrlFrame` is keyed on the fence body by `WidgetFrame`, exactly like its two neighbours, so a
+`EmbedUrlFrame` is keyed on the fence body alone by `WidgetFrame` (its two neighbours' keys also carry the host window), so a
 changed address arrives as a NEW element rather than as a reassigned `src`: the frame navigates
 once in its life and a re-render can never throw away what the reader did inside it.
 
@@ -4989,10 +5007,12 @@ behind the card and keeps the keyboard, so every keystroke lands in a list the r
 full-screen card showing only its own header is a screen of nothing — and the chevron is not drawn
 at all rather than drawn dead; the fold MEMORY is untouched, so leaving fullscreen returns the card
 to exactly the state it was left in. The root carries `data-owns-escape` (`shared/ui/overlayEscape`)
-while it is up, and `WidgetFrame`'s own listener takes the key in the capture phase and stops it
-there, so the transcript's turn-abort Escape behind the card never fires. A modal DIALOG is the
+while it is up, and `WidgetFrame`'s own listener takes the key in the capture phase, on the window the card is
+drawn in (`useHostWindow()`, MAN-7443), and stops it there, so the transcript's turn-abort Escape
+behind the card never fires. A modal DIALOG is the
 exception, because it is not behind — and so is any panel that owns the key (`OWNS_ESCAPE`): the
-widget's own dropdown, the composer's menu. The listener asks `otherOverlayHoldsEscape()` and stands
+widget's own dropdown, the composer's menu. The listener asks `otherOverlayHoldsEscape(hostWindow.document)` — the document of that same window,
+because a panel open in a picture-in-picture window lives in that window's document — and stands
 down, so the press closes what is in front and leaves the card fullscreen. It cannot win that by `stopPropagation` — the
 dialog listens on the same window capture stage, and stopping propagation there does not stop a
 second listener on the same node, so without the stand-down one press closes the dialog AND leaves
@@ -5003,7 +5023,7 @@ The listener exists only while fullscreen is on.
 `fullscreen` and `onToggleFullscreen`; `ChatGutterLayout` holds WHICH widget has the screen (one
 value, so two fullscreen WIDGETS cannot happen — though a transcript card and a widget can both be
 fullscreen at once, two identical panels on one layer that one Escape leaves together) and owns the
-Escape listener, with the same dialog stand-down, and drops it when the region narrows past the
+Escape listener, on the same host window and with the same dialog stand-down, and drops it when the region narrows past the
 gutters' threshold. The switch is a second control, so it
 is a second button beside the header's toggle rather than inside it — a button within a button is
 invalid markup — and the header row therefore holds every control at once: the toggle, the frame's
@@ -5105,7 +5125,7 @@ section: 07-live-widgets/014 If you change this, check that
 | `WIDGET_CSP` | `connect-src 'none'` survives, `img-src`/`font-src` stay at `data:`, and the meta is still emitted before the style, the script and the body. If you added a directive meaning to close frame self-navigation, re-measure the twelve vectors before believing it — the last three candidates all looked right and changed nothing |
 | `buildWidgetDocument` | The fence body still reaches only the `<body>` element, and token values still come from `getComputedStyle` |
 | `WIDGET_TOKEN_NAMES` | Every name is still declared in `src/shared/ui/verve/tokens.css`, and the `theme` message carries the same list |
-| The theme path | A flip still posts `theme` and does NOT rebuild `srcDoc`; the memo in `WidgetFrameLive` is keyed on `code` alone. Gate 10 of the probe leaves a sentinel on the frame's `window` and requires it to survive a flip, so adding anything theme-shaped to that memo key reddens it |
+| The theme path | A flip still posts `theme` and does NOT rebuild `srcDoc`; the memo in `WidgetFrameLive` is keyed on `code` and `hostDocument` alone (a theme flip changes neither). Gate 10 of the probe leaves a sentinel on the frame's `window` and requires it to survive a flip, so adding anything theme-shaped to that memo key reddens it |
 | The height clamp | A widget still SHRINKS, not just grows — gate 4 drives one widget each way, because a `min-height` (or a monotonic `setHeight`) passes every growth assertion alone |
 | `useWidgetHost`'s listener | The `event.source` identity check, the shape validation, and the `[24, 2000]` clamp on a finite number |
 | `WidgetFrame`'s mount gate | `buildTranscriptHtml` still exports a `<pre>` and no `<iframe>` — gate 9 of the probe |
@@ -5126,9 +5146,9 @@ section: 07-live-widgets/014 If you change this, check that
 | `ShapeFrame`'s `fullscreen` prop | The flex chain is unbroken (root → `Collapsible` → `CollapsibleContent` + its inner `[&>div]` → body → wrapper → iframe at `height: 100%`), the fold is still forced open with the MEMORY untouched, and the root still carries `data-owns-escape` while it is up. A break in the chain leaves the frame at its card height inside a screen-sized box |
 | The fullscreen layer or the flush floor | The card still sits at `z-[45]`, under `Dialog`'s z-50 — raise it and a dialog opened from fullscreen comes up behind it holding the keyboard. The flush gutter card still has a floor under its `flex-1` — drop it and a tall neighbour crushes the Embed widget to 2px with no control left to reopen it |
 | `WidgetFrame`'s fullscreen state | It is still a class change and never a move: the live element must keep its position in the React tree across the toggle, or the iframe reloads and a part-typed DocSpace edit is gone. Toggle it and assert the SAME DOM node before and after |
-| The `key` on `WidgetFrameLive` OR on `DocSpaceFrame` | BOTH forks carry `key={code}` and both rest on the same premise — the revoke rule, not a reconciliation nicety. Without it a changed fence body is applied to the SAME element: `srcDoc` reassigned in place for an HTML widget, a new `src` for a DocSpace block. Either fires a second `load`, which the host cannot tell from the frame navigating itself away, and it silently revokes a healthy frame forever. Gate 9c rebuilds a body and requires `live.theme` to be set inside the new document — the sentinel half of that gate passes either way, because an in-place swap is also a new document, so `live.theme` is the read that matters |
+| The `key` on `WidgetFrameLive` OR on `DocSpaceFrame` | BOTH forks carry the key `<windowKey>:<code>` (host window and body) and both rest on the same premise — the revoke rule, not a reconciliation nicety. Without the body half a changed fence body is applied to the SAME element: `srcDoc` reassigned in place for an HTML widget, a new `src` for a DocSpace block. Either fires a second `load`, which the host cannot tell from the frame navigating itself away, and it silently revokes a healthy frame forever. Gate 9c rebuilds a body and requires `live.theme` to be set inside the new document — the sentinel half of that gate passes either way, because an in-place swap is also a new document, so `live.theme` is the read that matters. Without the window half a widget carried into the floating window reloads under the same element and is revoked: 1 `theme` message before the move, 0 after (`.verify/chat-surfaces-window.mjs` moves one across and back and requires it still sized and still hearing the host) |
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/verve/tokens.css, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-22.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-24.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-28.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-docspace-canvas.mjs
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/widgets/WidgetFrame.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/verve/tokens.css, /home/lyphe/.claude/claudecodeui_lyphe/.verify/chat-surfaces-window.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-22.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-24.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-28.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-docspace-canvas.mjs
 
 ## MAN-426 — In one paragraph
 section: 08-rendered-shapes/000 In one paragraph

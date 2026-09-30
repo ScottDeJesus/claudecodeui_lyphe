@@ -57,6 +57,12 @@ function subscribe(listener: () => void): () => void {
   listeners.add(listener);
   // Attached with the first reader and dropped with the last, so a document that never opens a
   // chat never listens either.
+  //
+  // AN OPENER FACT, and it stays on the global `window`: `storage` is `localStorage`'s news, and
+  // `localStorage` belongs to the opener. This code runs in the opener's realm, so every write it
+  // makes is the opener's own and never echoes back here — the news that does arrive is another
+  // TAB's, which reaches the opener whichever window the chat is drawn in. A dismissal made in
+  // this document is published to the listeners directly by `dismissPins`.
   if (!listening) {
     window.addEventListener('storage', onStorage);
     listening = true;

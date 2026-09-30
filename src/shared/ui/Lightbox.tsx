@@ -4,8 +4,10 @@ import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { Maximize2, Minus, Plus, X } from 'lucide-react';
 
+import { useHostWindow } from '@/shared/context/HostWindowContext';
 import { OWNS_ESCAPE } from '@/shared/ui/overlayEscape';
 import { useZoomPan } from '@/shared/ui/useZoomPan';
+import { isElementLike } from '@/shared/utils';
 
 type LightboxProps = {
   /** The dialog's accessible name: the picture's alt text, or what the diagram is. */
@@ -41,6 +43,7 @@ const CONTROL_CLASS = 'rounded-full p-2 text-white transition-colors hover:bg-wh
  */
 export function Lightbox({ label, children, onClose }: LightboxProps) {
   const { t } = useTranslation('common');
+  const hostWindow = useHostWindow();
   const {
     surfaceRef, stageRef, contentRef, scale, x, y, animated, canZoomIn, canZoomOut,
     onPointerDown, wasDrag, zoomIn, zoomOut, fit,
@@ -52,16 +55,21 @@ export function Lightbox({ label, children, onClose }: LightboxProps) {
   // Opens the dialog into the top layer, and puts focus back on whatever opened it when it goes.
   // A LAYOUT effect so the dialog is shown before the first paint, never as an empty flash; the
   // guard keeps a re-run (Strict Mode) from calling `showModal()` on a dialog that is already open.
+  // The host window is a dependency because the dialog is portalled to that window's body: when the
+  // chat moves, React draws a new `<dialog>` in the new window, and only a re-run opens it into that
+  // window's top layer. The opener is found by the property it must have (`focus`), not by
+  // `instanceof HTMLElement`, which is false for an element the floating window made.
   useLayoutEffect(() => {
     const dialog = surfaceRef.current;
     if (!dialog) return undefined;
-    const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const active = hostWindow.document.activeElement as HTMLElement | null;
+    const opener = active !== null && typeof active.focus === 'function' ? active : null;
     if (dialog.isConnected && !dialog.open) dialog.showModal();
     return () => {
       dialog.close();
       opener?.focus({ preventScroll: true });
     };
-  }, [surfaceRef]);
+  }, [surfaceRef, hostWindow]);
 
   useEffect(() => {
     const handleKeyDown = (event: globalThis.KeyboardEvent) => {
@@ -85,9 +93,9 @@ export function Lightbox({ label, children, onClose }: LightboxProps) {
         fit();
       }
     };
-    window.addEventListener('keydown', handleKeyDown, true);
-    return () => window.removeEventListener('keydown', handleKeyDown, true);
-  }, [onClose, zoomIn, zoomOut, fit]);
+    hostWindow.addEventListener('keydown', handleKeyDown, true);
+    return () => hostWindow.removeEventListener('keydown', handleKeyDown, true);
+  }, [onClose, zoomIn, zoomOut, fit, hostWindow]);
 
   const percent = Math.round(scale * 100);
 
@@ -111,7 +119,7 @@ export function Lightbox({ label, children, onClose }: LightboxProps) {
       onCancel={(event) => event.preventDefault()}
       onPointerDownCapture={(event) => {
         // Capture, because the controls stop the press before the bubble reaches this layer.
-        pressBeganOnControl.current = event.target instanceof Element && event.target.closest('[data-lightbox-control]') !== null;
+        pressBeganOnControl.current = isElementLike(event.target) && event.target.closest('[data-lightbox-control]') !== null;
       }}
       onPointerDown={(event) => {
         // This layer is a portal: React would still bubble the press through the tree that opened
@@ -187,6 +195,6 @@ export function Lightbox({ label, children, onClose }: LightboxProps) {
         </button>
       </div>
     </dialog>,
-    document.body,
+    hostWindow.document.body,
   );
 }
