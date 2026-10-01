@@ -573,34 +573,6 @@ probe-key: d44df19ee6cfb716eeb5cfd3783a7d7855682d57
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/claude-updates/ClaudeUpdatesSettingsTab.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/claude-updates/hooks/useClaudeUpdates.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts
 
-## INV-5686 — probe — the docstore row that governs this module still describes the fake (MED)
-
-the docstore row that governs this module still describes the fake (MED)
-
-```probe
-docstore get MAN-7404 | python3 -c "import sys,json,re; t=json.load(sys.stdin)['row']['text']; print('\n'.join(l for l in t.splitlines() if re.search(r'fake|FILL|#updates=', l)))" ; grep -n "fake\.ts\|#updates=\|FILL:" MANUAL.md | head -8
-expect: the row still reads "reading a fake report only — nothing here calls the real routes yet", still lists `fake.ts` / `FAKE_REPORT` as live, still counts "11" FILL markers, still documents `#updates=<name>` — and the exported MANUAL.md repeats it
-```
-
-measured 2026-09-28 by chain chain-claude-update-pipeline--fill-20260928-171627-a599, finding M2, MEDIUM
-probe-key: af44bd97e966b3100c99c5b74a3f4a96591e0dd7
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/claude-updates/ClaudeUpdatesSettingsTab.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/claude-updates/hooks/useClaudeUpdates.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts
-
-## INV-5687 — probe — the new `api.ts` comment points at a section that does not exist (LOW)
-
-the new `api.ts` comment points at a section that does not exist (LOW)
-
-```probe
-cd /home/lyphe/.claude/claudecodeui_lyphe && grep -n "claude-updates" src/shared/api.ts ; grep -c "claude-updates" docs/MANUAL.md
-expect: api.ts names "docs/MANUAL.md (claude-updates)" and docs/MANUAL.md contains 0 occurrences of "claude-updates"
-```
-
-measured 2026-09-28 by chain chain-claude-update-pipeline--fill-20260928-171627-a599, finding L1, LOW
-probe-key: 97363355f9a12f221ec609c2fec666013995c735
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/claude-updates/ClaudeUpdatesSettingsTab.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/claude-updates/hooks/useClaudeUpdates.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts
-
 ## INV-5688 — probe — with no reading yet, the pane offers nothing at all for up to a poll (LOW)
 
 with no reading yet, the pane offers nothing at all for up to a poll (LOW)
