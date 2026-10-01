@@ -313,13 +313,9 @@
   },
   "question": {
     "needsInput": "Claude braucht deine Eingabe",
-    "planNeedsInput": "Ein Plan braucht deine Antwort",
-    "collapse": "Ausblenden",
-    "expand": "Öffnen",
     "selectAll": "Alle zutreffenden auswählen",
     "other": "Andere...",
     "otherPlaceholder": "Antwort eingeben...",
-    "notePlaceholder": "Deine Notizen — wortwörtlich gesendet",
     "skip": "Überspringen",
     "skipAll": "Alle überspringen",
     "back": "Zurück",

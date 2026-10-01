@@ -31,9 +31,11 @@ export const providerRegistry = {
    * EVERY holder of an ask waiting on a person: each provider runtime's own permission gateway, then
    * each gateway the app registered for a prompt it raises itself (the dispatcher's plan prompts —
    * `dispatcher-asks.service.ts`). The one list every reader of pending asks walks — the chat
-   * subscribe's `pendingPermissions`, an answer from the panel or the phone, the sidebar's yellow
-   * dot — so a prompt the app raised is answered, listed and marked by the very doors a tool
-   * approval is.
+   * subscribe's `pendingPermissions`, an answer from the phone, the sidebar's yellow dot — so a
+   * prompt that IS pending in a chat is answered, listed and marked by the very doors a tool
+   * approval is. THE DISPATCHER'S GATEWAY IS THE EXCEPTION: it settles the phone's taps on a plan's
+   * prompt and lists nothing at all, because a plan's prompt is pending in no chat — the card in the
+   * Runner tab and the phone are where it is answered.
    */
   listPermissionGateways(): ProviderRuntimePermissionGateway[] {
     const runtimes = Object.values(providers)
@@ -56,8 +58,9 @@ export const providerRegistry = {
   },
 };
 
-// Used by the dispatcher module to put the plan prompts it raises in chats behind the same doors as a
-// tool approval (`listPermissionGateways`). Answers the unregister, which the module's `stop` calls.
+// Used by the dispatcher module so a phone's tap on a plan's prompt goes through the same doors as a
+// tool approval (`listPermissionGateways`) — a gateway that answers and recalls, and lists NOTHING,
+// since a plan's prompt is pending in no chat. Answers the unregister, which the module's `stop` calls.
 export function registerPermissionGateway(gateway: ProviderRuntimePermissionGateway): () => void {
   appPermissionGateways.add(gateway);
   return () => {

@@ -685,23 +685,9 @@ probe-key: 15332941c1203bf0feb98371dac680940517b0f4
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/PlanControls.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/SwarmControl.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/constants.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Stepper.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/verve/controls.css, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-plan-swarm.mjs, /home/lyphe/.claude/hooks/dispatcher/cmd/swarm.py, /home/lyphe/.claude/hooks/dispatcher/swarm_word.py, /home/lyphe/.claude/hooks/dispatcher/width.py, /home/lyphe/.claude/hooks/plan_runner/swarm.py
 
-## INV-5696 — probe — A real plan's Accept prompt can't be answered on a phone, and it hides the composer until it is answered
+## INV-5697 — probe — After a Rework, the re-cut's fresh Accept prompt comes back silently: no phone push, no lane bell (`DispatcherAskBell`, MAN-7540)
 
-A real plan's Accept prompt can't be answered on a phone, and it hides the composer until it is answered
-
-```probe
-cd /tmp/pipeline-reviews/plan-prompt-in-chat/athena-probes && node census-fit.mjs claude-update-pipeline 390x844 mobile && node census-fit.mjs claude-update-pipeline 1280x720 desktop
-expect: both lines end `answerable and composer reachable: true` (today: false — 390x844: card 1245px, Submit bottom 1282 → 1282, composer bottom 1368; 1280x720: Submit bottom 791 in a 720px viewport). Any plan of ≥6 phases can stand in for claude-update-pipeline if it has since walked.
-```
-
-measured 2026-09-28 by chain chain-plan-prompt-in-chat-20260928-183429-267d, finding H1, HIGH
-probe-key: 35eb978ec49f385acff7b913ab237e76afb9a1ac
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-answer.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-ask.reader.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-asks.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-ask.transport.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-prompts.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-raise.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/tools/InteractiveRenderers/QuestionTextField.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/hooks/dispatcher/ask.py, /home/lyphe/.claude/hooks/dispatcher/cmd/ask.py, /home/lyphe/.claude/hooks/dispatcher/owed.py, /home/lyphe/.claude/hooks/dispatcher_stop_planners.py, /home/lyphe/.claude/hooks/dispatcher_stop.py, /home/lyphe/.claude/hooks/intent_lock.py, /home/lyphe/.claude/skills/arc/SKILL.md, /home/lyphe/.claude/skills/plan/SKILL.md
-
-## INV-5697 — probe — After a Rework, the re-cut's fresh Accept prompt comes back silently: no phone push, no tab bell
-
-After a Rework, the re-cut's fresh Accept prompt comes back silently: no phone push, no tab bell
+After a Rework, the re-cut's fresh Accept prompt comes back silently: no phone push, no lane bell (`DispatcherAskBell`, MAN-7540)
 
 ```probe
 bash /tmp/pipeline-reviews/plan-prompt-in-chat/athena-probes/rework_key.sh
@@ -711,7 +697,7 @@ expect: `same prompt key: false` (today: `first ask: token 634745e991 asked {'id
 measured 2026-09-28 by chain chain-plan-prompt-in-chat-20260928-183429-267d, finding M1, MEDIUM
 probe-key: 74af5a4f5ee80876547473078c98d616f0b65148
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-answer.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-ask.reader.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-asks.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-ask.transport.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-prompts.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-raise.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/tools/InteractiveRenderers/QuestionTextField.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/hooks/dispatcher/ask.py, /home/lyphe/.claude/hooks/dispatcher/cmd/ask.py, /home/lyphe/.claude/hooks/dispatcher/owed.py, /home/lyphe/.claude/hooks/dispatcher_stop_planners.py, /home/lyphe/.claude/hooks/dispatcher_stop.py, /home/lyphe/.claude/hooks/intent_lock.py, /home/lyphe/.claude/skills/arc/SKILL.md, /home/lyphe/.claude/skills/plan/SKILL.md
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-answer.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-ask.reader.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-ask-reads.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-asks.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-ask.transport.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-prompts.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-raise.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/tools/InteractiveRenderers/QuestionTextField.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/hooks/dispatcher/ask.py, /home/lyphe/.claude/hooks/dispatcher/cmd/ask.py, /home/lyphe/.claude/hooks/dispatcher/owed.py, /home/lyphe/.claude/hooks/dispatcher_stop_planners.py, /home/lyphe/.claude/hooks/dispatcher_stop.py, /home/lyphe/.claude/hooks/intent_lock.py, /home/lyphe/.claude/skills/arc/SKILL.md, /home/lyphe/.claude/skills/plan/SKILL.md
 
 ## INV-5698 — probe — Two servers can both record the same landing's ask; the raise service claims the second hears `nothing`
 
@@ -725,7 +711,7 @@ expect: `runs recording TWO asks for one landing: 0/10` (today: 9/10)
 measured 2026-09-28 by chain chain-plan-prompt-in-chat-20260928-183429-267d, finding L1, LOW
 probe-key: 26bcadb0c241191691e2917d8fd62a43db0ab6eb
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-answer.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-ask.reader.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-asks.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-ask.transport.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-prompts.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-raise.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/tools/InteractiveRenderers/QuestionTextField.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/hooks/dispatcher/ask.py, /home/lyphe/.claude/hooks/dispatcher/cmd/ask.py, /home/lyphe/.claude/hooks/dispatcher/owed.py, /home/lyphe/.claude/hooks/dispatcher_stop_planners.py, /home/lyphe/.claude/hooks/dispatcher_stop.py, /home/lyphe/.claude/hooks/intent_lock.py, /home/lyphe/.claude/skills/arc/SKILL.md, /home/lyphe/.claude/skills/plan/SKILL.md
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-answer.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-ask.reader.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-ask-reads.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-asks.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-ask.transport.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-prompts.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-raise.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/tools/InteractiveRenderers/QuestionTextField.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/hooks/dispatcher/ask.py, /home/lyphe/.claude/hooks/dispatcher/cmd/ask.py, /home/lyphe/.claude/hooks/dispatcher/owed.py, /home/lyphe/.claude/hooks/dispatcher_stop_planners.py, /home/lyphe/.claude/hooks/dispatcher_stop.py, /home/lyphe/.claude/hooks/intent_lock.py, /home/lyphe/.claude/skills/arc/SKILL.md, /home/lyphe/.claude/skills/plan/SKILL.md
 
 ## INV-5699 — probe — The Stop hold's stand-down reads the store, not the screen, and `dispatcher ask` runs inside a Claude session
 
@@ -797,20 +783,6 @@ probe-key: 0a2314ada3ac501357c89a2d38bf3c95d1f8b3ca
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-ask-names.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-asks.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-prompts.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/ntfy-action.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/services/ntfy-action-token.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/provider-runtime.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useChatRealtimeHandlers.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts
 
-## INV-5711 — probe — A click whose catch-up read fails is dropped silently to the operator
-
-A click whose catch-up read fails is dropped silently to the operator
-
-```probe
-bash /tmp/pipeline-reviews/plan-ask-survives-restart/athena-probes/read_fail_silent.sh
-expect: the tab receives a frame naming the undone answer (today: `frames the operator's tab receives after its click: NONE`, plan not approved, one journal line)
-```
-
-measured 2026-09-28 by chain chain-plan-ask-survives-restart-20260928-202000-d5a0, finding L2, LOW
-probe-key: e9a7e9ecfc1e0e2f475306377e039b470e2235ee
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-ask-names.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-asks.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-prompts.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/ntfy-action.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/services/ntfy-action-token.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/provider-runtime.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useChatRealtimeHandlers.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts
-
 ## INV-5712 — probe — The durable ask name is unique per record, not per ask over time
 
 The durable ask name is unique per record, not per ask over time
@@ -836,20 +808,6 @@ expect: no output — both comments say the first gateway that claims a key sett
 
 measured 2026-09-28 by chain chain-plan-ask-survives-restart-20260928-202000-d5a0, finding L4, LOW
 probe-key: 895a0f6a64f0ae719ff6b4d83f7a4e2d11c62560
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-ask-names.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-asks.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-prompts.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/ntfy-action.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/services/ntfy-action-token.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/provider-runtime.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useChatRealtimeHandlers.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts
-
-## INV-5714 — probe — The stale-answer notice reaches every tab of that chat, and its copy says "your answer"
-
-The stale-answer notice reaches every tab of that chat, and its copy says "your answer"
-
-```probe
-node /tmp/pipeline-reviews/plan-ask-survives-restart/athena-probes/toast-shot.mjs 390x844 mobile
-expect: no toast in a tab that sent no answer (today: the `light` and `dark` lines print the "Prompt already answered" toast; the `other-chat` line prints [] as it should)
-```
-
-measured 2026-09-28 by chain chain-plan-ask-survives-restart-20260928-202000-d5a0, finding L5, LOW
-probe-key: ba588a565c064530119a7ef989c943ff7c53cc89
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-ask-names.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-asks.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-prompts.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/ntfy-action.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/services/ntfy-action-token.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/provider-runtime.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useChatRealtimeHandlers.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts
 
@@ -906,20 +864,6 @@ expect: `hour armed on the Queued plan: None` (today: `2026-09-29T10:00:00Z`, wi
 
 measured 2026-09-28 by chain chain-accept-once-20260928-214132-9473, finding H1, HIGH
 probe-key: c6944f8dd646713cca7f890fbc04d9ba0f7f59c5
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-asks.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useChatRealtimeHandlers.ts, /home/lyphe/.claude/hooks/dispatcher/accept.py, /home/lyphe/.claude/hooks/dispatcher/cmd/run.py, /home/lyphe/.claude/hooks/dispatcher/judgment_accept.py, /home/lyphe/.claude/hooks/dispatcher/store.py, /home/lyphe/.claude/hooks/dispatcher/store_write.py, /home/lyphe/.claude/hooks/intent_lock.py
-
-## INV-5728 — probe — MEDIUM — the "Already answered" toast reaches every tab of the chat, including the tab whose own answer won, and says "before your answer arrived"
-
-MEDIUM — the "Already answered" toast reaches every tab of the chat, including the tab whose own answer won, and says "before your answer arrived"
-
-```probe
-node /tmp/pipeline-reviews/accept-once/athena-probes/already-toast.mjs 390x844 mobile dark
-expect: the bystander tab prints `toasts -> []`, and the sender's toast does not say its own answer arrived late (today: both lines print the "Already answered / … before your answer arrived …" toast)
-```
-
-measured 2026-09-28 by chain chain-accept-once-20260928-214132-9473, finding M1, MEDIUM
-probe-key: 69492cc18675a99b6dfc41bc6bf8f3b61e96e5c1
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-asks.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useChatRealtimeHandlers.ts, /home/lyphe/.claude/hooks/dispatcher/accept.py, /home/lyphe/.claude/hooks/dispatcher/cmd/run.py, /home/lyphe/.claude/hooks/dispatcher/judgment_accept.py, /home/lyphe/.claude/hooks/dispatcher/store.py, /home/lyphe/.claude/hooks/dispatcher/store_write.py, /home/lyphe/.claude/hooks/intent_lock.py
 
@@ -1405,23 +1349,6 @@ probe-key: f77ce2f9cabcc4086a663f85bfa98a8bea965f0f
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/ArcDeck.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/LaneCardHead.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/PlanCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-card-description.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dispatch-arc-word.mjs
 
-## INV-5794 — probe — the longest real prompt is the arc lock, not `coi-backend-conformance`; the panel proof stops at a fifth of it
-
-the longest real prompt is the arc lock, not `coi-backend-conformance`; the panel proof stops at a fifth of it
-
-```probe
-cd ~/.claude && PYTHONPATH=hooks python3 -c "
-from dispatcher import store, lock
-c=store.connect(); a=c.execute(\"SELECT id FROM arcs WHERE name='restorly'\").fetchone()[0]
-n=[p['name'] for p in store.arc_plans(c,a)]; print(len(n), len(lock.question_text(c,n)))"
-expect: 14 plans and ~39.8k characters — 5x the 7,451-char prompt the panel proof used (moves with the store; the shape is what matters)
-```
-
-measured 2026-09-29 by chain chain-lock-prompt-glance-20260929-110148-17f8, finding M1, MEDIUM
-probe-key: c6145a3457e6d12ef4613f3ac632435aedb1d64f
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-intent-lock-prompt.mjs, /home/lyphe/.claude/hooks/dispatcher/lock_glance.py, /home/lyphe/.claude/hooks/dispatcher/lock.py, /home/lyphe/.claude/skills/plan/SKILL.md
-
 ## INV-5795 — probe — an unclosed code fence in a plan's `delivers` swallows the facts line, the phase list and the token into the code block
 
 an unclosed code fence in a plan's `delivers` swallows the facts line, the phase list and the token into the code block
@@ -1437,7 +1364,7 @@ expect: 1 — the prompt's blocks carry an odd number of fence lines, so nothing
 measured 2026-09-29 by chain chain-lock-prompt-glance-20260929-110148-17f8, finding L1, LOW
 probe-key: f761e8f6129637e561901ea900beaa317b2e4d1c
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-intent-lock-prompt.mjs, /home/lyphe/.claude/hooks/dispatcher/lock_glance.py, /home/lyphe/.claude/hooks/dispatcher/lock.py, /home/lyphe/.claude/skills/plan/SKILL.md
+governs: /home/lyphe/.claude/hooks/dispatcher/lock_glance.py, /home/lyphe/.claude/hooks/dispatcher/lock.py, /home/lyphe/.claude/skills/plan/SKILL.md
 
 ## INV-5796 — probe — three lines still describe the old prompt shape
 
@@ -1451,7 +1378,7 @@ expect: 1 and 1 — both still describe the old shape (0 once healed)
 measured 2026-09-29 by chain chain-lock-prompt-glance-20260929-110148-17f8, finding L2, LOW
 probe-key: a2e8cb06d0adeaa9543eea5c39d72cc3ce71ed19
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-intent-lock-prompt.mjs, /home/lyphe/.claude/hooks/dispatcher/lock_glance.py, /home/lyphe/.claude/hooks/dispatcher/lock.py, /home/lyphe/.claude/skills/plan/SKILL.md
+governs: /home/lyphe/.claude/hooks/dispatcher/lock_glance.py, /home/lyphe/.claude/hooks/dispatcher/lock.py, /home/lyphe/.claude/skills/plan/SKILL.md
 
 ## INV-5797 — probe — "read ONCE for the text and the token" is not what runs; the two can part under a concurrent write
 
@@ -1468,7 +1395,7 @@ expect: 2 for one plan's prompt (the docstring, MANUAL and MAN-1443 say once)
 measured 2026-09-29 by chain chain-lock-prompt-glance-20260929-110148-17f8, finding L3, LOW
 probe-key: e5c97527ca014e1398bcf3be3e1557e755bb9143
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-intent-lock-prompt.mjs, /home/lyphe/.claude/hooks/dispatcher/lock_glance.py, /home/lyphe/.claude/hooks/dispatcher/lock.py, /home/lyphe/.claude/skills/plan/SKILL.md
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-card-ask.mjs, /home/lyphe/.claude/hooks/dispatcher/lock_glance.py, /home/lyphe/.claude/hooks/dispatcher/lock.py, /home/lyphe/.claude/skills/plan/SKILL.md
 
 ## INV-5798 — probe — `Arc <arc>, plan <i> of <n>` shows the store's id order, which is wrong for the real `restorly` arc
 
@@ -1482,7 +1409,7 @@ expect: the prompt says "plan 9 of 14" while the arc file lists it 7th of 13
 measured 2026-09-29 by chain chain-lock-prompt-glance-20260929-110148-17f8, finding L4, LOW
 probe-key: f96881d501a30e609e660221eb73cc93c2d093e7
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-intent-lock-prompt.mjs, /home/lyphe/.claude/hooks/dispatcher/lock_glance.py, /home/lyphe/.claude/hooks/dispatcher/lock.py, /home/lyphe/.claude/skills/plan/SKILL.md
+governs: /home/lyphe/.claude/hooks/dispatcher/lock_glance.py, /home/lyphe/.claude/hooks/dispatcher/lock.py, /home/lyphe/.claude/skills/plan/SKILL.md
 
 ## INV-5885 — probe — the showing left its scratch id in the operator's icon cache
 
@@ -2572,28 +2499,6 @@ probe-key: 5ab6902890cacb730a984a344dc7b77ec75aa07b
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/session-user-state.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/simple-list-ladder.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/session-user-state.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/session-user-state.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-sidebar-state-api.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-simple-reorder.mjs
 
-## INV-6095 — probe — the card's door writes the closed-key memo and never consults it: every replay of a press for an ask the book does not hold pays a full store read
-
-the card's door writes the closed-key memo and never consults it: every replay of a press for an ask the book does not hold pays a full store read
-
-```probe
-cd /home/lyphe/.claude/claudecodeui_lyphe && TSX_TSCONFIG_PATH=server/tsconfig.json node --import tsx --input-type=module -e "
-const { createDispatcherAsks } = await import('./server/modules/dispatcher/dispatcher-asks.service.ts');
-let reads = 0;
-const ask = { kind: 'accept', plan: 'athena-h', plans: ['athena-h'], header: 'athena-h', question: 'q', token: 't', options: [{ label: 'Accept', description: '' }, { label: 'Queue', description: '' }, { label: 'Rework', description: '' }], rework: [], asked: { id: 1, at: '2026-09-30T10:00:00Z' } };
-const asks = createDispatcherAsks({ chatFor: () => ({ sessionId: 's', provider: 'c', sessionName: 'n' }), broadcast() {}, push() {}, forgetButtons() {}, carry: async () => ({ outcome: 'took', said: '' }), read: async () => { reads += 1; return { plans: [{ name: 'athena-h', asking: null, session_app_id: null }], generated_at: '2026-09-30T10:00:00Z' }; }, log() {} });
-const d = { allow: true, updatedInput: { answers: { q: 'Accept' } } };
-const a = await asks.answer(ask, d), b = await asks.answer(ask, d);
-console.log('outcomes', a.outcome, b.outcome, 'reads=' + reads);
-"
-expect: outcomes not-open not-open reads=1 (the 5s memo spares the second read) — measured `reads=2`
-```
-
-measured 2026-09-30 by chain chain-prompts-in-cards--door-20260930-135345-1a23, finding M1, MEDIUM
-probe-key: 6c7d528f38708dd266b3081431a4286b52d3cd8a
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-answer.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-answer.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-asks.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-prompts.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-card-door.ts, /home/lyphe/.claude/hooks/dispatcher/accept.py, /home/lyphe/.claude/hooks/dispatcher/cmd/run.py, /home/lyphe/.claude/hooks/dispatcher/store_write.py
-
 ## INV-6110 — probe — `.verify/probe-plan-ask-scaffold.mjs` is stale by construction, and no longer inert
 
 `.verify/probe-plan-ask-scaffold.mjs` is stale by construction, and no longer inert
@@ -2607,3 +2512,81 @@ measured 2026-09-30 by chain chain-prompts-in-cards--fill-20260930-145432-20c1, 
 probe-key: bfa2d7be2ebac6322ccd9574bcda7afb113b1ae4
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-plan-ask-scaffold.mjs
+
+## INV-6116 — probe — the widget-list probe's lead assertion is false when the open chat's plan sits in an arc
+
+the widget-list probe's lead assertion is false when the open chat's plan sits in an arc
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe && node /tmp/pipeline-reviews/prompts-in-cards--surfacing/athena-probes/widget-arc-false-fail/probe-runner-widget-list.mjs --when after
+expect: `[OK] … the list draws the tab's items in this phase's order — the asks, then this chat's, then the rest (darc:athena-probe--arc, plan:coi-send-switch, …)` immediately followed by `[FAIL] … the open chat's plan leads every item that is not asking, wearing its "This session" pin (darc:athena-probe--arc, pinned null, pin false)` — the widget agreeing with the tab while the reading calls it wrong; the run's other two FAILs are this scratch copy's own (its one-plan arc cannot swipe; `api.github.com` 403s)
+```
+
+measured 2026-09-30 by chain chain-prompts-in-cards--surfacing-20260930-154725-9e97, finding M2, MEDIUM
+probe-key: 444f05a178b7ddb2deafc9dc89e3a34d345ee4b4
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/askState.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/dispatcherState.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/hooks/useDispatcherPlans.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/runner-tab/RunnerWidgetBody.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/ask-lane.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-card-ask.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-runner-widget-list.mjs
+
+## INV-6117 — probe — the `--surfacing` proof's arc half cannot fail — and never exercises "an arc is asking when ANY of its plans is"
+
+the `--surfacing` proof's arc half cannot fail — and never exercises "an arc is asking when ANY of its plans is"
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe && node /tmp/pipeline-reviews/prompts-in-cards--surfacing/athena-probes/surfacing-nulled-asks/probe-card-ask.mjs --surfacing
+expect: `[OK] … the asking arc is the FIRST of the tab's 1 deck(s) (probe-card-ask--surfacing-arc)` with every ask-dependent reading around it failing (`5 FAILED`, exit 1) — nothing on the lane owes a word and the frame holds one deck, and the reading passes anyway; its opposite control (`surfacing-quiet-arc-first`: a quiet arc carried first) discriminates at 2 decks and passes
+```
+
+measured 2026-09-30 by chain chain-prompts-in-cards--surfacing-20260930-154725-9e97, finding M3, MEDIUM
+probe-key: 4679d86903975065e344d6cb331e871da95215f6
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/askState.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/dispatcherState.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/hooks/useDispatcherPlans.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/runner-tab/RunnerWidgetBody.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/ask-lane.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-card-ask.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-runner-widget-list.mjs
+
+## INV-6141 — probe — INV-6095: "the card's door … never consults it" no longer reproduces
+
+INV-6095: "the card's door … never consults it" no longer reproduces
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe && TSX_TSCONFIG_PATH=server/tsconfig.json node --import tsx --input-type=module -e "
+const { createDispatcherAsks } = await import('./server/modules/dispatcher/dispatcher-asks.service.ts');
+let reads = 0;
+const ask = { kind: 'accept', plan: 'athena-h', plans: ['athena-h'], header: 'athena-h', question: 'q', token: 't', options: [{ label: 'Accept', description: '' }, { label: 'Queue', description: '' }, { label: 'Rework', description: '' }], rework: [], asked: { id: 1, at: '2026-09-30T10:00:00Z' } };
+const asks = createDispatcherAsks({ sessionOf: () => ({ sessionId: 's', provider: 'c', sessionName: 'n' }), push() {}, forgetButtons() {}, carry: async () => ({ outcome: 'took', said: '' }), read: async () => { reads += 1; return { plans: [{ name: 'athena-h', asking: null, session_app_id: null }], generated_at: '2026-09-30T10:00:00Z' }; }, log() {} });
+const d = { allow: true, updatedInput: { answers: { q: 'Accept' } } };
+const a = await asks.answer(ask, d), b = await asks.answer(ask, d);
+console.log('outcomes', a.outcome, b.outcome, 'reads=' + reads);
+"
+expect: `outcomes not-open not-open reads=1` — the second replay pays no store read, so the row's `reads=2` and "never consults it" no longer reproduce
+```
+
+measured 2026-09-30 by chain chain-prompts-in-cards--docs-app-20260930-175729-5966, finding L1, LOW
+probe-key: f2bf8b27aa9596ace057e3fe46fe2a7ebc88ad55
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/
+
+## INV-6142 — probe — INV-6115: the absent-`asking` lift loss no longer reproduces
+
+INV-6115: the absent-`asking` lift loss no longer reproduces
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe && node /tmp/pipeline-reviews/prompts-in-cards--surfacing/athena-probes/owesword-ab.mjs
+expect: `… the chat's own plans lead the widget with the key present: YES; with it omitted: YES` and `coi-backend-conformance: position 2 of 8 with the key present, 2 of 8 with it omitted` — the row's `with it omitted: NO` / `8 of 8` no longer reproduce
+```
+
+measured 2026-09-30 by chain chain-prompts-in-cards--docs-app-20260930-175729-5966, finding L2, LOW
+probe-key: 29acaf82935d489d14e0a76cec0983ee4f84c0a0
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/
+
+## INV-6143 — probe — INV-6130: "four probes die before their scenario" no longer reproduces
+
+INV-6130: "four probes die before their scenario" no longer reproduces
+
+```probe
+bash /tmp/pipeline-reviews/plan-ask-survives-restart/athena-probes/{settle_throw,read_fail_silent,stale_token_flood,id_reuse}.sh
+expect: all four reach their own scenario, rc=0 — `still alive after the settle chain threw` / `process exit code 0`; `plan approved by the answer: false`; `store reads for 40 taps of ONE stale token: 1` and `extra store reads: 0`; `two different asks share one key …: false` — no TypeError at composition, so the row's "four probes die" no longer reproduces
+```
+
+measured 2026-09-30 by chain chain-prompts-in-cards--docs-app-20260930-175729-5966, finding L3, LOW
+probe-key: a8b0e04fefd37861c549129a8f30c94aef7d6428
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/

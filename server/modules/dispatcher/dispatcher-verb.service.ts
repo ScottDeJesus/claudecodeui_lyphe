@@ -139,7 +139,7 @@ export async function runDispatcherVerb(
     //
     // Residue, named: an output overflow has no signal and so lands on `spawn-failed`, the one
     // string-code case where something DID start. The vocabulary is sealed at two and mirrored
-    // client-side; `VERB_MAX_BUFFER` is what keeps that case unreachable rather than merely unlikely.
+    // client-side; `VERB_MAX_BUFFER` is what keeps that case out of reach rather than merely unlikely.
     const reason = typeof failure.signal === 'string' ? 'timeout' : 'spawn-failed';
     return {
       ok: false,

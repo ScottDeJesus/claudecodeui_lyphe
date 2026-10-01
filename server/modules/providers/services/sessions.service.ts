@@ -196,9 +196,10 @@ export const sessionsService = {
         projectDisplayName: resolveProjectDisplayName(projectPath, project?.custom_project_name),
         sessionTitle: session?.custom_name?.trim() || run.sessionId,
         lastActivity: session?.updated_at ?? session?.created_at ?? null,
-        // Read from the registry directly: `providerRuntimeService` imports this service.
+        // Read from the registry directly: `providerRuntimeService` imports this service. A gateway
+        // whose asks are pending in no chat lists nothing at all (the dispatcher's).
         awaitingInput: providerRegistry.listPermissionGateways().some(
-          (gateway) => gateway.listPending(run.sessionId).length > 0,
+          (gateway) => (gateway.listPending?.(run.sessionId) ?? []).length > 0,
         ),
       };
     });
@@ -218,9 +219,11 @@ export const sessionsService = {
   listAwaitingInputSessionIds(): string[] {
     const sessionIds = new Set<string>();
 
-    // Every holder of an ask — a provider's run, or a plan prompt the app raised in the chat itself.
+    // Every holder of an ask that is pending in a CHAT — a provider's run, or a runtime's own approval.
+    // The dispatcher's gateway is not one of them: a plan's prompt is answered on the plan's card and
+    // on the phone, and this mark is the chat's.
     for (const gateway of providerRegistry.listPermissionGateways()) {
-      for (const sessionId of gateway.listPendingSessions()) {
+      for (const sessionId of gateway.listPendingSessions?.() ?? []) {
         sessionIds.add(sessionId);
       }
     }

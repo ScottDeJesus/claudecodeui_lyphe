@@ -3,17 +3,18 @@ import type { DispatcherAsk } from '@/shared/types.js';
 import { each, field, isCount, isRecord, isText, names, need, oneOf } from './dispatcher-state.transport.js';
 
 /**
- * A plan's `asking` key, read field by field: the prompt CloudCLI has put up in the plan's owning
- * chat and is still waiting on (`hooks/dispatcher/ask.py:asking`).
+ * A plan's `asking` key, read field by field: the prompt CloudCLI has put up for the plan — on its
+ * card in the Runner tab and in the Runner widget — and is still waiting on
+ * (`hooks/dispatcher/ask.py:asking`).
  *
  * The plan reader's sibling, under every rule it states once (`dispatcher-plan.reader.ts`): the
  * document is printed whole by a process that has exited, so a key that does not read is a DIFFERENT
  * BUILD of the dispatcher and is refused by name. A made-up prompt is worse than none — its answer
- * runs `dispatcher accept` or `dispatcher tell`, so every word the panel shows and every verb it runs
+ * runs `dispatcher accept` or `dispatcher tell`, so every word the card shows and every verb it runs
  * has to be the document's own.
  *
  * READ TOLERANTLY AT THE TOP (`askingSince`): a dispatcher build older than the key writes none, and
- * that reads as "asking nothing" — the plan still draws, the panel stays empty and the Stop hold of
+ * that reads as "asking nothing" — the plan still draws, its card draws no ask and the Stop hold of
  * that build is what asks. A key that IS there and does not read is still refused.
  */
 

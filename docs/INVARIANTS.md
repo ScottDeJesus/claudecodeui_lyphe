@@ -179,3 +179,12 @@ measured 2026-09-26 by chain chain-runner-card-makeover--whole-20260926-210824-b
 probe-key: fc4abb9778d094436351a99d60c0a4b49ab42bcb
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/phaseWord.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/PlanCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/PlanPhaseRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/ScrollArea.tsx
+
+## INV-6114 — probe — the ask and landing probes answer api.github.com in the page
+
+`.verify/probe-card-ask.mjs`, `.verify/probe-runner-widget-list.mjs` and `.verify/probe-runner-landing.mjs` each answer `api.github.com` with an empty release (`context.route(GITHUB, …)`), 200 `{}`, registered before the page is created.
+- Trap: the app's update check is a GET to `api.github.com`; a route scoped to `**/api/**` (this origin's) lets it reach the real network.
+- Measured 2026-09-30: anonymous GitHub answered 403, its console error turned a correct build red (`0 console errors` fails); the landing probe went red ×2 at quota 0, green at quota 55.
+- Rule: a `.verify/` probe answers every host the page reaches that is not a read of this origin, before it counts console errors. A filter on the collected console lines is not the cure; the reading stays exact only when the request never leaves the page.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-card-ask.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-runner-landing.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-runner-widget-list.mjs

@@ -11,9 +11,9 @@ type QuestionTextFieldProps = {
 };
 
 /**
- * The typed half of an answer on the question card: the "Other" option's own words, or the note an
- * option that takes one asks for (a plan prompt's Rework — `needsNote`). Indented under the row that
- * opened it, with the Enter keycap inside its right edge. Used by chat's AskUserQuestionPanel.
+ * The typed half of an answer on the question card: the "Other" option's own words. Indented under
+ * the row that opened it, with the Enter keycap inside its right edge. Used by chat's
+ * AskUserQuestionPanel.
  *
  * Every key typed here is the field's: the card's own digits and Enter must not fire on a letter of
  * the sentence, so each keydown stops at the field, and Enter is handed to `onEnter` instead.

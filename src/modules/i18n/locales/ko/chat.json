@@ -332,13 +332,9 @@
   },
   "question": {
     "needsInput": "Claude가 입력을 기다리고 있습니다",
-    "planNeedsInput": "계획이 당신의 답을 기다립니다",
-    "collapse": "숨기기",
-    "expand": "열기",
     "selectAll": "해당하는 항목을 모두 선택",
     "other": "기타...",
     "otherPlaceholder": "답변을 입력하세요...",
-    "notePlaceholder": "메모 — 그대로 전송됩니다",
     "skip": "건너뛰기",
     "skipAll": "모두 건너뛰기",
     "back": "뒤로",

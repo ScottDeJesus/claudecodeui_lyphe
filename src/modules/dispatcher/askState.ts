@@ -40,7 +40,9 @@ export function lockOptions(ask: Extract<DispatcherAsk, { kind: 'accept' }>): { 
 }
 
 /**
- * Whether this plan owes the operator a word — `asking` set.
+ * Whether this plan owes the operator a word — `asking` set. A frame from a server older than that
+ * key carries NO `asking` at all, and a plan with none owes nothing: absent and `null` are ONE
+ * reading here, the same one `planAsking` (`useDispatcherPlans.ts`) and the lane's bell take.
  *
  * AN OWED WORD IS THE MOST URGENT STATE A CARD CAN BE IN, above every status (`STATUS_ORDER`). Live
  * means the work is moving; queued and parked mean a press is available whenever he wants it; an ask
@@ -50,7 +52,7 @@ export function lockOptions(ask: Extract<DispatcherAsk, { kind: 'accept' }>): { 
  * word comes up whatever else it is: done, parked, or older than everything beside it.
  */
 export function owesWord(plan: DispatcherPlan): boolean {
-  return plan.asking !== null;
+  return (plan.asking ?? null) !== null;
 }
 
 /**
@@ -73,7 +75,9 @@ export function arcAsks(plans: readonly DispatcherPlan[]): DispatcherAsk[] {
   const asks: DispatcherAsk[] = [];
   const seen = new Set<string>();
   for (const plan of plans) {
-    const ask = plan.asking;
+    // The absent key owes nothing, exactly as `owesWord` reads it: a frame from an older server draws
+    // a deck with no ask rather than throwing on `askIdentity(undefined)`.
+    const ask = plan.asking ?? null;
     if (ask === null) continue;
     const identity = askIdentity(ask);
     if (seen.has(identity)) continue;

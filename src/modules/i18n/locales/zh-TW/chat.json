@@ -349,13 +349,9 @@
   },
   "question": {
     "needsInput": "Claude 需要你的回答",
-    "planNeedsInput": "有個計畫在等你的答覆",
-    "collapse": "隱藏",
-    "expand": "開啟",
     "selectAll": "選擇所有適用項目",
     "other": "其他...",
     "otherPlaceholder": "輸入你的回答...",
-    "notePlaceholder": "你的備註 — 一字不改送出",
     "skip": "略過",
     "skipAll": "全部略過",
     "back": "上一步",

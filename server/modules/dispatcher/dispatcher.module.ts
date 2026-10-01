@@ -24,8 +24,9 @@ import { createDispatcherWatcher } from './dispatcher-watcher.service.js';
  * The dispatcher is the plan store's OWN owner — a SQLite store under `~/.claude/state/dispatcher`,
  * a daemon that walks one phase at a time, and a command that answers `status --json` (`hooks/
  * dispatcher/`). NOTHING HERE WRITES ANY OF IT. The lane reads one document, relays verbs, and puts
- * the prompts a plan owes the operator up in its owning chat's question panel — the ask recorded by the
- * dispatcher's own `ask` verb (`dispatcher-raise.service.ts`), shown from the document's `asking` key
+ * the prompts a plan owes the operator up on the plan's card in the Runner tab and in the Runner
+ * widget, and on his phone — the ask recorded by the dispatcher's own `ask` verb
+ * (`dispatcher-raise.service.ts`), shown from the document's `asking` key
  * (`dispatcher-asks.service.ts`), and answered through its own `accept` and `tell`. The dispatcher
  * decides what each verb means and prints its own refusal when it will not act. That division is the
  * whole design, and it is the reason no route in this module can put this server's words into the
@@ -114,7 +115,7 @@ export function createDispatcherModule(): DispatcherModule {
   const bin = expandHome(process.env.DISPATCHER_BIN || DEFAULT_BIN);
   const env = laneEnv();
 
-  /** Every frame this module's sockets carry: the lane's picture, and a chat prompt's own frames. */
+  /** Every frame this module's sockets carry: the lane's own picture, and nothing else. */
   const broadcast = (frame: object): void => {
     const message = JSON.stringify(frame);
     connectedClients.forEach((client) => {
@@ -176,7 +177,7 @@ export function createDispatcherModule(): DispatcherModule {
   });
 
   const commands = { bin, timeoutMs: VERB_TIMEOUT_MS, env };
-  const prompts = createDispatcherPrompts({ commands, broadcast, log: logErrorOnce });
+  const prompts = createDispatcherPrompts({ commands, log: logErrorOnce });
 
   const watcher = createDispatcherWatcher({
     // One subprocess, and the promise support in `polled-lane.service.ts` is what a tick does with

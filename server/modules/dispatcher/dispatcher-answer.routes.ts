@@ -97,7 +97,7 @@ export function createDispatcherAnswerRouter(dependencies: DispatcherAnswerRoute
       }
     }
 
-    // The one shape every door of this lane answers in: the panel's, the phone's and now the card's.
+    // The one shape every door of this lane answers in: the card's and the phone's.
     const decision: ProviderPermissionDecision = {
       allow: true,
       updatedInput: { answers, ...(notes === null ? {} : { notes }) },

@@ -11,7 +11,7 @@ import { firstLine } from './dispatcher-ask.transport.js';
  * - `accept` — Accept runs `dispatcher accept --lock <token> --by app:<door> <plans…>`, Queue the same
  *   with `--paused`. The token is the census he was shown, re-checked by the verb itself (`lock.stale`),
  *   so an Accept whose plans moved on since approves NOTHING and the current prompt is raised again.
- *   `--by` names his press — the card, the panel or the phone — in `approved_by`. A plan is approved ONCE per load
+ *   `--by` names his press — the card or the phone — in `approved_by`. A plan is approved ONCE per load
  *   (`store.approve`): an Accept that reaches a plan already approved approves nothing and exits
  *   `ACCEPT_ALREADY_APPROVED_EXIT`, which is an answer that arrived second — `already-answered`, never a
  *   refusal to put the prompt back for.
@@ -41,12 +41,12 @@ export type AskReply =
   | { kind: 'answers'; brief: string };
 
 /**
- * Which door the press came through — named in `approved_by` (`app:panel`, `app:card`, `app:phone`).
- * `'card'` is the plan's own card in the Runner tab and the Runner widget, which answers over its
- * own HTTP door (`dispatcher-answer.routes.ts`) rather than through the chat's gateway; `'panel'`
- * leaves when the chat stops asking.
+ * Which door the press came through — named in `approved_by` (`app:card`, `app:phone`). `'card'` is
+ * the plan's own card in the Runner tab and the Runner widget, which answers over its own HTTP door
+ * (`dispatcher-answer.routes.ts`) rather than through a runtime's gateway; `'phone'` is a push's
+ * button, which walks that gateway (`ntfy-action.routes.ts`).
  */
-export type AnswerDoor = 'panel' | 'card' | 'phone';
+export type AnswerDoor = 'card' | 'phone';
 
 /** One carried answer: what the dispatcher did, and its own first line saying so (`''` when it said nothing). */
 export type CarriedAnswer = { outcome: DispatcherAnswerOutcome; said: string };
@@ -58,9 +58,9 @@ function textAt(map: unknown, question: string): string {
 }
 
 /**
- * The reply a panel or phone decision carries for `ask`, or `null` when it carries none.
+ * The reply a card or phone decision carries for `ask`, or `null` when it carries none.
  *
- * The panel answers in `updatedInput.answers` (question text → chosen label), and a Rework's notes ride
+ * The card answers in `updatedInput.answers` (question text → chosen label), and a Rework's notes ride
  * beside them in `updatedInput.notes` under the same question — the option that takes a note opens a
  * field for it (`needsNote`). The phone answers the same shape with a label alone, and its Rework
  * button opens the app instead, because a button cannot carry the notes. Used by

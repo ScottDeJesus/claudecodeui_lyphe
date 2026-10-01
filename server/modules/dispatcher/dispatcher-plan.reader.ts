@@ -180,9 +180,9 @@ export function planOf(raw: unknown): DocumentPlan {
     // so a dispatcher build older than the field draws its cards' gate verb rather than blank ones.
     launched: flagSince(field(plan, 'launched'), 'plan.launched'),
     approved: approvedOf(field(plan, 'approved')),
-    // The prompt CloudCLI has put up in this plan's owning chat and is waiting on — the one key the
-    // question panel is projected from (`dispatcher-asks.service.ts`). Tolerant for a build older
-    // than it, which asks nothing.
+    // The prompt CloudCLI has put up for this plan and is waiting on — the one key the plan's card is
+    // drawn from and the book is raised off (`dispatcher-asks.service.ts`). Tolerant for a build
+    // older than it, which asks nothing.
     asking: askingSince(field(plan, 'asking'), `asking of ${name}`),
     waits_on: names(field(plan, 'waits_on'), 'plan.waits_on'),
     schedule: scheduleOf(field(plan, 'schedule')),

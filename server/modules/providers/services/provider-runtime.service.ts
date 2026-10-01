@@ -115,7 +115,9 @@ export function createProviderRuntimeService(
     },
 
     getPendingApprovalsForSession(sessionId: string): unknown[] {
-      return dependencies.listPermissionGateways().flatMap((gateway) => gateway.listPending(sessionId));
+      // A gateway whose asks are pending in no chat has no `listPending` at all (the dispatcher's,
+      // whose plan prompts are answered on the card and on the phone), so it lists nothing here.
+      return dependencies.listPermissionGateways().flatMap((gateway) => gateway.listPending?.(sessionId) ?? []);
     },
   };
 }

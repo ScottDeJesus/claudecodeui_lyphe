@@ -6,7 +6,7 @@ import type { DispatcherAsk } from '@/shared/types.js';
 import { askingSince } from './dispatcher-ask.reader.js';
 
 /**
- * The subprocess side of the prompts this lane raises in a chat: `dispatcher ask <plan>`, which records
+ * The subprocess side of the prompts this lane raises: `dispatcher ask <plan>`, which records
  * the ask in the store, and the two doors an answer goes through — `dispatcher accept` and `dispatcher
  * tell --brief -` — run with the operator's words on stdin.
  *

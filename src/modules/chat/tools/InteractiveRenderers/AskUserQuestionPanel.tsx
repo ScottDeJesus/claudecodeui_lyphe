@@ -1,11 +1,11 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ChevronDown, ChevronLeft } from 'lucide-react';
+import { ChevronLeft } from 'lucide-react';
 
 import { useHostWindow } from '@/shared/context/HostWindowContext';
 import type { PermissionPanelProps, Question } from '@/shared/types';
 import { Badge, Button, Card, QuestionOptionRow } from '@/shared/ui';
-import { cn, isElementLike } from '@/shared/utils';
+import { isElementLike } from '@/shared/utils';
 import { QuestionText } from '@/modules/chat/tools/ContentRenderers/QuestionText';
 import { QuestionTextField } from '@/modules/chat/tools/InteractiveRenderers/QuestionTextField';
 
@@ -41,31 +41,13 @@ const holdsDraft = (element: Element | null): boolean => {
   return false;
 };
 
-/** The label of the option on `question` that takes the operator's note (`needsNote`), or null. */
-const noteOptionOf = (question: Question | undefined): string | null =>
-  question?.options.find((option) => option.needsNote)?.label ?? null;
-
 /**
- * The answer panel for an AskUserQuestion request. Rendered by chat's QuestionAnswerContent inline in
- * the transcript, and by PermissionRequestsBanner above the composer for a STANDALONE ask — a plan's
- * prompt the app raised itself, which no transcript row carries. A standalone ask is the operator's
- * word owed, so it offers no Skip: it stays up until he answers it.
- *
- * A STANDALONE CARD IS BOUNDED (half the dynamic viewport): it sits in the composer shell, outside the
- * scrolling transcript, so a real prompt — the plan's description above ten phases and more — grew it past the screen and took
- * Submit and the composer with it (measured 2026-09-29: a 1245 px card on a 390×844 phone). Its header
- * and footer stay put and everything between scrolls inside the card — the prompt is never shortened,
- * because the lock token pins what the operator sees. `onCollapse` folds it to a one-line bar
- * (`PermissionRequestsBanner`) without answering it: the plan still owes, and one tap re-opens it.
- *
- * AN OPTION THAT TAKES A NOTE (`needsNote` — a plan prompt's Rework) opens a field under the options
- * when chosen, and the answer is not ready until the note has words; the note rides beside the answers
- * as `notes`, keyed by the question. That question offers no "Other…": the note IS its typed answer.
+ * The answer panel for an AskUserQuestion request: a run's own question, drawn inline in the
+ * transcript by chat's QuestionAnswerContent — the row the run's tool call left behind.
  */
-export const AskUserQuestionPanel: React.FC<PermissionPanelProps & { onCollapse?: () => void }> = ({
+export const AskUserQuestionPanel: React.FC<PermissionPanelProps> = ({
   request,
   onDecision,
-  onCollapse,
 }) => {
   const { t } = useTranslation('chat');
   // The window the panel is drawn in: its entrance frame and its Escape listener belong to it, not
@@ -78,8 +60,6 @@ export const AskUserQuestionPanel: React.FC<PermissionPanelProps & { onCollapse?
   const [selections, setSelections] = useState<Map<number, Set<string>>>(() => new Map());
   const [otherTexts, setOtherTexts] = useState<Map<number, string>>(() => new Map());
   const [otherActive, setOtherActive] = useState<Map<number, boolean>>(() => new Map());
-  const [noteTexts, setNoteTexts] = useState<Map<number, string>>(() => new Map());
-  const standalone = request.standalone === true;
   const [mounted, setMounted] = useState(false);
 
   const containerRef = useRef<HTMLDivElement>(null);
@@ -115,13 +95,6 @@ export const AskUserQuestionPanel: React.FC<PermissionPanelProps & { onCollapse?
       otherInputRef.current?.focus();
     }
   }, [otherActive, currentStep]);
-
-  // The note a chosen note-taking option asks for takes the focus, as the "Other" field does.
-  const stepNoteOption = noteOptionOf(questions[currentStep]);
-  const noteChosen = stepNoteOption !== null && (selections.get(currentStep)?.has(stepNoteOption) ?? false);
-  useEffect(() => {
-    if (noteChosen) otherInputRef.current?.focus();
-  }, [noteChosen, currentStep]);
 
   const toggleOption = useCallback((qIdx: number, label: string, multiSelect: boolean) => {
     setSelections(prev => {
@@ -168,22 +141,9 @@ export const AskUserQuestionPanel: React.FC<PermissionPanelProps & { onCollapse?
     return answers;
   }, [questions, selections, otherActive, otherTexts]);
 
-  /** The note each question's chosen note-taking option carries, keyed by its question — omitted when none do. */
-  const buildNotes = useCallback(() => {
-    const notes: Record<string, string> = {};
-    questions.forEach((q, idx) => {
-      const noteOption = noteOptionOf(q);
-      const text = (noteTexts.get(idx) || '').trim();
-      if (noteOption && selections.get(idx)?.has(noteOption) && text) notes[q.question] = text;
-    });
-    return notes;
-  }, [questions, selections, noteTexts]);
-
   const handleSubmit = useCallback(() => {
-    const notes = buildNotes();
-    const answers = { answers: buildAnswers(), ...(Object.keys(notes).length > 0 ? { notes } : {}) };
-    onDecision(request.requestId, { allow: true, updatedInput: { ...input, ...answers } });
-  }, [onDecision, request.requestId, input, buildAnswers, buildNotes]);
+    onDecision(request.requestId, { allow: true, updatedInput: { ...input, answers: buildAnswers() } });
+  }, [onDecision, request.requestId, input, buildAnswers]);
 
   const handleSkip = useCallback(() => {
     onDecision(request.requestId, { allow: true, updatedInput: { ...input, answers: {} } });
@@ -191,7 +151,7 @@ export const AskUserQuestionPanel: React.FC<PermissionPanelProps & { onCollapse?
 
   // Keyboard handler for number keys and navigation
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
-    // Don't capture keys when typing in a text field ("Other", or a note)
+    // Don't capture keys when typing in the "Other" field
     if (isElementLike(e.target) && e.target.tagName === 'INPUT') return;
 
     const q = questions[currentStep];
@@ -207,27 +167,22 @@ export const AskUserQuestionPanel: React.FC<PermissionPanelProps & { onCollapse?
       return;
     }
 
-    // 0 for "Other" — a question whose note is its typed answer has none
-    if (e.key === '0' && !noteOptionOf(q)) {
+    // 0 for "Other"
+    if (e.key === '0') {
       e.preventDefault();
       toggleOther(currentStep, multi);
       return;
     }
 
-    // Enter to advance / submit — or, on a chosen note-taking option with no note yet, into its field
+    // Enter to advance / submit
     if (e.key === 'Enter') {
       e.preventDefault();
-      const stepNote = noteOptionOf(q);
-      if (stepNote && selections.get(currentStep)?.has(stepNote) && !(noteTexts.get(currentStep) || '').trim()) {
-        otherInputRef.current?.focus();
-        return;
-      }
       const isLast = currentStep === questions.length - 1;
       if (isLast) handleSubmit();
       else setCurrentStep(s => s + 1);
       return;
     }
-  }, [currentStep, questions, selections, noteTexts, toggleOption, toggleOther, handleSubmit]);
+  }, [currentStep, questions, toggleOption, toggleOther, handleSubmit]);
 
   // Escape skips — from a window-level CAPTURE listener, the shape the accounts panel uses
   // (docs/MANUAL.md (accounts)). ChatInterface aborts the running turn from a document-level capture
@@ -237,7 +192,6 @@ export const AskUserQuestionPanel: React.FC<PermissionPanelProps & { onCollapse?
   // field it is "back out of this field", never "skip every question and discard what I typed"
   // — marked, so the run survives, and nothing more.
   useEffect(() => {
-    if (standalone) return;
     const onEscape = (event: KeyboardEvent) => {
       if (event.key !== 'Escape' || event.repeat) return;
       const focused = hostWindow.document.activeElement;
@@ -248,7 +202,7 @@ export const AskUserQuestionPanel: React.FC<PermissionPanelProps & { onCollapse?
     };
     hostWindow.addEventListener('keydown', onEscape, { capture: true });
     return () => hostWindow.removeEventListener('keydown', onEscape, { capture: true });
-  }, [handleSkip, standalone, hostWindow]);
+  }, [handleSkip, hostWindow]);
 
   if (questions.length === 0) return null;
 
@@ -260,13 +214,7 @@ export const AskUserQuestionPanel: React.FC<PermissionPanelProps & { onCollapse?
   const isOtherOn = otherActive.get(currentStep) || false;
   const isLast = currentStep === total - 1;
   const isFirst = currentStep === 0;
-  const noteOption = noteOptionOf(q);
-  const isNoteOn = noteOption !== null && selected.has(noteOption);
-  const noteText = noteTexts.get(currentStep) || '';
-  // A chosen note-taking option is not an answer until its note has words.
-  const hasCurrentSelection = isNoteOn
-    ? noteText.trim().length > 0
-    : selected.size > 0 || (isOtherOn && (otherTexts.get(currentStep) || '').trim().length > 0);
+  const hasCurrentSelection = selected.size > 0 || (isOtherOn && (otherTexts.get(currentStep) || '').trim().length > 0);
   const advance = () => (isLast ? handleSubmit() : setCurrentStep((step) => step + 1));
 
   // Keyboard help, so it gives way below `sm`: with it, "Skip all · Back · Submit" in German or
@@ -283,35 +231,23 @@ export const AskUserQuestionPanel: React.FC<PermissionPanelProps & { onCollapse?
         mounted ? 'translate-y-0 opacity-100' : 'translate-y-3 opacity-0'
       }`}
     >
-      <Card className={cn('overflow-hidden shadow-none', standalone && 'flex max-h-[50dvh] flex-col')}>
+      <Card className="overflow-hidden shadow-none">
         {/* Header: who is asking and about what. */}
         <div className="flex-shrink-0 px-3 pt-3 sm:px-4">
           <div className="mb-2 flex min-w-0 items-center gap-2">
             {/* Pending, in the frame's "Waiting for you" tone. */}
             <span aria-hidden className="vv-pulse h-2 w-2 flex-shrink-0 rounded-full bg-warn-ink" />
             <span className="truncate text-xs font-medium uppercase tracking-[0.14em] text-ink-faint">
-              {standalone
-                ? t('question.planNeedsInput', { defaultValue: 'A plan needs your word' })
-                : t('question.needsInput', { defaultValue: 'Claude needs your input' })}
+              {t('question.needsInput', { defaultValue: 'Claude needs your input' })}
             </span>
             {q.header && (
               <Badge as="span" tone="neutral" className="vv-badge--compact flex-shrink-0 uppercase tracking-wider">
                 {q.header}
               </Badge>
             )}
-            {(!isSingle || onCollapse) && (
-              <span className="ml-auto flex flex-shrink-0 items-center gap-1">
-                {!isSingle && (
-                  <span className="text-xs tabular-nums text-ink-faint">
-                    {currentStep + 1}/{total}
-                  </span>
-                )}
-                {onCollapse && (
-                  <Button type="button" variant="ghost" size="sm" onClick={onCollapse} className="h-7 px-2 text-xs text-muted-foreground">
-                    {t('question.collapse', { defaultValue: 'Hide' })}
-                    <ChevronDown aria-hidden />
-                  </Button>
-                )}
+            {!isSingle && (
+              <span className="ml-auto flex-shrink-0 text-xs tabular-nums text-ink-faint">
+                {currentStep + 1}/{total}
               </span>
             )}
           </div>
@@ -334,9 +270,8 @@ export const AskUserQuestionPanel: React.FC<PermissionPanelProps & { onCollapse?
           )}
         </div>
 
-        {/* The body: the question in body type, its options and the typed half of the answer. On a
-            standalone card it is the ONE region that scrolls, between a header and a footer that stay. */}
-        <div className={cn(standalone && 'scrollbar-thin min-h-0 flex-1 overflow-y-auto overscroll-contain')}>
+        {/* The body: the question in body type, its options and the typed half of the answer. */}
+        <div>
           <div className="px-3 pb-2 sm:px-4">
             <QuestionText text={q.question} />
             {multi && (
@@ -348,7 +283,7 @@ export const AskUserQuestionPanel: React.FC<PermissionPanelProps & { onCollapse?
 
           {/* Options. Inline, only the LIST scrolls past twelve rem; the "Other" row and its field sit in
               their own block below, so nothing a person types into is ever clipped. */}
-          <div className={cn('px-3 sm:px-4', !standalone && 'scrollbar-thin max-h-48 overflow-y-auto')} role={multi ? 'group' : 'radiogroup'} aria-label={q.question}>
+          <div className="scrollbar-thin max-h-48 overflow-y-auto px-3 sm:px-4" role={multi ? 'group' : 'radiogroup'} aria-label={q.question}>
             <div className="space-y-1.5">
               {q.options.map((opt, optIdx) => (
                 <QuestionOptionRow
@@ -366,20 +301,17 @@ export const AskUserQuestionPanel: React.FC<PermissionPanelProps & { onCollapse?
 
           {/* The typed half of the answer — outside the scroller above. Inside it, with three or more
               options, the field landed below the twelve-rem fold and was clipped against the footer's
-              Submit button, hiding the lower half of what was being typed. Measured 2026-09-10. A
-              question whose option takes a note offers that note here instead of "Other". */}
+              Submit button, hiding the lower half of what was being typed. Measured 2026-09-10. */}
           <div className="space-y-1.5 px-3 pb-3 pt-1.5 sm:px-4">
-            {noteOption === null && (
-              <QuestionOptionRow
-                label={t('question.other', { defaultValue: 'Other...' })}
-                selected={isOtherOn}
-                keyHint="0"
-                dashed
-                onClick={() => toggleOther(currentStep, multi)}
-              />
-            )}
+            <QuestionOptionRow
+              label={t('question.other', { defaultValue: 'Other...' })}
+              selected={isOtherOn}
+              keyHint="0"
+              dashed
+              onClick={() => toggleOther(currentStep, multi)}
+            />
 
-            {noteOption === null && isOtherOn && (
+            {isOtherOn && (
               <QuestionTextField
                 ref={otherInputRef}
                 value={otherTexts.get(currentStep) || ''}
@@ -388,27 +320,15 @@ export const AskUserQuestionPanel: React.FC<PermissionPanelProps & { onCollapse?
                 placeholder={t('question.otherPlaceholder', { defaultValue: 'Type your answer...' })}
               />
             )}
-
-            {isNoteOn && (
-              <QuestionTextField
-                ref={otherInputRef}
-                value={noteText}
-                onChange={(text) => setNoteTexts((prev) => new Map(prev).set(currentStep, text))}
-                onEnter={() => { if (noteText.trim()) advance(); }}
-                placeholder={t('question.notePlaceholder', { defaultValue: 'Your notes — sent word for word' })}
-              />
-            )}
           </div>
         </div>
 
         {/* Footer */}
         <div className="flex flex-shrink-0 flex-wrap items-center justify-between gap-2 border-t border-border bg-muted/40 px-3 py-2 sm:px-4">
-          {!standalone && (
-            <Button type="button" variant="ghost" size="sm" onClick={handleSkip} className="h-8 px-2 text-muted-foreground">
-              {isSingle ? t('question.skip', { defaultValue: 'Skip' }) : t('question.skipAll', { defaultValue: 'Skip all' })}
-              <span className={keyHintClass}>Esc</span>
-            </Button>
-          )}
+          <Button type="button" variant="ghost" size="sm" onClick={handleSkip} className="h-8 px-2 text-muted-foreground">
+            {isSingle ? t('question.skip', { defaultValue: 'Skip' }) : t('question.skipAll', { defaultValue: 'Skip all' })}
+            <span className={keyHintClass}>Esc</span>
+          </Button>
 
           <div className="ml-auto flex items-center gap-1.5">
             {!isSingle && !isFirst && (
@@ -423,7 +343,7 @@ export const AskUserQuestionPanel: React.FC<PermissionPanelProps & { onCollapse?
                 type="button"
                 size="sm"
                 onClick={handleSubmit}
-                disabled={isNoteOn ? !hasCurrentSelection : !hasCurrentSelection && !Object.keys(buildAnswers()).length}
+                disabled={!hasCurrentSelection && !Object.keys(buildAnswers()).length}
                 className="h-8 px-3.5"
               >
                 {t('question.submit', { defaultValue: 'Submit' })}

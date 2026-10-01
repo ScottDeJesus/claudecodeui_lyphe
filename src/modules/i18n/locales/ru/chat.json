@@ -313,13 +313,9 @@
   },
   "question": {
     "needsInput": "Claude ждёт вашего ответа",
-    "planNeedsInput": "План ждёт вашего решения",
-    "collapse": "Скрыть",
-    "expand": "Открыть",
     "selectAll": "Выберите все подходящие",
     "other": "Другое...",
     "otherPlaceholder": "Введите ответ...",
-    "notePlaceholder": "Ваши заметки — отправляются дословно",
     "skip": "Пропустить",
     "skipAll": "Пропустить все",
     "back": "Назад",

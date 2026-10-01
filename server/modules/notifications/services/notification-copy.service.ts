@@ -218,7 +218,7 @@ function permissionCopy(meta: Record<string, unknown>): { headline: string; body
   const toolInput = isRecord(meta.toolInput) ? meta.toolInput : null;
 
   if (toolName === 'AskUserQuestion') {
-    // A plan's prompt, raised by the app itself in the plan's owning chat (`dispatcher-asks.service.ts`):
+    // A plan's prompt, raised by the app itself on the plan's card (`dispatcher-asks.service.ts`):
     // the headline names the plan, since no model is the one asking.
     const plan = readText(meta.plan);
     if (plan) {

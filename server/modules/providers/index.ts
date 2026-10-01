@@ -30,6 +30,7 @@ export type { LiveHost } from './list/claude/session-host/index.js';
 // Claude keeps it.
 export { readClaudeTranscriptBySessionId } from './list/claude/claude-transcript-activity.js';
 
-// registerPermissionGateway: used by the dispatcher module to answer, list and mark the plan prompts it
-// raises in a chat through the same doors a tool approval uses (the panel, the phone, the sidebar dot).
+// registerPermissionGateway: used by the dispatcher module so a phone's tap on a plan's prompt goes
+// through the same doors a tool approval uses (an answer, a recall). It lists NOTHING: a plan's prompt
+// is pending in no chat, so no chat lists it and no sidebar dot marks it.
 export { registerPermissionGateway } from './provider.registry.js';

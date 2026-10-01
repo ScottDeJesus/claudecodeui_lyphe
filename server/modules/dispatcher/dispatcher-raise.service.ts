@@ -1,18 +1,19 @@
 import type { DispatcherPlan, DispatcherStateEvent } from '@/shared/types.js';
 
 /**
- * The raise: a plan that lands owing the OPERATOR's word has its prompt put up in its owning chat.
+ * The raise: a plan that lands owing the OPERATOR's word has its ask recorded and its prompt put up —
+ * on the plan's card in the Runner tab and in the Runner widget, and on his phone.
  *
  * WHAT IT IS FOR. A plan's Accept prompt, or its designer's questions, is the operator's to answer —
  * and on 2026-09-28 one sat in `questions` until he asked for it himself ("I didnt get that
  * question until i asked"). So the moment a landing owes his word, this lane asks the dispatcher to
- * record the ask (`dispatcher ask <plan>`, `hooks/dispatcher/ask.py`), and the chat's question panel
- * shows it at once — the verb prints the ask it recorded, which every later picture's `asking` key
- * carries too (`dispatcher-asks.service.ts`): the SAME panel and the
- * SAME `permission.required` push an `AskUserQuestion` gets, whether the chat is idle, mid-reply or
- * closed. No model is involved in asking, no turn is spent, and nothing is written into the
- * transcript in his name. The ask is recorded in the STORE — `prompted_at` and an `asked` event — so
- * the Stop hold stands down for it (`owed.kind`), and a restart finds it again.
+ * record the ask (`dispatcher ask <plan>`, `hooks/dispatcher/ask.py`), and the card draws it at once
+ * off the frame — the verb prints the ask it recorded, which every later picture's `asking` key
+ * carries too (`dispatcher-asks.service.ts`): the SAME `permission.required` push an `AskUserQuestion`
+ * gets, and a card and a phone that need no chat — the chat the plan names may be idle, mid-reply or
+ * closed, and the prompt stands. No model is involved in asking, no turn is spent, and nothing is
+ * written into the transcript in his name. The ask is recorded in the STORE — `prompted_at` and an
+ * `asked` event — so the Stop hold stands down for it (`owed.kind`), and a restart finds it again.
  *
  * ONE MARK PER PLAN, durable across handovers. The store's `events` ids come from one global sequence
  * (`hooks/dispatcher/report.py`), so a mark is a plan's own newest ANSWERED landing id. The endings'
@@ -30,8 +31,7 @@ import type { DispatcherPlan, DispatcherStateEvent } from '@/shared/types.js';
  * - The dispatcher did not answer at all. That is not an answer.
  *
  * Every other answer marks the landing: the ask was recorded; nothing is owed; or the debt is one this
- * lane cannot raise — a session the app does not know, a plan no Eupalinos designed — which is logged
- * once and left where it was, on the owning session's own Stop hold.
+ * lane cannot raise — a plan no Eupalinos designed — which is logged once and left where it was.
  *
  * THE MARK IS READ AGAIN JUST BEFORE IT IS WRITTEN, for the reason `dispatcher-endings.service.ts`
  * states: a dev-server handover runs two servers over one store, and an id at or below what the other
@@ -42,17 +42,16 @@ import type { DispatcherPlan, DispatcherStateEvent } from '@/shared/types.js';
 
 /**
  * What became of one raise: the ask recorded (`raised`), nothing owed right now (`nothing`), or a
- * debt this lane cannot raise and the Stop hold keeps (`refused` — the dispatcher's word — or
- * `unreachable`, the owning session unknown here).
+ * debt this lane cannot raise and the Stop hold keeps (`refused`, in the dispatcher's own word).
  */
-export type RaiseOutcome = 'raised' | 'nothing' | 'refused' | 'unreachable';
+export type RaiseOutcome = 'raised' | 'nothing' | 'refused';
 
 export type DispatcherRaiseDependencies = {
   /** Every plan's mark — the highest landing id already answered for it — or `null` when this database has never raised through the store. */
   readMarks: () => ReadonlyMap<string, number> | null;
   /** Writes the marks back whole: the durable copy is the caller's, and this file keeps no state of its own. */
   writeMarks: (marks: ReadonlyMap<string, number>) => void;
-  /** Puts `plan`'s owed prompt up in its owning chat, or says why not; THROWS when the dispatcher did not answer. */
+  /** Records `plan`'s owed ask and puts its prompt up, or says why not; THROWS when the dispatcher did not answer. */
   raise: (plan: DispatcherPlan) => Promise<RaiseOutcome>;
   /** Injected by the composition root — this server has no logger (see `polled-lane.service.ts`). */
   log: (message: string) => void;

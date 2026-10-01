@@ -6,21 +6,21 @@ import type { DispatcherAsk, DispatcherCardAnswer, DispatcherPlan, DispatcherSta
 import { carryReply } from './dispatcher-answer.service.js';
 import { runDispatcherAsk, runDispatcherCommand } from './dispatcher-ask.transport.js';
 import { createDispatcherAsks } from './dispatcher-asks.service.js';
-import type { AskChat } from './dispatcher-asks.service.js';
+import type { AskSession } from './dispatcher-asks.service.js';
 import { createDispatcherRaiser } from './dispatcher-raise.service.js';
 import { readDispatcherState } from './dispatcher-state.service.js';
 
 /**
- * The prompts a plan owes the operator, put up in its owning chat — the composition of the raise
+ * The prompts a plan owes the operator, raised on the plan's card — the composition of the raise
  * (`dispatcher-raise.service.ts`: a landing that owes his word has its ask recorded by the dispatcher's
- * own `ask` verb), the projection of every open ask onto the question panel, the phone and the
- * sidebar's mark (`dispatcher-asks.service.ts`), and the doors his answer goes back through
+ * own `ask` verb), of the book of the open asks for the phone's push and buttons and for the card's
+ * door (`dispatcher-asks.service.ts`), and of the doors his answer goes back through
  * (`dispatcher-answer.service.ts`).
  *
  * A composition root of its own, under `dispatcher.module.ts`, for the reason that file's head gives:
  * this is where the database, the notification orchestrator and the provider registry are named, so
- * everything beneath takes them as arguments. The lane's own root hands down the three things it
- * owns — the dispatcher command, the socket broadcast, and the journal.
+ * everything beneath takes them as arguments. The lane's own root hands down the two things it
+ * owns — the dispatcher command and the journal.
  */
 
 /** The `app_config` key holding each plan's newest LANDING already raised for — durable for the endings' reason (`dispatcher-endings.service.ts`), per plan for the raise's (`dispatcher-raise.service.ts`). */
@@ -30,11 +30,12 @@ const RAISED_THROUGH_KEY = 'dispatcher_raised_through';
  * The orchestrator is JavaScript, so TypeScript reads `dedupeKey = null` and `sessionId = null` as
  * parameters that accept only `null` — too narrow to be cast to directly, hence through `unknown`. This
  * alias states the contract it implements for the push a raised prompt earns: the same event a
- * provider's own `AskUserQuestion` raises.
+ * provider's own `AskUserQuestion` raises. `sessionId` is `null` for a plan whose session this server
+ * does not know — the push is the phone's, and the phone needs no chat to tap it.
  */
 const buildPromptEvent = createNotificationEvent as unknown as (input: {
   provider: string;
-  sessionId: string;
+  sessionId: string | null;
   kind: 'action_required';
   code: 'permission.required';
   meta: Record<string, unknown>;
@@ -46,8 +47,6 @@ const buildPromptEvent = createNotificationEvent as unknown as (input: {
 export type DispatcherPromptsDependencies = {
   /** The dispatcher command as every verb of the lane runs it: its binary, its ceiling, its environment. */
   commands: { bin: string; timeoutMs: number; env: NodeJS.ProcessEnv };
-  /** One frame to every open socket. */
-  broadcast: (frame: object) => void;
   /** The lane's once-per-message journal (`dispatcher.module.ts`). */
   log: (message: string) => void;
 };
@@ -91,12 +90,13 @@ export function createDispatcherPrompts(dependencies: DispatcherPromptsDependenc
   };
 
   /**
-   * The chat a plan's prompt is shown in: its owning session, resolved to this app's own. RESOLVED OR
-   * NOTHING, never guessed — `plan.session_app_id` is `null` when the plan names no session, and an id
-   * no row carries resolves to itself (`sessions.db.ts`'s `resolveAppSessionId`) and is caught by the
-   * lookup. Either way this server cannot show the prompt, and the owning session's Stop hold keeps it.
+   * The session a plan's prompt belongs to: its owning session, resolved to this app's own. RESOLVED
+   * OR NOTHING, never guessed — `plan.session_app_id` is `null` when the plan names no session, and an
+   * id no row carries resolves to itself (`sessions.db.ts`'s `resolveAppSessionId`) and is caught by
+   * the lookup. Either way the ask is raised with NO session at all (`provider: 'system'`): the plan's
+   * card and the phone are where it is answered, and neither needs a chat.
    */
-  const chatFor = (plan: DispatcherPlan): AskChat | null => {
+  const sessionOf = (plan: DispatcherPlan): AskSession | null => {
     if (plan.session_app_id === null) return null;
     const session = sessionsDb.getSessionById(plan.session_app_id);
     if (!session || !session.provider) return null;
@@ -104,8 +104,7 @@ export function createDispatcherPrompts(dependencies: DispatcherPromptsDependenc
   };
 
   const asks = createDispatcherAsks({
-    chatFor,
-    broadcast: dependencies.broadcast,
+    sessionOf,
     // The push an `AskUserQuestion` gets, to every active user — a plan belongs to no login — each
     // user's own switches and channels deciding what reaches them. The key carries the user for the
     // endings' reason: the orchestrator's dedupe is process-wide.
@@ -147,21 +146,18 @@ export function createDispatcherPrompts(dependencies: DispatcherPromptsDependenc
   const raiser = createDispatcherRaiser({
     readMarks: raisedMarks.read,
     writeMarks: raisedMarks.write,
-    // The chat is checked FIRST: an ask recorded for a session this server cannot show would stand
-    // the owning session's Stop hold down over a prompt nobody sees.
+    // EVERY landing that owes a word is asked for, whatever session the plan names: the card and the
+    // phone are where it is answered, and a plan this server knows no session for owes its word all
+    // the same.
     raise: async (plan) => {
-      if (chatFor(plan) === null) {
-        log(`[Dispatcher] no prompt raised for ${plan.name}: its session is not one this server knows — its Stop hold keeps whatever it owes`);
-        return 'unreachable';
-      }
       const answer = await runDispatcherAsk(commands, plan.name);
       if (answer.outcome === 'refused') {
         log(`[Dispatcher] ${answer.line} — its Stop hold keeps it`);
         return 'refused';
       }
       if (answer.outcome === 'nothing') return 'nothing';
-      // Up in the chat the moment it is recorded — the tick that saw the landing — rather than on the
-      // next picture's `asking`, which then carries the same ask.
+      // Raised the moment it is recorded — the tick that saw the landing — rather than on the next
+      // picture's `asking`, which then carries the same ask.
       if (answer.ask !== null) asks.show(plan, answer.ask);
       return 'raised';
     },
@@ -170,14 +166,14 @@ export function createDispatcherPrompts(dependencies: DispatcherPromptsDependenc
 
   return {
     // The raise is called bare because it never throws — its pass runs on a promise it logs itself —
-    // and it reads the FRAME, whose outings are what it holds a landing back on. The chats' prompts
-    // are a projection of the same frame's `asking`, and a fault there never costs the tabs their frame.
+    // and it reads the FRAME, whose outings are what it holds a landing back on. The book of the open
+    // asks is raised off the same frame's `asking`, and a fault there never costs the tabs their frame.
     observe: (frame) => {
       raiser.observe(frame);
       try {
         asks.observe(frame);
       } catch (error) {
-        log(`[Dispatcher] could not show a plan's prompt: ${error instanceof Error ? error.message : String(error)}`);
+        log(`[Dispatcher] could not bring a plan's prompt up: ${error instanceof Error ? error.message : String(error)}`);
       }
     },
     stop: unregisterAsks,

@@ -1324,15 +1324,7 @@ that is deliberately waiting on a person. The wait itself has no timeout for an 
 through either caller; an ordinary tool's wait is `CLAUDE_TOOL_APPROVAL_TIMEOUT_MS` and the
 runtime denies the tool when it runs out.
 
-**A third asker belongs to no run: the app itself.** A plan that lands owing the operator's word has
-its Accept prompt or its designer's questions put up in the plan's owning chat by the dispatcher lane
-(`server/modules/dispatcher/dispatcher-asks.service.ts`, MAN-7400) — an `AskUserQuestion`-shaped
-`permission_request` with `standalone: true`, broadcast to every socket, and the same
-`permission.required` push. Its asks are held by a permission gateway the lane registers with the
-provider registry (`registerPermissionGateway`), and `providerRegistry.listPermissionGateways()` is the
-one list every reader walks — `chat.subscribe`'s `pendingPermissions`, an answer from the panel or a
-phone tap (`resolveToolApproval` stops at the first gateway that claims the key and warns once when
-none does — this one claims every key of its own, held or not, and settles it from the store, MAN-7400), and the sidebar's waiting mark. It answers through the dispatcher's own verbs, never a run. Its `requestId` is derived from the store's record of the ask, never minted, so it names the same ask in every process: the id a tab holds across a handover is still the ask's, and a re-issue is the same request rather than a new one.
+**The app itself asks no chat.** A plan that lands owing the operator's word has its Accept prompt or its designer's questions drawn on the plan's card and pushed to the phone by the dispatcher lane (`server/modules/dispatcher/dispatcher-asks.service.ts`, MAN-7400), never raised as a `permission_request`. The lane registers a permission gateway with the provider registry (`registerPermissionGateway`) that answers the phone's taps through the dispatcher's own verbs, never a run, and lists nothing: `listPending` and `listPendingSessions` are optional on the gateway, and every reader of `providerRegistry.listPermissionGateways()` — `chat.subscribe`'s `pendingPermissions`, the sidebar's waiting mark — calls them optionally. `resolveToolApproval` stops at the first gateway that claims the key and warns once when none does; the dispatcher's claims every key of its own, held or not, and settles it from the store.
 
 The client keeps the pending list in `ChatInterface` state, not in the store — permission
 kinds are among the five that are never persisted as rows. The rules:
@@ -1347,22 +1339,11 @@ kinds are among the five that are never persisted as rows. The rules:
 - Duplicate `requestId`s are ignored, because `chat_subscribed` also carries the full
   pending set and can race with a live `permission_request`.
 - `permission_resolved` and `permission_cancelled` remove their `requestId` from the
-  list, whichever tab or replay delivered the request. A `permission_cancelled` carrying
-  `answerNotCarried: true` is the server saying an answer sent for that id was not carried — the
-  prompt is no longer open, or the dispatcher could not be read to find out: a tab that was told about
-  that ask (its bell rang for it) and never heard it close also shows an "Answer not applied" toast. A frame that also carries `alreadyAnswered: true` is the plan's second approval refused by the store (the prompt was retracted as resolved BEFORE the answer ran, so every tab has heard it close): only the tab that SENT the answer shows "Already answered" — it is the tab whose own pending list had dropped the request when `permission_resolved` arrived (`answeredHereRef`) — and a tab that answered nothing is told nothing.
+  list, whichever tab or replay delivered the request.
 - `chat_subscribed` replaces the list wholesale, and rings for any actionable ask in it whose key
   this tab has not yet announced — a handover puts the still-parked question back in that catalogue
   under a fresh `requestId`, and the key is what keeps that delivery silent.
-- `complete` empties the list for the viewed session — of the RUN's asks: a `standalone` ask stays
-  until its own `permission_resolved` or `permission_cancelled`.
-- A `standalone` ask marks no session processing, and is drawn above the composer by
-  `PermissionRequestsBanner` in the same `AskUserQuestionPanel` an inline ask uses — no transcript row
-  carries it — with no Skip (the operator's word is owed). Outside the scrolling transcript, the card
-  is BOUNDED at half the dynamic viewport, its body scrolling between a header and a footer that stay,
-  the prompt never shortened (the token pins it); and it folds to a one-line bar without answering —
-  the plan still owes, one tap re-opens it — so an unanswered prompt never holds the composer; and an option marked `needsNote` opening a
-  field for his note, sent beside the answers as `updatedInput.notes`.
+- `complete` empties the list for the viewed session.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-runtime.provider.js, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useChatRealtimeHandlers.ts
 
@@ -3451,8 +3432,8 @@ section: 06-tool-view/002 The pieces
 | `src/modules/chat/tools/SubagentNote.tsx` | One prose or reasoning entry from an agent's own narration. Extracted out of `SubagentPanel.tsx` so it can be shared, verbatim, with the gutter's read-on-demand transcript view (§Subagents) |
 | `src/modules/chat/tools/PlanDisplay.tsx` | ExitPlanMode card with the inline Build and Revise buttons |
 | `src/modules/chat/tools/ContentRenderers/` | The bodies a collapsible can contain |
-| `src/modules/chat/tools/InteractiveRenderers/AskUserQuestionPanel.tsx` | Keyboard-driven answer picker for an `AskUserQuestion` prompt — inline, and above the composer for a `standalone` ask the app raised (no Skip; a `needsNote` option opens a note field) |
-| `src/modules/chat/tools/InteractiveRenderers/QuestionTextField.tsx` | The panel's typed half of an answer: the "Other" option's words, or a `needsNote` option's note |
+| `src/modules/chat/tools/InteractiveRenderers/AskUserQuestionPanel.tsx` | Keyboard-driven answer picker for an `AskUserQuestion` prompt — a run's own ask, drawn inline in the transcript |
+| `src/modules/chat/tools/InteractiveRenderers/QuestionTextField.tsx` | The panel's typed half of an answer: the "Other" option's words |
 | `src/modules/chat/transcript/MessageComponent.tsx` | Draws one transcript row. Decides container versus tool versus error |
 | `src/modules/chat/transcript/ToolGroupContainer.tsx` | The collapsed `Read x4` row and its expanded children |
 | `src/modules/chat/transcript/ThinkingRow.tsx` | A thinking block as a tool row: brain, `Thinking /`, the first line truncated, copy on hover (always shown on touch); the row toggles the full text |
@@ -6458,7 +6439,7 @@ section: README/003 The protocol, in two tables/004 Server → client: the `kind
 | `status` | provider | Progress text, and the token-budget payload. |
 | `permission_request` | provider | A tool is asking for approval. |
 | `permission_resolved` | provider | A client answered that request. Retracts it from replays and other tabs. |
-| `permission_cancelled` | provider | That request is no longer live (timeout, abort, withdrawal). A plan's prompt the store no longer holds open is retracted the same way; carrying `answerNotCarried: true` it also says that an answer sent for the prompt was NOT carried (the ask is no longer open, or the dispatcher could not be read) — a tab that was told about that ask and never heard it close shows an "Answer not applied" toast (`useChatRealtimeHandlers.ts`); the frame names the chat only when the server's picture can say which. Also carrying `alreadyAnswered: true` (panel door only) it says the plan's approval was already held, so the answer changed nothing: only the tab that sent the answer toasts "Already answered". |
+| `permission_cancelled` | provider | That request is no longer live (timeout, abort, withdrawal). A plan's prompt is never a request: the server sends no frame about it (MAN-7400). |
 | `error` | provider | An informational failure row. **Not terminal.** |
 | `complete` | provider | The one terminal event of a run. Exactly one per run, always. |
 | `session_created` | provider | The runtime announcing its native id. **Swallowed server-side; no client ever sees it.** |
