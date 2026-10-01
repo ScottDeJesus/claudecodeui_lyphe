@@ -154,7 +154,7 @@ function HealCardView({ heal, onOpenChain }: { heal: HealCard; onOpenChain: (hea
               ))}
               {/* The COUNT is the heal's own total (`shapes_claimed`), not the length of the head the
                   payload carries: the worker ships `SIGNATURES_SHOWN` shapes, so a card whose claim is
-                  larger would otherwise say "+9 more" when the heal cured five hundred. */}
+                  larger would otherwise say "+9 more" when the heal took five hundred. */}
               {heal.shapes_claimed > SHAPE_CHIPS && (
                 <span className="text-muted-foreground"
                       title={heal.signatures_claimed.slice(SHAPE_CHIPS).join('\n')}>

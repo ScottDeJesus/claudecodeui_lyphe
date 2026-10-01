@@ -7,7 +7,7 @@
  *
  * `klass` is THE CAUSE CLASS, null until judged — the heal doctrine's four. It is what a kind's chip
  * and the tallies' class breakdown read, and it is NOT what a heal claims: a claim is the set of
- * `signature` SHAPES a heal cured (`HealCard.signatures_claimed`), because a bucket is too coarse to
+ * `signature` SHAPES of the rows a heal took (`HealCard.signatures_claimed`), because a bucket is too coarse to
  * be a cause — a busy kind's rows carry all four, so a claim of the buckets marked every classified
  * row a regression (measured 2026-09-23: 109 rows). Only a shape can mark one.
  *
@@ -43,7 +43,7 @@ export type HealItem = {
   ignored: boolean;
 };
 
-/** A landed heal cured this SHAPE, and a live row of that kind carries it again. */
+/** A landed heal took this SHAPE, and a live row of that kind carries it again. */
 export type HealRegression = {
   heal_id: string;
   /** The normalized failure shape that came back — the worker's own claim, printed as it wrote it. */
@@ -85,9 +85,9 @@ export type HealCard = {
   /** Rows this heal claimed and closed. */
   closed: number;
   /**
-   * The failure shapes this heal cured — what `read.regressions()` compares a returning row against.
+   * The failure shapes of the rows this heal took — what `read.regressions()` compares a returning row against.
    * A HEAD of the claim, never all of it: the worker sends `SIGNATURES_SHOWN` (12) and the count in
-   * `shapes_claimed`, because one heal of a long-running kind can cure hundreds of shapes and this
+   * `shapes_claimed`, because one heal of a long-running kind can take hundreds of shapes and this
    * payload rides every sixty seconds. The whole list is on the heal row and in its brief.
    */
   signatures_claimed: string[];
