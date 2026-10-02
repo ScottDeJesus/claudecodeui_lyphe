@@ -5048,9 +5048,10 @@ A verb that needs two writes to be atomic does both inside ONE `mutate` callback
 approve it as one event.
 
 Two things the seam needs from the caller rather than the verb: `actor`, which defaults to
-`'operator'` and rides straight into the event row — no route reads an identity off the request,
-because there is none on this board today, and the parameter exists so that adding one later is a
-caller change rather than a schema change — and `boardId`, which is a plain string for the
+`'operator'` and rides straight into the event row — the routes hand each verb the actor their
+mount's guard stamped on the request (`kanbanWriteContext`: `'metis'` behind `kanbanMetisSecretGuard`
+on `/api/kanban-pm`, nothing on the operator's own `/api/kanban`, which reads as `'operator'`) — and
+`boardId`, which is a plain string for the
 twenty-eight kinds whose board already exists, NULLABLE for the two lesson kinds that may belong to
 no board at all (a staged lesson with no card behind it — §"The lessons lane"), and a FUNCTION for
 the one kind that creates its board, because `board.created` mints that id inside the transaction and
@@ -5070,7 +5071,7 @@ section: kanban/005 The services
 
 Seven service files, cut by cohesion rather than one file growing to twenty-nine verbs. Every write
 verb takes an optional trailing `context?: KanbanWriteContext` (`{ actor?: string }`); the routes
-pass nothing. The lease verbs take an explicit `owner` instead — a lease owner is a different
+hand it the actor the mount's guard stamped, so a write through the Metis door records `metis`. The lease verbs take an explicit `owner` instead — a lease owner is a different
 concept from an event actor, and both ride on the summary.
 
 `kanban-boards.service.ts`
@@ -5089,7 +5090,8 @@ listEvents(options: { boardId?, cardId?, limit? }) -> KanbanEventRow[]
 
 `selectBoard` is a write to `kanban_settings.current_board` and takes the seam like any other.
 `laneCounts`, `claimableCount` and `listEvents` are the only three reads the whole module exposes
-at board level. `claimableCount` counts a board's live `todo` cards plus its `active` cards on a
+at board level. `claimableCount` counts a board's live `todo` cards (not those tagged `operator-scheduled` —
+they are the operator's, and Metis's orient lists them under `awaiting_you`) plus its `active` cards on a
 stale build lease (the same staleness `KANBAN_LEASE_STALE_SECONDS` defines above) — the green
 light an autonomous session reads before it spawns, over `GET /boards/:boardId/claimable`
 (§"The routes"). Nothing in this module spawns that session or reads `deepseekFlash`; the driver
@@ -5416,7 +5418,8 @@ statement, every one of them excluding archived cards:
   content-complete — a non-blank plan, body or description, because an intake card carries its intent
   in `description` with `body` empty.
 - `claimable` — the same predicate and the same staleness window the driver's own green light uses
-  (`kanbanBoardsDb.countClaimable`), so this register and the driver can never disagree.
+  (`kanbanBoardsDb.countClaimable`: a To-do card tagged `operator-scheduled` is the operator's and
+  does not count), so this register and the driver can never disagree.
 - `lessonsPendingEstate` — STAGED lessons awaiting a person's review. It reads the board's own lesson
   table and is NOT board-scoped: a lesson belongs to the estate and its card is provenance, so there
   is no board filter here to get wrong.
@@ -5846,7 +5849,10 @@ bearer claims and accepts it only while the registry holds that session id in st
 Nothing is kept in memory between restarts — a map in memory is a map that empties on restart, and
 every live Metis's next tool call would then 401 against a server that had simply forgotten her,
 mid-build, with no way back but to kill her. Revocation is the registry's `running` set: a session
-that leaves it stops being accepted on its next call, and nothing has to be erased. **The same
+that leaves it stops being accepted on its next call, and nothing has to be erased. **A request
+that passes is stamped `response.locals.kanbanActor = 'metis'`**, which the route behind it hands
+every write verb as its audit actor — so a Metis's approvals, archives and moves read `metis` in the
+activity spine, never the operator's own word. **The same
 guard refuses a lesson review** — any path matching `/lessons/<id>/(approve|reject)` — ahead of the
 credential check, because reviewing is a person's act and whose credential arrived is not the
 question (§"The lessons lane"). **And the same guard refuses one method, not a path** — a `DELETE`

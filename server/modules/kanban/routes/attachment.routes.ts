@@ -4,6 +4,7 @@ import express from 'express';
 import type { NextFunction, Request, RequestHandler, Response, Router } from 'express';
 import multer from 'multer';
 
+import { kanbanWriteContext } from '@/shared/kanban-types.js';
 import { AppError } from '@/shared/utils.js';
 
 import {
@@ -28,7 +29,8 @@ import type { KanbanAttachmentsService } from '../kanban-attachments.service.js'
  * bytes. Healed means deleted: that route and its body parsing are gone.
  *
  * Auth is the mount's (`authenticateToken` for `/api/kanban`, `kanbanMetisSecretGuard` for
- * `/api/kanban-pm`): no handler here reads an actor off the request. The DELETE is refused at the
+ * `/api/kanban-pm`): the write verbs here take the guard's stamped actor through
+ * `kanbanWriteContext(response)`. The DELETE is refused at the
  * child's door, ahead of this router (`kanban-metis.routes.ts`'s `OPERATOR_BYTES`) — an unattended
  * session does not destroy an operator's uploaded file. Reading and uploading are not refused: they
  * are how a build sees the screenshot it was handed.
@@ -129,11 +131,11 @@ function uploadAttachment(
       }
 
       try {
-        const attachment = dependencies.attachments.addAttachment(request.params.cardId, {
-          filename: file.originalname,
-          mime: file.mimetype,
-          bytes: file.buffer,
-        });
+        const attachment = dependencies.attachments.addAttachment(
+          request.params.cardId,
+          { filename: file.originalname, mime: file.mimetype, bytes: file.buffer },
+          kanbanWriteContext(response)
+        );
         response.status(201).json({ attachment });
       } catch (thrown) {
         next(thrown);
@@ -195,7 +197,8 @@ function removeAttachment(
   return handle<{ cardId: string; attachmentId: string }>((request, response) => {
     const removed = dependencies.attachments.removeAttachment(
       request.params.cardId,
-      request.params.attachmentId
+      request.params.attachmentId,
+      kanbanWriteContext(response)
     );
     if (!removed) throw attachmentNotFound(request.params.attachmentId);
 

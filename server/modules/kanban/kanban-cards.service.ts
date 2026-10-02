@@ -156,7 +156,8 @@ function setCardTag(
 /**
  * The card verbs. EVERY write goes through `writeKanban` — no verb here opens a transaction, inserts
  * an event or broadcasts — and each threads `context?.actor` into the seam, so an audit row's actor
- * is `'operator'` today and an adapter's own tomorrow without a signature moving.
+ * is the caller's own (`'metis'` through the Metis door, `'operator'` when the route stamped none)
+ * without a signature moving.
  */
 export const kanbanCardsService = {
   /**

@@ -6,7 +6,7 @@ import type { NextFunction, Request, RequestHandler, Response, Router } from 'ex
 import { appConfigDb } from '@/modules/database/index.js';
 import { kanbanBoardsService } from '@/modules/kanban/index.js';
 import { readClaudeTranscriptBySessionId } from '@/modules/providers/index.js';
-import { KANBAN_CONCURRENCY_MAX } from '@/shared/kanban-types.js';
+import { KANBAN_ACTOR_LOCAL, KANBAN_CONCURRENCY_MAX, KANBAN_METIS_ACTOR } from '@/shared/kanban-types.js';
 import { AppError } from '@/shared/utils.js';
 
 import { deriveMetisSecret } from './metis-env.service.js';
@@ -170,6 +170,10 @@ function readBearer(request: Request): string | null {
  * where this has exactly one, so it fails the split before an HMAC is ever computed. That is what
  * keeps the operator's own JWT — which the chat sends to `/api/kanban` — from quietly working on
  * the autonomous door as well.
+ *
+ * A request that passes is STAMPED: `response.locals.kanbanActor` carries `'metis'` to the route
+ * behind it, and every write verb records that as the event's actor. The operator's own mount stamps
+ * nothing, so its writes stay `'operator'`.
  */
 export function kanbanMetisSecretGuard(
   request: Request,
@@ -222,6 +226,10 @@ export function kanbanMetisSecretGuard(
     return;
   }
 
+  // The credential checked out, so this request IS a board Metis: the write routes behind this
+  // guard hand the stamp to every verb as its audit actor. Without it her approvals and archives
+  // would read as the operator's own — an approval in the record that he never gave.
+  response.locals[KANBAN_ACTOR_LOCAL] = KANBAN_METIS_ACTOR;
   next();
 }
 

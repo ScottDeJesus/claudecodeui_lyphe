@@ -98,6 +98,13 @@ export type KanbanLeaseState = 'none' | 'held' | 'stale';
  *  Consumers: the summary mapper in kanban-cards.db.ts, and kanban-leases.service.ts. */
 export const KANBAN_LEASE_STALE_SECONDS = 40;
 
+/** The tag that puts a To-do card in the operator's own court: the Metis orient read lists it under
+ *  `awaiting_you`, never as work to claim, so the board's claimable count must not count it either —
+ *  a board whose only To-do cards are tagged is a board with nothing for a session to do. Compared
+ *  trimmed and lower-cased. Consumers: `kanban-boards.db.ts` (`countClaimable`),
+ *  `kanban-vitals.service.ts` (the `claimable` register) and the Metis MCP's orient projection. */
+export const KANBAN_OPERATOR_SCHEDULED_TAG = 'operator-scheduled';
+
 /** How many cards a lane page holds when the caller names no limit. The ONE home for the number.
  *  Consumers: `routes/card.routes.ts` (it clamps), `kanban-cards.service.ts` (the default), and
  *  the lane read in `kanban-cards.db.ts` (its last-line fallback). A page size spelled in three
@@ -164,13 +171,39 @@ export function clampKanbanConcurrency(value: number): number {
 /**
  * The optional trailing argument every WRITE verb takes. An absent actor means `'operator'`.
  *
- * It exists so that adding a real identity later is a CALLER change rather than a schema change:
- * the routes pass nothing today and an in-process MCP adapter passes its own name tomorrow,
- * without a signature moving. A lease owner is a different concept and travels separately.
+ * It exists so that a real identity is a CALLER change rather than a schema change: the routes
+ * hand over the actor their mount's guard stamped (`kanbanWriteContext`), and a caller with no
+ * stamp passes nothing. A lease owner is a different concept and travels separately.
  *
  * Consumers: every write verb in `server/modules/kanban/`, and the write seam's `actor` field.
  */
 export type KanbanWriteContext = { actor?: string };
+
+/** The audit actor of every write that arrives through the `kanban-pm` door — the one a board's Metis
+ *  holds a credential for. Her approvals and archives are real acts the operator did not do, and the
+ *  activity spine must say so. Consumers: `kanbanMetisSecretGuard` (stamps it once the credential
+ *  checks out). */
+export const KANBAN_METIS_ACTOR = 'metis';
+
+/** The `response.locals` key a mount's guard stamps the caller's actor under. Request-scoped on
+ *  purpose: it travels with the request through every continuation (a multipart upload's callback
+ *  included), and a client cannot set it. Consumers: `kanbanMetisSecretGuard` (writes) and
+ *  `kanbanWriteContext` (reads). */
+export const KANBAN_ACTOR_LOCAL = 'kanbanActor';
+
+/**
+ * The write context a route hands its service verb: the actor the mount's guard stamped on this
+ * request, or `undefined` when no guard stamped one — which the verbs read as `'operator'`, so the
+ * operator's own `/api/kanban` mount (no stamp) behaves exactly as before.
+ *
+ * Consumers: the card, detail, board and attachment route files, for every WRITE verb they call.
+ */
+export function kanbanWriteContext(response: {
+  locals: Record<string, unknown>;
+}): KanbanWriteContext | undefined {
+  const actor = response.locals[KANBAN_ACTOR_LOCAL];
+  return typeof actor === 'string' && actor !== '' ? { actor } : undefined;
+}
 
 /**
  * Every event kind the seam may record — the `kanban_events.kind` vocabulary, and with it the

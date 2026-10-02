@@ -67,8 +67,8 @@ function requireBoardName(name: string): string {
  *
  * EVERY write here goes through `writeKanban` — no verb in this file opens a transaction, inserts
  * an event or broadcasts. A write verb threads `context?.actor` straight into the seam, so the
- * actor on an audit row is `'operator'` today and an adapter's own name tomorrow without a
- * signature moving.
+ * actor on an audit row is the caller's own — `'metis'` through the Metis door, `'operator'` when
+ * the route stamped none — without a signature moving.
  *
  * Consumers: `routes/board.routes.ts` (every board route), and the barrel, which is how a future
  * in-process MCP adapter calls the same verbs.

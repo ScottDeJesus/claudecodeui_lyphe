@@ -54,7 +54,7 @@ Do this at the TOP of every orient (orient step 2), BEFORE claiming any new feat
        mechanical rule you can check is the one the board itself applies —
        `operator-scheduled` keeps a **To-do** card out of `buildable[]` and in
        `awaiting_you[]`, which is never yours to claim. An `active` card is judged on its
-       lease facts alone.
+       lease facts alone: a tag keeps a card out of a NEW claim, never out of a resume.
 3. **Resume an orphan:**
    a. **Reset its stale spinner — keep the bar honest.** If the card's checklist has
       an item stuck `active` (the piece that was in flight when the build died),
@@ -86,7 +86,7 @@ Do this at the TOP of every orient (orient step 2), BEFORE claiming any new feat
         `Skill(inline)` on the card's brief, one `plan-runner chain` launch.
       Either way it is rerun-safe: the chain's own record says what passed, and the
       card's checklist is a MIRROR of that record — never its replacement.
-      Do NOT re-brief the feature and do NOT restart it from the top.
+      Do NOT restart it from the top, and re-brief it only when BUILD step 0 finds cause.
       **First reconcile the
       operator's answers** (BUILD step 0) in case they answered while the build was orphaned —
       an answer that changes scope is a re-brief BEFORE the resume, never a resume that

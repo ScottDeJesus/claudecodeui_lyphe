@@ -35,23 +35,14 @@ want more throughput on a board, that is the operator's dial, and a Metis who tr
 second session would be inventing a lock-holder the lease never saw. Your only job is the one
 card in front of you.
 
-**No more conductor, no more workflow.** The old model — *"ONE Metis is a SINGLE conductor
-that launches a build WORKFLOW running N feature pipelines at once under the slider"* — is
-**RETIRED**. Workflows were a workaround for a constraint that this model resolves
-differently. The constraint was real: **a subagent CANNOT invoke a Skill** (`Skill(inline)`
-is main-loop-only and runs *inline*, walking the `plan-runner chain` out of the main loop).
-The OLD cure routed around it with a workflow engine so
-one main-loop could fan out N pipelines. The NEW cure is simpler: **parallelism comes from
-MULTIPLE main-loops (sessions), each building its OWN one feature through `Skill(inline)`** —
-not
-one main-loop fanning out workflows. A Metis session IS a main loop, so `Skill(inline)`
-runs natively in it; there is nothing to route around. (And the old failure that the
-workflow was guarding against — a soul-LESS solo agent doing a fake build — is NOT what
-happens here: `Skill(inline)` launches the chain, which runs the REAL souls, a separate
-builder and an independent
-Athena with real-data verify, exactly as everywhere else. The forbidden anti-pattern is a
-single agent doing build + self-review + self-verify; an inline `/inline` is the OPPOSITE
-of that — it is the full multi-soul pipeline.)
+**One main loop per session, never workflows.** **A subagent CANNOT invoke a Skill**:
+`Skill(inline)` is main-loop-only and runs *inline*, walking the `plan-runner chain` out of the
+main loop. A Metis session IS a main loop, so it runs natively there, and **parallelism comes
+from MULTIPLE sessions, each building its OWN one feature through `Skill(inline)`** — never from
+one main loop fanning out pipelines. `Skill(inline)` launches the chain, which runs the REAL
+souls: a separate builder and an independent Athena with real-data verify. The forbidden
+anti-pattern is a single agent doing build + self-review + self-verify; `/inline` is the
+OPPOSITE of that — the full multi-soul pipeline.
 
 **How a session builds its ONE claimed feature.** Write the feature's BRIEF
 (`~/.claude/plans/briefs/<slug>.brief.md`, PLAN & QUESTION step 1) and run `Skill(inline)` on it.
@@ -168,10 +159,8 @@ they will touch:
     is routine and safe. Footprint disjointness remains the planning doctrine because
     disjoint *features* avoid semantic entanglement — not because same-file writes are
     dangerous.
-    The arbiter is no longer blind here: with multiple sessions, a real two-session
-    same-file edit carries TWO distinct `session_id`s, so the arbiter sees and serializes
-    it (the old single-conductor problem — all builders sharing ONE session_id, invisible
-    to the arbiter — is gone, because parallelism is now across sessions, not within one).
+    A real two-session same-file edit carries TWO distinct `session_id`s, so the arbiter
+    sees and serializes it.
   (No worktrees — the operator's deliberate choice; builds edit the live `main` tree
   directly, uncommitted.)
 

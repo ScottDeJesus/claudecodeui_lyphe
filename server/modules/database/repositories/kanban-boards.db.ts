@@ -1,6 +1,7 @@
 import { getConnection } from '@/modules/database/connection.js';
 import {
   clampKanbanConcurrency,
+  KANBAN_OPERATOR_SCHEDULED_TAG,
   type KanbanBoard,
   type KanbanLaneCount,
   type KanbanStatus,
@@ -265,10 +266,13 @@ export const kanbanBoardsDb = {
   /**
    * How many of a board's live cards an autonomous session could pick up right now.
    *
-   * A card is claimable when it is `todo`, or when it is `active` on a lease that has gone stale —
-   * an `active` card whose owner died mid-build is work nobody is doing, and leaving it out would
-   * strand it until an operator noticed. A card on a FRESH lease is somebody else's and is not
-   * counted, which is what keeps two sessions off one card.
+   * A card is claimable when it is `todo` and not tagged `operator-scheduled`, or when it is
+   * `active` on a lease that has gone stale — an `active` card whose owner died mid-build is work
+   * nobody is doing, and leaving it out would strand it until an operator noticed. A card on a
+   * FRESH lease is somebody else's and is not counted, which is what keeps two sessions off one
+   * card. A To-do card the operator tagged `operator-scheduled` is in his court, never a
+   * session's: counting it would make the driver spawn a Metis every cooldown to find nothing to
+   * do. An `active` card keeps counting with or without the tag — an orphan is resumed, not skipped.
    *
    * `staleSeconds` is the caller's dial and the ISO-8601 UTC seconds bound is derived HERE from
    * `Date.now()`: `build_lease_at` is TEXT in that same format, so the comparison below is
@@ -281,12 +285,14 @@ export const kanbanBoardsDb = {
     const staleBefore = new Date(Date.now() - staleSeconds * 1000).toISOString();
     const row = db
       .prepare(
-        `SELECT COUNT(*) AS n FROM kanban_cards
-         WHERE board_id = ? AND archived = 0
-           AND ( status = 'todo'
-              OR (status = 'active' AND (build_lease_at IS NULL OR build_lease_at < ?)) )`
+        `SELECT COUNT(*) AS n FROM kanban_cards c
+         WHERE c.board_id = ? AND c.archived = 0
+           AND ( (c.status = 'todo' AND NOT EXISTS (
+                   SELECT 1 FROM kanban_card_tags t
+                   WHERE t.card_id = c.id AND lower(trim(t.tag)) = ?))
+              OR (c.status = 'active' AND (c.build_lease_at IS NULL OR c.build_lease_at < ?)) )`
       )
-      .get(boardId, staleBefore) as { n: number };
+      .get(boardId, KANBAN_OPERATOR_SCHEDULED_TAG, staleBefore) as { n: number };
 
     return row.n;
   },

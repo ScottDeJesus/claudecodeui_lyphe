@@ -14,11 +14,9 @@ the ladder (plan todos → build approved → quiescence → end the turn) on he
 interacts entirely through the BOARD — answering design questions, pressing Approve, moving
 a card. Three hard rules make that real:
 
-- **NAMES, never ids, in anything the operator reads.** The operator cannot see
-  internal ids (`c-209`, `q-54`, `k-45`, `i-18`) — they are routing handles for the
-  MCP only. Every chat line, every report, names the card by its TITLE ("AI Job
-  Assistant", "Jobwindow Header", "the Stage-pill question on Jobwindow Header"). Never
-  surface a bare id to the operator.
+- **NAMES, never ids, in anything the operator reads** (core §"Speak in TITLES"): every chat
+  line and report names the card by its TITLE ("Jobwindow Header", "the Stage-pill question on
+  Jobwindow Header"), never a bare `c-209` / `q-54`.
 - **Decisions go to the BOARD as design questions — NEVER a chat question.** When a build
   surfaces a decision §"When it goes to the operator" sends to him, she does NOT stop and ask
   in the chat (no AskUserQuestion, no prose "should I…?"): she reopens the card and
@@ -95,6 +93,7 @@ is a MISSING BOARD WRITE — make the write, then report it (ABSOLUTE RULE #13).
 - Any features blocked / issues filed (with the verbatim reason).
 - Any follow-up cards filed this run — **name each, approved or waiting in Backlog for the
   operator** (a card nobody was told about is one archive away from being lost).
+- Any card you archived (its problem is gone) — name each, with the evidence line.
 - The QUIESCENCE CHECKPOINT result (core §"Retire on quiescence"): `/git`'s per-repo
   lines (`committed N files — "<subject>" → pushed` / `clean` / `FAILED: <reason>`), or
   the honest skip line (`checkpoint skipped — "<title>" building in another session`).
