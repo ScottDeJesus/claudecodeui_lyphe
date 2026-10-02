@@ -158,10 +158,11 @@ export function createDetailTools(client: KanbanPmClient): ToolTable {
     {
       name: 'approve_feature',
       description:
-        "Set the operator-delegated approval gate on a feature card. This is the operator's " +
-        'tool: a Metis session calls it only when the operator explicitly instructs her to. The ' +
-        'board refuses unless the card is past not_ready, has zero open questions, and carries a ' +
-        'plan, body or description.',
+        'Set the approval gate on a feature card. A Metis session calls it only on a follow-up ' +
+        "she filed that clears her brief's 'When it goes to the operator' rule; every other " +
+        "approval is Harmonia's or the operator's. A Backlog (not_ready) card is promoted to To " +
+        'do in the same statement. The board refuses only a card with an open question or with ' +
+        'no plan, body or description.',
       inputSchema: toolSchema({ id: CARD_ID_ARGUMENT }, ['id']),
     },
   ];
