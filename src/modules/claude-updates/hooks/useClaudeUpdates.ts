@@ -83,14 +83,17 @@ export function isUpdateJobActive(job: ClaudeUpdateJob | null): job is ClaudeUpd
 }
 
 /**
- * Whether the detached runner owns the install tree right now — the two states in which
- * `POST /restart` answers 409 `job-active` (the server's `RESTART_ACTIVE_STATES`, mirrored here
- * because the client never imports server code). `installed` and `restarting` are the API's own to
- * carry, and a job parked in `restarting` is exactly where the report says "press Restart server",
- * so this is narrower than {@link isUpdateJobActive} on purpose.
+ * Whether a press of Restart server can do anything now. With no active job it can. While a job is
+ * active it cannot, with ONE exception: a job parked in `restarting` whose restart step is `pending`
+ * — the supervisor never answered, or there is none — which is exactly where the report says "press
+ * Restart server". The route (`RESTART_ACTIVE_STATES`) refuses only `installing` and `rolling-back`;
+ * this is stricter in `installed` (the reconciler is about to ask for the reboot itself) and in
+ * `restarting` with the step `running` (a reboot is already in flight, and the supervisor reads a
+ * second `reboot` during a boot as "restarting boot", so a press would redo it).
  */
-export function isRunnerOwningJob(job: ClaudeUpdateJob | null): boolean {
-  return job !== null && (job.state === 'installing' || job.state === 'rolling-back');
+export function canPressRestart(job: ClaudeUpdateJob | null): boolean {
+  if (!isUpdateJobActive(job)) return true;
+  return job.state === 'restarting' && job.steps.some((s) => s.key === 'restart' && s.state === 'pending');
 }
 
 /** The poll period the picture in hand calls for: fast while a job is being carried out. */

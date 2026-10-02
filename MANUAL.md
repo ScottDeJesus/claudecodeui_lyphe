@@ -274,7 +274,7 @@ group — `GET /api/claude-updates`, `POST /api/claude-updates/{check,apply,rest
 | file | owns |
 |---|---|
 | `index.ts` | the module's whole export surface: `ClaudeUpdatesSettingsTab`, `ClaudeUpdateFooterRow`, `ClaudeUpdateRailButton` |
-| `hooks/useClaudeUpdates.ts` | the client contract: `{ report, refresh, check, apply, restart, setAutoInstall }`; `isUpdateJobActive(job)` — true on `installing`/`installed`/`restarting`/`rolling-back`; and the one module-scope report with its poller |
+| `hooks/useClaudeUpdates.ts` | the client contract: `{ report, refresh, check, apply, restart, setAutoInstall }`; `isUpdateJobActive(job)` — true on `installing`/`installed`/`restarting`/`rolling-back`; `canPressRestart(job)` — true with no active job, or a job in `restarting` whose `restart` step is `pending`; and the one module-scope report with its poller |
 | `ClaudeUpdatesSettingsTab.tsx` | Settings → Updates: title (drawn even before the first report, with the one Try again press), clock line + Check now, `AutoInstallRow` (left out when `report.autoInstall` is absent), one `PackageUpdateCard` per package, the actions row, `UpdateJobPanel`, the last press's refusal |
 | `AutoInstallRow.tsx` | the automatic-install switch + its `Not installed yet — <waiting>` status line (MAN-7516); composes `SettingRow` + the library `Switch`, not `SettingsToggle` (the settings module already imports this tab) |
 | `PackageUpdateCard.tsx` | one package: state line, `reason`, SDK `loaded` line, CLI mid-turn plural line, Roll back |
@@ -299,7 +299,8 @@ on its own, answering true/false.
 - Roll back shows only when `job.kind === 'update' && job.state === 'done'` and this package's own
   step is `done`; it sends `{ targets: { [pkg.key]: step.from } }` — one package at a time.
 - `Restart server` is drawn only while `report.supervised` — a process that cannot hand itself over
-  offers no restart.
+  offers no restart; it is disabled unless `canPressRestart(report.job)` (stricter than the route,
+  which refuses only `installing`/`rolling-back` — MAN-7408 has the per-state reasons).
 - The under-buttons sentence is drawn only while `versions.length > 0` (an offer exists); there is
   no fallback copy for "nothing on offer".
 - The CLI card's mid-turn count is `useCliVersion().staleSessionIds.size` — this module never reads
