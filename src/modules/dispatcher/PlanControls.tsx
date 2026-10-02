@@ -62,6 +62,12 @@ function boxSwarmWord(route: DispatcherRoute | null): DispatcherSwarmWord | null
  * rule's next take-up). `Box` hands the plan back to the box's switch and wears that switch's word, so
  * the card says what bounds the plan whichever switch it is.
  *
+ * A STALLED PLANNER IS DRAWN BESIDE ALL OF THEM, whatever the plan's status (`plan.planner.stalled`):
+ * Resume planner, the press that puts the outing that ended short back to work. Which door it goes
+ * back through — `cut`, `judge`, a `tell` of `continue` — is the dispatcher's own reading of its store
+ * at the press, so the card names none; the daemon asks again for an ending that was only the weather
+ * (`planner_retry`), and this is the operator's hand for the ones it will not.
+ *
  * A refusal is the dispatcher's own first line, toasted by `useDispatcherVerbs`.
  *
  * Used by `PlanCard`, directly under its head.
@@ -74,7 +80,7 @@ export function PlanControls({ plan }: { plan: DispatcherPlan }) {
   // reads `queued`).
   const stops = plan.status === 'paused' || (plan.status === 'scheduled' && plan.launched);
   const starts = plan.status === 'queued' || (plan.status === 'scheduled' && !plan.launched);
-  const { stop, resume, schedule, park, unpark, setModel, setSwarm, busy } = useDispatcherVerbs(plan.name, 'plan',
+  const { stop, resume, schedule, park, unpark, plannerResume, setModel, setSwarm, busy } = useDispatcherVerbs(plan.name, 'plan',
     starts ? t('runner.start') : t('runner.resume'));
   const { route } = useDispatcherPlans();
   const held = busy !== null;
@@ -115,6 +121,19 @@ export function PlanControls({ plan }: { plan: DispatcherPlan }) {
       <Button variant="secondary" size="sm" className="h-8" disabled={held} onClick={() => void park()} data-dispatcher-park>
         {t('dispatcher.park')}
       </Button>
+    );
+  }
+
+  // The stalled planner's Resume rides after whichever verbs the status drew, in the same row.
+  if (plan.planner?.stalled) {
+    verbs = (
+      <>
+        {verbs}
+        <Button variant="secondary" size="sm" className="h-8" disabled={held} onClick={() => void plannerResume()}
+          data-dispatcher-planner-resume>
+          {t('dispatcher.plannerResume')}
+        </Button>
+      </>
     );
   }
 

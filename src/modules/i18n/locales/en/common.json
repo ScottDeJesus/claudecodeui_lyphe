@@ -922,6 +922,7 @@
     "arcScheduleTitle": "Start every plan of this arc that is not moving when DeepSeek’s daily peak lifts — one timer per plan, at the gate or stopped mid-walk alike, each pressing Start at that hour",
     "park": "Park",
     "unpark": "Unpark",
+    "plannerResume": "Resume planner",
     "delete": {
       "word": "Delete",
       "menu": "Delete plan…",

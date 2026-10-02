@@ -810,6 +810,10 @@ export const api = {
     // A plan out of the store for good (`dispatcher drop <plan>`): `DROPPED <name>`, or the
     // dispatcher's REFUSED line while a phase walks or a planner outing is live, as a 409.
     drop: (name: string) => post(`/api/dispatcher/plans/${encodeURIComponent(name)}/drop`, {}),
+    // A plan's STALLED planner outing put back to work (`dispatcher planner-resume <plan>`): the
+    // dispatcher reads which door from its own store — `cut`, `judge`, or a `tell` of `continue` — and
+    // answers with that door's own sentence (`QUEUED cut <plan> — …`), or `REFUSED planner-resume …` as a 409.
+    plannerResume: (name: string) => post(`/api/dispatcher/plans/${encodeURIComponent(name)}/planner-resume`, {}),
     // The operator's answer to a plan's prompt, from its card: the ask exactly as the card drew
     // it, the chosen label (or typed words) by question, and a Rework's notes by question. A
     // refusal is a RESULT (409), as for every verb.

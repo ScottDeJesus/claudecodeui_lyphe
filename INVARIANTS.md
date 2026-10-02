@@ -290,7 +290,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.cl
 A Hide lives only in the page's memory until its PATCH lands
 
 ```probe
-node /tmp/pipeline-reviews/arc-dismiss/athena-probes/arc-hide-5xx-reload.mjs
+node /home/lyphe/.claude/state/pipeline-reviews/arc-dismiss/athena-probes/arc-hide-5xx-reload.mjs
 expect: the "after reload + 8 s" line reads `decks 0` and `server hides` holding every restorly lane plan (today: `decks 1 … server hides []`); needs restorly on the lane (until 2026-09-29T19:02Z) — else set the arc to one the lane carries
 ```
 
@@ -304,7 +304,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/.oxlintrc.json, /home/lyphe/.cla
 A hide already sent is erased locally by a sign-in read that lands after it; the new comment and INV-4406 claim otherwise
 
 ```probe
-node /tmp/pipeline-reviews/arc-dismiss/athena-probes/arc-hide-races.mjs s5
+node /home/lyphe/.claude/state/pipeline-reviews/arc-dismiss/athena-probes/arc-hide-races.mjs s5
 expect: the "S5b in-flight" line reads `decks after hydrate: 0` (today: `decks after hydrate: 1` with the server holding all 4 hides); the "S5a queued" line reads `decks after hydrate: 0`
 ```
 
@@ -410,7 +410,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/http-drain.ts, /home/lyph
 Hide on a MIXED arc silently dismisses its done plans, and Show brings back a truncated deck
 
 ```probe
-node /tmp/pipeline-reviews/done-cards-leave/athena-probes/athena-dcl.mjs s9
+node /home/lyphe/.claude/state/pipeline-reviews/done-cards-leave/athena-probes/athena-dcl.mjs s9
 expect: the "S9 round trip" line reads `[HOLD] … returns the deck with 4 of its 4 cards (progress 3/4 → 3/4)` (today: `[BREAK] … 1 of its 4 cards (progress 3/4 → 0/1)`); needs restorly on the lane (until 2026-09-29T19:02Z)
 ```
 
@@ -452,7 +452,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.cl
 Dismiss is dead on a slow browser clock (S13)
 
 ```probe
-node /tmp/pipeline-reviews/done-cards-leave/athena-probes/athena-dcl.mjs s13
+node /home/lyphe/.claude/state/pipeline-reviews/done-cards-leave/athena-probes/athena-dcl.mjs s13
 expect: `[HOLD] S13: after Dismiss with a 6 h slow clock the judgment card is gone (count 0)` (today: `[BREAK] … (count 1)`)
 ```
 
@@ -662,7 +662,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispat
 After a Rework, the re-cut's fresh Accept prompt comes back silently: no phone push, no lane bell (`DispatcherAskBell`, MAN-7540)
 
 ```probe
-bash /tmp/pipeline-reviews/plan-prompt-in-chat/athena-probes/rework_key.sh
+bash /home/lyphe/.claude/state/pipeline-reviews/plan-prompt-in-chat/athena-probes/rework_key.sh
 expect: `same prompt key: false` (today: `first ask: token 634745e991 asked {'id': 8 …}` / `re-cut ask: token 634745e991 asked {'id': 11 …}` / `same prompt key: true | re-cut prompt suppressed by the phone push memory: true`)
 ```
 
@@ -676,7 +676,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.cl
 Two servers can both record the same landing's ask; the raise service claims the second hears `nothing`
 
 ```probe
-bash /tmp/pipeline-reviews/plan-prompt-in-chat/athena-probes/double_ask.sh
+bash /home/lyphe/.claude/state/pipeline-reviews/plan-prompt-in-chat/athena-probes/double_ask.sh
 expect: `runs recording TWO asks for one landing: 0/10` (today: 9/10)
 ```
 
@@ -690,7 +690,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.cl
 The Stop hold's stand-down reads the store, not the screen, and `dispatcher ask` runs inside a Claude session
 
 ```probe
-bash /tmp/pipeline-reviews/plan-prompt-in-chat/athena-probes/mute.sh
+bash /home/lyphe/.claude/state/pipeline-reviews/plan-prompt-in-chat/athena-probes/mute.sh
 expect: `hold after:` still names the Accept order, or the in-session `ask` is refused (today: `ask inside a Claude session: exit 0` and `hold after:   (no order)`)
 ```
 
@@ -732,7 +732,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/ly
 Every replay of a spent-out, genuine ntfy token costs a full store read, uncapped, on a public route
 
 ```probe
-bash /tmp/pipeline-reviews/plan-ask-survives-restart/athena-probes/stale_token_flood.sh
+bash /home/lyphe/.claude/state/pipeline-reviews/plan-ask-survives-restart/athena-probes/stale_token_flood.sh
 expect: `store reads for 40 taps of ONE stale token:` at most 2 and `one more tap of the same token afterwards, extra store reads: 0` (today: 40 and 1)
 ```
 
@@ -746,7 +746,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispat
 `answer()`'s settle chain has no catch, and the server has no `unhandledRejection` handler
 
 ```probe
-bash /tmp/pipeline-reviews/plan-ask-survives-restart/athena-probes/settle_throw.sh
+bash /home/lyphe/.claude/state/pipeline-reviews/plan-ask-survives-restart/athena-probes/settle_throw.sh
 expect: `still alive after the settle chain threw` and `process exit code 0` (today: `process exit code 1` and the thrown `SqliteError: database is locked` trace)
 ```
 
@@ -760,7 +760,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispat
 The durable ask name is unique per record, not per ask over time
 
 ```probe
-bash /tmp/pipeline-reviews/plan-ask-survives-restart/athena-probes/id_reuse.sh
+bash /home/lyphe/.claude/state/pipeline-reviews/plan-ask-survives-restart/athena-probes/id_reuse.sh
 expect: `two different asks share one key (phone push memory and tab bell key on it): false` (today: true)
 ```
 
@@ -830,7 +830,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/claude-updates-final.mjs
 HIGH — the chat door arms the park-at-peak hour BEFORE the store refuses, so a refused second Accept still schedules a Start for the plan the operator Queued
 
 ```probe
-bash /tmp/pipeline-reviews/accept-once/athena-probes/hold_then_refuse.sh
+bash /home/lyphe/.claude/state/pipeline-reviews/accept-once/athena-probes/hold_then_refuse.sh
 expect: `hour armed on the Queued plan: None` (today: `2026-09-29T10:00:00Z`, with the second answer's text still reading "This answer recorded nothing")
 ```
 
@@ -891,7 +891,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/agent-launch/agen
 the gates are checked before the launch-table ask and never after, and the ask makes the window about ten times wider
 
 ```probe
-sh /tmp/pipeline-reviews/agent-launch-config--metis/scn/stagger2.sh now resume 40
+sh /home/lyphe/.claude/state/pipeline-reviews/agent-launch-config--metis/scn/stagger2.sh now resume 40
 expect: resume stagger 40 ms -> ["took","refused 409"] and "--resume children actually started: 1"   (measured on this tree: ["took","took"], 2, three runs out of three; HEAD gives ["took","refused 409"], 1)
 ```
 
@@ -905,7 +905,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/kanban-metis/kanb
 a table outage is charged by the driver as a failed launch, and parks the board for ten minutes
 
 ```probe
-cd /home/lyphe/.claude/claudecodeui_lyphe && S=$(mktemp -d /tmp/athena-drv.XXXXXX) && mkdir -p "$S/home" "$S/st" "$S/bin" && printf '#!/bin/sh\necho boom >&2\nexit 1\n' > "$S/bin/launch-table" && chmod +x "$S/bin/launch-table" && cp ~/.claude/charters/launch.toml "$S/table.toml" && env HOME="$S/home" DATABASE_PATH="$S/db.sqlite" KANBAN_METIS_STATE_ROOT="$S/st" LAUNCH_TABLE_PATH="$S/table.toml" LAUNCH_TABLE_BIN="$S/bin/launch-table" TSX_TSCONFIG_PATH=$PWD/server/tsconfig.json node --import tsx /tmp/pipeline-reviews/agent-launch-config--metis/scn/drv.mts 2>&1 | grep "launch failed\|relaunchAllowed"; case "$S" in /tmp/athena-drv.*) rm -r "$S";; esac
+cd /home/lyphe/.claude/claudecodeui_lyphe && S=$(mktemp -d /tmp/athena-drv.XXXXXX) && mkdir -p "$S/home" "$S/st" "$S/bin" && printf '#!/bin/sh\necho boom >&2\nexit 1\n' > "$S/bin/launch-table" && chmod +x "$S/bin/launch-table" && cp ~/.claude/charters/launch.toml "$S/table.toml" && env HOME="$S/home" DATABASE_PATH="$S/db.sqlite" KANBAN_METIS_STATE_ROOT="$S/st" LAUNCH_TABLE_PATH="$S/table.toml" LAUNCH_TABLE_BIN="$S/bin/launch-table" TSX_TSCONFIG_PATH=$PWD/server/tsconfig.json node --import tsx /home/lyphe/.claude/state/pipeline-reviews/agent-launch-config--metis/scn/drv.mts 2>&1 | grep "launch failed\|relaunchAllowed"; case "$S" in /tmp/athena-drv.*) rm -r "$S";; esac
 expect: `launch failed: Metis's launch table could not be read: … (boom)` and `"relaunchAllowed":false` after one failed tick   (this pins the assumption; it is not a claimed defect)
 ```
 
@@ -919,7 +919,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/kanban-metis/kanb
 Two saves in flight: `saving` is one string, so the second overwrites the first's hold and the first to finish releases the other's
 
 ```probe
-cd /tmp/pipeline-reviews/agent-launch-config--fill/athena-probes && node s12.mjs
+cd /home/lyphe/.claude/state/pipeline-reviews/agent-launch-config--fill/athena-probes && node s12.mjs
 expect: the line `held=-` is printed BEFORE the line `hermes answered` (today ≈2.1 s vs ≈4.7 s); held once means hermes stays `held=hermes` until its own answer
 ```
 
@@ -933,7 +933,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/agent-launch/hooks/u
 A non-JSON answer reaches the tab as a JSON parser's fragment
 
 ```probe
-cd /tmp/pipeline-reviews/agent-launch-config--fill/athena-probes && node s6b.mjs
+cd /home/lyphe/.claude/state/pipeline-reviews/agent-launch-config--fill/athena-probes && node s6b.mjs
 expect: the `html-502` and `html-200` lines print an unreadable banner carrying `Unexpected token '<'` (a readable sentence would carry no parser text)
 ```
 
@@ -947,7 +947,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/agent-launch/hooks/u
 A 200 whose body is not a census blanks the workspace region
 
 ```probe
-cd /tmp/pipeline-reviews/agent-launch-config--fill/athena-probes && node s6b.mjs
+cd /home/lyphe/.claude/state/pipeline-reviews/agent-launch-config--fill/athena-probes && node s6b.mjs
 expect: the `json {}` line prints `panel never mounted (region blanked)` (a guarded hook prints `unreadable` with a banner and boundary: 0)
 ```
 
@@ -961,7 +961,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/agent-launch/hooks/u
 A save that outlives the browser's 30 s deadline says "Not saved" and holds the old picture
 
 ```probe
-cd /tmp/pipeline-reviews/agent-launch-config--fill/athena-probes && node s13.mjs
+cd /home/lyphe/.claude/state/pipeline-reviews/agent-launch-config--fill/athena-probes && node s13.mjs
 expect: after ≈30.5 s the banner reads `Not saved — the launch table refused the change to hermes:` then `signal timed out`
 ```
 
@@ -989,7 +989,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts
 MEDIUM — a picture bypasses `MAX_TOOL_RESULT_CONTENT`; an image-heavy session's history page is 4.85× larger
 
 ```probe
-bash /tmp/pipeline-reviews/chat-image-results/athena-probes/history_size.sh
+bash /home/lyphe/.claude/state/pipeline-reviews/chat-image-results/athena-probes/history_size.sh
 expect: `under 3 MB: true` (HEAD: 2,034,059 bytes; today: 9,866,660 and `false`)
 ```
 
@@ -1003,7 +1003,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/file-tree/file-tr
 LOW — `files/content` has no regular-file guard, and the diff made every FIFO under the home dir reachable
 
 ```probe
-bash /tmp/pipeline-reviews/chat-image-results/athena-probes/fifo_content.sh
+bash /home/lyphe/.claude/state/pipeline-reviews/chat-image-results/athena-probes/fifo_content.sh
 expect: `refused instead of hung: true` (today: answered `000`, the request hung)
 ```
 
@@ -1017,7 +1017,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/files/content
 LOW — the preview offers Edit on an outside text file, and Edit dead-ends
 
 ```probe
-bash /tmp/pipeline-reviews/chat-image-results/athena-probes/outside_text_open.sh
+bash /home/lyphe/.claude/state/pipeline-reviews/chat-image-results/athena-probes/outside_text_open.sh
 expect: `Edit offered on the outside file: false` (today: `true`, then `editor says: Couldn't open note.txt for editing`)
 ```
 
@@ -1031,7 +1031,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/file-tree/file-tr
 LOW — every open of an outside file requests a listing the server always refuses; it logs a console error and shows an amber refusal, and the probe's console gate is closed before that step
 
 ```probe
-bash /tmp/pipeline-reviews/chat-image-results/athena-probes/outside_text_open.sh
+bash /home/lyphe/.claude/state/pipeline-reviews/chat-image-results/athena-probes/outside_text_open.sh
 expect: `403s []` and `console errors 0` on the "after opening the chip" line (today: `403s ["/list"] | console errors 1 | folder pane refusal shown: true`)
 ```
 
@@ -1045,7 +1045,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/file-tree/file-tr
 LOW — a picture is not on the page when the Read sits in a collapsed run, even with Show work on
 
 ```probe
-node /tmp/pipeline-reviews/chat-image-results/athena-probes/grouped_read_hides.mjs
+node /home/lyphe/.claude/state/pipeline-reviews/chat-image-results/athena-probes/grouped_read_hides.mjs
 expect: the "group collapsed" line lists a picture, or the collapsed row signals one (today: `[]`, then two pictures only after the group opens)
 ```
 
@@ -1059,7 +1059,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/file-tree/file-tr
 LOW — a picture the assistant read is announced as "Attached image"
 
 ```probe
-node /tmp/pipeline-reviews/chat-image-results/athena-probes/grouped_read_hides.mjs
+node /home/lyphe/.claude/state/pipeline-reviews/chat-image-results/athena-probes/grouped_read_hides.mjs
 expect: the picture's label names the file, not "Attached image" (today: `["Expand Attached image","Expand Attached image"]`)
 ```
 
@@ -1073,7 +1073,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/file-tree/file-tr
 LOW — `.verify/chat-image-results.mjs` cannot fail
 
 ```probe
-bash /tmp/pipeline-reviews/chat-image-results/athena-probes/probe_exit_code.sh
+bash /home/lyphe/.claude/state/pipeline-reviews/chat-image-results/athena-probes/probe_exit_code.sh
 expect: `phases that drew no picture: 4` followed by a non-zero exit code (today: `exit code: 0`; needs a client build without the fix, `:3011` today)
 ```
 
@@ -1116,7 +1116,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/Pr
 the viewer opens INVISIBLY behind the PRD editor (`z-[200]` over the viewer's `z-[100]`)
 
 ```probe
-cd /tmp/pipeline-reviews/diagram-lightbox && node athena-zindex.mjs
+cd /home/lyphe/.claude/state/pipeline-reviews/diagram-lightbox && node athena-zindex.mjs
 expect: {"dialogMounted":true,"dialogZ":"100","hostZ":"200","topmostAtCentre":"PRD-EDITOR","topmostAtCorner":"PRD-EDITOR","topmostAtCloseBtn":"PRD-EDITOR"} then "after Esc: dialog still mounted = false"
 ```
 
@@ -1130,7 +1130,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/Chat
 the id rename breaks mermaid's end-anchored id selectors, so the viewer's copy loses paint on some markers
 
 ```probe
-cd /tmp/pipeline-reviews/diagram-lightbox && A_THEME=dark node athena-stick.mjs
+cd /home/lyphe/.claude/state/pipeline-reviews/diagram-lightbox && A_THEME=dark node athena-stick.mjs
 expect: INLINE lists "-crosshead path fill=rgb(211, 211, 211) stroke=rgb(211, 211, 211)"; VIEWER lists "-crosshead-viewer path fill=none stroke=rgb(0, 0, 0)"
 ```
 
@@ -1144,7 +1144,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/Chat
 a resize or a phone rotation while zoomed leaves the content outside its pan clamp
 
 ```probe
-cd /tmp/pipeline-reviews/diagram-lightbox && node athena-interact.mjs
+cd /home/lyphe/.claude/state/pipeline-reviews/diagram-lightbox && node athena-interact.mjs
 expect: the "(d)" line ends with a content box whose "top":190 (a band above it) and "bottom":2397 against "dialog [ 700, 500 ]"
 ```
 
@@ -1158,7 +1158,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/Chat
 pressing a toolbar button and sliding off it onto the backdrop closes the viewer
 
 ```probe
-cd /tmp/pipeline-reviews/diagram-lightbox && node athena-interact.mjs
+cd /home/lyphe/.claude/state/pipeline-reviews/diagram-lightbox && node athena-interact.mjs
 expect: (c) press on "+" then release over the backdrop: viewer open = false
 ```
 
@@ -1172,7 +1172,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/Chat
 one Ctrl+mouse-wheel notch zooms 2.7×
 
 ```probe
-cd /tmp/pipeline-reviews/diagram-lightbox && node athena-interact.mjs
+cd /home/lyphe/.claude/state/pipeline-reviews/diagram-lightbox && node athena-interact.mjs
 expect: (e) one ctrl+mouse-wheel notch (deltaY -100): scale 2.718   and   one plain wheel notch (deltaY -100): scale 1.246
 ```
 
@@ -1214,7 +1214,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/Chat
 focus does not move into the dialog when the viewer opens
 
 ```probe
-cd /tmp/pipeline-reviews/diagram-lightbox && node athena-focus.mjs
+cd /home/lyphe/.claude/state/pipeline-reviews/diagram-lightbox && node athena-focus.mjs
 expect: after Enter opens the viewer, focus: {"insideDialog":false,"active":"DIV[role=button][aria-label=Open diagram full screen]"}
 ```
 
@@ -1228,7 +1228,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/Chat
 the plugin tab's "Install from git" button is cut off at the operator's own width, and the probe cannot see it
 
 ```probe
-cd /home/lyphe/.claude/claudecodeui_lyphe && A_WIDTHS=341 A_SCALES=1.072 node /tmp/pipeline-reviews/settings-mobile-round2/athena-r2-cards.mjs | grep '^Plugins'
+cd /home/lyphe/.claude/claudecodeui_lyphe && A_WIDTHS=341 A_SCALES=1.072 node /home/lyphe/.claude/state/pipeline-reviews/settings-mobile-round2/athena-r2-cards.mjs | grep '^Plugins'
 expect: the line ends installForm:{"form":"17-324","input":"238w","btn":"288-368(79w)","cut":44,"label":"Install"} — cut > 0; healed when cut is -1 at 320, 341 and 360 × 1, 1.072, 1.2
 ```
 
@@ -1242,7 +1242,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/plugins/PluginSettin
 the uninstall-confirm banner clips its Remove button on phones
 
 ```probe
-cd /home/lyphe/.claude/claudecodeui_lyphe && node /tmp/pipeline-reviews/settings-mobile-round2/athena-r2-banner.mjs | grep -E '^w=(320|341) x1\.(072|2):'
+cd /home/lyphe/.claude/claudecodeui_lyphe && node /home/lyphe/.claude/state/pipeline-reviews/settings-mobile-round2/athena-r2-banner.mjs | grep -E '^w=(320|341) x1\.(072|2):'
 expect: w=320 x1.072 reads "Usage Dashbo:REMOVE-CUT-7px Session Mana:REMOVE-CUT-11px snake_case_p:REMOVE-CUT-325px Extraordinar:REMOVE-CUT-31px"; healed when every name reads ok
 ```
 
@@ -1312,7 +1312,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/ArcDeck.t
 PlanCard's fold rationale still promises a compact head, and a folded card is no longer one
 
 ```probe
-node /tmp/pipeline-reviews/card-description-full/athena-probes/fold.mjs | grep -E "^390"
+node /home/lyphe/.claude/state/pipeline-reviews/card-description-full/athena-probes/fold.mjs | grep -E "^390"
 expect: either the fold's rationale no longer says "at a glance", or every folded loose card at 390 reads under ~250px (today: folded 151 / 470 / 206 / 338, arc 539)
 ```
 
@@ -1402,7 +1402,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/shared/app-types.ts, /hom
 `useHostMove` calls the listener from the render BEFORE the one that committed the move
 
 ```probe
-cd /home/lyphe/.claude/claudecodeui_lyphe && node /tmp/pipeline-reviews/app-drawer-chat--host-window/athena-probe-s6.mjs
+cd /home/lyphe/.claude/claudecodeui_lyphe && node /home/lyphe/.claude/state/pipeline-reviews/app-drawer-chat--host-window/athena-probe-s6.mjs
 expect: `listener closure heard (n after the change is 1): [0]` while the defect stands; `[1]` once the ref is written in a layout effect ahead of the subscription
 ```
 
@@ -1459,7 +1459,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/.oxlintrc.json
 In simple-list mode (the operator's own setting) `openProjectChat(B, 'new')` answers `true` and the workspace ends on the saved project, not B
 
 ```probe
-cd /home/lyphe/.claude/claudecodeui_lyphe && node /tmp/pipeline-reviews/app-drawer-chat--projects-door/probe-door-simple-list.mjs simple
+cd /home/lyphe/.claude/claudecodeui_lyphe && node /home/lyphe/.claude/state/pipeline-reviews/app-drawer-chat--projects-door/probe-door-simple-list.mjs simple
 expect: `new in ArchPulse: answered true; project .claude → .claude; url /; trigger 0→1` and `latest in keepalive-proof (no conversation): … project .claude → .claude` (a door that held reads `→ ArchPulse` and `→ keepalive-proof`, which is what `… tree` prints). Needs the verve account to list `.claude`, `ArchPulse` and one project with no sessions.
 ```
 
@@ -1487,7 +1487,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/.oxlintrc.json, /home/lyphe/.cla
 When the registry loses the row of the left slot, the layer draws the right application under `data-pane-side="left"`, and every act over it is greyed
 
 ```probe
-node /tmp/pipeline-reviews/app-drawer-chat--switcher-acts/athena-probes/s10b.mjs
+node /home/lyphe/.claude/state/pipeline-reviews/app-drawer-chat--switcher-acts/athena-probes/s10b.mjs
 expect: the "after delete" line reads front left, cur null, disabled [false,false,true,true,true] while the layer still draws EIS App; the run ends "registry BASELINE RESTORED"
 ```
 
@@ -1571,7 +1571,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-host/utils/chat
 a mouse press held on a node in the edge fade is lost (desktop, gutter)
 
 ```probe
-node /tmp/pipeline-reviews/flow-scroll/athena-press-edge.mjs
+node /home/lyphe/.claude/state/pipeline-reviews/flow-scroll/athena-press-edge.mjs
 expect: PRESS-OK on both edges (today: PRESS-LOST leading n7 [] and PRESS-LOST trailing n18 [], exit 1)
 ```
 
@@ -1585,7 +1585,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/hooks/use
 on WebKit the track's end padding is not scrollable overflow: the last node sits flush and its ring is cut
 
 ```probe
-node /tmp/pipeline-reviews/flow-scroll/athena-webkit-end.mjs
+node /home/lyphe/.claude/state/pipeline-reviews/flow-scroll/athena-webkit-end.mjs
 expect: roomRight px {"webkit":10,"chromium":10} (today: {"webkit":0,"chromium":10}, exit 1)
 ```
 
@@ -1599,7 +1599,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/hooks/use
 Tab into an overflowing flow throws the track back to phase 1
 
 ```probe
-node /tmp/pipeline-reviews/flow-scroll/athena-tab-jump.mjs
+node /home/lyphe/.claude/state/pipeline-reviews/flow-scroll/athena-tab-jump.mjs
 expect: the current phase stays in view after the Tab (today: opened {"scrollLeft":246,"liveInView":true} → after Tab {"scrollLeft":0,"liveInView":false,"focus":"n1"}, exit 1)
 ```
 
@@ -1613,7 +1613,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/hooks/use
 `taken` is set by touches and wheels that never scroll the track, and outlives the element
 
 ```probe
-node /tmp/pipeline-reviews/flow-scroll/athena-wheel-taken.mjs
+node /home/lyphe/.claude/state/pipeline-reviews/flow-scroll/athena-wheel-taken.mjs
 expect: the landed phase is in view (today: {"scrollLeft":0,"landedInView":false}, exit 1)
 ```
 
@@ -1641,7 +1641,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/auth/auth.middlew
 (MED) — a sign-out caused by emptied storage leaves no client trace
 
 ```probe
-node /tmp/pipeline-reviews/signed-out/athena-probes/storage-wiped-no-trace.mjs
+node /home/lyphe/.claude/state/pipeline-reviews/signed-out/athena-probes/storage-wiped-no-trace.mjs
 expect: page trace records: 1 or more, naming why the session ended (measured: 0)
 ```
 
@@ -1683,7 +1683,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/auth/auth.middlew
 . `host-window-home.mjs`: the useDeviceSettings row cannot fail
 
 ```probe
-/tmp/pipeline-reviews/app-drawer-chat--seam-kit/mutants/run-mutant.sh host-window-home '[{"glob":"**/src/shared/hooks/useDeviceSettings.ts*","from":"hostWindow.innerWidth < mobileBreakpoint","to":"false"}]' | tail -1
+/home/lyphe/.claude/state/pipeline-reviews/app-drawer-chat--seam-kit/mutants/run-mutant.sh host-window-home '[{"glob":"**/src/shared/hooks/useDeviceSettings.ts*","from":"hostWindow.innerWidth < mobileBreakpoint","to":"false"}]' | tail -1
 expect: ALL PASS (with useDeviceSettings forced to "wide" at 390px; a discriminating row prints a FAIL)
 ```
 
@@ -1697,7 +1697,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/utils.ts, /home/lyphe
 . `host-window-kit.mjs`: reverting four of its subjects leaves it on ALL PASS
 
 ```probe
-/tmp/pipeline-reviews/app-drawer-chat--seam-kit/mutants/run-mutant.sh host-window-kit '[{"glob":"**/src/shared/ui/Dialog.tsx*","from":"hostWindow.requestAnimationFrame(","to":"requestAnimationFrame("},{"glob":"**/src/shared/ui/Dialog.tsx*","from":"hostWindow.cancelAnimationFrame(","to":"cancelAnimationFrame("},{"glob":"**/src/shared/ui/Tooltip.tsx*","from":"isNodeLike(target) && ","to":"(target instanceof Node) && "},{"glob":"**/src/shared/ui/useZoomPan.ts*","from":"resizeObserverIn(hostWindow, ","to":"((cb) => new ResizeObserver(cb))("}]' | tail -1
+/home/lyphe/.claude/state/pipeline-reviews/app-drawer-chat--seam-kit/mutants/run-mutant.sh host-window-kit '[{"glob":"**/src/shared/ui/Dialog.tsx*","from":"hostWindow.requestAnimationFrame(","to":"requestAnimationFrame("},{"glob":"**/src/shared/ui/Dialog.tsx*","from":"hostWindow.cancelAnimationFrame(","to":"cancelAnimationFrame("},{"glob":"**/src/shared/ui/Tooltip.tsx*","from":"isNodeLike(target) && ","to":"(target instanceof Node) && "},{"glob":"**/src/shared/ui/useZoomPan.ts*","from":"resizeObserverIn(hostWindow, ","to":"((cb) => new ResizeObserver(cb))("}]' | tail -1
 expect: ALL PASS (with the Dialog frame back on the global window, Tooltip's isNodeLike reverted to instanceof, and useZoomPan's observer built by the opener's constructor)
 ```
 
@@ -1711,7 +1711,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/utils.ts, /home/lyphe
 . `useZoomPan`: a press held across a move poisons the next click
 
 ```probe
-cd /tmp/pipeline-reviews/app-drawer-chat--seam-kit/athena-scaffold && node lightbox.mjs 2>&1 | grep '^VIOLATED L9'
+cd /home/lyphe/.claude/state/pipeline-reviews/app-drawer-chat--seam-kit/athena-scaffold && node lightbox.mjs 2>&1 | grep '^VIOLATED L9'
 expect: a line reading VIOLATED L9 (adversarial) … {"stillThere":true}  (fixed: HELD L9 … {"stillThere":false})
 ```
 
@@ -1753,7 +1753,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-host/ChatHostSl
 Two of `CommandMenu`'s three viewport reads survive a mutant in the window probe (a 420-px window cannot reach line 117)
 
 ```probe
-cd /tmp/pipeline-reviews/app-drawer-chat--seam-chat-surfaces/athena-probes && MUT='[{"glob":"**/src/modules/chat/composer/CommandMenu.tsx*","from":"hostWindow.innerWidth - 440","to":"innerWidth - 440"}]' node --import ./preload.mjs /home/lyphe/.claude/claudecodeui_lyphe/.verify/chat-surfaces-window.mjs | grep -E "FAIL|all checks"
+cd /home/lyphe/.claude/state/pipeline-reviews/app-drawer-chat--seam-chat-surfaces/athena-probes && MUT='[{"glob":"**/src/modules/chat/composer/CommandMenu.tsx*","from":"hostWindow.innerWidth - 440","to":"innerWidth - 440"}]' node --import ./preload.mjs /home/lyphe/.claude/claudecodeui_lyphe/.verify/chat-surfaces-window.mjs | grep -E "FAIL|all checks"
 expect: a "[FAIL] the command menu is placed against the window's width" line; today "all checks passed" (the same mutant against `node wide.mjs` — the probe with a 700-px window — prints that FAIL with "right":740)
 ```
 
@@ -1781,7 +1781,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/widgets/hooks/useWid
 The updated proof script cannot fail for the regression it names, and nothing in it guards H1
 
 ```probe
-cd /home/lyphe/.claude/claudecodeui_lyphe && node /tmp/pipeline-reviews/app-drawer-chat--float-panel/probes/guard-vacuous.mjs
+cd /home/lyphe/.claude/claudecodeui_lyphe && node /home/lyphe/.claude/state/pipeline-reviews/app-drawer-chat--float-panel/probes/guard-vacuous.mjs
 expect: the mutant line (`hidden`, display none) does not read the same assertionValue as the as-built line (today both read "assertionValue":0, with display flex vs none)
 ```
 
@@ -1819,7 +1819,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/Wo
 a double activation of a radial item inside the close fade runs the act twice (Open in a new tab: two pages; Reload: two document requests)
 
 ```probe
-node /tmp/pipeline-reviews/app-drawer-chat--radial-fill/athena-radial-dblclick.mjs
+node /home/lyphe/.claude/state/pipeline-reviews/app-drawer-chat--radial-fill/athena-radial-dblclick.mjs
 expect: every row prints newPages 1 (today: gapMs 0, 30, 60 print newPages 2)
 ```
 
@@ -1895,7 +1895,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-host/ChatHostWi
 (MEDIUM) — the forget effect fires on a transient `null` while an application is still up, so a press re-routes inside a visit that never ended
 
 ```probe
-cd /home/lyphe/.claude/claudecodeui_lyphe && node /tmp/pipeline-reviews/app-drawer-chat--routing/athena-probes/dual-close.mjs dualclose
+cd /home/lyphe/.claude/claudecodeui_lyphe && node /home/lyphe/.claude/state/pipeline-reviews/app-drawer-chat--routing/athena-probes/dual-close.mjs dualclose
 expect: exit 1 with `VIOLATED the left application was up the whole time (one visit)…` whose `s.url` is /session/0f01a88c-b726-42e9-9b75-7236641b603b (ArchPulse) and whose press log holds two pushState entries; fixed, it prints `HELD` with the URL on the .claude conversation and an empty log
 ```
 
@@ -1909,7 +1909,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/ho
 (LOW) — with no chat mounted, the first press routes but does not float
 
 ```probe
-cd /home/lyphe/.claude/claudecodeui_lyphe && node /tmp/pipeline-reviews/app-drawer-chat--routing/athena-probes/routing-door.mjs nomount
+cd /home/lyphe/.claude/claudecodeui_lyphe && node /home/lyphe/.claude/state/pipeline-reviews/app-drawer-chat--routing/athena-probes/routing-door.mjs nomount
 expect: exit 1 with `VIOLATED a press with an application linked to ArchPulse: the chat ends up FLOATING…` showing `"ph":null,"panel":false` on the ArchPulse newest URL, then `(info) a SECOND press then floats it: true`
 ```
 
@@ -1952,7 +1952,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/ho
 "no console error while signed in, in the tab or in the window" cannot fail for a server 5xx or a failed resource load
 
 ```probe
-/tmp/pipeline-reviews/app-drawer-chat--whole/athena-probes/mut500.sh
+/home/lyphe/.claude/state/pipeline-reviews/app-drawer-chat--whole/athena-probes/mut500.sh
 expect: two " 500 GET /api/providers/sessions/<id>/token-usage" lines, "console errors while signed in (404s, aborted fetches and blocked font loads aside): 0", then "ALL CHECKS PASS" and "exit=0"
 ```
 
@@ -1980,7 +1980,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/whole-check-inpage-l
 `windowGone` has no timeout: a window that does not close hangs the run for ever
 
 ```probe
-cd /home/lyphe/.claude/claudecodeui_lyphe && node /tmp/pipeline-reviews/app-drawer-chat--whole/athena-probes/probe-d-windowgone.mjs
+cd /home/lyphe/.claude/claudecodeui_lyphe && node /home/lyphe/.claude/state/pipeline-reviews/app-drawer-chat--whole/athena-probes/probe-d-windowgone.mjs
 expect: "windowGone on a window that stays open: STILL PENDING after 45000ms"
 ```
 
@@ -1994,7 +1994,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/whole-check-inpage-l
 `simple-list-deep-link.mjs` prints "held" while it exits 1, and exits 0 when tree mode is the one that lost the link
 
 ```probe
-cd /tmp/pipeline-reviews/app-drawer-chat--whole/athena-probes && ./deeplink-stub.sh / / ; ./deeplink-stub.sh /session/x /
+cd /home/lyphe/.claude/state/pipeline-reviews/app-drawer-chat--whole/athena-probes && ./deeplink-stub.sh / / ; ./deeplink-stub.sh /session/x /
 expect: first prints "held: the deep link survives a late session lookup in both modes" with exit=1; second prints the same line with exit=0 although tree mode lost the link
 ```
 
@@ -2022,7 +2022,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/whole-check-inpage-l
 a run that is killed leaves its scratch chat behind
 
 ```probe
-/tmp/pipeline-reviews/app-drawer-chat--whole/athena-probes/kill-midrun.sh
+/home/lyphe/.claude/state/pipeline-reviews/app-drawer-chat--whole/athena-probes/kill-midrun.sh
 expect: "scratch chat deleted: false" and "threw: page.waitForTimeout: Target page, context or browser has been closed"; afterwards `DELETE /api/providers/sessions/<the printed id>?force=true` answers 200 (the chat was still there)
 ```
 
@@ -2036,7 +2036,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/whole-check-inpage-l
 the harness's Google Fonts accommodation hides an 8.4 s blank window, and the report does not flag it
 
 ```probe
-cd /home/lyphe/.claude/claudecodeui_lyphe && node /tmp/pipeline-reviews/app-drawer-chat--whole/athena-probes/probe-c-fonts.mjs
+cd /home/lyphe/.claude/claudecodeui_lyphe && node /home/lyphe/.claude/state/pipeline-reviews/app-drawer-chat--whole/athena-probes/probe-c-fonts.mjs
 expect: "window page at +<100ms, composer in window at +8xxxms" (8397 measured)
 ```
 
@@ -2375,7 +2375,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/electron/main.js, /home/lyphe/.c
 `/?runner=<plan>` at the root never lands after the project is picked (scenario S6)
 
 ```probe
-node /tmp/pipeline-reviews/prompts-in-cards--reveal/athena-probes/landing-attacks-2.mjs   # dev client on 127.0.0.1:5183
+node /home/lyphe/.claude/state/pipeline-reviews/prompts-in-cards--reveal/athena-probes/landing-attacks-2.mjs   # dev client on 127.0.0.1:5183
 expect: [FAIL] S6 the pick never lands: the tab stays Chat and the landing URL is gone (navigate('/') in handleProjectSelect) — rootPick.after `/ | tab Chat | stored chat | pane no cards 0 | target false`, while beforePick the same page holds `/?runner=coi-backend-conformance | tab null | tabs []`; S6b prints [OK] on the already-picked page
 ```
 
@@ -2389,7 +2389,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/co
 an empty `?runner=` is read as a plan name (scenario S7)
 
 ```probe
-node /tmp/pipeline-reviews/prompts-in-cards--reveal/athena-probes/landing-attacks-2.mjs
+node /home/lyphe/.claude/state/pipeline-reviews/prompts-in-cards--reveal/athena-probes/landing-attacks-2.mjs
 expect: [FAIL] S7 an EMPTY `?runner=` lands on the Runner tab and strips the param — emptyParam.series[1] `/session/e609dd36-… | tab Runner | stored runner | pane no cards 0`, and the param is gone from the URL
 ```
 
@@ -2403,7 +2403,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/co
 the reveal is not retired over an empty lane; it stays pending and fires late (scenario S21)
 
 ```probe
-node /tmp/pipeline-reviews/prompts-in-cards--reveal/athena-probes/landing-attacks-2.mjs
+node /home/lyphe/.claude/state/pipeline-reviews/prompts-in-cards--reveal/athena-probes/landing-attacks-2.mjs
 expect: [FAIL] S21 the reveal was still PENDING over the empty lane: after the lane drew 8 cards the pane moved to 2970px (target top 464px) with no landing
 ```
 
@@ -2512,7 +2512,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/
 INV-6130: "four probes die before their scenario" no longer reproduces
 
 ```probe
-bash /tmp/pipeline-reviews/plan-ask-survives-restart/athena-probes/{settle_throw,read_fail_silent,stale_token_flood,id_reuse}.sh
+bash /home/lyphe/.claude/state/pipeline-reviews/plan-ask-survives-restart/athena-probes/{settle_throw,read_fail_silent,stale_token_flood,id_reuse}.sh
 expect: all four reach their own scenario, rc=0 — `still alive after the settle chain threw` / `process exit code 0`; `plan approved by the answer: false`; `store reads for 40 taps of ONE stale token: 1` and `extra store reads: 0`; `two different asks share one key …: false` — no TypeError at composition, so the row's "four probes die" no longer reproduces
 ```
 
@@ -2526,7 +2526,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/
 MEDIUM — a reorder re-inserts the *neighbours'* DOM nodes, so a moved deck's strip shows plan 1 under a counter that says "Card 2 of 2", and a moved card's census scroll is lost
 
 ```probe
-node /tmp/pipeline-reviews/card-order-drag/athena-probes/a5.mjs
+node /home/lyphe/.claude/state/pipeline-reviews/card-order-drag/athena-probes/a5.mjs
 expect: the "right after" line reads "scrollLeft":1049 with "planShownInStrip":"probe-order--arc-two" under "label":"Card 2 of 2" (today: "scrollLeft":0 … "planShownInStrip":"probe-order--arc-one", and the "4 s later" line is unchanged)
 ```
 
@@ -2540,7 +2540,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/cardOrder
 LOW — a cancelled touch commits the drop
 
 ```probe
-node /tmp/pipeline-reviews/card-order-drag/athena-probes/a6.mjs
+node /home/lyphe/.claude/state/pipeline-reviews/card-order-drag/athena-probes/a6.mjs
 expect: the "after touchCancel" line reads the wall as it began, `p6 p5 p4 p3 p2 p1`, and `local cardOrder []` (today: `p4 p6 p5 p3 p2 p1` and `[{"name":"probe-order--p4","rank":1790755561000}]`)
 ```
 
@@ -2554,7 +2554,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/cardOrder
 LOW — grabbing a card again inside its 200 ms settle slide strips the new carry's marks
 
 ```probe
-node /tmp/pipeline-reviews/card-order-drag/athena-probes/r1.mjs
+node /home/lyphe/.claude/state/pipeline-reviews/card-order-drag/athena-probes/r1.mjs
 expect: the "400 ms later, still holding" line keeps `position: relative; z-index: 30; will-change: transform; background-color: …; border-radius: …` (today: `transform: translate(13.3333px, 13.3333px);` alone)
 ```
 
@@ -2568,7 +2568,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/cardOrder
 LOW — the tied-rank branch of `ranksForMove` moves cards the operator did not touch, against the other kind
 
 ```probe
-cd /home/lyphe/.claude/claudecodeui_lyphe && TSX_TSCONFIG_PATH=tsconfig.json npx tsx /tmp/pipeline-reviews/card-order-drag/athena-probes/tie.mts
+cd /home/lyphe/.claude/claudecodeui_lyphe && TSX_TSCONFIG_PATH=tsconfig.json npx tsx /home/lyphe/.claude/state/pipeline-reviews/card-order-drag/athena-probes/tie.mts
 expect: "widget column after" keeps c-wall before d-deck (today: `a-wall b-deck d-deck e-wall c-wall`, with `c-wall` — never carried — now below the deck that stood below it)
 ```
 
@@ -2582,7 +2582,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/cardOrder
 LOW — a second finger lifts the wrong card
 
 ```probe
-node /tmp/pipeline-reviews/card-order-drag/athena-probes/t2.mjs
+node /home/lyphe/.claude/state/pipeline-reviews/card-order-drag/athena-probes/t2.mjs
 expect: "lifted after the hold" names the card under finger 1, `["p5"]`, or nothing (today: `["p4"]`)
 ```
 
@@ -2682,7 +2682,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-runner-model-pin.m
 a keyboard reader cannot reach a page's options: focus never follows the strip, and Tab always enters page 1
 
 ```probe
-node /tmp/pipeline-reviews/round-questions-strip/probe-kb-focus.mjs
+node /home/lyphe/.claude/state/pipeline-reviews/round-questions-strip/probe-kb-focus.mjs
 expect: `(1) after one Tab from the strip: focus is "Option A1" on page 0; the strip now shows page [0]` and `(2) next Tab: focus "Option B1" on page 0; the strip now shows page [0]` (page numbers 0-based)
 ```
 
@@ -2696,7 +2696,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/DeckStrip
 `Other…` pressed with its page ending at the fold: the field it focused ends up below the fold
 
 ```probe
-node /tmp/pipeline-reviews/round-questions-strip/probe-other-clip.mjs
+node /home/lyphe/.claude/state/pipeline-reviews/round-questions-strip/probe-other-clip.mjs
 expect: `field focused: true; field fully on screen: false; field inside the strip: true`
 ```
 
@@ -2710,7 +2710,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/DeckStrip
 a second tap on the same spot after a pick answers the NEXT question, unread
 
 ```probe
-node /tmp/pipeline-reviews/round-questions-strip/attack3.mjs
+node /home/lyphe/.claude/state/pipeline-reviews/round-questions-strip/attack3.mjs
 expect: `[tap again after 300ms] radios chosen: ["Beta","Epsilon"]; marks=✓ ✓ 3; inView=[2]`
 ```
 
@@ -2724,7 +2724,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/DeckStrip
 `.verify/lib/round-strip.mjs` waits a fixed 500ms for the live door and fails when it is slower
 
 ```probe
-node /tmp/pipeline-reviews/round-questions-strip/rerun-libs.mjs
+node /home/lyphe/.claude/state/pipeline-reviews/round-questions-strip/rerun-libs.mjs
 expect: `[FAIL] desktop · typed words answer it again, and the strip is still on question 2` and `[FAIL] phone · …` then `libs re-run: 178 OK, 2 FAIL` — environment-dependent: needs the live door's first refusal of the fixture ask to take over ~500ms (a cold store read, ~1.1s here); on a warm door it prints `0 FAIL`
 ```
 
@@ -2756,7 +2756,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatch-souls/ch
 a fresh chain owns nothing until its first stage has a spec; the dot is dark for seconds
 
 ```probe
-python3 /tmp/pipeline-reviews/purple-dot-souls/athena-probes/chain-start-lag.py
+python3 /home/lyphe/.claude/state/pipeline-reviews/purple-dot-souls/athena-probes/chain-start-lag.py
 expect: `chains 200 | seconds with a chain running and no stage launch to name an owner: median 4.8 p90 17.1 max 62.2` (figures drift a little; median several seconds, max a minute)
 ```
 
@@ -2770,7 +2770,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.cl
 the reader's id fence is tighter than the launcher's: a chain id over 120 characters is never counted
 
 ```probe
-cd /home/lyphe/.claude/claudecodeui_lyphe && TSX_TSCONFIG_PATH=server/tsconfig.json timeout 90 node --import tsx /tmp/pipeline-reviews/purple-dot-souls/athena-probes/long-chain-id.mjs
+cd /home/lyphe/.claude/claudecodeui_lyphe && TSX_TSCONFIG_PATH=server/tsconfig.json timeout 90 node --import tsx /home/lyphe/.claude/state/pipeline-reviews/purple-dot-souls/athena-probes/long-chain-id.mjs
 expect: `id length 127: launcher walker_alive=True | dot reader counts it=false` — and `id length 32: … counts it=true`
 ```
 
@@ -2784,7 +2784,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.cl
 the MANUAL says planner outings are stamped with no chat and not counted; 75 of 75 are stamped, and the reader has no role filter
 
 ```probe
-python3 /tmp/pipeline-reviews/purple-dot-souls/athena-probes/planner-stamp.py
+python3 /home/lyphe/.claude/state/pipeline-reviews/purple-dot-souls/athena-probes/planner-stamp.py
 expect: `75 planner specs; 75 stamped with a chat id` (the doc says planner outings are stamped with no chat)
 ```
 
@@ -2812,7 +2812,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.cl
 A page that has been open a while never sees another device's draft, and its first keystroke replaces that draft whole
 
 ```probe
-node /tmp/pipeline-reviews/ask-drafts/athena-probes/s6.mjs
+node /home/lyphe/.claude/state/pipeline-reviews/ask-drafts/athena-probes/s6.mjs
 expect: `[FAIL] LONG-LIVED phone page, 8 s after the desktop saved: shows the desktop's draft? -> {"rework":true,"notes":null}` and `[FAIL] after the phone typed, the account's draft is "phone note" (desktop's words GONE)`; after a reload the phone page shows `"notes":"phone note"`
 ```
 
@@ -2826,7 +2826,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/AskDraftP
 The prune deletes a draft on the first frame without its ask, but an open ask can leave the lane and come back under the same identity; two comments say it cannot
 
 ```probe
-bash /tmp/pipeline-reviews/ask-drafts/athena-probes/gap.sh && node /tmp/pipeline-reviews/ask-drafts/athena-probes/s9.mjs
+bash /home/lyphe/.claude/state/pipeline-reviews/ask-drafts/athena-probes/gap.sh && node /home/lyphe/.claude/state/pipeline-reviews/ask-drafts/athena-probes/s9.mjs
 expect: `asking while the outing is live: null`, then `SAME identity as before the gap: true`; then `entries while the ask was off the lane: 0; after the SAME ask (910001-2026-10-01T12:00:00Z) returned: entries=0, notes field=null`
 ```
 
@@ -2840,7 +2840,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/AskDraftP
 The builder's probe writes whole lists to the shared account, which wipes any concurrent writer's entries (INV-4406 says never whole)
 
 ```probe
-node /tmp/pipeline-reviews/ask-drafts/athena-probes/s11.mjs
+node /home/lyphe/.claude/state/pipeline-reviews/ask-drafts/athena-probes/s11.mjs
 expect: `bystander entry present before: true`, then `bystander entry present after the probe's whole-list write: false`
 ```
 

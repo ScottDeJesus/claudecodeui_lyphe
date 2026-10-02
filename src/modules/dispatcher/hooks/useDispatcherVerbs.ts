@@ -34,7 +34,7 @@ async function readBody(response: Response): Promise<VerbBody | null> {
 }
 
 /**
- * The verb a press is relaying: the dispatcher's own eight, plus the card's `answer`. The answer is
+ * The verb a press is relaying: the dispatcher's own nine, plus the card's `answer`. The answer is
  * a door of its own (`POST /api/dispatcher/answer`, never one of the verb routes), and the union
  * stays LOCAL to this hook — `DispatcherVerb` remains exactly the set the server spawns, so no
  * route or service is ever read against a word the dispatcher's binary does not know.
@@ -49,6 +49,8 @@ export type DispatcherPlanVerbs = {
   park(): Promise<void>;
   unpark(): Promise<void>;
   drop(): Promise<void>;
+  /** The plan's stalled planner outing put back to work — the dispatcher picks the door (`cut`, `judge`, or a `tell` of `continue`). */
+  plannerResume(): Promise<void>;
   setModel(choice: DispatcherModelChoice): Promise<void>;
   setSwarm(choice: DispatcherSwarmChoice): Promise<void>;
   /**
@@ -74,7 +76,7 @@ export type DispatcherArcVerbs = {
 };
 
 /**
- * Stop, Resume, Schedule, Park, Unpark, Model, Swarm, Drop and Answer for one plan — or Stop, Resume,
+ * Stop, Resume, Schedule, Park, Unpark, Model, Swarm, Drop, Resume planner and Answer for one plan — or Stop, Resume,
  * Schedule and Model for one dispatch ARC — and what to say about each.
  *
  * ONE HOOK, TWO DOORS, because the two are the same act on the same store through the same verbs:
@@ -109,7 +111,7 @@ export type DispatcherArcVerbs = {
  *
  * ANSWER IS THE ONE PRESS THAT REPORTS BACK, and the only one whose outcome a control reads: the
  * card draws its answered state from a `true`, so `send` resolves whether the lane took the word
- * (2xx) and the other eight resolve `void`, their outcome nobody's but the next frame's. It travels
+ * (2xx) and the other nine resolve `void`, their outcome nobody's but the next frame's. It travels
  * the plan door alone (`POST /api/dispatcher/answer`, never one of the verb routes) and is not a
  * `DispatcherVerb` — that set is exactly what the server spawns.
  *
@@ -162,6 +164,7 @@ export function useDispatcherVerbs(
       if (verb === 'park') return t('dispatcher.park');
       if (verb === 'unpark') return t('dispatcher.unpark');
       if (verb === 'drop') return t('dispatcher.delete.word');
+      if (verb === 'planner-resume') return t('dispatcher.plannerResume');
       if (verb === 'schedule') return t('runner.schedule.refused');
       if (verb === 'model') return t('runner.model.refused');
       if (verb === 'swarm') return t('dispatcher.swarm.refused');
@@ -193,7 +196,7 @@ export function useDispatcherVerbs(
    *
    * It resolves `true` exactly when the response was 2xx and `false` on a refusal or a request that
    * never completed. Only `answer` hands that back (its card draws its answered state from it); the
-   * eight verbs discard it at their callbacks — the toast above is what a human reads.
+   * nine verbs discard it at their callbacks — the toast above is what a human reads.
    */
   const send = useCallback(
     async (verb: DispatcherPress, call: () => Promise<Response>): Promise<boolean> => {
@@ -233,7 +236,7 @@ export function useDispatcherVerbs(
     [doneWord, t, toast, word],
   );
 
-  // The eight verbs are one-way presses: each awaits `send` and returns `void`, because nothing
+  // The nine verbs are one-way presses: each awaits `send` and returns `void`, because nothing
   // reads their outcome — the card redraws from the next frame. `answer`, below, is the one that
   // hands the boolean back.
   const stop = useCallback(
@@ -265,10 +268,14 @@ export function useDispatcherVerbs(
     [name, scope, send],
   );
 
-  // The plan card's own four, which no arc header draws and no arc route exists for.
+  // The plan card's own five, which no arc header draws and no arc route exists for.
   const park = useCallback(async () => { await send('park', () => api.dispatcher.park(name)); }, [name, send]);
   const unpark = useCallback(async () => { await send('unpark', () => api.dispatcher.unpark(name)); }, [name, send]);
   const drop = useCallback(async () => { await send('drop', () => api.dispatcher.drop(name)); }, [name, send]);
+  const plannerResume = useCallback(
+    async () => { await send('planner-resume', () => api.dispatcher.plannerResume(name)); },
+    [name, send],
+  );
   const setSwarm = useCallback(
     async (choice: DispatcherSwarmChoice) => {
       await send('swarm', () => api.dispatcher.swarm(name, choice));
@@ -286,5 +293,5 @@ export function useDispatcherVerbs(
   );
 
   if (scope === 'arc') return { stop, resume, schedule, setModel, busy };
-  return { stop, resume, schedule, park, unpark, drop, setModel, setSwarm, answer, busy };
+  return { stop, resume, schedule, park, unpark, drop, plannerResume, setModel, setSwarm, answer, busy };
 }

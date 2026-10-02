@@ -5,13 +5,16 @@ import { promisify } from 'node:util';
 import type { DispatcherVerb, DispatcherVerbResult } from '@/shared/types.js';
 
 /**
- * Relaying the dispatcher's own seven verbs: `stop`, `resume`, `schedule` (a plan's Start — or its
+ * Relaying the dispatcher's own nine verbs: `stop`, `resume`, `schedule` (a plan's Start — or its
  * Resume, for one already stopped — at a time), `park` (a designed plan set aside), `unpark` (handed
- * back to be cut), `model` (a plan's or an arc's own DeepSeek / Claude word) and `drop` (a plan
- * removed, with everything the store holds of it — refused while a phase of it walks or while a
- * planner outing for the plan or its arc is live, the two gates of `hooks/dispatcher/cmd/drop.py`).
+ * back to be cut), `model` (a plan's or an arc's own DeepSeek / Claude word), `swarm` (a plan's own
+ * swarm word), `drop` (a plan removed, with everything the store holds of it — refused while a phase
+ * of it walks or while a planner outing for the plan or its arc is live, the two gates of
+ * `hooks/dispatcher/cmd/drop.py`) and `planner-resume` (a plan's stalled planner outing put back to
+ * work — which door it goes back through is the dispatcher's own reading of its store, so it takes
+ * the press's `--by` and nothing else).
  *
- * FOUR OF THE SEVEN NAME AN ARC AS READILY AS A PLAN — `stop`, `resume`, `schedule` and `model`, each
+ * FOUR OF THE NINE NAME AN ARC AS READILY AS A PLAN — `stop`, `resume`, `schedule` and `model`, each
  * resolved by the dispatcher's own door and by nothing on this side. An arc has no walk of its own:
  * `stop <arc>` is this same verb over the arc's LIVE plans — what is walking and what is approved,
  * unpaused and waiting its turn — and `resume <arc>` over its STOPPED ones, which is every plan of it
@@ -89,8 +92,8 @@ function readExitCode(value: unknown): number | null {
 /**
  * Runs one verb against one name — a plan's, or an arc's for the four the arc's door also opens on.
  * `verbArgs` follow the name — `schedule`'s hour, `model`'s word and `swarm`'s, each already checked
- * by the route against the shapes the dispatcher accepts; `stop`, `resume`, `park`, `unpark` and `drop` take
- * none.
+ * by the route against the shapes the dispatcher accepts, and `planner-resume`'s `--by app:card`, which the
+ * route spells itself; `stop`, `resume`, `park`, `unpark` and `drop` take none.
  *
  * `cwd` is the home directory rather than this repository: the dispatcher resolves its own store from
  * `DISPATCHER_HOME`/`$HOME` (`hooks/dispatcher/store.py:home`), and a verb must never be interpreted

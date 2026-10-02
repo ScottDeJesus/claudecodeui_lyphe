@@ -3077,7 +3077,7 @@ governs: /home/lyphe/.claude/hooks/skill_router.py, /home/lyphe/.claude/skills/h
 ## MAN-1498 — The dispatcher lane
 section: dispatcher/000
 
-A polled lane on this server: sixteen routes under `/api/dispatcher` (fifteen in `dispatcher.routes.ts`, plus the card's `POST /answer`, MAN-7534), behind `authenticateToken` in `server/index.ts` (`createDispatcherModule()`, the mount, and its `start()`/`stop()` after `listen` and on shutdown), wired in `dispatcher.module.ts`, plus one websocket frame pushed to every open `/ws` socket whenever the picture changes — `kind:
+A polled lane on this server: seventeen routes under `/api/dispatcher` (sixteen in `dispatcher.routes.ts`, plus the card's `POST /answer`, MAN-7534), behind `authenticateToken` in `server/index.ts` (`createDispatcherModule()`, the mount, and its `start()`/`stop()` after `listen` and on shutdown), wired in `dispatcher.module.ts`, plus one websocket frame pushed to every open `/ws` socket whenever the picture changes — `kind:
 'dispatcher_state'` — and one notification for each plan ending. A plan that lands owing the OPERATOR's word has its prompt put up on the plan's card (Runner tab, Runner widget) and on his phone — the Accept prompt or the designer's questions, raised by this lane itself through `dispatcher ask <name>` and answered back through `dispatcher accept` and `dispatcher tell` (MAN-7400) — and still not a word of it is this lane's composition: the census, the options and the questions are the dispatcher's. A path under `/api` that no lane names answers 404 JSON (MAN-5437).
 
 The dispatcher is a separate program. It owns a SQLite store under `~/.claude/state/dispatcher`
@@ -3163,7 +3163,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.cl
 ## MAN-5636 — The dispatcher lane — The verbs. `POST /plans/:name/stop|resume|park|unpark|drop` (no body — `drop` takes the plan out of
 section: dispatcher/000/004 The verbs. `POST /plans/:name/stop|resume|park|unpark|drop` (no body — `drop` takes the plan out of
 
-**The verbs.** `POST /plans/:name/stop|resume|park|unpark|drop` (no body — `drop` takes the plan out of the store with everything it holds of it, refused while a phase walks or a planner outing for the plan or its arc is live; the client presses it as `api.dispatcher.drop(name)`), `POST /plans/:name/model
+**The verbs.** `POST /plans/:name/stop|resume|park|unpark|drop|planner-resume` (no body — `planner-resume` runs `dispatcher planner-resume <name> --by app:card`, the `--by` spelled by the route and never taken from the request: the dispatcher reads the plan's stalled planner off its own store and sends it back through `cut`, `judge` or `tell … continue`, and refuses with `REFUSED planner-resume …` when nothing of the plan ended short, MAN-7591; `drop` takes the plan out of the store with everything it holds of it, refused while a phase walks or a planner outing for the plan or its arc is live; the client presses it as `api.dispatcher.drop(name)`), `POST /plans/:name/model
 { model }` and `POST /plans/:name/schedule { when }`, where `when` is checked by `readDispatcherScheduleWhen` (`server/shared/utils.ts`: the `offpeak|<iso with a zone>|none` grammar) and `model` by `readDispatcherModelChoice` (the closed three: `deepseek`, `claude`, `auto`), so the argv word is always one this server wrote down. `runDispatcherVerb` relays them as argv (`dispatcher
 <verb> <name> [arg]`, `cwd` the home) and NEVER throws: a numeric exit is a verdict carried whole
 (`ok` is exit 0). **The dispatcher refuses on STDOUT** — `REFUSED <verb> <name>: <reason>` exit 2, a not-found line exit 1 — `no plan <name>`, or `no plan or arc <name>` from any of the four verbs an arc's own name also reaches — so `stdout` is the field a reader reads first, and `stdout` is also where
@@ -3439,10 +3439,12 @@ carries the hour, with `verb` (`start` | `resume`) choosing the label and the ti
 (`dispatcher.scheduleTitle` / `dispatcher.resumeTitle`) and nothing else — the timer runs `resume`
 either way.
 
+**A STALLED PLANNER ADDS ONE MORE, WHATEVER THE STATUS.** When `plan.planner.stalled` (the document's own word for an outing that ended short, `report_planners.of_plan`), the bar draws **Resume planner** (`dispatcher.plannerResume`, `data-dispatcher-planner-resume`) after the verbs its status drew. It presses `POST /api/dispatcher/plans/:name/planner-resume`, which runs `dispatcher planner-resume <plan> --by app:card`: the dispatcher picks the door from its own store at the press (a cut → `cut`, a judge → `judge`, a design or a tell → `tell` with `continue`; MAN-7591), so the card names none, and its refusal (a 409) is toasted like any verb's. The daemon already asks again for a cut or judgment that ended on the weather; this is the hand for the rest.
+
 Every verb goes through `useDispatcherVerbs(name, 'plan', resumeWord)` under one `busy`; a refusal
 toasts the dispatcher's own first line, and a SUCCESS toasts the dispatcher's own sentence (the empty-
 body fallback is `runner.toast.model` for a model press, never its refusal word). Handles:
-`data-dispatcher-stop|resume|start|park|unpark`, `data-dispatcher-schedule` (`-set`, `-cancel`,
+`data-dispatcher-stop|resume|start|park|unpark|planner-resume`, `data-dispatcher-schedule` (`-set`, `-cancel`,
 and the armed hour as the group's own attribute VALUE — `''` while unarmed).
 The button words Stop, Resume, Start are `runner.*`; Park and Unpark are
 `dispatcher.park` / `dispatcher.unpark`, and a Delete's toast is headed `dispatcher.delete.word`.
@@ -3635,14 +3637,14 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/, /home/l
 section: dispatcher/010 The plan card/025 The verbs' door.
 
 **The verbs' door.** `api.dispatcher` (`src/shared/api.ts`): `plans()`, `plan(name)`, `offpeak()`,
-`stop|resume|park|unpark|drop(name)`, `schedule(name, when)`, `model(name, choice)` over
+`stop|resume|park|unpark|drop|plannerResume(name)`, `schedule(name, when)`, `model(name, choice)` over
 `/api/dispatcher/plans…`, and `arcModel(name, choice)`, `arcStop(name)`, `arcResume(name)`,
 `arcSchedule(name, when)` over `/api/dispatcher/arcs/:name/…` — four routes, one per verb an arc's own
 name reaches (MAN-1498). `answer(ask, answers, notes?)` is no verb: it is `POST /api/dispatcher/answer`, the
 prompts' own door (MAN-7400), carrying the ask exactly as the card drew it, the chosen label (or typed words)
 by question, and a Rework's notes by question. `useDispatcherVerbs.answer` is the ONE press that reports
 back: it resolves `true` on a 2xx, `false` on a refusal or a request that never completed, and the card draws its
-answered state from that `true`; the eight verbs resolve `void`. `busy` is `'answer'` while it is out, and a
+answered state from that `true`; the nine verbs resolve `void`. `busy` is `'answer'` while it is out, and a
 control disables itself on it. `'answer'` lives in the hook's own `DispatcherPress` and never joins
 `DispatcherVerb`, the set the server spawns. The verbs return the
 raw `Response`: a refusal is a RESULT on a 409 with the dispatcher's line on `stdout`, which
@@ -11900,3 +11902,25 @@ The account is shared and this feature is live on the dev client for every page 
 Shots `.verify/shots/ask-drafts-<surface>-<theme>-<what>.png` (14). Exits 1 with the failed checks. 2026-10-02: before the change (`--leg1`) 20 `[FAIL]` and 18 `[OK]` (dark and light together; picks, `Other…` words and notes empty after the reload, "both drafts reach the account" read `none`); after the change 61 `[OK]`, 0 `[FAIL]`, 0 console errors. That run predates the `dropOwnDrafts` rewrite (previously a whole-list restore); the rewrite has had `node --check` only and is not re-run. `.verify/probe-card-ask.mjs` re-run alongside: 584 `[OK]`, 0 `[FAIL]`.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/AskDraftPrune.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/askDrafts.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/hooks/useAskDraft.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-ask-drafts.mjs
+
+## MAN-7593 — Resume planner probe — the card's standing proof and its fixture
+
+Standing proof of the plan card's **Resume planner** (MAN-6794, MAN-7591).
+
+| step | what |
+|---|---|
+| run | `node .verify/probe-planner-resume.mjs` — dev client on :5183, its server on :3011; exit 0 on a pass |
+| fixture | `python3 .verify/probe-planner-resume-write.py` — run by the probe; writes into the LIVE dispatcher store |
+| exit door | `dispatcher drop probe-planner-resume` — the probe runs it in a `finally` |
+| shots | `.verify/shots/probe-planner-resume-light.png`, `…-dark.png`, 1440×900 |
+
+**Fixture.** Plan `probe-planner-resume`, state `designing`; ONE `eupalinos` `design` outing already `ended` on `wall 3601s past cap 3600s`, with no `launch_id`. Both writes commit in one `with conn:`, so the daemon never sees a `queued` row to launch. `report_planners.entries` carries it `stalled`, so `plan.planner.stalled` draws the button.
+
+**Asserts.**
+1. The button reads `Resume planner` in light and in dark.
+2. A calm card draws none.
+3. The press answers 409 with `exit: 2`, and the card toasts `REFUSED tell …` — `send_tell` refuses a design that never forked.
+
+A press on this fixture can only be refused, so no model turn ever launches. The successful press paths (cut, judge, an arc's cut from a member card, `tell continue`) are not in this probe; they were proven on a scratch `DISPATCHER_HOME`.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-planner-resume.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-planner-resume-write.py

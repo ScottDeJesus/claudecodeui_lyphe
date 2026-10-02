@@ -85,19 +85,19 @@ function statusForVerb(result: DispatcherVerbResult): number {
 }
 
 /**
- * The dispatcher lane's fifteen routes: three reads of the plan list, eight presses on a plan, four on
+ * The dispatcher lane's sixteen routes: three reads of the plan list, nine presses on a plan, four on
  * an arc. Auth is the mount's `authenticateToken`, in `server/index.ts`.
  *
  * These handlers validate and translate, and do nothing else: nothing is read here, no process is
  * started here, and no route names a path from the request — the binary and the store are the
  * module's, fixed at composition, and a request can only ever choose a plan or an arc by name, a
- * word from the closed set of eight verbs, and — where the verb takes one — a word from the three
+ * word from the closed set of nine verbs, and — where the verb takes one — a word from the three
  * model words or the swarm grammar.
  *
  * A READ THAT FINDS NO PICTURE IS TOLD SO (`NOT_READ_YET` above), and the read waits a bound for one
  * first: the two together are what keep a handover from being drawn as an empty plan list.
  *
- * FOUR OF THE EIGHT ARE RELAYED TWICE, once under `/plans/:name` and once under `/arcs/:name`, because
+ * FOUR OF THE NINE ARE RELAYED TWICE, once under `/plans/:name` and once under `/arcs/:name`, because
  * the dispatcher's own doors open on both: `model`, `stop`, `resume` and `schedule` take an arc's
  * name as readily as a plan's. The two spellings are two routes rather than one param because the
  * NAME CLASSES differ (`PLAN_NAME` against `ARC_NAME` below) — a fence that would be lost the moment
@@ -210,6 +210,13 @@ export function createDispatcherRouter(dependencies: DispatcherRouterDependencie
   // drop …` while a phase walks or a planner outing for the plan or its arc is live (exit 2), and
   // `no plan <name>` (exit 1) — are each a 409 whose body is that sentence, untouched.
   router.post('/plans/:name/drop', relay('drop'));
+  // A plan's STALLED planner outing put back to work (`dispatcher planner-resume <plan> --by app:card`) —
+  // the card's `Resume planner`. THE DISPATCHER CHOOSES THE DOOR, from its own store at the press: a cut
+  // goes back through `cut`, a judgment through `judge`, a design or a tell through a `tell` of
+  // `continue`, so this route carries no verb of the outing's and no body, and a plan with nothing
+  // stalled is the dispatcher's own refusal (`REFUSED planner-resume …`, a 409). `--by app:card` is the
+  // press's actor, written to the plan's log the way an Accept's is; the word is ours, never the request's.
+  router.post('/plans/:name/planner-resume', relay('planner-resume', () => ['--by', 'app:card']));
   // A plan's own DeepSeek / Claude word (`dispatcher model <name> <word>`). RESTARTS NOTHING AND
   // WAKES NOBODY: the word is read when a chain is launched (`phase_chain.launch_env`), so it takes
   // the plan's NEXT phase and never disturbs a walk already out — which is why no plan's state is a

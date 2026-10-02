@@ -143,7 +143,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/all.mjs, /home/lyphe/.cl
 MAN-373 and ScrollArea's comment say "a focus" scrolled the outer box; measured, a focus does not
 
 ```probe
-node /tmp/pipeline-reviews/runner-card-makeover--whole/athena-probes/focusescape.mjs
+node /home/lyphe/.claude/state/pipeline-reviews/runner-card-makeover--whole/athena-probes/focusescape.mjs
 expect: `before (static):` prints "outerScrollTop":0 with "innerScrollTop" equal to "innerMax" — a focus never reaches the escaped range
 ```
 
