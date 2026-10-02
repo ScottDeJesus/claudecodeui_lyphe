@@ -62,6 +62,26 @@ export function arcAsks(plans: readonly DispatcherPlan[]): DispatcherAsk[] {
   return asks;
 }
 
+/**
+ * Every ask a lane picture carries, by identity, each once and in the lane's order. A lock that names
+ * several plans arrives on each of them and is ONE ask. It is asked of the picture's own plans, put
+ * away or not: a plan the operator has hidden is still on the lane and still owes him a word.
+ *
+ * Read by the lane's bell (`DispatcherAskBell`), which rings for an identity it has not heard, and by
+ * `AskDraftPrune`, which drops the saved drafts of every ask this no longer names.
+ */
+export function asksOnLane(plans: readonly DispatcherPlan[] | undefined): string[] {
+  const identities: string[] = [];
+  for (const plan of Array.isArray(plans) ? plans : []) {
+    // The absent key owes nothing, as in `arcAsks`: a frame from an older server carries none.
+    const ask = plan.asking ?? null;
+    if (ask === null) continue;
+    const identity = askIdentity(ask);
+    if (!identities.includes(identity)) identities.push(identity);
+  }
+  return identities;
+}
+
 /** The first line of a text with anything on it, trimmed; empty for a null or blank text. Kept here — three lines — so this file carries no value import, only the shared types. */
 function firstLineOf(text: string | null): string {
   return (text ?? '').split('\n').map((line) => line.trim()).find(Boolean) ?? '';

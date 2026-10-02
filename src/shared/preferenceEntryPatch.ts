@@ -4,8 +4,8 @@ import type { PreferenceEntryPatch } from '@/shared/types';
  * The ENTRY PATCH: how a preference that is a document of entry lists is written, so that no
  * device's write can erase an entry another device wrote.
  *
- * WHY IT EXISTS. The `dispatcher` preference holds three lists (the hidden plans, the folded cards and
- * the card order) that every open client writes. Each client's copy is read at sign-in and never again. So when a
+ * WHY IT EXISTS. The `dispatcher` preference holds four lists (the hidden plans, the folded cards, the
+ * card order and the half-typed answers to open asks) that every open client writes. Each client's copy is read at sign-in and never again. So when a
  * write sent the WHOLE document, any client that had been open a while (a second tab, a phone, the
  * :5184 build) wrote back its own old copy and erased every hide and fold made elsewhere since. That
  * is how the operator's arc Hide of 2026-09-28 22:17:49 was undone, 11 s later, by another of his

@@ -1,5 +1,6 @@
 import { useEffect, type ReactNode } from 'react';
 
+import { AskDraftPrune } from '@/modules/dispatcher/AskDraftPrune';
 import { DispatcherAskBell } from '@/modules/dispatcher/DispatcherAskBell';
 import { DISPATCHER_ALL_TOPIC, useLiveBus } from '@/modules/live-bus';
 import { api } from '@/shared/api';
@@ -114,6 +115,9 @@ export function DispatcherFeed({ children }: { children: ReactNode }) {
           subscription that fills the bus — a bell inside a card would be remounted by every fold
           and would forget what it had already rung for. It draws nothing. */}
       <DispatcherAskBell />
+      {/* AND SO DOES THE DRAFT PRUNE, for the same reason: it drops the saved half-answers of asks the
+          lane no longer carries, whichever home is on screen. It draws nothing. */}
+      <AskDraftPrune />
       {children}
     </>
   );

@@ -80,9 +80,10 @@ function mergeGutters(stored: unknown, incoming: unknown): unknown {
 }
 
 /**
- * The Runner lane's memory (`dispatcher`) is the other document every open client writes: two ENTRY
- * LISTS, `hiddenPlans` (`{ name, at }` per hidden plan) and `collapsedCards` (one fold key per folded
- * card). Replaced whole, it let any client write back the copy it read at sign-in and erase every hide
+ * The Runner lane's memory (`dispatcher`) is the other document every open client writes: four ENTRY
+ * LISTS, `hiddenPlans` (`{ name, at }` per hidden plan), `collapsedCards` (one fold key per folded
+ * card), `cardOrder` (`{ name, rank }` per moved card) and `askDrafts` (one half-typed answer per open
+ * ask). Replaced whole, it let any client write back the copy it read at sign-in and erase every hide
  * and fold made elsewhere since: on 2026-09-28 the operator's arc Hide (22:17:49) was undone 11 s later
  * by another of his clients folding the same arc. So the write unit is the ENTRY. A list sent as a
  * RECORD is an entry patch (`src/shared/preferenceEntryPatch.ts`, whose rule this mirrors):

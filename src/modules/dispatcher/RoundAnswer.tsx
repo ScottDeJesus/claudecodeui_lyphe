@@ -1,20 +1,20 @@
-import { useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import type { HTMLAttributes } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { ROUND_DRAFT } from '@/modules/dispatcher/askDrafts';
+import { askIdentity } from '@/modules/dispatcher/askState';
+import { useAskDraft } from '@/modules/dispatcher/hooks/useAskDraft';
 import { useDispatcherVerbs } from '@/modules/dispatcher/hooks/useDispatcherVerbs';
 import { useSnapStrip } from '@/modules/dispatcher/hooks/useSnapStrip';
 import { SnapStrip, SnapStripItem } from '@/modules/dispatcher/SnapStrip';
 import { StatusFlow } from '@/modules/dispatcher/StatusFlow';
 import { QuestionText } from '@/modules/chat';
-import type { DispatcherAsk, LaneFlowNode } from '@/shared/types';
+import type { DispatcherAsk, LaneFlowNode, RoundPick } from '@/shared/types';
 import { Button, Input, QuestionOptionRow } from '@/shared/ui';
 
 /** The round this form answers: `DispatcherAsk` narrowed to its questions kind — a designer's questions, which the plan waits on. */
 type RoundAsk = Extract<DispatcherAsk, { kind: 'questions' }>;
-
-/** One question's answer as it is being composed: the offered label picked, the words typed in its `Other…` field, and whether that field is open. */
-type RoundPick = { picked: string | null; other: string; otherOpen: boolean };
 
 /**
  * The page the reader is not on. `inert` takes its controls out of the tab order and out of reach, so
@@ -101,6 +101,14 @@ function nextUnanswered(picks: RoundPick[], from: number): number | null {
  * a question, keyed by the question's own text — the AskUserQuestion contract's key, and the same
  * one `LockAnswer` answers its lock by — in the round's own order.
  *
+ * HALF AN ANSWER IS KEPT (operator: "Plan card answers to questions should save"). The picks, the
+ * `Other…` words and whether each field is open are a draft in the `dispatcher` preference
+ * (`askDrafts.ts`, through `useAskDraft`), so a reload, the other surface or an unmounted widget gives
+ * the round back as it was left. A restored open field does NOT take focus — only the press that opens
+ * one does (`pressedOpen`) — because a card that grabs the caret on mount takes it from whatever the
+ * reader was doing. A draft is never sent by itself: Send stays the reader's press, and a TAKEN
+ * answer clears it.
+ *
  * `busy` IS READ, NEVER GUESSED: the control that sends — `Send answers` — refuses a press while
  * the lane is carrying the round, so one answer is never sent twice. The rows and the Other field
  * on the pages only compose it, and stay live on purpose: a press among them during flight changes
@@ -121,13 +129,19 @@ export function RoundAnswer({ ask, onAnswered }: { ask: RoundAsk; onAnswered: ()
   // CARRIES the round — Send answers — reads it, so one round is never sent twice.
   const busy = carrying === 'answer';
 
-  // One slot a question, in the round's own order: what is picked, what is typed, which Other field is open. Essential: a round is answered question by question and sent ONCE, so all three facts are this form's own state until Send carries them together.
-  const [picks, setPicks] = useState<RoundPick[]>(
-    () => ask.questions.map(() => ({ picked: null, other: '', otherOpen: false })),
+  // A round with nothing picked or typed: one slot a question. Memoised on the count because the draft hook compares against it, and a round's questions never change under one ask.
+  const questionCount = ask.questions.length;
+  const blankPicks = useMemo<RoundPick[]>(
+    () => Array.from({ length: questionCount }, () => ({ picked: null, other: '', otherOpen: false })),
+    [questionCount],
   );
 
+  // One slot a question, in the round's own order: what is picked, what is typed, which Other field is open. Essential: a round is answered question by question and sent ONCE, so all three facts are this form's own state until Send carries them together. It is a draft in the preference too (`useAskDraft`), which is why it comes back after a reload.
+  const { state: picks, edit: editPicks, clear: clearDraft, scopeRef } = useAskDraft(askIdentity(ask), blankPicks, ROUND_DRAFT);
+  // The question whose Other field the reader's latest PRESS opened, until that field has taken focus. Essential: only that press means "I am typing" and may take focus (`autoFocus` is read when the field mounts); a field that arrives restored from a draft, or adopted from another copy, must not.
+  const [pressedOpen, setPressedOpen] = useState<number | null>(null);
+
   // The strip the pages ride, held here because a pick pages it (`goTo`) and the map reads which page is in view. It opens on the first question: a round has no walk, so no question is further along than another.
-  const questionCount = ask.questions.length;
   const strip = useSnapStrip(0, questionCount);
   // When the last pick paged the strip. Essential: it is the one fact `pickOption` needs to refuse a repeat tap while the next question is still sliding in, and nothing else records it. A ref: it paints nothing.
   const lastPagedAt = useRef(Number.NEGATIVE_INFINITY);
@@ -137,7 +151,8 @@ export function RoundAnswer({ ask, onAnswered }: { ask: RoundAsk; onAnswered: ()
     const pressedAt = pressClock();
     if (pressedAt - lastPagedAt.current < PAGING_SETTLE_MS) return;
     const next = picks.map((slot, at) => (at === index ? { ...slot, picked: label, otherOpen: false } : slot));
-    setPicks(next);
+    setPressedOpen(null);
+    editPicks(next);
     const target = nextUnanswered(next, index);
     if (target === null) return;
     lastPagedAt.current = pressedAt;
@@ -148,12 +163,13 @@ export function RoundAnswer({ ask, onAnswered }: { ask: RoundAsk; onAnswered: ()
 
   // Open or close a question's Other field: opening it takes the answer off the offered labels, and closing it leaves the typed words where they were. It never pages: the reader is still on this page.
   const toggleOther = (index: number) => {
-    setPicks((slots) => slots.map((slot, at) => (at === index ? { ...slot, picked: null, otherOpen: !slot.otherOpen } : slot)));
+    setPressedOpen(picks[index].otherOpen ? null : index);
+    editPicks((slots) => slots.map((slot, at) => (at === index ? { ...slot, picked: null, otherOpen: !slot.otherOpen } : slot)));
   };
 
   // The Other field's own value, exactly as typed.
   const typeOther = (index: number, words: string) => {
-    setPicks((slots) => slots.map((slot, at) => (at === index ? { ...slot, other: words } : slot)));
+    editPicks((slots) => slots.map((slot, at) => (at === index ? { ...slot, other: words } : slot)));
   };
 
   // Which questions have an answer, derived from the slots on every draw and never stored: the map's marks and Send's enabled state both ARE this.
@@ -181,12 +197,14 @@ export function RoundAnswer({ ask, onAnswered }: { ask: RoundAsk; onAnswered: ()
       if (given !== null) answers[question.text] = given;
     });
     void answer(ask, answers).then((took) => {
-      if (took) onAnswered();
+      if (!took) return;
+      clearDraft();
+      onAnswered();
     });
   };
 
   return (
-    <div className="flex min-w-0 flex-col gap-3">
+    <div ref={scopeRef} className="flex min-w-0 flex-col gap-3">
       {questionCount > 1 && (
         <StatusFlow
           nodes={nodes}
@@ -239,11 +257,12 @@ export function RoundAnswer({ ask, onAnswered }: { ask: RoundAsk; onAnswered: ()
             {/* The field the PRESS opened, and the only thing here that ever takes focus: the press
                 that opened it means "I am typing", exactly as the chat's `Other` row does. Nothing
                 focuses on mount — a card that grabs the caret takes it from whatever the reader was
-                doing when the lane moved. */}
+                doing when the lane moved — and so a field restored from a draft stays unfocused. */}
             {picks[index].otherOpen && (
               <Input
                 data-ask-other
-                autoFocus
+                autoFocus={pressedOpen === index}
+                onFocus={() => setPressedOpen(null)}
                 value={picks[index].other}
                 onChange={(event) => typeOther(index, event.target.value)}
                 placeholder={t('dispatcher.ask.otherPlaceholder')}

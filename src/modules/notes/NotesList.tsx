@@ -9,9 +9,10 @@ import type { Note } from '@/shared/types';
 import { Card, ConfirmDialog, EmptyState, Spinner } from '@/shared/ui';
 
 /**
- * The notes wall's grid, and this file's own constant: a card is never narrower than 18rem, and on a
- * phone it is the full width rather than 18rem of a 20rem pane. `items-start` is what keeps a tall
- * note from stretching its neighbours to its own height.
+ * The notes wall's grid, and this file's own constant: each column is at least 18rem wide and the
+ * columns share the leftover width (`1fr`), and a container narrower than 18rem gets one column as
+ * wide as the container — a wall card is 18rem and up, a card in a narrow gutter or phone pane is the
+ * full pane. `items-start` is what keeps a tall note from stretching its neighbours to its own height.
  */
 const NOTES_WALL_GRID = 'grid grid-cols-[repeat(auto-fill,minmax(min(100%,18rem),1fr))] items-start gap-4';
 

@@ -1454,6 +1454,27 @@ export function expandHome(value: string): string {
   return value.startsWith('~/') ? path.join(os.homedir(), value.slice(2)) : value;
 }
 
+/**
+ * Where the launcher keeps its launch directories, unless the operator moved it.
+ *
+ * Consumers: the dispatch-souls module (its poll and its running-launchers read) and the providers
+ * module (`session-soul-launches.service.ts`'s stamp scan), which all had to ask the same question
+ * and answered it three times over before this.
+ *
+ * The launcher's own root is `hooks/plan_runner/solo/record.py:dispatch_dir()` — `dispatch-souls/`
+ * under the house's state root, `~/.claude/state` unless `$DISPATCHER_HOME` moves it — so this
+ * default is a COPY of a rule we do not own, and the env name is ours: a seam for pointing a probe
+ * at a hermetic tree rather than a knob for moving the launcher. Set it and every reader here looks
+ * somewhere else; a dispatch still writes to the launcher's own root, which is not something an env
+ * var of THIS name may reach.
+ *
+ * Read on every call, never cached, so a probe that sets the seam after import is not answered with
+ * the live root.
+ */
+export function dispatchSoulsStateDir(): string {
+  return expandHome(process.env.DISPATCH_SOULS_STATE_DIR || '~/.claude/state/dispatch-souls');
+}
+
 // ---------------------------
 //----------------- DISPATCHER MODEL WORD UTILITIES ------------
 

@@ -82,6 +82,17 @@ export function isUpdateJobActive(job: ClaudeUpdateJob | null): job is ClaudeUpd
   );
 }
 
+/**
+ * Whether the detached runner owns the install tree right now — the two states in which
+ * `POST /restart` answers 409 `job-active` (the server's `RESTART_ACTIVE_STATES`, mirrored here
+ * because the client never imports server code). `installed` and `restarting` are the API's own to
+ * carry, and a job parked in `restarting` is exactly where the report says "press Restart server",
+ * so this is narrower than {@link isUpdateJobActive} on purpose.
+ */
+export function isRunnerOwningJob(job: ClaudeUpdateJob | null): boolean {
+  return job !== null && (job.state === 'installing' || job.state === 'rolling-back');
+}
+
 /** The poll period the picture in hand calls for: fast while a job is being carried out. */
 function cadenceMs(): number {
   return isUpdateJobActive(report?.job ?? null) ? BUSY_POLL_MS : POLL_MS;

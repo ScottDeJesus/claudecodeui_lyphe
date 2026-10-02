@@ -1,4 +1,5 @@
 import { sessionsDb } from '@/modules/database/index.js';
+import { listRunningLaunchers } from '@/modules/dispatch-souls/index.js';
 import { chatRunRegistry } from '@/modules/websocket/index.js';
 import { providerRegistry } from '@/modules/providers/provider.registry.js';
 import { sessionHistoryCache } from '@/modules/providers/services/session-history-cache.service.js';
@@ -11,27 +12,37 @@ import {
 import type { LLMProvider } from '@/shared/types.js';
 
 /**
- * Which conversations have a subagent running right now — the answer behind the sidebar's purple
- * dot.
+ * Which conversations have an agent running right now — the answer behind the sidebar's purple dot.
+ * A conversation counts when EITHER of two things is true:
  *
- * The sidebar's run marks could not say this before: they come from `listRunningSessions`, which
+ * 1. Its own transcript shows a backgrounded `Agent` call still out (the sidechain reading below).
+ * 2. A soul or chain it LAUNCHED through the dispatch door (`plan-runner chain`, `plan-runner soul`)
+ *    is still out. That process is a child of nothing the chat can see — it streams no sidechain
+ *    into the transcript — so the only record of it is the launcher's, stamped with the CLI session
+ *    id that launched it (`listRunningLaunchers`, in the dispatch-souls module). The stamp is the
+ *    CLI's id and the dot is the app's, so each one is mapped through the sessions table, and an id
+ *    the app does not know is skipped. A chain keeps the dot lit between its stages, where no soul
+ *    is running but the walker still is.
+ *
+ * The sidebar's run marks could not say either before: they come from `listRunningSessions`, which
  * reads `chatRunRegistry`, and a run leaves that registry the moment its turn ends. A BACKGROUNDED
  * `Agent` call outlives the turn that launched it — the run is over, the agent is still out there —
- * and that is the ordinary case, not an edge one. Nothing client-side can answer it either: the
- * chat a dot belongs to is usually not open, so its transcript is not loaded anywhere. So the
- * server answers, from the only place the container rows and their agents' sidechains meet.
+ * and that is the ordinary case, not an edge one; a dispatched soul outlives the turn by an hour.
+ * Nothing client-side can answer either: the chat a dot belongs to is usually not open, so its
+ * transcript is not loaded anywhere. So the server answers.
  *
- * The rule is `hasRunningSubagent`'s, which is the pinned strip's: same container selection, same
- * four-hour window. The two readings part in one place — the strip times a row from
- * `subagent.resume.at ?? message.timestamp`, this one from the launch — so a resume more than four
- * hours after its launch leaves the strip's row pinned while this answer stays dark.
+ * The sidechain reading's rule is `hasRunningSubagent`'s, which is the pinned strip's: same
+ * container selection, same four-hour window. The two readings part in one place — the strip times
+ * a row from `subagent.resume.at ?? message.timestamp`, this one from the launch — so a resume more
+ * than four hours after its launch leaves the strip's row pinned while this answer stays dark.
  *
  * Cost is the reason this file has the shape it does. A poll every five seconds cannot read every
  * conversation, and it does not have to: the candidates are bounded to a window, and a transcript
  * read is skipped entirely unless something on disk says the session could hold a running agent
  * (`hasFreshSubagentSidechains`). What is left rides the same `sessionHistoryCache` the chat's own
  * history reads use, keyed on the same subagent stamp, so a session the reader has open is parsed
- * once for both.
+ * once for both. The dispatched reading costs a directory listing bounded by the launcher's own
+ * recency window and a few small files per live launch, and rides the same cached pass.
  */
 
 /** A ceiling on one pass, in sessions. Twice the busiest four hours this box has recorded. */
@@ -158,7 +169,8 @@ async function needsTranscriptRead(candidate: Candidate, now: number): Promise<b
   }
 }
 
-async function collectRunningSessionIds(now: number): Promise<string[]> {
+/** The conversations whose own transcript shows an agent still out. */
+async function collectSidechainRunningSessionIds(now: number): Promise<string[]> {
   const candidates = candidateSessions(now);
   // The cheap narrowing runs together — it is all directory reads — and the parses behind it run
   // one at a time: they are CPU-bound, and a box with a dozen live agents should parse a dozen
@@ -182,7 +194,44 @@ async function collectRunningSessionIds(now: number): Promise<string[]> {
     }
   }
 
-  return running.sort();
+  return running;
+}
+
+/**
+ * The app's id for the conversation a CLI session id belongs to, or `null` when the app has never
+ * heard of it. `resolveAppSessionId` hands an unknown id back unchanged, so the row is looked up
+ * once more to tell a translation from an echo — and it follows a conversation through a rewind,
+ * which a plain provider-id lookup would not.
+ */
+function appSessionIdForCliSession(cliSessionId: string): string | null {
+  const appSessionId = sessionsDb.resolveAppSessionId(cliSessionId);
+  return sessionsDb.getSessionById(appSessionId) ? appSessionId : null;
+}
+
+/** The conversations that launched a soul or a chain which is still out, in the app's own ids. */
+function collectDispatchedRunningSessionIds(now: number): string[] {
+  const running = new Set<string>();
+  for (const launcher of listRunningLaunchers(now / 1000)) {
+    const appSessionId = appSessionIdForCliSession(launcher.cliSessionId);
+    if (appSessionId !== null) {
+      running.add(appSessionId);
+    }
+  }
+  return [...running];
+}
+
+async function collectRunningSessionIds(now: number): Promise<string[]> {
+  const running = new Set(await collectSidechainRunningSessionIds(now));
+  try {
+    for (const appSessionId of collectDispatchedRunningSessionIds(now)) {
+      running.add(appSessionId);
+    }
+  } catch (error) {
+    // The launcher's records are the second source, not the first: a fault reading them costs the
+    // dispatched dots this pass, never the sidechain dots the pass already holds.
+    console.error('[SubagentRuns] Could not read the dispatched souls and chains:', error);
+  }
+  return [...running].sort();
 }
 
 let cachedAt = 0;
@@ -190,8 +239,9 @@ let cachedIds: readonly string[] = [];
 let inFlight: Promise<readonly string[]> | null = null;
 
 /**
- * The ids of the conversations with a subagent running right now, cached briefly and never
- * computed twice at once (`inFlight`) — the endpoint is polled by every open tab.
+ * The ids of the conversations with an agent running right now — a sidechain `Agent` or a
+ * dispatched soul or chain — cached briefly and never computed twice at once (`inFlight`): the
+ * endpoint is polled by every open tab.
  *
  * Every caller gets its own array: the cached one is shared state, and a caller that sorted or
  * spliced it in place would be editing the answer the next poll reads.

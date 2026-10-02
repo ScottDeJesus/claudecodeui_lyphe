@@ -3,23 +3,11 @@ import type { Router } from 'express';
 import { WS_OPEN_STATE, connectedClients } from '@/modules/websocket/index.js';
 import { createPolledLane } from '@/shared/polled-lane.service.js';
 import type { SoulLaunchSnapshot, SoulLaunchStateEvent } from '@/shared/types.js';
-import { expandHome } from '@/shared/utils.js';
+import { dispatchSoulsStateDir } from '@/shared/utils.js';
 
 import { createDispatchSoulsRouter } from './dispatch-souls.routes.js';
 import { readSoulTranscript } from './soul-transcript.service.js';
 import { snapshotLaunches } from './soul-launch.service.js';
-
-/**
- * Where the launcher keeps its launch directories, unless the operator moved it.
- *
- * The launcher's own root is `hooks/plan_runner/solo/record.py:dispatch_dir()` — `dispatch-souls/`
- * under the house's state root, `~/.claude/state` unless `$DISPATCHER_HOME` moves it — so this
- * default is a COPY of a rule we do not own — and the env name is ours, a seam for pointing a
- * probe at a hermetic tree rather than a knob for moving the launcher. Set it and this lane reads
- * somewhere else; a dispatch still writes to the launcher's own root, which is not something an
- * env var of THIS name may reach.
- */
-const DEFAULT_STATE_DIR = '~/.claude/state/dispatch-souls';
 
 /**
  * How often the launch root is read. Two seconds: fast enough that a launch appearing or a receipt
@@ -58,7 +46,7 @@ export type DispatchSoulsModule = {
  * third-party plugin frontends that have no business seeing it (`taskmaster.routes.ts:30-50`).
  */
 export function createDispatchSoulsModule(): DispatchSoulsModule {
-  const stateDir = expandHome(process.env.DISPATCH_SOULS_STATE_DIR || DEFAULT_STATE_DIR);
+  const stateDir = dispatchSoulsStateDir();
 
   const broadcast = (frame: SoulLaunchStateEvent): void => {
     const message = JSON.stringify(frame);

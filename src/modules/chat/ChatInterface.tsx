@@ -26,6 +26,7 @@ import { useChatRealtimeHandlers } from '@/modules/chat/hooks/useChatRealtimeHan
 import { useChatComposerState } from '@/modules/chat/hooks/useChatComposerState';
 import { useIsLookingAtSession, useSessionPresence } from '@/modules/chat/hooks/useSessionPresence';
 import { useSessionStore } from '@/modules/chat/hooks/useSessionStore';
+import { useCliSessionId } from '@/modules/chat/hooks/useCliSessionId';
 import { clearStreamFlush } from '@/modules/chat/utils/streamFlushTimer';
 import {
   useProcessingSessions,
@@ -223,14 +224,19 @@ function ChatInterface({
     sessionStore,
   });
 
+  // The id the launcher stamps on every launch this chat makes — a chain's later stages included,
+  // which print no receipt into any transcript. The strip and the widget anchor the lane's launches
+  // by it (`readStampedLaunchIds`), so a new stage shows the moment the lane carries it.
+  const cliSessionId = useCliSessionId(selectedSession?.id ?? null);
+
   // The gutters cannot see this chat's own store — `useSessionStore` is a ref private to this
   // component — so the rows they draw are published here, tagged with the id they are handed.
   useEffect(() => {
     const sessionId = selectedSession?.id;
     if (typeof sessionId !== 'string') { publishSubagentSource(null); return; }
-    publishSubagentSource({ sessionId, agentMessages, soulLaunchIds });
+    publishSubagentSource({ sessionId, cliSessionId, agentMessages, soulLaunchIds });
     return () => publishSubagentSource(null);
-  }, [selectedSession?.id, agentMessages, soulLaunchIds]);
+  }, [selectedSession?.id, cliSessionId, agentMessages, soulLaunchIds]);
 
   // The addresses this chat has declared in embed fences, for the Embed widget in the gutter. Read
   // off the MESSAGES rather than off the rendered transcript, because the transcript unmounts rows
@@ -656,7 +662,7 @@ function ChatInterface({
 
           <ChatComposer
             exportSurface={exportSurface}
-          pinnedAgents={stripClaimed ? null : <PinnedSubagents messages={agentMessages} soulLaunchIds={soulLaunchIds} sessionId={selectedSession?.id ?? null} />}
+          pinnedAgents={stripClaimed ? null : <PinnedSubagents messages={agentMessages} soulLaunchIds={soulLaunchIds} sessionId={selectedSession?.id ?? null} cliSessionId={cliSessionId} />}
           pendingPermissionRequests={pendingPermissionRequests}
           handlePermissionDecision={handlePermissionDecision}
           handleGrantToolPermission={handleGrantToolPermission}

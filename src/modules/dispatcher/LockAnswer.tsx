@@ -1,14 +1,18 @@
-import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { lockOptions } from '@/modules/dispatcher/askState';
+import { LOCK_DRAFT } from '@/modules/dispatcher/askDrafts';
+import { askIdentity, lockOptions } from '@/modules/dispatcher/askState';
+import { useAskDraft } from '@/modules/dispatcher/hooks/useAskDraft';
 import { useDispatcherVerbs } from '@/modules/dispatcher/hooks/useDispatcherVerbs';
 import { QuestionText } from '@/modules/chat';
-import type { DispatcherAsk } from '@/shared/types';
+import type { DispatcherAsk, LockCompose } from '@/shared/types';
 import { Button } from '@/shared/ui';
 
 /** The lock this form answers: `DispatcherAsk` narrowed to its Accept kind — the shape `lockOptions` takes, and the only one a lock's card is drawn from. */
 type LockAsk = Extract<DispatcherAsk, { kind: 'accept' }>;
+
+/** A lock with nothing typed: the three answers showing, no notes. */
+const BLANK_LOCK: LockCompose = { rework: false, notes: '' };
 
 /**
  * A LOCK'S ANSWER FORM — the census a plan's Accept prompt prints, whole, and the three words under it.
@@ -37,6 +41,12 @@ type LockAsk = Extract<DispatcherAsk, { kind: 'accept' }>;
  * re-read the census has not untyped what he wrote, and the form is kept mounted across a fold for
  * that same reason (`PlanAsk` hides it rather than unmounting it).
  *
+ * THE NOTES ARE KEPT AS A DRAFT (operator: "Plan card answers to questions should save"). Whether the
+ * notes field is open and what is in it are a draft in the `dispatcher` preference (`askDrafts.ts`,
+ * through `useAskDraft`), so a reload, the other surface or an unmounted widget gives the field back
+ * open, with the notes in it, and nothing focused. A draft is never sent by itself: every send is the
+ * operator's press, and a TAKEN answer — any of the three — clears it.
+ *
  * `busy` IS READ, NEVER GUESSED: every control THAT LEADS TO A SEND — Accept, Queue, Rework and
  * Send notes — refuses a press while the lane is carrying one, because a lock is ONE word, and two
  * presses racing at the same store is how a plan is approved twice. The two compose-only controls,
@@ -57,37 +67,36 @@ export function LockAnswer({ ask, onAnswered }: { ask: LockAsk; onAnswered: () =
   // so two presses racing at the same store cannot approve the plan twice.
   const busy = carrying === 'answer';
 
-  // Whether the three answers have given way to the notes field. Essential: a Rework is the one answer that cannot be sent without words, and this is the whole of what swaps the controls.
-  const [rework, setRework] = useState(false);
+  // Whether the three answers have given way to the notes field, and the notes exactly as typed. Essential: a Rework is the one answer that cannot be sent without words, `rework` is the whole of what swaps the controls, and the notes are its payload — sent to the plan's designer word for word. They live above the swap, so Cancel and a fold of the card both leave them where the operator wrote them, and they are a draft in the preference too (`useAskDraft`), which is why they come back after a reload.
+  const { state: compose, edit, clear: clearDraft, scopeRef } = useAskDraft(askIdentity(ask), BLANK_LOCK, LOCK_DRAFT);
+  const { rework, notes } = compose;
 
-  // The notes, exactly as typed. Essential: they are a Rework's payload — sent to the plan's designer word for word — and they live here, above the swap, so Cancel and a fold of the card both leave them where the operator wrote them.
-  const [notes, setNotes] = useState('');
+  // What every press does with the lane's word: a TAKEN answer ends the ask, so its draft goes and the card is marked answered; a refusal changes nothing and the prompt stands beside the toast that says why.
+  const settle = (took: boolean) => {
+    if (!took) return;
+    clearDraft();
+    onAnswered();
+  };
 
   // Accept, in one press: the lock's own label as the answer to its one question.
   const pressAccept = () => {
-    void answer(ask, { [ask.question]: options.accept.label }).then((took) => {
-      if (took) onAnswered();
-    });
+    void answer(ask, { [ask.question]: options.accept.label }).then(settle);
   };
 
   // Queue: the same press with the queue label — the verdict is recorded and the run comes up parked.
   const pressQueue = () => {
-    void answer(ask, { [ask.question]: options.queue.label }).then((took) => {
-      if (took) onAnswered();
-    });
+    void answer(ask, { [ask.question]: options.queue.label }).then(settle);
   };
 
   // Send notes: Rework's own label, with the words typed above it, by that same one question. The
   // notes travel TRIMMED and under the same key the labels do: the census is what the token pins, and
   // a leading newline is not a word the operator meant to send.
   const pressSendNotes = () => {
-    void answer(ask, { [ask.question]: options.rework.label }, { [ask.question]: notes.trim() }).then((took) => {
-      if (took) onAnswered();
-    });
+    void answer(ask, { [ask.question]: options.rework.label }, { [ask.question]: notes.trim() }).then(settle);
   };
 
   return (
-    <div className="flex min-w-0 flex-col gap-2">
+    <div ref={scopeRef} className="flex min-w-0 flex-col gap-2">
       <div
         data-ask-region
         role="region"
@@ -104,7 +113,10 @@ export function LockAnswer({ ask, onAnswered }: { ask: LockAsk; onAnswered: () =
             data-ask-notes
             rows={3}
             value={notes}
-            onChange={(event) => setNotes(event.target.value)}
+            onChange={(event) => {
+              const words = event.target.value;
+              edit((current) => ({ ...current, notes: words }));
+            }}
             placeholder={t('dispatcher.ask.notes')}
             aria-label={t('dispatcher.ask.notes')}
             className="vv-input w-full resize-y px-3 py-2 text-sm"
@@ -120,7 +132,7 @@ export function LockAnswer({ ask, onAnswered }: { ask: LockAsk; onAnswered: () =
             >
               {t('dispatcher.ask.sendNotes')}
             </Button>
-            <Button type="button" variant="ghost" size="sm" className="h-8" onClick={() => setRework(false)}>
+            <Button type="button" variant="ghost" size="sm" className="h-8" onClick={() => edit((current) => ({ ...current, rework: false }))}>
               {t('dispatcher.ask.cancel')}
             </Button>
           </div>
@@ -158,7 +170,7 @@ export function LockAnswer({ ask, onAnswered }: { ask: LockAsk; onAnswered: () =
             className="h-8"
             title={options.rework.description}
             disabled={busy}
-            onClick={() => setRework(true)}
+            onClick={() => edit((current) => ({ ...current, rework: true }))}
           >
             {options.rework.label}
           </Button>

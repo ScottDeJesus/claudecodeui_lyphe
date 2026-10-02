@@ -1,8 +1,8 @@
 import { useEffect, useRef } from 'react';
 
-import { askIdentity } from '@/modules/dispatcher/askState';
+import { asksOnLane } from '@/modules/dispatcher/askState';
 import { DISPATCHER_ALL_TOPIC, useLiveTopic } from '@/modules/live-bus';
-import type { DispatcherAsk, DispatcherLanePicture, DispatcherPlan } from '@/shared/types';
+import type { DispatcherLanePicture } from '@/shared/types';
 import { playNotificationSound } from '@/shared/utils';
 
 /**
@@ -75,22 +75,6 @@ export function DispatcherAskBell() {
   }, [value]);
 
   return null;
-}
-
-/**
- * Every ask the picture carries, by identity, each once and in the lane's order — a lock that names
- * several plans arrives on each of them and is ONE prompt, so the arc's two cards must not ring
- * twice for the one ask they share.
- */
-function asksOnLane(plans: DispatcherPlan[] | undefined): string[] {
-  const identities: string[] = [];
-  for (const plan of Array.isArray(plans) ? plans : []) {
-    const ask: DispatcherAsk | null | undefined = plan.asking;
-    if (ask === null || ask === undefined) continue;
-    const identity = askIdentity(ask);
-    if (!identities.includes(identity)) identities.push(identity);
-  }
-  return identities;
 }
 
 /**

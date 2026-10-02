@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 
 import { AutoInstallRow } from '@/modules/claude-updates/AutoInstallRow';
 import {
+  isRunnerOwningJob,
   isUpdateJobActive,
   useClaudeUpdates,
   type ClaudeUpdateActionResult,
@@ -221,7 +222,11 @@ export function ClaudeUpdatesSettingsTab() {
           </Button>
           {/* Only where this process can hand itself over: nowhere else is there a restart to offer. */}
           {report.supervised && (
-            <Button variant="outline" disabled={jobActive} onClick={onRestartServer}>
+            <Button
+              variant="outline"
+              disabled={isRunnerOwningJob(report.job)}
+              onClick={onRestartServer}
+            >
               {t('updates.actions.restartServer', { defaultValue: 'Restart server' })}
             </Button>
           )}

@@ -173,6 +173,11 @@ export function classifyLaunch(
   const provider = providerOf(spec, result, ended);
   return {
     launch_id: files.launchId,
+    // The launcher's own stamp of which conversation made this launch (`solo/launch.py`, from
+    // `CLAUDE_CODE_SESSION_ID`). Carried so a chat can anchor a launch the instant the lane shows
+    // it — a chain's later stages leave no receipt in any transcript. `null`, never `''`: an empty
+    // stamp names nobody, and a client comparing ids must not be able to match it.
+    launched_by: readString(field(spec, 'launched_by')) || null,
     role: readString(field(spec, 'role')),
     agent: readString(field(spec, 'agent')),
     // The task the soul was handed, as its brief's first line. `''` when it could not be read —

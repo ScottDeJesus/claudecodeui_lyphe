@@ -502,7 +502,10 @@ export function useChatSessionState({
    * only until the conversation moves past it, and a soul runs for minutes after the row that
    * started it has left the window — so the ids also come off the server, which reads the WHOLE
    * history for the session (`storeSoulLaunchIds`, the same door the agent list uses). The scan is
-   * kept because it is what makes a launch appear the second it happens, with no refetch.
+   * kept because it is what makes a launch appear the second it happens, with no refetch. A THIRD
+   * WITNESS IS NOT HERE: a launch the launcher stamped with this chat's CLI session id is joined in
+   * the row hook itself, off the lane (`readStampedLaunchIds`), so a chain stage no receipt names
+   * still pins the moment the lane pushes it.
    *
    * TWO MEMOS, NOT ONE, AND THE JOIN IS THE POINT. The scan runs on every streamed delta like any
    * other read of the transcript, but the array it returns is fresh each time — and the strip it

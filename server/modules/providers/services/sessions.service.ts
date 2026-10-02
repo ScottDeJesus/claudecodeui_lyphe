@@ -77,6 +77,13 @@ export type RunningSessionListItem = {
 type SessionDetails = {
   /** Canonical app-facing session id (may differ from the looked-up id when a provider-native id was given). */
   sessionId: string;
+  /**
+   * The provider's own (CLI) session id, or `null` before the provider has reported one — a chat with
+   * no turn yet. Carried here, as a 200, so a caller that only wants to know whether the id exists
+   * yet (the open chat anchoring the launches the launcher stamped with it) is not answered with
+   * the 409 the `provider-id` route gives, which the browser logs as a console error on every empty chat.
+   */
+  providerSessionId: string | null;
   provider: LLMProvider;
   summary: string;
   createdAt: string | null;
@@ -646,6 +653,7 @@ export const sessionsService = {
 
     return {
       sessionId: session.session_id,
+      providerSessionId: session.provider_session_id || null,
       provider: session.provider as LLMProvider,
       summary: session.custom_name?.trim() || '',
       createdAt: session.created_at ?? null,

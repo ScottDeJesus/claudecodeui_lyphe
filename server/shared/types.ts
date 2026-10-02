@@ -393,6 +393,13 @@ export type SoulLaunchState = 'running' | 'completed' | 'failed' | 'stopped';
  * `blocked` marks a launch DeepSeek refused or never answered: it did no work, and the launcher
  * never re-routes a soul to Claude.
  *
+ * `launched_by` is the CLI session id the launcher stamped into `spec.json` from its own
+ * `CLAUDE_CODE_SESSION_ID` at the moment it minted the launch — ownership recorded by the process
+ * that made the launch, never read off a transcript. A chain's stages are minted later by the
+ * detached walker and carry the stamp of the chat that launched the chain. `null` when the spec
+ * names no launcher (a launch from a bare terminal, or one older than the stamp). A client anchors a
+ * launch to a chat only on an EXACT match between this and that chat's CLI session id.
+ *
  * Every timestamp is epoch SECONDS, which is what the launcher's Python wrote with `time.time()`.
  * `cost_usd`, `tokens`, `tokens_in`/`tokens_out` and `duration_s` are `null` until the receipt lands: a
  * live soul's spend is not knowable from here, and a zero would read as "free" rather than as "not yet".
@@ -402,7 +409,7 @@ export type SoulLaunchState = 'running' | 'completed' | 'failed' | 'stopped';
  * throughout on a soul a vendor billed, whose tokens are that vendor's own business. So the pin draws
  * `$0.28 DeepSeek` with no tokens or `1.2M in · 48k out` with no `$`.
  */
-export type SoulLaunchSnapshot = { launch_id: string; role: string; agent: string; brief: string; provider: 'deepseek' | 'claude'; blocked: boolean; state: SoulLaunchState; status: string; cause: string; started_at: number; ended_at: number | null; duration_s: number | null; cost_usd: number | null; tokens: number | null; tokens_in: number | null; tokens_out: number | null };
+export type SoulLaunchSnapshot = { launch_id: string; launched_by: string | null; role: string; agent: string; brief: string; provider: 'deepseek' | 'claude'; blocked: boolean; state: SoulLaunchState; status: string; cause: string; started_at: number; ended_at: number | null; duration_s: number | null; cost_usd: number | null; tokens: number | null; tokens_in: number | null; tokens_out: number | null };
 /** The whole picture, pushed on change over `/ws`. `launches` is ordered by `started_at` ascending, oldest first. `at` is epoch MILLISECONDS (`Date.now()`), unlike every field inside a snapshot. */
 export type SoulLaunchStateEvent = { kind: 'soul_launch_state'; launches: SoulLaunchSnapshot[]; at: number };
 // ---------------------------

@@ -1508,7 +1508,7 @@ section: 03-conversation-handoff/002 The pieces
 
 | File | Role |
 | --- | --- |
-| `server/modules/providers/provider.routes.ts` | `POST /sessions` mints the app id; `GET /sessions/:id/messages`, `/sessions/:id/provider-id`, `/sessions/running`, `POST /sessions/:id/fork` |
+| `server/modules/providers/provider.routes.ts` | `POST /sessions` mints the app id; `GET /sessions/:id/messages`, `/sessions/:id/provider-id` (409 until the first turn reports an id), `GET /sessions/:id` (details, `providerSessionId` null inside a 200 until then — what `useCliSessionId` reads), `/sessions/running`, `POST /sessions/:id/fork` |
 | `server/modules/providers/services/sessions.service.ts` | `createAppSession`, `resolveProviderSessionId`, `resolveEditAnchor`, `providerRewindsForEdit`, `rewindSessionForEdit`, `forkSessionById`, `fetchHistory`, `listRunningSessions` |
 | `server/modules/database/repositories/sessions.db.ts` | The one row that holds both ids, and every mutation of the mapping |
 | `server/modules/websocket/services/chat-session-writer.service.ts` | `ChatSessionWriter`: swallows `session_created`, captures the native id, fans out to every attached socket |
@@ -4066,7 +4066,10 @@ result that dumped another conversation carries that conversation's receipts (me
 anchoring seven ids it never launched). The same test is applied twice, by
 `src/modules/chat/utils/soulLaunchAnchors.ts` over the loaded rows and by `collectSessionSoulLaunches`
 over the WHOLE history, for the same tail-window reason `agents` exists; the ids ride a latest page as
-`soulLaunches` and merge. **Liveness comes from the dispatch-souls lane**, polled server-side and
+`soulLaunches` and merge. **A third witness is the launcher's own stamp**: a chain's later stages print no
+receipt into any transcript, so the row hook also anchors every lane launch whose `launched_by` exactly
+equals the chat's CLI session id (`readStampedLaunchIds`, `useCliSessionId`; docs/MANUAL.md MAN-7583), and
+a new stage pins the moment the lane pushes it. **Liveness comes from the dispatch-souls lane**, polled server-side and
 pushed as `soul_launch_state` — an id the lane does not answer for draws nothing at all.
 
 The soul row's own contract — what a launch directory holds, how a soul's state and provider are
@@ -4162,8 +4165,9 @@ section: 06-tool-view/012 Subagents/008 The same rule, one strip away.
 with an agent still running — the mark the strip draws per agent, drawn per chat. It has to come
 from the server for the ordinary case, not the edge one: a backgrounded agent outlives the turn
 that launched it, so the chat it belongs to is usually not open and its transcript is loaded
-nowhere. `hasRunningSubagent` (same file as `collectSessionAgents`) is that answer, asked through
-the same container selection and the same four-hour window, and it rides the existing five-second
+nowhere. For an `Agent`-tool agent, `hasRunningSubagent` (same file as `collectSessionAgents`) is
+that answer, asked through the same container selection and the same four-hour window, and it rides
+the existing five-second
 running-sessions poll as a top-level `subagentSessionIds` rather than a second poller. One case
 separates the two readings, and it is the resume: the strip times a row from
 `subagent.resume.at ?? message.timestamp` (`usePinnedSubagentRows`'s `startedAtMs`), while
@@ -4172,6 +4176,28 @@ after that launch leaves the row pinned as running in its own chat while the dot
 the endpoint does to keep the answer cheap — the candidate window, the sidechain freshness gate,
 and the history cache it shares with the chat's own reads — is documented in
 `server/modules/providers/services/session-subagent-runs.service.ts`.
+
+**A dispatched soul or chain lights the same dot.** A builder or reviewer started through the
+dispatch door (`plan-runner chain`, `plan-runner soul`) is a separate process: it streams no
+sidechain into the chat that launched it, so the reading above never sees it. The launcher records
+it instead — `spec.json` carries `launched_by`, the Claude CLI session id whose turn launched it —
+and `listRunningLaunchers` (dispatch-souls module, `running-launchers.service.ts`) reads that
+record. A chat counts when a soul it launched reads `running` by `classifyLaunch`'s own reading
+(the lane the pinned strip draws), or when a chain with a stage it launched still reads
+`status: running` with its walker alive — which keeps the dot steady between a chain's stages
+(the walker's relaunch gap, the hand-off from builder to review to doc sweep), where no soul is
+running but the work is not over. A chain is owned by every session stamped on any of its stages,
+the rule `session_rails_chains.py` keeps for the rails. The stamp is the CLI's id and the dot is the
+app's, so `session-subagent-runs.service.ts` maps each one through the sessions table
+(`resolveAppSessionId`), skips an id the app does not know, and unions the result with the
+sidechain answer inside the same two-second cached pass. Records older than six hours are never
+opened — above the launcher's own caps (one hour a soul, four a planner) — and a missing, torn or
+half-written record is skipped, never thrown. A planner outing or a phase chain the dispatcher
+launches is stamped with the session of the PLAN that asked for it, never the daemon's own
+(`launch_env`, `planners._start`), so it lights that plan's chat like any other launch while it is
+out; one launched with no session to name carries no stamp and lights nothing.
+
+The records and the checks behind the dispatched half are `running-launchers.service.ts` (the two readings and the 6-hour window) and `chain-record.transport.ts` (`chain.json`, `walker.pid`); the launcher rules they restate are INV-6335.
 
 Those sidechain files are also why the full-history cache takes a second freshness value. It is
 keyed on the parent transcript's stat, and an agent writes its own file continuously while the
@@ -4186,8 +4212,6 @@ history load later attaches the server-indexed `subagentTools`, **the longer of 
 lists wins** — a mid-run refresh can attach a partial server timeline while newer live rows
 keep streaming. The projection cache's second key, `subagentActivitySource`, holds the
 newest row folded into that container, so a growing timeline invalidates the cached card.
-
-`src/modules/chat/tests/liveSubagentGrouping.test.ts` pins all four behaviours.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/session-agents.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/session-subagent-runs.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/usePinnedSubagentRows.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/subagents/subagentSource.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/subagents/SubagentWidgetBody.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/utils/soulLaunchAnchors.ts
 
@@ -4388,8 +4412,10 @@ section: 06-tool-view/017 Gotchas and why the code looks like this
   renderers behind a collapsed header. The timeline mounts only while open, in pages of 25
   (commit `7113270e`).
 - **A soul pin that does not appear has THREE possible causes, and only one of them is a bug.**
-  The row is a join, so it is drawn only when the id was anchored in this transcript AND the lane
-  carries that launch. Walk it in that order: is there a `SOUL LAUNCHED` line in a `Bash` *result*
+  The row is a join, so it is drawn only when the id was anchored AND the lane carries that launch.
+  Anchored means a receipt in this transcript, the server's list, or the lane's `launched_by` equal to
+  the chat's CLI session id (null until the chat's first turn). Walk it in that order: is there a
+  `SOUL LAUNCHED` line in a `Bash` *result*
   whose command segment opens with `plan-runner soul` (a quoted receipt, or one printed by a
   `grep`, deliberately anchors nothing); does
   `GET /api/dispatch-souls/launches` list the id; and has it been more than six hours since that
@@ -4479,7 +4505,7 @@ section: 06-tool-view/018 If you change this, check that
 | --- | --- |
 | `TOOL_CONFIGS` entry shape | `ToolRenderer`'s three `type` branches and its `contentType` switch; the `input` and `result` unions differ, so a field valid on one may not be on the other; `ToolGroupContainer` reads `label`, `colorScheme` and `contentType` off the same config |
 | `getToolConfig` fallback | `toolGrouping.ts` → `getToolInputPreview` calls it for the collapsed line, so an unmapped tool must still name what it did |
-| The soul-launch ownership rule (the receipt regex, the marker, the chain-segment test) | It is written TWICE and the two trees cannot import each other: `src/modules/chat/utils/soulLaunchAnchors.ts` and `server/modules/providers/services/session-soul-launches.service.ts`. Loosen one alone and one half pins souls the other will not. The line itself is the launcher's — INV-36 |
+| The soul-launch ownership rule (the receipt regex, the marker, the chain-segment test) | It is written TWICE and the two trees cannot import each other: `src/modules/chat/utils/soulLaunchAnchors.ts` and `server/modules/providers/services/session-soul-launches.service.ts`. Loosen one alone and one half pins souls the other will not. The stamp test is exact string equality in both (`readStampedLaunchIds`, `collectStampedSoulLaunches`). The line itself is the launcher's — INV-36 |
 | Anything the pinned rows render | Both row components, not one: `PinnedAgentRow.tsx` and `SoulLaunchPinRow.tsx` are deliberately the same shape, and `usePinnedSubagentRows.ts` feeds TWO surfaces — the strip above the composer when the desktop chat gutters are not showing, and the gutter's Subagents widget (`SubagentWidgetBody.tsx`) while they are — so a change to the centred mark, the two-line layout or the status column that lands in only one component, or in only one surface, makes the same rows read as two different lists |
 | The click-to-open affordance (`onOpen`/`openLabel`) | Both row components again: their keyboard handling and their dismiss button's `stopPropagation()` must stay identical, since both surfaces (`SubagentWidgetBody.tsx` and `PinnedSubagents.tsx`) supply the props and a divergence breaks one kind of row on both |
 | `deriveToolStatus` | `ToolStatusBadge`'s `STATUS_CONFIG` needs a key for every `ToolStatus`; `BashCommandDisplay` and `OneLineDisplay` both special-case `running`; every caller filters out `completed` |

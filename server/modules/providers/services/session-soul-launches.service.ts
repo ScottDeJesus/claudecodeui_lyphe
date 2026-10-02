@@ -1,8 +1,8 @@
 import { readdir, readFile } from 'node:fs/promises';
-import os from 'node:os';
 import path from 'node:path';
 
 import type { NormalizedMessage } from '@/shared/types.js';
+import { dispatchSoulsStateDir } from '@/shared/utils.js';
 
 /**
  * The launcher souls one conversation STARTED, read from the WHOLE history rather than from the
@@ -107,12 +107,6 @@ export function collectSessionSoulLaunches(messages: NormalizedMessage[]): strin
   return ids.slice(-MAX_LAUNCHES);
 }
 
-/** The launcher's root (`hooks/plan_runner/solo/record.py:dispatch_dir()`), with the dispatch-souls lane's probe seam. */
-function launchRoot(): string {
-  const raw = process.env.DISPATCH_SOULS_STATE_DIR || '~/.claude/state/dispatch-souls';
-  return raw.startsWith('~') ? path.join(os.homedir(), raw.slice(1)) : raw;
-}
-
 /** How many of the newest launch dirs are opened: ids sort by their timestamp, and the strip draws what is recent. */
 const MAX_SPECS_READ = 200;
 
@@ -129,7 +123,7 @@ export async function collectStampedSoulLaunches(providerSessionId: string | nul
   if (!providerSessionId) {
     return [];
   }
-  const root = launchRoot();
+  const root = dispatchSoulsStateDir();
   let names: string[];
   try {
     names = (await readdir(root)).filter((name) => name.startsWith('dispatch-'));

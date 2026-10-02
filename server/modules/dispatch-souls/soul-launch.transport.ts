@@ -93,8 +93,13 @@ function field(record: unknown, name: string): unknown {
   return record !== null && typeof record === 'object' ? (record as Record<string, unknown>)[name] : undefined;
 }
 
-/** Parsed JSON from a file, or `null` for absent, unreadable, or not-an-object. */
-function readJson(file: string): unknown {
+/**
+ * Parsed JSON from a file, or `null` for absent, unreadable, or not-an-object.
+ *
+ * Exported for `chain-record.transport.ts`, which reads the walker's `chain.json` under the same
+ * rule: a file being written while we read it is a normal event, and it answers `null`.
+ */
+export function readJson(file: string): unknown {
   try {
     const parsed: unknown = JSON.parse(fs.readFileSync(file, 'utf8'));
     return parsed !== null && typeof parsed === 'object' ? parsed : null;
@@ -193,9 +198,28 @@ export function readBriefLine(file: string): string {
   return taskLineIn(whole) ?? briefLines(whole)[0] ?? '';
 }
 
+/**
+ * One launch's `spec.json` alone, or `null` — the whole contract of the launch, and the one file
+ * that names who launched it (`launched_by`). Exported for `running-launchers.service.ts`, which
+ * asks a chain's stage launches who owns them and has no use for their pids or briefs.
+ */
+export function readLaunchSpec(dir: string): unknown {
+  return readJson(path.join(dir, 'spec.json'));
+}
+
+/**
+ * Whether the launch has written its receipt. `result.json`'s ABSENCE is how "the soul is still out"
+ * is spelled, so a launch that has one has ended and can never read `running` — which lets a caller
+ * that wants only the running ones skip the rest with one `stat` instead of the full read.
+ * Exported for `running-launchers.service.ts`; the verdict itself stays `classifyLaunch`'s.
+ */
+export function hasLaunchReceipt(dir: string): boolean {
+  return fs.existsSync(path.join(dir, 'result.json'));
+}
+
 /** Everything the lane reads out of one launch directory. Never throws: a torn read answers empty. */
 export function readLaunchFiles(dir: string, launchId: string): SoulLaunchFiles {
-  const spec = readJson(path.join(dir, 'spec.json'));
+  const spec = readLaunchSpec(dir);
   const result = readJson(path.join(dir, 'result.json'));
   const briefPath = field(spec, 'brief_path');
   return {

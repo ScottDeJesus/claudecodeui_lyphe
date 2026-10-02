@@ -26,7 +26,8 @@ import SoulLaunchPinRow from '@/modules/chat/transcript/SoulLaunchPinRow';
  * TWO KINDS OF PIN SIT IN THIS ONE STRIP. An `Agent`-tool subagent is a row in the transcript; a
  * launcher soul a session started by hand is a detached child that writes nothing here, so its pin is
  * joined in from the server's lane by launch id (`src/modules/dispatch-souls/`) against the ids
- * the transcript's own tool results name. They are sorted into ONE list, because the reader is
+ * the receipts in the transcript name, the server's list of them, and every launch the lane
+ * itself stamps with this chat's CLI session id (`launched_by`). They are sorted into ONE list, because the reader is
  * asking one question of the strip — what is working for me right now — and the answer would be a
  * lie if half of it were somewhere else. Both carry the logo of the provider they run on, centred
  * beside their two lines (an agent whose provider is unknown falls back to the robot); what tells a
@@ -55,6 +56,8 @@ type PinnedSubagentsProps = {
   soulLaunchIds: string[];
   /** The open chat, which a transcript is read through and which an open dialog belongs to. */
   sessionId: string | null;
+  /** The chat's CLI session id, against which the lane's launches are anchored by their `launched_by` stamp; `null` until the provider has reported it. */
+  cliSessionId: string | null;
 };
 
 /** The row whose transcript is open, tagged with the chat it was opened in. */
@@ -63,9 +66,9 @@ type OpenedTranscript = {
   target: SubagentTranscriptTarget & { label: string };
 };
 
-function PinnedSubagents({ messages, soulLaunchIds, sessionId }: PinnedSubagentsProps) {
+function PinnedSubagents({ messages, soulLaunchIds, sessionId, cliSessionId }: PinnedSubagentsProps) {
   const { t } = useTranslation();
-  const { rows, dismiss } = usePinnedSubagentRows(messages, soulLaunchIds);
+  const { rows, dismiss } = usePinnedSubagentRows(messages, soulLaunchIds, cliSessionId);
   const [opened, setOpened] = useState<OpenedTranscript | null>(null);
 
   const target = opened !== null && opened.sessionId === sessionId ? opened.target : null;

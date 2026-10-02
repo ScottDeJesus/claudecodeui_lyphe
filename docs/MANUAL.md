@@ -1348,7 +1348,7 @@ Pipeline depth: MAN-7401 (check), MAN-7402 (runner), MAN-7403 (API side), MAN-74
 | notes (`PatchNotes.tsx`) | newest 10 versions, one `Collapsible` each (first open), body through `MarkdownPreview`; `Show all <n> releases`; the `notesReason` line; `Full changelog` link (new tab) |
 | `Update and restart` | enabled while some package is `updateAvailable && updatable` and no job is active; sends each such package's `latest`; reads `Updating…` while a job is active |
 | line under it | `Installs <versions>, then restarts the server. A conversation mid-turn keeps its version until the turn ends; the rest move to the new version at their next message.` — only while an offer exists |
-| `Restart server` | drawn only when `report.supervised`; disabled while a job is active |
+| `Restart server` | drawn only when `report.supervised`; disabled only while the runner owns the job — `installing` or `rolling-back` (`isRunnerOwningJob`, the mirror of the server's `RESTART_ACTIVE_STATES`); enabled in `installed` and `restarting`, where a job parked waiting on a restart is told to "press Restart server" |
 | refusal | the server's `message`, in a warn `Banner` under the buttons that asked |
 | `UpdateJobPanel.tsx` | whenever `report.job` exists: one sentence per job state; each step with icon, label, `from → to`, detail; `logTail` in a folded monospace block |
 
@@ -2724,10 +2724,11 @@ So a soul's pin is a JOIN, and neither half can draw it alone:
 
 | Half | Source | Answers |
 |---|---|---|
-| **Ownership** | the transcript's own tool results | *did THIS conversation start that soul?* |
+| **Ownership** | the receipts in the transcript, the server's list of them, and the launcher's own `launched_by` stamp on the lane's snapshot (MAN-7583) | *did THIS conversation start that soul?* |
 | **Liveness** | this lane, polling the launch root | *is it still out, and what did it cost?* |
 
-They meet client-side by launch id, in the row hook (`usePinnedSubagentRows.ts`): for every id the transcript anchored, ask
+They meet client-side by launch id, in the row hook (`usePinnedSubagentRows.ts`): for every id anchored — by the
+transcript's receipt, by the server's list, or by the lane's own `launched_by` stamp equalling the chat's CLI session id — ask
 the lane's map (`useSoulLaunches`) whether it carries that launch. **An id the lane does not answer
 for draws nothing at all** — which is also what ages a pin out for good, since the lane drops a
 launch six hours after it ends while the receipt stays in the transcript forever.
@@ -2777,7 +2778,8 @@ session id, stamped by the launcher itself (`hooks/plan_runner/solo/launch.py`, 
 `collectStampedSoulLaunches` (`server/modules/providers/services/session-soul-launches.service.ts`)
 walks the newest `dispatch-*` dirs under the launch root, reads each `spec.json`, and keeps the ids
 whose `launched_by` matches the session asking; `sessions.service.ts` merges its result into
-`soulLaunches` beside `collectSessionSoulLaunches`'s transcript scan on every LATEST page.
+`soulLaunches` beside `collectSessionSoulLaunches`'s transcript scan on every LATEST page. The open chat also anchors the
+stamp live off the lane's snapshots, with no page read (MAN-7583).
 
 This is what makes a **wrapper-script launch** visible: the ownership test above requires a `Bash`
 command segment that OPENS with the launcher, so a launch made through a wrapper's own name (the
@@ -2816,11 +2818,12 @@ what a launch MEANS.
 
 | File | What this lane takes from it |
 |---|---|
-| `spec.json` | `started_at`, `role`, `agent`, `brief_path`, and `provider` — the switch's reading at launch time. **No spec, or no `started_at`, and the directory is not a launch**: it draws nothing rather than a phantom. |
+| `spec.json` | `started_at`, `role`, `agent`, `brief_path`, and `provider` — the switch's reading at launch time — and `launched_by` (the Claude CLI session id that launched it): carried on every snapshot, `null` when absent, and the stamp the open chat anchors the launch by (MAN-7583) and the purple dot reads (`running-launchers.service.ts`, MAN-6228). **No spec, or no `started_at`, and the directory is not a launch**: it draws nothing rather than a phantom. |
 | `result.json` | Its ABSENCE is how "still out" is spelled. Present: `status`, `ended_at`, `duration_s`, `cost_usd` (PAID dollars — read as 0 where `provider` names Claude, `receiptCostUsd`, INV-4299), `tokens`, `tokens_in`, `tokens_out` (A SPEND FIGURE IS DOLLARS **OR** TOKENS, BY WHO WAS USED: ALL THREE are `null` where a vendor billed the soul — DeepSeek's tokens are its own business — and `null` for one written before the split, which the pin reads as the total alone; `receiptTokens`), `cause`, `provider`, `provider_blocked` — and `session_id`, the Claude session the transcript read follows, once the soul has ended. |
 | `child.log` | The transcript read ONLY: its first `session_id`, when `result.json` has none yet, is handed to the providers module (`readClaudeTranscriptBySessionId`), which `GET /api/dispatch-souls/launches/:launchId/transcript` serves to the chat's Subagents widget. Nothing else in it is parsed. |
 | `launcher.pid` / `child.pid` | Liveness, proved through `/proc/<pid>/cmdline` against a needle (`soul-run`, `claude`) — a pid is reused, so the number alone proves nothing. |
 | `brief.md` (via `spec.json`'s `brief_path`) | ONE line: the task, for the pin's second row. |
+| `../dispatch-chains/<chain id>/chain.json` and `walker.pid` | The purple dot only, never the pin: `status`, each `stages[].launch`, and the walker proved through `/proc/<pid>/cmdline` carrying `chain-run` and the chain id. The chains root is the sibling of the souls root, so `DISPATCH_SOULS_STATE_DIR` moves both. `chain-record.transport.ts` owns the bytes. |
 
 **RULE: these are a contract the launcher does not know it has.** The receipt's wording, `result.json`'s
 `provider` and `status`, `spec.json`'s `provider`, and the directory layout are all read from here,
@@ -2975,11 +2978,15 @@ reading's own time beside the frame's arrival one. Why it polls rather than watc
 a picture as sent only AFTER the send returns, and why a failing tick never takes the interval down
 with it are documented once, there.
 
-What is THIS lane's and not the mechanism's: the launch root (`DISPATCH_SOULS_STATE_DIR`, defaulting
-to `~/.claude/state/dispatch-souls`), the two-second cadence, the six-hour window, and the frame.
-The env var is a seam for pointing a probe at a hermetic tree — **it moves this READER only**. A
-dispatch still writes to the real root, because that is the launcher's and not something a server
-env var may reach. It is read once, at composition, so moving it means restarting the server.
+What is THIS lane's and not the mechanism's: the launch root, the two-second cadence, the six-hour
+window, and the frame. The root is `dispatchSoulsStateDir()` in `server/shared/utils.ts`
+(`DISPATCH_SOULS_STATE_DIR`, defaulting to `~/.claude/state/dispatch-souls`), the one answer for this
+lane, the providers module's stamp scan (`session-soul-launches.service.ts`) and the purple dot's
+reader (`running-launchers.service.ts`). The env var is a seam for pointing a probe at a hermetic
+tree — **it moves these READERS only**. A dispatch still writes to the real root, because that is
+the launcher's and not something a server env var may reach. The function reads the env on every
+call; this lane calls it once, at composition, so moving the lane's root means restarting the server,
+while the stamp scan and the dot read it afresh each pass.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/shared/polled-lane.service.ts
 
@@ -2989,7 +2996,7 @@ section: dispatch-souls/012 The client
 | Piece | What it is |
 |---|---|
 | `src/modules/dispatch-souls/SoulLaunchFeed.tsx` | The lane's one door into the live bus, and the ONLY place in the client that names the `soul_launch_state` frame. Headless: it renders its children unchanged. `App` mounts it inside `LiveBusProvider`, inside the auth gate, below `WebSocketProvider` — nested inside `DispatcherFeed`, because a feed is a wrapper and not a sibling. |
-| `hooks/useSoulLaunches.ts` | The read side: the retained `souls:*` topic as a `Map` keyed by launch id. A map rather than the array because the reader asks one lookup per anchored id. `undefined` (nothing retained) and `[]` (the lane is empty) collapse to an empty map — to a screen they are the same instruction. |
+| `hooks/useSoulLaunches.ts` | The read side: the retained `souls:*` topic as a `Map` keyed by launch id. A map rather than the array because the reader looks each anchored id up once (and walks the values once for the launches stamped with the chat's own CLI session id, MAN-7583). `undefined` (nothing retained) and `[]` (the lane is empty) collapse to an empty map — to a screen they are the same instruction. |
 | `src/modules/chat/transcript/SoulLaunchPinRow.tsx` | One soul's row, drawn to be indistinguishable in SHAPE from the agent rows beside it. Its mark is `LLMProviderLogo` on the launch's provider — the DeepSeek whale, or Claude's mascot — centred beside its two lines, as an `Agent` subagent's row carries its own provider's mark. The row is also a button: an `onOpen` prop, given by both the strip (in a dialog) and the gutter's Subagents widget (in place), opens this soul's transcript live through the second route above ([docs/architecture/MANUAL.md (06-tool-view)](architecture/MANUAL.md) §Subagents). |
 
 The row lives in the CHAT module, not in `dispatch-souls/`: the pinned rows it lands among are the chat's, and
@@ -3015,9 +3022,9 @@ section: dispatch-souls/013 Known residuals
 
 - **A transcript can still anchor a soul it did not start**, if one chain segment of a `Bash` command
   opens with the launcher AND that same call's result carries someone else's receipt. The test is on
-  the command, and a command can both launch and print. The proper cure is on the launcher's side: a
-  session field in `spec.json`, so ownership is a fact the launch RECORDS rather than one the reader
-  infers.
+  the command, and a command can both launch and print. The launcher's own `launched_by` stamp
+  (MAN-526, MAN-7583) is ownership RECORDED rather than inferred; a launch made before the stamp
+  existed has only the receipt.
 - **The pinned rows' expiry timer only runs while the tab is awake.** One `setTimeout` is armed for the
   moment the next row crosses its own window; a backgrounded tab is throttled, so a row can outstay
   its two hours until the tab is looked at again. Without the timer at all a finished row sat there
@@ -3041,7 +3048,7 @@ looking at the real client — not asserting the shapes:
    narrow for the gutters, the gutter's Subagents widget on a wide one: the provider mark,
    `<Soul> / <role>`, `running · <elapsed>` ticking, the brief's task line.
    `data-testid="pinned-soul-row"` carries `data-status`, `data-provider` and `data-launch-id`.
-5. Reload the tab. The row must still be there — that is the server-side collector, not the scan.
+5. Reload the tab. The row must still be there — it is named by the server-side collector and by the lane's `launched_by` stamp, not by the receipt scan.
 6. When the soul returns, the row flips to `finished <time>` with its cost, and `X` dismisses it for
    good in this browser.
 
@@ -3619,7 +3626,7 @@ there and is not a list is refused like every other field. The bus topic is `dis
 restamped every poll, so republishing the frame whole wakes every reader twice a second (2026-09-24: the four
 keys byte-identical across two reads 4 s apart, zero publishes). `useDispatcherPlans` reads that topic —
 `{ plans, hidden, arcs, planners, loosePlanners, count, waiting, laneOpen, route, daemon, offpeakAt, carriedNames }` — and every piece of the card reads the
-hook or `dispatcherState.ts`. The feed also mounts `DispatcherAskBell` beside its children: it draws nothing and reads `dispatcher:all` for asks it has not heard (MAN-7540). The document's times are ISO-8601 UTC strings end to end: the server converts
+hook or `dispatcherState.ts`. The feed also mounts `DispatcherAskBell` and `AskDraftPrune` beside its children: both draw nothing and read `dispatcher:all`, the bell for asks it has not heard (MAN-7540), the prune for asks the lane no longer names (MAN-7584). The document's times are ISO-8601 UTC strings end to end: the server converts
 nothing, and `epochOf` (`Date.parse / 1000`) is the ONE edge where a string becomes the card's seconds.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-arc-nest.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-arc-strip-return.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dispatch-arc-start.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dispatch-card-phases.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dispatch-card-version-word.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dispatch-model-word.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dispatch-resume-3am.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-planner-card.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-planner-card-write.py
@@ -11467,7 +11474,7 @@ The **Notes** tab in the workspace: one account's cards — a sticky note each, 
 
 ## One list, two homes
 - `NotesList` is mounted by `NotesPanel` (the tab) and by `NotesWidgetBody` (the gutter) — one list, one provider, so a note added in either home is in both and neither holds a copy the other cannot see.
-- One auto-fill grid, and it is what makes the list a wall in the tab and a stack in a gutter: `NOTES_WALL_GRID` = `grid grid-cols-[repeat(auto-fill,minmax(min(100%,18rem),1fr))] items-start gap-4` (`NotesList.tsx`): each column is 18rem wide unless its container is narrower, in which case it is the container — the wall's cards are 18rem and up, and a gutter card is its column.
+- One auto-fill grid, and it is what makes the list a wall in the tab and a stack in a gutter: `NOTES_WALL_GRID` = `grid grid-cols-[repeat(auto-fill,minmax(min(100%,18rem),1fr))] items-start gap-4` (`NotesList.tsx`): each column is at least 18rem wide and the columns share the leftover width (`1fr`: a 700 px container draws 342 px columns, not 288), and a container narrower than 18rem gets one column as wide as the container — the wall's cards are 18rem and up, and a gutter card is its column.
 
 ## The drafts
 - `NotesProvider` holds the drafts on the second context (`NoteDraftsContext`): `composer`, what is typed in the blank card, and `edits` by note id — a card is in edit mode exactly while it has an entry.
@@ -11586,6 +11593,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/co
 | `askIdentity(ask)` | `<asked.id>-<asked.at>`, the same on every plan one lock names |
 | `lockOptions(ask)` | `{ accept, queue, rework }`, each `{ label, description }` verbatim from `intent_lock.OPTIONS`, read by position 0, 1, 2 |
 | `arcAsks(plans)` | every distinct open ask across the plans, arc order, first plan carrying an identity places it; a plan with no `asking` key is skipped |
+| `asksOnLane(plans)` | every `askIdentity` the picture's plans name, each once, lane order, put-away plans included; read by `DispatcherAskBell` (MAN-7540) and `AskDraftPrune` (MAN-7584) |
 | `askHeadline(ask)` | a lock's first non-blank `question` line; a round's first question's first non-blank line |
 
 Rules:
@@ -11676,14 +11684,14 @@ Handles (reading surface for a probe):
 | `data-ask-strip`, `-viewing`, `-prev`, `-next` | a round's strip, its `Question N of M` line and its two arrows (the arc deck's own are `data-arc-*`) |
 
 Rules:
-1. The form is never unmounted. A fold sets `display:none` (`hidden`) on `data-ask-form`; notes and picks live in `LockAnswer` / `RoundAnswer` state, and the wrapper is keyed by `askIdentity(ask)`, so the same ask folded and unfolded keeps its words and a different ask starts empty. `why:` a clip leaves controls in the tab order (MAN-5412).
+1. The form is never unmounted. A fold sets `display:none` (`hidden`) on `data-ask-form`; notes and picks are the form's state, kept as a draft (MAN-7584), and the wrapper is keyed by `askIdentity(ask)`, so the same ask keeps its words across a fold or a reload and a different ask starts empty. `why:` a clip leaves controls in the tab order (MAN-5412).
 2. A folded band is ONE button (`data-ask-bar`): head line, `askHeadline(ask)` truncated to one line, `dispatcher.ask.open`. It answers nothing.
 3. Head line: amber `vv-pulse` dot, `dispatcher.ask.waiting`, neutral `Badge` — `ask.header` for a lock, `ask.plan` for a round. Phrasing content only (`span`), because it sits inside a `button`.
 4. `answered` is reached only by `onAnswered` → `setAnswered(true)`, called when `answer(...)` resolves `true`. The answered band is `AskAnsweredLine` alone, no controls.
 5. A lock's census is drawn whole through `QuestionText` in one `max-h-[50dvh]` focusable `region` (`aria-label` = `ask.header`): no clamp, no excerpt. `why:` the last line is `lock:<digest>`, and the press approves what is drawn (MAN-7400). A round has no region: its questions are paged (rule 8), and its strip is labelled `dispatcher.ask.questionsStrip` (`ask.plan`).
 6. Lock buttons are `lockOptions(ask)` labels verbatim, each description as its `title`; the label IS the answer sent. Accept primary, Queue secondary, Rework outline, all `h-8`.
 7. Rework swaps the three buttons for the `vv-input` textarea, `Send notes` (disabled until words) and Cancel; Cancel keeps the notes.
-8. A round is PAGED, one question a view, on `SnapStrip` — the arc deck's own strip shape (MAN-5709, operator 2026-10-01: "Less scrolling the better"): the arrows with `Question N of M` (`dispatcher.pager.question`), a swipe or a horizontal wheel, Left/Right made inside the strip and not in a text control, and the strip as tall as the question in view (no `max-h`, no inner scrollbar). Above it a `StatusFlow` of the questions, drawn when there is more than one: the node in view selected, an answered question `✓` and `positive`, an unanswered one its number and `neutral`; a node press is `goTo`. A page: `QuestionText`, the options (`QuestionOptionRow` with `choice="radio"` and no `keyHint`, inside `role="radiogroup"`), the dashed `Other…` row OUTSIDE the group opening an `Input` (the only `autoFocus`; it follows the press). Picking a label closes Other and pages to the NEXT UNANSWERED question (forward from this one, wrapping to the earlier ones; none left → the reader stays) and moves focus to the strip, so the next Tab enters the question now in view; an option press within 500ms of a paging pick is dropped (`PAGING_SETTLE_MS`: the next question is sliding under the pointer, and a repeat tap would answer it unread); only the question in view is live — the other pages are `inert`, so Tab and the browser's focus-scroll cannot enter an off-view page and slide the strip back to it; opening Other and typing never page; opening Other clears the pick; typed words are kept on both. `Send answers` sits under the strip, outside every page, enabled only once EVERY question has an answer. A fold (`display:none`) keeps the question the reader was on (`useSnapStrip` reads nothing from a strip with no width, MAN-5715). `why:` the strip is the arc deck's own, so no snap, key or height rule exists twice.
+8. A round is PAGED, one question a view, on `SnapStrip` — the arc deck's own strip shape (MAN-5709, operator 2026-10-01: "Less scrolling the better"): the arrows with `Question N of M` (`dispatcher.pager.question`), a swipe or a horizontal wheel, Left/Right made inside the strip and not in a text control, and the strip as tall as the question in view (no `max-h`, no inner scrollbar). Above it a `StatusFlow` of the questions, drawn when there is more than one: the node in view selected, an answered question `✓` and `positive`, an unanswered one its number and `neutral`; a node press is `goTo`. A page: `QuestionText`, the options (`QuestionOptionRow` with `choice="radio"` and no `keyHint`, inside `role="radiogroup"`), the dashed `Other…` row OUTSIDE the group opening an `Input` (the only `autoFocus`; it follows the press, never a restore). Picking a label closes Other and pages to the NEXT UNANSWERED question (forward from this one, wrapping to the earlier ones; none left → the reader stays) and moves focus to the strip, so the next Tab enters the question now in view; an option press within 500ms of a paging pick is dropped (`PAGING_SETTLE_MS`: the next question is sliding under the pointer, and a repeat tap would answer it unread); only the question in view is live — the other pages are `inert`, so Tab and the browser's focus-scroll cannot enter an off-view page and slide the strip back to it; opening Other and typing never page; opening Other clears the pick; typed words are kept on both. `Send answers` sits under the strip, outside every page, enabled only once EVERY question has an answer. A fold (`display:none`) keeps the question the reader was on (`useSnapStrip` reads nothing from a strip with no width, MAN-5715). `why:` the strip is the arc deck's own, so no snap, key or height rule exists twice.
 9. Answer keys: a lock's by `ask.question` — Accept and Queue send their label; `Send notes` sends the Rework label plus `notes: { [ask.question]: notes.trim() }`; a round's by each answered question's own text.
 10. `busy` (one `const` per form) is read by the lock's Accept, Queue, Rework and `Send notes`, and the round's `Send answers`. The compose-only controls — the lock's notes field and Cancel, the round's rows, `Other…` row and field — stay live on purpose: none sends. Gating the round's rows needs a `disabled` prop on `QuestionOptionRow` (shared component, own review).
 11. Nothing calls `focus()` on mount and no key is bound outside the controls.
@@ -11821,3 +11829,68 @@ Carry behaviour:
 `node .verify/probe-card-order.mjs` (fixtures `.verify/lib/order-lane.mjs`; probe chat on Haiku): 2026-10-01 on 5183, 78 `[OK]`, 0 `[FAIL]`, 0 console errors, the operator's `dispatcher` document restored. Reads: churned frames move no card; mouse carry at 1440 with a poll mid-carry; the order after a reload and in the widget at 1920; one `cardOrder` entry written; the ending click swallowed; decks reorder among decks; a press on a button, the phase track, the arc strip, its next button or the ask textarea carries nothing; touch at 390×844 (move before the hold scrolls, long press lifts, bottom edge scrolls, drop reorders); touch in the widget at 1920. Not proven: a real finger, the widget at 390 (it draws only where the chat region is ≥ 1500 px).
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/cardOrderEntries.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/cardOrder.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/sortable/, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/usePointerDrag.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/order-lane.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-card-order.mjs
+
+## MAN-7583 — The live stamp: the open chat anchors the lane's launches by `launched_by`
+
+A chain's later stages (builder, review, fix-pass, docs) are minted by a detached walker; no
+transcript row of the launching chat ever carries their receipt. The lane carries each launch's
+stamp, so the open chat pins the stage the moment the lane pushes it — no message, no refetch.
+
+| Piece | Does |
+|---|---|
+| `classifyLaunch` (`soul-launch.service.ts`) | Puts `launched_by` on every `SoulLaunchSnapshot`: `spec.json`'s string, `null` when absent or empty. |
+| `readStampedLaunchIds` (`soulLaunchAnchors.ts`) | The launch ids whose `launched_by` EXACTLY equals the chat's CLI session id, in lane order. A `null` on either side matches nothing. |
+| `usePinnedSubagentRows(messages, soulLaunchIds, cliSessionId)` | Merges those ids with the receipt scan and the server's list (`mergeSoulLaunchIds`), then looks each up in the lane. The lane stays the only judge of what is still out. |
+| `useCliSessionId(appSessionId)` | The chat's CLI id. Reads `GET /sessions/:id` → `providerSessionId` (`null` inside a 200 for a chat with no turn yet), then follows `session_upserted`'s `providerSessionId`; re-reads on `websocket_reconnected`. |
+| `ChatInterface` | Calls `useCliSessionId`, hands the id to `PinnedSubagents` (the strip) and publishes it as `ChatSubagentSource.cliSessionId` (the gutter widget, via `useSubagentWidgetRows`). |
+
+Rules:
+- The id the client holds for a chat is the APP's; the stamp is the CLI's. They differ for every chat the app creates, so the stamp is never compared to `selectedSession.id`.
+- Read `GET /sessions/:id`, never `GET /sessions/:id/provider-id` for this: that route answers 409 for a chat with no turn yet, which the browser logs as a console error on every empty chat. The sidebar's copy-id menu is its other reader.
+- A chat has no CLI id until its first turn, so stamped launches anchor only after it; the server's latest-page stamp scan (MAN-526) covers the gap.
+- The server collector and `readStampedLaunchIds` apply the same exact-match test and must agree (MAN-525's twice-written rule).
+- Proof: `node .verify/probe-chat-soul-anchors.mjs` writes stamped and stranger fixture launches under the real souls root, then asserts the stamped row pins with zero history fetches and the stranger's does not.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatch-souls/soul-launch.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/sessions.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useCliSessionId.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useSubagentWidgetRows.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/utils/soulLaunchAnchors.ts
+
+## MAN-7584 — The plan card — the ask draft (`askDrafts.ts`, `useAskDraft`, `AskDraftPrune`)
+
+**The ask draft: a plan card's half-answered ask, kept in the `dispatcher` preference so a reload, the other surface or an unmounted widget gives it back.** Files in `src/modules/dispatcher/`. Operator: "Plan card answers to questions should save". Forms: `RoundAnswer`, `LockAnswer` (MAN-7537).
+
+| piece | file | does |
+|---|---|---|
+| `askDrafts` list | `askDrafts.ts` | one entry per open ask in the `dispatcher` preference, `name` = `askIdentity(ask)` (MAN-7532), capped at 200 like every list (INV-4406). Round entry: `{ name, picks: RoundPick[] }`; lock entry: `{ name, rework, notes }` (`AskDraft`, `RoundPick`, `LockCompose` in `src/shared/types.ts`) |
+| `readAskDraft(identity)`, `useStoredAskDraft(identity)` | `askDrafts.ts` | plain read; `useSyncExternalStore` read |
+| `saveAskDraft(identity, draft \| null)` | `askDrafts.ts` | the one write: a single-entry patch via `writeUserPreferenceEntries`; `null` for an ask with no entry writes nothing |
+| `pruneAskDrafts(carried)` | `askDrafts.ts` | one patch nulling every entry whose identity is not in `carried`; nothing to drop writes nothing |
+| `ROUND_DRAFT`, `LOCK_DRAFT` | `askDrafts.ts` | `AskDraftCodec`: `restore(draft, blank)` returns `null` for a draft of the wrong shape (a round's picks must equal the question count); `capture(identity, state)` returns `null` for a blank state, which deletes the entry |
+| `useAskDraft(identity, blank, codec)` | `hooks/useAskDraft.ts` | returns `{ state, edit, clear, scopeRef }`; the form types into its own `state`, the draft is the copy kept for it. `blank` must keep its identity for the life of the ask (memoised) |
+| `AskDraftPrune` | `AskDraftPrune.tsx` | render-null, mounted by `DispatcherFeed` beside `DispatcherAskBell` (MAN-6804); calls `pruneAskDrafts(asksOnLane(plans))` on each `dispatcher:all` frame |
+
+Rules:
+1. A draft is a picture of the form, never an answer. Nothing sends it; Send, Accept, Queue and Send notes stay the operator's press.
+2. Writes are entry patches naming only their ask (INV-4406), debounced `DRAFT_SAVE_DEBOUNCE_MS` = 400 after the last edit. An edit still waiting is written on `pagehide`, on `visibilitychange` to hidden, and on form unmount. why: a reload or a dropped background tab inside the beat must not lose words.
+3. The unmount write is skipped before preferences have hydrated (`hasHydratedUserPreferences()`), and the waiting timer is cleared. why: a sign-out tears the form down; its words must not land in the next account.
+4. Another copy's write (the tab and the widget are separate copies) is adopted only when this form has no unsent edit (`timer`) and no caret in one of its text fields (`holdsCaret(scopeRef)`); a held adoption is retried one tick after `focusout`. `known` (the wire form last written or adopted) tells this copy's own write coming back from another's.
+5. A taken answer clears: `clear()` deletes the entry and drops a waiting edit. Every taken lock answer clears, Accept and Queue included (`settle` in `LockAnswer`). A refused answer (`answer(...)` resolved `false`) keeps the draft.
+6. A restored open `Other…` field takes no focus: `RoundAnswer` focuses only the field its own press opened (`pressedOpen`, cleared on `onFocus` and on a pick). A restored lock notes field is open, nothing focused.
+7. The prune runs against the whole lane (`asksOnLane`, put-away plans included), so a hidden plan keeps its draft; `Show` brings it back. It does nothing until `useLiveTopic(DISPATCHER_ALL_TOPIC)` has a value. why: the bus holds nothing until the seed lands, and "nothing retained" read as "no asks" wiped every draft at each load. A picture that carries no asks prunes all.
+8. A re-cut ask has a new identity and starts empty; its old draft is pruned.
+9. Accepted gap: the store hides an ask while a planner outing is live on its plan or arc and shows the same ask, same identity, when the outing ends. The prune drops its draft at the first frame without it. Not closed by delaying the prune: an outing outlasts any frame count.
+10. Known limit: the preference store reads the server once at sign-in (`userSettings.ts`, shared by every preference), so a page left open does not see another device's draft until it reloads. A refresh path belongs to that shared store, not to this feature.
+11. A new ask form gets the edit-and-adopt rules by calling `useAskDraft` with a codec; it does not re-implement them.
+
+Proof: `node .verify/probe-ask-drafts.mjs` (`--leg1` the first leg alone, `--legs34` the last two) — the Runner tab of the live client (`:5183`) signed in as the dev account `verve`, the page's own lane rewritten around two fixture asks (`lib/ask-lane.mjs`, asked ids 900041–900043, the census lock and a three-question round); the answer door is answered in the page (0 presses reach it from composing alone). The `verve` `dispatcher` preference writes are REAL (they are the subject); every other preference write is answered in the page.
+
+| leg | reads |
+|---|---|
+| 1 | both drafts reach the account; after a reload picks, `Other…` words and notes (field open, nothing focused) are back in the tab, in the widget at 1920 and at 390×844, dark and light |
+| 2 | rewriting the lane without the fixture asks empties `askDrafts` on the account |
+| 3 | a refused answer keeps the draft, a taken one clears it; a re-cut ask starts empty and its old draft goes |
+| 4a–4e | an idle form adopts the other copy's draft; an unsent edit is not clobbered; a caret keeps its words and place; once the caret leaves the other copy's draft is adopted; words typed inside the 400 ms beat survive an immediate reload |
+
+The account is shared and this feature is live on the dev client for every page that signs in as it: a `verve` page of ANOTHER probe whose lane lacks the fixture asks prunes their drafts. The probe tells that from an app failure by the list shrinking with no removal from its own pages (the server changes a list only when a PATCH names it), notes it and reruns the leg up to 3 times; a failure with no such shrink stands. `--trace` prints the account's list and every `dispatcher` write in time order. The probe removes only its own three drafts, by entry patch `{ askDrafts: { <identity>: null } }` (`dropOwnDrafts`, at each leg start, at the 4e reset and at the end), and checks at the end that none of its drafts remain and every draft the account held before is still there. It never writes a whole list.
+
+Shots `.verify/shots/ask-drafts-<surface>-<theme>-<what>.png` (14). Exits 1 with the failed checks. 2026-10-02: before the change (`--leg1`) 20 `[FAIL]` and 18 `[OK]` (dark and light together; picks, `Other…` words and notes empty after the reload, "both drafts reach the account" read `none`); after the change 61 `[OK]`, 0 `[FAIL]`, 0 console errors. That run predates the `dropOwnDrafts` rewrite (previously a whole-list restore); the rewrite has had `node --check` only and is not re-run. `.verify/probe-card-ask.mjs` re-run alongside: 584 `[OK]`, 0 `[FAIL]`.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/AskDraftPrune.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/askDrafts.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/hooks/useAskDraft.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-ask-drafts.mjs

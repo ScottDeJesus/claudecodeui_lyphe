@@ -1,4 +1,4 @@
-import type { ChatMessage } from '@/shared/types';
+import type { ChatMessage, SoulLaunchSnapshot } from '@/shared/types';
 
 /**
  * Which launcher souls belong to THIS conversation.
@@ -21,6 +21,17 @@ import type { ChatMessage } from '@/shared/types';
  * from the server, which reads the WHOLE history for the session (`collectSessionSoulLaunches`,
  * hung on a latest page as `soulLaunches`). `mergeSoulLaunchIds` joins the two; this half is what
  * makes a soul appear the second it is launched, without waiting for a refetch.
+ *
+ * A THIRD WITNESS, FOR A LAUNCH THAT NEVER PRINTS A RECEIPT: `plan-runner chain` prints `CHAIN
+ * LAUNCHED`, and its stages — builder, review, fix-pass, docs — are minted later by a detached
+ * walker, so no transcript row of this chat ever names them and neither half above can see one
+ * until a latest-page fetch, which is when the operator next sends something. The launcher stamps
+ * every launch it mints with the CLI session id of the conversation that made it (`launched_by` in
+ * `spec.json`, from `CLAUDE_CODE_SESSION_ID`), and the lane carries that stamp on each snapshot.
+ * `readStampedLaunchIds` anchors a launch whose stamp EQUALS this chat's own CLI session id — an
+ * exact match on a fact the minting process wrote, the same test the server's
+ * `collectStampedSoulLaunches` applies to a latest page. It is never read off prose or off an id a
+ * result printed, so it keeps the rule above intact.
  *
  * The ids are only ever used to LOOK UP a launch in the lane's picture (`useSoulLaunches`), so an
  * id nothing answers for draws nothing at all.
@@ -110,4 +121,25 @@ export function mergeSoulLaunchIds(stored: string[], scanned: string[]): string[
   if (scanned.length === 0) return stored;
   const known = new Set(stored);
   return [...stored, ...scanned.filter((id) => !known.has(id))];
+}
+
+/**
+ * The lane's launches this chat's CLI session id minted, in the lane's own order (oldest first).
+ *
+ * Used by `usePinnedSubagentRows` against the lane's live picture, so a chain stage the walker has
+ * just launched is anchored the moment the lane carries it — no message, no page refetch. Ownership
+ * is an EXACT string match against the stamp the launcher wrote: `null` on either side matches
+ * nothing, so a chat whose CLI id is not yet known (a brand-new one) and a launch with no stamp can
+ * never be paired by accident.
+ */
+export function readStampedLaunchIds(
+  launches: Iterable<SoulLaunchSnapshot>,
+  cliSessionId: string | null,
+): string[] {
+  if (!cliSessionId) return [];
+  const ids: string[] = [];
+  for (const launch of launches) {
+    if (launch.launched_by === cliSessionId) ids.push(launch.launch_id);
+  }
+  return ids;
 }
