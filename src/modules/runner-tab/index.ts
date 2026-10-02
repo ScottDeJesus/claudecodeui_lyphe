@@ -5,5 +5,5 @@ import { lazy } from 'react';
 // barrel for anything else never pulls the panel into the first page load.
 export const RunnerPanel = lazy(() => import('@/modules/runner-tab/RunnerPanel').then((m) => ({ default: m.RunnerPanel })));
 // The same lane as the desktop chat gutter draws it — one list of every arc deck and every plan of no
-// arc, the open chat's first. Its consumer is src/modules/chat-gutters.
+// arc, in the operator's own order. Its consumer is src/modules/chat-gutters.
 export { RunnerWidgetBody } from '@/modules/runner-tab/RunnerWidgetBody';

@@ -106,14 +106,6 @@ record (`~/.claude/state/dispatch-chains/<chain-id>/`) is the resume substrate. 
 CONDUCTOR to reconcile against — the session that claimed the
 lease is the session that briefs it, rules on it, and writes its board.
 
-Background souls DO report back, though, and that is not a hole in the model: a soul this
-session dispatched delivers its task-notification to THIS session, which is the same session
-that holds the lease and writes the checklist. So the reconciliation is local and automatic —
-there is no third party to sync with. The practical consequence is a habit: when a dispatched
-soul is still running and you are only waiting on it, **end the turn**. The notification
-re-invokes this session with the result and the build resumes mid-ladder, lease and ledger
-intact. Polling it, or narrating the wait, re-sends the whole conversation to learn nothing.
-
 Because **nothing commits** (the operator commits manually), the old commit-barrier
 is gone. The parallel-safety mechanism is **disjoint-file claiming** — each session
 picks a feature whose files don't collide with any in-flight build, comparing the files

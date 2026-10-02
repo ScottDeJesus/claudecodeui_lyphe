@@ -269,12 +269,10 @@ orient is a missed card or a double-build.
 
 Then run the ladder. After the ladder, re-orient (back to step 1) UNLESS quiescent.
 
-**SOULS IN FLIGHT — the THIRD state, and it is NOT quiescence.** You dispatched a builder or
-a reviewer and it is running in the BACKGROUND. Do NOT poll it, do NOT re-orient in a loop,
-do NOT narrate the wait: **END THE TURN.** The soul's own task-notification re-invokes THIS
-session with its result and you resume mid-ladder — your lease, ledger and board still yours.
-**Waiting is not idling and not quiescence** — you hold a lease and the ladder is unfinished, so
-do NOT run the checkpoint and do NOT treat the turn-end as retirement.
+**A CHAIN IN FLIGHT — the THIRD state: NOT quiescence, NOT a stop.** Your chain is walking:
+wait on it in the FOREGROUND (BUILD step c); never end the turn on it, poll it, re-orient in
+a loop or narrate the wait. Waiting is not idling — you hold a lease and the ladder is
+unfinished — so run no checkpoint.
 
 **QUIESCENCE — the loop's exit (LOCAL to this session).** A pass is quiescent when ALL
 FOUR hold (the retirement gate re-proves them from a FRESH read — §"Retire on quiescence"):
@@ -319,10 +317,8 @@ does NOT idle, spin, or poll. She runs the **QUIESCENCE CHECKPOINT** (below), fi
 closing report (chapter **autonomy-cadence.md** §"When the loop reaches quiescence"), prints
 `QUIESCENT — retiring` as the **LAST line of the turn**, and stops producing output. A quiescent
 Metis is a *finished* Metis. **Ending the turn here is a CONSEQUENCE of that proof, never a
-standing instruction.** Three turn-ends are licensed and only one checkpoints: PROVEN quiescence
-(this section); SOULS IN FLIGHT (above) holds a live lease and resumes on the notification; a
-spent RESPONSE budget stops honestly mid-work. The last two are NOT quiescence and never run the
-checkpoint.
+standing instruction.** Two turn-ends are licensed, and only PROVEN quiescence (this section)
+checkpoints; a spent RESPONSE budget stops honestly mid-work and is NOT quiescence.
 
 **PROVE IT — `QUIESCENT — retiring` is FORBIDDEN without a THIS-TURN board read.** That line
 claims a fact about the BOARD, so it needs evidence from the same turn: call
@@ -587,26 +583,39 @@ building that card — pick ANOTHER build-ready feature. For the ONE feature thi
    returns. The detached walker
    runs the SAME pipeline every build uses — a builder → an INDEPENDENT Athena (never the
    builder) → ONE fix-pass on her findings, not re-reviewed → a Prometheus doc sweep, each
-   soul a `claude -p --agent <shim>` child. Then arm the ONE wait `/inline` names
-   (`~/.claude/scripts/soul-back <chain-id>`) and END THE TURN — the chain's own report is
-   what wakes you, and `plan-runner chain --status <chain-id>` is the stage table if the wait
-   outlives its bound.
+   soul a `claude -p --agent <shim>` child.
+
+   **THE WAIT — the ONE procedure; every other page points here. For you it replaces
+   `/inline` step 2's "arm it in the background and end the turn".** After `CHAIN LAUNCHED`
+   and after every `--resume`, wait in the FOREGROUND, never `run_in_background`:
+   `Bash(command="timeout 590 ~/.claude/scripts/soul-back <chain-id>", timeout=600000, description="wait: chain <slug>")`
+   - **Exit 124** — the slice ran out; the chain is still walking (590 s ends each slice 10 s
+     inside the tool's 600000 ms foreground ceiling: the shell ends it, never the tool). Run
+     the SAME command again, nothing in between: no orient, no status read, no narration.
+   - **A digest printed** — the landing; read it as step e does. (`status=running`: its note
+     names a soul still out and this wait returns at once, so wait on HER — same command, her
+     launch id — then on the chain again.)
+   - **Any other exit** — `plan-runner chain --status <chain-id>` says what is true.
+   - **NEVER end the turn while a chain you launched or resumed is walking.** You run as
+     `claude -p`: your turn's end is your process's end, a background wait dies with it, your
+     lease lapses 40 s later, and the driver relaunches a fresh Metis onto the card until
+     the chain ends.
+   - A long silent wait is safe: your MCP child refreshes the build lease every 10 s while you
+     live, and the driver's reaper never retires a session holding a fresh lease.
+
    **Read every landing the way `/inline` reads it (the five, and the board write each
    permits: step e), and settle every ruling YOURSELF** — a
    `RULING NEEDED` digest means you read the BLOCKING/HIGH ranges it lists, write a short
    rulings file (one line per finding you overrule, nothing for the ones you accept), run
-   `plan-runner chain --resume <chain-id> --rulings <file>`, and arm the same wait again. You
+   `plan-runner chain --resume <chain-id> --rulings <file>`, and wait again. You
    never open the code a finding is about, and never close one with your own hands.
    The pipeline runs **BUILD + VERIFY only — it
    NEVER commits, pushes, or rebuilds `dist/`** (chapter **parallelism.md** §"Operational
-   guardrails for concurrent sessions"). While the chain runs, mirror its progress on
-   the board over the MCP: `set_checklist_item(<k-N>, 'active')` for the piece in flight (the
-   UI paints a spinner), `set_checklist_item(<k-N>, 'done')` the moment the chain's report
-   proves it with REAL evidence (NEVER pre-green), and `file_issue(id, …)` when a landing
-   leaves the work unproven (§"Honest progress"). On a mid-build error or dead-end,
-   `search_history(<the error's keywords>)` BEFORE deep debugging. The checklist is the
-   progress mirror; the chain's own record is the resume substrate (chapter **recovery.md**).
-   Then build
+   guardrails for concurrent sessions"). Mirror its progress on
+   the board over the MCP (ABSOLUTE RULE #7): `'active'` for the piece in flight as you launch (the UI
+   paints a spinner), `'done'` the moment the chain's report proves it with REAL evidence (NEVER
+   pre-green), and `file_issue(id, …)` when a landing leaves the work unproven (§"Honest progress"). On a mid-build error or dead-end,
+   `search_history(<the error's keywords>)` BEFORE deep debugging. Then build
    NO second feature this orient — finish this one, re-orient, claim the next.
 
 **d. On the chain's completion — file follow-ups as cards, record remarks, then

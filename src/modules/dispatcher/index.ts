@@ -11,12 +11,11 @@ export { useDispatcherPlans } from '@/modules/dispatcher/hooks/useDispatcherPlan
 // one and re-draws from the next frame; nothing is guessed here. `drop` is the one verb a card
 // guards with a dialog, because it is the one no press undoes.
 export { useDispatcherVerbs } from '@/modules/dispatcher/hooks/useDispatcherVerbs';
-// The pure vocabulary of a plan, so a card never re-derives a tone, a progress count or
-// the order the cards sit in — and the lane's own split, so the Runner tab and the chat gutter's
-// widget group and order the arcs' plans by ONE rule instead of two.
+// The pure vocabulary of a plan, so a card never re-derives a tone or a progress count — and the
+// lane's own split, so the Runner tab and the chat gutter's widget group the arcs' plans and order
+// every card by ONE rule instead of two.
 export {
   byArc,
-  byUrgencyThenNewest,
   deckFocusIndex,
   epochOf,
   phaseProgress,
@@ -26,11 +25,10 @@ export {
   scheduleClock,
   waitsOnSiblings,
 } from '@/modules/dispatcher/dispatcherState';
-export type { DispatchDeckLayer, DispatcherArcGroup, DispatcherArcSplit } from '@/modules/dispatcher/dispatcherState';
-// The ask readings both homes' orders take: a plan that owes the operator a word comes up in every
-// list — the lane's own order and the widget's lift — because an ask is the one state that waits on
-// him and will not move until he answers.
-export { anyOwesWord, owesWord } from '@/modules/dispatcher/askState';
+// The operator's arrangement of the lane's cards, the one thing that orders them: the saved ranks
+// both homes feed `byArc`, and the write a drop makes — one entry for the moved card, in the
+// `dispatcher` preference's `cardOrder`.
+export { moveCard, useCardRanks } from '@/modules/dispatcher/cardOrderEntries';
 // The plan's card — head, action bar, glance face, the fold — and the arc's deck: the arc's head over
 // its plans, paged one card per view in a strip, in the tab and in the gutter alike. `DispatchArcDecks`
 // is the stack of decks, given the split that says which plans go under which arc. Drawn by both homes

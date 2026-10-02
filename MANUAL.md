@@ -721,7 +721,9 @@ The chat's state hooks bind timers, frames, listeners and observers to `useHostW
 | unit | file | bound to `hostWindow` |
 | --- | --- | --- |
 | `ChatInterface` | `src/modules/chat/ChatInterface.tsx` | Escape-stops-the-turn `keydown`: document CAPTURE listener on `hostWindow.document`, still checks `defaultPrevented`; `hostWindow` in the effect's dependencies |
-| `useChatSessionState` | `src/modules/chat/hooks/useChatSessionState.ts` | settle loop `requestAnimationFrame`/`cancelAnimationFrame` (`hostWindow` in the effect's dependencies); the follow-the-foot `setTimeout`s via `hostWindowRef`; scroll restore via `useHostMoveScroll` |
+| `useChatSessionState` | `src/modules/chat/hooks/useChatSessionState.ts` | settle loop `requestAnimationFrame`/`cancelAnimationFrame` (`hostWindow` in the effect's dependencies); the landing pin's frames via `hostWindowRef` (`landAtMessageTop`); scroll restore via `useHostMoveScroll` |
+| `useFollowGlide` | `src/modules/chat/hooks/useFollowGlide.ts` | glide frames (`requestAnimationFrame`, cancelled on `armedOn`, the window that issued them), the content-box `ResizeObserver` built by `hostWindow.ResizeObserver`, `matchMedia` for reduced motion, the `keydown` listener on `hostWindow.document`; the effect re-runs on a move (MAN-7574) |
+| `useIsLookingAtSession` | `src/modules/chat/hooks/useSessionPresence.ts` | the host document's `visibilityState` and `visibilitychange`; re-read at once when `hostWindow` changes (MAN-7575) |
 | `useChatRealtimeHandlers` | `src/modules/chat/hooks/useChatRealtimeHandlers.ts` | the 100 ms stream flush timer (below) |
 | `useSessionPresence` | `src/modules/chat/hooks/useSessionPresence.ts` | `visibilityState` and `visibilitychange` from `hostWindow.document`; `hostWindow` in the effect's dependencies, so a move says the old document left, then announces the new one |
 | `useLazyRowObserver` | `src/modules/chat/hooks/useLazyRowObserver.ts` | observer built by `hostWindow.IntersectionObserver`; a layout effect keyed on `hostWindow` disconnects the old one, builds a new one and re-observes every registered row; `isSupported` reads the host window |
@@ -742,7 +744,7 @@ The chat's state hooks bind timers, frames, listeners and observers to `useHostW
 | `state.anchor` is connected and `anchorOffset !== null` | shift `scrollTop` so the anchor row stands at its recorded offset |
 | else | `scrollTop = state.top` |
 
-- Callers: the became-active branch of `useChatSessionState` (`anchor: null`: foot or top; MAN-385) and the move's `'after'`.
+- Callers: the `becameLooking` branch of `useChatSessionState` (`anchor: null`: foot or top; MAN-385) and the move's `'after'`.
 - `'before'`: a scroller that is connected with `clientHeight > 0` is captured (`captureScrollRestoreState` plus `following`, read from `isUserScrolledUpRef`); otherwise nothing is captured.
 - `'after'`: restore from the capture, or from `fallback()` (`restoreStateAtMove` in `useChatSessionState`: the following flag, `scrollPositionRef.current.top`), then the capture is spent.
 - The node's first adoption at mount is a move: `'before'` finds the scroller detached and captures nothing, `'after'` restores from `fallback()`.
@@ -774,14 +776,14 @@ The chat's state hooks bind timers, frames, listeners and observers to `useHostW
 | `usePinnedSubagentRows.ts` expiry repaint | hours away |
 | `useVoiceAvailable.ts` | listens for `VOICE_CONFIG_SYNC_EVENT`, which settings dispatches on the opener's `window` |
 | `useVoiceInput.ts` `navigator` | the opener's |
-| `useChatSessionState` bare timers: the 8 s loading-wheel guard, the "Load all" hint pulses, the search-jump retries, the 4 s highlight flash | each bounds a wait; the reader is not waiting on it |
+| `useChatSessionState` bare timers: the 8 s loading-wheel guard, the "Load all" hint pulses, the search-jump and landing retries, the 4 s highlight flash | each bounds a wait; the reader is not waiting on it |
 | `useChatComposerState`'s 5 s draft poll | reconciles data |
 
 ## Probes
 
 | command | proves |
 | --- | --- |
-| `node .verify/chat-window-bindings-home.mjs` | at home, real Haiku turns in a scratch chat on :5183 (800×240 window, so two short turns overflow the scroller): a turn streams and the transcript follows its foot; Escape mid-stream stops the turn; a 400px-scrolled-up transcript is within 2px after a Files-tab trip, and at the foot it returns to the foot. Expects exactly two console `404`s from `/token-usage` on a fresh chat (the server answers 404 with no transcript yet). Deletes its chat |
+| `node .verify/chat-window-bindings-home.mjs` | at home, real Haiku turns in a scratch chat on :5183 (800×240 window, so two short turns overflow the scroller): a turn streams and the transcript follows its foot with a glide (back inside the near-bottom band within 60 frames, the jump-to-bottom button never showing); Escape mid-stream stops the turn; a 400px-scrolled-up transcript is within 2px after a Files-tab trip, and at the foot it returns to the foot; a reply that arrives while the Files tab is shown lands the operator on the message they sent, within 24px of the scroller's top, the reply below the fold (MAN-7575). Expects exactly two console `404`s from `/token-usage` on a fresh chat (the server answers 404 with no transcript yet). Deletes its chat |
 | `node .verify/chat-window-bindings-move.mjs` | the REAL hooks (served source) in a Chromium Document-PiP window under a `HostWindowProvider` driven like `moveTo` (emit `'before'`, place the node, set the host, emit `'after'`): scroll anchor within 2px in both directions while the scroll height changes ~40%, a follower lands on the foot, a control scroller with no hook drops 500 to 0; flush at `'before'` and cleared on the PiP; presence; observer rebuilt by the right constructor with all 60 rows answering. 2026-09-29: 33 of 33 pass |
 
 - `PROBE_APP_URL` points the home probe at another client of the same API (a before-tree on its own port).

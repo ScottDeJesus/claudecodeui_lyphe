@@ -78,7 +78,11 @@ export function useDispatcherPlans(): {
   loosePlanners: DispatcherPlanner[];
   /** The dispatcher's next DeepSeek off-peak moment, epoch SECONDS, or `null` when the clock answered `none` or nothing is retained. */
   offpeakAt: number | null;
-  /** Every plan name the lane carries, put away or not: what a press or a show prunes the stored list against. */
+  /**
+   * Every plan name AND every arc name the lane carries, put away or not: what a write prunes the
+   * stored lists against — the hidden plans (`hiddenPlans.ts`, plan names) and the card order
+   * (`cardOrderEntries.ts`, plan and arc names, which never collide).
+   */
   carriedNames: string[];
 } {
   const value = useLiveTopic<DispatcherLanePicture>(DISPATCHER_ALL_TOPIC);
@@ -99,8 +103,9 @@ export function useDispatcherPlans(): {
     // The UNFILTERED lane on purpose: every write prunes the stored list against every name the lane
     // still carries, and pruning against the drawn `plans` would drop every earlier entry the moment
     // a second one was made. The dispatcher still holds those plans, so they would come straight back
-    // as cards.
-    const carriedNames = lane.map((plan) => plan.name);
+    // as cards. The arcs the lane carries ride along for the card order, whose entries name decks too:
+    // an arc whose every plan is put away has no deck drawn, and its place is still its own.
+    const carriedNames = [...lane.map((plan) => plan.name), ...(Array.isArray(picture?.arcs) ? picture.arcs : []).map((arc) => arc.name)];
 
     // THE ARCS THE SCREEN ACTUALLY HAS CARDS FOR, which is one step stricter than the lane's own
     // list: the server drops an arc with no plan left on the lane, and a put-away plan is on the lane

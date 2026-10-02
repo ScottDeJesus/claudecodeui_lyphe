@@ -9,15 +9,18 @@ import {
   HiddenPlans,
   landFocusInHome,
   LoosePlannerBadges,
+  moveCard,
   PlanCard,
   PlannerLanesReadout,
   planPutAway,
+  useCardRanks,
   useDispatcherPlans,
 } from '@/modules/dispatcher';
 import { DISPATCHER_ALL_TOPIC, useLiveTopic } from '@/modules/live-bus';
 import { useLaneFoldPrune } from '@/modules/runner-tab/hooks/useLaneFoldPrune';
 import { LANE_WALL_GRID } from '@/shared/constants';
 import { Badge, Button, EmptyState, ScrollArea } from '@/shared/ui';
+import { useSortable } from '@/shared/ui/sortable/useSortable';
 import { cn } from '@/shared/utils';
 import type { DispatcherLanePicture } from '@/shared/types';
 
@@ -58,8 +61,14 @@ import type { DispatcherLanePicture } from '@/shared/types';
  * THE PLANS ARE NESTED BY ARC. The lane is split by ONE rule (`byArc`, so this pane and the chat
  * gutter's widget cannot group differently): every arc of it is one DECK holding the plans of that
  * arc in the ARC's own walk order — one strip inside the deck, with the arc's flow over it — and
- * the plans no arc holds are `PlanCard`s in their own urgency order, in the wall's grid below the
- * decks. Every press passes the lane's own carried names, which is what the put-away store
+ * the plans no arc holds are `PlanCard`s in the wall's grid below the decks.
+ *
+ * THE CARDS STAND WHERE THE OPERATOR PUT THEM AND NOWHERE ELSE. Decks and wall cards each keep the
+ * shared order among their own kind (`byArc`'s `groups` and `rest`; the order is `cardOrder.ts`'s),
+ * and each of the two lists is sortable: a free press on a card carries it, the grid lays itself out
+ * around the gap, and a drop writes one rank (`moveCard`). The wall is two-dimensional, so a card
+ * can be dropped into any slot of its rows; decks reorder among decks and plans among plans — a
+ * deck and a plan swap places only in the widget, which draws them in one column. Every press passes the lane's own carried names, which is what the put-away store
  * (`hiddenPlans.ts`) prunes its list against: `planPutAway` is a card's corner (Dismiss on a done card,
  * Hide on an unfinished one), `doneDismiss` the header's `Dismiss done · N`, and `HiddenPlans` at the
  * foot is the way back from a Hide. A dismissed card has no way back and needs none: the dispatcher
@@ -93,7 +102,21 @@ export function RunnerPanel({ revealPlan = null, onRevealed }: RunnerPanelProps)
   // "nothing retained yet", which a board that has been dealt and drawn empty is NOT. Same topic, so
   // the two reads agree within one render. The reveal effect below is the only reader.
   const retained = useLiveTopic<DispatcherLanePicture>(DISPATCHER_ALL_TOPIC);
-  const split = useMemo(() => byArc(plans, arcs), [plans, arcs]);
+  const ranks = useCardRanks();
+  const split = useMemo(() => byArc(plans, arcs, ranks), [plans, arcs, ranks]);
+  // The two sortable lists: the decks, and the plans of no arc in the wall. A drop hands `moveCard`
+  // the cards of ITS list for the neighbours' ranks, and the whole lane's names to prune against.
+  const deckKeys = useMemo(() => split.groups.map((group) => group.arc.name), [split]);
+  const wallKeys = useMemo(() => split.rest.map((plan) => plan.name), [split]);
+  const sortDecks = useSortable({
+    keys: deckKeys,
+    onReorder: (carried, order) => moveCard(carried, order, split.groups.map((group) => group.arc), carriedNames),
+  });
+  const wallPlans = useMemo(() => new Map(split.rest.map((plan) => [plan.name, plan])), [split]);
+  const { order: wallOrder, attachList: attachWall, itemProps: wallItemProps } = useSortable({
+    keys: wallKeys,
+    onReorder: (carried, order) => moveCard(carried, order, split.rest, carriedNames),
+  });
   useLaneFoldPrune(plans, hidden, arcs);
   const done = doneDismiss(plans, carriedNames);
   // The pane's root: where `Dismiss done · N` hands the keyboard on once the button has left with its count.
@@ -188,14 +211,14 @@ export function RunnerPanel({ revealPlan = null, onRevealed }: RunnerPanelProps)
             {/* THE ARCS SIT ABOVE THE PLANS NO ARC HOLDS, each deck holding the plans of its own arc:
                 an arc's word and verbs reach every plan of it, so its plans are that arc's own strip
                 rather than cards beside it (`DispatchArcDecks`). */}
-            <DispatchArcDecks groups={split.groups} carriedNames={carriedNames} />
+            <DispatchArcDecks groups={split.groups} carriedNames={carriedNames} sort={sortDecks} />
             {/* The plans of no arc, in the pane's own wall. They are the ONLY cards in this grid: an
                 arc's plans are paged one per view inside their deck's strip, so a loose card is the
                 width the wall gives every card that has no arc to be read under. */}
             {split.rest.length > 0 && (
-              <ul className={cn('min-w-0', LANE_WALL_GRID)} data-runner-loose-plans>
-                {split.rest.map((plan) => (
-                  <li key={plan.name} className="min-w-0">
+              <ul ref={attachWall} className={cn('min-w-0', LANE_WALL_GRID)} data-runner-loose-plans>
+                {wallOrder.flatMap((name) => wallPlans.get(name) ?? []).map((plan) => (
+                  <li key={plan.name} className="min-w-0" {...wallItemProps(plan.name)}>
                     <PlanCard plan={plan} onPutAway={planPutAway(plan, carriedNames)} />
                   </li>
                 ))}

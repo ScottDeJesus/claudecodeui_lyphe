@@ -17,7 +17,7 @@ import { readUserPreference } from '@/shared/userSettings';
 import { useSimpleChatListPreferences } from '@/shared/hooks/useSimpleChatListPreferences';
 import { useHostMove, useHostWindow } from '@/shared/context/HostWindowContext';
 import { applyPlainMode, usePlainModePreference } from '@/shared/hooks/usePlainModePreference';
-import type { CommandModalPayload, CostCommandData, HelpCommandData, MarkSessionProcessing, ModelCommandData, QueuedDraft, SessionActivityMap, StatusCommandData,QueuedSendOptions,ChatAttachment,ChatMessage,PendingPermissionRequest,PermissionMode,SessionEstablishedContext,Project,ProjectSession,LLMProvider,SlashCommand } from '@/shared/types';
+import type { CommandModalPayload, CostCommandData, HelpCommandData, MarkSessionProcessing, ModelCommandData, QueuedDraft, SessionActivityMap, StatusCommandData,QueuedSendOptions,ChatAttachment,ChatMessage,PendingPermissionRequest,PermissionMode,SessionEstablishedContext,Project,ProjectSession,LLMProvider,SlashCommand,SentUserTurn } from '@/shared/types';
 import { grantClaudeToolPermission } from '@/modules/chat/utils/chatPermissions';
 import {
   clearQueuedMessage,
@@ -69,6 +69,8 @@ type UseChatComposerStateArgs = {
   onShowSettings?: () => void;
   scrollToBottom: () => void;
   addMessage: (msg: ChatMessage) => void;
+  /** Marks a message just sent as the one the operator is brought back to if they leave before the reply lands. */
+  armReplyAnchor: (sessionId: string, sent: SentUserTurn) => void;
   setIsUserScrolledUp: (isScrolledUp: boolean) => void;
   setPendingPermissionRequests: Dispatch<SetStateAction<PendingPermissionRequest[]>>;
 };
@@ -182,6 +184,7 @@ export function useChatComposerState({
   onShowSettings,
   scrollToBottom,
   addMessage,
+  armReplyAnchor,
   setIsUserScrolledUp,
   setPendingPermissionRequests,
 }: UseChatComposerStateArgs) {
@@ -876,6 +879,15 @@ export function useChatComposerState({
       };
 
       addMessage(userMessage);
+      // Where the operator replied: the message they are brought back to if they leave before the reply
+      // lands. Identified by what it said and when — its echo's id and stamp change when the persisted
+      // row replaces it.
+      armReplyAnchor(targetSessionId, {
+        text: currentInput,
+        imageCount: userMessage.images?.length ?? 0,
+        fileCount: userMessage.files?.length ?? 0,
+        sentAtMs: userMessage.timestamp instanceof Date ? userMessage.timestamp.getTime() : Date.now(),
+      });
       // Mark this request as processing in the per-session activity map (the
       // single source of truth the indicator derives from). The id is always
       // concrete at this point — no pending placeholder exists anymore.
@@ -944,6 +956,7 @@ export function useChatComposerState({
       sendMessage,
       sessionKey,
       addMessage,
+      armReplyAnchor,
       setIsUserScrolledUp,
       simpleChatListEnabled,
       plainModeEnabled,

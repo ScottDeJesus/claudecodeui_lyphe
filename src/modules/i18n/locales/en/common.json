@@ -858,7 +858,8 @@
       "other": "Other…",
       "otherPlaceholder": "Type your answer…",
       "sendAnswers": "Send answers",
-      "word": "Answer"
+      "word": "Answer",
+      "questionsStrip": "Questions of {{plan}}, one at a time"
     },
     "status": {
       "live": "LIVE",
@@ -884,12 +885,19 @@
       "node": "Phase {{position}} · {{title}} · {{word}}",
       "caption": "{{done}} of {{total}} done",
       "arc": "Plans of {{arc}}",
-      "plan": "{{name}} · {{word}}"
+      "plan": "{{name}} · {{word}}",
+      "questions": "Questions of {{plan}}",
+      "question": "Question {{position}} · {{word}}",
+      "answered": "answered",
+      "unanswered": "not answered yet"
     },
     "pager": {
       "plan": "Card {{n}} of {{total}}",
       "previousPlan": "Previous card",
-      "nextPlan": "Next card"
+      "nextPlan": "Next card",
+      "question": "Question {{n}} of {{total}}",
+      "previousQuestion": "Previous question",
+      "nextQuestion": "Next question"
     },
     "now": {
       "next": "Next",

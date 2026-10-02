@@ -43,7 +43,7 @@ export type UserPreferences = {
   themeFollowsSun: boolean;
   /** The transcript's reading size in px. See `useChatFontSize`. */
   chatFontSize: number;
-  /** The Runner tab's memory, two entry lists written by entry patch (`writeUserPreferenceEntries`): `{ collapsedCards: string[], hiddenPlans: {name, at}[] }`. See `modules/dispatcher/hiddenPlans.ts` and `shared/hooks/useCardFold.ts`. */
+  /** The Runner tab's memory, three entry lists written by entry patch (`writeUserPreferenceEntries`): `{ collapsedCards: string[], hiddenPlans: {name, at}[], cardOrder: {name, rank}[] }` — the folded cards, the put-away plans, and the rank of each card the operator has moved (a plan's or an arc's name, higher first). See `shared/hooks/useCardFold.ts`, `modules/dispatcher/hiddenPlans.ts` and `modules/dispatcher/cardOrderEntries.ts`. */
   dispatcher: unknown;
   /** Composer toggle: every sent message rides under the `/plain` command. See `usePlainModePreference`. */
   plainMode: boolean;

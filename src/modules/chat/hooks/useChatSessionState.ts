@@ -2,14 +2,17 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import type { MutableRefObject } from 'react';
 
 import { api } from '@/shared/api';
-import type { MarkSessionIdle, SessionActivityMap,Project,ProjectSession,LLMProvider,NormalizedMessage,ChatMessage,DiffCalculator } from '@/shared/types';
-import { TRANSCRIPT_GREW_EVENT } from '@/modules/chat/transcript/transcriptGrew';
+import type { MarkSessionIdle, SessionActivityMap,Project,ProjectSession,LLMProvider,NormalizedMessage,ChatMessage,DiffCalculator,SentUserTurn } from '@/shared/types';
 import type { SessionStore } from '@/modules/chat/hooks/useSessionStore';
 import { SESSION_MESSAGES_PAGE_SIZE } from '@/modules/chat/utils/sessionMessagePagination';
 import { createMessageHistoryRefreshCoordinator } from '@/modules/chat/utils/messageHistoryRefreshCoordinator';
 import { createCachedDiffCalculator } from '@/modules/chat/utils/messageTransforms';
 import { normalizedToChatMessages } from '@/modules/chat/hooks/useChatMessages';
 import { findSearchTargetIndex, resolveSearchWindowSize } from '@/modules/chat/utils/searchTargetLocator';
+import { findSentUserTurn } from '@/modules/chat/utils/sessionMessageReconciliation';
+import { landAtMessageTop } from '@/modules/chat/utils/landAtMessageTop';
+import { useFollowGlide } from '@/modules/chat/hooks/useFollowGlide';
+import { useReplyAnchor } from '@/modules/chat/hooks/useReplyAnchor';
 import { mergeSoulLaunchIds, readSoulLaunchIds } from '@/modules/chat/utils/soulLaunchAnchors';
 import { readSelectedProvider } from '@/shared/selectedProvider';
 import { useHostWindow } from '@/shared/context/HostWindowContext';
@@ -101,6 +104,10 @@ const NO_LAUNCH_IDS: string[] = [];
 
 type UseChatSessionStateArgs = {
   isActive: boolean;
+  /** The operator is looking at the session: the chat is on screen and its document visible (`useIsLookingAtSession`). */
+  isLooking: boolean;
+  /** The websocket is up: the store hears the server's rows. A return made while it is down cannot tell whether a reply arrived. */
+  isConnected: boolean;
   selectedProject: Project | null;
   selectedSession: ProjectSession | null;
   ws: WebSocket | null;
@@ -116,6 +123,13 @@ type UseChatSessionStateArgs = {
   lastSeqRef: MutableRefObject<Map<string, number>>;
   sessionStore: SessionStore;
 };
+
+/**
+ * What the transcript still owes a scroll to: a sidebar search hit, or — as `landing` — the message
+ * the operator sent, which they are being brought back to. Both are brought into view by the one
+ * reveal path (the effect below that loads older rows until the message is among them).
+ */
+type RevealTarget = SearchTarget & { landing?: SentUserTurn };
 
 type PendingScrollRestore = ScrollRestoreState & {
   /**
@@ -187,6 +201,8 @@ function chatMessageToNormalized(
 
 export function useChatSessionState({
   isActive,
+  isLooking,
+  isConnected,
   selectedProject,
   selectedSession,
   ws,
@@ -201,9 +217,9 @@ export function useChatSessionState({
   sessionStore,
 }: UseChatSessionStateArgs) {
   const hostWindow = useHostWindow();
-  // The same window as of the latest commit, for a follow-up timer armed from an async continuation
-  // or an effect that a move must not re-run (a re-run of the external-update effect would fetch the
-  // transcript again). A ref because those callers read it when they fire, not when they render.
+  // The same window as of the latest commit, for a frame armed from an async continuation or an effect
+  // that a move must not re-run (the reveal effect would fetch the transcript again). A ref because
+  // those callers read it when they fire, not when they render.
   const hostWindowRef = useRef(hostWindow);
   useLayoutEffect(() => {
     hostWindowRef.current = hostWindow;
@@ -230,8 +246,18 @@ export function useChatSessionState({
   // The sidebar-search hit this transcript still owes the user a scroll to.
   // State rather than a ref because resolving it widens the render window,
   // and it is cleared once the row is on screen or the retries run out.
-  const [searchTarget, setSearchTarget] = useState<SearchTarget | null>(null);
+  const [searchTarget, setSearchTarget] = useState<RevealTarget | null>(null);
   const searchScrollActiveRef = useRef(false);
+  // True from the request to land on the operator's sent message until it is placed, so the open-session
+  // settle leaves the chat hidden behind its loading wheel until the landing, instead of showing the
+  // top of the transcript and then jumping.
+  const landingPendingRef = useRef(false);
+  // Stops the landing's re-alignment frames (`landAtMessageTop`).
+  const stopLandingPinRef = useRef<(() => void) | null>(null);
+  // True while those frames run. The landing parks the message near the top of the loaded rows, which
+  // is where the older-page pager and the short-screen fill act and re-pin the foot; they wait for the
+  // pin to end, and so does the follow.
+  const landingHoldRef = useRef(false);
   /**
    * The pending step of the search-jump retry chain, so a session change can
    * cancel a jump that belongs to the transcript the user just left.
@@ -347,7 +373,10 @@ export function useChatSessionState({
 
   const isActiveRef = useRef(isActive);
   const activeSessionIdRef = useRef(activeSessionId);
+  // `isLooking` readable from a frame or a timer: the follow re-reads it whenever it is about to write.
+  const isLookingRef = useRef(isLooking);
   isActiveRef.current = isActive;
+  isLookingRef.current = isLooking;
   activeSessionIdRef.current = activeSessionId;
 
   const latestRefreshExecutorRef = useRef<(sessionId: string) => Promise<boolean | void>>(
@@ -517,11 +546,34 @@ export function useChatSessionState({
     isUserScrolledUpRef.current = isUserScrolledUp;
   }, [isUserScrolledUp]);
 
+  // Whether the follow may move the view: the operator is looking at the session and is at its foot,
+  // and no other writer owns the position — the open-session settle, a page prepend or load-all, a
+  // search jump or the landing. Read when a growth is seen and on every frame of a glide.
+  const canFollow = useCallback(() => (
+    isLookingRef.current
+    && !isUserScrolledUpRef.current
+    && !pendingInitialScrollRef.current
+    && !isLoadingMoreRef.current
+    && !pendingScrollRestoreRef.current
+    && !searchScrollActiveRef.current
+    && !landingHoldRef.current
+  ), []);
+  const { stopGlide, isOwnScroll } = useFollowGlide({ scrollContainerRef, canFollow });
+
+  const { armReplyAnchor, takeLanding, takeDeferredLanding } = useReplyAnchor({
+    sessionId: activeSessionId,
+    isLooking,
+    isProcessing,
+    getMessages: sessionStore.getMessages,
+  });
+
+  // An instant write takes the position from any glide in flight.
   const scrollToBottom = useCallback(() => {
     const container = scrollContainerRef.current;
     if (!container) return;
+    stopGlide();
     container.scrollTop = container.scrollHeight;
-  }, []);
+  }, [stopGlide]);
 
   const scrollToBottomAndReset = useCallback(() => {
     scrollToBottom();
@@ -623,12 +675,15 @@ export function useChatSessionState({
     const container = scrollContainerRef.current;
     if (!container) return;
 
-    const nearBottom = isNearBottom();
-    setIsUserScrolledUp(!nearBottom);
-    // Written here as well as by the syncing effect: a picture that finishes loading between this
-    // scroll and the next commit reads the ref to decide whether to re-pin, and a flag one render
-    // behind would snap a reader who just scrolled up back to the bottom.
-    isUserScrolledUpRef.current = !nearBottom;
+    // The follow's own glide is not the reader: its mid-flight gap is not "scrolled up", and reading it
+    // as one would flash the jump button and stop the follow it is performing.
+    if (!isOwnScroll()) {
+      const nearBottom = isNearBottom();
+      setIsUserScrolledUp(!nearBottom);
+      // Written here as well as by the syncing effect: a flag one render behind would let the follow
+      // move a reader who just scrolled up back to the bottom.
+      isUserScrolledUpRef.current = !nearBottom;
+    }
     scrollPositionRef.current = {
       height: container.scrollHeight,
       top: container.scrollTop,
@@ -663,19 +718,31 @@ export function useChatSessionState({
     if (
       !allMessagesLoadedRef.current
       && !isLoadingSessionMessages
-      // While a chat settles to its bottom, the settle loop owns the scroll.
+      // While a chat settles to its bottom, the settle loop owns the scroll; while the operator is
+      // being landed on their message, the landing does.
       && !pendingInitialScrollRef.current
+      && !landingHoldRef.current
       && container.scrollHeight > container.clientHeight
       && container.scrollTop < container.clientHeight
     ) {
       await loadOlderMessages(container);
     }
-  }, [hasMoreMessages, isActive, isLoadingSessionMessages, isNearBottom, loadOlderMessages]);
+  }, [hasMoreMessages, isActive, isLoadingSessionMessages, isNearBottom, isOwnScroll, loadOlderMessages]);
 
-  const wasChatActiveRef = useRef(isActive);
+  // Asks the reveal effect below to bring the operator's sent message to the top of the view. The
+  // claim on the position (`searchScrollActiveRef`) is made here, not when the effect runs, so the
+  // follow and the open-session settle stand down from the moment of the request.
+  const requestLanding = useCallback((sent: SentUserTurn) => {
+    searchScrollActiveRef.current = true;
+    landingPendingRef.current = true;
+    setSearchTarget({ landing: sent });
+  }, []);
+
+  const wasLookingRef = useRef(isLooking);
   useLayoutEffect(() => {
-    const becameActive = isActive && !wasChatActiveRef.current;
-    wasChatActiveRef.current = isActive;
+    // Looking again: the Chat tab shown, the browser tab visible, the floating chat reopened.
+    const becameLooking = isLooking && !wasLookingRef.current;
+    wasLookingRef.current = isLooking;
     if (!isActive || !scrollContainerRef.current) return;
 
     const container = scrollContainerRef.current;
@@ -699,7 +766,16 @@ export function useChatSessionState({
     // Armed and still waiting for the commit that adds the older rows.
     if (pending) return;
 
-    if (becameActive) {
+    if (becameLooking) {
+      // Rows arrived below the message the operator sent while they were away: put them back at it,
+      // not at the foot of a reply they have not read. Decided here, before the first paint, so the
+      // view never shows the foot (or a hidden tab's reset top) on the way.
+      const sessionId = activeSessionIdRef.current;
+      const landing = sessionId ? takeLanding(sessionId, sessionStore.getMessages(sessionId), isProcessing, isConnected) : null;
+      if (landing) {
+        requestLanding(landing);
+        return;
+      }
       restoreScroll(container, {
         following: !isUserScrolledUp,
         top: scrollPositionRef.current.top,
@@ -709,7 +785,19 @@ export function useChatSessionState({
       });
     }
   // `visibleMessageCount`: a prepend can reach the screen by widening the window alone.
-  }, [chatMessages.length, isActive, isUserScrolledUp, visibleMessageCount]);
+  // `isLooking` joins `isActive`: a browser tab shown again is a return, like a tab switched back.
+  }, [chatMessages.length, isActive, isConnected, isLooking, isProcessing, isUserScrolledUp, requestLanding, sessionStore, takeLanding, visibleMessageCount]);
+
+  // A return made while the socket was down could not tell whether the reply had arrived: the store may
+  // have been behind the server. The rows the reconnect catches up arrive in front of the operator, and
+  // this asks again as they do — a layout effect, so the claim on the position is made before the follow's
+  // observer sees the growth.
+  useLayoutEffect(() => {
+    const sessionId = activeSessionIdRef.current;
+    if (!isActive || !isLooking || !sessionId) return;
+    const landing = takeDeferredLanding(sessionId, sessionStore.getMessages(sessionId), isProcessing);
+    if (landing) requestLanding(landing);
+  }, [chatMessages.length, isActive, isLooking, isProcessing, requestLanding, sessionStore, takeDeferredLanding]);
 
   // A move of the chat between hosts is a scroller that was away and is back, so it restores by the
   // same rule as the became-active branch above. `isFollowing` and `fallback` read refs: they answer
@@ -745,7 +833,13 @@ export function useChatSessionState({
       searchScrollTimerRef.current = null;
     }
     searchScrollActiveRef.current = false;
+    // The same goes for a landing on the previous session's sent message, and for the frames that were
+    // holding it in place.
+    landingPendingRef.current = false;
+    stopLandingPinRef.current?.();
+    stopLandingPinRef.current = null;
     setSearchTarget(null);
+    stopGlide();
 
     pendingInitialScrollRef.current = true;
     setIsOpeningSession(true);
@@ -756,7 +850,26 @@ export function useChatSessionState({
     liveScrollStateRef.current = null;
     wasNearTopRef.current = false;
     setIsUserScrolledUp(false);
+  }, [selectedProject?.projectId, selectedSession?.id, stopGlide]);
+
+  // Picked again in the sidebar with rows arrived below the message the operator sent while they were
+  // away: the same landing as a tab coming back, requested here because a session change reloads the
+  // chat and this is the one place after the reset above where the request survives it. Declared
+  // after the reset effect for exactly that reason — effects of one commit run in order.
+  useEffect(() => {
+    const sessionId = selectedSession?.id;
+    if (!sessionId || !isLookingRef.current) return;
+    // A session opened from a message-search hit goes to that hit: the search jump owns the position.
+    const searchSnippet = (selectedSession as Record<string, unknown>).__searchTargetSnippet;
+    if (typeof searchSnippet === 'string' && searchSnippet) return;
+    const landing = takeLanding(sessionId, sessionStore.getMessages(sessionId), isProcessing, isConnected);
+    if (landing) requestLanding(landing);
+  // Keyed like the reset above: it is that effect's follow-up, not a reaction to anything else.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedProject?.projectId, selectedSession?.id]);
+
+  // The frames holding a landing in place belong to this chat and go with it.
+  useEffect(() => () => stopLandingPinRef.current?.(), []);
 
   // Initial scroll to bottom — robust to lazy content reflow.
   // The previous implementation fired one scrollToBottom() at +200ms and
@@ -778,7 +891,8 @@ export function useChatSessionState({
     if (chatMessages.length === 0) return;
     if (searchScrollActiveRef.current) {
       pendingInitialScrollRef.current = false;
-      setIsOpeningSession(false);
+      // A landing places the view itself and then lifts the wheel; a search jump scrolls in view.
+      if (!landingPendingRef.current) setIsOpeningSession(false);
       return;
     }
 
@@ -966,19 +1080,10 @@ export function useChatSessionState({
 
     const reloadExternalMessages = async () => {
       try {
-        // Skip store refresh during active streaming
+        // Skip store refresh during active streaming. A reader at the foot is followed down by the
+        // follow's own observer when the refreshed rows grow the transcript.
         if (!isProcessing) {
-          const shouldStickToBottom = isActiveRef.current && isNearBottom();
           await requestLatestMessages(selectedSession.id);
-
-          if (shouldStickToBottom) {
-            // The follow is what the reader watches for, so it runs on the window they watch in.
-            hostWindowRef.current.setTimeout(() => {
-              if (!isUserScrolledUpRef.current) {
-                scrollToBottom();
-              }
-            }, 200);
-          }
         }
       } catch (error) {
         console.error('Error reloading messages from external update:', error);
@@ -989,7 +1094,6 @@ export function useChatSessionState({
   }, [
     externalMessageUpdate,
     requestLatestMessages,
-    scrollToBottom,
     selectedProject,
     selectedSession,
     isProcessing,
@@ -1009,15 +1113,31 @@ export function useChatSessionState({
     }
   }, [selectedSession]);
 
-  // Scroll to search target
-  useEffect(() => {
+  // Bring a message into view, loading older rows until it is among them: a sidebar search hit
+  // (smooth, centred, flashed) or the message the operator sent (instant, at the top, no flash).
+  // A layout effect, so a landing requested as the chat returns is placed before its first paint.
+  useLayoutEffect(() => {
     if (!isActive || !searchTarget || chatMessages.length === 0 || isLoadingSessionMessages) return;
 
     const target = searchTarget;
+    const landing = target.landing;
     setSearchTarget(null);
 
+    // A landing that cannot be placed leaves the reader where today's return would: at the foot.
+    const abandonLanding = () => {
+      landingPendingRef.current = false;
+      setIsOpeningSession(false);
+      if (!isUserScrolledUpRef.current) scrollToBottom();
+    };
+
     const scrollToTarget = async () => {
-      if (!allMessagesLoadedRef.current && selectedSession && selectedProject) {
+      // A landing's message is usually among the loaded rows already; the whole transcript is only
+      // fetched for it when it is not. A search hit is always looked up in the whole transcript.
+      const landingSessionId = activeSessionIdRef.current;
+      const landingRowLoaded = Boolean(
+        landing && landingSessionId && findSentUserTurn(sessionStore.getMessages(landingSessionId), landing),
+      );
+      if (!allMessagesLoadedRef.current && !landingRowLoaded && selectedSession && selectedProject) {
           try {
             // Load all messages into the store for search navigation
             const slot = await sessionStore.fetchFromServer(selectedSession.id, {
@@ -1045,17 +1165,27 @@ export function useChatSessionState({
             // Fall through and scroll in current messages
           }
       }
+      // The reader moved to another session while the transcript was being fetched: its landing is
+      // not this chat's to place (the session change already cleared it).
+      if (landing && activeSessionIdRef.current !== landingSessionId) return;
       // Resolve the target against the loaded transcript rather than the DOM.
       // The store is the freshest source here: the `fetchFromServer` above has
       // landed but `chatMessages` is from the render that scheduled this effect.
       const messagesForSearch = activeSessionIdRef.current
         ? normalizedToChatMessages(sessionStore.getMessages(activeSessionIdRef.current))
         : chatMessages;
-      const targetIndex = findSearchTargetIndex(messagesForSearch, target);
+      // The sent message is found by what it said and when, in the form the store holds it now (the
+      // local echo or the persisted row), and then addressed by that row's own timestamp like a hit.
+      const sentRow = landing && landingSessionId
+        ? findSentUserTurn(sessionStore.getMessages(landingSessionId), landing)
+        : null;
+      const resolvedTarget: SearchTarget = landing ? { timestamp: sentRow?.message.timestamp } : target;
+      const targetIndex = findSearchTargetIndex(messagesForSearch, resolvedTarget);
       if (targetIndex < 0) {
         // The target is not in the transcript at all. Scrolling somewhere
         // plausible would claim a hit that does not exist.
         searchScrollActiveRef.current = false;
+        if (landing) abandonLanding();
         return;
       }
 
@@ -1083,6 +1213,26 @@ export function useChatSessionState({
           retriesLeft === 0,
         );
 
+        if (targetElement && landing) {
+          stopGlide();
+          stopLandingPinRef.current?.();
+          landingHoldRef.current = true;
+          // Located again every frame, by what was sent: the echo's wrapper is replaced when the
+          // persisted row takes over, and the element found now would be gone.
+          const locateSentMessage = () => {
+            const row = landingSessionId ? findSentUserTurn(sessionStore.getMessages(landingSessionId), landing) : null;
+            return row ? findRenderedMessageElement(container, row.message.timestamp, false) : null;
+          };
+          stopLandingPinRef.current = landAtMessageTop(container, locateSentMessage, hostWindowRef.current, () => {
+            landingHoldRef.current = false;
+          });
+          landingPendingRef.current = false;
+          setIsOpeningSession(false);
+          searchScrollTimerRef.current = null;
+          searchScrollActiveRef.current = false;
+          return;
+        }
+
         if (targetElement) {
           targetElement.scrollIntoView({ block: 'center', behavior: 'smooth' });
           targetElement.classList.add('search-highlight-flash');
@@ -1102,8 +1252,16 @@ export function useChatSessionState({
 
         searchScrollTimerRef.current = null;
         searchScrollActiveRef.current = false;
+        if (landing) abandonLanding();
       };
 
+      // A search hit waits for the widened window to commit. A landing tries at once — its row is
+      // usually drawn already, and this runs before the paint — and falls back to the same retry chain
+      // when it is not.
+      if (landing) {
+        scrollToRenderedTarget(SEARCH_SCROLL_RETRIES);
+        return;
+      }
       searchScrollTimerRef.current = setTimeout(
         () => scrollToRenderedTarget(SEARCH_SCROLL_RETRIES),
         150,
@@ -1151,44 +1309,11 @@ export function useChatSessionState({
   });
 
   useEffect(() => {
-    if (!isActive) return;
-    if (!scrollContainerRef.current || chatMessages.length === 0) return;
-    if (isLoadingMoreRef.current || isLoadingMoreMessages || pendingScrollRestoreRef.current) return;
-    if (searchScrollActiveRef.current) return;
-
-    if (!isUserScrolledUp) {
-      // Follows new messages: the timer the reader feels when a reply lands, so it runs on the
-      // window they are reading in, where a hidden opener would hold it back up to a second.
-      hostWindowRef.current.setTimeout(() => {
-        if (!isUserScrolledUpRef.current) {
-          scrollToBottom();
-        }
-      }, 50);
-    }
-  }, [chatMessages.length, isActive, isLoadingMoreMessages, isUserScrolledUp, scrollToBottom]);
-
-  useEffect(() => {
     const container = scrollContainerRef.current;
     if (!container) return;
     container.addEventListener('scroll', handleScroll);
     return () => container.removeEventListener('scroll', handleScroll);
   }, [handleScroll]);
-
-  // A block that grew after it painted — a picture whose bytes landed late — re-pins a chat the
-  // reader left at its bottom. The open-session settle loop has stopped by then, and the effect above
-  // follows new MESSAGES, not a row that grew, so without this a screenshot at the end of the last
-  // reply sits under the fold. Growth does not fire `scroll`, so `isUserScrolledUp` still says where
-  // the reader was; one who scrolled away, or a search or older-message load, is left where it is.
-  useEffect(() => {
-    const container = scrollContainerRef.current;
-    if (!container) return;
-    const repin = () => {
-      if (isUserScrolledUpRef.current || searchScrollActiveRef.current || isLoadingMoreRef.current) return;
-      scrollToBottom();
-    };
-    container.addEventListener(TRANSCRIPT_GREW_EVENT, repin);
-    return () => container.removeEventListener(TRANSCRIPT_GREW_EVENT, repin);
-  }, [scrollToBottom]);
 
   // "Load all" overlay visibility is driven by scroll-to-top in handleScroll;
   // timers are cleared on session change via the reset effect above.
@@ -1291,6 +1416,8 @@ export function useChatSessionState({
     const container = scrollContainerRef.current;
     // Nothing loaded yet is the session load's job, not a short screen to fill.
     if (!isActive || !container || isLoadingSessionMessages || isLoadingMoreRef.current || chatMessages.length === 0) return;
+    // A landing parks its message near the top of the loaded rows; filling the screen then would re-pin the foot.
+    if (landingHoldRef.current || landingPendingRef.current) return;
     if (container.scrollHeight > container.clientHeight + VIEWPORT_FILL_MARGIN_PX) return;
     // One attempt per state: a load that brought nothing back is not retried in a loop.
     const attemptKey = `${activeSessionId}:${chatMessages.length}:${visibleMessageCount}`;
@@ -1311,6 +1438,7 @@ export function useChatSessionState({
     agentMessages,
     soulLaunchIds,
     addMessage,
+    armReplyAnchor,
     sessionActivity,
     isProcessing,
     canAbortSession,

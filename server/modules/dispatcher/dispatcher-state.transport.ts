@@ -198,7 +198,7 @@ export const MODEL_CHOICES: readonly DispatcherModelChoice[] = ['deepseek', 'cla
  *
  * `null` is the shape a row with no word of its own already has downstream — a plan that carries none
  * follows its arc, and `effectiveModelWord` turns the end of that chain into the store's default
- * (`deepseek`). So an older dispatcher's document draws the default its plans would really run under,
+ * (`claude`). So an older dispatcher's document draws the default its plans would really run under,
  * rather than a lane that went stale for a field it never wrote.
  */
 export function modelSince(value: unknown, where: string): DispatcherModelChoice | null {

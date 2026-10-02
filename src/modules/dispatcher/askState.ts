@@ -40,31 +40,6 @@ export function lockOptions(ask: Extract<DispatcherAsk, { kind: 'accept' }>): { 
 }
 
 /**
- * Whether this plan owes the operator a word — `asking` set. A frame from a server older than that
- * key carries NO `asking` at all, and a plan with none owes nothing: absent and `null` are ONE
- * reading here, the same one `planAsking` (`useDispatcherPlans.ts`) and the lane's bell take.
- *
- * AN OWED WORD IS THE MOST URGENT STATE A CARD CAN BE IN, above every status (`STATUS_ORDER`). Live
- * means the work is moving; queued and parked mean a press is available whenever he wants it; an ask
- * is the one state that is WAITING ON HIM and will not move until he answers — a plan holding one is
- * stuck exactly where the operator can free it. So this is the first key of both the lane's orders
- * (`byUrgencyThenNewest`, `byArc`) and of the widget's lift (`widgetItemsOf`), and a plan that owes a
- * word comes up whatever else it is: done, parked, or older than everything beside it.
- */
-export function owesWord(plan: DispatcherPlan): boolean {
-  return (plan.asking ?? null) !== null;
-}
-
-/**
- * Whether ANY plan of this set owes one — the same reading one level up, for an item that is a group
- * of plans rather than a plan: an arc's deck is asking when a plan of it is, because the deck is the
- * item the operator presses and the arc cannot move while one of its plans waits on him.
- */
-export function anyOwesWord(plans: readonly DispatcherPlan[]): boolean {
-  return plans.some(owesWord);
-}
-
-/**
  * Every distinct open ask across an arc's drawn plans, in the arc's order: the first plan carrying
  * one places it.
  *
@@ -75,8 +50,8 @@ export function arcAsks(plans: readonly DispatcherPlan[]): DispatcherAsk[] {
   const asks: DispatcherAsk[] = [];
   const seen = new Set<string>();
   for (const plan of plans) {
-    // The absent key owes nothing, exactly as `owesWord` reads it: a frame from an older server draws
-    // a deck with no ask rather than throwing on `askIdentity(undefined)`.
+    // The absent key owes nothing, exactly as `planAsking` (`useDispatcherPlans.ts`) reads it: a frame
+    // from an older server draws a deck with no ask rather than throwing on `askIdentity(undefined)`.
     const ask = plan.asking ?? null;
     if (ask === null) continue;
     const identity = askIdentity(ask);

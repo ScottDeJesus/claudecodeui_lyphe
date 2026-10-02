@@ -1,4 +1,4 @@
-import type { HTMLAttributes, ReactNode } from 'react';
+import type { ReactNode } from 'react';
 
 import { DeckStrip } from '@/modules/dispatcher/DeckStrip';
 import { useRiseOnce } from '@/modules/dispatcher/hooks/useFirstSight';
@@ -98,7 +98,7 @@ export function DeckFrame({
   focusIndex: number;
   /** How many cards the strip holds — the arrows' own count. */
   cardCount: number;
-  /** The deck's items — one `DeckItem` per card, in the arc's own order. */
+  /** The deck's items — one `SnapStripItem` per card, in the arc's own order. */
   children: ReactNode;
 }) {
   const { collapsed, toggle } = useCardFold(foldKey);
@@ -139,19 +139,4 @@ export function DeckFrame({
       </Collapsible>
     </section>
   );
-}
-
-/**
- * One card's slot in the deck, its size set in ONE place so a deck cannot have items of two sizes:
- * EXACTLY the strip's width, so one whole card is in view at a time and the snap and the arrows page
- * one card per press. That is the whole of the sidebar-peek's cure (operator, 2026-09-26: "Do not
- * bring back the side-by-side peek that clipped a taller neighbour" — a narrower item showed a sliver
- * of the next card and cut it at the strip's edge wherever it ran taller than the reader's). The
- * item's own handles (`data-dispatch-plan-row`, `data-arc-layer`) ride the same node through
- * `attributes`.
- *
- * Used by `DispatchArcDeck`, one per plan of the arc.
- */
-export function DeckItem({ className, ...attributes }: HTMLAttributes<HTMLLIElement>) {
-  return <li {...attributes} className={cn('w-full flex-none snap-center rounded-xl', className)} />;
 }

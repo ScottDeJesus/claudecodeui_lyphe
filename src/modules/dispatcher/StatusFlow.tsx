@@ -48,8 +48,8 @@ const FADE_MASK = 'linear-gradient(to right, transparent, black var(--fade-befor
  * track. A node is a button, so Enter and Space press it — and pressing is `onSelect(key)`, which
  * the caller decides the meaning of.
  *
- * Used by `PlanFace`, as a plan card's track of its phases, and by `DeckFrame` and `DeckStrip`, as an
- * arc deck's track of its plans.
+ * Used by `PlanFace`, as a plan card's track of its phases, by `DeckStrip`, as an arc deck's track of
+ * its plans, and by `RoundAnswer`, as a round's track of its questions.
  */
 export function StatusFlow({
   nodes,

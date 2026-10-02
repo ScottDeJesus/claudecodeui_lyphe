@@ -75,12 +75,13 @@ Do this at the TOP of every orient (orient step 2), BEFORE claiming any new feat
       - **A chain exists for the slug** (its record is
         `~/.claude/state/dispatch-chains/<chain-id>/chain.json`, and
         `plan-runner chain --status <chain-id>` prints its stage table, plus `dead: <stage>`
-        if its walker is gone) → **resume that chain**
-        (`plan-runner chain --resume <chain-id>`, arming the same wait `/inline` names).
-        A resume re-runs the stage that failed and NEVER a stage that already passed, so
-        nothing is re-built and nothing is re-reviewed; a chain that stopped at a
-        `RULING NEEDED` digest is resumed with `--rulings <file>` (or with no rulings
-        file, which is the answer "take Athena's stated fix direction").
+        if its walker is gone) → **WAIT FIRST** (core BUILD step c's foreground wait): it
+        returns at once with the digest if the chain already ended, adopts a chain whose
+        walker died (ending it `dead: <stage>`), and keeps waiting while it still walks. Land
+        the digest as BUILD step e reads it, and run `plan-runner chain --resume <chain-id>`
+        ONLY where step e says to — a ruling, a `dead` chain, a `done` chain with an `open:` line
+        (rulings needed); `blocked` is step e's `file_issue`, never a resume — then wait again.
+        A chain still walking is never `--resume`d.
       - **No chain record — the build died before the launch** → re-run BUILD step c:
         `Skill(inline)` on the card's brief, one `plan-runner chain` launch.
       Either way it is rerun-safe: the chain's own record says what passed, and the
@@ -151,15 +152,14 @@ as step a of the BUILD ladder does for a fresh build.
   up as **her own**, and the driver's re-adoption of a session is a continuation rather
   than a new claimant.
 - **The lease tracks THIS session's liveness** (its 10s heartbeat refresh). The build runs
-  through this session, which stays the live owner for the whole of it — it ends the turn
-  only to be woken by the chain's report, and the MCP child's heartbeat keeps the lease
-  fresh throughout. If the session is KILLED mid-build (a crash, a usage-limit cutoff), the
-  heartbeat stops, the lease goes stale (40s), and a later orient (this session restarted,
-  or ANOTHER session) correctly reads it as ORPHANED → resumable. That is the intended
-  recovery path. After the build completes, the session re-orients and claims the next
-  disjoint feature; at QUIESCENCE it simply ends the turn (it does NOT idle or poll) — and a
-  session with no in-flight build that exits leaks nothing (its lease was already cleared
-  at `done`/`file_issue`).
+  through this session, which waits on the chain in the foreground and stays the live owner
+  throughout — the MCP child's heartbeat keeps the lease fresh. If the session is KILLED
+  mid-build (a crash, a usage-limit cutoff), the heartbeat stops, the lease goes stale (40s),
+  and a later orient (this session restarted, or ANOTHER session) reads it as ORPHANED →
+  resumable: the intended recovery path. After the build completes, the session re-orients and
+  claims the next disjoint feature; at QUIESCENCE it simply ends the turn (it does NOT idle or
+  poll) — a session with no in-flight build that exits leaks nothing (its lease was already
+  cleared at `done`/`file_issue`).
 
 ---
 

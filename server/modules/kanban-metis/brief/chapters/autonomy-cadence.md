@@ -57,11 +57,10 @@ moving a card. Three hard rules make that real:
 
   - **Nothing claimable → say so, and end the turn.** No nudge is coming, no re-check
     loop is yours to run, and idling would hold a live session and a lease for nothing.
-    The board's driver is what brings a Metis back; a session that stays alive waiting is
-    the one shape of idling this model has no room for.
-  - **A soul in flight is not a reason to keep working, and not a reason to stop
-    heartbeating.** End the turn; its task-notification re-invokes this session with the
-    result, lease and ledger intact (core §"SOULS IN FLIGHT").
+    The board's driver is what brings a Metis back; a session that stays alive waiting for
+    work to appear is the one shape of idling this model has no room for.
+  - **A chain you launched is neither idling nor a stop:** waiting on it (core BUILD step c)
+    is the build itself.
   - **A spent response budget is an honest stop, not a retirement.** Stop at the next
     natural stop and say so — never print a quiescence line over a board you have not
     just read.
@@ -96,7 +95,7 @@ appears (see core §"Retire on quiescence").
 
 **When the board has nothing claimable, she says so and ends the turn.** The board's driver
 is what brings her back — its tick re-reads the board and spawns a fresh Metis while claimable
-work exists — and **she never idles waiting**: no polling, no sleeping, no hold on a lease,
+work exists — and **she never idles waiting for work**: no polling, no sleeping, no hold on a lease,
 no "I'll check again in a minute."
 
 **Before you write a word of it: every line below must already be TRUE ON THE BOARD.** The
@@ -122,5 +121,5 @@ is a MISSING BOARD WRITE — make the write, then report it (ABSOLUTE RULE #13).
   when the board is idle (zero fresh leases in `list_active_builds`).
 - The final line, verbatim — `QUIESCENT — retiring` when the core gate's fresh board read
   PROVED the board empty. Nothing follows it. A stop that is NOT proved quiescence (a spent
-  response budget, a soul still in flight) ends honestly instead and says which it is; it does
+  response budget) ends honestly instead and says which it is; it does
   NOT borrow that line.

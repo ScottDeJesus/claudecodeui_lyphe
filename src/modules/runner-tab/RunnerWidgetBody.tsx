@@ -1,35 +1,42 @@
 import { ActivityIcon } from 'lucide-react';
-import { useLayoutEffect, useMemo, useRef } from 'react';
+import { useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import {
-  anyOwesWord,
   byArc,
   DispatchArcDecks,
   doneDismiss,
   HiddenPlans,
   landFocusInHome,
   LoosePlannerBadges,
+  moveCard,
   PlanCard,
   PlannerLanesReadout,
-  owesWord,
   planPutAway,
   SessionPin,
+  useCardRanks,
   useDispatcherPlans,
 } from '@/modules/dispatcher';
-import type { DispatcherArcGroup, DispatcherArcSplit } from '@/modules/dispatcher';
 import { useLaneFoldPrune } from '@/modules/runner-tab/hooks/useLaneFoldPrune';
 import { LANE_CARD_GAP } from '@/shared/constants';
-import type { DispatcherPlan } from '@/shared/types';
+import type { DispatcherPlan, LaneCard } from '@/shared/types';
 import { Button, EmptyState } from '@/shared/ui';
+import { useSortable } from '@/shared/ui/sortable/useSortable';
 import { cn } from '@/shared/utils';
 
-/** One item of the widget's list: a whole arc deck, or one plan no arc holds. */
-type WidgetItem = { kind: 'arc'; group: DispatcherArcGroup } | { kind: 'plan'; plan: DispatcherPlan };
+/** A card's name — the plan's or the arc's, which never collide: the key the card is ranked, saved and carried by. */
+function cardName(card: LaneCard): string {
+  return rankedOf(card).name;
+}
 
-/** An item's identity across polls — `darc:` beside `plan:`, so an arc and a plan never share one. */
-function itemKey(item: WidgetItem): string {
-  return item.kind === 'arc' ? `darc:${item.group.arc.name}` : `plan:${item.plan.name}`;
+/** The card as the order sees it: its name and creation, which a plan and an arc both carry. */
+function rankedOf(card: LaneCard) {
+  return card.kind === 'arc' ? card.group.arc : card.plan;
+}
+
+/** A card's identity across polls — `darc:` beside `plan:`, so an arc and a plan never share one. */
+function itemKey(card: LaneCard): string {
+  return card.kind === 'arc' ? `darc:${card.group.arc.name}` : `plan:${card.plan.name}`;
 }
 
 /** Whether the open chat is the one that opened `plan`. */
@@ -37,63 +44,26 @@ function openedBy(plan: DispatcherPlan, sessionId: string | null): boolean {
   return sessionId !== null && plan.session_app_id === sessionId;
 }
 
-/** The nearest ancestor of `element` that scrolls vertically: the widget frame's viewport. */
-function scrollViewportOf(element: HTMLElement | null): HTMLElement | null {
-  for (let node = element?.parentElement ?? null; node !== null; node = node.parentElement) {
-    if (/(auto|scroll)/.test(getComputedStyle(node).overflowY)) return node;
-  }
-  return null;
-}
-
-/**
- * The lane as the widget's list: the items that owe a word first, then the open chat's, then the
- * rest. The base order is the tab's own — the arcs in the lane's order, then the plans of no arc in
- * `byArc`'s urgency order — and each of the three parts keeps it.
- *
- * AN OWED WORD LEADS, ABOVE THE CHAT'S OWN (`owesWord`): a prompt waiting on the operator is the one
- * thing in this column he has to answer, so it comes up in the home he is looking at while the chat
- * is open — which is the whole point of drawing the lane beside the transcript at all. An arc item is
- * asking when ANY plan of its group is: the deck is the item, and its prompt stands on the deck.
- *
- * THE CHAT'S OWN COME NEXT: the items holding a plan this chat opened, keeping that order among
- * themselves, so the card a person was just working in is under the asks and above the rest. An arc
- * holds the chat's plan when ANY plan of it does — the deck is the item, and it pins that plan's row
- * inside (`SessionPin`), while the arc's own walk order inside the deck is left alone.
- */
-function widgetItemsOf(split: DispatcherArcSplit, sessionId: string | null): WidgetItem[] {
-  const asking = (item: WidgetItem) => (item.kind === 'arc'
-    ? anyOwesWord(item.group.plans)
-    : owesWord(item.plan));
-  const holdsMine = (item: WidgetItem) => (item.kind === 'arc'
-    ? item.group.plans.some((plan) => openedBy(plan, sessionId))
-    : openedBy(item.plan, sessionId));
-  const items: WidgetItem[] = [
-    ...split.groups.map((group): WidgetItem => ({ kind: 'arc', group })),
-    ...split.rest.map((plan): WidgetItem => ({ kind: 'plan', plan })),
-  ];
-  return [
-    ...items.filter(asking),
-    ...items.filter((item) => !asking(item) && holdsMine(item)),
-    ...items.filter((item) => !asking(item) && !holdsMine(item)),
-  ];
-}
-
 /**
  * The dispatcher's lane as the desktop chat gutter draws it: ONE vertical list of every top-level item
- * the lane carries — each arc as its deck, each plan of no arc as its card — the open chat's first.
+ * the lane carries — each arc as its deck, each plan of no arc as its card — in the operator's order.
  *
  * THE SECOND HOME, BESIDE THE TRANSCRIPT AND NEVER OVER IT. The Runner tab is the card's other home and
  * lays the loose cards out as a wall; here the column is the gutter's own width, one card wide, so the
  * same items stand one under another at the tab's own spacing — two cards `LANE_CARD_GAP` apart, a deck
  * 24px from its neighbours — and the widget frame's body scrolls them (`src/modules/chat-gutters`).
  * Every item is drawn whole and at once (operator, 2026-09-28: "please remove the arrows and show a
- * list of plans instead"). A chat switch returns that scroll to the top, where the new chat's own
- * items stand.
+ * list of plans instead").
  *
- * THE ITEMS ARE THE TAB'S SPLIT, LIFTED FOR THIS CHAT (`widgetItemsOf`): the asks first, then the open
- * chat's own, then the rest. An arc is the SAME deck the tab draws (`DispatchArcDecks`'
- * `home="gutter"`), its plans still swiped one card per view in its own strip; a plan of no arc is its
- * `PlanCard`, wearing this chat's `SessionPin` when the chat opened it.
+ * THE ITEMS ARE THE TAB'S SPLIT AND THE TAB'S ORDER (`byArc`'s `cards`): decks and plans interleaved
+ * where the operator put them, and nowhere else — a plan that asks keeps its place, and so does the
+ * plan the open chat opened, which wears this chat's `SessionPin` where it stands. Which chat is open
+ * moves no card, and a chat switch moves no scroll. An arc is the SAME deck the tab draws
+ * (`DispatchArcDecks`' `home="gutter"`), its plans still swiped one card per view in its own strip; a
+ * plan of no arc is its `PlanCard`.
+ *
+ * THE COLUMN IS ONE SORTABLE LIST: any item, deck or plan, is carried by a free press and put down
+ * between any two others, and the drop writes one rank (`moveCard`) that the tab reads as well.
  *
  * THE FOLDS ARE THE TAB'S FOLDS, AND THIS BODY PRUNES THE SAME MEMORY. `useLaneFoldPrune` hands the
  * fold store what this widget draws AND what it has hidden, so a card folded here is folded on the tab,
@@ -107,32 +77,32 @@ function widgetItemsOf(split: DispatcherArcSplit, sessionId: string | null): Wid
  * `data-widget-item` (valued by the item's key), `runner-widget-plan`, `data-plan-name` and
  * `data-pinned` are the browser harness's handles.
  *
- * IT READS THE BUS, HOLDS NO STATE AND DRAWS NO FRAME. `useDispatcherPlans` hands it the retained
- * picture, so it paints on its first render; the chrome, the slots and the scrolling belong to
- * `src/modules/chat-gutters`.
+ * IT READS THE BUS, HOLDS NO STATE OF ITS OWN BUT A CARRY'S PREVIEW AND DRAWS NO FRAME.
+ * `useDispatcherPlans` hands it the retained picture, so it paints on its first render; the chrome,
+ * the slots and the scrolling belong to `src/modules/chat-gutters`.
  *
  * Used by `src/modules/chat-gutters` (`ChatGutterLayout`), as the Runner widget's body.
  */
 export function RunnerWidgetBody({ sessionId }: { sessionId: string | null }) {
   const { t } = useTranslation();
   const { plans, hidden, arcs, loosePlanners, carriedNames } = useDispatcherPlans();
-  // The lane split once, by the one rule both homes read, then ordered for this chat.
-  const split = useMemo(() => byArc(plans, arcs), [plans, arcs]);
-  const items = useMemo(() => widgetItemsOf(split, sessionId), [split, sessionId]);
+  // The lane split once, by the one rule both homes read, in the operator's order.
+  const ranks = useCardRanks();
+  const split = useMemo(() => byArc(plans, arcs, ranks), [plans, arcs, ranks]);
+  const cards = split.cards;
+  const cardsByName = useMemo(() => new Map(cards.map((card) => [cardName(card), card])), [cards]);
+  const keys = useMemo(() => cards.map(cardName), [cards]);
+  const { order, attachList, itemProps } = useSortable({
+    keys,
+    // The carried item's neighbours in the dropped order are cards of either kind: both are ranked.
+    onReorder: (carried, order) => moveCard(carried, order, cards.map(rankedOf), carriedNames),
+  });
+  const items = order.flatMap((name) => cardsByName.get(name) ?? []);
   useLaneFoldPrune(plans, hidden, arcs);
   const done = doneDismiss(plans, carriedNames);
   // The widget's root: where `Dismiss done · N` hands the keyboard on once the button has left with its
   // count. One element in both branches below, so a press that emptied the lane still finds it.
   const widgetRef = useRef<HTMLDivElement>(null);
-
-  // A chat switch re-renders this body in place — the route changes, the widget stays mounted — so the
-  // frame's scroller would keep the last chat's offset and could open the new chat with another chat's
-  // item filling the widget. The list starts with the open chat's own items, so the top is where a
-  // newly opened chat is read from. A layout effect, so the old offset is never painted.
-  useLayoutEffect(() => {
-    const viewport = scrollViewportOf(widgetRef.current);
-    if (viewport !== null) viewport.scrollTop = 0;
-  }, [sessionId]);
 
   // `Dismiss done · N` takes itself away (nothing done is left to dismiss), so a keyboard reader who
   // pressed it would land on `<body>`. On the next frame, once the write has re-rendered the widget,
@@ -169,15 +139,15 @@ export function RunnerWidgetBody({ sessionId }: { sessionId: string | null }) {
             </Button>
           )}
           {items.length > 0 && (
-            <ul className={cn('flex min-w-0 flex-col', LANE_CARD_GAP)}>
+            <ul ref={attachList} className={cn('flex min-w-0 flex-col', LANE_CARD_GAP)}>
               {items.map((item, index) => {
                 // A deck stands 24px from its neighbours, as the tab's decks do (`DispatchArcDecks`'
                 // `gap-6`), so where an arc begins and ends is read from the spacing: the list's card
-                // gap (16px) plus `mt-2`. The list stays flat and keyed by item, so a poll that re-sorts
-                // it moves cards rather than remounting them.
+                // gap (16px) plus `mt-2`. The list stays flat and keyed by item, so a reorder moves
+                // cards rather than remounting them.
                 const besideDeck = index > 0 && (item.kind === 'arc' || items[index - 1]?.kind === 'arc');
                 return (
-                  <li key={itemKey(item)} data-widget-item={itemKey(item)} className={cn('min-w-0', besideDeck && 'mt-2')}>
+                  <li key={itemKey(item)} data-widget-item={itemKey(item)} className={cn('min-w-0', besideDeck && 'mt-2')} {...itemProps(cardName(item))}>
                     {item.kind === 'arc' ? (
                       <DispatchArcDecks groups={[item.group]} home="gutter" pinnedSessionId={sessionId} carriedNames={carriedNames} />
                     ) : (

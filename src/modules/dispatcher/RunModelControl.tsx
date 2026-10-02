@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { Button, ClaudeCodeMark, LLMProviderLogo } from '@/shared/ui';
 import type { DispatcherModelChoice } from '@/shared/types';
 
-/** The three options, in the order they are drawn. `deepseek` is the dispatcher's default; `auto` hands the choice to the chat's switch. */
+/** The three options, in the order they are drawn. `claude` is the dispatcher's default; `auto` hands the choice to the chat's switch. */
 const CHOICES: readonly DispatcherModelChoice[] = ['deepseek', 'claude', 'auto'];
 
 /** Whose word the control is drawing — the two homes it has, and the scope of the sentence behind every option. */

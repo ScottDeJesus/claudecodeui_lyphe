@@ -2485,34 +2485,6 @@ probe-key: bfa2d7be2ebac6322ccd9574bcda7afb113b1ae4
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-plan-ask-scaffold.mjs
 
-## INV-6116 — probe — the widget-list probe's lead assertion is false when the open chat's plan sits in an arc
-
-the widget-list probe's lead assertion is false when the open chat's plan sits in an arc
-
-```probe
-cd /home/lyphe/.claude/claudecodeui_lyphe && node /tmp/pipeline-reviews/prompts-in-cards--surfacing/athena-probes/widget-arc-false-fail/probe-runner-widget-list.mjs --when after
-expect: `[OK] … the list draws the tab's items in this phase's order — the asks, then this chat's, then the rest (darc:athena-probe--arc, plan:coi-send-switch, …)` immediately followed by `[FAIL] … the open chat's plan leads every item that is not asking, wearing its "This session" pin (darc:athena-probe--arc, pinned null, pin false)` — the widget agreeing with the tab while the reading calls it wrong; the run's other two FAILs are this scratch copy's own (its one-plan arc cannot swipe; `api.github.com` 403s)
-```
-
-measured 2026-09-30 by chain chain-prompts-in-cards--surfacing-20260930-154725-9e97, finding M2, MEDIUM
-probe-key: 444f05a178b7ddb2deafc9dc89e3a34d345ee4b4
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/askState.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/dispatcherState.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/hooks/useDispatcherPlans.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/runner-tab/RunnerWidgetBody.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/ask-lane.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-card-ask.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-runner-widget-list.mjs
-
-## INV-6117 — probe — the `--surfacing` proof's arc half cannot fail — and never exercises "an arc is asking when ANY of its plans is"
-
-the `--surfacing` proof's arc half cannot fail — and never exercises "an arc is asking when ANY of its plans is"
-
-```probe
-cd /home/lyphe/.claude/claudecodeui_lyphe && node /tmp/pipeline-reviews/prompts-in-cards--surfacing/athena-probes/surfacing-nulled-asks/probe-card-ask.mjs --surfacing
-expect: `[OK] … the asking arc is the FIRST of the tab's 1 deck(s) (probe-card-ask--surfacing-arc)` with every ask-dependent reading around it failing (`5 FAILED`, exit 1) — nothing on the lane owes a word and the frame holds one deck, and the reading passes anyway; its opposite control (`surfacing-quiet-arc-first`: a quiet arc carried first) discriminates at 2 decks and passes
-```
-
-measured 2026-09-30 by chain chain-prompts-in-cards--surfacing-20260930-154725-9e97, finding M3, MEDIUM
-probe-key: 4679d86903975065e344d6cb331e871da95215f6
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/askState.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/dispatcherState.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/hooks/useDispatcherPlans.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/runner-tab/RunnerWidgetBody.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/ask-lane.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-card-ask.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-runner-widget-list.mjs
-
 ## INV-6141 — probe — INV-6095: "the card's door … never consults it" no longer reproduces
 
 INV-6095: "the card's door … never consults it" no longer reproduces
@@ -2535,20 +2507,6 @@ probe-key: f2bf8b27aa9596ace057e3fe46fe2a7ebc88ad55
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/
 
-## INV-6142 — probe — INV-6115: the absent-`asking` lift loss no longer reproduces
-
-INV-6115: the absent-`asking` lift loss no longer reproduces
-
-```probe
-cd /home/lyphe/.claude/claudecodeui_lyphe && node /tmp/pipeline-reviews/prompts-in-cards--surfacing/athena-probes/owesword-ab.mjs
-expect: `… the chat's own plans lead the widget with the key present: YES; with it omitted: YES` and `coi-backend-conformance: position 2 of 8 with the key present, 2 of 8 with it omitted` — the row's `with it omitted: NO` / `8 of 8` no longer reproduce
-```
-
-measured 2026-09-30 by chain chain-prompts-in-cards--docs-app-20260930-175729-5966, finding L2, LOW
-probe-key: 29acaf82935d489d14e0a76cec0983ee4f84c0a0
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/
-
 ## INV-6143 — probe — INV-6130: "four probes die before their scenario" no longer reproduces
 
 INV-6130: "four probes die before their scenario" no longer reproduces
@@ -2562,3 +2520,215 @@ measured 2026-09-30 by chain chain-prompts-in-cards--docs-app-20260930-175729-59
 probe-key: a8b0e04fefd37861c549129a8f30c94aef7d6428
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/
+
+## INV-6317 — probe — MEDIUM — a reorder re-inserts the *neighbours'* DOM nodes, so a moved deck's strip shows plan 1 under a counter that says "Card 2 of 2", and a moved card's census scroll is lost
+
+MEDIUM — a reorder re-inserts the *neighbours'* DOM nodes, so a moved deck's strip shows plan 1 under a counter that says "Card 2 of 2", and a moved card's census scroll is lost
+
+```probe
+node /tmp/pipeline-reviews/card-order-drag/athena-probes/a5.mjs
+expect: the "right after" line reads "scrollLeft":1049 with "planShownInStrip":"probe-order--arc-two" under "label":"Card 2 of 2" (today: "scrollLeft":0 … "planShownInStrip":"probe-order--arc-one", and the "4 s later" line is unchanged)
+```
+
+measured 2026-10-01 by chain chain-card-order-drag-20261001-152353-c269, finding M1, MEDIUM
+probe-key: d5bd7fb89caf7ac8ab9fa9f37163fffb4454e386
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/cardOrder.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/sortable/motion.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/sortable/useSortable.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/usePointerDrag.ts
+
+## INV-6318 — probe — LOW — a cancelled touch commits the drop
+
+LOW — a cancelled touch commits the drop
+
+```probe
+node /tmp/pipeline-reviews/card-order-drag/athena-probes/a6.mjs
+expect: the "after touchCancel" line reads the wall as it began, `p6 p5 p4 p3 p2 p1`, and `local cardOrder []` (today: `p4 p6 p5 p3 p2 p1` and `[{"name":"probe-order--p4","rank":1790755561000}]`)
+```
+
+measured 2026-10-01 by chain chain-card-order-drag-20261001-152353-c269, finding L1, LOW
+probe-key: 7b6392f0467e28adba17f74ad914d539f0a68ecd
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/cardOrder.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/sortable/motion.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/sortable/useSortable.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/usePointerDrag.ts
+
+## INV-6319 — probe — LOW — grabbing a card again inside its 200 ms settle slide strips the new carry's marks
+
+LOW — grabbing a card again inside its 200 ms settle slide strips the new carry's marks
+
+```probe
+node /tmp/pipeline-reviews/card-order-drag/athena-probes/r1.mjs
+expect: the "400 ms later, still holding" line keeps `position: relative; z-index: 30; will-change: transform; background-color: …; border-radius: …` (today: `transform: translate(13.3333px, 13.3333px);` alone)
+```
+
+measured 2026-10-01 by chain chain-card-order-drag-20261001-152353-c269, finding L2, LOW
+probe-key: 86f054f104378a3860ee59ad1c06ea9e087d7735
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/cardOrder.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/sortable/motion.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/sortable/useSortable.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/usePointerDrag.ts
+
+## INV-6320 — probe — LOW — the tied-rank branch of `ranksForMove` moves cards the operator did not touch, against the other kind
+
+LOW — the tied-rank branch of `ranksForMove` moves cards the operator did not touch, against the other kind
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe && TSX_TSCONFIG_PATH=tsconfig.json npx tsx /tmp/pipeline-reviews/card-order-drag/athena-probes/tie.mts
+expect: "widget column after" keeps c-wall before d-deck (today: `a-wall b-deck d-deck e-wall c-wall`, with `c-wall` — never carried — now below the deck that stood below it)
+```
+
+measured 2026-10-01 by chain chain-card-order-drag-20261001-152353-c269, finding L3, LOW
+probe-key: 44e21d54a9185ed78094e1ebb08b12ce9801a104
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/cardOrder.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/sortable/motion.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/sortable/useSortable.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/usePointerDrag.ts
+
+## INV-6321 — probe — LOW — a second finger lifts the wrong card
+
+LOW — a second finger lifts the wrong card
+
+```probe
+node /tmp/pipeline-reviews/card-order-drag/athena-probes/t2.mjs
+expect: "lifted after the hold" names the card under finger 1, `["p5"]`, or nothing (today: `["p4"]`)
+```
+
+measured 2026-10-01 by chain chain-card-order-drag-20261001-152353-c269, finding L4, LOW
+probe-key: 64c83ba4015088ad80ae19fccecb474581aa4359
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/cardOrder.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/sortable/motion.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/sortable/useSortable.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/usePointerDrag.ts
+
+## INV-6326 — probe — MEDIUM — `status=running` + "wait again" is an instant-return loop when a soul outlived its walker
+
+MEDIUM — `status=running` + "wait again" is an instant-return loop when a soul outlived its walker
+
+```probe
+D=$(mktemp -d /tmp/athena-probe-held-XXXXXX) || exit 1
+case "$D" in /tmp/athena-probe-held-*) ;; *) echo refusing; exit 1;; esac
+S="$D/state"; C=chain-x-20261001-000000-aaaa
+mkdir -p "$S/dispatcher" "$S/runner" "$S/dispatch-chains/$C" "$S/dispatch-souls/dispatch-x-1" || exit 1
+export DISPATCHER_HOME="$S/dispatcher" EXECUTE_LEDGER_STATE_DIR="$S" PLAN_RUNNER_STATE_DIR="$S/runner"
+python3 -c "import time; time.sleep(60)" soul-run dispatch-x-1 & SOUL=$!
+echo $SOUL > "$S/dispatch-souls/dispatch-x-1/launcher.pid"
+python3 - "$S/dispatch-chains/$C" "$C" <<'PY'
+import json, sys, time
+d, i = sys.argv[1:3]
+json.dump({"id": i, "slug": "x", "agent": "hephaestus", "cwd": "/tmp", "add_dirs": [], "docs": True, "pause": True,
+           "builder_brief": d + "/b.md", "break_it": None, "rulings": None, "fix_round": 0, "status": "running",
+           "stage": "builder", "targets": [], "flags": [], "cause": "", "failed_stage": None, "started_at": time.time(),
+           "updated_at": time.time(), "unattributed": [], "resume_at": None, "ruled": False,
+           "stages": [{"name": "builder", "attempt": 1, "launch": "dispatch-x-1", "provider": "claude",
+                       "status": "waiting", "at": time.time()}]}, open(d + "/chain.json", "w"))
+PY
+for n in 1 2 3; do ( time timeout 60 ~/.claude/scripts/soul-back "$C" ) 2>&1 | grep -oE "STILL RUNNING|real.*"; done
+kill $SOUL; wait 2>/dev/null
+case "$D" in /tmp/athena-probe-held-*) rm -r "$D";; esac
+```
+
+measured 2026-10-01 by chain chain-metis-foreground-wait-20261001-165407-e80a, finding M1, MEDIUM
+probe-key: a687bea1bcba6afd52d5005b40205ef04d58ad0a
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/kanban-metis/brief/chapters/recovery.md, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/kanban-metis/brief/METIS.md, /home/lyphe/.claude/hooks/plan_runner/solo/chain_adopt.py, /home/lyphe/.claude/scripts/soul-back, /home/lyphe/.claude/skills/inline/SKILL.md
+
+## INV-6327 — probe — MEDIUM — `blocked` is a `--resume` case in one rule and a `file_issue` case in another, inside her one prompt
+
+MEDIUM — `blocked` is a `--resume` case in one rule and a `file_issue` case in another, inside her one prompt
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe/server/modules/kanban-metis/brief && grep -c '`dead` or `blocked`' chapters/recovery.md; grep -c '\*\*`nothing-changed`\*\* or \*\*`blocked`\*\* → `file_issue`' METIS.md
+```
+
+measured 2026-10-01 by chain chain-metis-foreground-wait-20261001-165407-e80a, finding M2, MEDIUM
+probe-key: 140b2e8b70c77888e713f170dea02952fe789488
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/kanban-metis/brief/chapters/recovery.md, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/kanban-metis/brief/METIS.md, /home/lyphe/.claude/hooks/plan_runner/solo/chain_adopt.py, /home/lyphe/.claude/scripts/soul-back, /home/lyphe/.claude/skills/inline/SKILL.md
+
+## INV-6328 — probe — LOW — claims this diff made false, left in place (healed means deleted)
+
+LOW — claims this diff made false, left in place (healed means deleted)
+
+```probe
+cd /home/lyphe/.claude && grep -c 'imports no `plan_runner`' hooks/plan_runner/solo/chain_adopt.py hooks/INVARIANTS.md; scripts/docstore get INV-40 | python3 -c "import json,sys; b=json.load(sys.stdin)['row']['body']; print('10800' in b, '#29 holds' in b)"
+```
+
+measured 2026-10-01 by chain chain-metis-foreground-wait-20261001-165407-e80a, finding L2, LOW
+probe-key: 883e8e89df2f74eaeb5d571680ac69ed8e156a37
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/kanban-metis/brief/chapters/recovery.md, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/kanban-metis/brief/METIS.md, /home/lyphe/.claude/hooks/plan_runner/solo/chain_adopt.py, /home/lyphe/.claude/scripts/soul-back, /home/lyphe/.claude/skills/inline/SKILL.md
+
+## INV-6329 — probe — INV-4355 and a `store_arcs.py` docstring still say a fenced typo becomes `deepseek`
+
+INV-4355 and a `store_arcs.py` docstring still say a fenced typo becomes `deepseek`
+
+```probe
+cd /home/lyphe/.claude && docstore get INV-4355 | python3 -c "import sys,json,re; b=json.load(sys.stdin)['row']['body']; print(re.findall(r'silent .deepseek.', b))"; rg -n "never a silent" hooks/dispatcher/store_arcs.py; PYTHONPATH=$HOME/.claude/hooks python3 -c "from dispatcher import model; print(model.clean('deepseekk'))"
+expect: [] , then a store_arcs.py line that does not name `deepseek`, then `claude` (today: `['silent `deepseek`']`, then line 522 ending "never a silent `deepseek`.", then `claude`)
+```
+
+measured 2026-10-01 by chain chain-plan-model-default-claude-20261001-165404-dcb1, finding L1, LOW
+probe-key: 64905667859c70b3b1fe440f60d1fe69f8225173
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/utils.ts, /home/lyphe/.claude/hooks/dispatcher/model.py, /home/lyphe/.claude/hooks/dispatcher/store_arcs.py, /home/lyphe/.claude/hooks/dispatcher/width.py
+
+## INV-6330 — probe — `.verify/probe-runner-model-pin.mjs` asserts the old default against a surface that is gone
+
+`.verify/probe-runner-model-pin.mjs` asserts the old default against a surface that is gone
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe && rg -c "data-runner-model|plan-runner/runs" src server -g '!node_modules'; rg -n "the runner's default" .verify/probe-runner-model-pin.mjs
+expect: no output from either — the script is deleted, or no longer says DeepSeek is the default (today: the first prints nothing because the surface is gone, the second prints line 59)
+```
+
+measured 2026-10-01 by chain chain-plan-model-default-claude-20261001-165404-dcb1, finding L2, LOW
+probe-key: 3b5f37d101f8b284f660097a532f267045cd2e4f
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-runner-model-pin.mjs
+
+## INV-6331 — probe — a keyboard reader cannot reach a page's options: focus never follows the strip, and Tab always enters page 1
+
+a keyboard reader cannot reach a page's options: focus never follows the strip, and Tab always enters page 1
+
+```probe
+node /tmp/pipeline-reviews/round-questions-strip/probe-kb-focus.mjs
+expect: `(1) after one Tab from the strip: focus is "Option A1" on page 0; the strip now shows page [0]` and `(2) next Tab: focus "Option B1" on page 0; the strip now shows page [0]` (page numbers 0-based)
+```
+
+measured 2026-10-01 by chain chain-round-questions-strip-20261001-185557-37ce, finding M1, MEDIUM
+probe-key: 8cb50b01d1d0c126e77e0d66379ab2583f0f21b1
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/DeckStrip.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/hooks/useSnapStrip.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/RoundAnswer.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/SnapStrip.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/deck-strip.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/round-strip.mjs
+
+## INV-6332 — probe — `Other…` pressed with its page ending at the fold: the field it focused ends up below the fold
+
+`Other…` pressed with its page ending at the fold: the field it focused ends up below the fold
+
+```probe
+node /tmp/pipeline-reviews/round-questions-strip/probe-other-clip.mjs
+expect: `field focused: true; field fully on screen: false; field inside the strip: true`
+```
+
+measured 2026-10-01 by chain chain-round-questions-strip-20261001-185557-37ce, finding L2, LOW
+probe-key: a5bee074e70adb8020be57e8b30dd91d330a442e
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/DeckStrip.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/hooks/useSnapStrip.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/RoundAnswer.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/SnapStrip.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/deck-strip.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/round-strip.mjs
+
+## INV-6333 — probe — a second tap on the same spot after a pick answers the NEXT question, unread
+
+a second tap on the same spot after a pick answers the NEXT question, unread
+
+```probe
+node /tmp/pipeline-reviews/round-questions-strip/attack3.mjs
+expect: `[tap again after 300ms] radios chosen: ["Beta","Epsilon"]; marks=✓ ✓ 3; inView=[2]`
+```
+
+measured 2026-10-01 by chain chain-round-questions-strip-20261001-185557-37ce, finding L3, LOW
+probe-key: 9c331f8473e0061d9935cf9e2eca03f5d0ae6362
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/DeckStrip.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/hooks/useSnapStrip.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/RoundAnswer.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/SnapStrip.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/deck-strip.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/round-strip.mjs
+
+## INV-6334 — probe — `.verify/lib/round-strip.mjs` waits a fixed 500ms for the live door and fails when it is slower
+
+`.verify/lib/round-strip.mjs` waits a fixed 500ms for the live door and fails when it is slower
+
+```probe
+node /tmp/pipeline-reviews/round-questions-strip/rerun-libs.mjs
+expect: `[FAIL] desktop · typed words answer it again, and the strip is still on question 2` and `[FAIL] phone · …` then `libs re-run: 178 OK, 2 FAIL` — environment-dependent: needs the live door's first refusal of the fixture ask to take over ~500ms (a cold store read, ~1.1s here); on a warm door it prints `0 FAIL`
+```
+
+measured 2026-10-01 by chain chain-round-questions-strip-20261001-185557-37ce, finding L4, LOW
+probe-key: 54149458d07cbcddbee02204782fba2fc01824b0
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/round-strip.mjs

@@ -92,7 +92,7 @@ section: 01-websocket-transport/003 The pieces
 | `src/modules/chat/hooks/useChatRealtimeHandlers.ts` | The one `kind` switch on the client, and `lastSeqRef` bookkeeping |
 | `src/modules/chat/ChatInterface.tsx`, `src/modules/chat/hooks/useChatSessionState.ts` | The two places that send `chat.subscribe` |
 | `src/modules/chat/hooks/useChatComposerState.ts` | Builds `chat.send`, `chat.edit-send`, `chat.abort`, `chat.permission-response` |
-| `src/modules/chat/hooks/useSessionPresence.ts` | Builds `chat.presence` — the one place, called once from `ChatInterface.tsx` |
+| `src/modules/chat/hooks/useSessionPresence.ts` | Builds `chat.presence` — the one place, called once from `ChatInterface.tsx`. Also exports `useIsLookingAtSession(isActive)`, the same pair (chat on screen, document visible) as a boolean (MAN-7575) |
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/auth/auth.middleware.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/websocket/desktop-notifications-websocket.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/projects/services/projects-with-sessions-fetch.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/taskmaster/taskmaster.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/websocket/services/chat-run-registry.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/websocket/services/chat-session-writer.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/websocket/services/chat-websocket.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/websocket/services/plugin-websocket-proxy.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/websocket/services/session-upsert-broadcast.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/websocket/services/shell-websocket.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/websocket/services/websocket-auth.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/websocket/services/websocket-server.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/websocket/services/websocket-state.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/ChatInterface.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useChatComposerState.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useChatRealtimeHandlers.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useChatSessionState.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useSessionPresence.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/context/WebSocketContext.tsx
 
@@ -915,7 +915,7 @@ section: 02-realtime-stream/003 The pieces
 | `src/modules/chat/hooks/useChatMessages.ts` | `normalizedToChatMessages` — the projection from store records to UI objects. Pairs `tool_use` with `tool_result`, folds subagent rows into their container, and memoises through a `WeakMap`. |
 | `src/modules/chat/hooks/useChatSessionState.ts` | Sends `chat.subscribe` on session open and on reconnect, owns `requestLatestMessages` and `resetStreamingState`, and memoises `chatMessages`. |
 | `src/modules/chat/hooks/useChatComposerState.ts` | The outbound side: `chat.send`, `chat.edit-send`, `chat.abort`, `chat.permission-response`, plus the optimistic user echo. |
-| `src/modules/chat/hooks/useSessionPresence.ts` | Sends `chat.presence`: which session this tab is showing, restated on reconnect, on `visibilitychange` and every 30 s, and cleared on the way out — so the notification channels skip a session you are watching. |
+| `src/modules/chat/hooks/useSessionPresence.ts` | Sends `chat.presence`: which session this tab is showing, restated on reconnect, on `visibilitychange` and every 30 s, and cleared on the way out — so the notification channels skip a session you are watching. `useIsLookingAtSession(isActive)` exposes the same "watching" test as a boolean for the scroll follow and the reply anchor (MAN-7575). |
 | `src/shared/hooks/useSessionProtection.ts` | The per-session activity map that the indicator and the abort button derive from. |
 | `src/modules/chat/transcript/StreamingMarkdown.tsx` | Renders an assistant reply, streaming or finished, as a settled half plus a pending half. |
 | `src/modules/chat/utils/streamingMarkdown.ts` | `splitStreamingMarkdown` — where it is safe to cut a partially-written markdown document in two. |
@@ -926,12 +926,6 @@ section: 02-realtime-stream/003 The pieces
 | `server/shared/utils.ts` | `createNormalizedMessage` at `:348` and `createCompleteMessage` — the envelope every provider event is built with. **Not** `message-unification.ts`; that file exports only `prepareTranscriptMessages`, which runs on REST history reads and never on the live path. |
 | `server/shared/types.ts` | `MessageKind` at `:178` — the fifteen kinds a provider can emit. `GatewayEventKind` at `:204` — the four the gateway adds. |
 | `server/modules/providers/list/*/` | Per provider, a `*-runtime.provider.js` that drives the CLI or SDK and a `*-sessions.provider.ts` whose `normalizeMessage` converts one raw event into `NormalizedMessage[]`. |
-
-Tests worth knowing about: `streamingMarkdown.test.ts` and
-`streamingMarkdownRenderEquivalence.test.tsx` pin the split; `messageStreamEnd.test.tsx`
-pins the DOM-identity rule; `tokenBudgetSessionScope.test.tsx` pins the token-counter
-scoping; `liveSubagentGrouping.test.ts` pins the subagent fold;
-`sessionStoreTruncate.test.tsx` pins `truncateAt`. All in `src/modules/chat/tests/`.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/websocket/services/chat-run-registry.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/websocket/services/chat-session-writer.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/websocket/services/chat-websocket.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/utils.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/ChatInterface.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useChatComposerState.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useChatMessages.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useChatRealtimeHandlers.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useChatSessionState.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useSessionPresence.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useSessionStore.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/StreamingMarkdown.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/utils/streamingMarkdown.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/context/WebSocketContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useSessionProtection.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts
 
@@ -1031,8 +1025,8 @@ reload can make the transcript look completely different from what streamed.
 
 Two entries deserve the emphasis:
 
-**Claude does not stream deltas today.** `claude-sessions.provider.ts:684` does contain a
-branch that turns `content_block_delta` into a `stream_delta`, which is why the opposite
+**Claude does not stream deltas today.** `claude-sessions.provider.ts` does contain a
+`content_block_delta` branch in `normalizeMessageRows` that turns it into a `stream_delta`, which is why the opposite
 is widely believed. That branch is unreachable: `mapCliOptionsToSDK` in
 `claude-runtime.provider.js` builds its options object from scratch and never sets
 `includePartialMessages`, which the SDK defaults to false — and even with it enabled the
@@ -1196,9 +1190,8 @@ Four surprises, all of them intended:
   That is deliberate. `MessageComponent` used to swap `<StreamingMarkdown>` for
   `<Markdown>` at that position, and React treats a different element type in the same
   position as a different component — so every reply threw away its DOM the moment it
-  completed, destroying a selection the user had started. `messageStreamEnd.test.tsx`
-  asserts on node identity, not HTML, because identity is what the browser keys a
-  selection to.
+  completed, destroying a selection the user had started. Identity, not HTML, is what the
+  browser keys a selection to.
 - **The `streaming` flag decides more than the widget fence.** `StreamingMarkdown`
   renders the pending half as `<MarkdownBody streaming>`, and `MarkdownBodyRenderer`
   reads that one flag to pick which react-markdown component map to hand down: the plain
@@ -1393,9 +1386,9 @@ section: 02-realtime-stream/012 Gotchas and why the code looks like this
 - **`finalizeStreaming` mutates the array slot in place.** It does not remove and append.
   The id changes underneath the same position, on purpose, so React reconciles the
   existing DOM and a text selection survives the end of the reply.
-- **A streaming reply does not re-trigger auto-scroll.** The follow effect depends on
-  `chatMessages.length`, and an in-place rewrite does not change it. Within one streamed
-  block the browser pins the pane; the next row that arrives re-follows. See
+- **A streaming reply is followed by size, not by row count.** Each flush rewrites the
+  same row, so `chatMessages.length` does not change; the follow watches the size of the
+  pane's content box, and the growth glides a reader at the foot down (MAN-7574). See
   [scrolling](MANUAL.md).
 - **The 100 ms flush publishes the whole reply, not the delta.** Anyone optimising this
   into an incremental append has to also handle the case where a flush is skipped, which
@@ -1441,7 +1434,7 @@ section: 02-realtime-stream/013 If you change this, check that
 | --- | --- |
 | The 100 ms flush interval or the timer arming | `StreamingMarkdown`'s whole reason for existing is that interval. Slower means fewer re-parses but visibly chunkier text; faster means the split has to earn more. |
 | `updateStreaming` or the `__streaming_` id | `pruneRealtimeSupersededByServer` matches that id by name, and `dedupeAdjacentAssistantEchoes` special-cases a `stream_delta` row followed by an identical assistant `text` row. |
-| `finalizeStreaming` | It must keep the array position and must not append. `messageStreamEnd.test.tsx` covers the DOM-identity half; the duplicate-bubble half is covered by the store's dedupe. |
+| `finalizeStreaming` | It must keep the array position and must not append: the reply's DOM identity, and a selection inside it, survive only when the slot is rewritten in place. The duplicate-bubble half is covered by the store's dedupe. |
 | The `shouldPersist` filter | Adding a kind to it makes that kind renderable, which means `normalizedToChatMessages` needs a case for it or it silently disappears. |
 | Anything in `splitStreamingMarkdown` | `streamingMarkdown.test.ts` for the boundary rules and `streamingMarkdownRenderEquivalence.test.tsx` for split-equals-unsplit on every prefix. Both must pass on the fenced and list fixtures. |
 | A provider's `normalizeMessage` | The kind table above. Adding `stream_delta` to a provider that had none makes the shared buffer and the missing `stream_end` suddenly matter for it. |
@@ -1532,7 +1525,7 @@ section: 03-conversation-handoff/002 The pieces
 | `src/modules/chat/hooks/useChatSessionState.ts` | Subscribe-on-open, load-on-switch, the refresh coordinator, the New Session reset |
 | `src/modules/chat/hooks/useChatRealtimeHandlers.ts` | Routes frames into the store and the busy map |
 | `src/modules/chat/hooks/useSessionStore.ts` | Per-session slots, `appendRealtime`, `truncateAt`, `refreshLatestFromServer` |
-| `src/modules/chat/utils/sessionMessageReconciliation.ts` | `removeOptimisticUserEchoes` — retires local echoes against persisted rows |
+| `src/modules/chat/utils/sessionMessageReconciliation.ts` | `removeOptimisticUserEchoes` — retires local echoes against persisted rows; `findSentUserTurn` — finds the operator's sent message in either form, by the same matcher (MAN-7575) |
 | `src/modules/chat/utils/messageHistoryRefreshCoordinator.ts` | Coalesces refresh signals; keeps hidden sessions dirty |
 | `src/modules/chat/utils/messageKeys.ts` | `getIntrinsicMessageKey` — stable React keys across re-fetches |
 | `src/shared/context/SessionProtectionContext.tsx`, `src/shared/hooks/useSessionProtection.ts` | The busy map: which sessions are producing a response |
@@ -2099,7 +2092,7 @@ section: 04-message-store-and-lazy-loading/002 The pieces
 | --- | --- |
 | `src/modules/chat/hooks/useSessionStore.ts` | The `Map<sessionId, SessionSlot>`, the merge, and every mutator. |
 | `src/modules/chat/utils/sessionMessagePagination.ts` | Pure page-stitching helpers: overlap detection, bridge planning, prepend merge. |
-| `src/modules/chat/utils/sessionMessageReconciliation.ts` | `removeOptimisticUserEchoes` — retires a locally-appended user row once its persisted copy arrives. |
+| `src/modules/chat/utils/sessionMessageReconciliation.ts` | `removeOptimisticUserEchoes` — retires a locally-appended user row once its persisted copy arrives. `findSentUserTurn` — finds the operator's sent message among the rows, echo or persisted, by the same matcher (MAN-7575). |
 | `src/modules/chat/hooks/useChatMessages.ts` | `normalizedToChatMessages` — `NormalizedMessage[]` to `ChatMessage[]`, with a `WeakMap` projection cache. |
 | `src/modules/chat/hooks/useChatSessionState.ts` | The view layer: decides when to fetch, owns the render window, scroll restore and "load all". |
 | `src/modules/chat/utils/messageHistoryRefreshCoordinator.ts` | Coalesces automatic tail refreshes; keeps hidden sessions dirty instead of fetching. |
@@ -2704,19 +2697,18 @@ fighting the user. Paging and row mounting are covered in
 ## MAN-371 — In one paragraph
 section: 05-scrolling/001 In one paragraph
 
-The transcript is one scrolling `div`, and five separate pieces of code write its
+The transcript is one scrolling `div`, and seven separate pieces of code write its
 `scrollTop`. There is no scroll controller and no state machine: the writers are
 coordinated by a handful of refs that each one checks before acting. The shared truth is
 `isUserScrolledUp` — `false` means "the user is parked at the bottom, keep them there",
 `true` means "the user is reading, do not move them" — and it is recomputed only from
-`scroll`, `wheel` and `touchmove`, never from a height change. Every deferred automatic
-scroll re-reads that intent through `isUserScrolledUpRef` at the moment it fires, because
-the value it was armed with may be seconds stale. Everything else — the settle after
-opening a session, the position restore after older history is prepended, the jump to a
-search hit — stakes a temporary claim in a ref that tells the other writers to stand down
-until it is finished. The test file says it plainly: *"The transcript's scroll position is
-written from five places coordinated by refs and timers rather than by one owner"*
-(`src/modules/chat/tests/transcriptScrollOwnership.test.tsx`).
+`scroll`, `wheel` and `touchmove`, never from a height change. The follow is a glide
+(`useFollowGlide`, MAN-7574) started by the size of the pane's content box; it asks
+`canFollow` at every frame, because the value it started with may be a second stale.
+Everything else — the settle after opening a session, the position restore after older
+history is prepended, the jump to a search hit, the landing on the message the operator
+sent (MAN-7575) — stakes a temporary claim in a ref that tells the other writers to stand
+down until it is finished.
 
 ## MAN-372 — Mental model
 section: 05-scrolling/002 Mental model
@@ -2727,10 +2719,12 @@ section: 05-scrolling/002 Mental model
    and their native `scroll` events do not bubble, so they never reach `handleScroll`.
 2. **The pane component holds no scroll state.** It takes `scrollContainerRef`, `onWheel`
    and `onTouchMove` as props. Every write to `scrollTop`, every threshold and every claim
-   ref lives in `src/modules/chat/hooks/useChatSessionState.ts`. If you are reading
+   ref lives in `src/modules/chat/hooks/useChatSessionState.ts`; the glide's per-frame
+   writes are in `useFollowGlide.ts` and the landing pin's in `landAtMessageTop.ts`, both
+   started from that hook, which supplies their conditions. If you are reading
    `ChatMessagesPane.tsx` looking for scroll logic, you are in the wrong file.
 3. **`isUserScrolledUp` is the only shared decision, and it has exactly three readers.**
-   The append-follow effect, the tab-reactivation branch of the `useLayoutEffect`, and the
+   The follow's `canFollow`, the tab-reactivation branch of the `useLayoutEffect`, and the
    jump-to-bottom button in `ChatInterface.tsx`. Predict from it: if the flag is `true`,
    no automatic scroll happens, and the round arrow button is on screen.
 4. **The flag is only recomputed from an input event.** `handleScroll` runs on `scroll`,
@@ -2738,18 +2732,17 @@ section: 05-scrolling/002 Mental model
    < 50`. Content that grows *below* the fold does not move `scrollTop`, emits no event, and
    therefore leaves the flag stale.
 5. **A deferred scroll must re-read intent at fire time.** `isUserScrolledUpRef` mirrors
-   the state so a timer armed 50 ms or 200 ms ago can ask whether the user has scrolled
-   away since. Adding a timed scroll without that check reintroduces the bug
-   `transcriptScrollOwnership.test.tsx` exists to catch.
-6. **The follow effect re-runs on three things, not one.** Its deps are
-   `chatMessages.length`, `isUserScrolledUp` and `isLoadingMoreMessages`. So a new *row*
-   re-follows; a streamed rewrite of an existing row does not; and the flag flipping back
-   to `false` also arms a scroll, which is what snaps you the last few pixels when you
-   scroll back down.
+   the state so a frame or a timer armed earlier can ask whether the user has scrolled
+   away since; the glide asks `canFollow` at every frame (MAN-379).
+6. **The follow is keyed on size, not on rows.** A `ResizeObserver` on the content box
+   starts a glide on any growth — a new row, a row rewritten in place, a late picture, the
+   activity padding — while `canFollow()` holds. A reader's wheel, touchmove, scrollbar
+   press, or a move of the view the glide did not make, stops it (MAN-7574).
 7. **A claim ref suppresses the other writers.** `pendingInitialScrollRef`,
-   `pendingScrollRestoreRef`, `searchScrollActiveRef`, plus one latch at the top of the
-   list, `wasNearTopRef`. A session change clears or re-arms all four in one effect, and
-   drops `liveScrollStateRef` with them.
+   `pendingScrollRestoreRef`, `searchScrollActiveRef`, `landingPendingRef` and
+   `landingHoldRef` (MAN-7575), plus one latch at the top of the list, `wasNearTopRef`. A
+   session change clears or re-arms all of them in one effect, and drops
+   `liveScrollStateRef` with them.
 8. **Row geometry does not change behind the user's back.** Lazy rows keep their measured
    height when their content unmounts, React keys are derived from intrinsic message fields
    rather than object identity, and rows are never render-skipped, so a mounted row reports
@@ -2762,11 +2755,15 @@ section: 05-scrolling/003 The pieces
 
 | File | Role |
 | --- | --- |
-| `src/modules/chat/hooks/useChatSessionState.ts` | Owns the scroll position. All five writers, `isNearBottom`, `handleScroll`, every claim ref, the search jump. It calls `useHostMoveScroll`: the restore across a host move is that hook's, and chat-host never touches a scroll position (MAN-7489). |
+| `src/modules/chat/hooks/useChatSessionState.ts` | Owns the scroll position. The writers it runs itself (`scrollToBottom`, the prepend restore, the tab-reactivation restore, the open-session settle, the search jump), `isNearBottom`, `handleScroll`, every claim ref, `canFollow`, and the reveal effect that lands on a message. It starts the glide and the landing pin from the hooks below. It calls `useHostMoveScroll`: the restore across a host move is that hook's, and chat-host never touches a scroll position (MAN-7489). |
 | `src/modules/chat/hooks/useHostMoveScroll.ts` | `useHostMoveScroll({ scrollContainerRef, isFollowing, fallback })`, called by `useChatSessionState`: keeps the reader's place when the chat's node moves between hosts (tab, panel, picture-in-picture window), because a detached node loses its `scrollTop` and the new host may be another width. On `'before'`, only when the scroller is connected with `clientHeight > 0`, it captures `captureScrollRestoreState` (offsets, the first `.chat-message` still on screen and that row's offset) and whether the reader follows the foot. On `'after'` it restores from that capture, else from `fallback()`, through `restoreScroll`. `restoreScroll` is the one restore rule — the foot when following, else the anchor row at its recorded offset, else the saved top — and the tab's became-active branch calls it too, so two writers never race to different answers. Both phases run in the move's own task; the node's first adoption at mount is a move (MAN-7452, MAN-7489). |
-| `src/modules/chat/transcript/ChatMessagesPane.tsx` | Renders the one scrolling element, binds the ref and the wheel/touch handlers it is handed, mounts the newest `INITIAL_MOUNTED_TAIL_ROWS` rows eagerly. |
-| `src/modules/chat/ChatInterface.tsx` | Wires the hook to the pane, passes `handleScroll` as `onWheel`/`onTouchMove`, renders the jump-to-bottom button. |
-| `src/modules/chat/hooks/useChatComposerState.ts` | `handleSubmit` clears `isUserScrolledUp` and scrolls to the bottom at +100 ms. |
+| `src/modules/chat/hooks/useFollowGlide.ts` | The follow: a `ResizeObserver` on the content box starts a spring toward the live foot while `canFollow()` holds; `stopGlide` and `isOwnScroll` are what the other writers and `handleScroll` call (MAN-7574). |
+| `src/modules/chat/hooks/useReplyAnchor.ts` | Per-session anchors on the message the operator sent: `armReplyAnchor`, `takeLanding`, `takeDeferredLanding` (MAN-7575). |
+| `src/modules/chat/utils/landAtMessageTop.ts` | The instant landing on that message and its 45-frame pin (MAN-7575). |
+| `src/modules/chat/hooks/useSessionPresence.ts` | `useIsLookingAtSession(isActive)` — `isActive` and the host document visible; the one definition of "looking" the follow and the landing read (MAN-7575). |
+| `src/modules/chat/transcript/ChatMessagesPane.tsx` | Renders the one scrolling element, binds the ref and the wheel/touch handlers it is handed, mounts the newest `INITIAL_MOUNTED_TAIL_ROWS` rows eagerly. The bottom padding sits on the content box inside the scroller, which is the box the glide observes. |
+| `src/modules/chat/ChatInterface.tsx` | Wires the hook to the pane, passes `handleScroll` as `onWheel`/`onTouchMove`, renders the jump-to-bottom button. Computes `isLooking` once and passes it, with `isConnected`, to the hook, and `armReplyAnchor` to the composer. |
+| `src/modules/chat/hooks/useChatComposerState.ts` | `handleSubmit` clears `isUserScrolledUp`, arms the reply anchor and scrolls to the bottom at +100 ms. |
 | `src/modules/chat/transcript/LoadAllMessagesOverlay.tsx` | The "load all" pill that appears when the user reaches the top. |
 | `src/modules/chat/transcript/LazyMessageRow.tsx` | Swaps a row's content for a placeholder of the same measured height, keeping an addressable wrapper. |
 | `src/modules/chat/hooks/useLazyRowObserver.ts` | One `IntersectionObserver` per pane, rooted at the scroll container, `LAZY_ROW_VIEWPORT_MARGIN_PX = 1200`; built by the host window's constructor and rebuilt on a host move, re-observing every registered row (MAN-7452). |
@@ -2789,13 +2786,18 @@ flowchart TD
   W3["Tab reactivation restore"] --> PANE
   W4["Initial settle rAF loop"] --> PANE
   W5["Search jump scrollIntoView"] --> PANE
+  W6["Follow glide, one write per frame"] --> PANE
+  W7["Landing pin, up to 45 frames"] --> PANE
   PANE -->|"scroll, wheel, touchmove"| HS["handleScroll"]
   HS --> FLAG["isUserScrolledUp and isUserScrolledUpRef"]
   FLAG --> W1
   FLAG --> W3
+  FLAG --> W6
 ```
 
-All five are in `useChatSessionState.ts`. A repo-wide grep for `scrollTop =`, `scrollTop +=`,
+Five are in `useChatSessionState.ts`. The glide is `useFollowGlide.ts` (MAN-7574) and the landing pin
+is `landAtMessageTop.ts` (MAN-7575); both are started from that hook. The tab-reactivation restore writes through
+`restoreScroll` in `useHostMoveScroll.ts` (MAN-7452). A repo-wide grep for `scrollTop =`, `scrollTop +=`,
 `scrollIntoView` and `scrollTo(` finds no other transcript writer — the remaining hits are the
 composer's textarea highlight overlay and its own dropdown, the command menu, the sidebar's mobile
 rename input, the mobile terminal's momentum scroller, and the file manager's preview pane, which
@@ -2852,35 +2854,84 @@ section: 05-scrolling/006 Staying at the bottom
 `useChatSessionState.ts` → `isNearBottom` returns
 `scrollHeight - scrollTop - clientHeight < 50`, and `false` when there is no container.
 `handleScroll` calls it on every `scroll`, `wheel` and `touchmove` (after bailing out when
-the Chat tab is inactive), writes `setIsUserScrolledUp(!nearBottom)`, and records the
-current `{height, top}` into `scrollPositionRef` for the tab-reactivation restore. A
+the Chat tab is inactive), writes `setIsUserScrolledUp(!nearBottom)` — except for a scroll
+event that is the follow's own glide, which `isOwnScroll()` recognises and the flag ignores
+(MAN-7574) — and records the current `{height, top}` into `scrollPositionRef` for the
+tab-reactivation restore. A
 separate effect mirrors the state into `isUserScrolledUpRef` — an effect rather than an
 assignment beside each setter, because `setIsUserScrolledUp` is also returned from the hook
 and called by the composer.
 
-**RULE: an append only scrolls when the user has not scrolled away, and it re-checks
-before it moves.**
+**RULE: a change in the transcript's size glides a following reader down, and the glide
+re-checks before every frame.** The trigger is the size of the pane's content box, never a
+row count.
 
 ```mermaid
 flowchart TD
-  A["Follow effect runs on a change to chatMessages.length, isUserScrolledUp or isLoadingMoreMessages"] --> B{"Chat tab active and transcript non-empty"}
-  B -->|"no"| Z["Do nothing"]
-  B -->|"yes"| D{"Loading an older page or a restore is pending"}
-  D -->|"yes"| Z
-  D -->|"no"| E{"Search jump in flight"}
-  E -->|"yes"| Z
-  E -->|"no"| F{"isUserScrolledUp"}
-  F -->|"true"| Z
-  F -->|"false"| G["Arm a 50 ms timer"]
-  G --> H{"isUserScrolledUpRef still false when it fires"}
-  H -->|"no"| Z
-  H -->|"yes"| I["Set scrollTop to scrollHeight"]
+  A["The pane's content box changes size"] --> B["ResizeObserver in useFollowGlide"]
+  B --> C{"canFollow"}
+  C -->|"no"| Z["Do nothing"]
+  C -->|"yes"| D{"Gap to the foot is 0.75 px or more"}
+  D -->|"no"| Z
+  D -->|"yes"| E["Start a glide: a spring toward the live foot, one step per animation frame"]
+  E --> F{"canFollow, asked again at every frame"}
+  F -->|"no"| Z
+  F -->|"yes"| G["Write scrollTop until the foot is reached"]
 ```
 
-That is the whole auto-follow. Note what re-runs it. A new **row** re-follows; the 100 ms
-streaming flushes that rewrite an existing row in place do not (see the gotchas). And
-because `isUserScrolledUp` is a dependency, dropping back inside the 50 px band arms one
-more scroll that finishes the trip to the bottom.
+- `canFollow` is the whole condition: the reader is looking at the session, `isUserScrolledUp`
+  is false, and no other writer's claim is held (MAN-7574).
+- Everything that grows the transcript takes this one path: a new row, a streamed reply
+  rewritten in place (Cursor and OpenCode flush the whole reply every 100 ms into one row),
+  a picture that loads late, an expanded tool card, the typing indicator, the activity
+  padding.
+- A reader who drops back inside the 50 px band sets the flag false, and the next growth
+  follows again.
+
+## MAN-7574 — The follow glide
+section: 05-scrolling/006 Staying at the bottom/006a The follow glide
+
+**RULE: when the content under a reader parked at the foot grows, the view eases down to the live foot. It never jumps, and the reader always wins.**
+
+`src/modules/chat/hooks/useFollowGlide.ts` — `useFollowGlide({ scrollContainerRef, canFollow })` returns `{ stopGlide, isOwnScroll }`. `useChatSessionState` calls it and stays the scroll's one owner.
+
+| Part | Fact |
+| --- | --- |
+| Trigger | A `ResizeObserver` on the pane's content box (`container.firstElementChild`), built by the host window's constructor. A new row, a row that grew in place (a late picture, an expanded tool card), the typing indicator and the activity padding all resize that box. None of them fires a scroll event |
+| Padding | The room under the last row (`pb-12 sm:pb-14` while the activity tab floats over it, else `pb-3 sm:pb-4`) is padding of the content box in `ChatMessagesPane.tsx`, not of the scroller. why: padding on the scroller moves the foot while nothing observed resizes |
+| Motion | A critically damped spring, `GLIDE_RATE_PER_SECOND = 18`, solved exactly each frame so it does not depend on frame rate, with no overshoot. `MAX_FRAME_SECONDS = 0.05` caps a delayed frame. 2026-10-01: 0.46 s to 0.57 s over a 300 to 2600 px gap |
+| Target | The live foot, re-read every frame: growth that continues is chased. It lands exactly inside `SNAP_DISTANCE_PX = 0.75` at under `SNAP_SPEED_PX_PER_S = 40` |
+| Reduced motion | `prefers-reduced-motion: reduce` on the host window: one instant write to the foot |
+| Frames | `requestAnimationFrame` of the host window, cancelled on the window that armed it |
+
+## `canFollow()` — asked when growth is seen and again on every frame
+
+True only when ALL hold: `isLooking`; `!isUserScrolledUp`; and none of `pendingInitialScrollRef`, `isLoadingMoreRef`, `pendingScrollRestoreRef`, `searchScrollActiveRef`, `landingHoldRef` is set. A false ends the glide where it stands.
+
+## Whose scroll event is it
+
+The glide keeps `ownTopRef`, the position it last wrote. `classifyScroll` sorts each event:
+
+| Origin | When | Result |
+| --- | --- | --- |
+| `own` | `scrollTop` within `OWN_SCROLL_TOLERANCE_PX = 2` of the last write | `handleScroll` leaves `isUserScrolledUp` alone: a mid-glide gap is not the reader scrolling up |
+| `browser-adjustment` | not the app's, no reader input in the last `READER_INTENT_MS = 600`, moved at most `BROWSER_ADJUSTMENT_LIMIT_PX = 120` | scroll anchoring after a row above changed height; the glide adopts the new position |
+| `reader` | anything else | `stopGlide()`; `handleScroll` reads the event as the reader's |
+
+## What stops a glide
+
+| Input | Stops it |
+| --- | --- |
+| `wheel` with `deltaY !== 0` | yes. A sideways wheel moves nothing vertically and does not |
+| `touchmove` | yes. A `touchstart` or a tap does not |
+| `pointerdown` whose target is the scroller itself (its scrollbar) | yes. A press on a row does not |
+| `keydown` outside INPUT, TEXTAREA, SELECT and contenteditable | not itself: it makes the move that follows the reader's |
+
+- Every other writer of the scroll position calls `stopGlide()` first: `scrollToBottom`, the session-change effect, the landing (MAN-7575).
+- A new condition for "may the app move the view" goes into `canFollow`, never into a second observer.
+- Probe: MAN-7576.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useFollowGlide.ts
 
 ## MAN-377 — Follow and detached
 section: 05-scrolling/006 Staying at the bottom/007 Follow and detached
@@ -2889,6 +2940,10 @@ section: 05-scrolling/006 Staying at the bottom/007 Follow and detached
 flowchart LR
   S["Settling — pendingInitialScrollRef is set"] -->|"height stable for 3 frames or 60 frames elapsed"| F["Following — isUserScrolledUp is false"]
   S -->|"a search target was armed for this session"| J["Jumping — searchScrollActiveRef is set"]
+  S -->|"a landing was requested for this session"| L["Landing — searchScrollActiveRef, then landingHoldRef while the pin runs"]
+  F -->|"looked again and rows arrived below the message the operator sent"| L
+  L -->|"message placed at the top of the view"| D
+  L -->|"message cannot be placed"| F
   F -->|"input event and the gap from the bottom is 50 px or more"| D["Detached — isUserScrolledUp is true"]
   D -->|"input event and the gap is under 50 px"| F
   D -->|"jump-to-bottom button"| F
@@ -2899,7 +2954,8 @@ flowchart LR
   D -->|"session change"| S
 ```
 
-`Settling` and `Jumping` are claims held in refs, not values of the flag. Note the last
+`Settling`, `Jumping` and `Landing` are claims held in refs, not values of the flag
+(`Landing`: MAN-7575). `Following` is the glide (MAN-7574). Note the last
 `Jumping` edge: when a jump resolves to nothing, `searchScrollActiveRef` clears but the
 initial settle has already been consumed, so the transcript stays wherever it rendered with
 the flag still `false`.
@@ -2928,19 +2984,17 @@ sequenceDiagram
     participant H as handleScroll
     participant W as Realtime
     participant S as Store
-    participant E as FollowEffect
+    participant G as FollowGlide
 
     U->>P: drag upward
     P->>H: scroll event
     H->>H: gap is 50 px or more, set isUserScrolledUp true
-    W->>S: stream_delta flush every 100 ms
-    S->>E: same row rewritten, so the row count is unchanged
-    E->>E: effect does not re-run
-    W->>S: a tool_use row arrives
-    S->>E: row count changed, effect runs
-    E->>E: isUserScrolledUp is true, no timer armed
+    W->>S: stream_delta flush every 100 ms, or a tool_use row arrives
+    S->>P: the transcript grows, so the content box resizes
+    P->>G: ResizeObserver fires
+    G->>G: canFollow is false because isUserScrolledUp is true, no glide starts
     U->>P: press jump-to-bottom
-    P->>P: scrollToBottomAndReset sets scrollTop to scrollHeight
+    P->>P: scrollToBottomAndReset stops any glide, sets scrollTop to scrollHeight
     P->>H: scroll event
     H->>H: gap is under 50 px, set isUserScrolledUp false
 ```
@@ -2948,32 +3002,20 @@ sequenceDiagram
 ## MAN-379 — Deferred scrolls re-check intent
 section: 05-scrolling/009 Deferred scrolls re-check intent
 
-**RULE: a scroll armed on a timer must re-read `isUserScrolledUpRef` before it moves
+**RULE: a scroll armed on a timer or a frame must re-read the reader's intent before it moves
 anything.**
 
-| Where | Delay | Re-checks? |
+| Where | Fires | Re-checks? |
 | --- | --- | --- |
-| Append follow effect (`useChatSessionState.ts`) | 50 ms | yes — `if (!isUserScrolledUpRef.current)` |
-| External-update refresh (same file, the `externalMessageUpdate` effect) | 200 ms | yes — same guard, and only armed when `isNearBottom()` held before the refetch |
-| Composer send (`useChatComposerState.ts` → `handleSubmit`) | 100 ms | **no** — it sets the flag false itself, then calls `scrollToBottom()` unconditionally |
+| Follow glide (`useFollowGlide.ts`) | every animation frame while it runs | yes — `canFollow()` at each frame; a reader's wheel, touchmove or scrollbar press, or a move of the view the glide did not make, stops it (MAN-7574) |
+| Landing pin (`landAtMessageTop.ts`) | every frame for `PIN_FRAMES = 45` | yes — gives up on reader input or a position it did not leave (MAN-7575) |
+| Composer send (`useChatComposerState.ts` → `handleSubmit`) | 100 ms | **no** — it sets the flag false itself, then calls `scrollToBottom()` unconditionally; `scrollToBottom` stops any glide first |
 
-The first two used to fire unconditionally. Commit `a1a42774` describes the failure:
-scrolling up inside the delay was silently undone, and because a programmatic scroll itself
-emits a `scroll` event, the resulting `handleScroll` reset `isUserScrolledUp` to false and
-hid the jump-to-bottom button too. The user was returned to the bottom *and* lost the
-control that would have explained why.
-
-`transcriptScrollOwnership.test.tsx` pins both directions on fake timers, driving the real
-hook against a hand-built container (jsdom has no layout, so `scrollHeight`/`clientHeight`
-are stubbed and `scrollTop` writes are recorded):
-
-- *"does not yank the view back down when the user scrolls up inside the delay"* — appends
-  a row, flips the flag, advances 200 ms, asserts **zero** writes.
-- *"still sticks to the bottom when the user has not scrolled away"* — same setup without
-  the flip, asserts a write of `scrollHeight`.
-
-The test stubs `requestAnimationFrame` to a no-op on purpose: the initial-settle loop is a
-separate writer that would otherwise satisfy an assertion meant for the timer.
+Why the check matters: a programmatic scroll itself emits a `scroll` event. An unguarded
+write returns a reader who scrolled up to the bottom and, through `handleScroll`, resets
+`isUserScrolledUp` and hides the jump-to-bottom button — the reader loses the control that
+would explain why. The glide's own writes are the exception `handleScroll` recognises
+(`isOwnScroll`); every other writer's are read as the reader's.
 
 The composer send is deliberately unguarded — the user pressed Enter, so the intent is
 fresh. The cost is that scrolling up within 100 ms of sending is undone.
@@ -3012,6 +3054,9 @@ flowchart TD
   moves `scrollTop` down by what it added, and a page that brings nothing back ends it. A
   restore's own `scroll` event can chain the next page; that is intended, and it stops once a
   screen of history sits above the view.
+- **A landing's pin holds the pager.** The landing parks the sent message near the top of a
+  partial transcript, inside the pager's zone. While `landingHoldRef` is set the pager stands
+  down, so it cannot prepend and re-arm the open-session settle over the landing (MAN-7575).
 
 `loadAllMessages` (the overlay's button) takes a different path: it fetches the whole
 transcript with `limit: null`, sets `visibleMessageCount` to `Infinity`, captures a scroll
@@ -3054,7 +3099,7 @@ hydration. The key falls back through `id`, `messageId`, `toolId`, `toolCallId`,
 `rowid`, `sequence`, and only then to a timestamp-plus-content-prefix string.
 
 The same mechanism is reused by `loadAllMessages`. While `pendingScrollRestoreRef` is set,
-the append-follow effect declines outright — a prepend must never be mistaken for an
+the follow's `canFollow` is false — a prepend must never be mistaken for an
 append — and the restore branch of the `useLayoutEffect` returns early, so a pending restore
 also beats the tab-reactivation restore in the same commit.
 
@@ -3066,11 +3111,13 @@ section: 05-scrolling/012 Opening a session, switching, and coming back
 | Trigger | Mechanism | Claim ref |
 | --- | --- | --- |
 | Opening a session | rAF settle loop | `pendingInitialScrollRef` |
-| Returning to the Chat tab | `useLayoutEffect` reactivation branch | — |
+| Looking again: the Chat tab, the browser tab or the floating chat | `useLayoutEffect` `becameLooking` branch | — |
+| Looking again after a reply arrived below the sent message, or the session picked again | reveal effect → `landAtMessageTop` (MAN-7575) | `searchScrollActiveRef`, `landingPendingRef`, then `landingHoldRef` while the pin runs |
+| Content growing under a reader at the foot | `useFollowGlide` (MAN-7574) | — (`canFollow` reads every claim ref) |
 | Older page prepended | `useLayoutEffect` restore branch | `pendingScrollRestoreRef` |
 | Short screen filled while at the bottom | rAF settle loop, re-armed | `pendingInitialScrollRef` |
 | Sidebar search hit | `scrollIntoView` retry chain | `searchScrollActiveRef` |
-| Expanding a tool view | nothing — pure layout change | — |
+| Expanding a tool view | nothing, or the glide when the reader is at the foot | — |
 
 ## MAN-383 — Opening a session
 section: 05-scrolling/012 Opening a session, switching, and coming back/013 Opening a session
@@ -3102,7 +3149,8 @@ rows mount with real content on the first commit, so the loop measures real heig
 bottom rather than placeholder estimates.
 
 The loop declines entirely if `searchScrollActiveRef` is set — a session opened from a
-search hit is not supposed to land at the bottom.
+search hit is not supposed to land at the bottom. A landing request sets the same flag; it
+keeps `isOpeningSession` true until the message is placed (MAN-7575).
 
 **Filling a short screen.** A 20-row page with "Show work", thinking or the compaction summary off can leave one
 reply and nothing to scroll, so `fillViewportWithHistory` (asked by `ChatMessagesPane` after
@@ -3111,19 +3159,23 @@ history until the transcript overflows by 200 px. While the reader has not scrol
 passes `pinToBottom`, and `loadOlderMessages` **re-arms `pendingInitialScrollRef`** instead
 of setting `pendingScrollRestoreRef`: the older page lands above and the settle loop keeps
 the newest reply in view. An anchor restore there would pin a row near the top and let the
-tail drift off screen as the prepended rows change the heights below it. `visibleMessageCount` is
+tail drift off screen as the prepended rows change the heights below it. The fill stands down
+while a landing is pending or held (MAN-7575). `visibleMessageCount` is
 in the loop's dependencies so a fill that only widens the window re-runs it too.
 
 ## MAN-384 — Switching sessions
 section: 05-scrolling/012 Opening a session, switching, and coming back/014 Switching sessions
 
 The session-change effect (keyed on `selectedProject?.projectId` and `selectedSession?.id`)
-clears the pending search timer, clears `searchScrollActiveRef` and `searchTarget`, nulls
+clears the pending search timer, clears `searchScrollActiveRef`, `landingPendingRef`, the
+landing's pin and `searchTarget`, stops any glide, nulls
 `pendingScrollRestoreRef` and `liveScrollStateRef`, clears `wasNearTopRef`, re-arms
 `pendingInitialScrollRef`, resets `visibleMessageCount` to `INITIAL_VISIBLE_MESSAGES`, and
 sets `isUserScrolledUp` to false. Its comment records that ordering is load-bearing: the
 effect that reads `__searchTargetSnippet` off the newly selected session runs *after* this
-one, so a session opened *from* a search result re-arms immediately.
+one, so a session opened *from* a search result re-arms immediately. An effect declared after
+it asks `takeLanding` for the picked session and requests a landing when rows arrived below
+the message the operator sent (MAN-7575); it skips a session opened from a search hit.
 
 ## MAN-385 — Returning to the Chat tab
 section: 05-scrolling/012 Opening a session, switching, and coming back/015 Returning to the Chat tab
@@ -3131,9 +3183,60 @@ section: 05-scrolling/012 Opening a session, switching, and coming back/015 Retu
 The chat tree stays mounted behind Tailwind's `hidden` (`display: none`) when another
 workspace tab is active (`WorkspaceMain.tsx`, which also passes `isActive`). An effect with
 no dependency array records `{height, top}` into `scrollPositionRef` after every render
-while the tab is active, and the `useLayoutEffect` reactivation branch — recognised through
-`wasChatActiveRef` — restores through `restoreScroll` (`useHostMoveScroll.ts`, the rule a move between hosts shares, MAN-7452): `container.scrollHeight` when following, else `scrollPositionRef.current.top` (no anchor is passed). Hidden tabs must not reset pagination or scroll:
-`handleScroll`, the restore branch and the settle loop all bail out on `!isActive`.
+while the tab is active, and the `useLayoutEffect` reactivation branch — `becameLooking`, read
+off `wasLookingRef` — runs when `isLooking` (`useIsLookingAtSession`, MAN-7575) turns true: the
+Chat tab shown, the browser tab visible, the floating chat reopened. It first asks `takeLanding`:
+rows that arrived below the message the operator sent while they were away make it a landing
+on that message (MAN-7575), and nothing else runs. Otherwise it restores through `restoreScroll` (`useHostMoveScroll.ts`, the rule a move between hosts shares, MAN-7452): `container.scrollHeight` when following, else `scrollPositionRef.current.top` (no anchor is passed). Hidden tabs must not reset pagination or scroll:
+`handleScroll`, the restore branch and the settle loop all bail out on `!isActive`, and the
+follow does not move a hidden browser tab (`canFollow` needs `isLooking`).
+
+## MAN-7575 — Landing on the message you sent
+section: 05-scrolling/012 Opening a session, switching, and coming back/015a Landing on the message you sent
+
+**RULE: a reader who left while a reply was still coming is put back at the message they sent, at the top of the view — never at the foot of a reply they have not read.**
+
+| File | Role |
+| --- | --- |
+| `src/modules/chat/hooks/useReplyAnchor.ts` | `useReplyAnchor({ sessionId, isLooking, isProcessing, getMessages })` returns `{ armReplyAnchor, takeLanding, takeDeferredLanding }`. One anchor per session, in a ref that survives session switches (one `ChatInterface` serves every session) |
+| `src/modules/chat/utils/landAtMessageTop.ts` | `landAtMessageTop(container, locateMessage, hostWindow, onDone)` — the instant landing and its pin |
+| `src/modules/chat/hooks/useSessionPresence.ts` | `useIsLookingAtSession(isActive)` — `isActive` and the host document visible. The one definition of "looking", the pair the server's presence record is built from. `ChatInterface` calls it once and passes `isLooking` to `useChatSessionState` |
+| `src/modules/chat/utils/sessionMessageReconciliation.ts` | `findSentUserTurn(messages, sent)` — finds the sent message in the store, local echo or persisted row, by text, image and file counts, and time (`SentUserTurn`, `src/shared/types.ts`). Shares its matcher with `removeOptimisticUserEchoes` |
+
+## Life of an anchor
+
+1. Armed: `handleSubmit` (`useChatComposerState.ts`) calls `armReplyAnchor` after `addMessage`, replacing the session's earlier anchor. A message queued mid-turn arms nothing: the queued path returns before the arm.
+2. Departure: `isLooking` turns false for the session (another session picked, Chat tab left, browser tab hidden). The rows after the sent message at that moment are recorded.
+3. Return: `isLooking` true again. `takeLanding(sessionId, messages, isTurnRunning, isSocketUp)` answers the sent message when more rows follow it than at departure, else null — then the ordinary return stands (the foot when following, else the saved top).
+4. Spent: a landing on a turn that already ended deletes the anchor; one on a running turn keeps it. A turn ending while the reader looks at the session deletes it too.
+
+## Where a return is caught
+
+| Return | Caught by |
+| --- | --- |
+| Chat tab shown again, browser tab visible again, floating chat reopened | the `becameLooking` branch of the layout effect in `useChatSessionState`, before the first paint |
+| Session picked again in the sidebar | the effect declared after the session-change reset, so it runs after the reset in the same commit |
+| Session opened from a message-search hit (`__searchTargetSnippet`) | never landed: the search jump owns the position (MAN-386) |
+
+## Socket down
+
+A "nothing new" answer while `isSocketUp` is false is not an answer: the store may be behind the server. The anchor is marked `isReturnDeferred` and `takeDeferredLanding` asks again as rows arrive below the message (the reconnect's catch-up). It runs in a layout effect, so the claim on the position is made before the follow's observer sees the growth.
+
+## The landing
+
+`requestLanding(sent)` sets `searchScrollActiveRef` and `landingPendingRef` at once and calls `setSearchTarget({ landing })`. The reveal effect — a layout effect shared with the search jump (MAN-386) — places it:
+
+- The sent row is found with `findSentUserTurn` and addressed by its own timestamp. The whole transcript is fetched only when the row is not loaded; the window widens to cover it.
+- It tries at once (a search hit waits 150 ms), then on the same retry chain. No row to place: `abandonLanding` leaves the reader at the foot.
+- It is instant, with no smooth scroll and no flash. The message stands at the scroller's `padding-top` inset. `isOpeningSession` stays true — the chat hidden behind the loading wheel — until it is placed.
+- `landAtMessageTop` pins it for `PIN_FRAMES = 45` frames (about 0.75 s) and locates the row again every frame, because the persisted row replaces the echo's wrapper and rows near it measure themselves a commit later. It ends on a wheel, a `touchstart`, a scrollbar press, a key, or a position it did not leave.
+- The view is then above the foot: `isUserScrolledUp` is true, the jump-to-bottom button shows, the follow is off (MAN-7574).
+
+**RULE: while a landing's pin runs, nothing but the pin writes the scroll position.** `landingHoldRef` is true from the pin's start to its `onDone`. The older-page pager in `handleScroll`, `fillViewportWithHistory` (also while a landing is pending) and the follow's `canFollow` stand down. why: the message sits near the top of a partial transcript, where the pager and the short-screen fill re-armed the open-session settle and re-pinned the foot over the landing. A new writer of the position checks `landingHoldRef`.
+
+Probe: MAN-7576.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useReplyAnchor.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/utils/landAtMessageTop.ts
 
 ## MAN-386 — Jumping to a search hit
 section: 05-scrolling/016 Jumping to a search hit
@@ -3144,7 +3247,7 @@ exact timestamp until the final try.**
 The sidebar (`Sidebar.tsx`, `onConversationResultClick`) puts `__searchTargetSnippet` and
 `__searchTargetTimestamp` on the selected session object. The jump then:
 
-1. Sets `searchScrollActiveRef` — the initial settle and the append-follow both stand down.
+1. Sets `searchScrollActiveRef` — the initial settle and the follow both stand down.
    The arming effect requires a non-empty snippet string; without one there is no jump.
 2. Fetches the **entire** transcript into the store (`limit: null`) so an old hit is
    reachable, without rendering all of it.
@@ -3155,9 +3258,7 @@ The sidebar (`Sidebar.tsx`, `onConversationResultClick`) puts `__searchTargetSni
    and string tool-result content. **Only if the snippet misses** does the timestamp take
    over, and it returns the *nearest* message by time, not an exact match. `-1` — and
    therefore no scroll at all — happens only when the snippet misses *and* there is no
-   finite timestamp. `searchTargetLocator.test.ts` pins both halves: *"a snippet that
-   matches nothing reports a miss instead of guessing"* and *"the timestamp is only a
-   fallback when the snippet misses"*.
+   finite timestamp.
 4. Widens the render window with
    `resolveSearchWindowSize(count, index, SEARCH_TARGET_CONTEXT_MESSAGES = 20)`, applied as
    `Math.max(previous, required)` so the window never shrinks. `visibleMessages` is a tail
@@ -3172,6 +3273,9 @@ spaced `SEARCH_SCROLL_RETRY_DELAY_MS = 150` apart — about 3.15 s in total**. T
 that long because widening the window can commit thousands of rows that each run the
 markdown pipeline.
 
+The same reveal effect and retry chain land the operator on the message they sent — instant,
+at the top, no flash (MAN-7575).
+
 **Why `allowNearest` exists.** `findRenderedMessageElement` is called with
 `allowNearest = (retriesLeft === 0)`, so every attempt but the last accepts an **exact**
 timestamp match only. The final attempt relaxes to nearest-by-time because a hit on the
@@ -3182,10 +3286,11 @@ second or later call inside a collapsed tool group has no row of its own:
 ## MAN-387 — Expanding a tool view
 section: 05-scrolling/016 Jumping to a search hit/017 Expanding a tool view
 
-Nothing scrolls. There is no `scrollIntoView` anywhere under
-`src/modules/chat/transcript/` or the tool renderers. Expansion is a layout change the
-browser's own scroll anchoring absorbs; if the row later unmounts, `LazyMessageRow` records
-the expanded height first.
+No code scrolls for it: there is no `scrollIntoView` anywhere under
+`src/modules/chat/transcript/` or the tool renderers. Expansion is a layout change. The
+browser's own scroll anchoring absorbs it for a reader above the foot; a reader at the foot
+is glided down with the growth (MAN-7574). If the row later unmounts, `LazyMessageRow`
+records the expanded height first.
 
 ## MAN-388 — Lazy rows and height stability
 section: 05-scrolling/018 Lazy rows and height stability
@@ -3248,7 +3353,8 @@ and out of the band. Off-screen cost is `LazyMessageRow`'s job alone.
 
 The repo **never sets `overflow-anchor`**, so the browser default (`auto`) stays in effect
 for everything the JS does not explicitly restore — which is what absorbs a tool card
-expanding or a code block finishing highlighting.
+expanding or a code block finishing highlighting. A reader at the foot is followed by the
+glide, which counts a browser adjustment of up to 120 px as its own (MAN-7574).
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/index.css
 
@@ -3266,39 +3372,37 @@ section: 05-scrolling/019 Mobile, keyboard and CSS
 | `--keyboard-height` from `visualViewport.resize` | `useVisualViewportKeyboardOffset.ts` | `ProjectWorkspaceShell.tsx` applies it as `style={{ bottom: 'var(--keyboard-height, 0px)' }}`, so the fixed shell shrinks above the iOS keyboard instead of being covered by it. |
 | `@media (prefers-reduced-motion: reduce) { scroll-behavior: auto !important; }` | `src/index.css` | The only `scroll-behavior` declaration in the repo. Nothing sets `smooth` in CSS. |
 
-`scrollToBottom` is an instant `scrollTop = scrollHeight` assignment. The only smooth scroll
-in the transcript is the search jump's explicit `behavior: 'smooth'`.
+`scrollToBottom` (the jump button, the composer send) is an instant `scrollTop = scrollHeight`
+assignment that stops any glide first. The other motion in the transcript is the follow glide —
+a spring written one animation frame at a time, instant under `prefers-reduced-motion` (MAN-7574)
+— and the search jump's explicit `behavior: 'smooth'`.
 
-The pane's bottom padding switches between `pb-12 sm:pb-14` and `pb-3 sm:pb-4` depending on
-`hasActivityIndicator` — the composer's floating activity/stop tab overlaps the pane, so the
-padding reserves space for it. That toggle changes the pane's usable height without emitting
-a scroll event.
+The bottom padding of the pane's content box (the `div` inside the scroller, not the scroller)
+switches between `pb-12 sm:pb-14` and `pb-3 sm:pb-4` depending on `hasActivityIndicator` — the
+composer's floating activity/stop tab overlaps the pane, so the padding reserves space for it.
+That toggle resizes the content box, which the follow glide observes, so a reader at the foot is
+carried with it; it emits no scroll event.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/index.css
 
 ## MAN-390 — Gotchas and why the code looks like this
 section: 05-scrolling/020 Gotchas and why the code looks like this
 
-- **Streaming text does not re-follow, but the first flush does.** `updateStreaming` in
-  `useSessionStore.ts` writes a row with the well-known id `__streaming_<sessionId>`. The
-  first flush appends it, so `chatMessages.length` changes once and the follow effect runs.
-  Every flush after that replaces the same array slot, so the length is unchanged and the
-  effect stays quiet. Within one streamed block the pane is held by the browser, not by this
-  code.
-- **`stream_end` does not re-follow either.** `finalizeStreaming` rewrites the same slot in
-  place, changing only the id, `kind` and `role`; both `stream_delta` and an assistant
-  `text` map to exactly one row in `normalizedToChatMessages`. The length never moves, so
-  the effect does not re-run. What re-follows is the *next* row — a tool call, or the next
-  streamed block, which allocates a fresh `__streaming_` id.
+- **The follow is keyed on size, not on row count.** `updateStreaming` in `useSessionStore.ts`
+  writes a row with the well-known id `__streaming_<sessionId>`; the first flush appends it
+  and every flush after that replaces the same array slot. `finalizeStreaming` rewrites the
+  same slot in place, changing only the id, `kind` and `role`. `chatMessages.length` moves
+  only once, yet each rewrite grows the row and resizes the pane's content box, which is what
+  `useFollowGlide` observes (MAN-7574). Nothing re-follows by watching the length.
 - **`isUserScrolledUp` can be stale.** It is only recomputed from `scroll`, `wheel` and
-  `touchmove`. Content growing below the fold does not move `scrollTop`, so no event fires,
-  the flag stays `false`, and the jump-to-bottom button stays hidden even though the newest
-  content is off screen. Same for the keyboard opening and for the activity indicator's
-  padding toggle.
+  `touchmove`. Growth the follow does not take — a hidden browser tab — does not move
+  `scrollTop`, so no event fires, the flag stays `false`, and the jump-to-bottom button stays
+  hidden even though the newest content is off screen. Same for the keyboard opening.
 - **A programmatic scroll emits a `scroll` event.** Every `scrollTop` write feeds back
-  through `handleScroll` and rewrites the flag. That is why the deferred writers guard
-  themselves — an unguarded write both moves the user *and* erases the evidence that they
-  had scrolled away.
+  through `handleScroll`. The glide's own writes are recognised (`isOwnScroll`) and leave the
+  flag alone; any other writer's rewrite the flag, so an unguarded write both moves the user
+  *and* erases the evidence that they had scrolled away. That is why the deferred writers
+  guard themselves (MAN-379).
 - **The pager cannot drain a long session in one gesture.** The restore after a prepend
   lands the reader near the top by design, but the zone is `scrollTop < clientHeight` and each
   prepend moves the reader down by what it added, so the chain stops once a screen of history
@@ -3306,17 +3410,14 @@ section: 05-scrolling/020 Gotchas and why the code looks like this
   it exists for.
 - **`loadEarlierMessages` has no scroll restore.** It just does
   `setVisibleMessageCount(prev + 100)` on already-loaded messages, so `chatMessages.length`
-  never changes and neither the follow effect nor the restore `useLayoutEffect` runs. Only
+  never changes and the restore `useLayoutEffect` does not run. Only
   the browser's native scroll anchoring holds the position there. `loadOlderMessages` and
   `loadAllMessages` both capture an anchor; this one does not.
 - **A search jump left armed across a session change was visibly wrong twice.** The new
   session opened part-way up (the initial settle declines while a jump is pending), and then
   once the retries ran out and `allowNearest` engaged, it scrolled to an unrelated message
-  in the *new* session and flashed the highlight on it.
-  `transcriptScrollOwnership.test.tsx` → *"does not follow the user into the next session"*
-  drives exactly that: it plants a session-B row in the container, lets the jump start
-  retrying against session A, switches sessions, advances past the whole retry budget, and
-  asserts zero `scrollIntoView` calls and zero `.search-highlight-flash` elements.
+  in the *new* session and flashed the highlight on it. The session-change effect cancels the
+  retry timer; the same reset clears a landing's request and pin (MAN-7575).
 - **The nearest-row fallback is not laziness.** It was removed from the early attempts
   (commit `0a19ad8a`) because an uncommitted window made it scroll to an arbitrary message —
   the exact failure the rewrite was meant to remove. It survives on the final attempt only,
@@ -3350,19 +3451,41 @@ section: 05-scrolling/021 If you change this, check that
 
 | If you touch | Also check |
 | --- | --- |
-| The 50 px threshold in `isNearBottom` | The follow effect, the tab-reactivation branch and the jump-to-bottom button all read the same flag. |
+| The 50 px threshold in `isNearBottom` | `canFollow`, the tab-reactivation branch and the jump-to-bottom button all read the same flag. |
 | The one-screen (`clientHeight`) pager zone | Each prepend must still move the reader down by what it added (the anchor restore), or paging runs away. |
-| `chatMessages` shape or identity | The follow effect and the restore/reactivation `useLayoutEffect` are both keyed on `chatMessages.length`; in-place row rewrites are invisible to both. |
-| Anything that adds a deferred scroll | It must re-read `isUserScrolledUpRef` at fire time, or `transcriptScrollOwnership.test.tsx` should fail. |
+| `chatMessages` shape or identity | The restore/reactivation `useLayoutEffect` and the deferred-landing effect are keyed on `chatMessages.length`; in-place row rewrites are invisible to both. The follow is keyed on the content box's size, not on this. |
+| Anything that adds a scroll write, deferred or not | It re-reads intent at fire time (`canFollow` for a follow, MAN-379), calls `stopGlide()` before it writes, and does not write at all while `landingHoldRef` is set (MAN-7575). |
+| `canFollow`, a claim ref, or the follow's reader-input list | Every writer that sets a claim ref must be in `canFollow`, or the glide moves the view under it (MAN-7574). |
+| The landing, the reply anchor or `findSentUserTurn` | The reveal effect shared with the search jump, `landingHoldRef` in the pager and `fillViewportWithHistory`, and the socket-down deferral (MAN-7575). |
 | `getIntrinsicMessageKey` or the key map in `ChatMessagesPane` | The prepend restore needs the anchor element to survive; unstable keys remount rows and drop it to the height-delta fallback. |
-| `LazyMessageRow` placeholder height, the `.chat-message` class placement, or the 1200 px observer margin | Prepend anchor scan, search-jump row lookup, and `lazyMessageRow.test.tsx`. |
-| `SEARCH_SCROLL_RETRIES`, the retry delay, or `findRenderedMessageElement` | The cross-session cancellation test and `searchTargetLocator.test.ts`; `allowNearest` must stay on the final attempt only. |
+| `LazyMessageRow` placeholder height, the `.chat-message` class placement, or the 1200 px observer margin | Prepend anchor scan and search-jump row lookup. |
+| `SEARCH_SCROLL_RETRIES`, the retry delay, or `findRenderedMessageElement` | The landing shares the chain (MAN-7575); `allowNearest` must stay on the final attempt only. |
 | `.chat-message` or `.chat-messages-pane` gaining `contain`, any `content-visibility` on a row, or an ancestor `transform`/`filter`/`perspective`/`will-change` | A fullscreen card's `fixed inset: 0` is sized (and, under `paint`/`content`, clipped) by that ancestor instead of the viewport — `contain: layout` alone is enough, and it shows in neither a `contain`-shaped nor a clip-shaped audit; a render-skipped row also reports a stand-in height to every geometry reader in the transcript. [Lazy rows and height stability](MAN-388). |
 | Session load or pagination in `useChatSessionState.ts` | `pendingScrollRestoreRef`, `liveScrollStateRef`, `pendingInitialScrollRef`, `searchScrollActiveRef` and `wasNearTopRef` are all handled by the session-change effect — see [the message store](MANUAL.md). |
-| Composer send or the activity indicator | `handleSubmit` forces `isUserScrolledUp` false and scrolls unconditionally at +100 ms; the indicator changes the pane's padding without a scroll event. |
-| Tool card expand/collapse | Nothing scrolls today — see [tool views](MANUAL.md). Adding a `scrollIntoView` there adds a sixth writer with no claim ref. |
+| Composer send or the activity indicator | `handleSubmit` forces `isUserScrolledUp` false, arms the reply anchor (MAN-7575) and scrolls unconditionally at +100 ms. The indicator's padding is the content box's, which the follow observes; moved onto the scroller it resizes nothing the follow can see. |
+| Tool card expand/collapse | No code scrolls for it; a reader at the foot is glided with the growth (MAN-7574) — see [tool views](MANUAL.md). A `scrollIntoView` there adds another writer with no claim ref. |
 
 Related: [the realtime stream](MANUAL.md) for how rows arrive.
+
+## MAN-7576 — Probe — the glide and the landing
+section: 05-scrolling/021a Probe — the glide and the landing
+
+`node .verify/probe-follow-glide.mjs` — real Haiku turns in scratch chats under `/tmp` (`.verify/lib/probe-project.mjs`), driven through the composer on :5183. Every chat it makes is deleted at the end. Exits 1 with the failed checks listed.
+
+| Leg | Proves |
+| --- | --- |
+| 1 glide | 800×300 window at the foot, a tall reply lands whole: the view reaches the foot over several frames and never in one jump, in 250 to 1100 ms, ends within 2 px, and the jump-to-bottom button never shows (MAN-7574) |
+| 2 landing | Send, pick another session before the reply lands, wait for the turn to finish, come back with no page reload: the sent message stands within 24 px of the scroller's top and the button shows. Run at desktop and 390×844, dark and light (MAN-7575) |
+| 3 hidden tab | `document.visibilityState` answers `hidden` while a reply lands: the transcript grows with 0 px of follow movement; shown again, the sent message is at the top |
+| 4 reader wins | A wheel 150 ms into the glide stops it; the reader stays scrolled up with the button showing |
+| 5 reduced motion | `prefers-reduced-motion: reduce`: the foot is reached in one frame and kept |
+
+- "Pick the session again" is the router's own navigation to the chat's link. why: the scratch chat sits in a hidden root the sidebar does not list.
+- The reply prompt is a markdown bulleted list. why: "one number per line" renders as one 338 px paragraph, too short for the glide to cover real distance.
+- A reply is waited for on the server, after this turn's own prompt only. why: an earlier reply in the same chat can hold the same number.
+- Sibling: `node .verify/chat-window-bindings-home.mjs` covers the follow and the Files-tab return (MAN-7452).
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-follow-glide.mjs
 
 ## MAN-392 — In one paragraph
 section: 06-tool-view/000 In one paragraph
@@ -5282,7 +5405,7 @@ section: 08-rendered-shapes/002 The pieces/002 `shapes/useFilePreview.ts`
 | --- | --- |
 | `shapes/useFilePreview.ts` | `useFilePreview` — a file chip's preview: reads a picture's or a PDF's bytes through the workspace's `readFileReference` palette op, shared within the reply, and keeps its fold in the shapes' own fold memory. Nothing while loading, when unreadable or mistyped, in an export, where chips are suppressed, in a reply still streaming, or for a PDF unless `navigator.pdfViewerEnabled` is true and the pointer is fine (a phone gets none). An SVG is shown from a `data:` URL, never a `blob:` one a new tab would run in this origin |
 | `shapes/previewScope.ts` | `PreviewScopeContext` — the row a preview belongs to: `MessageComponent` provides a tool row's `toolId`, or a finished reply's trimmed text hashed with its turn anchor — the last tool call before it in its turn, else the prompt, read by `ChatMessagesPane` from the full message order (never an id, which changes as a reply finalises, and never the rows on screen, which "Show work" changes), `false` while a reply streams, and `null` — this mount alone — where neither exists |
-| `shapes/FilePreview.tsx` | `FilePreviewFrame` — the preview under a chip: the picture (a click opens `ImageLightbox`, square as well) or the PDF in an `iframe` at most 32rem or 60vh tall, in a square-cornered hairline frame with nothing drawn over it, so a screenshot's corners and edges all show. The chip beside it carries the open-in-Files button. A loaded preview fires `TRANSCRIPT_GREW_EVENT` (`transcript/transcriptGrew.ts`), which `useChatSessionState` answers by re-pinning a chat left at its bottom |
+| `shapes/FilePreview.tsx` | `FilePreviewFrame` — the preview under a chip: the picture (a click opens `ImageLightbox`, square as well) or the PDF in an `iframe` at most 32rem or 60vh tall, in a square-cornered hairline frame with nothing drawn over it, so a screenshot's corners and edges all show. The chip beside it carries the open-in-Files button. A preview that loads late grows its row like any other growth: `useFollowGlide`'s observer on the transcript's content box sees it and glides a chat left at its bottom down to the new foot (MAN-7574) |
 | `shapes/MarkdownImage.tsx` | `MarkdownImage`, the `img` override in both maps: a relative `src` with a picture's extension is drawn as that file's chip (labelled with the alt text), which previews it; any other `src` is react-markdown's own `<img>` with the props it was given |
 | `shapes/DataTable.tsx` | Every table that is not a matrix or a before/after pair: three-state sort, CSV copy, and a `Meter` bar down the one numeric column |
 | `shapes/DecisionMatrix.tsx` | `Option \| Pros \| Cons [\| Verdict]` as one `Card` per option, verdict as a `Badge` toned by its glyph |

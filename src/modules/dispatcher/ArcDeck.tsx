@@ -12,20 +12,21 @@ import {
   scheduleClock,
   waitsOnSiblings,
 } from '@/modules/dispatcher/dispatcherState';
-import { DeckFrame, DeckItem } from '@/modules/dispatcher/DeckFrame';
-import type { DispatcherArcGroup } from '@/modules/dispatcher/dispatcherState';
+import { DeckFrame } from '@/modules/dispatcher/DeckFrame';
 import { arcPutAway, doneDismiss, planPutAway, putAwayVerb } from '@/modules/dispatcher/hiddenPlans';
 import { LaneCardHead } from '@/modules/dispatcher/LaneCardHead';
 import { PlanAsk } from '@/modules/dispatcher/PlanAsk';
 import { PlanCard } from '@/modules/dispatcher/PlanCard';
 import { PlannerBadge } from '@/modules/dispatcher/PlannerBadge';
 import { SessionPin } from '@/modules/dispatcher/SessionPin';
+import { SnapStripItem } from '@/modules/dispatcher/SnapStrip';
 import { SpendPills } from '@/modules/dispatcher/SpendPills';
 import { dispatchArcFoldKey, useCardFold } from '@/shared/hooks/useCardFold';
 import { spendParts } from '@/shared/spend';
 import { Badge } from '@/shared/ui';
 import type { ActionMenuItem } from '@/shared/ui';
-import type { DispatcherArcStatus, DispatcherPlanStatus, LaneFlowNode, Tone } from '@/shared/types';
+import type { SortableList } from '@/shared/ui/sortable/useSortable';
+import type { DispatcherArcGroup, DispatcherArcStatus, DispatcherPlanStatus, LaneFlowNode, Tone } from '@/shared/types';
 import { cn } from '@/shared/utils';
 
 /**
@@ -251,7 +252,7 @@ export function DispatchArcDeck({
         const mine = pinnedSessionId !== null && plan.session_app_id === pinnedSessionId;
         const layer = planLayer(plan);
         return (
-          <DeckItem
+          <SnapStripItem
             key={plan.name}
             data-dispatch-plan-row
             data-plan-name={plan.name}
@@ -261,7 +262,7 @@ export function DispatchArcDeck({
           >
             {mine && <SessionPin />}
             <PlanCard plan={plan} waitsOn={waitsOnSiblings(plan, plans)} onPutAway={planPutAway(plan, carriedNames)} headingLevel={4} showAsk={false} />
-          </DeckItem>
+          </SnapStripItem>
         );
       })}
     </DeckFrame>
@@ -284,6 +285,11 @@ export function DispatchArcDeck({
  * THE DECKS STACK AT `gap-6`, wider than the `LANE_CARD_GAP` between two cards, so where one arc ends
  * and the next begins is read from the spacing before any head is read.
  *
+ * `sort` MAKES THE STACK THE OPERATOR'S TO REARRANGE: the tab hands it the sortable list over its
+ * decks, and the decks are then drawn in the list's order (a carry reorders them live) with each
+ * deck's own `li` the carried item. The widget hands none: its column is one sortable list of decks
+ * and plans together, drawn by the widget, and each deck there is alone in its stack.
+ *
  * NOTHING AT ZERO ARCS: an operator with none sees the pane exactly as it was before arcs existed.
  * Nothing here reads the lane either — the caller hands it the split it already has, so a caller that
  * filters its list and one that does not can never draw different decks.
@@ -296,18 +302,23 @@ export function DispatchArcDecks({
   home = 'tab',
   pinnedSessionId = null,
   carriedNames,
+  sort,
 }: {
   groups: DispatcherArcGroup[];
   /** Which home is drawing these decks. It changes no layout — an arc is drawn the same in both — and exists to write `data-dispatch-arcs`, so a probe always reads ONE home's decks and never both. */
   home?: 'tab' | 'gutter';
   pinnedSessionId?: string | null;
   carriedNames: string[];
+  /** The sortable list over these decks (keyed by arc name), when the operator may rearrange them here. */
+  sort?: SortableList;
 }) {
   if (groups.length === 0) return null;
+  const byName = new Map(groups.map((group) => [group.arc.name, group]));
+  const drawn = sort === undefined ? groups : sort.order.flatMap((name) => byName.get(name) ?? []);
   return (
-    <ul data-dispatch-arcs={home} className="flex min-w-0 flex-col gap-6">
-      {groups.map((group) => (
-        <li key={group.arc.name} className="min-w-0">
+    <ul ref={sort?.attachList} data-dispatch-arcs={home} className="flex min-w-0 flex-col gap-6">
+      {drawn.map((group) => (
+        <li key={group.arc.name} className="min-w-0" {...sort?.itemProps(group.arc.name)}>
           <DispatchArcDeck
             group={group}
             pinnedSessionId={pinnedSessionId}

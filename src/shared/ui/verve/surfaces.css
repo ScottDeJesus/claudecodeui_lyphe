@@ -272,6 +272,11 @@ body.vv-dragging iframe { pointer-events: none; }
 body.vv-drag-fab,
 body.vv-drag-fab .vv-fab { cursor: grabbing; }
 body.vv-drag-split { cursor: col-resize; }
+/* A carried card is held, whatever it is over: every element of it names a cursor of its own (a
+ * pointer on each button), and the hand that stays closed for the whole carry is the only thing
+ * on screen that says a card is in it. */
+body.vv-drag-sort,
+body.vv-drag-sort * { cursor: grabbing; }
 /* A resize shows the corner the reader took hold of for its whole length, even once the pointer has
  * left the grip: the body's cursor is what the pointer wears over the frames (inert, so they no longer
  * set their own) and over the app around it. The grip carries its corner and its drag on its own

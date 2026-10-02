@@ -387,13 +387,13 @@ export function formatBytes(bytes: number | null | undefined): string {
 //----------------- THE DISPATCHER'S MODEL WORD ------------
 
 /**
- * The model word a plan's or an arc's control shows as pressed: the stored word, or `deepseek` for a record with
+ * The model word a plan's or an arc's control shows as pressed: the stored word, or `claude` for a record with
  * none (`null` / absent — a store row carrying no word of its own), because that is how the store itself reads it
- * (`run_model.clean`). Used by `PlanControls` and `DispatchArcControls` to hand `RunModelControl` its value, so
+ * (`run_model.DEFAULT`). Used by `PlanControls` and `DispatchArcControls` to hand `RunModelControl` its value, so
  * `Chat switch` is pressed only when the record says `auto`.
  */
 export function effectiveModelWord(stored: DispatcherModelChoice | null | undefined): DispatcherModelChoice {
-  return stored ?? 'deepseek';
+  return stored ?? 'claude';
 }
 
 // ---------------------------

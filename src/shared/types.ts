@@ -795,6 +795,13 @@ export type StreamFlushTimer = { id: number; armedOn: Window; flush: () => void 
 
 // ---------------------------
 
+//----------------- CHAT REPLY ANCHOR ------------
+
+/** What identifies a message the operator sent, in whatever form the transcript holds it: the text, how many pictures and files it carried, and when it was sent. The local echo and the persisted row that replaces it share no id and no timestamp, so the pair is found again by these (`findSentUserTurn`). Built by the composer when it sends, held per session by `useReplyAnchor`, and carried to the transcript's reveal path as `landing`. */
+export type SentUserTurn = { text: string; imageCount: number; fileCount: number; sentAtMs: number };
+
+// ---------------------------
+
 //----------------- CHAT STORAGE ------------
 
 /**
@@ -2472,7 +2479,7 @@ export type DispatcherCardAnswer = {
   /** The one line the card toasts: the dispatcher's own first line when it heard the answer, else the lane's sentence for why it never reached it — the field every relayed verb's sentence travels in. */
   stdout: string;
 };
-/** A plan's or an arc's OWN model word, as the store records it and as the model control sends it through `POST /plans/:name/model` and `POST /arcs/:name/model`: `deepseek` (the store's default, what a row carrying no word of its own reads), `claude`, or `auto` — follow the chat's DeepSeek switch. The three words have ONE home, `hooks/plan_runner/run_model.py:WORDS`, unpacked by `hooks/dispatcher/model.py` rather than re-spelled; the server checks a request against exactly these three (`readDispatcherModelChoice`) before anything is spawned, so the argv word is always ours. */
+/** A plan's or an arc's OWN model word, as the store records it and as the model control sends it through `POST /plans/:name/model` and `POST /arcs/:name/model`: `deepseek`, `claude` (the store's default, what a row carrying no word of its own reads), or `auto` — follow the chat's DeepSeek switch. The three words have ONE home, `hooks/plan_runner/run_model.py:WORDS`, unpacked by `hooks/dispatcher/model.py` rather than re-spelled; the server checks a request against exactly these three (`readDispatcherModelChoice`) before anything is spawned, so the argv word is always ours. */
 export type DispatcherModelChoice = 'deepseek' | 'claude' | 'auto';
 /** A plan's OWN swarm word as the store records it and the document carries it (`DispatcherPlan.swarm`): the box flag's grammar (`hooks/plan_runner/swarm.py:parse`), canonical — `off` (one of this plan's phases at a time), `on` (no ceiling of its own), `on <N>` (at most N of its phases at once, N a positive safe integer). */
 export type DispatcherSwarmWord = 'off' | 'on' | `on ${number}`;
@@ -2484,6 +2491,14 @@ export type DispatcherOffpeak = { at: number | null };
 //----------------- DISPATCHER, CLIENT ONLY: the picture the lane's feed retains ------------
 /** What the dispatcher's feed retains on `dispatcher:all`, and what every plan card reads off it: the frame's whole picture MINUS the two keys that change without anything moving (`home`, `generated_at`, restamped on every poll of the watcher) and minus the frame's own clock, which the bus carries as the value's `at`. It is the document's own spelling throughout — `offpeak_at` keeps its underscore — so the one place that renames it is the reader's `epochOf`. `planners` is the store's own list of outings, and it is what draws the badges no plan card and no deck can carry: an arc's design before its arc file loads. */
 export type DispatcherLanePicture = { plans: DispatcherPlan[]; arcs: DispatcherArc[]; planners: DispatcherPlanner[]; route: DispatcherRoute; daemon: DispatcherDaemon; offpeak_at: string };
+// ---------------------------
+//----------------- DISPATCHER, CLIENT ONLY: the lane's top-level cards, in the operator's order ------------
+/** One arc of the lane with the plans of it, in the arc's own order (`DispatcherArc.plans`) — one deck's worth. Built by `byArc`, drawn by `DispatchArcDecks`. */
+export type DispatcherArcGroup = { arc: DispatcherArc; plans: DispatcherPlan[] };
+/** One top-level card of the lane: an arc's whole deck, or one plan no arc holds. `byArc` returns every card in the ONE order both homes draw. */
+export type LaneCard = { kind: 'arc'; group: DispatcherArcGroup } | { kind: 'plan'; plan: DispatcherPlan };
+/** The lane split by arc, in the operator's order: `cards` is every top-level card in that order (the widget's column), `groups` the decks among them and `rest` the plans of no arc among them (the tab's decks and wall) — the same cards, so the homes can never disagree about which comes first. Every plan given comes back exactly once. */
+export type DispatcherArcSplit = { cards: LaneCard[]; groups: DispatcherArcGroup[]; rest: DispatcherPlan[] };
 // ---------------------------
 //----------------- SPEND: a spend figure's two halves, decided once ------------
 /** A spend figure DECIDED and not yet worded — `spendParts` (`src/shared/spend.ts`) is its one maker, and `spendText` and `SpendPills` (`src/modules/dispatcher/`) are its two drawers, so a sentence and a row of pills can never disagree about which halves a record has. `paid` is the PAID dollars, `null` where no API billed (a figure of 0 means the work rode Claude, never "this cost nothing"). `tokens` is the CLAUDE half: `split` when the record carries `in` and `out` that ARE its total, `total` when only the total can be trusted (a pre-split record, or a sum over records half of which predate the split), `null` when it carries neither. A split's `cacheRead` is the part of `in` served from the prompt cache, or `null` where the record does not state it (a record from before the field, a caller that has none) — `cachePercent` turns it into the `in` pill's `(94% cache)`, and `null` draws no suffix rather than a `0%`. Client-only: the server's mirrored dispatcher block above never carries it. */
@@ -2655,7 +2670,7 @@ export type UniverseDigest = { edits: number; execs: number; at: number };
  *  a place in it, and the rest close up or make room — there is no fixed number of berths. */
 export type GutterSide = 'left' | 'right';
 
-/** The widgets a chat gutter can hold: the dispatcher's plan cards, the open chat's plans first, the
+/** The widgets a chat gutter can hold: the dispatcher's plan cards, in the operator's own order, the
  *  memory-intake rows the session proposed, the subagents it has pinned, the embed — a live page the
  *  chat named, or the reader typed in — and the account's notes. These are the ids the DOM carries as
  *  `data-widget`, and the keys `useGutterPlacements` stores its records under. */

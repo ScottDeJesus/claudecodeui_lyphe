@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import { useWebSocket } from '@/shared/context/WebSocketContext';
 import { useHostWindow } from '@/shared/context/HostWindowContext';
@@ -28,6 +28,32 @@ type UseSessionPresenceInput = {
  * make every verification run look unwatched.
  */
 const isVisible = (hostDocument: Document) => hostDocument.visibilityState === 'visible';
+
+/**
+ * THE ONE DEFINITION OF "THE OPERATOR IS LOOKING AT THE SESSION": the chat is on screen (`isActive` —
+ * the Chat tab shown, or the chat floating) and the host document is visible. It is the pair the
+ * server's presence record is built from (`ChatInterface` passes the session only while `isActive`,
+ * and `announce` states the document's visibility), exposed here as a boolean so the scroll follow and
+ * the return-to-where-they-replied read the very same answer instead of a second guess at it.
+ *
+ * Used by ChatInterface, which hands the result to the session state hook. State, not a ref: coming
+ * back is a transition the hook's effects must hear.
+ */
+export function useIsLookingAtSession(isActive: boolean): boolean {
+  const hostWindow = useHostWindow();
+  const [isDocumentVisible, setIsDocumentVisible] = useState(() => isVisible(hostWindow.document));
+
+  useEffect(() => {
+    const hostDocument = hostWindow.document;
+    const sync = () => setIsDocumentVisible(isVisible(hostDocument));
+    // A move to another window reads that window's document at once: it may already be hidden.
+    sync();
+    hostDocument.addEventListener('visibilitychange', sync);
+    return () => hostDocument.removeEventListener('visibilitychange', sync);
+  }, [hostWindow]);
+
+  return isActive && isDocumentVisible;
+}
 
 /**
  * Tells the server which session this tab is showing, so the notification channels stay quiet

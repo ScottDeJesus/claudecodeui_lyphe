@@ -24,7 +24,7 @@ import { useScheduledMessages } from '@/modules/chat/composer/useScheduledMessag
 import { useChatSessionState } from '@/modules/chat/hooks/useChatSessionState';
 import { useChatRealtimeHandlers } from '@/modules/chat/hooks/useChatRealtimeHandlers';
 import { useChatComposerState } from '@/modules/chat/hooks/useChatComposerState';
-import { useSessionPresence } from '@/modules/chat/hooks/useSessionPresence';
+import { useIsLookingAtSession, useSessionPresence } from '@/modules/chat/hooks/useSessionPresence';
 import { useSessionStore } from '@/modules/chat/hooks/useSessionStore';
 import { clearStreamFlush } from '@/modules/chat/utils/streamFlushTimer';
 import {
@@ -116,6 +116,7 @@ function ChatInterface({
     onChatExportSurface?.(surface);
   }, [onChatExportSurface]);
   useSessionPresence({ sessionId: isActive ? selectedSession?.id ?? null : null, sendMessage, isConnected });
+  const isLooking = useIsLookingAtSession(isActive);
   const { t } = useTranslation('chat');
   const processingSessions = useProcessingSessions();
   const {
@@ -173,6 +174,7 @@ function ChatInterface({
     agentMessages,
     soulLaunchIds,
     addMessage,
+    armReplyAnchor,
     sessionActivity,
     isProcessing,
     canAbortSession,
@@ -205,6 +207,8 @@ function ChatInterface({
     requestLatestMessages,
   } = useChatSessionState({
     isActive,
+    isLooking,
+    isConnected,
     selectedProject,
     selectedSession,
     ws,
@@ -331,6 +335,7 @@ function ChatInterface({
     onShowSettings,
     scrollToBottom,
     addMessage,
+    armReplyAnchor,
     setIsUserScrolledUp,
     setPendingPermissionRequests,
     resolvePermissionModeForProvider,

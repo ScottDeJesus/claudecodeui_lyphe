@@ -1,5 +1,5 @@
-import { anyOwesWord, owesWord } from '@/modules/dispatcher/askState';
-import type { DispatcherArc, DispatcherPhase, DispatcherPlan, DispatcherPlanStatus, DispatcherPlanner, Tone } from '@/shared/types';
+import { inCardOrder } from '@/modules/dispatcher/cardOrder';
+import type { DispatcherArc, DispatcherArcSplit, DispatcherPhase, DispatcherPlan, DispatcherPlanStatus, DispatcherPlanner, LaneCard, Tone } from '@/shared/types';
 
 /**
  * The pure vocabulary of a plan, in one file with no React in it.
@@ -10,8 +10,7 @@ import type { DispatcherArc, DispatcherPhase, DispatcherPlan, DispatcherPlanStat
  *
  * THE ONE EDGE WHERE THIS DOCUMENT'S STRINGS BECOME NUMBERS IS {@link epochOf}. Every time in the
  * document is the store's own `YYYY-MM-DDTHH:MM:SSZ` UTC string, never a number, and everything the
- * card draws from one — a scheduled start, an ended plan's age, the order two plans sit in — wants
- * seconds. Converting in one function rather than at each call site is what keeps a half-converted
+ * card draws from one — a scheduled start, an ended plan's age — wants seconds. Converting in one function rather than at each call site is what keeps a half-converted
  * card from existing at all.
  */
 
@@ -90,97 +89,33 @@ export function phaseProgress(plan: DispatcherPlan): { done: number; total: numb
 }
 
 /**
- * Where a plan is ranked in the list, and it is a reading of URGENCY rather than of recency.
+ * The lane split by `plan.arc`, every card in the operator's order — the one split the Runner tab and
+ * the chat gutter's widget both read.
  *
- * NO STATUS IS RANKED HERE AT ALL, BECAUSE AN ASK IS NOT ONE. A plan that owes the operator a word
- * outranks every entry below (`owesWord`), whatever its status: a live plan walks whether or not
- * anyone is watching, and a parked or complete one can wait forever, but an ask is the one state
- * that cannot move until the operator answers — so it is the FIRST key of the order, and the status
- * ranks below decide only among the plans that do not owe one.
+ * ONE FUNCTION, TWO HOMES, AND NO THIRD READING. The tab and the widget draw the same lane, and a home
+ * that grouped or ordered for itself is how the two would come to disagree about which card sits under
+ * which arc and which stands first — so the split is here, a total function of the frame and of the
+ * operator's saved ranks (`cardOrderEntries.ts`), and both homes read it. `cards` is every top-level
+ * card in the ONE order (`cardOrder.ts`: rank, higher first, ties by name — the widget's column);
+ * `groups` and `rest` are its decks and its plans of no arc, each keeping that order among its own
+ * kind (the tab's decks above, its wall below).
  *
- * LIVE first among those, because something is happening to it right now. SCHEDULED next because it is the one
- * plan that will move WITHOUT the operator — the hour is armed and a timer will press Start — so it
- * outranks the two parks below it (the document's own precedence, `DispatcherPlanStatus`). QUEUED
- * above PAUSED because a queued plan has not started at all and its Start is the
- * card's whole point, while a paused one was stopped mid-walk and can wait. PARKED and IDLE follow:
- * both were set aside on purpose, and a list that raised the operator's own decision above a plan in
- * motion would be the app arguing with them. COMPLETE last of all — nothing more will happen to it;
- * it is there to be read and then hidden — and within each rank the most recently touched first, since
- * that is the one the operator came to see.
+ * NOTHING BUT THE OPERATOR'S ARRANGEMENT MOVES A CARD. Status, `updated_at`, an owed word, a swarm
+ * press and the open chat all change a plan every few seconds; a card that stood by any of them would
+ * jump under the reader's hand. A plan that asks keeps its place and its band.
  *
- * Reversible in one place, by design: change these numbers and the order changes, with nothing else
- * to find.
- */
-export const STATUS_ORDER: Record<DispatcherPlanStatus, number> = {
-  live: 0,
-  scheduled: 1,
-  queued: 2,
-  paused: 3,
-  parked: 4,
-  idle: 5,
-  complete: 6,
-};
-
-/** When a plan was last touched, epoch seconds; `0` for a stamp nothing can read, which parks it last inside its rank. */
-function touchedAt(plan: DispatcherPlan): number {
-  return epochOf(plan.updated_at) ?? 0;
-}
-
-/**
- * The plans that owe a word first, then status, then newest first inside each status — the lane's
- * own order for the plans no arc holds, read by the tab's wall and the widget's list alike.
- *
- * THE FIRST KEY IS `owesWord` AND NOT `STATUS_ORDER`, for the reason stated over those ranks: an
- * ask is the one state that is waiting on the operator, so a plan carrying one comes up whatever it
- * is — a done one, a parked one, and one nothing has touched in months, which is exactly the card
- * nobody would find again by reading the lane in urgency order.
- */
-export function byUrgencyThenNewest(a: DispatcherPlan, b: DispatcherPlan): number {
-  return askingRank(a) - askingRank(b)
-    || STATUS_ORDER[a.status] - STATUS_ORDER[b.status]
-    || touchedAt(b) - touchedAt(a);
-}
-
-/** `owesWord` as a sort key: 0 for the plans that come first, 1 for the rest. */
-function askingRank(plan: DispatcherPlan): number {
-  return owesWord(plan) ? 0 : 1;
-}
-
-/** One arc of the lane with the plans of it, in the arc's own order (`DispatcherArc.plans`) — one card's worth. */
-export type DispatcherArcGroup = { arc: DispatcherArc; plans: DispatcherPlan[] };
-
-/** The lane, split: the arcs that hold plans, and the plans no arc holds. */
-export type DispatcherArcSplit = { groups: DispatcherArcGroup[]; rest: DispatcherPlan[] };
-
-/**
- * The lane split by `plan.arc` — every arc with the plans of it in the ARC's order, and everything
- * else in the urgency order a flat list has always used.
- *
- * ONE FUNCTION, TWO HOMES, AND NO THIRD READING. The Runner tab and the chat gutter's widget draw
- * the same lane in the same column, and a home that grouped or ordered for itself is how the two
- * would come to disagree about which card sits under which arc — so the split is here, a total
- * function of the frame, and both homes read it.
- *
- * AN ARC'S OWN ORDER IS THE STORE'S, NOT URGENCY'S. `arc.plans` is the arc file's walk order
- * (`store.arc_plans`, oldest first), and it is what the arc's deck draws: the reader is looking at a
- * sequence of thirteen plans that depend on each other, and re-sorting that by status would put the
- * live one at the top and undo the sequence the operator designed. A plan the arc's list does not
- * name (a member that pre-dated its arc, or a frame an older server built) still belongs to its arc
- * and is drawn after those, by urgency, so no plan is ever lost between the two orders.
- *
- * AN ARC HOLDING A PLAN THAT OWES A WORD IS FIRST (`anyOwesWord`), and the order inside it is
- * exactly what it was: the deck is the item the operator presses, so a deck he owes an answer on
- * comes up whole, and the decks that owe nothing — like the plans of no arc beside them — keep the
- * lane's own order. An owed word is the most urgent state a card can be in, and it is more urgent
- * still for an arc, whose prompt stands over a sequence of plans that cannot move until it is
- * answered.
+ * AN ARC'S OWN ORDER IS THE STORE'S. `arc.plans` is the arc file's walk order (`store.arc_plans`), and
+ * it is what the arc's deck draws: the reader is looking at a sequence of thirteen plans that depend
+ * on each other, and re-sorting that would undo the sequence the operator designed. A plan the arc's
+ * list does not name (a member that pre-dated its arc, or a frame an older server built) still
+ * belongs to its arc and is drawn after those, in the order it was created.
  *
  * NOTHING IS DROPPED EITHER WAY, which is the property the whole screen rests on: every plan given
  * comes back exactly once — under its arc when the lane carries that arc, in `rest` when it belongs
  * to no arc or names one the lane does not carry (a frame whose arc list was refused, or an arc row
  * the server dropped). A split that could lose a card would be a list that silently hides a plan.
  */
-export function byArc(plans: DispatcherPlan[], arcs: DispatcherArc[]): DispatcherArcSplit {
+export function byArc(plans: DispatcherPlan[], arcs: DispatcherArc[], ranks: ReadonlyMap<string, number>): DispatcherArcSplit {
   const carried = new Set(arcs.map((arc) => arc.name));
   const held = new Map<string, DispatcherPlan[]>();
   const rest: DispatcherPlan[] = [];
@@ -194,22 +129,26 @@ export function byArc(plans: DispatcherPlan[], arcs: DispatcherArc[]): Dispatche
     else bucket.push(plan);
   }
 
+  const created = (plan: DispatcherPlan) => epochOf(plan.created_at) ?? 0;
   const groups = arcs.map((arc) => {
     const position = new Map(arc.plans.map((name, at) => [name, at]));
     const mine = [...(held.get(arc.name) ?? [])].sort((a, b) =>
       (position.get(a.name) ?? Number.MAX_SAFE_INTEGER) - (position.get(b.name) ?? Number.MAX_SAFE_INTEGER)
-      || byUrgencyThenNewest(a, b));
+      || created(a) - created(b)
+      || (a.name < b.name ? -1 : 1));
     return { arc, plans: mine };
   });
 
-  // AN ARC THAT OWES A WORD COMES UP WHOLE (`anyOwesWord`), and STABLY: the answering decks keep the
-  // lane's own arc order, and the quiet ones follow in it. An arc is not a card that can be lifted on
-  // its own — its plans are swiped one per view inside its strip — so the whole deck moves, and a plan
-  // that has put its arc in the operator's debt brings the deck he has to press.
-  const owing = groups.filter((group) => anyOwesWord(group.plans));
-  const quiet = groups.filter((group) => !anyOwesWord(group.plans));
-
-  return { groups: [...owing, ...quiet], rest: rest.sort(byUrgencyThenNewest) };
+  const cards = inCardOrder<LaneCard>(
+    [...groups.map((group): LaneCard => ({ kind: 'arc', group })), ...rest.map((plan): LaneCard => ({ kind: 'plan', plan }))],
+    (card) => (card.kind === 'arc' ? card.group.arc : card.plan),
+    ranks,
+  );
+  return {
+    cards,
+    groups: cards.flatMap((card) => (card.kind === 'arc' ? [card.group] : [])),
+    rest: cards.flatMap((card) => (card.kind === 'plan' ? [card.plan] : [])),
+  };
 }
 
 /** The layer a plan's card wears in the arc's strip: three words, over a plan's status. */
@@ -229,9 +168,9 @@ export function planLayer(plan: DispatcherPlan): DispatchDeckLayer {
  * The plan a dispatch arc's strip opens on: the FIRST plan of the arc that has not finished — the one
  * the arc is walking, or is waiting on next — and the last when every plan of it is complete.
  *
- * Both orders are the ARC's (`arc.plans`), never urgency's: an arc is a sequence of plans that depend
- * on each other, so "where this arc stands" is a position in that sequence and not the most urgent
- * card in it. It is what the deck's strip opens on.
+ * Both orders are the ARC's (`arc.plans`), never a status's: an arc is a sequence of plans that depend
+ * on each other, so "where this arc stands" is a position in that sequence and not whichever card is
+ * busiest. It is what the deck's strip opens on.
  */
 export function deckFocusIndex(plans: readonly DispatcherPlan[]): number {
   const next = plans.findIndex((plan) => plan.status !== 'complete');
