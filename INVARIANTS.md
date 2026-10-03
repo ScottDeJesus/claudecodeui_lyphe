@@ -1321,23 +1321,6 @@ probe-key: f77ce2f9cabcc4086a663f85bfa98a8bea965f0f
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/ArcDeck.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/LaneCardHead.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/PlanCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-card-description.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dispatch-arc-word.mjs
 
-## INV-5795 — probe — an unclosed code fence in a plan's `delivers` swallows the facts line, the phase list and the token into the code block
-
-an unclosed code fence in a plan's `delivers` swallows the facts line, the phase list and the token into the code block
-
-```probe
-cd ~/.claude && PYTHONPATH=hooks python3 -c "
-from dispatcher import lock_glance as g
-x=g.Glance('p','see:\n\`\`\`sh\nrun','/tmp',None,None,(),1,1,0,'',(),'')
-print(sum(1 for b in g.blocks([x]) for l in b.splitlines() if l.startswith('\`\`\`')) % 2)"
-expect: 1 — the prompt's blocks carry an odd number of fence lines, so nothing closes the fence before the facts, phase list and token
-```
-
-measured 2026-09-29 by chain chain-lock-prompt-glance-20260929-110148-17f8, finding L1, LOW
-probe-key: f761e8f6129637e561901ea900beaa317b2e4d1c
-
-governs: /home/lyphe/.claude/hooks/dispatcher/lock_glance.py, /home/lyphe/.claude/hooks/dispatcher/lock.py, /home/lyphe/.claude/skills/plan/SKILL.md
-
 ## INV-5796 — probe — three lines still describe the old prompt shape
 
 three lines still describe the old prompt shape
