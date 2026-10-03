@@ -1,15 +1,19 @@
-import { EyeOff, MoreHorizontal, X } from 'lucide-react';
+import { EyeOff, Layers, MoreHorizontal, Puzzle, X } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import { useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { putAwayKeepingFocus, selectKeepingFocus } from '@/modules/dispatcher/putAwayFocus';
-import { ActionMenu, Button, CardFoldToggle, Tooltip } from '@/shared/ui';
+import type { Kind } from '@/shared/types';
+import { ActionMenu, Badge, Button, CardFoldToggle, Tooltip } from '@/shared/ui';
 import type { ActionMenuItem } from '@/shared/ui';
 import { cn } from '@/shared/utils';
 
 type LaneCardHeadProps = {
-  /** Which card this is: the plan's mono name, or the arc's mark and mono name (`ArcMark`) — the one thing that tells the two heads apart. */
+  /** What KIND of card this is — `epic` for an arc deck, `feature` for a plan card. The head draws the kind tag (`KindTag`) in front of the title; no caller draws a mark of its own. */
+  kind: Kind;
+  /** Which card this is: its mono name, which the kind tag leads. */
   title: ReactNode;
   /** The card's one status word, in its tone. */
   badge: ReactNode;
@@ -41,6 +45,42 @@ type LaneCardHeadProps = {
  * width and read as one group.
  */
 const CORNER_BUTTON = 'h-10 w-10 text-muted-foreground sm:h-7 sm:w-7';
+
+/**
+ * What each kind's tag says besides its colour: the glyph that carries it in greyscale (design doctrine
+ * §6 — colour is never the whole signal) and its word. `Layers` is a card that holds cards; `Puzzle` is
+ * one piece of an epic, and means nothing else on this board.
+ */
+const KIND_TAG: Record<Kind, { icon: LucideIcon; wordKey: string }> = {
+  epic: { icon: Layers, wordKey: 'dispatcher.kind.epic' },
+  feature: { icon: Puzzle, wordKey: 'dispatcher.kind.feature' },
+};
+
+/**
+ * THE KIND TAG — what tells an arc deck from a plan card at a glance, and what says a plan IS a
+ * feature (operator, 2026-10-03: "add color coded epic tags and feature tags, a feature should be
+ * indicated as such"; the epic half since 2026-09-28: "a special indicator for arcs on arc cards").
+ *
+ * A KIND, NOT A STATE: the kit's `Badge` through its `kind` axis, so the paint is Verve's `[data-kind]`
+ * pair (violet for an epic, blue for a feature — tokens.css) and never one of the five tones. The tone
+ * words on a lane card are states and this is identity; sharing a vocabulary would have a plan "being a
+ * feature" read as `info` or `positive`. The glyph and the word carry it without colour. No count: the
+ * head already binds `done/total` to the card's word.
+ *
+ * It rides INSIDE the heading, before the name, so heading navigation hears "Epic restorly" or
+ * "Feature roadmap--store", and the tag and the name wrap as words do. `data-kind-tag` is the browser
+ * harness's handle.
+ */
+function KindTag({ kind }: { kind: Kind }) {
+  const { t } = useTranslation();
+  const { icon: Glyph, wordKey } = KIND_TAG[kind];
+  return (
+    <Badge as="span" kind={kind} className="me-1 gap-1 align-middle" data-kind-tag={kind}>
+      <Glyph aria-hidden="true" className="h-3.5 w-3.5" />
+      {t(wordKey)}
+    </Badge>
+  );
+}
 
 /**
  * A lane card's description, FOLDED TO ONE LINE until it is pressed (operator, 2026-10-02: "make the
@@ -75,10 +115,11 @@ export function CardDescription({ text, className }: { text: string; className?:
  * A lane card's HEAD — the part that says WHICH card this is and how it stands, and the one part a fold
  * never takes. The plan card and the arc deck both draw it, so the two share one anatomy — the same
  * rows in the same order, the same corner in the same place — and at a glance differ by one thing: the
- * arc's mark leading its title (`ArcMark`, handed in by `DispatchArcDeck`).
+ * kind tag leading the title, Epic on the arc deck and Feature on the plan card (`KindTag`, drawn here
+ * from the `kind` each caller hands in, so the two heads cannot drift).
  *
- * THREE ROWS AND A CORNER. Row one is the title, the card's word bound to `done/total`, and its clock;
- * row two is the lead (the description, then the planner badge and the waits); row three is the
+ * THREE ROWS AND A CORNER. Row one is the kind tag and the title, the card's word bound to `done/total`,
+ * and its clock; row two is the lead (the description, then the planner badge and the waits); row three is the
  * card's total as pills. The corner holds `⋯` (only when the menu has something in it), Dismiss or
  * Hide, and the fold. It is drawn inside the card's `Collapsible` and OUTSIDE its `CardFoldBody`, so a
  * folded card keeps every row of it: name, word, clock, count, description, spend and the three
@@ -117,16 +158,21 @@ export function CardDescription({ text, className }: { text: string; className?:
  * `clientWidth` is the reading that catches it (`data-lane-head-row`).
  *
  * THE FLOOR IS CONTENT-DRIVEN AND NOT A BREAKPOINT: these heads are drawn in the Runner tab and in the
- * chat gutter (~380px even on a 1440px screen), so an `sm:` rule would put one home's card on the
- * other home's branch.
+ * chat gutter (a 300–480px column, drawn only where the chat region is 1500px or more — never at phone
+ * width, never on a 1440px screen), so an `sm:` rule would put one home's card on the other home's branch.
  *
- * Handles: `data-lane-head` (the head), `data-lane-head-row` (row one), `data-lane-progress`,
- * `data-lane-menu`, the corner press's `data-dispatcher-dismiss` or `data-dispatcher-hide`, and the
- * fold's own `data-card-fold`.
+ * THE KIND TAG RIDES INSIDE THAT FLOOR: it is part of the heading, so the floor is the widest unbreakable
+ * item — the tag or the name's longest word — and the tag and the name wrap as words do, the name
+ * dropping under the tag where the two do not share a line. It never makes the title narrower than
+ * a word.
+ *
+ * Handles: `data-lane-head` (the head), `data-lane-head-row` (row one), `data-kind-tag` (the tag,
+ * `epic` or `feature`), `data-lane-progress`, `data-lane-menu`, the corner press's
+ * `data-dispatcher-dismiss` or `data-dispatcher-hide`, and the fold's own `data-card-fold`.
  *
  * Used by `PlanCard` and `DispatchArcDeck`.
  */
-export function LaneCardHead({ title, badge, clock, progress, lead, spend, corner, headingLevel = 3 }: LaneCardHeadProps) {
+export function LaneCardHead({ kind, title, badge, clock, progress, lead, spend, corner, headingLevel = 3 }: LaneCardHeadProps) {
   const { t } = useTranslation();
   const pressRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLSpanElement>(null);
@@ -148,7 +194,7 @@ export function LaneCardHead({ title, badge, clock, progress, lead, spend, corne
         {/* The group's floor is the corner's height (`CORNER_BUTTON`), so a one-line title centres on
             the corner's presses rather than riding their top edge. */}
         <div className="flex min-h-10 min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1 sm:min-h-7">
-          <Heading className="min-w-fit flex-1 break-words text-sm font-medium leading-snug">{title}</Heading>
+          <Heading className="min-w-fit flex-1 break-words text-sm font-medium leading-snug"><KindTag kind={kind} />{' '}{title}</Heading>
           {/* THE WORD AND THE COUNT ARE ONE UNBREAKABLE PAIR (`COMPLETE 14/14`): wrapped as two free
               items, the count fell onto a line of its own on half the heads at 320px and read as a
               stray number. The pair is narrower than the narrowest group, so it never overflows;

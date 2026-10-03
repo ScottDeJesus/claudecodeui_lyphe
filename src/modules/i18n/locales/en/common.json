@@ -956,7 +956,10 @@
       "showAll": "Show all",
       "allHidden": "Every unfinished feature is hidden"
     },
-    "arcMark": "Epic",
+    "kind": {
+      "epic": "Epic",
+      "feature": "Feature"
+    },
     "arcStatus": {
       "designing": "DESIGNING",
       "judging": "JUDGING",
@@ -984,17 +987,10 @@
       "arcLabel": "Model for every feature of this epic"
     },
     "swarm": {
-      "label": "Swarm for this feature",
-      "hint": "How many of this feature's tasks walk at once.",
-      "box": "Box",
-      "boxWord": "Box · {{word}}",
-      "boxTitle": "Follow the box's swarm switch (Settings → Agents → Claude)",
-      "off": "Off",
-      "offTitle": "One of this feature's tasks at a time",
-      "on": "On",
-      "onTitle": "Every independent task of this feature at once, up to its ceiling",
+      "hint": "How many of this feature's tasks walk at once. Step back to Settings → Agents' number to follow Settings again.",
+      "hintDefault": "How many of this feature's tasks walk at once. This number comes from Settings → Agents; step to another to give this feature its own, and back to follow Settings again.",
+      "default": "default",
       "all": "All",
-      "allTitle": "No ceiling: every independent task of this feature at once",
       "lanesLabel": "Most of this feature's tasks at once",
       "lanesDown": "One task fewer at once",
       "lanesUp": "One task more at once",

@@ -1,6 +1,7 @@
 import { clsx, type ClassValue } from 'clsx';
 import { extendTailwindMerge, validators } from 'tailwind-merge';
 
+import { LANES_MIN, SWARM_LADDER_TOP } from '@/shared/constants';
 import type { DispatcherModelChoice, Project, ProjectSession } from '@/shared/types';
 
 //----------------- DEPLOYMENT MODE ------------
@@ -394,6 +395,45 @@ export function formatBytes(bytes: number | null | undefined): string {
  */
 export function effectiveModelWord(stored: DispatcherModelChoice | null | undefined): DispatcherModelChoice {
   return stored ?? 'claude';
+}
+
+// ---------------------------
+
+//----------------- THE SWARM CEILING LADDER ------------
+
+/**
+ * The top counted rung of the swarm ladder (`1, 2, … top, All`): `SWARM_LADDER_TOP`, or the widest count
+ * already in play — the box's, the plan's own — whichever is larger. On the plan card the box's count is
+ * always in play, so a box count above six stays a rung however the plan's own count moves; on the
+ * Settings row the row's own count is the only one in play, so a count above six steps down by one and,
+ * once stepped below it, is not climbed back to. `null` is `All` (no ceiling) and widens nothing. Because every count the ladder
+ * ever steps to is at most this, `+` can never produce a count wider than one the server already
+ * handed us (and so never one the swarm reader refuses). Used by the dispatcher module's `SwarmControl`
+ * and the settings module's `RunnerModelContent`, which hand its answer to `swarmLadderSteps`.
+ */
+export function swarmLadderTop(...inPlay: Array<number | null>): number {
+  return Math.max(SWARM_LADDER_TOP, ...inPlay.filter((lanes): lanes is number => lanes !== null));
+}
+
+/**
+ * Where `−` and `+` land from `current` on the one swarm ladder, `1, 2, … top, All`; `null` is `All`
+ * (the box's bare `on`, Settings' `Unlimited`). A press that is refused is `null`; a press that lands is
+ * `{ lanes }`, where `lanes: null` is `All`.
+ *
+ * `+` adds one below `top`, and from `top` goes to `All`; it is refused on `All`. `−` takes `All` to
+ * `top`, and subtracts one from a count; it is refused on one lane. Used by the dispatcher module's
+ * `SwarmControl` (one plan's own word) and the settings module's `RunnerModelContent` (the box's
+ * switch), so the two climb the same ladder from one copy of the rules.
+ */
+export function swarmLadderSteps(
+  current: number | null,
+  top: number,
+): { down: { lanes: number | null } | null; up: { lanes: number | null } | null } {
+  if (current === null) return { down: { lanes: top }, up: null };
+  return {
+    down: current > LANES_MIN ? { lanes: current - 1 } : null,
+    up: { lanes: current < top ? current + 1 : null },
+  };
 }
 
 // ---------------------------

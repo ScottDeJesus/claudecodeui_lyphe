@@ -13,9 +13,12 @@ import path from 'node:path';
  *
  * The file holds ONE line and it is the whole contract between the two languages:
  *
- *   `off`      the swarm is off; the runner walks one phase at a time
+ *   `off`      the swarm is off; the runner walks one phase of each plan at a time
  *   `on`       on, at NO CEILING: every phase the independence rule frees runs at once
- *   `on <N>`   on, with a ceiling of N lanes — any positive integer, honoured as written
+ *   `on <N>`   on, with a ceiling of N lanes for each plan — any positive integer, honoured as written
+ *
+ * The number is every plan's DEFAULT, weighed over that plan's own phases in flight: no plan's
+ * phases count against another's, so nothing caps the board as a whole.
  *
  * `swarm.read()` accepts the bare on word, or the on word and a positive decimal count separated
  * by whitespace, and reads everything else — absent, unreadable, `ON`, `off`, `on 0`, `on -1`,

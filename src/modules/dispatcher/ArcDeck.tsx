@@ -1,4 +1,4 @@
-import { Layers, X } from 'lucide-react';
+import { X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 import { DispatchArcControls } from '@/modules/dispatcher/ArcControls';
@@ -64,33 +64,6 @@ const ARC_STATUS: Record<DispatcherArcStatus, { key: string; tone: Tone }> = {
 const FLOW_MARK: Partial<Record<DispatcherPlanStatus, string>> = { complete: '✓', live: '▶︎', paused: '⏸︎', scheduled: '◷' };
 
 /**
- * THE ARC'S MARK — what tells an arc deck from a plan card at a glance (operator, 2026-09-28: "can we
- * also have a special indicator for arcs on arc cards please"). The two draw one head anatomy
- * (`LaneCardHead`), and the `.arc` ending on the name was all that set the arc apart; the mark
- * REPLACES that ending rather than standing beside it, so the head says "epic" once.
- *
- * A KIND, NOT A STATE: the kit's `Badge` in its OUTLINE shape. Every state word on a lane card is a
- * filled badge, so the one outlined pill in the head reads as a different kind of fact before its word
- * is read, and it never argues with the arc's status tone beside it. The `Layers` glyph (a card that
- * holds cards) and the word carry it without colour (design doctrine §6). No count: the head already
- * binds `done/total` plans to the arc's word.
- *
- * It rides INSIDE the heading, before the name, so heading navigation hears "Epic restorly" and the
- * mark and the name wrap as words do. A fold keeps it because a fold keeps the head, and no plan card
- * draws it — a plan's head is `PlanCard`'s, which has no mark to hand. `data-arc-mark` is the browser
- * harness's handle.
- */
-function ArcMark() {
-  const { t } = useTranslation();
-  return (
-    <Badge as="span" variant="outline" className="me-1 gap-1 align-middle" data-arc-mark>
-      <Layers aria-hidden="true" className="h-3.5 w-3.5" />
-      {t('dispatcher.arcMark')}
-    </Badge>
-  );
-}
-
-/**
  * ONE dispatch arc, drawn as the deck every arc on this screen is drawn as, in the lane card's ONE
  * anatomy (`LaneCardHead`, `ActionBar`): the arc's head on top, its action bar directly under it, the
  * arc's flow of plans under that, and beneath it the plans of the arc in the arc's own walk order
@@ -105,7 +78,7 @@ function ArcMark() {
  * paused, `◷` scheduled, else the plan's place in the arc (`FLOW_MARK`); toned as the plan's own badge
  * is (`planStatusTone`), named `<plan> · <word>`, and filled as far as the arc's complete plans reach.
  *
- * THE HEAD, ROW BY ROW: the arc's mark and name (`ArcMark`), its word (`ARC_STATUS`), the hour a
+ * THE HEAD, ROW BY ROW: the Epic tag (`LaneCardHead` draws it from `kind="epic"`) and the arc's name, its word (`ARC_STATUS`), the hour a
  * Schedule start armed (the clock slot, `data-dispatch-arc-schedule-note`) and how many of its plans
  * are complete; then the arc's description (`cardDescription`: its design's `delivers` line, else its
  * goal's where that yields nothing), folded to one line until pressed (`CardDescription`), and who is
@@ -203,7 +176,8 @@ export function DispatchArcDeck({
       status={arc.status}
       head={(
         <LaneCardHead
-          title={<><ArcMark />{' '}<span data-arc-title className="font-mono">{arc.name}</span></>}
+          kind="epic"
+          title={<span data-arc-title className="font-mono">{arc.name}</span>}
           badge={<Badge tone={word.tone} className="shrink-0">{t(word.key)}</Badge>}
           clock={armed !== null ? (
             <span className="flex-none font-mono text-xs text-muted-foreground" data-dispatch-arc-schedule-note>
@@ -233,7 +207,7 @@ export function DispatchArcDeck({
         />
       )}
       foldKey={dispatchArcFoldKey(arc.name)}
-      // The flow and the strip are named by the bare name, as the head is, and the mark says it is an epic.
+      // The flow and the strip are named by the bare name, as the head is, and the head's Epic tag says it is an epic.
       flow={{ nodes, doneCount, ariaLabel: t('dispatcher.flow.arc', { arc: arc.name }) }}
       bodyTop={<DispatchArcControls arc={arc} />}
       asks={asks.length > 0

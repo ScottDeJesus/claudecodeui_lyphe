@@ -63,6 +63,9 @@
   --warn-dot:#d9a64a;--warn-soft:#faf1de;--warn-ink:#8a6620;
   --danger-dot:#b3373c;--danger-soft:#fdecec;--danger-ink:#b3373c;
   --danger:#b3373c;--danger-deep:#992f33;
+  /* two kinds — soft fill + deep ink, swapped in by [data-kind] (see "kind" below) */
+  --epic-soft:#efe9fb;--epic-ink:#6b3fc8;
+  --feature-soft:#e6eefc;--feature-ink:#2f5bb7;
   --success-dot:#4ade80;
   /* water — drying gauge fill */
   --water:#3aa6b9;
@@ -104,6 +107,8 @@
   --pos-soft:#143026;--pos-ink:#6fd0a8;
   --warn-soft:#3b2f16;--warn-ink:#e3b96b;
   --danger-soft:#3a1c1e;--danger-ink:#e58a8e;
+  --epic-soft:#2a2140;--epic-ink:#c4b1f5;
+  --feature-soft:#1a2640;--feature-ink:#9dbcf7;
 }
 
 /* ---------- type ----------
@@ -203,6 +208,17 @@ button:focus-visible,input:focus-visible,a:focus-visible,[tabindex]:focus-visibl
 [data-tone="positive"]{--tone-soft:var(--pos-soft);--tone-ink:var(--pos-ink);--tone-dot:var(--pos-dot);--tone-glyph:"✓"}
 [data-tone="warn"]{--tone-soft:var(--warn-soft);--tone-ink:var(--warn-ink);--tone-dot:var(--warn-dot);--tone-glyph:"▲"}
 [data-tone="danger"]{--tone-soft:var(--danger-soft);--tone-ink:var(--danger-ink);--tone-dot:var(--danger-dot);--tone-glyph:"✕"}
+
+/* ---------- kind ----------
+   The tone swap's twin, for IDENTITY: what a card IS (an epic, a feature), never how it stands. A
+   kind is never a tone and no tone stands in for one — the five tones are states, and a plan being an
+   epic or a feature must not read as `info` or `positive`. Setting `data-kind` on an element swaps
+   `--kind-soft` / `--kind-ink` exactly as `data-tone` swaps the tone pair, so the kit's `Badge` paints
+   a kind through `.vv-badge[data-kind]` and no component adds a colour rule of its own. §6 holds here
+   too: a kind is always drawn with a glyph and its word, so it survives greyscale. The hues stay at
+   least 25° clear of every tone's ink and of each other. These two ARE the vocabulary. */
+[data-kind="epic"]{--kind-soft:var(--epic-soft);--kind-ink:var(--epic-ink)}
+[data-kind="feature"]{--kind-soft:var(--feature-soft);--kind-ink:var(--feature-ink)}
 
 /* The size half of §5's swap: the frame sets these two, the library reads them. */
 [data-text-scale="flow"]{--vv-text-body:1em;--vv-text-meta:.875em}

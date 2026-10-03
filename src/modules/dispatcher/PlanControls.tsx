@@ -13,8 +13,9 @@ import type { DispatcherPlan, DispatcherRoute, DispatcherSwarmWord } from '@/sha
 import { effectiveModelWord } from '@/shared/utils';
 
 /**
- * The box's swarm switch as one word of the grammar — `off`, `on`, `on <N>` — the word a plan on
- * `Box` walks under, which its swarm control wears. `null` before the first frame has a route.
+ * The box's swarm switch (Settings → Agents) as one word of the grammar — `off`, `on`, `on <N>` — the
+ * word a plan with none of its own walks under, whose number its swarm control draws as the default.
+ * `null` before the first frame has a route.
  */
 function boxSwarmWord(route: DispatcherRoute | null): DispatcherSwarmWord | null {
   if (route === null) return null;
@@ -59,8 +60,9 @@ function boxSwarmWord(route: DispatcherRoute | null): DispatcherSwarmWord | null
  *
  * THE PLAN'S OWN SWARM WORD RIDES BESIDE IT (`SwarmControl`), on the same plans and for the same
  * reason: `dispatcher swarm` is never refused for a plan's state either (the word is read at the
- * rule's next take-up). `Box` hands the plan back to the box's switch and wears that switch's word, so
- * the card says what bounds the plan whichever switch it is.
+ * rule's next take-up). It is one stepper of how many of the feature's tasks walk at once, defaulting to
+ * the number Settings holds: a plan with no word of its own draws that number marked `default`, and
+ * stepping back to it hands the plan back to Settings.
  *
  * A STALLED PLANNER IS DRAWN BESIDE ALL OF THEM, whatever the plan's status (`plan.planner.stalled`):
  * Resume planner, the press that puts the outing that ended short back to work. Which door it goes
@@ -144,7 +146,7 @@ export function PlanControls({ plan }: { plan: DispatcherPlan }) {
       verbs={verbs}
       model={movable ? (
         <>
-          <SwarmControl value={plan.swarm ?? null} boxWord={boxSwarmWord(route)} busy={held}
+          <SwarmControl value={plan.swarm ?? null} settingsWord={boxSwarmWord(route)} busy={held}
             onChoose={(choice) => void setSwarm(choice)} />
           <RunModelControl scope="plan" value={modelWord} busy={held}
             onChoose={(choice) => void setModel(choice)} />

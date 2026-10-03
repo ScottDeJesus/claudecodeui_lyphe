@@ -25,7 +25,8 @@ import { cn } from '@/shared/utils';
  * One plan the dispatcher is carrying, in the lane card's ONE anatomy — the arc deck's too: a head
  * that says which plan this is and how it stands, the action bar directly under it, and the face.
  *
- * - THE HEAD (`LaneCardHead`): the mono name, the word (`PlanStatusBadge`), the clock (`PlanClock`)
+ * - THE HEAD (`LaneCardHead`): the Feature tag (`kind="feature"`, whether the card stands alone or
+ *   sits in an epic's deck) leading the mono name, the word (`PlanStatusBadge`), the clock (`PlanClock`)
  *   and `done/total` phases on row one; the plan's description (`cardDescription`: its design's
  *   `delivers` line, else its goal's where that yields nothing) folded to one line until pressed, when
  *   it opens whole (`CardDescription`) — then who is out on the plan (`PlannerBadge`) and what of its
@@ -134,6 +135,7 @@ export function PlanCard({
       <Collapsible open={!collapsed} onOpenChange={toggle}>
         <CardHeader className="p-3">
           <LaneCardHead
+            kind="feature"
             title={<span className="font-mono">{plan.name}</span>}
             badge={<PlanStatusBadge plan={plan} />}
             clock={<PlanClock plan={plan} />}

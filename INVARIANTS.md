@@ -643,20 +643,6 @@ probe-key: e16078533cfaaada7d84b5b0a038ab0455356b54
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/PlanControls.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/SwarmControl.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/constants.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Stepper.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/verve/controls.css, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-plan-swarm.mjs, /home/lyphe/.claude/hooks/dispatcher/cmd/swarm.py, /home/lyphe/.claude/hooks/dispatcher/swarm_word.py, /home/lyphe/.claude/hooks/dispatcher/width.py, /home/lyphe/.claude/hooks/plan_runner/swarm.py
 
-## INV-5695 — probe — Two statements still describe the box's switch as every plan's bound
-
-Two statements still describe the box's switch as every plan's bound
-
-```probe
-cd /home/lyphe/.claude/claudecodeui_lyphe && grep -n "exactly as it always has\|runs up to {{lanes}} independent phases" src/modules/settings/tabs/agents-settings/sections/content/RunnerModelContent.tsx; grep -c "\`ceiling\`, the most phases that may walk at once" src/shared/types.ts server/shared/types.ts
-expect: no RunnerModelContent lines, and both type files count 0 — the box row says a plan with its own swarm word follows that word, and `ceiling` is described as the box's number for plans with none (today: lines 163 and 169, and a count of 1 in each types file)
-```
-
-measured 2026-09-28 by chain chain-swarm-per-plan-20260928-184148-98ae, finding L2, LOW
-probe-key: 15332941c1203bf0feb98371dac680940517b0f4
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/PlanControls.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/SwarmControl.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/constants.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Stepper.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/verve/controls.css, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-plan-swarm.mjs, /home/lyphe/.claude/hooks/dispatcher/cmd/swarm.py, /home/lyphe/.claude/hooks/dispatcher/swarm_word.py, /home/lyphe/.claude/hooks/dispatcher/width.py, /home/lyphe/.claude/hooks/plan_runner/swarm.py
-
 ## INV-5697 — probe — After a Rework, the re-cut's fresh Accept prompt comes back silently: no phone push, no lane bell (`DispatcherAskBell`, MAN-7540)
 
 After a Rework, the re-cut's fresh Accept prompt comes back silently: no phone push, no lane bell (`DispatcherAskBell`, MAN-7540)
@@ -2892,3 +2878,108 @@ measured 2026-10-02 by chain chain-vocab-epics-features--whole-20261002-174523-3
 probe-key: 5984e86a1cdc1efcb750386267e414d32efad24a
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dismiss-done.mjs
+
+## INV-6508 — probe — MAN-6358, which governs `probe-swarm-ceiling.mjs`, still describes the ladder the builder removed
+
+MAN-6358, which governs `probe-swarm-ceiling.mjs`, still describes the ladder the builder removed
+
+```probe
+cd /home/lyphe/.claude && docstore get MAN-6358 | python3 -c "import sys,json; b=json.load(sys.stdin)['row']['body']; print({k: (k in b) for k in ['no upper bound', 'Unlimited\` action', 'first count']})"
+echo "[probe exit $?]"
+expect: {'no upper bound': False, 'Unlimited` action': False, 'first count': False} (today: True for all three)
+```
+
+measured 2026-10-03 by chain chain-swarm-ladder-20261003-135357-11f2, finding M1, MEDIUM
+probe-key: 7122ea9a970501d9f3937c9fc0d186dd2d965332
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/PlanControls.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/SwarmControl.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/agents-settings/sections/content/RunnerModelContent.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/constants.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useSwarmSwitch.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Stepper.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/verve/controls.css, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/utils.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/settings-rows-walk.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/swarm-stub.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-plan-swarm.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-settings-rows.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-swarm-ceiling.mjs
+
+## INV-6509 — probe — a screen reader hears the default marker glued to the number: "Alldefault"
+
+a screen reader hears the default marker glued to the number: "Alldefault"
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe && node /home/lyphe/.claude/state/pipeline-reviews/swarm-ladder/athena-probes/marker.mjs a11y 2>&1 | grep -v Bearer | tail -2
+echo "[probe exit $?]"
+expect: accessible text of the value: ["- text: All default"] (today: ["- text: Alldefault"]); the page is stubbed, witness UNCHANGED
+```
+
+measured 2026-10-03 by chain chain-swarm-ladder-20261003-135357-11f2, finding L1, LOW
+probe-key: 5a6f8e02adaf53afa259314d233acf1f8dbcbf9c
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/PlanControls.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/SwarmControl.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/agents-settings/sections/content/RunnerModelContent.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/constants.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useSwarmSwitch.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Stepper.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/verve/controls.css, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/utils.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/settings-rows-walk.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/swarm-stub.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-plan-swarm.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-settings-rows.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-swarm-ceiling.mjs
+
+## INV-6510 — probe — the default marker is 3.34:1 in light and 4.32:1 in dark, at 10px
+
+the default marker is 3.34:1 in light and 4.32:1 in dark, at 10px
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe && node /home/lyphe/.claude/state/pipeline-reviews/swarm-ladder/athena-probes/marker.mjs contrast 2>&1 | grep -v Bearer | tail -3
+echo "[probe exit $?]"
+expect: both lines read ≥ 4.50:1 (today: `marker contrast light: 3.34:1 at 10px`, `marker contrast dark: 4.32:1 at 10px`)
+```
+
+measured 2026-10-03 by chain chain-swarm-ladder-20261003-135357-11f2, finding L2, LOW
+probe-key: 46dad8a0b3462e4ac64ecf80ccf5d38e05c76eb0
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/PlanControls.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/SwarmControl.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/agents-settings/sections/content/RunnerModelContent.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/constants.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useSwarmSwitch.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Stepper.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/verve/controls.css, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/utils.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/settings-rows-walk.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/swarm-stub.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-plan-swarm.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-settings-rows.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-swarm-ceiling.mjs
+
+## INV-6511 — probe — `.verify/lib/settings-rows-walk.mjs:64` names the removed ghost `Unlimited` button, and its stub is no longer the widest swarm row
+
+`.verify/lib/settings-rows-walk.mjs:64` names the removed ghost `Unlimited` button, and its stub is no longer the widest swarm row
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe && (grep -n "ghost" .verify/lib/settings-rows-walk.mjs || echo none); node /home/lyphe/.claude/state/pipeline-reviews/swarm-ladder/athena-probes/row-width.mjs 2>&1 | grep -v Bearer | grep "^3 lanes 390\|^Unlimited 390" | cut -c1-70
+echo "[probe exit $?]"
+expect: `none`, and the stub the walk answers (`lanes: 3`) is the widest state, i.e. its stepperW ≥ the Unlimited row's (today: line 64 names the ghost; stepperW 122 against 138)
+```
+
+measured 2026-10-03 by chain chain-swarm-ladder-20261003-135357-11f2, finding L3, LOW
+probe-key: 766b23f13ec49c5a3ef27094517bcf237da76553
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/settings-rows-walk.mjs
+
+## INV-6512 — probe — the new probes narrate the retired control
+
+the new probes narrate the retired control
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe && (grep -n "retired\|used to draw\|previous form" .verify/probe-plan-swarm.mjs .verify/probe-swarm-ceiling.mjs || echo none)
+echo "[probe exit $?]"
+expect: `none` (today: four lines — probe-plan-swarm.mjs:23, :24, :337 and probe-swarm-ceiling.mjs:30)
+```
+
+measured 2026-10-03 by chain chain-swarm-ladder-20261003-135357-11f2, finding L4, LOW
+probe-key: 75d20a8f01bbe3701187b5709175a175bec3f439
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/PlanControls.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/SwarmControl.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/agents-settings/sections/content/RunnerModelContent.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/constants.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useSwarmSwitch.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Stepper.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/verve/controls.css, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/utils.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/settings-rows-walk.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/swarm-stub.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-plan-swarm.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-settings-rows.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-swarm-ceiling.mjs
+
+## INV-6513 — probe — three comments say a wide count stays reachable both ways, and on the Settings row it isn't
+
+three comments say a wide count stays reachable both ways, and on the Settings row it isn't
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe && timeout 100 node /home/lyphe/.claude/state/pipeline-reviews/swarm-ladder/athena-probes/wide-roundtrip.mjs 2>&1 | grep -v Bearer | tail -2; grep -n "reachable both ways\|out of reach in either direction" src/shared/constants.ts src/shared/utils.ts src/modules/settings/tabs/agents-settings/sections/content/RunnerModelContent.tsx | cut -c1-90
+echo "[probe exit $?]"
+expect: either the round trip reads `9 lanes | − → 8 lanes | + → 9 lanes`, or the grep prints no line (today: `+ → Unlimited`, and three lines; the box is stubbed, swarm.flag UNCHANGED)
+```
+
+measured 2026-10-03 by chain chain-swarm-ladder-20261003-135357-11f2, finding L5, LOW
+probe-key: aa8eaedbd9cdb361aafbc13b377aa7539a02bf49
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/PlanControls.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/SwarmControl.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/agents-settings/sections/content/RunnerModelContent.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/constants.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useSwarmSwitch.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Stepper.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/verve/controls.css, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/utils.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/settings-rows-walk.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/swarm-stub.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-plan-swarm.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-settings-rows.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-swarm-ceiling.mjs
+
+## INV-6519 — probe — MEDIUM — the builder's docs edits did not survive; the estate again teaches `ArcMark`, `data-arc-mark` and `dispatcher.arcMark`, and the new standing proof is undocumented
+
+MEDIUM — the builder's docs edits did not survive; the estate again teaches `ArcMark`, `data-arc-mark` and `dispatcher.arcMark`, and the new standing proof is undocumented
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe && echo "kind-tag mentions in docs/MANUAL.md: $(grep -c 'data-kind-tag\|probe-kind-tags' docs/MANUAL.md)"; echo "lines naming the deleted ArcMark / data-arc-mark / dispatcher.arcMark: $(grep -c 'data-arc-mark\|arcMark\|ArcMark' docs/MANUAL.md)"; for t in MAN-5706 MAN-5716 MAN-6797 MAN-6810; do printf '%s deleted-name hits: ' $t; (cd ~/.claude && docstore get $t | python3 -c "import sys,json; b=json.load(sys.stdin)['row']['body']; print(b.count('data-arc-mark')+b.count('arcMark')+b.count('ArcMark'))"); done
+echo "[probe exit $?]"
+expect: kind-tag mentions of 3 or more, then 0 deleted-name lines, and 0 hits in each of the four rows (today: 0, 4, and 3 / 1 / 2 / 1)
+```
+
+measured 2026-10-03 by chain chain-kind-tags-20261003-140320-3897, finding M1, MEDIUM
+probe-key: 9cbff8c793881d65d595db195c0d67ee7da0745b
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/verve/controls.css, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/verve/tokens.css, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-kind-tags.mjs

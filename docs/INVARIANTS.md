@@ -115,7 +115,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-deck-height.mjs
 
 measured 2026-09-25. Operator, with a phone screenshot of the Runner widget: "This card is rendering funny on my phone" (`/tmp/chains/arc-header-phone.jpg`: `restorly.arc` one letter per line in a monospace column, `$0.32 DeepSeek · 2.6M in · 26k out` whole beside it, the status word and the fold chevron cut off past the card's edge).
 
-- CONTROL ON THE RUNNING BUILD (`--head-css` sets the group `nowrap` and the title `min-width: 0` in the page): on the 2026-09-25 header, 12 lines in a 0px-wide box at 390px and 23px of spill; on `LaneCardHead` with the arc's mark in the title (2026-09-28), 1 line in a 91px box at 390 and 4 lines in a 21px box at 320 — the corner now stands outside the group, so 390px leaves the title room even without its floor.
+- CONTROL ON THE RUNNING BUILD (`--head-css` sets the group `nowrap` and the title `min-width: 0` in the page): on the 2026-09-25 header, 12 lines in a 0px-wide box at 390px and 23px of spill; on `LaneCardHead` with the Epic tag in the title (2026-09-28), 1 line in a 91px box at 390 and 4 lines in a 21px box at 320 — the corner now stands outside the group, so 390px leaves the title room even without its floor.
 - AFTER (2026-09-26, `LaneCardHead`): all 20 heads of the Runner tab — the `restorly` deck, its 13 plan cards and 6 loose plans — read `scrollWidth === clientWidth` on `data-lane-head-row` at 1920, 390 and 320; the arc's title is 1 line in a 113px box at 390 and 134px at 320, the pills below it, 0px of header overflow, light and dark.
 
 ```probe
@@ -188,3 +188,47 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/phaseWord
 - Rule: a `.verify/` probe answers every host the page reaches that is not a read of this origin, before it counts console errors. A filter on the collected console lines is not the cure; the reading stays exact only when the request never leaves the page.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-card-ask.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-runner-landing.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-runner-widget-list.mjs
+
+## INV-6506 — probe — The standing proof for `width.reason` cannot tell the per-plan rule from the old board-wide one
+
+The standing proof for `width.reason` cannot tell the per-plan rule from the old board-wide one
+
+```probe
+S=$(mktemp -d /tmp/athena-mut-XXXXXX) || exit 1
+case "$S" in /tmp/athena-mut-*) ;; *) echo "refusing $S"; exit 1;; esac
+mkdir -p "$S/.claude/scripts" || exit 1
+tar -C ~/.claude --exclude=.venv --exclude=__pycache__ -cf - hooks | tar -C "$S/.claude" -xf - || exit 1
+cp -r ~/.claude/scripts/runner_fixtures "$S/.claude/scripts/" || exit 1
+python3 - "$S/.claude/hooks/dispatcher/width.py" <<'PY'
+import re, sys
+p = sys.argv[1]; s = open(p).read()
+new, n = re.subn(r'    mine = \[other for other in busy_phases\(conn\) if .*\]\n', '    mine = busy_phases(conn)\n', s)
+print("mutation applied:", n == 1)
+open(p, "w").write(new)
+PY
+HOME="$S" timeout 120 python3 "$S/.claude/scripts/runner_fixtures/claude_swarm.py" 2>&1 | cut -c1-110 | tail -5
+echo "fixture exit: ${PIPESTATUS[0]}"
+case "$S" in /tmp/athena-mut-*) rm -r "$S";; esac
+echo "[probe exit $?]"
+expect: `mutation applied: True`, then a `FAIL` reading line and `fixture exit: 1` once the fixture holds a cross-plan reading (today: four PASS lines and `fixture exit: 0` — the board-wide count passes)
+```
+
+measured 2026-10-03 by chain chain-swarm-per-plan-20261003-135930-38a4, finding M1, MEDIUM
+probe-key: 25810ac941c45dac1daf3446b719f82b9747be50
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/settings/swarm-switch.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/agents-settings/sections/content/RunnerModelContent.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useSwarmSwitch.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/hooks/dispatcher/planner_lanes.py, /home/lyphe/.claude/hooks/dispatcher/planner_rule.py, /home/lyphe/.claude/hooks/dispatcher/rule.py, /home/lyphe/.claude/hooks/dispatcher/swarm_word.py, /home/lyphe/.claude/hooks/dispatcher/width.py, /home/lyphe/.claude/scripts/runner_fixtures/claude_swarm.py
+
+## INV-6507 — probe — Statements that the box's number bounds the whole board remain, in places the doc sweep's net will not reach
+
+Statements that the box's number bounds the whole board remain, in places the doc sweep's net will not reach
+
+```probe
+cd ~/.claude && docstore get MAN-6438 | python3 -c "import sys,json; b=json.load(sys.stdin)['row']['body']; print('MAN-6438 board-wide sentence:', 'decides **how many phases the dispatcher walks at once' in b)"; grep -n "the runner walks one phase at a time" claudecodeui_lyphe/server/modules/settings/swarm-switch.ts
+echo "[probe exit $?]"
+expect: `MAN-6438 board-wide sentence: False` and no grep line — the flag's number is described as each plan's default, and `off` as one phase of each plan at a time (today: `True`, and `16: *   \`off\`      the swarm is off; the runner walks one phase at a time`)
+```
+
+measured 2026-10-03 by chain chain-swarm-per-plan-20261003-135930-38a4, finding L1, LOW
+probe-key: f94c2531ee54f86bce8fe2dd7582a96f9364321c
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/settings/swarm-switch.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/agents-settings/sections/content/RunnerModelContent.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useSwarmSwitch.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/hooks/dispatcher/planner_lanes.py, /home/lyphe/.claude/hooks/dispatcher/planner_rule.py, /home/lyphe/.claude/hooks/dispatcher/rule.py, /home/lyphe/.claude/hooks/dispatcher/swarm_word.py, /home/lyphe/.claude/hooks/dispatcher/width.py, /home/lyphe/.claude/scripts/runner_fixtures/claude_swarm.py

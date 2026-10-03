@@ -3,9 +3,10 @@ import { useTranslation } from 'react-i18next';
 
 import { useDeepSeekFlashSwitch } from '@/shared/hooks/useDeepSeekFlashSwitch';
 import { useHealMasterSwitch } from '@/shared/hooks/useHealMasterSwitch';
-import { LANES_MIN, useSwarmSwitch } from '@/shared/hooks/useSwarmSwitch';
-import { SWARM_FIRST_CEILING } from '@/shared/constants';
+import { useSwarmSwitch } from '@/shared/hooks/useSwarmSwitch';
+import { LANES_MIN } from '@/shared/constants';
 import { Button, LLMProviderLogo, SettingRow, Stepper } from '@/shared/ui';
+import { swarmLadderSteps, swarmLadderTop } from '@/shared/utils';
 import SettingsToggle from '@/modules/settings/SettingsToggle';
 import RunnerHealModelRow from '@/modules/settings/tabs/agents-settings/sections/content/RunnerHealModelRow';
 import RunnerParkAtPeakRow from '@/modules/settings/tabs/agents-settings/sections/content/RunnerParkAtPeakRow';
@@ -83,18 +84,18 @@ export default function RunnerModelContent() {
       // The count's own singular is its own string: `{{count}} lanes` would print "1 lanes".
       ? t('agents.runnerSwarm.lane', { defaultValue: '1 lane' })
       : t('agents.runnerSwarm.lanes', { defaultValue: '{{count}} lanes', count: lanes });
-  // UNLIMITED IS THE TOP OF THE SCALE, not a dead end — the count climbs towards it from below and
-  // the press that reaches it is the row's own `Unlimited` action, so nothing here has to walk a
-  // number all the way down to get back to no ceiling. `−` from Unlimited therefore CHOOSES the
-  // first ceiling, `+` from Unlimited is refused because nothing is wider than it, and `+` on any
-  // count is unbounded. One lane is the floor: there is no lane under one to ask for.
+  // UNLIMITED IS THE TOP RUNG OF ONE LADDER, `1, 2, … top, All`, shared with the plan card's swarm
+  // control (`swarmLadderSteps`): `+` climbs a count by one and from the top count reaches Unlimited,
+  // `−` from Unlimited lands on the top count, and one lane is the floor. The top is six, or the
+  // count the row holds when that is wider; the row's own count is the only one in play, so a count
+  // above six steps down by one but is not climbed back to once left.
+  // A press the ladder refuses has no step, and so no handler to fire.
+  const steps = swarmLadderSteps(lanes, swarmLadderTop(lanes));
   const dropCeiling = () => {
-    if (lanes === null) void setLanes(SWARM_FIRST_CEILING);
-    else if (lanes > LANES_MIN) void setLanes(lanes - 1);
+    if (steps.down !== null) void setLanes(steps.down.lanes);
   };
   const raiseCeiling = () => {
-    // The twin of the disabled `+` at Unlimited: that button never fires, and this cannot either.
-    if (lanes !== null) void setLanes(lanes + 1);
+    if (steps.up !== null) void setLanes(steps.up.lanes);
   };
 
   return (
@@ -151,16 +152,16 @@ export default function RunnerModelContent() {
           : swarmEnabled === true
             ? lanes === null
               ? t('agents.runnerSwarm.descriptionOnUnlimited', {
-                  defaultValue: 'The runner runs every independent task of a feature at once — only ever tasks that touch no file each other writes and that do not wait on each other; everything else stays serial. A feature given its own swarm word on its card follows that word instead of this switch. Takes effect at the next task boundary.',
+                  defaultValue: 'The runner runs every independent task of each feature at once — only ever tasks that touch no file each other writes and that do not wait on each other; everything else stays serial. A feature given its own swarm word on its card follows that word instead of this switch. Takes effect at the next task boundary.',
                 })
               : t('agents.runnerSwarm.descriptionOn', {
-                  defaultValue: 'At most {{lanes}} independent tasks walk at once, and only tasks that touch no file each other writes and that do not wait on each other; everything else stays serial. A feature given its own swarm word on its card follows that word instead of this switch. Takes effect at the next task boundary.',
+                  defaultValue: 'At most {{lanes}} of each feature’s independent tasks walk at once, and only tasks that touch no file each other writes and that do not wait on each other; everything else stays serial. A feature given its own swarm word on its card follows that word instead of this switch. Takes effect at the next task boundary.',
                   lanes,
                 })
-            // Said in the tense the runner is in: with the switch off exactly one phase is admitted,
+            // Said in the tense the runner is in: with the switch off exactly one phase of each plan is admitted,
             // so a sentence about lanes would be describing a walk that is not happening.
             : t('agents.runnerSwarm.descriptionOff', {
-                defaultValue: 'Off: the runner walks one task at a time. Turn this on and it runs every independent task of a feature at once — with an optional ceiling on how many at a time — and only ever tasks that touch no file each other writes and that do not wait on each other. A feature given its own swarm word on its card follows that word instead of this switch. Takes effect at the next task boundary.',
+                defaultValue: 'Off: the runner walks one task of each feature at a time. Turn this on and it runs every independent task of each feature at once — with an optional ceiling on how many at a time — and only ever tasks that touch no file each other writes and that do not wait on each other. A feature given its own swarm word on its card follows that word instead of this switch. Takes effect at the next task boundary.',
               })}
       >
         {swarmUnknown ? (
@@ -170,11 +171,11 @@ export default function RunnerModelContent() {
         ) : (
           <div className="flex flex-wrap items-center gap-3">
             {/* THE CEILING IS OPTIONAL, and this control is where it is chosen: `Unlimited` is the
-                switch's own default and the TOP of the scale, with the counts below it and no
-                largest count at all — the runner's own grammar (`hooks/plan_runner/swarm.py`) has 1
-                as its floor and no ceiling on a ceiling. Stepper buttons and NOT a number input: the
-                reader is choosing whether to have a ceiling at all, which is a press and not a
-                figure to type.
+                switch's own default and the top rung of the ladder, with the counts below it — the
+                runner's own grammar (`hooks/plan_runner/swarm.py`) has 1 as its floor. Stepper
+                buttons and NOT a number input: the reader is choosing whether to have a ceiling at
+                all, which is a press and not a figure to type. There is no separate press for
+                Unlimited: it is a rung, reached by `+` from the top count.
                 Both presses are live with the switch OFF as well as on: the flag file is one line
                 and `off` carries no ceiling, so a count chosen while off is held here and written by
                 the next ON press — the same way the toggle's own next press carries it. The row
@@ -184,21 +185,12 @@ export default function RunnerModelContent() {
               value={ceiling}
               onDecrease={dropCeiling}
               onIncrease={raiseCeiling}
-              canDecrease={swarmEnabled !== null && (lanes === null || lanes > LANES_MIN)}
-              canIncrease={swarmEnabled !== null && lanes !== null}
+              canDecrease={swarmEnabled !== null && steps.down !== null}
+              canIncrease={swarmEnabled !== null && steps.up !== null}
               decreaseLabel={t('agents.runnerSwarm.lanesDown', { defaultValue: 'One lane fewer' })}
               increaseLabel={t('agents.runnerSwarm.lanesUp', { defaultValue: 'One lane more' })}
               ariaLabel={t('agents.runnerSwarm.lanesLabel', { defaultValue: 'Ceiling on tasks run at once' })}
             />
-            {/* THE WAY BACK IS ITS OWN PRESS, shown exactly while there is a ceiling to clear, so a
-                reader never has to step a count down to reach no ceiling — and so the one count they
-                cannot see from the row, the number of phases the independence rule will free, is
-                never the number the row would make them count to. */}
-            {lanes !== null && (
-              <Button variant="ghost" size="sm" onClick={() => void setLanes(null)}>
-                {t('agents.runnerSwarm.lanesUnlimitedAction', { defaultValue: 'Unlimited' })}
-              </Button>
-            )}
             <SettingsToggle
               checked={swarmEnabled === true}
               onChange={(next) => void setSwarmEnabled(next)}
