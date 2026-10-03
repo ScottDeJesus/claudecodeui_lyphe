@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next';
 
 import { epochOf, plannerStatusTone } from '@/modules/dispatcher/dispatcherState';
+import { operatorWords } from '@/modules/dispatcher/operatorWords';
 import { useElapsed } from '@/shared/hooks/useElapsed';
 import { Badge } from '@/shared/ui';
 import type { DispatcherPlanner } from '@/shared/types';
@@ -84,7 +85,7 @@ export function PlannerBadge({ planner }: { planner: DispatcherPlanner }) {
   const work = ended
     ? planner.outcome === null
       ? t('dispatcher.planner.endedShort')
-      : t('dispatcher.planner.endedShortCause', { outcome: planner.outcome })
+      : t('dispatcher.planner.endedShortCause', { outcome: operatorWords(planner.outcome) })
     : planner.state === 'queued'
       ? t('dispatcher.planner.queued')
       : t(WORK_KEYS[planner.verb]);

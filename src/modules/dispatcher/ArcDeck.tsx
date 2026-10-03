@@ -14,7 +14,7 @@ import {
 } from '@/modules/dispatcher/dispatcherState';
 import { DeckFrame } from '@/modules/dispatcher/DeckFrame';
 import { arcPutAway, doneDismiss, planPutAway, putAwayVerb } from '@/modules/dispatcher/hiddenPlans';
-import { LaneCardHead } from '@/modules/dispatcher/LaneCardHead';
+import { CardDescription, LaneCardHead } from '@/modules/dispatcher/LaneCardHead';
 import { PlanAsk } from '@/modules/dispatcher/PlanAsk';
 import { PlanCard } from '@/modules/dispatcher/PlanCard';
 import { PlannerBadge } from '@/modules/dispatcher/PlannerBadge';
@@ -67,7 +67,7 @@ const FLOW_MARK: Partial<Record<DispatcherPlanStatus, string>> = { complete: '�
  * THE ARC'S MARK — what tells an arc deck from a plan card at a glance (operator, 2026-09-28: "can we
  * also have a special indicator for arcs on arc cards please"). The two draw one head anatomy
  * (`LaneCardHead`), and the `.arc` ending on the name was all that set the arc apart; the mark
- * REPLACES that ending rather than standing beside it, so the head says "arc" once.
+ * REPLACES that ending rather than standing beside it, so the head says "epic" once.
  *
  * A KIND, NOT A STATE: the kit's `Badge` in its OUTLINE shape. Every state word on a lane card is a
  * filled badge, so the one outlined pill in the head reads as a different kind of fact before its word
@@ -75,7 +75,7 @@ const FLOW_MARK: Partial<Record<DispatcherPlanStatus, string>> = { complete: '�
  * holds cards) and the word carry it without colour (design doctrine §6). No count: the head already
  * binds `done/total` plans to the arc's word.
  *
- * It rides INSIDE the heading, before the name, so heading navigation hears "Arc restorly" and the
+ * It rides INSIDE the heading, before the name, so heading navigation hears "Epic restorly" and the
  * mark and the name wrap as words do. A fold keeps it because a fold keeps the head, and no plan card
  * draws it — a plan's head is `PlanCard`'s, which has no mark to hand. `data-arc-mark` is the browser
  * harness's handle.
@@ -108,15 +108,16 @@ function ArcMark() {
  * THE HEAD, ROW BY ROW: the arc's mark and name (`ArcMark`), its word (`ARC_STATUS`), the hour a
  * Schedule start armed (the clock slot, `data-dispatch-arc-schedule-note`) and how many of its plans
  * are complete; then the arc's description (`cardDescription`: its design's `delivers` line, else its
- * goal's where that yields nothing), drawn whole, and who is out on it; then its
+ * goal's where that yields nothing), folded to one line until pressed (`CardDescription`), and who is
+ * out on it; then its
  * books as pills, counting at first sight (`darc:<name>`). The corner is `⋯` — carrying `Dismiss done
- * plans · N` while some plans of the deck are done and some are not — then the deck's own press, which
+ * features · N` while some plans of the deck are done and some are not — then the deck's own press, which
  * puts EVERY plan of the deck away in one write (`arcPutAway`), then the fold. That press is Dismiss
  * once every plan of the deck is complete (the deck leaves the board, and nothing lists it), and Hide
  * before then (its unfinished plans go to the `Hidden` list, its done ones leave with the deck), by
  * the one rule a plan's corner follows (`putAwayVerb`). It is ONE press: a `Show` of any of its plans,
  * or news on any plan of the arc, brings the whole deck back (`hiddenPlans.ts`). A wholly done deck
- * draws no `Dismiss done plans`, which would be its corner again.
+ * draws no `Dismiss done features`, which would be its corner again.
  *
  * A FOLD KEEPS THAT WHOLE HEAD (MAN-5412) and takes the bar, the flow and the cards: the model
  * switch and Start/Pause are VERBS, and the reader who folded a deck away asked for the row, not for a
@@ -167,9 +168,6 @@ export function DispatchArcDeck({
 }) {
   const { t } = useTranslation();
   const { arc, plans } = group;
-  // The arc's DOOR, as the CLI and the routes spell it: what the flow and the strip are named by for a
-  // screen reader. The head shows the bare name, because its mark already says "arc".
-  const door = `${arc.name}.arc`;
   const word = ARC_STATUS[arc.status] ?? ARC_STATUS.designing;
   const description = cardDescription(arc.delivers, arc.goal);
   // The arc's own books: the store carries them on the arc row so no head has to add up the cards
@@ -216,11 +214,9 @@ export function DispatchArcDeck({
           lead={(
             <>
               {/* A measure of its own (`max-w-3xl`): the tab's deck spans the wall, and a description
-                  set at that width runs in lines of 250 characters no eye can track back across. It
-                  is drawn whole, so the measure is the only thing that shapes it. */}
-              {description && (
-                <p data-card-description className="min-w-0 max-w-3xl break-words text-xs leading-snug text-muted-foreground">{description}</p>
-              )}
+                  set at that width runs in lines of 250 characters no eye can track back across.
+                  Opened, it wraps whole, so the measure is what shapes it. */}
+              {description && <CardDescription text={description} className="max-w-3xl" />}
               {/* Who is out on the arc, under its description: a planner badge is a LONG LINE, and on
                   row one it would take the room the arc's name and word are read in. Nothing when none is. */}
               {arc.planner && <PlannerBadge planner={arc.planner} />}
@@ -237,14 +233,15 @@ export function DispatchArcDeck({
         />
       )}
       foldKey={dispatchArcFoldKey(arc.name)}
-      flow={{ nodes, doneCount, ariaLabel: t('dispatcher.flow.arc', { arc: door }) }}
+      // The flow and the strip are named by the bare name, as the head is, and the mark says it is an epic.
+      flow={{ nodes, doneCount, ariaLabel: t('dispatcher.flow.arc', { arc: arc.name }) }}
       bodyTop={<DispatchArcControls arc={arc} />}
       asks={asks.length > 0
         ? asks.map((ask) => (
           <PlanAsk key={askIdentity(ask)} ask={ask} folded={collapsed} onUnfold={toggle} />
         ))
         : null}
-      stripLabel={t('runner.arcStrip', { title: door })}
+      stripLabel={t('runner.arcStrip', { title: arc.name })}
       focusIndex={deckFocusIndex(plans)}
       cardCount={plans.length}
     >

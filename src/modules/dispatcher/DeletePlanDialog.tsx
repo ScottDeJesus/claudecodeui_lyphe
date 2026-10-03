@@ -27,7 +27,7 @@ function useReturnFocus(): void {
 }
 
 /**
- * `Delete plan…`: `dispatcher drop` asked first, since no later press can undo it.
+ * `Delete feature…`: `dispatcher drop` asked first, since no later press can undo it.
  *
  * It is open for as long as it is mounted, and the card mounts it only while the question is asked.
  * That also keeps the lane subscription (`useDispatcherPlans`) to the one open dialog, instead of one

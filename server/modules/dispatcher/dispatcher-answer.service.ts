@@ -58,23 +58,41 @@ function textAt(map: unknown, question: string): string {
 }
 
 /**
+ * What an Accept's decision answers in `map` (`answers` or `notes`): the string at `question`, else the
+ * decision's sole answer — the one non-blank string a plain question-keyed object holds, when it holds
+ * exactly one; an array is no such map, so it has no sole answer — else `''`. A questions round never
+ * reads this way: each of its questions is answered by its own key.
+ */
+function textAtAsk(map: unknown, question: string): string {
+  const keyed = textAt(map, question);
+  if (keyed !== '' || map === null || typeof map !== 'object' || Array.isArray(map)) return keyed;
+  const held = Object.values(map).filter((value): value is string => typeof value === 'string' && value.trim() !== '');
+  return held.length === 1 ? held[0].trim() : '';
+}
+
+/**
  * The reply a card or phone decision carries for `ask`, or `null` when it carries none.
  *
  * The card answers in `updatedInput.answers` (question text → chosen label), and a Rework's notes ride
  * beside them in `updatedInput.notes` under the same question — the option that takes a note opens a
  * field for it (`needsNote`). The phone answers the same shape with a label alone, and its Rework
- * button opens the app instead, because a button cannot carry the notes. Used by
- * `dispatcher-asks.service.ts`.
+ * button opens the app instead, because a button cannot carry the notes. An Accept's answer is read by
+ * the ask it answers — the label at `ask.question`, else the decision's sole answer — because
+ * `dispatcher-asks.service.ts` books an ask as it was first raised (its `raised` map, read as `entry.ask`
+ * in `answerFromCard`) while the card keys its answer by the census it draws now, so under the same
+ * token and asked event a reworded census made every card press answer "the answer names no option the
+ * prompt offered" until the server restarted; the ask's identity is its key (`keyOf`), and its sole
+ * answer is the answer to that ask. Used by `dispatcher-asks.service.ts`.
  */
 export function readReply(ask: DispatcherAsk, decision: ProviderPermissionDecision): AskReply | null {
   if (!decision.allow) return null;
   const input = decision.updatedInput as { answers?: unknown; notes?: unknown } | undefined;
   if (ask.kind === 'accept') {
-    const chosen = textAt(input?.answers, ask.question);
+    const chosen = textAtAsk(input?.answers, ask.question);
     const [accept, queue, rework] = ask.options.map((option) => option.label);
     if (chosen === accept) return { kind: 'accept', paused: false };
     if (chosen === queue) return { kind: 'accept', paused: true };
-    const notes = textAt(input?.notes, ask.question);
+    const notes = textAtAsk(input?.notes, ask.question);
     return chosen === rework && notes !== '' ? { kind: 'rework', notes } : null;
   }
   const pairs = ask.questions.map((question) => ({ question: question.text, answer: textAt(input?.answers, question.text) }));

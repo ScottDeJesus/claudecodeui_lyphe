@@ -75,7 +75,7 @@ export type DispatcherVerbDependencies = {
  * it goes, and not `stderr`, because on this lane stdout is the field a reader reads.
  */
 const NO_ANSWER: Record<'timeout' | 'spawn-failed', string> = {
-  timeout: "the dispatcher was stopped before it answered — read the plan's state before retrying, since a verb acts before it prints",
+  timeout: "the dispatcher was stopped before it answered — read the feature's state before retrying, since a verb acts before it prints",
   'spawn-failed': 'the dispatcher command could not be started on this host',
 };
 

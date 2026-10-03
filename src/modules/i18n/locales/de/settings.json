@@ -324,7 +324,7 @@
     "connectionStatus": "Verbindungsstatus",
     "runnerModel": {
       "label": "DeepSeek Flash für Build-Souls verwenden",
-      "description": "Der Plan-Runner schickt seinen Builder, dessen Fix-Durchlauf und Athena auf DeepSeeks deepseek-flash statt auf Claude Sonnet. Prometheus, die Scouts und der Replanner bleiben auf Claude. Wirkt ab der nächsten Phase.",
+      "description": "Der Runner schickt seinen Builder, dessen Fix-Durchlauf und Athena auf DeepSeeks deepseek-flash statt auf Claude Sonnet. Prometheus, die Scouts und der Replanner bleiben auf Claude. Wirkt ab der nächsten Aufgabe.",
       "unreadable": "Der Schalter konnte nicht vom Server gelesen werden, seine Stellung ist also unbekannt — das ist nicht dasselbe wie aus. Bei jedem Fokuswechsel wird erneut gelesen."
     },
     "jev": {

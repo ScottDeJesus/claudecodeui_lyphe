@@ -8,7 +8,7 @@ import { cardDescription, phaseProgress, planDroppable } from '@/modules/dispatc
 import { putAwayVerb } from '@/modules/dispatcher/hiddenPlans';
 import { useDispatcherPlans } from '@/modules/dispatcher/hooks/useDispatcherPlans';
 import { useRiseOnce } from '@/modules/dispatcher/hooks/useFirstSight';
-import { LaneCardHead } from '@/modules/dispatcher/LaneCardHead';
+import { CardDescription, LaneCardHead } from '@/modules/dispatcher/LaneCardHead';
 import { PlanAsk } from '@/modules/dispatcher/PlanAsk';
 import { PlanControls } from '@/modules/dispatcher/PlanControls';
 import { PlanClock, PlanFace, PlanStatusBadge } from '@/modules/dispatcher/PlanFace';
@@ -27,9 +27,9 @@ import { cn } from '@/shared/utils';
  *
  * - THE HEAD (`LaneCardHead`): the mono name, the word (`PlanStatusBadge`), the clock (`PlanClock`)
  *   and `done/total` phases on row one; the plan's description (`cardDescription`: its design's
- *   `delivers` line, else its goal's where that yields nothing) drawn WHOLE — it wraps, and no line of
- *   it is cut — then who is out on the plan (`PlannerBadge`) and what of its arc it waits on, on row
- *   two; the plan's total as pills
+ *   `delivers` line, else its goal's where that yields nothing) folded to one line until pressed, when
+ *   it opens whole (`CardDescription`) — then who is out on the plan (`PlannerBadge`) and what of its
+ *   arc it waits on, on row two; the plan's total as pills
  *   (`SpendPills`, counting at first sight) on row three; Dismiss or Hide, and the fold, in the corner.
  * - THE BAR (`PlanControls` → `ActionBar`): the verbs the plan's status allows and its model switch.
  * - THE FACE (`PlanFace`): the phases' track, what is moving now, and the closed lists. Its own rules —
@@ -38,8 +38,8 @@ import { cn } from '@/shared/utils';
  * A FOLD KEEPS THE WHOLE HEAD AND TAKES THE REST (MAN-5412). The head is what says WHICH plan this is
  * and how it stands — name, word, clock, count, description, spend — and the corner is how the card
  * comes back or goes away, so a reader who folded ten cards still knows which ten they are. The
- * description is drawn whole, so a folded card is as tall as its description is long: a fold takes the
- * plan's verbs and its detail, and does not make the card compact. The bar and the face fold: a fold
+ * description stays as the reader left it — one line until pressed — so a fold takes the plan's verbs
+ * and its detail and leaves the description alone. The bar and the face fold: a fold
  * that left verbs on screen would be a card that had not collapsed. The body is the house's
  * `CardFoldBody`, so a folded card's verbs leave the tab order too.
  *
@@ -55,7 +55,7 @@ import { cn } from '@/shared/utils';
  * caller's `planPutAway(plan, carriedNames)`, because only the caller holds the lane's carried names
  * the store prunes against.
  *
- * DELETE IS THE MENU'S, AND ONLY WHERE THE DISPATCHER WOULD TAKE IT. `⋯` carries `Delete plan…`
+ * DELETE IS THE MENU'S, AND ONLY WHERE THE DISPATCHER WOULD TAKE IT. `⋯` carries `Delete feature…`
  * exactly when `planDroppable(plan, planners)` holds. It is never drawn disabled on a `live` plan, a
  * walking phase or a planner out on the plan or its arc. Delete is the menu's only item, so those cards
  * draw no `⋯` at all. The planner half of that gate needs the lane's `planners` list, so the card reads
@@ -112,7 +112,7 @@ export function PlanCard({
   const description = cardDescription(plan.delivers, plan.goal);
   const { collapsed, toggle } = useCardFold(planFoldKey(plan.name));
   const rise = useRiseOnce(`plan:${plan.name}`);
-  // Whether `Delete plan…` has been pressed and its question is up. Local, since it is this card's
+  // Whether `Delete feature…` has been pressed and its question is up. Local, since it is this card's
   // question, and the dialog is mounted only while it is asked.
   const [deleting, setDeleting] = useState(false);
   const { planners } = useDispatcherPlans();
@@ -140,9 +140,7 @@ export function PlanCard({
             progress={phaseProgress(plan)}
             lead={(
               <>
-                {description && (
-                  <p data-card-description className="min-w-0 break-words text-xs leading-snug text-muted-foreground">{description}</p>
-                )}
+                {description && <CardDescription text={description} />}
                 {/* WHO IS OUT ON THIS PLAN and what it waits on, under its description: the word says
                     what the PLAN is (`designing`), the badge who is doing something about it; the wait is
                     a fact about THIS plan ("before this, that"). Neither draws anything when absent. */}

@@ -241,13 +241,13 @@ function permissionCopy(meta: Record<string, unknown>): { headline: string; body
 }
 
 /**
- * `3/7 phases` — the dispatcher's own progress, counted over ALL of a plan's phases rather than
+ * `3/7 tasks` — the dispatcher's own progress, counted over ALL of a plan's phases rather than
  * its shipped ones: its card's meter is `done` out of `phases`, so a push that counted anything else
  * would disagree with the screen it sends the operator to.
  */
 function dispatcherPhaseText(meta: Record<string, unknown>): string {
   const phases = readNumber(meta.phases) ?? 0;
-  return `${readNumber(meta.done) ?? 0}/${phases} phase${phases === 1 ? '' : 's'}`;
+  return `${readNumber(meta.done) ?? 0}/${phases} task${phases === 1 ? '' : 's'}`;
 }
 
 const COPY_BY_CODE = new Map<string, CodeCopy>([
@@ -332,7 +332,7 @@ const COPY_BY_CODE = new Map<string, CodeCopy>([
    */
   ['dispatcher.finished', ({ meta }) => {
     return {
-      headline: 'Plan finished',
+      headline: 'Feature finished',
       body: [
         dispatcherPhaseText(meta),
         spendText(meta),
@@ -340,7 +340,7 @@ const COPY_BY_CODE = new Map<string, CodeCopy>([
     };
   }],
   ['dispatcher.paused', ({ meta }) => ({
-    headline: 'Plan paused',
+    headline: 'Feature paused',
     body: [dispatcherPhaseText(meta), readText(meta.detail), 'Resume from the Runner tab']
       .filter((part): part is string => part !== null)
       .join(' · '),
@@ -353,16 +353,16 @@ const COPY_BY_CODE = new Map<string, CodeCopy>([
     // A limit that named no reset time carries the dispatcher's own GUESS: it says so, and does not
     // promise the hour as though the API had given it.
     body: `${meta.limitGuess === true
-      ? `Plans paused — no reset time named, retrying at ${limitLiftText(meta.resetsAt)}`
-      : `Plans paused until ${limitLiftText(meta.resetsAt)}`} · Resume from the Runner tab`,
+      ? `Features paused — no reset time named, retrying at ${limitLiftText(meta.resetsAt)}`
+      : `Features paused until ${limitLiftText(meta.resetsAt)}`} · Resume from the Runner tab`,
   })],
   ['dispatcher.relaunched', ({ meta }) => {
     const phase = readText(meta.phase);
     const detail = readText(meta.detail);
     return {
-      headline: 'Phase relaunched',
+      headline: 'Task relaunched',
       body: [
-        phase ? `Phase ${phase} was taken up again` : 'A phase was taken up again',
+        phase ? `Task ${phase} was taken up again` : 'A task was taken up again',
         detail,
       ].filter((part): part is string => part !== null).join(' · '),
     };

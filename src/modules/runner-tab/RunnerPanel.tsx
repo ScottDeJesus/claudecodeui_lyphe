@@ -193,7 +193,7 @@ export function RunnerPanel({ revealPlan = null, onRevealed }: RunnerPanelProps)
           of its own, and "nothing here" over a soul at work would be the pane's one lie. */}
       {count === 0 && arcs.length === 0 && loosePlanners.length === 0 ? (
         <div className="flex flex-1 flex-col items-center justify-center gap-4 p-4">
-          {/* Over hidden plans the words are "every unfinished plan is hidden", never "nothing is
+          {/* Over hidden plans the words are "every unfinished feature is hidden", never "nothing is
               running": a hidden plan may still be walking, and the list below says which. */}
           <EmptyState icon={ActivityIcon} title={t(hidden.length > 0 ? 'dispatcher.hidden.allHidden' : 'runner.empty')} />
           <div className="w-full max-w-md">

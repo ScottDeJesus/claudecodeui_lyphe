@@ -1,11 +1,12 @@
 import { EyeOff, MoreHorizontal, X } from 'lucide-react';
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { putAwayKeepingFocus, selectKeepingFocus } from '@/modules/dispatcher/putAwayFocus';
 import { ActionMenu, Button, CardFoldToggle, Tooltip } from '@/shared/ui';
 import type { ActionMenuItem } from '@/shared/ui';
+import { cn } from '@/shared/utils';
 
 type LaneCardHeadProps = {
   /** Which card this is: the plan's mono name, or the arc's mark and mono name (`ArcMark`) — the one thing that tells the two heads apart. */
@@ -16,7 +17,7 @@ type LaneCardHeadProps = {
   clock?: ReactNode;
   /** How far the card has got: phases done for a plan, plans complete for an arc. `null`, or a total of 0, draws no count. */
   progress: { done: number; total: number } | null;
-  /** The second row: the card's description (`cardDescription`) drawn whole, then who is out on the card and what it waits on. */
+  /** The second row: the card's description (`CardDescription`, folded to one line until pressed), then who is out on the card and what it waits on. */
   lead?: ReactNode;
   /** The third row: the card's total, as pills. */
   spend?: ReactNode;
@@ -40,6 +41,35 @@ type LaneCardHeadProps = {
  * width and read as one group.
  */
 const CORNER_BUTTON = 'h-10 w-10 text-muted-foreground sm:h-7 sm:w-7';
+
+/**
+ * A lane card's description, FOLDED TO ONE LINE until it is pressed (operator, 2026-10-02: "make the
+ * descriptions of plan cards collapsible and default them to collapsed"). The line itself is the press
+ * — no chevron and no "more"; the ellipsis is what says there is more — and it opens WHOLE, wrapping
+ * with no line cut, until a second press folds it back. Whether it is open is this card's own state
+ * and is never stored, so every card starts folded. A press on it starts no drag (`isFreePress`).
+ *
+ * The clamp rides an inner span, never the button: `-webkit-line-clamp` needs `display: -webkit-box`,
+ * which a `<button>` box does not take reliably. Opened, the span is a block, so its own box measures
+ * what it paints. `className` is a home's measure (the arc deck's `max-w-3xl`). `data-card-description`
+ * marks the span, and the button's `aria-expanded` says which way it stands.
+ *
+ * Used by `PlanCard` and `DispatchArcDeck`, in the head's lead.
+ */
+export function CardDescription({ text, className }: { text: string; className?: string }) {
+  // Whether the reader opened it. Local and unsaved on purpose: folded is where every card starts.
+  const [open, setOpen] = useState(false);
+  return (
+    <button
+      type="button"
+      aria-expanded={open}
+      onClick={() => setOpen((wasOpen) => !wasOpen)}
+      className={cn('min-w-0 text-left text-xs leading-snug text-muted-foreground transition-colors hover:text-foreground', className)}
+    >
+      <span data-card-description className={cn('break-words', open ? 'block' : 'line-clamp-1')}>{text}</span>
+    </button>
+  );
+}
 
 /**
  * A lane card's HEAD — the part that says WHICH card this is and how it stands, and the one part a fold

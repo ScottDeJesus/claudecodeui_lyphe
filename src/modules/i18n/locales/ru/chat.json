@@ -113,7 +113,7 @@
     "deepseekFlash": "DeepSeek Flash",
     "deepseekFlashShort": "Flash",
     "deepseekFlashOffShort": "Claude",
-    "deepseekFlashTooltip": "Пока это включено, строительные души plan runner — сборщик, его проход исправлений и Athena — работают на DeepSeek Flash. Prometheus и разведчики остаются на Claude.",
+    "deepseekFlashTooltip": "Пока это включено, строительные души runner — сборщик, его проход исправлений и Athena — работают на DeepSeek Flash. Prometheus и разведчики остаются на Claude.",
     "deepseekFlashReading": "Чтение переключателя…",
     "deepseekFlashUnreadable": "Не удалось прочитать переключатель — нажмите, чтобы повторить.",
     "clearInput": "Очистить ввод",

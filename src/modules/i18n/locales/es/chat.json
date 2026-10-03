@@ -122,7 +122,7 @@
     "deepseekFlash": "DeepSeek Flash",
     "deepseekFlashShort": "Flash",
     "deepseekFlashOffShort": "Claude",
-    "deepseekFlashTooltip": "Mientras esto está activo, las almas constructoras del plan runner — el builder, su pase de correcciones y Athena — corren en DeepSeek Flash. Prometheus y los scouts siguen en Claude.",
+    "deepseekFlashTooltip": "Mientras esto está activo, las almas constructoras del runner — el builder, su pase de correcciones y Athena — corren en DeepSeek Flash. Prometheus y los scouts siguen en Claude.",
     "deepseekFlashReading": "Leyendo el interruptor…",
     "deepseekFlashUnreadable": "No se pudo leer el interruptor: pulsa para reintentar.",
     "clearInput": "Limpiar entrada",

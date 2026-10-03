@@ -113,7 +113,7 @@
     "deepseekFlash": "DeepSeek Flash",
     "deepseekFlashShort": "Flash",
     "deepseekFlashOffShort": "Claude",
-    "deepseekFlashTooltip": "Bu açıkken plan runner yapı ruhları — builder, düzeltme turu ve Athena — DeepSeek Flash üzerinde çalışır. Prometheus ve izciler Claude üzerinde kalır.",
+    "deepseekFlashTooltip": "Bu açıkken runner yapı ruhları — builder, düzeltme turu ve Athena — DeepSeek Flash üzerinde çalışır. Prometheus ve izciler Claude üzerinde kalır.",
     "deepseekFlashReading": "Anahtar okunuyor…",
     "deepseekFlashUnreadable": "Anahtar okunamadı — tekrar denemek için basın.",
     "clearInput": "Girdiyi temizle",

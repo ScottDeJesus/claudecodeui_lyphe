@@ -86,7 +86,7 @@ const NAV_TABS: Array<{ id: AppTab; label: string; keywords: string }> = [
   { id: 'notes', label: 'Go to Notes', keywords: 'notes note cards jot write memo' },
   { id: 'tasks', label: 'Go to Tasks', keywords: 'tasks taskmaster' },
   { id: 'memory', label: 'Go to Memory', keywords: 'memory intake pending' },
-  { id: 'runner', label: 'Go to Runner', keywords: 'runner plan run live phases' },
+  { id: 'runner', label: 'Go to Runner', keywords: 'runner feature epic task run live plan phases' },
   { id: 'heal', label: 'Go to Heal', keywords: 'heal friction ledger reflex regression ignore' },
   { id: 'api', label: 'Go to API', keywords: 'api jev deepseek spend balance burn tokens consumers usage outings typesafe' },
 ];

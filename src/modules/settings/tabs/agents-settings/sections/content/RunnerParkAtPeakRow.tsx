@@ -22,7 +22,7 @@ export default function RunnerParkAtPeakRow() {
   const { t } = useTranslation('settings');
   const { enabled, unreadable, setEnabled, refresh } = useParkAtPeakSwitch();
 
-  const label = t('agents.runnerParkAtPeak.label', { defaultValue: 'Park new plans at DeepSeek peak hours' });
+  const label = t('agents.runnerParkAtPeak.label', { defaultValue: 'Park new features at DeepSeek peak hours' });
   // No position is not OFF, and for this switch the lie cuts both ways: drawn off while on, it
   // promises an Accept that walks now; drawn on while off, an hour that is not armed.
   const unknown = enabled === null;
@@ -38,7 +38,7 @@ export default function RunnerParkAtPeakRow() {
             })
           : t('status.loading', { ns: 'common', defaultValue: 'Loading...' })
         : t('agents.runnerParkAtPeak.description', {
-            defaultValue: 'An Accept during DeepSeek’s peak window (01:00–04:00 and 06:00–10:00 UTC, weekdays) queues the plan and starts it when the window lifts. Off: Accept walks now.',
+            defaultValue: 'An Accept during DeepSeek’s peak window (01:00–04:00 and 06:00–10:00 UTC, weekdays) queues the feature and starts it when the window lifts. Off: Accept walks now.',
           })}
     >
       {unknown ? (

@@ -59,7 +59,7 @@ export function putAwayKeepingFocus(button: HTMLElement | null, onPress: () => v
 }
 
 /**
- * A menu action, with somewhere for the keyboard to land. `Dismiss done plans · N` can empty the menu
+ * A menu action, with somewhere for the keyboard to land. `Dismiss done features · N` can empty the menu
  * it sits in, so the whole `ActionMenu` unmounts in the same commit as the press and its own close can
  * only restore focus to a trigger that no longer exists — focus fell to `<body>`. So on the next
  * frame, if the menu is gone, focus goes to this head's own corner press (a menu action never takes

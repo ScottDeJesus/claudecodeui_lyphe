@@ -25,7 +25,7 @@ export type DispatcherEndingCode =
   | 'dispatcher.relaunched';
 
 export type DispatcherEndingMeta = {
-  /** The plan's name — what the notification's own header reads ("Plan finished · <name>"). */
+  /** The plan's name — what the notification's own header reads ("Feature finished · <name>"). */
   sessionName: string;
   /** How many phases the plan has, and how many of them are `done`. */
   phases: number;

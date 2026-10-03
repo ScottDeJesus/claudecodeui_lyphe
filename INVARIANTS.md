@@ -494,8 +494,8 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.cl
 The standing proof passes a lead that paints nothing
 
 ```probe
-cd /home/lyphe/.claude/claudecodeui_lyphe && T=$(mktemp -d) && sed -e "s#'../src/#'$PWD/src/#" -e "s#^async function openTab(page, viewport) {#&\n  await page.addInitScript(() => document.addEventListener('DOMContentLoaded', () => { const s = document.createElement('style'); s.textContent = '[data-card-description]{display:none !important}'; document.head.appendChild(s); }));#" .verify/probe-card-description.mjs > $T/p.mjs && node $T/p.mjs --tag hidden-lead | grep -E "painted on|reading\(s\) failed" | sort | uniq -c; echo "exit ${PIPESTATUS[0]}"
-expect: exit 1, with a FAIL on the clamp line for a lead painted on 0 lines (today: 8× "painted on 0 line(s)", "0 reading(s) failed", exit 0)
+cd /home/lyphe/.claude/claudecodeui_lyphe && T=$(mktemp -d) && sed -e "s#'../src/#'$PWD/src/#" -e "s#^async function openTab(page, viewport) {#&\n  await page.addInitScript(() => document.addEventListener('DOMContentLoaded', () => { const s = document.createElement('style'); s.textContent = '[data-card-description]{display:none !important}'; document.head.appendChild(s); }));#" .verify/probe-card-description.mjs > $T/p.mjs && npx tsx $T/p.mjs --tag hidden-lead | grep -E "painted on|reading\(s\) failed" | sort | uniq -c; echo "exit ${PIPESTATUS[0]}"
+expect: exit 1, with a FAIL on the "starts folded to one line" check for a lead painted on 0 lines (2026-10-02: 4× that FAIL, "8 reading(s) failed", exit 1)
 ```
 
 measured 2026-09-28 by chain chain-card-description-20260928-165807-7220, finding L1, LOW
@@ -1270,8 +1270,8 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/plugins/PluginSettin
 The standing proof cannot see a lead cut by an ellipsis or by a clipping ancestor
 
 ```probe
-cd /home/lyphe/.claude/claudecodeui_lyphe && T=$(mktemp -d) && sed -e "s#'../src/#'$PWD/src/#" -e "s#^async function openTab(page, viewport) {#&\n  await page.addInitScript(() => document.addEventListener('DOMContentLoaded', () => { const s = document.createElement('style'); s.textContent = '[data-card-description]{white-space:nowrap !important;overflow:hidden !important;text-overflow:ellipsis !important}'; document.head.appendChild(s); }));#" .verify/probe-card-description.mjs > $T/p.mjs && node $T/p.mjs --tag ellipsis | grep -E "arc restorly's lead is drawn whole|reading\(s\) failed" | sed -E 's/^(PASS|FAIL) tab [0-9]+ (light|dark)/\1 tab/' | sort | uniq -c; echo "exit ${PIPESTATUS[0]}"
-expect: exit 1 and a FAIL on the arc restorly's "drawn whole" line for a 1,367-character lead painted on 1 line (today: 4× PASS "painted on 1 line(s)", "0 reading(s) failed", exit 0)
+cd /home/lyphe/.claude/claudecodeui_lyphe && T=$(mktemp -d) && sed -e "s#'../src/#'$PWD/src/#" -e "s#^async function openTab(page, viewport) {#&\n  await page.addInitScript(() => document.addEventListener('DOMContentLoaded', () => { const s = document.createElement('style'); s.textContent = '[data-card-description]{white-space:nowrap !important;overflow:hidden !important;text-overflow:ellipsis !important}'; document.head.appendChild(s); }));#" .verify/probe-card-description.mjs > $T/p.mjs && npx tsx $T/p.mjs --tag ellipsis | grep -E "lead opens whole|reading\(s\) failed" | sed -E 's/^(PASS|FAIL) tab [0-9]+ (light|dark)/\1 tab/' | sort | uniq -c; echo "exit ${PIPESTATUS[0]}"
+expect: exit 1 and a FAIL on the judged card's "opens whole" line, its lead painted on 1 line with its scrollWidth past its clientWidth (2026-10-02: 4× that FAIL, "4 reading(s) failed", exit 1)
 ```
 
 measured 2026-09-29 by chain chain-card-description-full-20260929-105755-1234, finding M1, MEDIUM
@@ -1368,20 +1368,6 @@ measured 2026-09-29 by chain chain-lock-prompt-glance-20260929-110148-17f8, find
 probe-key: e5c97527ca014e1398bcf3be3e1557e755bb9143
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-card-ask.mjs, /home/lyphe/.claude/hooks/dispatcher/lock_glance.py, /home/lyphe/.claude/hooks/dispatcher/lock.py, /home/lyphe/.claude/skills/plan/SKILL.md
-
-## INV-5798 — probe — `Arc <arc>, plan <i> of <n>` shows the store's id order, which is wrong for the real `restorly` arc
-
-`Arc <arc>, plan <i> of <n>` shows the store's id order, which is wrong for the real `restorly` arc
-
-```probe
-cd ~/.claude && scripts/dispatcher question restorly--vendors | grep -o "Arc restorly, plan [0-9]* of [0-9]*"; python3 -c "import tomllib; o=[p['name'] for p in tomllib.load(open('plans/restorly.arc.toml','rb'))['plan']]; print(o.index('restorly--vendors')+1, len(o))"
-expect: the prompt says "plan 9 of 14" while the arc file lists it 7th of 13
-```
-
-measured 2026-09-29 by chain chain-lock-prompt-glance-20260929-110148-17f8, finding L4, LOW
-probe-key: f96881d501a30e609e660221eb73cc93c2d093e7
-
-governs: /home/lyphe/.claude/hooks/dispatcher/lock_glance.py, /home/lyphe/.claude/hooks/dispatcher/lock.py, /home/lyphe/.claude/skills/plan/SKILL.md
 
 ## INV-5885 — probe — the showing left its scratch id in the operator's icon cache
 
@@ -2848,3 +2834,78 @@ measured 2026-10-02 by chain chain-ask-drafts-20261002-042748-c2a8, finding L3, 
 probe-key: 0b072066a79008946c0e4064ce981cff325817f1
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/AskDraftPrune.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/askDrafts.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/hooks/useAskDraft.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-ask-drafts.mjs
+
+## INV-6394 — The operator's words — CloudCLI names an arc an epic, a plan a feature, a phase a task; the house's code keeps arc, plan, phase
+
+CloudCLI's text names arcs, plans and phases as epics, features and tasks. Identifiers, store words, CLI verbs and their stdout, hook names, plan files and charters keep arc, plan and phase. The house's prompt to the operator carries his words (below).
+
+| the house's word | CloudCLI's text | plurals, possessives and counted plurals follow |
+|---|---|---|
+| arc | epic | arcs → epics, arc's → epic's, arc(s) → epic(s) |
+| plan | feature | plans → features, plan(s) → feature(s) |
+| phase | task | phases → tasks, phase(s) → task(s) |
+| plan runner, plan chains | the runner, runner chains | — |
+
+**CloudCLI's own words — where they are written**
+- The en locale: `src/modules/i18n/locales/en/{common,chat,settings}.json`.
+- The `defaultValue` beside a key: the drawn text when its key is absent, the fallback when present — both carry the new words (`ComposerDeepSeekSwitch.tsx`, `RunnerModelContent.tsx` with its five `agents.runnerSwarm.*` keys no locale holds, `RunnerParkAtPeakRow.tsx`).
+- The command palette's Runner keywords carry both vocabularies (`CommandPalette.tsx`).
+- The ten other locales hold none of the dispatcher keys and fall back to English. Their values whose English changed say what the new English says: `chat.json` `input.deepseekFlashTooltip`, `settings.json` `agents.runnerModel.description`, fr `agents.runnerParkAtPeak.*`. "plan runner" is "runner" in them, left in English.
+- The push copy: `notification-copy.service.ts` — `Feature finished`, `Feature paused`, `Features paused …`, `Task relaunched`, `Task <key> was taken up again`, `<done>/<n> tasks`.
+- The server's two sentences: `NO_ANSWER.timeout` (`dispatcher-verb.service.ts`), `OTHER_PROCESS_EXAMPLES` (`claude-activity.service.ts`).
+
+**A house sentence a dispatcher surface relays verbatim** passes through `operatorWords` (MAN-7596) where it is drawn, and nowhere else:
+- `useDispatcherVerbs` — the verb toast.
+- `PlanFace` — the caption's posture.
+- `PlannerBadge` — the cause a planner outing ended on.
+- The dispatcher's own bytes never change.
+
+**The house's prompt to the operator** carries his words at its own home:
+- `lock._count` — `<N> tasks`, `, <K> done`.
+- `lock_glance.facts_line` — `Epic <arc>`, `<N> tasks in <W> waves`.
+- `intent_lock.DESCRIPTIONS` — the Accept and Rework descriptions.
+- Untouched: `LOCK_HEADER`, `OPTIONS` and their labels, `TOKEN_RE`, `names_of`, and every input of `lock.token`. why: the vet reads the first line and the last token; an outstanding token must stand.
+
+**The slash doors**: `/feature` is `/plan`, `/epic` is `/arc` (`skills/feature/SKILL.md`, `skills/epic/SKILL.md`). Each loads its skill and runs that sequence; nothing of the sequence lives in the door.
+
+**Authored text is drawn as written**: a plan's name, goal, `delivers`, phase titles, the events feed, the stage lines.
+
+**Keeps arc, plan, phase**
+- Identifiers and store words: `plans`, `phases`, `arcs`, `plan.arc`, `DispatcherPlan`.
+- CLI verbs and their stdout: `LOADED phases <name> — <N> phases`, `RESUMED <arc>.arc — 2 plan(s)`.
+- Hook names, plan files (`plans/<arc>.arc.toml`), charters, the `plan-runner` command.
+- A row's prose about the code.
+
+**Other senses stay**
+- Plan mode: `plan.*`, `codex.modes.plan`, `composer.editMode.*.plan` in `chat.json`, the ExitPlanMode push (`Plan ready for approval`).
+- Plan limits: `pluginSettings.claudeUsagePlugin.description`, `pluginSettings.codexUsagePlugin.description`.
+- A kanban card's plan: `kanban.approve.blockedByEmptiness`.
+- The planner role: `Planner lanes`, `Resume planner`.
+
+| when | do |
+|---|---|
+| a new CloudCLI string names an arc, plan or phase | write epic, feature, task, in the locale and in its `defaultValue` |
+| a house sentence reaches the DOM verbatim | draw it through `operatorWords` where it is drawn; add the reader to MAN-7596 |
+| the house prompts the operator | write his words at the sentence's own home; leave every input of the token alone |
+| a row quotes an operator string | quote the new word; prose about the code keeps the code word |
+
+Proof — prints exactly the eight other-sense keys above:
+`cd claudecodeui_lyphe && python3 -c "import json,re,glob;w=lambda d,p='':[x for k,v in d.items() for x in (w(v,p+k+'.') if isinstance(v,dict) else [(p+k,v)])];print(sorted(k for f in glob.glob('src/modules/i18n/locales/en/*.json') for k,v in w(json.load(open(f))) if isinstance(v,str) and re.search(r'\b(plans?|arcs?|phases?)\b',re.sub(r'\{\{[^}]*\}\}','',v),re.I)))"`
+
+Translator contract: MAN-7596. Push wording: MAN-622. The prompt's census and facts line: MAN-6047, MAN-1475.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/services/notification-copy.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/operatorWords.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/, /home/lyphe/.claude/hooks/dispatcher/lock_glance.py, /home/lyphe/.claude/hooks/dispatcher/lock.py, /home/lyphe/.claude/hooks/intent_lock.py, /home/lyphe/.claude/skills/epic/, /home/lyphe/.claude/skills/feature/
+
+## INV-6398 — probe — `.verify/probe-dismiss-done.mjs` cannot run, and its edited labels were never run (LOW)
+
+`.verify/probe-dismiss-done.mjs` cannot run, and its edited labels were never run (LOW)
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe && timeout 60 node .verify/probe-dismiss-done.mjs >/dev/null 2>&1; echo rc=$?
+expect: rc=1 (throws "the lane carries no wholly done restorly arc" at probe-dismiss-done.mjs:393 while the lane holds no done restorly arc); it writes nothing before that throw
+```
+
+measured 2026-10-02 by chain chain-vocab-epics-features--whole-20261002-174523-3a6d, finding L2, LOW
+probe-key: 5984e86a1cdc1efcb750386267e414d32efad24a
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dismiss-done.mjs

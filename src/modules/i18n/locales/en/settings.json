@@ -407,7 +407,7 @@
     },
     "runnerModel": {
       "label": "Use DeepSeek Flash for build souls",
-      "description": "Dispatch the plan runner’s builder, its fix-pass and Athena on DeepSeek’s deepseek-flash instead of Claude Sonnet. Prometheus, the scouts and the replanner stay on Claude. Takes effect on the next phase.",
+      "description": "Dispatch the runner’s builder, its fix-pass and Athena on DeepSeek’s deepseek-flash instead of Claude Sonnet. Prometheus, the scouts and the replanner stay on Claude. Takes effect on the next task.",
       "unreadable": "The switch could not be read from the server, so its position is unknown — this is not the same as off. It is retried whenever this page regains focus."
     },
     "runnerHealModel": {
@@ -417,8 +417,8 @@
       "descriptionUnknown": "Which model this heal’s souls run on could not be read — the reflex’s summary is not in hand. Press Try again to ask for it."
     },
     "runnerParkAtPeak": {
-      "label": "Park new plans at DeepSeek peak hours",
-      "description": "An Accept during DeepSeek’s peak window (01:00–04:00 and 06:00–10:00 UTC, weekdays) queues the plan and starts it when the window lifts. Off: Accept walks now.",
+      "label": "Park new features at DeepSeek peak hours",
+      "description": "An Accept during DeepSeek’s peak window (01:00–04:00 and 06:00–10:00 UTC, weekdays) queues the feature and starts it when the window lifts. Off: Accept walks now.",
       "unreadable": "The switch could not be read from the server, so its position is unknown — this is not the same as off. It is retried whenever this page regains focus."
     },
     "plannerLanes": {

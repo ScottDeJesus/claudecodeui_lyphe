@@ -210,7 +210,7 @@ export function useSnapStrip(focusIndex: number, itemCount: number) {
     // ONLY A KEYSTROKE MADE IN THE STRIP MOVES IT. An item may open a modal that portals its DOM out to
     // `<body>` while staying a React child of the strip, and React bubbles a keydown along THAT tree,
     // portal included — so an arrow pressed over an open dialog reached here and paged the deck behind
-    // it (measured 2026-09-26: one ArrowRight with `Delete plan…` up took card 4 to 5). The DOM box is
+    // it (measured 2026-09-26: one ArrowRight with `Delete feature…` up took card 4 to 5). The DOM box is
     // the honest test: a keystroke belongs to the strip when it happened inside it.
     if (!stripRef.current?.contains(event.target as Node)) return;
     // AND A KEYSTROKE MADE IN A TEXT CONTROL IS THAT CONTROL'S. A round's `Other…` field sits inside

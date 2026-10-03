@@ -27,7 +27,7 @@ import { listClaudeProcessIds } from './claude-process-scan.js';
 
 /** What kinds of process the "other Claude processes" reason names: the ones this server never
  *  registered as a turn, and that only the process list can see. */
-const OTHER_PROCESS_EXAMPLES = 'dispatch souls, plan chains, terminals';
+const OTHER_PROCESS_EXAMPLES = 'dispatch souls, runner chains, terminals';
 
 /** An error's own words, for the one place a failed leg becomes a sentence here. */
 function messageOf(error: unknown): string {

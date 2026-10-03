@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { operatorWords } from '@/modules/dispatcher/operatorWords';
 import { api } from '@/shared/api';
 import { useToast } from '@/shared/context/ToastContext';
 import type { DispatcherAsk, DispatcherModelChoice, DispatcherSwarmChoice, DispatcherVerb } from '@/shared/types';
@@ -94,13 +95,13 @@ export type DispatcherArcVerbs = {
  * it, and so it is the one verb a card guards with a dialog — the card's (`DeletePlanDialog`), not
  * this hook's, which relays the press it is handed like any other.
  *
- * THE DISPATCHER'S OWN SENTENCE IS THE ANSWER, ON BOTH PATHS. Every dispatcher verb speaks on STDOUT — `UNSCHEDULED dispatcher-ready` when it worked,
- * `REFUSED schedule dispatcher-ready: is live — stop it first` when it did not — so `stdout` is
- * read FIRST and `stderr` only as the fallback. The lane carries that body whole on a 409: the
+ * THE DISPATCHER'S OWN SENTENCE IS THE ANSWER, ON BOTH PATHS, AND THE TOAST SHOWS IT IN THE OPERATOR'S
+ * WORDS (`operatorWords`). Every dispatcher verb speaks on STDOUT — `UNSCHEDULED dispatcher-ready` when
+ * it worked, `REFUSED schedule dispatcher-ready: is live — stop it first` when it did not — so `stdout`
+ * is read FIRST and `stderr` only as the fallback. The lane carries that body whole on a 409: the
  * dispatcher's refusal names the one rule the plan met, and a generic "something went wrong" would
- * throw away the only useful thing in the answer. 503 and 504
- * are the two cases where the dispatcher never spoke and the server's own sentence stands in; they
- * travel the same field and need no branch here.
+ * throw away the only useful thing in the answer. 503 and 504 are the two cases where the dispatcher
+ * never spoke and the server's own sentence stands in; they travel the same field and need no branch here.
  *
  * The toast is amber rather than red on a refusal: a refused verb denied nothing and destroyed
  * nothing (design doctrine :145).
@@ -211,12 +212,12 @@ export function useDispatcherVerbs(
 
         // Read before the status, because a 409 carries the very same shape — and because the
         // dispatcher's successes are sentences too (`PARKED dispatcher-ready`), not empty bodies.
-        const said = firstLine(body?.stdout) || firstLine(body?.stderr);
+        const said = operatorWords(firstLine(body?.stdout) || firstLine(body?.stderr), [name]);
 
         if (response.ok) {
-          // The dispatcher's own sentence IS the answer, and every one of its verbs answers with one
-          // (`MODEL <name> model=claude`, `RESUMED dr-arc.arc — 2 plan(s)`). `doneWord` is the
-          // fallback for a dispatcher build that answered with an empty body.
+          // The dispatcher's own sentence IS the answer, and every one of its verbs answers with one, shown in
+          // the operator's words: `RESUMED dr-arc.arc — 2 plan(s)` is its stdout, the toast reads
+          // `RESUMED dr-arc — 2 feature(s)`. `doneWord` is the fallback for an empty body.
           toast({ tone: 'positive', title: said || doneWord(verb) });
           return true;
         }
@@ -233,7 +234,7 @@ export function useDispatcherVerbs(
         if (mountedRef.current) setBusy(null);
       }
     },
-    [doneWord, t, toast, word],
+    [doneWord, name, t, toast, word],
   );
 
   // The nine verbs are one-way presses: each awaits `send` and returns `void`, because nothing

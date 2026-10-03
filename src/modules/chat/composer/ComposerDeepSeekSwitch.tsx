@@ -75,7 +75,7 @@ export default function ComposerDeepSeekSwitch({ yieldsToVoice }: Props) {
   const flashInWords = t('input.deepseekFlashTooltip', {
     // The fallback is the shipped English string verbatim: a missing key must not quietly render a
     // DIFFERENT sentence than the one every locale was translated from.
-    defaultValue: "While this is on, the plan runner's build souls — the builder, its fix-pass and Athena — run on DeepSeek Flash. Prometheus and the scouts stay on Claude.",
+    defaultValue: "While this is on, the runner's build souls — the builder, its fix-pass and Athena — run on DeepSeek Flash. Prometheus and the scouts stay on Claude.",
   });
 
   return (

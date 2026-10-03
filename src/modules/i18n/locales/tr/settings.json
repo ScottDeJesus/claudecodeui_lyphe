@@ -325,7 +325,7 @@
     "connectionStatus": "Bağlantı Durumu",
     "runnerModel": {
       "label": "Yapı ruhları için DeepSeek Flash kullan",
-      "description": "plan runner; builder, düzeltme turu ve Athena'yı Claude Sonnet yerine DeepSeek'in deepseek-flash'inde çalıştırır. Prometheus, izciler ve yeniden planlayıcı Claude'da kalır. Sonraki aşamada geçerli olur.",
+      "description": "runner; builder, düzeltme turu ve Athena'yı Claude Sonnet yerine DeepSeek'in deepseek-flash'inde çalıştırır. Prometheus, izciler ve yeniden planlayıcı Claude'da kalır. Sonraki görevde geçerli olur.",
       "unreadable": "Anahtar sunucudan okunamadı, bu yüzden konumu bilinmiyor — kapalı olmakla aynı şey değil. Bu sayfa odağı her geri aldığında yeniden denenir."
     },
     "jev": {

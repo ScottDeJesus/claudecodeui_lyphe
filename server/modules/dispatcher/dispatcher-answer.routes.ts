@@ -48,9 +48,9 @@ const STATUS_OF: Record<DispatcherCardAnswer['outcome'], number> = {
 /**
  * A question-text → string map as the card sends one — `answers`, and a Rework's `notes` — or `null`
  * when the value is not one. EVERY value must be a string: both maps become the decision's
- * `updatedInput` verbatim and are read back by question (`dispatcher-answer.service.ts:readReply`),
- * so a value of any other type is a request this door has no answer for rather than something to
- * coerce into one.
+ * `updatedInput` verbatim and are read back by question, an Accept's by the ask it answers
+ * (`dispatcher-answer.service.ts:readReply`), so a value of any other type is a request this door has
+ * no answer for rather than something to coerce into one.
  */
 function readTextMap(value: unknown): Record<string, string> | null {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) return null;

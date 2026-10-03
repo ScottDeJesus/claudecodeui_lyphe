@@ -4,6 +4,7 @@ import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { PlanNow } from '@/modules/dispatcher/PlanNow';
+import { operatorWords } from '@/modules/dispatcher/operatorWords';
 import { currentPhaseKey, phaseWord } from '@/modules/dispatcher/phaseWord';
 import { PlanPhaseRow } from '@/modules/dispatcher/PlanPhaseRow';
 import { StatusFlow } from '@/modules/dispatcher/StatusFlow';
@@ -76,8 +77,9 @@ export function PlanClock({ plan }: { plan: DispatcherPlan }) {
  *
  * THE PLAN'S POSTURE RIDES THE CAPTION (`plan.posture`, `width.word` of its two words): DeepSeek or
  * Claude — its own model word's route — and one at a time or all at once under whichever swarm switch
- * bounds it, `plan swarm …` when its own word does. Two plans on one screen can walk under different
- * postures, and a plan that sits still under `one at a time` is explained by its own.
+ * bounds it, `plan swarm …` when its own word does. The caption draws it through `operatorWords`, so
+ * that reads `feature swarm …` while the dispatcher's own word stays `plan`. Two plans on one screen can
+ * walk under different postures, and a plan that sits still under `one at a time` is explained by its own.
  *
  * THE EVENT LOG IS THE CARD'S FEED, folded by default: the last thirty events, newest first —
  * time, kind, phase, detail. It is where a relaunch or a held take-up is read in the dispatcher's
@@ -110,8 +112,9 @@ export function PlanFace({ plan }: { plan: DispatcherPlan }) {
     progress.total > 0 ? t('dispatcher.flow.caption', { done: progress.done, total: progress.total }) : '',
     t('dispatcher.rounds', { count: plan.rounds }),
     // THIS plan's width (`report.plan_dict`'s `posture`): its own route and whichever swarm switch
-    // bounds it. The box's phrase stands in only against a dispatcher build older than the field.
-    plan.posture ?? route?.word ?? '',
+    // bounds it, in the operator's words. The box's phrase stands in only against a dispatcher build
+    // older than the field.
+    operatorWords(plan.posture ?? route?.word ?? ''),
   ].filter(Boolean).join(' · ');
   const receipt = plan.phases.find((phase) => phase.key === selected) ?? null;
   const feed = plan.events.slice(-FEED_LIMIT).reverse();

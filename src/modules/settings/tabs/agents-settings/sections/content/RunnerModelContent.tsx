@@ -64,7 +64,7 @@ export default function RunnerModelContent() {
   const unknown = enabled === null;
 
   const swarmLabel = t('agents.runnerSwarm.label', {
-    defaultValue: 'Run every independent phase of a plan at once',
+    defaultValue: 'Run every independent task of a feature at once',
   });
   // The same rule for the row below, and the same pair of sentences.
   const swarmUnknown = swarmEnabled === null;
@@ -109,7 +109,7 @@ export default function RunnerModelContent() {
               })
             : t('status.loading', { ns: 'common', defaultValue: 'Loading...' })
           : t('agents.runnerModel.description', {
-              defaultValue: 'Dispatch the plan runner’s builder, its fix-pass and Athena on DeepSeek’s deepseek-flash instead of Claude Sonnet. Prometheus, the scouts and the replanner stay on Claude. Takes effect on the next phase.',
+              defaultValue: 'Dispatch the runner’s builder, its fix-pass and Athena on DeepSeek’s deepseek-flash instead of Claude Sonnet. Prometheus, the scouts and the replanner stay on Claude. Takes effect on the next task.',
             })}
       >
         {unknown ? (
@@ -151,16 +151,16 @@ export default function RunnerModelContent() {
           : swarmEnabled === true
             ? lanes === null
               ? t('agents.runnerSwarm.descriptionOnUnlimited', {
-                  defaultValue: 'The plan runner runs every independent phase of a plan at once — only ever phases that touch no file each other writes and that do not wait on each other; everything else stays serial. A plan given its own swarm word on its card follows that word instead of this switch. Takes effect at the next phase boundary.',
+                  defaultValue: 'The runner runs every independent task of a feature at once — only ever tasks that touch no file each other writes and that do not wait on each other; everything else stays serial. A feature given its own swarm word on its card follows that word instead of this switch. Takes effect at the next task boundary.',
                 })
               : t('agents.runnerSwarm.descriptionOn', {
-                  defaultValue: 'At most {{lanes}} independent phases walk at once, and only phases that touch no file each other writes and that do not wait on each other; everything else stays serial. A plan given its own swarm word on its card follows that word instead of this switch. Takes effect at the next phase boundary.',
+                  defaultValue: 'At most {{lanes}} independent tasks walk at once, and only tasks that touch no file each other writes and that do not wait on each other; everything else stays serial. A feature given its own swarm word on its card follows that word instead of this switch. Takes effect at the next task boundary.',
                   lanes,
                 })
             // Said in the tense the runner is in: with the switch off exactly one phase is admitted,
             // so a sentence about lanes would be describing a walk that is not happening.
             : t('agents.runnerSwarm.descriptionOff', {
-                defaultValue: 'Off: the plan runner walks one phase at a time. Turn this on and it runs every independent phase of a plan at once — with an optional ceiling on how many at a time — and only ever phases that touch no file each other writes and that do not wait on each other. A plan given its own swarm word on its card follows that word instead of this switch. Takes effect at the next phase boundary.',
+                defaultValue: 'Off: the runner walks one task at a time. Turn this on and it runs every independent task of a feature at once — with an optional ceiling on how many at a time — and only ever tasks that touch no file each other writes and that do not wait on each other. A feature given its own swarm word on its card follows that word instead of this switch. Takes effect at the next task boundary.',
               })}
       >
         {swarmUnknown ? (
@@ -188,7 +188,7 @@ export default function RunnerModelContent() {
               canIncrease={swarmEnabled !== null && lanes !== null}
               decreaseLabel={t('agents.runnerSwarm.lanesDown', { defaultValue: 'One lane fewer' })}
               increaseLabel={t('agents.runnerSwarm.lanesUp', { defaultValue: 'One lane more' })}
-              ariaLabel={t('agents.runnerSwarm.lanesLabel', { defaultValue: 'Ceiling on phases run at once' })}
+              ariaLabel={t('agents.runnerSwarm.lanesLabel', { defaultValue: 'Ceiling on tasks run at once' })}
             />
             {/* THE WAY BACK IS ITS OWN PRESS, shown exactly while there is a ceiling to clear, so a
                 reader never has to step a count down to reach no ceiling — and so the one count they
