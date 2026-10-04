@@ -1902,3 +1902,48 @@ The folders' whole journey on the operator's own surface. Parts: MAN-7536 (folde
 - Size: 940 lines, over the 800 ceiling; the split shape is by stage (setup, steps, cleanup plus wire helpers).
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-whole-folders.mjs
+
+## MAN-7665 — The `?roadmap=<name>` landing — the Roadmap tab opens on its Roadmap face with that roadmap selected
+
+The workspace's second landing, beside `?runner=<plan>` (MAN-7531). The hook's shared rules (held name, one strip, leave-drop): MAN-7531 §"`useRunnerLanding` — rules". The tab: MAN-7654; its face state: MAN-7640; `useRoadmap().select`: MAN-7635; `roadmapSelected`: MAN-7655.
+
+| Part | File | Does |
+| --- | --- | --- |
+| `ROADMAP_LANDING_PARAM` | `src/shared/constants.ts` | `'roadmap'`; the hook imports it as `ROADMAP_PARAM` |
+| `useRunnerLanding` | `src/modules/project-workspace/hooks/useRunnerLanding.ts` | holds the name as `openRoadmap`, brings the `runner` tab forward, strips the param; `clearOpenRoadmap` is stable |
+| `WorkspaceMain` | `src/modules/project-workspace/WorkspaceMain.tsx` | passes `openRoadmap` and `onRoadmapOpened={clearOpenRoadmap}` to `RoadmapTab` |
+| `RoadmapTab` | `src/modules/roadmap/RoadmapTab.tsx` | turns the face to Roadmap on arrival; selects the roadmap once the picture is read; calls `onRoadmapOpened` |
+
+- Writer: the chat widget's foot link `roadmap.widget.open` (`RoadmapWidgetBody.openRoadmap`, MAN-7668) writes `?roadmap=<selected.name>` through `ROADMAP_LANDING_PARAM` (`replace`), as `useRevealCard` writes `RUNNER_LANDING_PARAM`; a hand-typed `?roadmap=<name>` takes the same road in.
+- `RoadmapTab` props: `openRoadmap: string | null`, `onRoadmapOpened: () => void`.
+
+## RoadmapTab — the landing's two steps
+| step | when | does |
+| --- | --- | --- |
+| turn the face | during render, once, at the render `openRoadmap` arrives in | `setFace('path')` unless `revealPlan` is non-null; `faceTurnedFor` records the request the face was turned for |
+| select and retire | effect, once `picture !== null` | name in `roadmaps`: wait for `selected !== null`, then `select(name)`; name absent: select nothing. Either way `onRoadmapOpened()` |
+
+- `faceTurnedFor` resets to `null` when the request is retired, so the same name landing later turns the face again. A tab already on In flight when a landing arrives still turns.
+- Once, never again: a press on In flight made while the picture loads is not undone when the picture lands.
+- `revealPlan` is read at the arrival render: a `?runner=` reveal that arrived with it wins the face (the card is the more specific ask); the roadmap is selected all the same.
+- Wait for `selected !== null` before `select`. why: `selected` is `null` until preferences hydrate (MAN-7655), and a write on a cold mirror is overwritten by the hydrate.
+- A name the picture lacks needs no wait: the tab opens on the Roadmap face on the roadmap already on screen, and the request is retired at once.
+- `?runner=<plan>&roadmap=<name>` together: both params leave the URL in one pass, In flight shows with the card in view, the roadmap is selected.
+- `/?roadmap=<name>` with no project picked: the param stays in the URL and the name is held; after a project is picked it lands and the param is stripped.
+
+## The standing proof
+`node .verify/probe-roadmap-landing.mjs` on the live app, 1440×900, light; exit 0 and `PASS` when clean. Artifacts: `.verify/artifacts/roadmap-widget/landing-{lyphecli,no-such-roadmap,runner-in-flight}-light.png`. `roadmapSelected` is read through the harness's `api()` (the server's copy) before and after each landing, and written back last.
+
+| Page | Holds |
+| --- | --- |
+| `/session/<id>?roadmap=lyphecli`, account on the other roadmap, stored tab `chat` | Roadmap tab on the Roadmap face showing lyphecli; `roadmapSelected` = `lyphecli`; URL without `roadmap` |
+| the same, then a picker pick of the other roadmap, a trip to Chat and back | the pick stands: the landing was retired, no replay |
+| `?roadmap=no-such-roadmap` | tab on the Roadmap face; `roadmapSelected` and the roadmap on screen unchanged, also after a trip away and back; URL stripped |
+| `?runner=<live card's plan>` | In flight face, that card in view, `runner` gone |
+| `?runner=<plan>&roadmap=lyphecli` | both gone from the URL, In flight with the card in view, lyphecli selected |
+| `/?roadmap=lyphecli`, no project | param stays; after a project click: lands on lyphecli, param stripped |
+
+- 2026-10-04: `node .verify/probe-roadmap-landing.mjs` ends `PASS`, the `[root]` leave-drop leg and the face turn on arrival among its checks; part `landings` of `probe-roadmap-widget.mjs` (MAN-7671) ends `PASS` with 13 ok, the Answer press among them (it is a `[SKIP]` only while nothing waits on the operator).
+- Counts console errors only from each page's own life: a chat fetch aborted by `goto` leaving the previous page is not a finding.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/hooks/useRunnerLanding.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/RoadmapTab.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/constants.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-roadmap-landing.mjs

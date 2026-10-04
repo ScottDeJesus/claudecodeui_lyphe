@@ -350,6 +350,9 @@
     "runner": {
       "title": "実行"
     },
+    "roadmap": {
+      "title": "ロードマップ"
+    },
     "memory": {
       "title": "メモリ",
       "pending": "レビュー待ち",

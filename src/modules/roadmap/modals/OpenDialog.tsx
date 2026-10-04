@@ -9,12 +9,15 @@ import { MoveDialog } from '@/modules/roadmap/modals/MoveDialog';
  * The dialog the Roadmap face has open, mounted: the one `FaceDialog` the face holds, drawn as the dialog
  * it names with the target it carries. Every dialog closes through the one `onClose`, whether its write
  * landed or not — the picture that follows is what shows a write, so the face has no use for the answer.
- * Used by `RoadmapPath`, in its one dialog slot.
+ * Used by `RoadmapPath` and `RoadmapWidgetBody`, each in its one dialog slot.
  */
 export function OpenDialog({ dialog, onClose, onOpenCard }: {
   dialog: FaceDialog;
   onClose: () => void;
-  /** Handed to a feature's dialog for its Open its card and Answer on its card: the face turns to In flight on that plan. */
+  /**
+   * Handed to a feature's dialog for its Open its card and Answer on its card: on the tab the face turns to
+   * In flight on that plan; in the chat gutter's widget the dialog closes and the page lands on `?runner=<plan>`.
+   */
   onOpenCard: (plan: string) => void;
 }) {
   switch (dialog.dialog) {

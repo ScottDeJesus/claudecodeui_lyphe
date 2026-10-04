@@ -1,5 +1,5 @@
 import { Layers, Milestone, Puzzle, Route } from 'lucide-react';
-import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
+import { useCallback, useId, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { CelebrationContext } from '@/modules/roadmap/celebrationContext';
@@ -7,11 +7,13 @@ import { CelebrationLayer } from '@/modules/roadmap/CelebrationLayer';
 import { RoadmapFaceContext } from '@/modules/roadmap/faceContext';
 import type { FaceDialog, RoadmapFace } from '@/modules/roadmap/faceContext';
 import { useCelebrations } from '@/modules/roadmap/hooks/useCelebrations';
+import { useMilestoneMomentInView } from '@/modules/roadmap/hooks/useMilestoneMomentInView';
 import { useRoadmap } from '@/modules/roadmap/hooks/useRoadmap';
 import { MilestoneFocus } from '@/modules/roadmap/MilestoneFocus';
 import { OpenDialog } from '@/modules/roadmap/modals/OpenDialog';
 import { RoadmapHeader } from '@/modules/roadmap/RoadmapHeader';
 import { RoadmapRail } from '@/modules/roadmap/RoadmapRail';
+import { playingMilestone } from '@/modules/roadmap/utils/celebrationMoments';
 import type { RoadmapPicture } from '@/shared/roadmap-types';
 import { Badge, Banner, Button, EmptyState, ScrollArea, Spinner } from '@/shared/ui';
 
@@ -53,31 +55,12 @@ export function RoadmapPath({ onOpenCard }: RoadmapPathProps) {
   const milestones = selected?.milestones ?? [];
   // What plays on this face: `active` is the CelebrationContext value below, `moment` and `skip` the layer's.
   const { moment, skip, active } = useCelebrations(selected, rootRef);
-  // The milestone holding what plays: named by `active.milestone`, or holding an epic of `active.epics`
-  // or a feature of `active.features`. The hook keeps `active` through the beat between two moments and
-  // empties it with the queue, so this holds through the gaps and is null once it is empty. A TASK moment
-  // is left out on purpose: its meter plays wherever its row is drawn (the stage or the rail's In flight
-  // section), and a task lands every few minutes while a feature walks, so taking the stage for it would
-  // pull the reader off the milestone he pressed and remount what he has open there.
-  const playing = milestones.find((item) => item.name === active.milestone)
-    ?? milestones.find((item) => item.epics.some((epic) => active.epics.has(epic.name) || epic.features.some((feature) => active.features.has(feature.name))))
-    ?? null;
-  // A milestone moment plays on its station, so a station scrolled out of the face's view (down the
-  // page, or along the sideways rail on a phone) is brought into it first: the smooth scroll lands inside
-  // the layer's 900 ms entrance, so the rail's draw, the bloom and the burst play where the reader looks.
-  // Instantly under reduced motion, which asks for no travel. A station already in view is left alone.
-  useEffect(() => {
-    if (moment?.level !== 'milestone') return;
-    const scroller = scrollRef.current;
-    const station = scroller?.querySelector<HTMLElement>(`[data-roadmap-milestone="${CSS.escape(moment.name)}"]`);
-    if (!scroller || !station) return;
-    const view = scroller.getBoundingClientRect();
-    const box = station.getBoundingClientRect();
-    const clipped = box.top < view.top || box.bottom > view.bottom || box.left < view.left || box.right > view.right;
-    if (!clipped) return;
-    const still = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    station.scrollIntoView({ behavior: still ? 'auto' : 'smooth', block: 'center', inline: 'center' });
-  }, [moment]);
+  // The milestone holding what plays (`playingMilestone`, which leaves a task moment out). The hook keeps
+  // `active` through the beat between two moments and empties it with the queue, so this holds through the
+  // gaps and is null once it is empty.
+  const playing = playingMilestone(milestones, active);
+  // A milestone moment plays on its station, so a station scrolled out of the face's view is brought into it first.
+  useMilestoneMomentInView(moment, scrollRef);
   // Which dialog is open, for which item, adding or editing — one at a time, as a dialog is modal. `null`
   // for none. Its opener is the face context's `openDialog`, so any press under the face can put one up.
   const [dialog, setDialog] = useState<FaceDialog | null>(null);

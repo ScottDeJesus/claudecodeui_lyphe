@@ -351,6 +351,9 @@
     "runner": {
       "title": "Çalıştırmalar"
     },
+    "roadmap": {
+      "title": "Yol haritası"
+    },
     "memory": {
       "title": "Bellek",
       "pending": "İnceleme bekliyor",

@@ -5043,8 +5043,8 @@ once in its life and a re-render can never throw away what the reader did inside
 ## MAN-421 — The Embed widget
 section: 07-live-widgets/010 The Embed widget
 
-The same address, in the gutter beside the transcript rather than inline in it — the fourth chat
-gutter widget, next to Runs, Memory and Subagents.
+The same address, in the gutter beside the transcript rather than inline in it — a chat
+gutter widget, beside Runs, Roadmap, Memory, Subagents and Notes (MAN-7526).
 
 **Why a widget and not only a card.** An inline card is part of the reply: it scrolls away with the
 message that declared it, and it is as wide as the transcript column. A page the reader is *working
@@ -6707,17 +6707,22 @@ how the pieces fit together.
 
 ## Gutter widgets — ids and default places
 
-`GutterWidgetId` (`src/shared/types.ts`) = `'runner' | 'memory' | 'subagents' | 'embed' | 'notes'`. The ids are the DOM's `data-widget` and the keys of the stored record.
+`GutterWidgetId` (`src/shared/types.ts`) = `'runner' | 'roadmap' | 'memory' | 'subagents' | 'embed' | 'notes'`. The ids are the DOM's `data-widget` and the keys of the stored record. Six widgets, three a side by default: left `runner`, `roadmap`, `subagents`; right `memory`, `embed`, `notes`. Any of them drags to either side at any rank.
 
 | id | default side | order | open | table entry in `ChatGutterLayout` |
 |---|---|---|---|---|
 | `runner` | left | 0 | no | badge `useDispatcherPlans().count`, `countTone: 'warn'` while `waiting > 0` (MAN-7540) |
-| `subagents` | left | 1 | yes | `HeaderAction: SubagentWidgetClearCompleted` |
+| `roadmap` | left | 1 | yes | badge `designing + in_flight` of `useRoadmap().selected.standing`, each read `?? 0`; `countTone: 'warn'` while `waiting_on_you > 0`; `Body: RoadmapWidgetBody` (MAN-7668); `flush: true`; title `gutters.roadmap.title` |
+| `subagents` | left | 2 | yes | `HeaderAction: SubagentWidgetClearCompleted` |
 | `memory` | right | 0 | no | |
 | `embed` | right | 1 | no | `flush: true` |
 | `notes` | right | 2 | no | badge `notes?.length ?? 0`, `Body: NotesWidgetBody`; not `flush`, no header action (MAN-7518) |
 
 Defaults live in `DEFAULT_PLACEMENTS` (`src/modules/chat-gutters/hooks/useGutterPlacements.ts`).
+- `roadmap` opens itself: the operator asked for it beside Runs, and a widget he asked for is seen without hunting.
+- `ChatGutterLayout` takes `RoadmapWidgetBody` and `useRoadmap` from the roadmap barrel (MAN-7635); the body's own row is MAN-7668.
+- The `roadmap` badge reads sit outside every widget's boundary, so the `?? 0` falls are load-bearing: a picture without `standing` costs the badge its number; a throw would take the whole chat to the workspace error panel.
+- A stored arrangement without `roadmap` gains it at its default through `parsePlacements`; ranks are then made dense per side and ties break on `GUTTER_WIDGET_ORDER`, so a stored `subagents` at order 1 draws after it.
 
 ## Gutter widgets — adding one
 

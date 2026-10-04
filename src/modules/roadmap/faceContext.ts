@@ -14,7 +14,7 @@ type NamedItem = { name: string; title: string };
  * `edit` changes the item as it stood when pressed, asking for its goal first when `goalFirst`; `move`
  * and `feature` name their item and read it off each new picture; `block` and `delete` carry the item
  * they are about. `kind` is the dispatcher's own word: `arc` is an epic, `plan` a feature. Held by
- * `RoadmapPath` as its one piece of dialog state, and drawn by `OpenDialog`.
+ * `RoadmapPath` and by `RoadmapWidgetBody`, each as its one piece of dialog state, and drawn by `OpenDialog`.
  */
 export type FaceDialog =
   | { dialog: 'add'; kind: RoadmapKind; parent: NamedItem | null }

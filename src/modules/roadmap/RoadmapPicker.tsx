@@ -11,8 +11,8 @@ import { Select } from '@/shared/ui';
  * for a roadmap that is not there finds how to start it where their hand already is. The choice is the
  * server-backed `roadmapSelected`, so the phone and the desk show the same roadmap.
  *
- * Used by `RoadmapHeader`, over the goal on the face, and by the chat gutter's roadmap widget through the
- * module's barrel — `sm` in both, the dense trigger that sits beside a 36px button.
+ * Used by `RoadmapHeader`, over the goal on the face, and by `RoadmapWidgetBody`, the chat gutter's roadmap
+ * widget — `sm` in both, the dense trigger that sits beside a 36px button.
  */
 export function RoadmapPicker({ size }: { size: 'md' | 'sm' }) {
   const { t } = useTranslation();

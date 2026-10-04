@@ -22,8 +22,8 @@ export type Moment = {
  * What is playing right now, by name, for the rows, cards and stations that carry their own motion:
  * the tasks and features whose row is moving, the epics whose card is, and the milestone whose
  * station is (or `null`). A task's name is its feature's, since the meter that grows is the
- * feature's row. Provided by `RoadmapPath` from `useCelebrations`; read by `FeatureRow`, `EpicCard`
- * and `MilestonePath`.
+ * feature's row. Provided by `RoadmapPath` and `RoadmapWidgetBody`, each from `useCelebrations`; read
+ * by `FeatureRow`, `EpicCard` and `MilestonePath`.
  */
 export type CelebrationActive = {
   tasks: Set<string>;
@@ -34,9 +34,9 @@ export type CelebrationActive = {
 
 /**
  * The celebration context. Its default is the still screen — every set empty and no milestone — so
- * a row, a card or a station drawn outside the Roadmap tab's face (the chat gutter's widget draws
- * `FeatureRow` and `MilestonePath` without a provider of its own) reads "nothing is playing" rather
- * than failing. Provided by `RoadmapPath`; read by `FeatureRow`, `EpicCard` and `MilestonePath`.
+ * a row, a card or a station drawn under no provider reads "nothing is playing" rather than failing.
+ * Provided by `RoadmapPath` (the tab's face) and `RoadmapWidgetBody` (the chat gutter's widget), each
+ * from its own `useCelebrations`; read by `FeatureRow`, `EpicCard` and `MilestonePath`.
  */
 export const CelebrationContext = createContext<CelebrationActive>({
   tasks: new Set(),

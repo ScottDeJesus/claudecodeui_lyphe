@@ -1171,6 +1171,15 @@
       "unblock": "{{title}} unblocked",
       "remove": "{{title}} deleted",
       "promote": "{{title}} sent to design"
+    },
+    "widget": {
+      "open": "Open the roadmap",
+      "more_one": "+{{count}} more",
+      "more_other": "+{{count}} more",
+      "focus_one": "Milestone {{n}} · {{title}} · {{complete}} of {{count}} epic complete",
+      "focus_other": "Milestone {{n}} · {{title}} · {{complete}} of {{count}} epics complete",
+      "focusWord": "Milestone {{n}} · {{title}} · {{word}}",
+      "quiet": "Nothing waiting on you, in flight or next up"
     }
   },
   "dispatcher": {
@@ -1560,6 +1569,9 @@
   "gutters": {
     "runner": {
       "title": "Runs"
+    },
+    "roadmap": {
+      "title": "Roadmap"
     },
     "memory": {
       "title": "Memory",

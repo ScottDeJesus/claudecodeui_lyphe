@@ -118,8 +118,9 @@ function WorkspaceMain({
     preferencesSettled,
   } = useWorkspaceTabGates(activeTab);
 
-  // A `?runner=<plan>` landing: the Roadmap tab comes forward on its In flight face and brings that plan's card into view.
-  const { revealPlan, clearReveal } = useRunnerLanding({ selectedProject, setActiveTab });
+  // The two landings onto the Roadmap tab: `?runner=<plan>` brings it forward on its In flight face with that plan's card in view,
+  // and `?roadmap=<name>` on its Roadmap face with that roadmap selected.
+  const { revealPlan, clearReveal, openRoadmap, clearOpenRoadmap } = useRunnerLanding({ selectedProject, activeTab, setActiveTab });
 
   useTaskMasterProjectSync(selectedProject);
 
@@ -432,7 +433,12 @@ function WorkspaceMain({
 
           {shouldShowRunnerTab && activeTab === 'runner' && (
             <div className="h-full overflow-hidden">
-              <RoadmapTab revealPlan={revealPlan} onRevealed={clearReveal} />
+              <RoadmapTab
+                revealPlan={revealPlan}
+                onRevealed={clearReveal}
+                openRoadmap={openRoadmap}
+                onRoadmapOpened={clearOpenRoadmap}
+              />
             </div>
           )}
 

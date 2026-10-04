@@ -3733,3 +3733,243 @@ measured 2026-10-04 by chain chain-regression-cases--screen--fill-20261004-03562
 probe-key: fca73ec3421d5b2d8d9aab48e39ef24596903c6b
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/caseMark.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/hooks/useFeatureCases.ts
+
+## INV-6689 — probe — MEDIUM — H2's cure taught the sweep about a run beside it, but not the walks: overlapping runs still turn each other red and clobber the account
+
+MEDIUM — H2's cure taught the sweep about a run beside it, but not the walks: overlapping runs still turn each other red and clobber the account
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe
+DP=~/.claude/scripts/dispatcher
+$DP roadmap add roadmap probe-screen-athena-fx --title "Probe screen athena fx" --by cli >/dev/null 2>&1
+node .verify/probe-roadmap-screen.mjs --only=look > /tmp/athena-n1.log 2>&1 &
+P=$!
+timeout 120 bash -c 'until grep -q "picker light\] lists" /tmp/athena-n1.log; do sleep 0.5; done'
+$DP roadmap remove roadmap probe-screen-athena-fx --by cli >/dev/null 2>&1
+timeout 500 bash -c "while kill -0 $P 2>/dev/null; do sleep 2; done"
+echo "failures: $(grep -cE '^\[FAIL\]' /tmp/athena-n1.log)"; tail -1 /tmp/athena-n1.log | cut -c1-80
+$DP roadmap --json | python3 -c "import sys,json;print('left in store:',[r['name'] for r in json.load(sys.stdin)['roadmaps'] if r['name'].startswith('probe-screen-')])"
+expect: "failures: 3" and a "FAIL — … 3 failed" line (the walk stopped waiting for the vanished roadmap's option, twice, plus "every roadmap of the store is listed"); cured: "failures: 0" and "PASS"
+```
+
+measured 2026-10-04 by chain chain-roadmap--screen--whole-20261004-032012-391b, finding M1, MEDIUM
+probe-key: 8f9b6677537832061ae07e1fd286ad90c7b1f8ea
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/report.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/roadmap-catchup-walk.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/roadmap-dialogs.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/roadmap-live-walks.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/roadmap-look-walk.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/roadmap-motion.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/roadmap-page.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/roadmap-store.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/roadmap-ui.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/roadmap-writes-build.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/roadmap-writes-kit.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/roadmap-writes-tidy.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/roadmap-writes-walk.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/roadmap-writes-words.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-roadmap-screen.mjs
+
+## INV-6690 — probe — LOW — an interrupt still races the `finally`: the stamp stays rewound about one time in five, a dead `seen` entry and the walk's pick can stay behind
+
+LOW — an interrupt still races the `finally`: the stamp stays rewound about one time in five, a dead `seen` entry and the walk's pick can stay behind
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe
+grep -n "SIGINT\|SIGTERM" .verify/probe-roadmap-screen.mjs .verify/lib/roadmap-*.mjs || echo none
+expect: "none" (no handler restores the account before Playwright's exit(130)); cured: a SIGINT/SIGTERM handler line that restores the stamp, the pick and the dead entry before exiting
+```
+
+measured 2026-10-04 by chain chain-roadmap--screen--whole-20261004-032012-391b, finding L1, LOW
+probe-key: fbe31717568fcd6bc19b26985edb711cd7f4a50c
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/report.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/roadmap-catchup-walk.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/roadmap-dialogs.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/roadmap-live-walks.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/roadmap-look-walk.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/roadmap-motion.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/roadmap-page.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/roadmap-store.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/roadmap-ui.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/roadmap-writes-build.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/roadmap-writes-kit.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/roadmap-writes-tidy.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/roadmap-writes-walk.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/roadmap-writes-words.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-roadmap-screen.mjs
+
+## INV-6691 — probe — LOW — "in view" now means "a top edge inside the window and half the card on screen": the transcript's own 32 px cut still passes
+
+LOW — "in view" now means "a top edge inside the window and half the card on screen": the transcript's own 32 px cut still passes
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe && node --input-type=module -e "
+import { cardInView } from './.verify/lib/roadmap-page.mjs';
+const w = { found: true, left: 29, right: 361, width: 390, height: 844 };
+console.log('y 454-876 of 844:', cardInView({ ...w, top: 454, bottom: 876 }), '| 1 px at the bottom edge:', cardInView({ ...w, top: 843, bottom: 1265 }), '| 20 px foot:', cardInView({ ...w, top: -400, bottom: 20 }));
+"
+expect: "true false false" (the measured 32 px cut passes, the two extremes are cured); cured, if the card's whole body is required: "false false false"
+```
+
+measured 2026-10-04 by chain chain-roadmap--screen--whole-20261004-032012-391b, finding L2, LOW
+probe-key: 27d70e329e0abebbc121a1020e6165466fd0c3cd
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/report.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/roadmap-catchup-walk.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/roadmap-dialogs.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/roadmap-live-walks.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/roadmap-look-walk.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/roadmap-motion.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/roadmap-page.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/roadmap-store.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/roadmap-ui.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/roadmap-writes-build.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/roadmap-writes-kit.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/roadmap-writes-tidy.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/roadmap-writes-walk.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/roadmap-writes-words.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-roadmap-screen.mjs
+
+## INV-6692 — probe — LOW — the mirror orphan count the writes walk prints is always 0, and the mirror's lines fill the transcript
+
+LOW — the mirror orphan count the writes walk prints is always 0, and the mirror's lines fill the transcript
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe
+node --input-type=module -e "import {mirrorOrphanProbePages as m} from './.verify/lib/roadmap-store.mjs'; console.log('probe says', m())" 2>/dev/null
+~/.claude/scripts/dispatcher roadmap mirror --dry-run 2>&1 >/dev/null | grep -c "orphan page-roadmap-probe-screen-"
+expect: "probe says 0" then a number ≥ 1 (6 today); cured: both numbers equal
+```
+
+measured 2026-10-04 by chain chain-roadmap--screen--whole-20261004-032012-391b, finding L3, LOW
+probe-key: 225b98a47a4c7cd0aa9d6b74bd1020e71b676371
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/report.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/roadmap-catchup-walk.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/roadmap-dialogs.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/roadmap-live-walks.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/roadmap-look-walk.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/roadmap-motion.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/roadmap-page.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/roadmap-store.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/roadmap-ui.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/roadmap-writes-build.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/roadmap-writes-kit.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/roadmap-writes-tidy.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/roadmap-writes-walk.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/roadmap-writes-words.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-roadmap-screen.mjs
+
+## INV-6694 — probe — The "when it last ran" oracle has no branch past 24 h, so the standing proof false-FAILs on a correct screen once the shell case's newest run ages out; and the oracle is read once and never refreshed
+
+The "when it last ran" oracle has no branch past 24 h, so the standing proof false-FAILs on a correct screen once the shell case's newest run ages out; and the oracle is read once and never refreshed
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe && sed -n '/^function agoWords/,/^}/p' .verify/lib/roadmap-cases-walk.mjs | grep -c -E "yesterday|days ago"; ~/.claude/scripts/cases list --plan restorly--shell --json | jq -r '.[0].newest_run.at'
+expect: first line `0` while the oracle has no day phrase (cured when 1 or more); second line is the newest run's stamp the 24 h clock counts from (a stamp 24 h or older with a first line of 0 is the false FAIL).
+```
+
+measured 2026-10-04 by chain chain-regression-cases--screen--whole-20261004-050431-851f, finding M1, MEDIUM
+probe-key: ab1b09a446d9c58b94c9b4572e799353b89be8de
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/roadmap-cases-walk.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-roadmap-cases.mjs
+
+## INV-6695 — probe — The 390 dialog capture is asserted by nothing: the intent's three things (sentence, word, when it last ran) are not checked to be in the capture
+
+The 390 dialog capture is asserted by nothing: the intent's three things (sentence, word, when it last ran) are not checked to be in the capture
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe && sed -n '/^async function readDialog/,/^}/p' .verify/lib/roadmap-cases-walk.mjs | grep -c -E "getBoundingClientRect|boundingBox|isIntersecting"
+expect: `0` while no step asserts the case's sentence, badge and "Last ran" lie inside `[data-roadmap-dialog-body]` before the capture; 1 or more once they are asserted per capture.
+```
+
+measured 2026-10-04 by chain chain-regression-cases--screen--whole-20261004-050431-851f, finding L1, LOW
+probe-key: affb24668dfbc2ce492c5f8163a12604021e757f
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/roadmap-cases-walk.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-roadmap-cases.mjs
+
+## INV-6696 — probe — A vacuous `[OK]` about a gutter widget that does not exist is counted in "83 ok"
+
+A vacuous `[OK]` about a gutter widget that does not exist is counted in "83 ok"
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe && grep -E '^\[(OK|SKIP)\] +\[gutter\]' .verify/artifacts/roadmap-cases/transcript.txt | cut -c1-120
+expect: a `[SKIP]` line for the missing widget AND an `[OK]   [gutter] no amber case mark stands in the gutter either` line beside it while the defect stands; no `[OK]` about the gutter while no widget is drawn once cured.
+```
+
+measured 2026-10-04 by chain chain-regression-cases--screen--whole-20261004-050431-851f, finding L2, LOW
+probe-key: 300a98f2d596f88834e19aec2abd1d3a3737d541
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/roadmap-cases-walk.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-roadmap-cases.mjs
+
+## INV-6697 — probe — The probe's header says "WRITES. None", but every `openConsole` it makes PATCHes the account
+
+The probe's header says "WRITES. None", but every `openConsole` it makes PATCHes the account
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe && grep -n "WRITES" .verify/probe-roadmap-cases.mjs | cut -c1-60; sed -n '/^async function parkOnProjectTree/,/^}/p' .verify/lib/console.mjs | grep -n -E "PATCH|simpleChatList"
+expect: the header line says "WRITES. None." and the second command prints the PATCH of `{ simpleChatList: false }` made by every session the probe opens (cured when the header names it, or the PATCH is skipped when the value already holds).
+```
+
+measured 2026-10-04 by chain chain-regression-cases--screen--whole-20261004-050431-851f, finding L3, LOW
+probe-key: 2c054d43bea8c8625ca7a6468ac961562e5a4e4e
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/roadmap-cases-walk.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-roadmap-cases.mjs
+
+## INV-6698 — probe — No manual governs the new probe or its helper
+
+No manual governs the new probe or its helper
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe && for f in .verify/probe-roadmap-cases.mjs .verify/lib/roadmap-cases-walk.mjs; do echo "$f manuals: $(docstore govern "$PWD/$f" --text | grep -c '^MAN-')"; done
+expect: `manuals: 0` for both while no manual governs them; 1 or more once MAN-7660's governs line names them.
+```
+
+measured 2026-10-04 by chain chain-regression-cases--screen--whole-20261004-050431-851f, finding L4, LOW
+probe-key: 0cd4841adf75e320ace09f2bc77e0ab8f76f9367
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/roadmap-cases-walk.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-roadmap-cases.mjs
+
+## INV-6720 — probe — Rows this phase owns carry history and process voice, and one says "not measured" about a thing that was measured
+
+Rows this phase owns carry history and process voice, and one says "not measured" about a thing that was measured
+
+```probe
+cd ~/.claude && echo "$(docstore get MAN-7668 --text | grep -c -i -E "reviewer'?s reading|builder'?s count") $(docstore get MAN-7665 --text | grep -c "predates the fix-pass") $(docstore get MAN-7640 --text | grep -c "not re-run")"
+expect: 0 0 0 (today it prints "2 1 1")
+```
+
+measured 2026-10-04 by chain chain-roadmap--widget--docs-20261004-081056-7d30, finding M1, MEDIUM
+probe-key: 488f91f90247b35baab3dc452a6747a690c5f9c2
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/modals/OpenDialog.tsx
+
+## INV-6721 — probe — `src/modules/chat/index.ts:5` still says Subagents is "the third widget"
+
+`src/modules/chat/index.ts:5` still says Subagents is "the third widget"
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe && grep -n "as the third widget" src/modules/chat/index.ts || echo none
+expect: none (today: 5:// opens. Its consumer is the chat-gutters module, which mounts it as the third widget.)
+```
+
+measured 2026-10-04 by chain chain-roadmap--widget--docs-20261004-081056-7d30, finding L1, LOW
+probe-key: 5f0926fcfb6ab6ce2c3fb292c3881caa4c443792
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/index.ts
+
+## INV-6722 — probe — MAN-7650 says `RoadmapPath` holds the one dialog state, against its own line 31 and the comment this diff changed
+
+MAN-7650 says `RoadmapPath` holds the one dialog state, against its own line 31 and the comment this diff changed
+
+```probe
+cd ~/.claude && docstore get MAN-7650 --text | grep -c "is the one dialog state .RoadmapPath. holds"
+expect: 0 (today 1)
+```
+
+measured 2026-10-04 by chain chain-roadmap--widget--docs-20261004-081056-7d30, finding L2, LOW
+probe-key: 1ceda3f239971f8c1814612bee57e63ca846569e
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/modals/OpenDialog.tsx
+
+## INV-6723 — probe — MAN-7665 is the only row of the roadmap lane in the `cloudcli:.` package
+
+MAN-7665 is the only row of the roadmap lane in the `cloudcli:.` package
+
+```probe
+cd ~/.claude && docstore get MAN-7665 | python3 -c "import sys,json;p=json.load(sys.stdin)['row']['package'];print(p['repo']+':'+p['path'])"
+expect: cloudcli:docs (today cloudcli:.)
+```
+
+measured 2026-10-04 by chain chain-roadmap--widget--docs-20261004-081056-7d30, finding L3, LOW
+probe-key: 7e480a2c247126c9591ce31c868cf0f62ddf1859
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/modals/OpenDialog.tsx
+
+## INV-6724 — probe — The report's "Shown" line is met for three rows of seven, as excerpts
+
+The report's "Shown" line is met for three rows of seven, as excerpts
+
+```probe
+cd ~/.claude && for n in 421 7527 7648 7656; do docstore history MAN-$n --text | head -1 | cut -c1-40; done
+expect: four lines dated 2026-10-04T15:14 to 15:15, rows the report names without printing
+```
+
+measured 2026-10-04 by chain chain-roadmap--widget--docs-20261004-081056-7d30, finding L4, LOW
+probe-key: 92ac425f298c18086f3684c6e8cccd540c4bf31b
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/modals/OpenDialog.tsx
+
+## INV-6725 — probe — LOW — "captured as frames every 150 ms" has a 0.72–0.75 s hole where the milestone banner arrives, in both plays, and the report and MAN-7671 say otherwise
+
+LOW — "captured as frames every 150 ms" has a 0.72–0.75 s hole where the milestone banner arrives, in both plays, and the report and MAN-7671 say otherwise
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe/.verify/shots/roadmap-widget && for d in frames-catchup frames-unfold; do ls $d 2>/dev/null | python3 -c "import sys,re;o=sorted(int(re.search(r'-(\d+)ms',l).group(1)) for l in sys.stdin);g=[b-a for a,b in zip(o,o[1:])];print('$d',len(o),'median',sorted(g)[len(g)//2] if g else 0,'max',max(g or [0]))"; done
+expect: max ≤ 300 in both folders; it stands at 748 (frames-catchup) and 720 (frames-unfold)
+```
+
+measured 2026-10-04 by chain chain-roadmap--widget--whole-20261004-084914-d809, finding L1, LOW
+probe-key: e887c94942b77fca35f4ad1afb78b28e2333f00c
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/roadmap-live-walks.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/roadmap-widget-prod.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/roadmap-widget-walks.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-roadmap-widget.mjs
+
+## INV-6726 — probe — LOW — the `:5184` capture can show a catch-up playing over the widget and the walk still passes
+
+LOW — the `:5184` capture can show a catch-up playing over the widget and the walk still passes
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe && grep -cE "data-roadmap-moment|data-roadmap-summary|data-celebrating|settleStamp" .verify/lib/roadmap-widget-prod.mjs || true
+expect: 0 today (the prod walk guards nothing against a moment playing over the widget); cured when it is at least 1
+```
+
+measured 2026-10-04 by chain chain-roadmap--widget--whole-20261004-084914-d809, finding L2, LOW
+probe-key: c4bc8e13f306f950a59a335a265155e012079326
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/roadmap-live-walks.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/roadmap-widget-prod.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/roadmap-widget-walks.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-roadmap-widget.mjs

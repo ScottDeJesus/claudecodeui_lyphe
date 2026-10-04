@@ -1,4 +1,4 @@
-import { ActivityIcon, BotIcon, BrainIcon, GlobeIcon, StickyNoteIcon, type LucideIcon } from 'lucide-react';
+import { ActivityIcon, BotIcon, BrainIcon, GlobeIcon, RouteIcon, StickyNoteIcon, type LucideIcon } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ComponentType, ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -17,6 +17,7 @@ import { GutterWidgetFrame } from '@/modules/chat-gutters/GutterWidgetFrame';
 import { useDispatcherPlans } from '@/modules/dispatcher';
 import { MemoryWidgetBody, useMemoryIntake } from '@/modules/memory-intake';
 import { NotesWidgetBody, useNotes } from '@/modules/notes';
+import { RoadmapWidgetBody, useRoadmap } from '@/modules/roadmap';
 import { RunnerWidgetBody } from '@/modules/runner-tab';
 import { useHostWindow } from '@/shared/context/HostWindowContext';
 import type { GutterSide, GutterWidgetId, Tone } from '@/shared/types';
@@ -47,7 +48,7 @@ const GUTTER_MIN_PX = 300;
 const MIN_REGION_PX = CHAT_COLUMN_PX + 2 * (GUTTER_MIN_PX + GUTTER_GAP_PX);
 
 /**
- * The desktop chat's side gutters: the runner, memory, subagents, embed and notes widgets beside the
+ * The desktop chat's side gutters: the runner, roadmap, memory, subagents, embed and notes widgets beside the
  * transcript, each of them draggable into either side's stack, at any place in it, and any one of
  * them able to take the whole viewport for as long as the reader wants it.
  *
@@ -91,6 +92,15 @@ export function ChatGutterLayout({
   // `waiting` is the badge's TONE, not its number: the count stays what it always was, and turns
   // amber while any of those plans owes the operator a word — the same amber the tab's dot wears.
   const { count: runnerCount, waiting: runnerWaiting } = useDispatcherPlans();
+  // The Roadmap widget's badge counts what is being worked on — features still being designed and features in
+  // flight, on the ONE roadmap on screen — and turns amber while any of them owes the operator a word: the
+  // same register as the Runs badge above. These reads sit OUTSIDE every widget's boundary, so a picture whose
+  // `standing` is missing or partial must cost the badge its number and nothing more, as the other widgets'
+  // hooks fall back to zero — a throw here would take the whole chat to the workspace's error panel.
+  const { selected: selectedRoadmap } = useRoadmap();
+  const roadmapStanding = selectedRoadmap?.standing;
+  const roadmapCount = (roadmapStanding?.designing ?? 0) + (roadmapStanding?.in_flight ?? 0);
+  const roadmapWaiting = roadmapStanding?.waiting_on_you ?? 0;
   const { pendingCount } = useMemoryIntake();
   const subagentCount = useSubagentWidgetCount(sessionId);
   const { count: embedCount, newest: newestEmbed, known: embedsKnown } = useEmbedWidgetState(sessionId);
@@ -280,6 +290,16 @@ export function ChatGutterLayout({
       countTone: runnerWaiting > 0 ? 'warn' : undefined,
       icon: ActivityIcon,
       Body: RunnerWidgetBody,
+    },
+    roadmap: {
+      title: t('gutters.roadmap.title'),
+      count: roadmapCount,
+      countTone: roadmapWaiting > 0 ? 'warn' : undefined,
+      icon: RouteIcon,
+      Body: RoadmapWidgetBody,
+      // A body that scrolls its own content and carries its own celebrations box: the card gives it its
+      // whole inside, with no padding and no scroll area of its own (as the Embed widget's is).
+      flush: true,
     },
     memory: {
       title: t('gutters.memory.title'),

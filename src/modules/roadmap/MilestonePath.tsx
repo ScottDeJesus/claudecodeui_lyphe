@@ -39,7 +39,7 @@ type MilestonePathProps = {
   focused: string | null;
   /** A station pressed: the caller puts that milestone on the stage. */
   onFocus: (name: string) => void;
-  /** `full` on the face, every station titled; `compact` in the chat gutter's widget, the focused station's title alone, under the rail. */
+  /** `full` on the face, every station titled; `compact` in the chat gutter's widget, discs alone, which names the focused station under the rail itself. */
   size: Size;
 };
 
@@ -74,8 +74,8 @@ function standingOf(milestone: RoadmapMilestone, current: string | null): Standi
  * Below 768px the rail scrolls sideways under the thumb, snapping a station to the middle; a wider
  * face scrolls it only when its stations would not fit.
  *
- * Used by `RoadmapHeader` at `full`, and by the chat gutter's roadmap widget at `compact` through the
- * module's barrel.
+ * Used by `RoadmapHeader` at `full`, and by `RoadmapWidgetBody` (the chat gutter's roadmap widget) at
+ * `compact`: the stations and the rail alone, a `title` on each disc, the widget's own line under them.
  */
 export function MilestonePath({ roadmap, focused, onFocus, size }: MilestonePathProps) {
   const { t } = useTranslation();
@@ -102,7 +102,6 @@ export function MilestonePath({ roadmap, focused, onFocus, size }: MilestonePath
   const travelled = currentIndex !== -1 ? centre(currentIndex) : milestones.length > 0 ? centre(milestones.length - 1) : 0;
   const drawFrom = momentIndex > 0 ? centre(momentIndex - 1) : 0;
   const drawTo = momentIndex === -1 ? 0 : centre(momentIndex);
-  const focusedMilestone = milestones.find((milestone) => milestone.name === focused) ?? null;
 
   return (
     <div className="min-w-0" data-milestone-path={size}>
@@ -175,20 +174,6 @@ export function MilestonePath({ roadmap, focused, onFocus, size }: MilestonePath
           </ol>
         </div>
       </div>
-
-      {/* The compact path names one station: the one on the stage, with its own line beside its title. */}
-      {size === 'compact' && (
-        <p className="mt-1 flex min-w-0 items-baseline gap-1.5 text-sm">
-          {focusedMilestone ? (
-            <>
-              <span className="truncate font-medium text-foreground">{focusedMilestone.title}</span>
-              <StationLine milestone={focusedMilestone} word={t(WORD_KEYS[focusedMilestone.word])} className="shrink-0" />
-            </>
-          ) : (
-            <span className="truncate text-muted-foreground">{ghostLabel}</span>
-          )}
-        </p>
-      )}
     </div>
   );
 }
@@ -257,7 +242,8 @@ function StationLine({ milestone, word, className }: { milestone: RoadmapMilesto
 
 /**
  * The station after the last, while every milestone is reached: a dashed disc with a plus, and the words
- * that say what pressing it does. Compact, the words are its name alone.
+ * that say what pressing it does. Compact, the words are its name alone, and its `title` as each compact
+ * station's is, so a pointer resting on the dashed disc reads what it adds.
  */
 function GhostStation({ size, label, onAdd }: { size: Size; label: string; onAdd: () => void }) {
   const geometry = GEOMETRY[size];
@@ -267,6 +253,7 @@ function GhostStation({ size, label, onAdd }: { size: Size; label: string; onAdd
         type="button"
         data-roadmap-ghost
         aria-label={size === 'compact' ? label : undefined}
+        title={size === 'compact' ? label : undefined}
         onClick={onAdd}
         className={cn('group flex min-w-0 flex-col items-center border border-transparent text-center hover:bg-muted/60', geometry.box)}
       >

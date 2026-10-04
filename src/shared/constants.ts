@@ -401,3 +401,11 @@ export const ROADMAP_MILESTONE_WORD_KEYS: Record<RoadmapMilestoneWord, string> =
  * module's `useRevealCard`, which writes it from a surface that has no Roadmap tab above it.
  */
 export const RUNNER_LANDING_PARAM = 'runner';
+
+/**
+ * The query parameter a landing names a roadmap in (`?roadmap=<name>`): the Roadmap tab's Roadmap face
+ * on that roadmap. Taken, held and stripped under the very rule `RUNNER_LANDING_PARAM` follows. Used by
+ * the project-workspace module's `useRunnerLanding`, which reads it, and the roadmap module's chat-gutter
+ * widget (`RoadmapWidgetBody`), which writes it from a surface that has no Roadmap tab above it.
+ */
+export const ROADMAP_LANDING_PARAM = 'roadmap';

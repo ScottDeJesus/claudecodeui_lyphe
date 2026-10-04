@@ -321,6 +321,9 @@
     "runner": {
       "title": "Läufe"
     },
+    "roadmap": {
+      "title": "Roadmap"
+    },
     "memory": {
       "title": "Erinnerungen",
       "pending": "Warten auf Prüfung",

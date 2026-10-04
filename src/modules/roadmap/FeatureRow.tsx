@@ -42,8 +42,8 @@ type FeatureRowProps = {
  * One feature as one line of state: its step line, its title, its step in words with its case mark and
  * its project beside them; a meter of its tasks while it is in flight; and, in warn, what it waits on the
  * operator for (in place of the step and the project) and why it is blocked. Used by `EpicCard` for its
- * features, by `RoadmapRail` at `compact` for its four sections, and by the chat gutter's roadmap
- * widget, which imports it through the module's barrel.
+ * features, by `RoadmapRail` at `compact` for its four sections, and by `RoadmapWidgetBody` at
+ * `compact` for the chat gutter's roadmap widget.
  *
  * A ROW, NOT A BUTTON, SO IT CAN BE CARRIED. An epic's rows are a sortable list, and `useSortable` lifts
  * an item only from a free press — never from a control (`freePress.ts`). So the row is a free surface

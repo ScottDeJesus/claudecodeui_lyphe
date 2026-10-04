@@ -350,6 +350,9 @@
     "runner": {
       "title": "執行"
     },
+    "roadmap": {
+      "title": "路線圖"
+    },
     "memory": {
       "title": "記憶",
       "pending": "等待審核",

@@ -2688,10 +2688,11 @@ export type UniverseDigest = { edits: number; execs: number; at: number };
 export type GutterSide = 'left' | 'right';
 
 /** The widgets a chat gutter can hold: the dispatcher's plan cards, in the operator's own order, the
- *  memory-intake rows the session proposed, the subagents it has pinned, the embed — a live page the
- *  chat named, or the reader typed in — and the account's notes. These are the ids the DOM carries as
- *  `data-widget`, and the keys `useGutterPlacements` stores its records under. */
-export type GutterWidgetId = 'runner' | 'memory' | 'subagents' | 'embed' | 'notes';
+ *  roadmap the Roadmap tab shows at a column's width, the memory-intake rows the session proposed, the
+ *  subagents it has pinned, the embed — a live page the chat named, or the reader typed in — and the
+ *  account's notes. These are the ids the DOM carries as `data-widget`, and the keys
+ *  `useGutterPlacements` stores its records under. */
+export type GutterWidgetId = 'runner' | 'roadmap' | 'memory' | 'subagents' | 'embed' | 'notes';
 
 /** One widget's place in its side's stack and whether it is expanded. `order` is the sort key within
  *  the side, dense from 0 after every move; a collapsed widget is still placed — it draws as a tab

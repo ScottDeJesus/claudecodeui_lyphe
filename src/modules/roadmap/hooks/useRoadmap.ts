@@ -26,8 +26,10 @@ const NO_ROADMAPS: Roadmap[] = [];
 
 /**
  * The roadmap lane's read side: the whole picture off the live bus, the roadmaps it carries, and the
- * ONE of them on screen. Used by the Roadmap tab's face (`RoadmapPath`, `RoadmapTab`) and by the
- * picker (`RoadmapPicker`), which the chat gutter's widget draws too.
+ * ONE of them on screen. Used by the Roadmap tab's face (`RoadmapPath`, `RoadmapTab`), by the picker
+ * (`RoadmapPicker`) and by the chat gutter's widget (`RoadmapWidgetBody`), and — through the roadmap
+ * barrel — by `src/modules/chat-gutters` (`ChatGutterLayout`), which reads the selected roadmap's
+ * standing for the Roadmap widget's count and its amber.
  *
  * `roadmapSelected` is a server-backed preference, so the choice follows the operator from desktop to
  * phone, and it is written WHOLE: the last device to choose wins, which is what "the roadmap on

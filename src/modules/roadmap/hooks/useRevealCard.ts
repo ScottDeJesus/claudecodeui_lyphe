@@ -10,7 +10,7 @@ import { RUNNER_LANDING_PARAM } from '@/shared/constants';
  * and hands the name down to `RunnerPanel`). Anywhere there is no tab above — the chat gutter's roadmap
  * widget — it is the workspace's own landing: the page goes to `?runner=<plan>`, which `useRunnerLanding`
  * answers by bringing the tab forward and the card into view, the way a tap on a plan's prompt does.
- * Used by `FeatureRow`, for its Answer press.
+ * Used by `FeatureRow`, for its Answer press, and by `RoadmapWidgetBody`, for its dialog's Open its card.
  */
 export function useRevealCard(): (plan: string) => void {
   const { openCard } = useContext(RoadmapFaceContext);

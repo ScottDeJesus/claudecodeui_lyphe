@@ -352,6 +352,9 @@
     "runner": {
       "title": "Exécutions"
     },
+    "roadmap": {
+      "title": "Feuille de route"
+    },
     "memory": {
       "title": "Mémoire",
       "pending": "En attente de révision",

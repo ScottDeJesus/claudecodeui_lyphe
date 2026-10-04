@@ -1,7 +1,8 @@
-import { Suspense, useCallback, useState } from 'react';
+import { Suspense, useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useDispatcherPlans } from '@/modules/dispatcher';
+import { useRoadmap } from '@/modules/roadmap/hooks/useRoadmap';
 import { RoadmapPath } from '@/modules/roadmap/RoadmapPath';
 import { RunnerPanel } from '@/modules/runner-tab';
 import { Spinner, Tabs } from '@/shared/ui';
@@ -14,6 +15,10 @@ type RoadmapTabProps = {
   revealPlan: string | null;
   /** Called once the reveal has run, whether or not a card was found, so the workspace retires the request. */
   onRevealed: () => void;
+  /** The roadmap a `?roadmap=` landing named, held by `useRunnerLanding` until this tab has tried to select it; `null` on every ordinary visit. */
+  openRoadmap: string | null;
+  /** Called once the landing has run, whether or not the roadmap exists, so the workspace retires the request. */
+  onRoadmapOpened: () => void;
 };
 
 /**
@@ -28,11 +33,18 @@ type RoadmapTabProps = {
  * which turns it and hands the plan down the same way. `RunnerPanel` does the reveal in both cases and
  * calls back once it has tried; this tab retires whichever request it was handed.
  *
+ * A `?roadmap=<name>` landing is the other way in, onto the Roadmap face. It turns the face the moment it
+ * arrives — once, so nothing the operator presses while the picture loads is undone, and a `?runner=`
+ * landing that arrived with it keeps In flight — and once the picture has been read it selects that
+ * roadmap and retires the request. A name the picture lacks selects nothing and is retired all the same:
+ * the tab opens on the roadmap that was already on screen.
+ *
  * Used by `WorkspaceMain` (project-workspace) as the `runner` tab's pane, through the module's barrel.
  */
-export function RoadmapTab({ revealPlan, onRevealed }: RoadmapTabProps) {
+export function RoadmapTab({ revealPlan, onRevealed, openRoadmap, onRoadmapOpened }: RoadmapTabProps) {
   const { t } = useTranslation();
   const { count, waiting } = useDispatcherPlans();
+  const { picture, roadmaps, selected, select } = useRoadmap();
   // The face on screen. Local and never remembered: every visit opens on the roadmap, and only a landing
   // or a card press turns it to In flight, so the operator always arrives where he lives.
   const [face, setFace] = useState<Face>('path');
@@ -47,6 +59,18 @@ export function RoadmapTab({ revealPlan, onRevealed }: RoadmapTabProps) {
   // flight until the request is retired: by the pane once the bus has spoken, or by the operator's own
   // press on Roadmap (`showFace`), so nothing he does is undone and nothing waits on a quiet lane.
   if (revealPlan !== null && face !== 'inFlight') setFace('inFlight');
+
+  // The `?roadmap=` request the face was last turned for. A landing turns the face ONCE, at the render it
+  // arrives in, with `revealPlan` read at that same moment: a reveal that arrived with it wins by
+  // construction (the card it names is the more specific ask), and a press the operator makes while the
+  // picture is still loading is not undone when the picture lands. Remembering the request, not just
+  // reading it, is what makes it once; it resets to `null` when the request is retired, so the same name
+  // landing again later turns the face again.
+  const [faceTurnedFor, setFaceTurnedFor] = useState<string | null>(null);
+  if (openRoadmap !== faceTurnedFor) {
+    setFaceTurnedFor(openRoadmap);
+    if (openRoadmap !== null && revealPlan === null) setFace('path');
+  }
 
   // Stable on purpose: `RunnerPanel`'s reveal effect lists it as a dependency, and a fresh identity per
   // render would re-run a reveal the request had already retired. Retires both kinds of request.
@@ -68,6 +92,21 @@ export function RoadmapTab({ revealPlan, onRevealed }: RoadmapTabProps) {
     if (revealPlan !== null) onRevealed();
     setFace('path');
   };
+
+  // The `?roadmap=` landing's selection, answered once there is something to answer it with (the face
+  // was turned above, on arrival). It waits for the picture: until the lane's first reading lands there is
+  // no telling a roadmap that is absent from one not yet read. And it waits for `selected` when the
+  // roadmap exists: `selected` is `null` until the preferences have settled (`useRoadmap`), and a pick
+  // written on a cold mirror is overwritten by the hydrate that follows. A name the picture lacks needs
+  // neither wait — it selects nothing — and is retired at once, so a stale link opens the tab and changes
+  // nothing.
+  useEffect(() => {
+    if (openRoadmap === null || picture === null) return;
+    const exists = roadmaps.some((roadmap) => roadmap.name === openRoadmap);
+    if (exists && selected === null) return;
+    if (exists) select(openRoadmap);
+    onRoadmapOpened();
+  }, [openRoadmap, picture, roadmaps, selected, select, onRoadmapOpened]);
 
   // Stable too: the Roadmap face puts it in the context every row and dialog reads.
   const openCard = useCallback((plan: string) => {
