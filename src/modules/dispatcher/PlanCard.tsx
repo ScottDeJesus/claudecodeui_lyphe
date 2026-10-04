@@ -21,6 +21,11 @@ import type { ActionMenuItem } from '@/shared/ui';
 import type { DispatcherPlan } from '@/shared/types';
 import { cn } from '@/shared/utils';
 
+/** The clause of a `wip_hold` sentence without its `WIP:` lead — the card says "Waiting for a WIP slot" itself, so the lead would read twice. */
+function wipClause(hold: string): string {
+  return hold.replace(/^WIP:\s*/, '');
+}
+
 /**
  * One plan the dispatcher is carrying, in the lane card's ONE anatomy — the arc deck's too: a head
  * that says which plan this is and how it stands, the action bar directly under it, and the face.
@@ -29,8 +34,8 @@ import { cn } from '@/shared/utils';
  *   sits in an epic's deck) leading the mono name, the word (`PlanStatusBadge`), the clock (`PlanClock`)
  *   and `done/total` phases on row one; the plan's description (`cardDescription`: its design's
  *   `delivers` line, else its goal's where that yields nothing) folded to one line until pressed, when
- *   it opens whole (`CardDescription`) — then who is out on the plan (`PlannerBadge`) and what of its
- *   arc it waits on, on row two; the plan's total as pills
+ *   it opens whole (`CardDescription`) — then who is out on the plan (`PlannerBadge`), what of its
+ *   arc it waits on and, while its epic's feature limit holds it, the WIP slot it waits for, on row two; the plan's total as pills
  *   (`SpendPills`, counting at first sight) on row three; Dismiss or Hide, and the fold, in the corner.
  * - THE BAR (`PlanControls` → `ActionBar`): the verbs the plan's status allows and its model switch.
  * - THE FACE (`PlanFace`): the phases' track, what is moving now, and the closed lists. Its own rules —
@@ -60,8 +65,7 @@ import { cn } from '@/shared/utils';
  * exactly when `planDroppable(plan, planners)` holds. It is never drawn disabled on a `live` plan, a
  * walking phase or a planner out on the plan or its arc. Delete is the menu's only item, so those cards
  * draw no `⋯` at all. The planner half of that gate needs the lane's `planners` list, so the card reads
- * the lane (`useDispatcherPlans`) for it, as its controls (`PlanControls`) do for the box's swarm word:
- * `plan.planner` gives a plan's own ended row ahead of its arc's live one, so it cannot answer what
+ * the lane (`useDispatcherPlans`) for it: `plan.planner` gives a plan's own ended row ahead of its arc's live one, so it cannot answer what
  * `drop` asks. The press opens `DeletePlanDialog`, the
  * module's one modal, because `dispatcher drop` is the one verb no press undoes. The card does not
  * leave on the press: it leaves when a frame no longer carries the plan.
@@ -78,10 +82,15 @@ import { cn } from '@/shared/utils';
  * (`waitsOnSiblings`), empty for a plan of no arc. It is passed IN rather than read here: the card
  * cannot know which plans are its arc's without the group it was handed.
  *
+ * `WAITING FOR A WIP SLOT` IS THE DISPATCHER'S OWN SENTENCE, NEVER THE CARD'S (`plan.wip_hold`): the
+ * FEATURE-WIP clause the gate returned for this plan's first ready phase, so a feature that is eligible
+ * and standing still because its epic already has its limit in progress says why, in the gate's own
+ * words, beside `waits on …`. A frame without the key (an older dispatcher) draws no line.
+ *
  * `data-dispatcher-card`, `data-plan-name`, `data-plan-status` and `data-collapsed` are the browser
  * harness's handles, on the ROOT so a probe scopes every reading and every press to ONE plan — the
  * live plan walking beside a probe must never be pressed. `data-card-description` marks the lead's
- * description line, the arc deck's too.
+ * description line, the arc deck's too, and `data-plan-wip-hold` the line above.
  *
  * Used by `RunnerPanel` and `RunnerWidgetBody` (runner-tab), for the plans no arc holds, and by
  * `DispatchArcDeck`, for each plan of an arc.
@@ -146,12 +155,17 @@ export function PlanCard({
                 {/* WHO IS OUT ON THIS PLAN and what it waits on, under its description: the word says
                     what the PLAN is (`designing`), the badge who is doing something about it; the wait is
                     a fact about THIS plan ("before this, that"). Neither draws anything when absent. */}
-                {(plan.planner || waitsOn.length > 0) && (
+                {(plan.planner || waitsOn.length > 0 || plan.wip_hold) && (
                   <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
                     {plan.planner && <PlannerBadge planner={plan.planner} />}
                     {waitsOn.length > 0 && (
                       <span data-plan-waits-on className="min-w-0 break-words font-mono text-xs text-muted-foreground">
                         {t('dispatcher.waitsOn', { names: waitsOn.join(', ') })}
+                      </span>
+                    )}
+                    {plan.wip_hold && (
+                      <span data-plan-wip-hold className="min-w-0 break-words text-xs text-muted-foreground">
+                        {t('dispatcher.wipHold', { clause: wipClause(plan.wip_hold) })}
                       </span>
                     )}
                   </div>

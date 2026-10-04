@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 
 /**
  * A card's ONE row of presses, directly under its head: the verbs its status allows on the left, the
- * card's switches at the row's end — the model switch, and on a plan card the plan's swarm word beside
+ * card's switches at the row's end — the model switch, and on an epic's deck the epic's WIP beside
  * it. The plan card and the arc deck both draw exactly this row, so a reader who learned one card's
  * controls has learned the other's — same place, same order, same size.
  *
@@ -12,7 +12,7 @@ import type { ReactNode } from 'react';
  * off the card; the slot wraps too, so two switches that do not fit one line stack at its end.
  *
  * EVERY CONTROL IN IT IS 32px TALL (`h-8`), set by each control this module puts here
- * (`PlanControls`, `DispatchArcControls`, `ScheduleControl`, `RunModelControl`, `SwarmControl`) rather than by a
+ * (`PlanControls`, `DispatchArcControls`, `ScheduleControl`, `RunModelControl`, `EpicWipControl`) rather than by a
  * descendant rule on this row: the model switch is a bordered group of buttons, and a rule sizing
  * every button in the row would size the group's own options past the group.
  *

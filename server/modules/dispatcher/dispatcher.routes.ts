@@ -1,12 +1,12 @@
 import express from 'express';
 
-import type { DispatcherOffpeak, DispatcherSwarmChoice, DispatcherVerb, DispatcherVerbResult } from '@/shared/types.js';
+import type { DispatcherOffpeak, DispatcherVerb, DispatcherVerbResult, DispatcherWipChoice, DispatcherWipLimit } from '@/shared/types.js';
 import {
   dispatcherModelChoiceError,
   dispatcherScheduleWhenError,
   readDispatcherModelChoice,
   readDispatcherScheduleWhen,
-  readDispatcherSwarmWord,
+  readDispatcherWipWord,
 } from '@/shared/utils.js';
 
 import type { DispatcherPicture } from './dispatcher-state.service.js';
@@ -34,8 +34,32 @@ const PLAN_NAME = /^[a-z0-9][a-z0-9-]{0,99}$/;
  */
 const ARC_NAME = /^[a-z0-9][a-z0-9-]{0,99}(\.arc)?$/;
 
-/** The 400 sentence the swarm route answers with when the body names no word the dispatcher takes. */
-const SWARM_CHOICE_ERROR = 'swarm must be off, on, on <N> (N a whole number from 1 to 9007199254740991), or auto';
+/** The two limits an epic carries, in the dispatcher's own spelling (`hooks/dispatcher/wip.py:KINDS`) — the only `limit` words the WIP route relays. */
+const WIP_LIMITS: readonly DispatcherWipLimit[] = ['features', 'tasks'];
+
+/** The 400 sentence the WIP route answers with when the body names no limit and word the dispatcher takes. */
+const WIP_BODY_ERROR = 'limit must be features or tasks, and word a whole number from 1 to 9007199254740991, all, or default';
+
+/**
+ * The argv words of an epic's WIP press — `[limit, word]` after the arc's name — or `null` for a body
+ * the dispatcher's `wip` verb would refuse.
+ *
+ * BOTH WORDS ARE OURS ONCE THEY ARE HERE, and checked BEFORE ANY PROCESS STARTS: the limit against the
+ * dispatcher's two, the word against its grammar (`readDispatcherWipWord`: a canonical count to
+ * 9007199254740991, or `all`) plus the door's own `default`. The count is bounded because the word
+ * travels back to the screen in `status --json`, and a count its reader refuses would freeze the whole
+ * Runner board's picture (INV-5693) — the bound is enforced where the word enters, not discovered
+ * where it is read. What reaches an argv array is a spelling this server wrote, never a string the
+ * request chose.
+ */
+function wipArgs(body: unknown): string[] | null {
+  const { limit, word } = (body ?? {}) as { limit?: unknown; word?: unknown };
+  const checkedLimit = WIP_LIMITS.find((entry) => entry === limit);
+  const checkedWord: DispatcherWipChoice | null = word === 'default'
+    ? 'default'
+    : (readDispatcherWipWord(word) as DispatcherWipChoice | null);
+  return checkedLimit === undefined || checkedWord === null ? null : [checkedLimit, checkedWord];
+}
 
 export type DispatcherRouterDependencies = {
   /**
@@ -85,14 +109,14 @@ function statusForVerb(result: DispatcherVerbResult): number {
 }
 
 /**
- * The dispatcher lane's sixteen routes: three reads of the plan list, nine presses on a plan, four on
+ * The dispatcher lane's sixteen routes: three reads of the plan list, eight presses on a plan, five on
  * an arc. Auth is the mount's `authenticateToken`, in `server/index.ts`.
  *
  * These handlers validate and translate, and do nothing else: nothing is read here, no process is
  * started here, and no route names a path from the request — the binary and the store are the
  * module's, fixed at composition, and a request can only ever choose a plan or an arc by name, a
  * word from the closed set of nine verbs, and — where the verb takes one — a word from the three
- * model words or the swarm grammar.
+ * model words or the WIP grammar.
  *
  * A READ THAT FINDS NO PICTURE IS TOLD SO (`NOT_READ_YET` above), and the read waits a bound for one
  * first: the two together are what keep a handover from being drawn as an empty plan list.
@@ -101,7 +125,8 @@ function statusForVerb(result: DispatcherVerbResult): number {
  * the dispatcher's own doors open on both: `model`, `stop`, `resume` and `schedule` take an arc's
  * name as readily as a plan's. The two spellings are two routes rather than one param because the
  * NAME CLASSES differ (`PLAN_NAME` against `ARC_NAME` below) — a fence that would be lost the moment
- * one route accepted either adornment.
+ * one route accepted either adornment. `wip` is the ninth and an ARC'S ALONE: a feature carries no WIP
+ * word, so it has no plan route.
  */
 export function createDispatcherRouter(dependencies: DispatcherRouterDependencies): express.Router {
   const router = express.Router();
@@ -189,17 +214,6 @@ export function createDispatcherRouter(dependencies: DispatcherRouterDependencie
     return choice === null ? null : [choice];
   };
 
-  /**
-   * A plan's swarm word — `readDispatcherSwarmWord`'s canonical `off`, `on`, `on <N>`, or the door's
-   * own `auto` — or `null`. The same shape as `modelArgs`: the word becomes an argv word only once it
-   * is one this server spelled.
-   */
-  const swarmArgs = (body: unknown): string[] | null => {
-    const typed = (body as { swarm?: unknown } | undefined)?.swarm;
-    const choice: DispatcherSwarmChoice | null = typed === 'auto' ? 'auto' : readDispatcherSwarmWord(typed);
-    return choice === null ? null : [choice];
-  };
-
   router.post('/plans/:name/stop', relay('stop'));
   router.post('/plans/:name/resume', relay('resume'));
   router.post('/plans/:name/park', relay('park'));
@@ -222,11 +236,6 @@ export function createDispatcherRouter(dependencies: DispatcherRouterDependencie
   // the plan's NEXT phase and never disturbs a walk already out — which is why no plan's state is a
   // reason to refuse this verb, and why the dispatcher's own answer is the whole verdict.
   router.post('/plans/:name/model', relay('model', modelArgs, dispatcherModelChoiceError()));
-  // A plan's own swarm word (`dispatcher swarm <name> <word>`), or `auto` to hand it back to the box's
-  // switch. A PLAN'S VERB ALONE — an arc carries no swarm word — and never refused for a plan's state:
-  // the word is read at the rule's next take-up (`width.reason`), and the dispatcher kicks its own
-  // daemon when the word changed, so a wider word frees a held phase without a press here.
-  router.post('/plans/:name/swarm', relay('swarm', swarmArgs, SWARM_CHOICE_ERROR));
   // A QUEUED plan's Start at a time, and the only verb here with an argument:
   // `dispatcher schedule <name> offpeak|<iso>|none`. The dispatcher refuses a plan that is live or
   // has never waited, and a time already past; that sentence is the 409's body, untouched.
@@ -236,7 +245,7 @@ export function createDispatcherRouter(dependencies: DispatcherRouterDependencie
   }));
 
   /**
-   * The ARC's four verbs — `model`, `stop`, `resume`, `schedule` — relayed to the arc's own door.
+   * The ARC's five verbs — `model`, `stop`, `resume`, `schedule`, `wip` — relayed to the arc's own door.
    *
    * AN ARC IS ADDRESSED BY ITS OWN NAME, and the dispatcher is what resolves it. Each of these four
    * verbs takes a plan's name OR an arc's and answers an arc's name with the PLAN verb applied to
@@ -253,6 +262,11 @@ export function createDispatcherRouter(dependencies: DispatcherRouterDependencie
    * for `schedule` it arms one hour for each of them (INV-201 knows no arc-level timer). The next
    * frame redraws the arc's header and its plans together — nothing here is optimistic, and nothing
    * is copied by this server.
+   *
+   * `wip` IS THE ARC'S ALONE: `dispatcher wip <arc> features|tasks <N|all|default>` sets one of the
+   * epic's two limits (or hands it back to Settings' default), never refused for the epic's state —
+   * the limit is read at the rule's next take-up (`width.reason`), and the dispatcher kicks its own
+   * daemon when the word changed, so a wider limit frees a held feature without another press.
    *
    * The same two fences as the plan routes, one name class over: the arc's own regex, and a verb word
    * that is OURS — never the request's.
@@ -292,6 +306,8 @@ export function createDispatcherRouter(dependencies: DispatcherRouterDependencie
     const when = readDispatcherScheduleWhen((body as { when?: unknown } | undefined)?.when);
     return when === null ? null : [when];
   }));
+  // One of the epic's two WIP limits (`dispatcher wip <arc> <limit> <word>`): the epic card's WIP control.
+  router.post('/arcs/:name/wip', arcRelay('wip', wipArgs, WIP_BODY_ERROR));
 
   return router;
 }

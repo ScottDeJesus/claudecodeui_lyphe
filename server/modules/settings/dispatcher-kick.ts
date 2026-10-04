@@ -46,7 +46,8 @@ function text(value: unknown): string {
  * A kick wakes the daemon that is already running, or starts one where the store holds work, and its
  * own answer is the record that the flip got there: `woke daemon`, `started daemon unit=…`,
  * `no work`, `daemon holds the home` when a daemon mid-handoff keeps the lock, or `no daemon` when
- * this host has no user manager to hold one.
+ * this host has no user manager to hold one — or when the home is a scratch one (`DISPATCHER_HOME`
+ * not the live home) and `DISPATCHER_SCRATCH_DAEMON=1` is not set, which starts none.
  *
  * NOTHING HERE RAISES AND NOTHING HERE AWAITS A VERDICT. The toggles that call it must answer with
  * the position on disk whatever the dispatcher is doing — a switch that failed because a daemon was

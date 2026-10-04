@@ -537,13 +537,10 @@
     "switches": {
       "chat": "DeepSeek chat switch",
       "heal": "Heal model switch",
-      "swarm": "Swarm switch",
       "on": "on",
       "off": "off",
       "unreadable": "unreadable",
-      "lanes": "up to {{n}} lanes",
-      "noCeiling": "no lane ceiling",
-      "caption": "Mirrors only. Settings changes the chat and swarm switches; Heal changes the heal model."
+      "caption": "Mirrors only. Settings changes the chat switch; Heal changes the heal model."
     },
     "recon": {
       "ledger": "ledger priced",
@@ -1277,6 +1274,7 @@
       "confirm": "Delete"
     },
     "waitsOn": "waits on {{names}}",
+    "wipHold": "Waiting for a WIP slot · {{clause}}",
     "dismissDone": "Dismiss done · {{count}}",
     "plannersOut": "planners {{out}} of {{lanes}} out",
     "dismiss": "Dismiss feature",
@@ -1321,16 +1319,26 @@
       "planLabel": "Model for this feature’s builders",
       "arcLabel": "Model for every feature of this epic"
     },
-    "swarm": {
-      "hint": "How many of this feature's tasks walk at once. Step back to Settings → Agents' number to follow Settings again.",
-      "hintDefault": "How many of this feature's tasks walk at once. This number comes from Settings → Agents; step to another to give this feature its own, and back to follow Settings again.",
-      "default": "default",
+    "wip": {
+      "label": "WIP",
+      "groupLabel": "WIP limits for this epic",
+      "groupHint": "How much of this epic may run at once: how many of its features are in progress, and how many tasks each of them runs.",
+      "features": "Features",
+      "tasks": "Tasks",
       "all": "All",
-      "lanesLabel": "Most of this feature's tasks at once",
-      "lanesDown": "One task fewer at once",
-      "lanesUp": "One task more at once",
-      "refused": "Swarm not set",
-      "done": "Swarm set — the next take-up reads it"
+      "default": "default",
+      "featuresLabel": "Most features of this epic in progress at once",
+      "featuresDown": "One feature fewer in progress",
+      "featuresUp": "One feature more in progress",
+      "featuresHint": "How many features of this epic are in progress at once. Step back to the Settings default to follow Settings again.",
+      "featuresHintDefault": "How many features of this epic are in progress at once. This is the Settings default; step to another number to give this epic its own, and back to it to follow Settings again.",
+      "tasksLabel": "Most tasks of each feature of this epic at once",
+      "tasksDown": "One task fewer at once",
+      "tasksUp": "One task more at once",
+      "tasksHint": "How many tasks each feature of this epic runs at once. Step back to the Settings default to follow Settings again.",
+      "tasksHintDefault": "How many tasks each feature of this epic runs at once. This is the Settings default; step to another number to give this epic its own, and back to it to follow Settings again.",
+      "refused": "WIP not set",
+      "done": "WIP set — the next take-up reads it"
     }
   },
   "navigation": {

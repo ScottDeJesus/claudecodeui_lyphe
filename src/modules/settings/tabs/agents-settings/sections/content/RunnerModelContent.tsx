@@ -1,50 +1,40 @@
-import { HeartPulseIcon, Network } from 'lucide-react';
+import { HeartPulseIcon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 import { useDeepSeekFlashSwitch } from '@/shared/hooks/useDeepSeekFlashSwitch';
 import { useHealMasterSwitch } from '@/shared/hooks/useHealMasterSwitch';
-import { useSwarmSwitch } from '@/shared/hooks/useSwarmSwitch';
-import { LANES_MIN } from '@/shared/constants';
-import { Button, LLMProviderLogo, SettingRow, Stepper } from '@/shared/ui';
-import { swarmLadderSteps, swarmLadderTop } from '@/shared/utils';
+import { Button, LLMProviderLogo, SettingRow } from '@/shared/ui';
 import SettingsToggle from '@/modules/settings/SettingsToggle';
 import RunnerHealModelRow from '@/modules/settings/tabs/agents-settings/sections/content/RunnerHealModelRow';
 import RunnerParkAtPeakRow from '@/modules/settings/tabs/agents-settings/sections/content/RunnerParkAtPeakRow';
 import RunnerPlannerLanesRow from '@/modules/settings/tabs/agents-settings/sections/content/RunnerPlannerLanesRow';
+import RunnerWipDefaultsRow from '@/modules/settings/tabs/agents-settings/sections/content/RunnerWipDefaultsRow';
 
 /**
  * Rendered by AgentCategoryContentSection under Claude's "account" panel: which model the plan
- * runner's hands — the builder, his fix-pass and Athena — actually dispatch on, whether the runner
- * runs several phases of one plan at once, how many planners run at once, and whether the heal reflex
- * may launch a heal at all.
+ * runner's hands — the builder, his fix-pass and Athena — actually dispatch on, the WIP defaults every
+ * epic starts from, how many planners run at once, and whether the heal reflex may launch a heal at
+ * all.
  *
  * It sits beside the Claude connection rather than in a tab of its own because that is the
  * question it answers: this account's souls, or DeepSeek's. Every switch it writes is a file the
  * runner or the reflex's worker re-reads as it goes, so a flip here reaches the next phase — or the
  * next ending — with nothing restarted.
  *
- * The read, the write and the re-read live in `useDeepSeekFlashSwitch`, `useSwarmSwitch` and
- * `useHealMasterSwitch` — one hook per switch rather than one generalised switch, because switches
- * sharing a module move together the first time one of them is edited, and these must never. The
- * fourth, `useHealModelSwitch`, is drawn by `RunnerHealModelRow` below — its own file, because the
- * row that asks WHICH MODEL a heal runs on needs this card's heal poller and grew past what this
- * file should hold.
+ * The read, the write and the re-read live in `useDeepSeekFlashSwitch` and `useHealMasterSwitch` —
+ * one hook per switch rather than one generalised switch, because switches sharing a module move
+ * together the first time one of them is edited, and these must never. The WIP defaults, the planner
+ * lanes and the park-at-peak switch each have a row of their own file below (`RunnerWipDefaultsRow`,
+ * `RunnerPlannerLanesRow`, `RunnerParkAtPeakRow`) with a hook of its own, and the fourth heal switch,
+ * `useHealModelSwitch`, is drawn by `RunnerHealModelRow` — its own file, because the row that asks
+ * WHICH MODEL a heal runs on needs this card's heal poller and grew past what this file should hold.
  *
- * THE SWARM ROW WEARS THE SWARM MARK, `Network` — the same Lucide glyph the run card draws beside a
- * swarming run's lanes — and the heal row wears the heal panel's own `HeartPulseIcon`, so one shape
- * means one thing wherever it appears.
+ * The heal row wears the heal panel's own `HeartPulseIcon`, so one shape means one thing wherever it
+ * appears.
  */
 export default function RunnerModelContent() {
   const { t } = useTranslation('settings');
   const { enabled, unreadable, setEnabled, refresh } = useDeepSeekFlashSwitch();
-  const {
-    enabled: swarmEnabled,
-    lanes,
-    unreadable: swarmUnreadable,
-    setEnabled: setSwarmEnabled,
-    setLanes,
-    refresh: refreshSwarm,
-  } = useSwarmSwitch();
   const {
     enabled: healEnabled,
     unreadable: healUnreadable,
@@ -64,39 +54,10 @@ export default function RunnerModelContent() {
   // sentence differs, and the chip already carries the same pair.
   const unknown = enabled === null;
 
-  const swarmLabel = t('agents.runnerSwarm.label', {
-    defaultValue: 'Run every independent task of a feature at once',
-  });
-  // The same rule for the row below, and the same pair of sentences.
-  const swarmUnknown = swarmEnabled === null;
-
   const healLabel = t('agents.runnerHeal.label', { defaultValue: 'Heal reflex' });
-  // The same rule a third time, and the same pair of sentences. It bites hardest here: a reflex drawn
+  // The same rule again, and the same pair of sentences. It bites hardest here: a reflex drawn
   // off while it is launching is a reader told to stop looking for the switch that would stop it.
   const healUnknown = healEnabled === null;
-
-  // `null` is NO CEILING, and the control says so in words: it is the switch's own default — every
-  // phase the independence rule frees — and not a missing value, so a reader has to be able to tell
-  // "Unlimited" from "not read yet" (which is the row's other branch, and says so itself).
-  const ceiling = lanes === null
-    ? t('agents.runnerSwarm.lanesUnlimited', { defaultValue: 'Unlimited' })
-    : lanes === LANES_MIN
-      // The count's own singular is its own string: `{{count}} lanes` would print "1 lanes".
-      ? t('agents.runnerSwarm.lane', { defaultValue: '1 lane' })
-      : t('agents.runnerSwarm.lanes', { defaultValue: '{{count}} lanes', count: lanes });
-  // UNLIMITED IS THE TOP RUNG OF ONE LADDER, `1, 2, … top, All`, shared with the plan card's swarm
-  // control (`swarmLadderSteps`): `+` climbs a count by one and from the top count reaches Unlimited,
-  // `−` from Unlimited lands on the top count, and one lane is the floor. The top is six, or the
-  // count the row holds when that is wider; the row's own count is the only one in play, so a count
-  // above six steps down by one but is not climbed back to once left.
-  // A press the ladder refuses has no step, and so no handler to fire.
-  const steps = swarmLadderSteps(lanes, swarmLadderTop(lanes));
-  const dropCeiling = () => {
-    if (steps.down !== null) void setLanes(steps.down.lanes);
-  };
-  const raiseCeiling = () => {
-    if (steps.up !== null) void setLanes(steps.up.lanes);
-  };
 
   return (
     <div className="divide-y divide-border rounded-xl border border-border bg-card">
@@ -138,72 +99,12 @@ export default function RunnerModelContent() {
         )}
       </SettingRow>
 
-      <SettingRow
-        // The swarm mark, in the slot the DeepSeek row above gives its logo — the same `Network`
-        // glyph a swarming run's card wears beside its lanes. One shape, one meaning, both surfaces.
-        icon={<Network className="h-4 w-4" />}
-        label={swarmLabel}
-        description={swarmUnknown
-          ? swarmUnreadable
-            ? t('agents.runnerSwarm.unreadable', {
-                defaultValue: 'The switch could not be read from the server, so its position is unknown — this is not the same as off. It is retried whenever this page regains focus.',
-              })
-            : t('status.loading', { ns: 'common', defaultValue: 'Loading...' })
-          : swarmEnabled === true
-            ? lanes === null
-              ? t('agents.runnerSwarm.descriptionOnUnlimited', {
-                  defaultValue: 'The runner runs every independent task of each feature at once — only ever tasks that touch no file each other writes and that do not wait on each other; everything else stays serial. A feature given its own swarm word on its card follows that word instead of this switch. Takes effect at the next task boundary.',
-                })
-              : t('agents.runnerSwarm.descriptionOn', {
-                  defaultValue: 'At most {{lanes}} of each feature’s independent tasks walk at once, and only tasks that touch no file each other writes and that do not wait on each other; everything else stays serial. A feature given its own swarm word on its card follows that word instead of this switch. Takes effect at the next task boundary.',
-                  lanes,
-                })
-            // Said in the tense the runner is in: with the switch off exactly one phase of each plan is admitted,
-            // so a sentence about lanes would be describing a walk that is not happening.
-            : t('agents.runnerSwarm.descriptionOff', {
-                defaultValue: 'Off: the runner walks one task of each feature at a time. Turn this on and it runs every independent task of each feature at once — with an optional ceiling on how many at a time — and only ever tasks that touch no file each other writes and that do not wait on each other. A feature given its own swarm word on its card follows that word instead of this switch. Takes effect at the next task boundary.',
-              })}
-      >
-        {swarmUnknown ? (
-          <Button variant="outline" size="sm" onClick={() => void refreshSwarm()}>
-            {t('buttons.retry', { ns: 'common', defaultValue: 'Try again' })}
-          </Button>
-        ) : (
-          <div className="flex flex-wrap items-center gap-3">
-            {/* THE CEILING IS OPTIONAL, and this control is where it is chosen: `Unlimited` is the
-                switch's own default and the top rung of the ladder, with the counts below it — the
-                runner's own grammar (`hooks/plan_runner/swarm.py`) has 1 as its floor. Stepper
-                buttons and NOT a number input: the reader is choosing whether to have a ceiling at
-                all, which is a press and not a figure to type. There is no separate press for
-                Unlimited: it is a rung, reached by `+` from the top count.
-                Both presses are live with the switch OFF as well as on: the flag file is one line
-                and `off` carries no ceiling, so a count chosen while off is held here and written by
-                the next ON press — the same way the toggle's own next press carries it. The row
-                whose position could not be read is the one state with nothing to point at, and there
-                the whole control stands down. */}
-            <Stepper
-              value={ceiling}
-              onDecrease={dropCeiling}
-              onIncrease={raiseCeiling}
-              canDecrease={swarmEnabled !== null && steps.down !== null}
-              canIncrease={swarmEnabled !== null && steps.up !== null}
-              decreaseLabel={t('agents.runnerSwarm.lanesDown', { defaultValue: 'One lane fewer' })}
-              increaseLabel={t('agents.runnerSwarm.lanesUp', { defaultValue: 'One lane more' })}
-              ariaLabel={t('agents.runnerSwarm.lanesLabel', { defaultValue: 'Ceiling on tasks run at once' })}
-            />
-            <SettingsToggle
-              checked={swarmEnabled === true}
-              onChange={(next) => void setSwarmEnabled(next)}
-              ariaLabel={swarmLabel}
-              // The same rule as the row above, for the same reason.
-              disabled={swarmEnabled === null}
-            />
-          </div>
-        )}
-      </SettingRow>
+      {/* THE WIP DEFAULTS — what every epic starts from: two steppers, features in progress and tasks
+          per feature, on the one shared ladder. Its own file and its own hook, like the rows around it. */}
+      <RunnerWipDefaultsRow />
 
-      {/* HOW MANY PLANNERS RUN AT ONCE — the swarm row's sibling for the other kind of worker; its own
-          file and its own hook, like the two rows around it. */}
+      {/* HOW MANY PLANNERS RUN AT ONCE — the WIP row's sibling for the other kind of worker; its own
+          file and its own hook, like the rows around it. */}
       <RunnerPlannerLanesRow />
 
       <RunnerParkAtPeakRow />

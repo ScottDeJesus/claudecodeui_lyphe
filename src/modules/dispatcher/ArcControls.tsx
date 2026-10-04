@@ -2,6 +2,8 @@ import { useTranslation } from 'react-i18next';
 
 import { ActionBar } from '@/modules/dispatcher/ActionBar';
 import { epochOf } from '@/modules/dispatcher/dispatcherState';
+import { EpicWipControl } from '@/modules/dispatcher/EpicWipControl';
+import { useDispatcherPlans } from '@/modules/dispatcher/hooks/useDispatcherPlans';
 import { useDispatcherVerbs } from '@/modules/dispatcher/hooks/useDispatcherVerbs';
 import { RunModelControl } from '@/modules/dispatcher/RunModelControl';
 import { ScheduleControl } from '@/modules/dispatcher/ScheduleControl';
@@ -12,7 +14,8 @@ import { effectiveModelWord } from '@/shared/utils';
 /**
  * Everything a dispatch arc PRESSES, as the deck's ONE `ActionBar` — the plan card's own row, so the
  * two read alike: the verbs that move the plans under the arc (Pause, or Start and Schedule start),
- * then the DeepSeek · Claude · Chat switch for the arc's ONE model word at the row's end.
+ * then, at the row's end, the epic's WIP (`EpicWipControl`: how many features are in progress at once,
+ * how many tasks each runs at once) and the DeepSeek · Claude · Chat switch for the arc's ONE model word.
  *
  * IT IS THE DECK'S `bodyTop`, AND THE FOLD TAKES IT WITH THE STRIP: the switch and Start/Pause are
  * VERBS, the same layer a plan card's own bar folds away, so the deck cannot disagree with a card about
@@ -41,9 +44,15 @@ import { effectiveModelWord } from '@/shared/utils';
  * never a plan's effective one — and a record with no word, or a frame from an older server, reads
  * the runner's default (`effectiveModelWord`), which is what its plans would run on.
  *
+ * THE EPIC'S WIP RIDES BESIDE THE SWITCH, and is the epic's alone: `dispatcher wip` takes an epic's name
+ * and no feature's, so a feature card carries no concurrency control of its own — the limits are the
+ * epic's, and Settings holds the defaults they follow (`route.wip`, read off the lane). The control
+ * draws nothing from a frame that carries no `arc.wip` or no defaults, and the bar stands without it.
+ * It is never refused for the epic's state: the limit is read at the rule's next take-up.
+ *
  * Handles: `data-dispatch-arc-model` / `data-dispatch-arc-model-choice`, `data-dispatch-arc-stop`,
  * `data-dispatch-arc-resume`, `data-dispatcher-arc-schedule` (`-set`, `-cancel`, the armed hour as
- * the group's value). A probe scopes them under the deck's own `[data-dispatch-arc][data-arc-name]`
+ * the group's value), and the WIP control's own (`EpicWipControl`'s `data-epic-wip…`). A probe scopes them under the deck's own `[data-dispatch-arc][data-arc-name]`
  * root, so it reads and presses ONE arc — the operator's own arcs walk beside a probe's and must never
  * be pressed.
  *
@@ -55,7 +64,8 @@ export function DispatchArcControls({ arc }: { arc: DispatcherArc }) {
   // the same reason `PlanControls` passes the word its button carries: a refused press must answer in
   // the word the operator actually read. The hook defaults this to "Resume", which is the plan card's
   // word for a stopped plan and never this row's.
-  const { stop, resume, schedule, setModel, busy } = useDispatcherVerbs(arc.name, 'arc', t('runner.start'));
+  const { stop, resume, schedule, setModel, setWip, busy } = useDispatcherVerbs(arc.name, 'arc', t('runner.start'));
+  const { route } = useDispatcherPlans();
   const armed = epochOf(arc.schedule);
   const held = busy !== null;
 
@@ -84,8 +94,12 @@ export function DispatchArcControls({ arc }: { arc: DispatcherArc }) {
         </>
       ) : null}
       model={(
-        <RunModelControl scope="dispatch-arc" value={effectiveModelWord(arc.model)} busy={held}
-          onChoose={(choice) => void setModel(choice)} />
+        <>
+          <EpicWipControl wip={arc.wip} defaults={route?.wip} busy={held}
+            onChoose={(limit, choice) => void setWip(limit, choice)} />
+          <RunModelControl scope="dispatch-arc" value={effectiveModelWord(arc.model)} busy={held}
+            onChoose={(choice) => void setModel(choice)} />
+        </>
       )}
     />
   );

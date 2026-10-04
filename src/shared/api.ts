@@ -3,7 +3,7 @@ import {
   getStoredAuthToken,
   storeAuthToken,
 } from '@/shared/authToken';
-import type { AuthTraceEvent, DeepseekRange, DispatcherAsk, DispatcherModelChoice, DispatcherSwarmChoice, FileLinePatch, JevRange, NoteInput, NtfySettingsInput, SimpleListItemRef, SimpleListPosition, SubagentTranscriptResult } from '@/shared/types';
+import type { AuthTraceEvent, DeepseekRange, DispatcherAsk, DispatcherModelChoice, DispatcherWipChoice, DispatcherWipLimit, FileLinePatch, JevRange, NoteInput, NtfySettingsInput, SimpleListItemRef, SimpleListPosition, SubagentTranscriptResult } from '@/shared/types';
 import type { AgentLaunchDefaultsChange, AgentLaunchRowChange } from '@/shared/agent-launch-types';
 import type { ClaudeUpdateApplyRequest } from '@/shared/claude-update-types';
 import type { RoadmapWriteBody } from '@/shared/roadmap-types';
@@ -605,13 +605,13 @@ export const api = {
     deepseekFlash: () => get('/api/settings/deepseek-flash'),
     saveDeepseekFlash: (enabled: boolean) => put('/api/settings/deepseek-flash', { enabled }),
 
-    // The plan runner's swarm switch — whether it runs several phases of a plan at once, and the
-    // optional ceiling it runs under. Same host-wide shape as the switch above, for the same
-    // reason, and the same answer read back off disk: `lanes` is a count the operator chose, or
-    // `null` for no ceiling at all, which is what a bare `on` in the flag means.
-    swarmSwitch: () => get('/api/settings/swarm'),
-    saveSwarmSwitch: (state: { enabled: boolean; lanes: number | null }) =>
-      put('/api/settings/swarm', state),
+    // The dispatcher's WIP defaults — how many of an epic's features are in progress at once and how
+    // many tasks each of them runs at once, for every epic with no word of its own. Same host-wide
+    // shape as the switch above, for the same reason, and the same answer read back off disk: each
+    // limit is a word, `'<N>'` for a whole number from 1 or `'all'` for no limit. One file holds both,
+    // so a write carries both.
+    wipDefaults: () => get('/api/settings/wip'),
+    saveWipDefaults: (state: { features: string; tasks: string }) => put('/api/settings/wip', state),
 
     // The dispatcher's planner-lane dial — how many planners (designs, cuts, judgments) may be out at
     // once. A fifth flag file on this host, in the same host-wide shape and with the same read-back
@@ -636,7 +636,7 @@ export const api = {
     healMaster: () => get('/api/settings/heal-master'),
     saveHealMaster: (enabled: boolean) => put('/api/settings/heal-master', { enabled }),
 
-    // The reflex's two knob files, beside the master switch and in the swarm switch's shape: the
+    // The reflex's two knob files, beside the master switch and in the shape of the switches above: the
     // nightly cycle's schedule (on/off and its UTC hour) and the day's spend ceiling. Both answer
     // the state read back off disk, never what was typed. `usd: null` is NO CEILING.
     healCycle: () => get('/api/settings/heal-cycle'),
@@ -824,11 +824,7 @@ export const api = {
     // control relays it; nothing is optimistic, and the next `dispatcher_state` frame reads the
     // word back. Restarts nothing — the word is read when a chain is LAUNCHED.
     model: (name: string, model: DispatcherModelChoice) => post(`/api/dispatcher/plans/${encodeURIComponent(name)}/model`, { model }),
-    // A plan's own swarm word (`dispatcher swarm <plan> <word>`) — `off`, `on`, `on <N>`, or `auto` to
-    // follow the box's switch again. The plan card's swarm control relays it; nothing is optimistic,
-    // and the next `dispatcher_state` frame reads the word back. A plan's verb alone: no arc route.
-    swarm: (name: string, swarm: DispatcherSwarmChoice) => post(`/api/dispatcher/plans/${encodeURIComponent(name)}/swarm`, { swarm }),
-    // The DISPATCH ARC header's four presses (`dispatcher model|stop|resume|schedule <arc> …`), each
+    // The DISPATCH ARC header's five presses (`dispatcher model|stop|resume|schedule|wip <arc> …`), each
     // relayed to the arc's own door. Separate routes from the plan's because an arc is addressed by
     // its own door (`.arc`), never through a plan's.
     //
@@ -842,6 +838,11 @@ export const api = {
     // The arc's Resume — or Start, for plans still at the gate — at a time: the same three shapes a
     // plan's schedule takes, through the same server-side reader.
     arcSchedule: (name: string, when: string) => post(`/api/dispatcher/arcs/${encodeURIComponent(name)}/schedule`, { when }),
+    // One of the epic's two WIP limits (`dispatcher wip <arc> <limit> <word>`) — a count, `all`, or
+    // `default` to follow Settings again. The epic card's WIP control relays it; nothing is optimistic,
+    // and the next `dispatcher_state` frame reads the word back. An epic's verb alone: no plan route.
+    arcWip: (name: string, limit: DispatcherWipLimit, word: DispatcherWipChoice) =>
+      post(`/api/dispatcher/arcs/${encodeURIComponent(name)}/wip`, { limit, word }),
     // A plan's Start at a time — `offpeak`, an ISO instant with a zone, or `none` to cancel — the
     // same three shapes the arc's own schedule takes, through the same reader.
     schedule: (name: string, when: string) => post(`/api/dispatcher/plans/${encodeURIComponent(name)}/schedule`, { when }),

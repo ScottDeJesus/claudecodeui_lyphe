@@ -615,20 +615,6 @@ probe-key: 9c5a0b10a091733a3a774a77800310216aaa0ef5
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-model-catalog.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-model-options.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/utils/modelLabels.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-claude-catalog-picker.mjs
 
-## INV-5693 — probe — The dispatcher stores a swarm count that CloudCLI's reader refuses, and one such plan freezes the entire Runner board
-
-The dispatcher stores a swarm count that CloudCLI's reader refuses, and one such plan freezes the entire Runner board
-
-```probe
-cd /home/lyphe/.claude/claudecodeui_lyphe && H=$(mktemp -d /tmp/athena-probe-swarm-XXXX) && DISPATCHER_HOME=$H PYTHONPATH=$HOME/.claude/hooks python3 -c "from dispatcher import store, store_write; c=store.connect(); store_write.open_plan(c,'athena-big',repo='/tmp',session=None); c.commit()" && DISPATCHER_HOME=$H ~/.claude/scripts/dispatcher swarm athena-big on 9007199254740993; DISPATCHER_HOME=$H ~/.claude/scripts/dispatcher status --json > $H/s.json; H=$H TSX_TSCONFIG_PATH=server/tsconfig.json node --import tsx -e "const {planOf}=await import('./server/modules/dispatcher/dispatcher-plan.reader.ts');const {each,field}=await import('./server/modules/dispatcher/dispatcher-state.transport.ts');const d=JSON.parse((await import('node:fs')).readFileSync(process.env.H+'/s.json','utf8'));try{each(field(d,'plans'),'plans',planOf);console.log('READ')}catch(e){console.log('THROW',e.message)}"; DISPATCHER_HOME=$H ~/.claude/scripts/dispatcher swarm athena-big "on $(printf '9%.0s' $(seq 5000))" | cut -c1-60
-expect: `REFUSED swarm 'on 9007199254740993': …` (exit 2), then `READ`, then a `REFUSED swarm …` line for the 5000-digit word (today: `SWARM athena-big swarm=on 9007199254740993`, `THROW dispatcher status --json answered the plan.swarm on 9007199254740993`, `dispatcher swarm: ValueError: Exceeds the limit (4300 digits)…`)
-```
-
-measured 2026-09-28 by chain chain-swarm-per-plan-20260928-184148-98ae, finding M1, MEDIUM
-probe-key: e16078533cfaaada7d84b5b0a038ab0455356b54
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/PlanControls.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/SwarmControl.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/constants.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Stepper.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/verve/controls.css, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-plan-swarm.mjs, /home/lyphe/.claude/hooks/dispatcher/cmd/swarm.py, /home/lyphe/.claude/hooks/dispatcher/swarm_word.py, /home/lyphe/.claude/hooks/dispatcher/width.py, /home/lyphe/.claude/hooks/plan_runner/swarm.py
-
 ## INV-5697 — probe — After a Rework, the re-cut's fresh Accept prompt comes back silently: no phone push, no lane bell (`DispatcherAskBell`, MAN-7540)
 
 After a Rework, the re-cut's fresh Accept prompt comes back silently: no phone push, no lane bell (`DispatcherAskBell`, MAN-7540)
@@ -683,21 +669,7 @@ expect: [] — the Enforced line names neither the deleted `word_of` nor `reason
 measured 2026-09-28 by chain chain-claude-swarm-20260928-195521-ce60, finding L1, LOW
 probe-key: 60d2230d13605ada2fae5d4f237d4d3e83cff8c1
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-claude-swarm.mjs, /home/lyphe/.claude/hooks/dispatcher/width.py, /home/lyphe/.claude/scripts/runner_fixtures/claude_swarm.py, /home/lyphe/.claude/skills/arc/SKILL.md
-
-## INV-5702 — probe — `probe-claude-swarm.mjs` cannot tell a DeepSeek caption from a Claude one, so its "Claude route" precondition proves less than it says
-
-`probe-claude-swarm.mjs` cannot tell a DeepSeek caption from a Claude one, so its "Claude route" precondition proves less than it says
-
-```probe
-cd /home/lyphe/.claude/claudecodeui_lyphe && node -e "const s=require('fs').readFileSync('.verify/probe-claude-swarm.mjs','utf8');const g=new RegExp(/const SWARM_GRAMMAR = \/(.*)\/;/.exec(s)[1]);console.log(g.test('0 of 10 done · 0 rounds · deepseek route, swarm on — all at once'), /\.provider/.test(s))"
-expect: false false — the gate rejects a caption that is not a Claude-route posture, or the probe reads route.provider (today: true false)
-```
-
-measured 2026-09-28 by chain chain-claude-swarm-20260928-195521-ce60, finding L2, LOW
-probe-key: f4758479bffab72a143c3321a70bdb15ecd8af44
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-claude-swarm.mjs, /home/lyphe/.claude/hooks/dispatcher/width.py, /home/lyphe/.claude/scripts/runner_fixtures/claude_swarm.py, /home/lyphe/.claude/skills/arc/SKILL.md
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/hooks/dispatcher/width.py, /home/lyphe/.claude/skills/arc/SKILL.md
 
 ## INV-5709 — probe — Every replay of a spent-out, genuine ntfy token costs a full store read, uncapped, on a public route
 
@@ -2762,7 +2734,7 @@ CloudCLI's text names arcs, plans and phases as epics, features and tasks. Ident
 **CloudCLI's own words — where they are written**
 - The en locale: `src/modules/i18n/locales/en/{common,chat,settings}.json`.
 - The roadmap screen: the `roadmap` block of `en/common.json` (MAN-7634) and the Roadmap tab's `tabs.runner`, `runner.title`, `runner.empty` (MAN-7654). It says milestone, epic, feature and task everywhere, and shows a slug only as the `Name for Claude: <name>` line of a feature's dialog (MAN-7645).
-- The `defaultValue` beside a key: the drawn text when its key is absent, the fallback when present — both carry the new words (`ComposerDeepSeekSwitch.tsx`, `RunnerModelContent.tsx` with its five `agents.runnerSwarm.*` keys no locale holds, `RunnerParkAtPeakRow.tsx`).
+- The `defaultValue` beside a key: the drawn text when its key is absent, the fallback when present — both carry the new words (`ComposerDeepSeekSwitch.tsx`, `RunnerWipDefaultsRow.tsx` with its `agents.wipDefaults.*` keys no locale holds, `RunnerParkAtPeakRow.tsx`).
 - The command palette's `Go to Roadmap` keywords carry both vocabularies (`CommandPalette.tsx`).
 - The ten other locales hold none of the dispatcher keys and fall back to English. Their values whose English changed say what the new English says: `chat.json` `input.deepseekFlashTooltip`, `settings.json` `agents.runnerModel.description`, fr `agents.runnerParkAtPeak.*`. "plan runner" is "runner" in them, left in English.
 - The push copy: `notification-copy.service.ts` — `Feature finished`, `Epic finished`, `Feature paused`, `Features paused …`, `Task relaunched`, `Task <key> was taken up again`, `<done>/<n> tasks`.
@@ -2826,96 +2798,6 @@ measured 2026-10-02 by chain chain-vocab-epics-features--whole-20261002-174523-3
 probe-key: 5984e86a1cdc1efcb750386267e414d32efad24a
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dismiss-done.mjs
-
-## INV-6508 — probe — MAN-6358, which governs `probe-swarm-ceiling.mjs`, still describes the ladder the builder removed
-
-MAN-6358, which governs `probe-swarm-ceiling.mjs`, still describes the ladder the builder removed
-
-```probe
-cd /home/lyphe/.claude && docstore get MAN-6358 | python3 -c "import sys,json; b=json.load(sys.stdin)['row']['body']; print({k: (k in b) for k in ['no upper bound', 'Unlimited\` action', 'first count']})"
-echo "[probe exit $?]"
-expect: {'no upper bound': False, 'Unlimited` action': False, 'first count': False} (today: True for all three)
-```
-
-measured 2026-10-03 by chain chain-swarm-ladder-20261003-135357-11f2, finding M1, MEDIUM
-probe-key: 7122ea9a970501d9f3937c9fc0d186dd2d965332
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/PlanControls.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/SwarmControl.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/agents-settings/sections/content/RunnerModelContent.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/constants.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useSwarmSwitch.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Stepper.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/verve/controls.css, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/utils.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/settings-rows-walk.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/swarm-stub.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-plan-swarm.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-settings-rows.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-swarm-ceiling.mjs
-
-## INV-6509 — probe — a screen reader hears the default marker glued to the number: "Alldefault"
-
-a screen reader hears the default marker glued to the number: "Alldefault"
-
-```probe
-cd /home/lyphe/.claude/claudecodeui_lyphe && node /home/lyphe/.claude/state/pipeline-reviews/swarm-ladder/athena-probes/marker.mjs a11y 2>&1 | grep -v Bearer | tail -2
-echo "[probe exit $?]"
-expect: accessible text of the value: ["- text: All default"] (today: ["- text: Alldefault"]); the page is stubbed, witness UNCHANGED
-```
-
-measured 2026-10-03 by chain chain-swarm-ladder-20261003-135357-11f2, finding L1, LOW
-probe-key: 5a6f8e02adaf53afa259314d233acf1f8dbcbf9c
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/PlanControls.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/SwarmControl.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/agents-settings/sections/content/RunnerModelContent.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/constants.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useSwarmSwitch.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Stepper.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/verve/controls.css, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/utils.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/settings-rows-walk.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/swarm-stub.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-plan-swarm.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-settings-rows.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-swarm-ceiling.mjs
-
-## INV-6510 — probe — the default marker is 3.34:1 in light and 4.32:1 in dark, at 10px
-
-the default marker is 3.34:1 in light and 4.32:1 in dark, at 10px
-
-```probe
-cd /home/lyphe/.claude/claudecodeui_lyphe && node /home/lyphe/.claude/state/pipeline-reviews/swarm-ladder/athena-probes/marker.mjs contrast 2>&1 | grep -v Bearer | tail -3
-echo "[probe exit $?]"
-expect: both lines read ≥ 4.50:1 (today: `marker contrast light: 3.34:1 at 10px`, `marker contrast dark: 4.32:1 at 10px`)
-```
-
-measured 2026-10-03 by chain chain-swarm-ladder-20261003-135357-11f2, finding L2, LOW
-probe-key: 46dad8a0b3462e4ac64ecf80ccf5d38e05c76eb0
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/PlanControls.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/SwarmControl.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/agents-settings/sections/content/RunnerModelContent.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/constants.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useSwarmSwitch.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Stepper.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/verve/controls.css, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/utils.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/settings-rows-walk.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/swarm-stub.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-plan-swarm.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-settings-rows.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-swarm-ceiling.mjs
-
-## INV-6511 — probe — `.verify/lib/settings-rows-walk.mjs:64` names the removed ghost `Unlimited` button, and its stub is no longer the widest swarm row
-
-`.verify/lib/settings-rows-walk.mjs:64` names the removed ghost `Unlimited` button, and its stub is no longer the widest swarm row
-
-```probe
-cd /home/lyphe/.claude/claudecodeui_lyphe && (grep -n "ghost" .verify/lib/settings-rows-walk.mjs || echo none); node /home/lyphe/.claude/state/pipeline-reviews/swarm-ladder/athena-probes/row-width.mjs 2>&1 | grep -v Bearer | grep "^3 lanes 390\|^Unlimited 390" | cut -c1-70
-echo "[probe exit $?]"
-expect: `none`, and the stub the walk answers (`lanes: 3`) is the widest state, i.e. its stepperW ≥ the Unlimited row's (today: line 64 names the ghost; stepperW 122 against 138)
-```
-
-measured 2026-10-03 by chain chain-swarm-ladder-20261003-135357-11f2, finding L3, LOW
-probe-key: 766b23f13ec49c5a3ef27094517bcf237da76553
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/settings-rows-walk.mjs
-
-## INV-6512 — probe — the new probes narrate the retired control
-
-the new probes narrate the retired control
-
-```probe
-cd /home/lyphe/.claude/claudecodeui_lyphe && (grep -n "retired\|used to draw\|previous form" .verify/probe-plan-swarm.mjs .verify/probe-swarm-ceiling.mjs || echo none)
-echo "[probe exit $?]"
-expect: `none` (today: four lines — probe-plan-swarm.mjs:23, :24, :337 and probe-swarm-ceiling.mjs:30)
-```
-
-measured 2026-10-03 by chain chain-swarm-ladder-20261003-135357-11f2, finding L4, LOW
-probe-key: 75d20a8f01bbe3701187b5709175a175bec3f439
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/PlanControls.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/SwarmControl.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/agents-settings/sections/content/RunnerModelContent.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/constants.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useSwarmSwitch.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Stepper.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/verve/controls.css, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/utils.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/settings-rows-walk.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/swarm-stub.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-plan-swarm.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-settings-rows.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-swarm-ceiling.mjs
-
-## INV-6513 — probe — three comments say a wide count stays reachable both ways, and on the Settings row it isn't
-
-three comments say a wide count stays reachable both ways, and on the Settings row it isn't
-
-```probe
-cd /home/lyphe/.claude/claudecodeui_lyphe && timeout 100 node /home/lyphe/.claude/state/pipeline-reviews/swarm-ladder/athena-probes/wide-roundtrip.mjs 2>&1 | grep -v Bearer | tail -2; grep -n "reachable both ways\|out of reach in either direction" src/shared/constants.ts src/shared/utils.ts src/modules/settings/tabs/agents-settings/sections/content/RunnerModelContent.tsx | cut -c1-90
-echo "[probe exit $?]"
-expect: either the round trip reads `9 lanes | − → 8 lanes | + → 9 lanes`, or the grep prints no line (today: `+ → Unlimited`, and three lines; the box is stubbed, swarm.flag UNCHANGED)
-```
-
-measured 2026-10-03 by chain chain-swarm-ladder-20261003-135357-11f2, finding L5, LOW
-probe-key: aa8eaedbd9cdb361aafbc13b377aa7539a02bf49
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/PlanControls.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/SwarmControl.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/agents-settings/sections/content/RunnerModelContent.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/constants.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useSwarmSwitch.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Stepper.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/verve/controls.css, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/utils.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/settings-rows-walk.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/swarm-stub.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-plan-swarm.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-settings-rows.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-swarm-ceiling.mjs
 
 ## INV-6519 — probe — MEDIUM — the builder's docs edits did not survive; the estate again teaches `ArcMark`, `data-arc-mark` and `dispatcher.arcMark`, and the new standing proof is undocumented
 
@@ -3987,3 +3869,188 @@ measured 2026-10-04 by chain chain-roadmap--judgment--names-app-20261004-110113-
 probe-key: cf2235f7cd2664d7ac664e22e6cd013fe402b6b2
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts
+
+## INV-6775 — probe — `wip_hold.py` leaves a real daemon on its scratch copy, and that daemon launches real souls for the operator's real plans
+
+`wip_hold.py` leaves a real daemon on its scratch copy, and that daemon launches real souls for the operator's real plans
+
+```probe
+bash <<'SH'
+export XDG_RUNTIME_DIR=/run/user/$(id -u)
+D=$(mktemp -d /tmp/athena-wipprobe.XXXXXX) || exit 1
+mkdir -p "$D/home/.claude/state/dispatcher" || exit 1
+ln -s "$HOME/.claude/scripts" "$D/home/.claude/scripts"; ln -s "$HOME/.claude/hooks" "$D/home/.claude/hooks"
+DISPATCHER_HOME="$D/home/.claude/state/dispatcher" "$HOME/.claude/scripts/dispatcher" status --json >/dev/null 2>&1
+before=$(pgrep -f "python3 -u -m dispatcher daemon" | sort)
+HOME="$D/home" python3 "$HOME/.claude/scripts/runner_fixtures/wip_hold.py" 2>&1 | grep -E "^PASS every|^FAIL"
+n=0
+for p in $(comm -13 <(echo "$before") <(pgrep -f "python3 -u -m dispatcher daemon" | sort)); do
+  h=$(tr '\0' '\n' < /proc/$p/environ 2>/dev/null | sed -n 's/^DISPATCHER_HOME=//p')
+  case "$h" in /tmp/wip-hold-*) n=$((n+1)); echo "daemon alive on the scratch home: pid=$p home=$h home-dir-exists=$([ -d "$h" ] && echo yes || echo no)"
+    [ -d "$h" ] || systemctl --user stop "$(sed -n 's#.*/\(dispatcher-[^/]*\.service\)$#\1#p' /proc/$p/cgroup)";; esac
+done
+echo "daemons left on a wip_hold scratch home: $n"
+case "$D" in /tmp/athena-wipprobe.*) rm -rf "$D";; esac
+SH
+echo "[probe exit $?]"
+expect: `PASS every reading` then `daemons left on a wip_hold scratch home: 1` with `home-dir-exists=no` — the defect stands while the count is above 0; cured when it prints 0
+```
+
+measured 2026-10-04 by chain chain-wip-2a-board-20261004-131759-e3d6, finding B1, BLOCKING
+probe-key: 634be2b8694fa43cd6554024add5f2a73629d113
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/settings/dispatcher-kick.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/EpicWipControl.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-epic-wip.mjs, /home/lyphe/.claude/hooks/dispatcher/wake.py, /home/lyphe/.claude/scripts/runner_fixtures/wip_hold.py
+
+## INV-6776 — probe — `probe-epic-wip.mjs` fails forever once the operator uses the control it ships
+
+`probe-epic-wip.mjs` fails forever once the operator uses the control it ships
+
+```probe
+grep -n "arcsWithWipWords !== 0" /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-epic-wip.mjs || echo none
+expect: line 631 prints while the defect stands (`after !== 0 || witness.arcsWithWipWords !== 0`); cured when the test compares `after` to `witness.arcsWithWipWords` and the line no longer prints
+```
+
+measured 2026-10-04 by chain chain-wip-2a-board-20261004-131759-e3d6, finding L1, LOW
+probe-key: 26c99d0b96a1f37da4f19bf18f79413d699ae50f
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/settings/dispatcher-kick.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/EpicWipControl.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-epic-wip.mjs, /home/lyphe/.claude/hooks/dispatcher/wake.py, /home/lyphe/.claude/scripts/runner_fixtures/wip_hold.py
+
+## INV-6798 — probe — (LOW) — `wip-defaults.ts` and the dispatcher's `read_flag` disagree on a U+FEFF inside the file, and MAN-629 says they agree "clause for clause"
+
+(LOW) — `wip-defaults.ts` and the dispatcher's `read_flag` disagree on a U+FEFF inside the file, and MAN-629 says they agree "clause for clause"
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe && D=$(mktemp -d /tmp/athena-bom.XXXXXX) || exit 1; printf 'features 5\n\xef\xbb\xbftasks 3\n' > "$D/wip.flag"; echo "dispatcher reads: $(DISPATCHER_WIP_FLAG_PATH=$D/wip.flag PYTHONPATH=$HOME/.claude/hooks python3 -c 'from dispatcher import wip; print(wip.defaults())')"; echo "CloudCLI row reads: $(DISPATCHER_WIP_FLAG_PATH=$D/wip.flag TSX_TSCONFIG_PATH=server/tsconfig.json node --import tsx -e "const {readWipDefaults}=await import('./server/modules/settings/wip-defaults.ts'); console.log(JSON.stringify(await readWipDefaults()))")"; case "$D" in /tmp/athena-bom.*) rm -r "$D";; esac
+echo "[probe exit $?]"
+expect: `dispatcher reads: {'features': '5', 'tasks': '2'}` and `CloudCLI row reads: {"features":"5","tasks":"3"}` while the defect stands; cured when the two lines agree
+```
+
+measured 2026-10-04 by chain chain-wip-2b-settings-20261004-142546-89c5, finding L1, LOW
+probe-key: abc85d0cb1158931d214bef81eb18a6416580cf7
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/settings/wip-defaults.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/hooks/useWipDefaults.ts
+
+## INV-6799 — probe — (LOW) — the standing proof cannot tell whether the gate honours an epic's own task WIP
+
+(LOW) — the standing proof cannot tell whether the gate honours an epic's own task WIP
+
+```probe
+bash /home/lyphe/.claude/state/pipeline-reviews/wip-2b-settings/athena-probes/epic-gate-blind.sh
+echo "[probe exit $?]"
+expect: `mutation applied: True`, then `PASS every reading` / `wip_tasks exit: 0` and `PASS every reading` / `wip_hold exit: 0` while the defect stands; cured when `wip_tasks` prints a `FAIL` reading and `wip_tasks exit: 1`
+```
+
+measured 2026-10-04 by chain chain-wip-2b-settings-20261004-142546-89c5, finding L2, LOW
+probe-key: f565b145c6b92093daa868908464db77bb44e75c
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/settings/wip-defaults.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/hooks/useWipDefaults.ts
+
+## INV-6800 — probe — (LOW) — a Settings tab that was not refocused writes the other default back stale
+
+(LOW) — a Settings tab that was not refocused writes the other default back stale
+
+```probe
+node /home/lyphe/.claude/state/pipeline-reviews/wip-2b-settings/athena-probes/stale-tab-clobber.mjs
+echo "[probe exit $?]"
+expect: `the file held features 5; this tab then sent {"features":"2","tasks":"3"} → file now {"features":"2","tasks":"3"}` while the defect stands (every write is stubbed at the route); cured when the body keeps features 5 or carries only tasks
+```
+
+measured 2026-10-04 by chain chain-wip-2b-settings-20261004-142546-89c5, finding L3, LOW
+probe-key: bdfa1ba791ed15458d5eb2509e0ed8e32dc497c1
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/settings/wip-defaults.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/hooks/useWipDefaults.ts
+
+## INV-6801 — probe — (LOW) — one `status --json` document reads `wip.flag` about 85 times, so a press mid-document gives plans a caption their own `route` contradicts
+
+(LOW) — one `status --json` document reads `wip.flag` about 85 times, so a press mid-document gives plans a caption their own `route` contradicts
+
+```probe
+python3 /home/lyphe/.claude/state/pipeline-reviews/wip-2b-settings/athena-probes/torn-snapshot.py
+echo "[probe exit $?]"
+expect: `plan a → claude route · WIP: 2 tasks at a time`, `plan b` and `plan c` at 5, and `document states one task default: False` while the defect stands; cured when it prints `True`
+```
+
+measured 2026-10-04 by chain chain-wip-2b-settings-20261004-142546-89c5, finding L4, LOW
+probe-key: dc101b5e3845f6c7c957fe5499a06b0aab1de076
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/settings/wip-defaults.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/hooks/useWipDefaults.ts
+
+## INV-6809 — probe — LOW — the purge grep looks for `swarm` only, so the other deleted name, `ceiling`, still stands in two places
+
+LOW — the purge grep looks for `swarm` only, so the other deleted name, `ceiling`, still stands in two places
+
+```probe
+cd /home/lyphe/.claude && grep -c 'width.route`/`ceiling`' hooks/dispatcher/report.py; echo "MAN-5604 route-and-ceiling lines: $(docstore get MAN-5604 | grep -c 'route and ceiling from')"
+echo "[probe exit $?]"
+expect: `0` and `0` (today: `1` and `1`) — neither names `ceiling` as something `width` hands the report
+```
+
+measured 2026-10-04 by chain chain-wip-3-retire-swarm-20261004-160207-cd7a, finding L1, LOW
+probe-key: 489b2fdafd17128b9c0d8202563ca59d607402c4
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/cardOrder.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/dispatcherState.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/order-lane.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-card-order.mjs, /home/lyphe/.claude/hooks/dispatcher/report.py
+
+## INV-6810 — probe — LOW — MAN-1496, a row this build rewrote, still teaches `task_word(plan, epic)` and a `_task_limit(P, E)` that no code defines
+
+LOW — MAN-1496, a row this build rewrote, still teaches `task_word(plan, epic)` and a `_task_limit(P, E)` that no code defines
+
+```probe
+cd /home/lyphe/.claude && docstore get MAN-1496 | python3 -c "import sys,json; b=json.load(sys.stdin)['row']['body']; print('row task_word(plan:', b.count('task_word(plan'), '| row _task_limit:', b.count('_task_limit'))"; echo "width.py defining either: $(grep -c '_task_limit\|def task_word(plan' hooks/dispatcher/width.py)"
+echo "[probe exit $?]"
+expect: `row task_word(plan: 0 | row _task_limit: 0` (today: `1` and `1`, with `width.py defining either: 0`)
+```
+
+measured 2026-10-04 by chain chain-wip-3-retire-swarm-20261004-160207-cd7a, finding L2, LOW
+probe-key: 61f1da106f1006d922c6904d3edd83b970321499
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/cardOrder.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/dispatcherState.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/order-lane.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-card-order.mjs, /home/lyphe/.claude/hooks/dispatcher/report.py
+
+## INV-6811 — probe — LOW — INV-6509 and INV-6510 are executable probe rows of the retired swarm ladder; both crash on the deleted harness. The report filed them as "provenance identifiers".
+
+LOW — INV-6509 and INV-6510 are executable probe rows of the retired swarm ladder; both crash on the deleted harness. The report filed them as "provenance identifiers".
+
+```probe
+cd /home/lyphe/.claude && for t in INV-6509 INV-6510; do docstore get $t >/dev/null 2>&1 && echo "$t still filed" || echo "$t retired"; done; for m in a11y contrast; do printf 'marker.mjs %s: ERR_MODULE_NOT_FOUND lines: ' $m; (cd claudecodeui_lyphe && timeout 100 node /home/lyphe/.claude/state/pipeline-reviews/swarm-ladder/athena-probes/marker.mjs $m 2>&1 | grep -c ERR_MODULE_NOT_FOUND); done
+echo "[probe exit $?]"
+expect: both rows `retired` (today: `still filed` twice, and the crash-line count `3` for each mode)
+```
+
+measured 2026-10-04 by chain chain-wip-3-retire-swarm-20261004-160207-cd7a, finding L3, LOW
+probe-key: 7042a8fadf0f2d26e08ca0a7f1156feddcf11451
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/cardOrder.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/dispatcherState.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/order-lane.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-card-order.mjs, /home/lyphe/.claude/hooks/dispatcher/report.py
+
+## INV-6812 — probe — LOW — the one-command proof cannot fail: `exit 0` carries nothing, and the report's headline leans on it
+
+LOW — the one-command proof cannot fail: `exit 0` carries nothing, and the report's headline leans on it
+
+```probe
+D=$(mktemp -d /tmp/athena-proofcopy-XXXXXX) || exit 1
+case "$D" in /tmp/athena-proofcopy-*) ;; *) echo "refusing $D"; exit 1;; esac
+sed -n '1,75p' /tmp/wip-3-proof.sh | sed 's/"swarm" not in route/"provider" not in route/' > "$D/head.sh"
+bash "$D/head.sh" 2>&1 | grep -E "^  (PASS|FAIL)  route has no .swarm"
+echo "script exit with that FAIL printed: ${PIPESTATUS[0]}"
+case "$D" in /tmp/athena-proofcopy-*) rm -r "$D";; esac
+echo "[probe exit $?]"
+expect: `FAIL  route has no \`swarm\`` and `script exit with that FAIL printed: 1` once the script carries a failing check out (today: `0`)
+```
+
+measured 2026-10-04 by chain chain-wip-3-retire-swarm-20261004-160207-cd7a, finding L4, LOW
+probe-key: 0ad01e788ea50828c6b9b80249d8ffc426e5a3a2
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/cardOrder.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/dispatcherState.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/order-lane.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-card-order.mjs, /home/lyphe/.claude/hooks/dispatcher/report.py
+
+## INV-6813 — probe — LOW — the card-order comments still say "a concurrency press bumps `updated_at`"; the only press left writes `arcs.updated_at`, not a plan's
+
+LOW — the card-order comments still say "a concurrency press bumps `updated_at`"; the only press left writes `arcs.updated_at`, not a plan's
+
+```probe
+grep -n "updated_at" /home/lyphe/.claude/hooks/dispatcher/store_wip.py | cut -c1-110; grep -n "concurrency press" /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/cardOrder.ts /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/dispatcherState.ts | cut -c1-140
+echo "[probe exit $?]"
+expect: the first grep prints one line, `UPDATE arcs SET … updated_at` — no plan row — and the second prints the two comments; cured when the comments state what a WIP press really bumps (the arc's row) or drop the claim
+```
+
+measured 2026-10-04 by chain chain-wip-3-retire-swarm-20261004-160207-cd7a, finding L5, LOW
+probe-key: 47b265e5b853f29d350f749556473399757b3d96
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/cardOrder.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/dispatcherState.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/order-lane.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-card-order.mjs, /home/lyphe/.claude/hooks/dispatcher/report.py

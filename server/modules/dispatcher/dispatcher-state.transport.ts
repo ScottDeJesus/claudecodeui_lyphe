@@ -1,6 +1,7 @@
 import { readDispatcherJson } from '@/shared/dispatcher-command.js';
 import { each, isCount, isCountOrNull, isFlag, isText, isTextOrNull, need, oneOf } from '@/shared/document-fields.js';
 import type { DispatcherModelChoice } from '@/shared/types.js';
+import { readDispatcherWipWord } from '@/shared/utils.js';
 
 // The dispatcher lane's readers import the field vocabulary from here, so its import surface is
 // the one it always had; the readers themselves live in `@/shared/document-fields.ts`.
@@ -105,6 +106,20 @@ export const MODEL_CHOICES: readonly DispatcherModelChoice[] = ['deepseek', 'cla
  */
 export function modelSince(value: unknown, where: string): DispatcherModelChoice | null {
   return value === undefined || value === null ? null : oneOf(value, MODEL_CHOICES, where);
+}
+
+/**
+ * An epic WIP word — a canonical count or `all` — refused by name when it is neither (`readDispatcherWipWord`).
+ *
+ * NOT TOLERANT, deliberately: this reads a key that IS there. A build older than the WIP fields writes
+ * no key at all, which the callers (`arcOf`, `routeOf`) already answer with "nothing to draw" before
+ * they ask for a word; a key that is there and holds a count past 2**53 - 1, a padded number or
+ * `default` is a build this lane cannot draw, and the lane keeps its last good picture and says why.
+ */
+export function wipWord(value: unknown, where: string): string {
+  const word = readDispatcherWipWord(value);
+  if (word === null) throw new Error(`dispatcher status --json answered the ${where} ${String(value)}`);
+  return word;
 }
 
 /**

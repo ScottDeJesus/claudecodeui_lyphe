@@ -4,8 +4,8 @@ import type { DispatcherVerb, DispatcherVerbResult } from '@/shared/types.js';
 /**
  * Relaying the dispatcher's own nine verbs: `stop`, `resume`, `schedule` (a plan's Start — or its
  * Resume, for one already stopped — at a time), `park` (a designed plan set aside), `unpark` (handed
- * back to be cut), `model` (a plan's or an arc's own DeepSeek / Claude word), `swarm` (a plan's own
- * swarm word), `drop` (a plan removed, with everything the store holds of it — refused while a phase
+ * back to be cut), `model` (a plan's or an arc's own DeepSeek / Claude word), `wip` (an epic's own
+ * feature or task WIP limit), `drop` (a plan removed, with everything the store holds of it — refused while a phase
  * of it walks or while a planner outing for the plan or its arc is live, the two gates of
  * `hooks/dispatcher/cmd/drop.py`) and `planner-resume` (a plan's stalled planner outing put back to
  * work — which door it goes back through is the dispatcher's own reading of its store, so it takes
@@ -19,7 +19,7 @@ import type { DispatcherVerb, DispatcherVerbResult } from '@/shared/types.js';
  * transaction and one kick, and the order the plans then walk in is the daemon's own (`rule.eligible`
  * keeps it). `schedule <arc>` arms the operator's one hour for each of those stopped plans (INV-201
  * knows no arc-level timer). `park`, `unpark` and `drop` are the plan card's own and no arc header
- * draws them.
+ * draws them; `wip` is the arc's alone, and takes the limit and the word after the arc's name.
  *
  * This server never touches a plan. It does not hold the dispatcher's lock, does not signal its
  * daemon and never writes the store (`hooks/dispatcher/store.py`, which no server writer may reach —
@@ -39,7 +39,7 @@ export type DispatcherVerbDependencies = DispatcherCommandDependencies;
 
 /**
  * Runs one verb against one name — a plan's, or an arc's for the four the arc's door also opens on.
- * `verbArgs` follow the name — `schedule`'s hour, `model`'s word and `swarm`'s, each already checked
+ * `verbArgs` follow the name — `schedule`'s hour, `model`'s word and `wip`'s limit and word, each already checked
  * by the route against the shapes the dispatcher accepts, and `planner-resume`'s `--by app:card`, which the
  * route spells itself; `stop`, `resume`, `park`, `unpark` and `drop` take none.
  */

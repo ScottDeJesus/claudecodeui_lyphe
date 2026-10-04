@@ -1,6 +1,6 @@
-import type { DispatcherArc, DispatcherArcStatus } from '@/shared/types.js';
+import type { DispatcherArc, DispatcherArcStatus, DispatcherArcWip, DispatcherWipSetting } from '@/shared/types.js';
 
-import { countOrNullSince, countSince, each, field, flagSince, isCount, isRecord, isText, isTextOrNull, modelSince, names, need, oneOf, textSince } from './dispatcher-state.transport.js';
+import { countOrNullSince, countSince, each, field, flagSince, isCount, isRecord, isText, isTextOrNull, modelSince, names, need, oneOf, textSince, wipWord } from './dispatcher-state.transport.js';
 import { plannerSince } from './dispatcher-planner.reader.js';
 
 /**
@@ -22,6 +22,31 @@ import { plannerSince } from './dispatcher-planner.reader.js';
 /** The eight words an arc's derived status may be (`store_arcs.arc_word`'s one precedence). Anything else is a build this lane cannot draw. */
 export const ARC_STATUSES: readonly DispatcherArcStatus[] = ['empty', 'complete', 'judging', 'live', 'scheduled', 'paused', 'queued', 'designing'];
 
+/** One limit of an arc's `wip` block: the epic's own word (`null` while it follows Settings) and the word in force. */
+function wipSettingOf(raw: unknown, where: string): DispatcherWipSetting {
+  const setting = need(raw, isRecord, where);
+  const own = field(setting, 'own');
+  return {
+    own: own === null ? null : wipWord(own, `${where}.own`),
+    effective: wipWord(field(setting, 'effective'), `${where}.effective`),
+  };
+}
+
+/**
+ * An arc's two WIP limits (`report_arcs.arc_dict.wip`), or `null` for a build OLDER than the field —
+ * the control and the line that read it then draw nothing and the board stands, which is the
+ * tolerance `modelSince` and its siblings give every field added after a build shipped. A key that IS
+ * there and does not read is refused by name, with the arc it came from.
+ */
+function wipOf(value: unknown, name: string): DispatcherArcWip | null {
+  if (value === undefined) return null;
+  const wip = need(value, isRecord, `arc.wip of ${name}`);
+  return {
+    features: wipSettingOf(field(wip, 'features'), `arc.wip.features of ${name}`),
+    tasks: wipSettingOf(field(wip, 'tasks'), `arc.wip.tasks of ${name}`),
+  };
+}
+
 /** One arc whole. Its `name` is read first, so every later refusal can name the arc it came from. */
 export function arcOf(raw: unknown): DispatcherArc {
   const arc = need(raw, isRecord, 'arc');
@@ -36,6 +61,9 @@ export function arcOf(raw: unknown): DispatcherArc {
     // (`store.set_arc_model`). A build older than the field reads `null` — the store's default.
     model: modelSince(field(arc, 'model'), 'arc.model'),
     status: oneOf(field(arc, 'status'), ARC_STATUSES, `status of ${name}`),
+    // The epic's two WIP limits, each as its own word and the word in force — what the epic's WIP
+    // control draws and presses back (`dispatcher wip`), carried as the document states them.
+    wip: wipOf(field(arc, 'wip'), name),
     // THE ARC'S OWN VERBS, read off its plans' status words by `report_arcs` and drawn by the header
     // here: `walking` is what Pause is drawn for and `stopped` what Start and Schedule start are —
     // and `stopped` is every plan of the arc that is approved, paused and unfinished, so a whole arc

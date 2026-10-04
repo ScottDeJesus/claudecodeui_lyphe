@@ -29,7 +29,6 @@ import type {
   ProviderModelsDefinition,
   ProviderSkillSource,
   DispatcherModelChoice,
-  DispatcherSwarmWord,
   SubagentActivity,
   WorkspacePathValidationResult,
 } from '@/shared/types.js';
@@ -1502,34 +1501,33 @@ export function dispatcherModelChoiceError(): string {
   return `model must be one of ${DISPATCHER_MODEL_CHOICES.join(', ')}`;
 }
 
-
 // ---------------------------
-//----------------- DISPATCHER SWARM WORD UTILITIES ------------
+//----------------- DISPATCHER WIP WORD UTILITIES ------------
 
-/** One canonical swarm word: `off`, `on`, or `on` and a count with no leading zero. */
-const DISPATCHER_SWARM_WORD = /^(?:off|on|on ([1-9][0-9]*))$/;
+/** One canonical WIP count: ASCII digits, a whole number from 1, no leading zero. */
+const DISPATCHER_WIP_COUNT = /^[1-9][0-9]*$/;
 
 /**
- * A plan's own swarm word in its CANONICAL spelling — `off`, `on`, `on <N>` — or `null` for anything
- * else: a missing field, another casing, padding, `on 0`, a count past the safe-integer range.
+ * One epic WIP word in its CANONICAL spelling — a whole number from 1 to 9007199254740991, or `all` (no
+ * limit) — or `null` for anything else: a missing field, a number rather than a string, padding, a
+ * leading zero, `0`, `default`, another casing, a count past the safe-integer range.
  *
- * The grammar is the runner's (`hooks/plan_runner/swarm.py:parse`) and the spelling is the store's
- * (`hooks/dispatcher/swarm_word.py:spell`), so a word this accepts is one the dispatcher stores
- * unchanged. The count is rebuilt from its number rather than echoed, so what reaches an argv array
- * is a string this server wrote. `Number.isSafeInteger` is the floor for the reason
- * `swarm-switch.ts` gives: past it this server's double and the runner's int disagree about the count.
+ * The grammar is the dispatcher's (`hooks/dispatcher/wip.py:spell`), and its bound is the one the
+ * dispatcher states in its own head: past 2**53 - 1 this server's double and the dispatcher's int
+ * disagree about the number, the reader that carries the word to the screen would refuse it, and one
+ * refused word freezes the whole Runner board's picture (INV-5693). So the bound is enforced HERE, on
+ * both sides of the lane: a request is refused before any process starts, and a document's word is
+ * refused by name. The count is rebuilt from its number rather than echoed, so what reaches an argv
+ * array is a string this server wrote.
  *
- * Used by the plan route (`POST /plans/:name/swarm`, which adds the door's `auto` itself) to refuse
- * a body with a 400 before anything is spawned, and by `dispatcher-plan.reader.ts` to carry the
- * document's stored word into the picture.
+ * Used by `dispatcher-state.transport.ts` (`wipWord`, the document's `own`, `effective` and
+ * `route.wip` words) and by the arc route (`POST /arcs/:name/wip`, which adds the door's `default`).
  */
-export function readDispatcherSwarmWord(value: unknown): DispatcherSwarmWord | null {
-  if (typeof value !== 'string') return null;
-  const match = DISPATCHER_SWARM_WORD.exec(value);
-  if (!match) return null;
-  if (match[1] === undefined) return value as 'off' | 'on';
-  const lanes = Number(match[1]);
-  return Number.isSafeInteger(lanes) ? `on ${lanes}` : null;
+export function readDispatcherWipWord(value: unknown): string | null {
+  if (value === 'all') return 'all';
+  if (typeof value !== 'string' || !DISPATCHER_WIP_COUNT.test(value)) return null;
+  const count = Number(value);
+  return Number.isSafeInteger(count) ? String(count) : null;
 }
 
 

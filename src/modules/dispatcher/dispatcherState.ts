@@ -100,9 +100,9 @@ export function phaseProgress(plan: DispatcherPlan): { done: number; total: numb
  * `groups` and `rest` are its decks and its plans of no arc, each keeping that order among its own
  * kind (the tab's decks above, its wall below).
  *
- * NOTHING BUT THE OPERATOR'S ARRANGEMENT MOVES A CARD. Status, `updated_at`, an owed word, a swarm
- * press and the open chat all change a plan every few seconds; a card that stood by any of them would
- * jump under the reader's hand. A plan that asks keeps its place and its band.
+ * NOTHING BUT THE OPERATOR'S ARRANGEMENT MOVES A CARD. Status, `updated_at`, an owed word and the
+ * open chat all change a plan every few seconds; a card that stood by any of them would jump under
+ * the reader's hand. A plan that asks keeps its place and its band.
  *
  * AN ARC'S OWN ORDER IS THE STORE'S. `arc.plans` is the arc file's walk order (`store.arc_plans`), and
  * it is what the arc's deck draws: the reader is looking at a sequence of thirteen plans that depend

@@ -132,12 +132,12 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/ArcDeck.t
 `.verify` probes written against the deleted plan-runner lane fail, and `node .verify/all.mjs` runs `phase-23.mjs`..`phase-27.mjs` by glob, so the whole run is red.
 
 - what is gone: the `/api/plan-runner` routes (404 now, MAN-5437), the `runner_state` and `arc_state` frames, the `planRunner` preference (the folds and the hidden plans live under `dispatcher`, as `collapsedCards` and `hiddenPlans`), the run and arc cards (`data-runner-card`, `data-arc-card`), and the run and arc directories a fixture wrote into the old runner state tree.
-- find the probes that still name them: `grep -rlE 'api/plan-runner|runner_state|arc_state|planRunner' claudecodeui_lyphe/.verify --include=*.mjs`. 2026-09-26: `phase-23` to `phase-27`, `probe-arc-run-merge`, `probe-phase-wave-mark`, `probe-runner-schedule`, `probe-side-widgets`, `probe-card-fold`, `stale-chat/asclepius-stale-proof`. Their fixtures (`lib/runner-fixture.mjs`, `lib/arc-run-fixture.mjs`, `lib/arc-stuck-fixture.mjs`) write fake runs into a tree no server reads.
+- find the probes that still name them: `grep -rlE 'api/plan-runner|runner_state|arc_state|planRunner' claudecodeui_lyphe/.verify --include=*.mjs`. 2026-09-26: `phase-23` to `phase-27`, `probe-arc-run-merge`, `probe-runner-schedule`, `probe-side-widgets`, `probe-card-fold`, `stale-chat/asclepius-stale-proof`. Their fixtures (`lib/runner-fixture.mjs`, `lib/arc-run-fixture.mjs`, `lib/arc-stuck-fixture.mjs`) write fake runs into a tree no server reads.
 - stale for a second reason: `probe-planner-card.mjs` and `probe-planner-card-write.py` still name plans with the retired name suffix (`grep -rl 'v3' claudecodeui_lyphe/.verify`), which the dispatcher refuses, and the planner soul under its retired id.
 - a red `all.mjs` is therefore not a regression in the change under test: read which phase failed.
 - retiring these files is the operator's call: they are the standing-gate record of past phases. `.verify/` is gitignored, so a `git clean -x` deletes it and no commit shows the change.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/all.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/arc-run-fixture.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/arc-stuck-fixture.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/runner-fixture.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-23.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-24.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-25.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-26.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-27.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-arc-run-merge.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-card-fold.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-phase-wave-mark.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-planner-card.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-planner-card-write.py, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-runner-schedule.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-side-widgets.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/stale-chat/asclepius-stale-proof.mjs
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/all.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/arc-run-fixture.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/arc-stuck-fixture.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/runner-fixture.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-23.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-24.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-25.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-26.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-27.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-arc-run-merge.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-card-fold.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-planner-card.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-planner-card-write.py, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-runner-schedule.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-side-widgets.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/stale-chat/asclepius-stale-proof.mjs
 
 ## INV-4650 — probe — MAN-373 and ScrollArea's comment say "a focus" scrolled the outer box; measured, a focus does not
 
@@ -179,32 +179,17 @@ new, n = re.subn(r'    mine = \[other for other in busy_phases\(conn\) if .*\]\n
 print("mutation applied:", n == 1)
 open(p, "w").write(new)
 PY
-HOME="$S" timeout 120 python3 "$S/.claude/scripts/runner_fixtures/claude_swarm.py" 2>&1 | cut -c1-110 | tail -5
+HOME="$S" timeout 120 python3 "$S/.claude/scripts/runner_fixtures/wip_tasks.py" 2>&1 | cut -c1-110 | tail -5
 echo "fixture exit: ${PIPESTATUS[0]}"
 case "$S" in /tmp/athena-mut-*) rm -r "$S";; esac
 echo "[probe exit $?]"
-expect: `mutation applied: True`, then a `FAIL` reading line and `fixture exit: 1` once the fixture holds a cross-plan reading (today: four PASS lines and `fixture exit: 0` — the board-wide count passes)
+expect: `mutation applied: True`, then a `FAIL` reading line and `fixture exit: 1` once the fixture holds a cross-plan reading — the fixture's cross-plan reading (`tasks 2, one feature full — ANOTHER is still taken up`) tells the per-plan rule from the board-wide one
 ```
 
 measured 2026-10-03 by chain chain-swarm-per-plan-20261003-135930-38a4, finding M1, MEDIUM
 probe-key: 25810ac941c45dac1daf3446b719f82b9747be50
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/settings/swarm-switch.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/agents-settings/sections/content/RunnerModelContent.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useSwarmSwitch.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/hooks/dispatcher/planner_lanes.py, /home/lyphe/.claude/hooks/dispatcher/planner_rule.py, /home/lyphe/.claude/hooks/dispatcher/rule.py, /home/lyphe/.claude/hooks/dispatcher/swarm_word.py, /home/lyphe/.claude/hooks/dispatcher/width.py, /home/lyphe/.claude/scripts/runner_fixtures/claude_swarm.py
-
-## INV-6507 — probe — Statements that the box's number bounds the whole board remain, in places the doc sweep's net will not reach
-
-Statements that the box's number bounds the whole board remain, in places the doc sweep's net will not reach
-
-```probe
-cd ~/.claude && docstore get MAN-6438 | python3 -c "import sys,json; b=json.load(sys.stdin)['row']['body']; print('MAN-6438 board-wide sentence:', 'decides **how many phases the dispatcher walks at once' in b)"; grep -n "the runner walks one phase at a time" claudecodeui_lyphe/server/modules/settings/swarm-switch.ts
-echo "[probe exit $?]"
-expect: `MAN-6438 board-wide sentence: False` and no grep line — the flag's number is described as each plan's default, and `off` as one phase of each plan at a time (today: `True`, and `16: *   \`off\`      the swarm is off; the runner walks one phase at a time`)
-```
-
-measured 2026-10-03 by chain chain-swarm-per-plan-20261003-135930-38a4, finding L1, LOW
-probe-key: f94c2531ee54f86bce8fe2dd7582a96f9364321c
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/settings/swarm-switch.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/agents-settings/sections/content/RunnerModelContent.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useSwarmSwitch.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/hooks/dispatcher/planner_lanes.py, /home/lyphe/.claude/hooks/dispatcher/planner_rule.py, /home/lyphe/.claude/hooks/dispatcher/rule.py, /home/lyphe/.claude/hooks/dispatcher/swarm_word.py, /home/lyphe/.claude/hooks/dispatcher/width.py, /home/lyphe/.claude/scripts/runner_fixtures/claude_swarm.py
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/agents-settings/sections/content/RunnerModelContent.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/hooks/dispatcher/planner_lanes.py, /home/lyphe/.claude/hooks/dispatcher/planner_rule.py, /home/lyphe/.claude/hooks/dispatcher/rule.py, /home/lyphe/.claude/hooks/dispatcher/width.py
 
 ## INV-6571 — probe — . An epic whose status turns `complete` without a new completion is never announced — and the comment and doc say it is
 
