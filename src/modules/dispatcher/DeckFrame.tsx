@@ -15,8 +15,8 @@ import { cn } from '@/shared/utils';
  *
  * THE CARDS ARE A STRIP, IN BOTH HOMES (`DeckStrip`, whose own rules are there): one card per view,
  * moved by its arrows, by a swipe or a trackpad through CSS scroll snap, by Left/Right on the focused
- * strip, and by a press on any node of the flow. AN ARC'S PLANS ARE SWIPED, NOT WALLED, in the Runner
- * tab as in the chat gutter — operator, 2026-09-26: "Can you please bring back the swipable plan
+ * strip, and by a press on any node of the flow. AN ARC'S PLANS ARE SWIPED, NOT WALLED, in the Roadmap tab's
+ * In flight face as in the chat gutter — operator, 2026-09-26: "Can you please bring back the swipable plan
  * cards if it's under an arc, a new plan changed it and I think it's poor design" — and only the
  * plans NO arc holds keep the tab's wall (`RunnerPanel`).
  *

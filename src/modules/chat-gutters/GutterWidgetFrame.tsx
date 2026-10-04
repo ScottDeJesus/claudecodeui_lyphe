@@ -94,7 +94,7 @@ export function GutterWidgetFrame({
   count: number;
   /**
    * The tone of the header's count badge — `info`, the badge's own cool register, unless the widget
-   * has something to raise. The Runner widget passes `warn` while a plan owes the operator a word,
+   * has something to raise. The Runs widget passes `warn` while a plan owes the operator a word,
    * so the badge says "these want you" rather than merely "these are here". Ignored at zero, where
    * no badge is drawn at all.
    */

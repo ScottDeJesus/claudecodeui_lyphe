@@ -8,9 +8,9 @@ import type { LaneFlow } from '@/shared/types';
 
 /**
  * An arc deck's plans as ONE horizontal strip, one card per view — AN ARC'S LAYOUT IN BOTH HOMES, the
- * Runner tab as much as the chat gutter's widget, so a reader who has paged one has paged the other
- * (operator, 2026-09-26: the swipable plan cards came back under an arc). The tab has the width for a
- * wall, and an arc's plans do not use it: they are a set of things that walk in order, and one whole
+ * Roadmap tab's In flight face as much as the chat gutter's widget, so a reader who has paged one has
+ * paged the other (operator, 2026-09-26: the swipable plan cards came back under an arc). The face has
+ * the width for a wall, and an arc's plans do not use it: they are a set of things that walk in order, and one whole
  * card at a time is how a reader reads one. Top to bottom: the arc's flow of plans, the nav row, and
  * the strip — the last two are `SnapStrip`, the one strip shape a round's questions are paged by too,
  * whose own rules are there.
@@ -27,7 +27,7 @@ import type { LaneFlow } from '@/shared/types';
  * `data-arc-strip`, `data-arc-viewing`, `data-arc-prev` and `data-arc-next` are the browser harness's
  * handles.
  *
- * Used by `DeckFrame`, as the body of every arc deck: the Runner tab's and the chat gutter widget's.
+ * Used by `DeckFrame`, as the body of every arc deck: the In flight face's and the chat gutter widget's.
  */
 export function DeckStrip({
   flow,

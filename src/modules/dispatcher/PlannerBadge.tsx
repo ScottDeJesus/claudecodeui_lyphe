@@ -28,8 +28,9 @@ import type { DispatcherPlanner } from '@/shared/types';
  * `data-planner-badge`, `data-planner-target`, `data-planner-soul` and `data-planner-state` are the
  * browser harness's handles, so a probe reads one outing's mark without reading the card's text.
  *
- * Used on the head's lead row of `PlanCard` and `DispatchArcDeck` (`PlannerBadge`), and by the Runner tab's
- * two homes for the outings that have no card and no deck to be drawn in (`LoosePlannerBadges`).
+ * Used on the head's lead row of `PlanCard` and `DispatchArcDeck` (`PlannerBadge`), and by both homes —
+ * the Roadmap tab's In flight face and the chat gutter's widget — for the outings that have no card and
+ * no deck to be drawn in (`LoosePlannerBadges`).
  */
 
 /**

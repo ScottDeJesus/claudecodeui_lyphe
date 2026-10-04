@@ -13,7 +13,7 @@ type ScrollAreaProps = React.HTMLAttributes<HTMLDivElement>;
  * THE INNER SCROLLER IS `relative`, SO IT IS THE CONTAINING BLOCK OF EVERYTHING IT SCROLLS. A static
  * scroller handed every absolutely positioned descendant with no positioned ancestor nearer — an
  * `sr-only` span is one — to the OUTER box. Those nodes escaped the scroll and gave the `overflow-hidden`
- * outer box a scroll range of its own: measured on the Runner tab at 320px, 2820px of range over a
+ * outer box a scroll range of its own: measured on the Roadmap tab's In flight face at 320px, 2820px of range over a
  * 621px box, from 22 `sr-only` figures in the plan cards. A centring `scrollIntoView`
  * (`block: 'center'`) on a control near the list's end then scrolled that outer box, which no reader
  * can scroll back, and the pane drew its bottom 279px empty with the list's last controls pushed out of

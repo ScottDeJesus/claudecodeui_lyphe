@@ -5,7 +5,7 @@ import type { DispatcherArc, DispatcherPlan } from '@/shared/types';
 
 /**
  * Keeps the remembered card folds to the cards this lane still carries — the one place the two kinds
- * of foldable key are assembled, so the Runner tab and the chat gutter's Runner widget prune by ONE
+ * of foldable key are assembled, so the Roadmap tab's In flight face and the Runs widget prune by ONE
  * rule and can never disagree about which folds are still worth keeping.
  *
  * THE LISTS ARE HANDED IN, NOT RE-READ. Both homes already hold all three of them (`useDispatcherPlans`),

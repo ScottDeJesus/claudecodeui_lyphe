@@ -89,7 +89,7 @@ export function phaseProgress(plan: DispatcherPlan): { done: number; total: numb
 }
 
 /**
- * The lane split by `plan.arc`, every card in the operator's order — the one split the Runner tab and
+ * The lane split by `plan.arc`, every card in the operator's order — the one split the Roadmap tab's In flight face and
  * the chat gutter's widget both read.
  *
  * ONE FUNCTION, TWO HOMES, AND NO THIRD READING. The tab and the widget draw the same lane, and a home

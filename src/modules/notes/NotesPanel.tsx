@@ -6,7 +6,7 @@ import { NotesList } from '@/modules/notes/NotesList';
 import { Badge, ScrollArea } from '@/shared/ui';
 
 /**
- * The Notes tab's pane: the header the Runner and Memory panes wear, and under it the wall.
+ * The Notes tab's pane: the header the Roadmap tab's In flight face and the Memory pane wear, and under it the wall.
  *
  * Used by `src/modules/project-workspace` (`WorkspaceMain`), which mounts it as the Notes tab's
  * pane — the tab's first home; the second is the chat gutter's Notes widget, which draws the same

@@ -4,7 +4,7 @@ import { each, field, isCount, isRecord, isText, names, need, oneOf } from './di
 
 /**
  * A plan's `asking` key, read field by field: the prompt CloudCLI has put up for the plan — on its
- * card in the Runner tab and in the Runner widget — and is still waiting on
+ * card in the Roadmap tab's In flight face and in the Runs widget — and is still waiting on
  * (`hooks/dispatcher/ask.py:asking`).
  *
  * The plan reader's sibling, under every rule it states once (`dispatcher-plan.reader.ts`): the

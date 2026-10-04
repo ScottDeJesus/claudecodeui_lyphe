@@ -50,8 +50,8 @@ export function useDispatcherPlans(): {
    * (`askState.ts`), across the plans this screen draws.
    *
    * COUNTED BY IDENTITY, NOT BY CARD: a lock names every plan of its arc still owing an Accept, and
-   * the operator owes that ONE answer however many cards carry it — so the amber mark on the Runner
-   * tab and the warn tone on the widget's badge count questions, not plans. Asked of the drawn plans
+   * the operator owes that ONE answer however many cards carry it — so the amber mark the In flight face puts
+   * on the tab strip and the warn tone on the widget's badge count questions, not plans. Asked of the drawn plans
    * alone, like `count`, because a plan the operator has put away draws no card his word could reach.
    */
   waiting: number;
@@ -65,8 +65,8 @@ export function useDispatcherPlans(): {
    */
   planners: DispatcherPlanner[];
   /**
-   * The outings with NO card and NO deck to be drawn in — what the Runner tab's two homes draw as
-   * badges above the arc decks. Empty on an ordinary lane.
+   * The outings with NO card and NO deck to be drawn in — what both homes, the Roadmap tab's In flight
+   * face and the chat gutter's widget, draw as badges above the arc decks. Empty on an ordinary lane.
    */
   loosePlanners: DispatcherPlanner[];
   /** The dispatcher's next DeepSeek off-peak moment, epoch SECONDS, or `null` when the clock answered `none` or nothing is retained. */

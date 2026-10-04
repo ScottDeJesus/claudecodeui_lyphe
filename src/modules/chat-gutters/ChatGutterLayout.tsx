@@ -86,9 +86,9 @@ export function ChatGutterLayout({
   // so the Escape below asks the same window it listens on.
   const hostWindow = useHostWindow();
   const { placements, moveWidget, toggleWidget } = useGutterPlacements(sessionId);
-  // The Runner widget lists the arcs as decks and the plans no arc holds as cards, so its badge
+  // The Runs widget lists the arcs as decks and the plans no arc holds as cards, so its badge
   // counts the plans alone: an arc's own plans are already counted, and the arc's deck is a
-  // heading over cards the count has counted — the tab's own rule (`useDispatcherPlans.count`).
+  // heading over cards the count has counted — the In flight face's own rule (`useDispatcherPlans.count`).
   // `waiting` is the badge's TONE, not its number: the count stays what it always was, and turns
   // amber while any of those plans owes the operator a word — the same amber the tab's dot wears.
   const { count: runnerCount, waiting: runnerWaiting } = useDispatcherPlans();

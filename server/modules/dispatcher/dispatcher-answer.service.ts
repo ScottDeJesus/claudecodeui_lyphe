@@ -42,7 +42,7 @@ export type AskReply =
 
 /**
  * Which door the press came through — named in `approved_by` (`app:card`, `app:phone`). `'card'` is
- * the plan's own card in the Runner tab and the Runner widget, which answers over its own HTTP door
+ * the plan's own card in the Roadmap tab's In flight face and the Runs widget, which answers over its own HTTP door
  * (`dispatcher-answer.routes.ts`) rather than through a runtime's gateway; `'phone'` is a push's
  * button, which walks that gateway (`ntfy-action.routes.ts`).
  */

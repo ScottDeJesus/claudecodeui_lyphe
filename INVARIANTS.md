@@ -3973,3 +3973,31 @@ measured 2026-10-04 by chain chain-roadmap--widget--whole-20261004-084914-d809, 
 probe-key: c4bc8e13f306f950a59a335a265155e012079326
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/roadmap-live-walks.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/roadmap-widget-prod.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/roadmap-widget-walks.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-roadmap-widget.mjs
+
+## INV-6748 — probe — (LOW) — "the chat gutter's Runner widget" became "the chat gutter's Runs widget", but the mapping says "the Runs widget"
+
+(LOW) — "the chat gutter's Runner widget" became "the chat gutter's Runs widget", but the mapping says "the Runs widget"
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe && grep -rn "gutter's Runs widget" src server docs/MANUAL.md docs/architecture/MANUAL.md | wc -l
+expect: 9 now; 0 if the qualifier is dropped to match the mapping
+```
+
+measured 2026-10-04 by chain chain-roadmap--judgment--names-app-20261004-110113-6ede, finding L1, LOW
+probe-key: c45095edce9207ee6905771a0956a45a24d2e3ce
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts
+
+## INV-6749 — probe — (LOW) — the screen is still called "Runner" in other words the three-phrase grep cannot see
+
+(LOW) — the screen is still called "Runner" in other words the three-phrase grep cannot see
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe && grep -rn -E "Runner (homes|lane's memory|card|readout)|opens the Runner at|Runner and Memory panes|Memory and Runner panels|Heal, Memory and Runner" src server docs/MANUAL.md docs/architecture/MANUAL.md | wc -l
+expect: 12 now; 0 once these read as the Roadmap tab's In flight face / the Runs widget (the panels sentences may stay if read as component names)
+```
+
+measured 2026-10-04 by chain chain-roadmap--judgment--names-app-20261004-110113-6ede, finding L2, LOW
+probe-key: cf2235f7cd2664d7ac664e22e6cd013fe402b6b2
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts

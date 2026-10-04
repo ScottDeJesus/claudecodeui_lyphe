@@ -14,8 +14,8 @@ import { createAskReads } from './dispatcher-ask-reads.service.js';
  * prompt the app has put up for it and is still waiting on (`hooks/dispatcher/ask.py`) — and every
  * distinct one is raised, whatever session it names: a `permission.required` push with its buttons,
  * which is the phone's (and the lane's bell's — `DispatcherAskBell.tsx`), and the record the card's
- * door answers out of (`answer`, `POST /api/dispatcher/answer`) — the plan's card in the Runner tab
- * and in the Runner widget. MOST OF THE STORE IS NOBODY'S CHAT: a plan opened from the terminal, or
+ * door answers out of (`answer`, `POST /api/dispatcher/answer`) — the plan's card in the Roadmap tab's In flight face
+ * and in the Runs widget. MOST OF THE STORE IS NOBODY'S CHAT: a plan opened from the terminal, or
  * one whose session this server has never seen, still owes the operator his word, and its ask is
  * raised all the same with `provider: 'system'` and no session at all — the store is the truth about
  * what is owed, and an owed word is answered on the card and on the phone, neither of which needs a
@@ -314,7 +314,7 @@ export function createDispatcherAsks(dependencies: DispatcherAsksDependencies): 
     declined('not-open', plan, 'this prompt is no longer open — answered, re-cut or changed since it was drawn; nothing was carried');
 
   /**
-   * The CARD's door — the plan's own card in the Runner tab and in the Runner widget
+   * The CARD's door — the plan's own card in the Roadmap tab's In flight face and in the Runs widget
    * (`POST /api/dispatcher/answer`). THE ASK COMES BACK EXACTLY AS THE CARD DREW IT and its NAME is
    * derived here (`keyOf`), so what is approved is this book's record of the ask that name finds, and
    * nothing the request carries reaches an argv. A card can be stale in four ways, and each is

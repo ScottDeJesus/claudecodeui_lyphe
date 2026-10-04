@@ -10,7 +10,7 @@ import { Button, SettingRow } from '@/shared/ui';
  * `~/.claude/state/park_at_peak.flag`, drawn below the swarm row (the planner-lanes row stands between them) because it answers the
  * same question the swarm row does: how the DeepSeek route spends its hours. The dispatcher reads it at
  * both Accept doors; on the Claude route it holds nothing, which is why it lives on this card and
- * not on the Runner tab.
+ * not on the Roadmap tab's In flight face.
  *
  * Its own file, as `RunnerHealModelRow` is: `RunnerModelContent` is past what it should hold, and a
  * row whose read, write and re-read are its own hook has nothing to share with the rows around it

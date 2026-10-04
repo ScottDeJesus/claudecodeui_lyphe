@@ -157,8 +157,8 @@ export function CardDescription({ text, className }: { text: string; className?:
  * token into a 25px column of 37 stacked letters — and the row's own `scrollWidth` against its
  * `clientWidth` is the reading that catches it (`data-lane-head-row`).
  *
- * THE FLOOR IS CONTENT-DRIVEN AND NOT A BREAKPOINT: these heads are drawn in the Runner tab and in the
- * chat gutter (a 300–480px column, drawn only where the chat region is 1500px or more — never at phone
+ * THE FLOOR IS CONTENT-DRIVEN AND NOT A BREAKPOINT: these heads are drawn in the Roadmap tab's In flight face and
+ * in the chat gutter (a 300–480px column, drawn only where the chat region is 1500px or more — never at phone
  * width, never on a 1440px screen), so an `sm:` rule would put one home's card on the other home's branch.
  *
  * THE KIND TAG RIDES INSIDE THAT FLOOR: it is part of the heading, so the floor is the widest unbreakable

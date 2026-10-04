@@ -9,7 +9,7 @@ import { askingSince } from './dispatcher-ask.reader.js';
  * path is `/api/dispatcher/answer`, behind the mount's `authenticateToken` (`server/index.ts`).
  *
  * THE CARD SENDS THE ASK BACK EXACTLY AS IT DREW IT — the `asking` record of the `dispatcher_state`
- * frame the plan card and the Runner widget render — with the operator's word by question. This route
+ * frame the plan card and the Runs widget render — with the operator's word by question. This route
  * reads and validates that body and does nothing else: the ask's NAME, the lookup in the book, the
  * carry to the dispatcher and the outcome all belong to the asks service
  * (`dispatcher-asks.service.ts`), whose `answer` this router is handed.

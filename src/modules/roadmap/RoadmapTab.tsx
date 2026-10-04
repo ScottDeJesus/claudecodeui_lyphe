@@ -23,8 +23,8 @@ type RoadmapTabProps = {
 
 /**
  * The Roadmap tab: a segmented switch over its two faces. Roadmap is the path to the goal
- * (`RoadmapPath`); In flight is the live cards (`RunnerPanel`, mounted exactly as the Runner tab mounted
- * it, so not one card behaviour changes). In flight carries the tab strip's own pill and amber — the
+ * (`RoadmapPath`); In flight is the live cards (`RunnerPanel`, mounted whole beneath the switch with only a
+ * reveal handed down). In flight carries the tab strip's own pill and amber — the
  * cards drawn, and the sentence for the prompts waiting on the operator — so the switch says where the
  * urgent thing is before he turns to it.
  *

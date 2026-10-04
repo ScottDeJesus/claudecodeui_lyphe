@@ -35,7 +35,7 @@ export const providerRegistry = {
    * prompt that IS pending in a chat is answered, listed and marked by the very doors a tool
    * approval is. THE DISPATCHER'S GATEWAY IS THE EXCEPTION: it settles the phone's taps on a plan's
    * prompt and lists nothing at all, because a plan's prompt is pending in no chat — the card in the
-   * Runner tab and the phone are where it is answered.
+   * Roadmap tab's In flight face and the phone are where it is answered.
    */
   listPermissionGateways(): ProviderRuntimePermissionGateway[] {
     const runtimes = Object.values(providers)

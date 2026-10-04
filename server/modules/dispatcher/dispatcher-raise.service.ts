@@ -2,7 +2,7 @@ import type { DispatcherPlan, DispatcherStateEvent } from '@/shared/types.js';
 
 /**
  * The raise: a plan that lands owing the OPERATOR's word has its ask recorded and its prompt put up —
- * on the plan's card in the Runner tab and in the Runner widget, and on his phone.
+ * on the plan's card in the Roadmap tab's In flight face and in the Runs widget, and on his phone.
  *
  * WHAT IT IS FOR. A plan's Accept prompt, or its designer's questions, is the operator's to answer —
  * and on 2026-09-28 one sat in `questions` until he asked for it himself ("I didnt get that

@@ -339,7 +339,7 @@ const COPY_BY_CODE = new Map<string, CodeCopy>([
    *
    * `dispatcher.paused` is the lane's stop-and-look: the dispatcher pauses a walk for its own
    * reasons (a spent ladder, a budget, the pause verb) and the phone is where the operator finds
-   * out, since the Runner tab is only read when he opens it. The remedy is named because it is the
+   * out, since the Roadmap tab's In flight face is only read when he opens it. The remedy is named because it is the
    * least obvious part: the plan is not retried by anything, it is resumed. A pause the dispatcher
    * itself held carries its cause in `meta.detail` (an API error line, the storm guard's), and the
    * body says it.

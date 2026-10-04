@@ -24,7 +24,7 @@ import { createDispatcherWatcher } from './dispatcher-watcher.service.js';
  * The dispatcher is the plan store's OWN owner — a SQLite store under `~/.claude/state/dispatcher`,
  * a daemon that walks one phase at a time, and a command that answers `status --json` (`hooks/
  * dispatcher/`). NOTHING HERE WRITES ANY OF IT. The lane reads one document, relays verbs, and puts
- * the prompts a plan owes the operator up on the plan's card in the Runner tab and in the Runner
+ * the prompts a plan owes the operator up on the plan's card in the Roadmap tab's In flight face and in the Runs
  * widget, and on his phone — the ask recorded by the dispatcher's own `ask` verb
  * (`dispatcher-raise.service.ts`), shown from the document's `asking` key
  * (`dispatcher-asks.service.ts`), and answered through its own `accept` and `tell`. The dispatcher

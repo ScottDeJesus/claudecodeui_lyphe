@@ -253,7 +253,7 @@ export function DispatchArcDeck({
  * plans of its own arc.
  *
  * ONE DECK FOR EACH ARC, IN EITHER HOME, and that is why this exists rather than a map at each call
- * site: the Runner tab and the chat gutter's Runner widget draw the same arcs from the same split
+ * site: the Roadmap tab's In flight face and the Runs widget draw the same arcs from the same split
  * (`byArc`), and the two must agree about which plans sit under which arc. AN ARC IS ONE SHAPE IN
  * BOTH HOMES — its plans in a strip, one card per view — so `home` no longer picks a layout and
  * decides nothing but the width each home gives the deck: the tab's scroll body spans the pane and

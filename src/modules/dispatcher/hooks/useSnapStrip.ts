@@ -30,7 +30,7 @@ function isTextControl(target: EventTarget): boolean {
  *
  * IT ALSO OWNS THE STRIP'S HEIGHT, and that is the same fact the scroll position is: WHICH item the
  * reader is on. A row of flex items is as tall as its tallest item, so a strip left to itself wears
- * the tallest item's height under every shorter one — measured on an arc deck in the Runner widget,
+ * the tallest item's height under every shorter one — measured on an arc deck in the Runs widget,
  * 2026-09-25: a three-line card painted 398px with 260px of nothing beneath it, because a
  * later card of the same arc carries seventeen phase rows (operator, the same day: "plan/arc cards
  * should not have so much empty space, it should be dynamically adjusting"). So the height here is
@@ -56,8 +56,9 @@ function isTextControl(target: EventTarget): boolean {
  * reader's item is where they left it and the next layout puts the strip back on it.
  *
  * The strip must be the offset parent of its items (`relative`): centring reads `offsetLeft`.
- * Used by `DeckStrip`, for an arc deck's plans in the Runner tab and in the chat gutter's widget alike,
- * and by `RoundAnswer`, for a round's questions — both draw the one `SnapStrip` over this.
+ * Used by `DeckStrip`, for an arc deck's plans in the Roadmap tab's In flight face and in the chat
+ * gutter's widget alike, and by `RoundAnswer`, for a round's questions — both draw the one `SnapStrip`
+ * over this.
  */
 export function useSnapStrip(focusIndex: number, itemCount: number) {
   const stripRef = useRef<HTMLOListElement>(null);

@@ -11,8 +11,8 @@ import type { AskDraft, LockCompose, RoundPick } from '@/shared/types';
  *
  * WHY IT IS HERE AND NOT IN THE FORM'S STATE (operator: "Plan card answers to questions should
  * save"). The form kept it in component state, so every remount emptied it: a page reload (the dev
- * client's own, a phone browser dropping a background tab), the other surface (the Runner tab and the
- * chat gutter's widget are separate copies of the same card), a widget unmounted below 1500px. The
+ * client's own, a phone browser dropping a background tab), the other surface (the Roadmap tab's In flight
+ * face and the Runs widget are separate copies of the same card), a widget unmounted below 1500px. The
  * ask's identity is stable for the life of one ask, so the key is not the problem and a different ask
  * — a re-cut — starts empty as it always did.
  *

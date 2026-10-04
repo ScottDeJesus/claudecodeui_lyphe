@@ -8,7 +8,7 @@ import type { DispatcherLanePicture } from '@/shared/types';
 /**
  * KEEPS THE SAVED DRAFTS TO THE ASKS THE LANE STILL CARRIES, and draws nothing. Mounted by
  * `DispatcherFeed` beside the lane's bell, so it lives exactly as long as the page does and prunes
- * whichever home — the Runner tab or the chat gutter's widget — is on screen, or neither.
+ * whichever home — the Roadmap tab's In flight face or the chat gutter's widget — is on screen, or neither.
  *
  * A draft belongs to one ask (`askDrafts.ts`), and an ask the lane stops naming — answered from
  * another device, retracted, re-cut under a new identity — is, as far as this page can tell, gone, so

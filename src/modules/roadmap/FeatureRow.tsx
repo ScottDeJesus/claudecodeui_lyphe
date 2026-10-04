@@ -133,10 +133,14 @@ export function FeatureRow({ feature, onOpen, density }: FeatureRowProps) {
 
   // The project, at the end of the step phrase's line — never on the title's line, where it took a third
   // of the width and wrapped most titles, and never on the amber line of a row that waits on the operator,
-  // which holds what he owes and the one press that answers it (the dialog names the project). Full rows only.
+  // which holds what he owes and the one press that answers it (the dialog names the project). Full rows only. A
+  // label too long for half the line is cut short, whole in its title: a label can be the repo's folder name, which
+  // no fence limits, and the chip must stay inside its row.
   const project = !compact && (
-    <span className="-my-0.5 ml-auto shrink-0">
-      <Chip size="sm">{feature.project}</Chip>
+    <span className="-my-0.5 ml-auto max-w-[50%] shrink-0">
+      <Chip size="sm" className="min-w-0 max-w-full" title={feature.project}>
+        <span className="truncate">{feature.project}</span>
+      </Chip>
     </span>
   );
 

@@ -20,8 +20,8 @@ import { readUserPreference, subscribeToUserPreferences, writeUserPreferenceEntr
  * PATCH (`writeUserPreferenceEntries`) naming only the cards it folds or opens. A client's copy is read
  * at sign-in and never again, so a write that sent the whole document let a client open a while erase
  * every fold, and every HIDE, made elsewhere since (INV-4406; the operator's arc Hide of 2026-09-28 was
- * undone that way by another client's fold). So a fold made in the Runner tab is there in the chat
- * gutter's Runner widget, a fold survives a reload, and a fold made on the phone is there on the
+ * undone that way by another client's fold). So a fold made in the Roadmap tab's In flight face is there in the
+ * Runs widget, a fold survives a reload, and a fold made on the phone is there on the
  * desktop at its next load. The mirror in localStorage is what makes the very first paint already
  * folded, with no flash of an open card.
  *
@@ -137,7 +137,7 @@ function pruneCardFolds(live: readonly string[]): void {
 /**
  * One card's fold: whether it is folded, and the one press that turns it.
  *
- * `useSyncExternalStore` rather than local state, because the fold is SHARED: the Runner tab and the
+ * `useSyncExternalStore` rather than local state, because the fold is SHARED: the Roadmap tab's In flight face and the
  * chat gutter's widget draw the same card at the same time, and a fold pressed in one has to be
  * folded in the other. It is also what makes the answer arrive on the first render, off the
  * preference mirror the app read at load — there is no effect and no second paint, so a card never

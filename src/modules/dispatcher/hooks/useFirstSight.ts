@@ -57,8 +57,8 @@ export function useFirstSight(key: string): boolean {
  * count or a flow node's ring ending inside the card does not end it. Once cleared, a re-display has
  * nothing to restart.
  *
- * THE RISE IS CLAIMED WHEN IT PLAYS, NOT WHEN A MOUNT READS IT. A card that arrives while the Runner
- * tab is showing mounts in BOTH homes in one commit, and first sight answers true in both; a CSS
+ * THE RISE IS CLAIMED WHEN IT PLAYS, NOT WHEN A MOUNT READS IT. A card that arrives while the Roadmap
+ * tab's In flight face is showing mounts in BOTH homes in one commit, and first sight answers true in both; a CSS
  * animation does not run under `display: none`, so the gutter copy kept its class and rose the moment
  * Chat was shown — the reader watched the card rise twice (measured 2026-09-26). So the root's own
  * `vv-rise` `animationstart` claims `key` in `risen`, and a copy whose rise starts after the key was

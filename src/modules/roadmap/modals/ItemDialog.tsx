@@ -116,16 +116,20 @@ function pairChoices(pairs: ProjectPair[]): { value: string; label: string }[] {
 }
 
 /**
- * The draft a dialog opens on: the item's own words and project, or a blank add on `opening`. A feature
- * whose pair the picture no longer carries opens on Another folder…, its path and label already typed.
+ * The draft a dialog opens on: the item's own words and project, or a blank add on `opening`. Only a promoted
+ * feature opens with its label typed, to be renamed in place; for any other the label field is Another
+ * folder…'s, and it opens blank, because the label a feature merely reads is not one it stores and a save
+ * would not send it. A feature whose pair the picture no longer carries opens on Another folder…, its path
+ * and label already typed, so a save that moves nothing sends nothing.
  */
 function draftOf(item: EditedItem | undefined, pairs: ProjectPair[], opening: string): ItemDraft {
   const feature = item && 'repo' in item ? item : null;
-  const opened = { title: item?.title ?? '', goal: item?.goal ?? '', folder: '', label: feature?.project ?? '' };
+  const label = feature !== null && !UNPROMOTED.has(feature.word) ? feature.project : '';
+  const opened = { title: item?.title ?? '', goal: item?.goal ?? '', folder: '', label };
   if (feature === null) return { ...opened, pair: opening };
   const pair = pairKey(feature);
   if (pairs.some((known) => pairKey(known) === pair)) return { ...opened, pair };
-  return { ...opened, pair: ANOTHER_FOLDER, folder: feature.repo };
+  return { ...opened, pair: ANOTHER_FOLDER, folder: feature.repo, label: feature.project };
 }
 
 /** The project a draft names: the chosen pair, or the folder and label typed for Another folder… (a blank label is none, and the dispatcher derives one). */
@@ -146,9 +150,13 @@ function changesOf(draft: ItemDraft, item: EditedItem, pairs: ProjectPair[]): Ro
   if (!promoted && draft.goal.trim() !== (item.goal ?? '').trim()) changes.goal = draft.goal.trim();
   if (feature === null) return changes;
   const pair = promoted ? { project: draft.label.trim() || null, repo: feature.repo } : pairOf(draft, pairs);
-  // A label left blank sends '', which hands the feature back to the dispatcher's rule for a label.
-  if (pair !== null && (pair.project ?? '') !== feature.project) changes.project = pair.project ?? '';
-  if (pair !== null && pair.repo !== feature.repo) changes.repo = pair.repo;
+  if (pair === null) return changes;
+  // A label left blank sends '', which hands the feature back to the dispatcher's rule for a label. A feature moved
+  // to another folder sends the label its project choice shows along with the repo, even when it is the one it
+  // already reads: a label it only reads is stored nowhere, and would follow the new folder.
+  const label = pair.project ?? '';
+  if (label !== feature.project || pair.repo !== feature.repo) changes.project = label;
+  if (pair.repo !== feature.repo) changes.repo = pair.repo;
   return changes;
 }
 
@@ -205,7 +213,11 @@ export function ItemDialog(props: ItemDialogProps) {
   // The lane's other fences, met before anything is sent: each field's own invalid state, with its sentence under it.
   const titleBreak = roadmapTextBreak(draft.title.trim(), FENCES.title, true);
   const goalBreak: FenceBreak | null = roadmapTextBreak(draft.goal.trim(), FENCES.goal, false) ?? (draft.goal.trim() === '-' ? 'dash' : null);
-  const labelBreak = roadmapTextBreak(draft.label.trim(), FENCES.label, true);
+  // The label's fence holds only for a label the operator typed: one the field is not drawing, or the feature's own
+  // left alone, is the dispatcher's to give, and its step for a repo no feature labels (the folder's name) is not
+  // fenced, so a label a feature reads can run past 40 and must never hold its title back.
+  const labelTyped = (another || promoted) && draft.label.trim() !== (feature?.project ?? '');
+  const labelBreak = labelTyped ? roadmapTextBreak(draft.label.trim(), FENCES.label, true) : null;
   const goalAsked = props.goalFirst !== undefined || feature?.word === 'proposed';
   const changed = item === undefined || Object.keys(changesOf(draft, item, pairs)).length > 0;
   const ready = draft.title.trim() !== '' && (!goalAsked || draft.goal.trim() !== '') && (!another || folder.startsWith('/')) && changed

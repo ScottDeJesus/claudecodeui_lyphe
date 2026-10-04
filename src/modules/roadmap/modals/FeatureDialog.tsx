@@ -204,7 +204,9 @@ export function FeatureDialog({ name, onOpenCard, onClose }: FeatureDialogProps)
                 {feature.title}
               </DialogTitle>
               <div className="mt-2.5 flex">
-                <Chip size="sm">{feature.project}</Chip>
+                <Chip size="sm" className="min-w-0 max-w-full" title={feature.project}>
+                  <span className="truncate">{feature.project}</span>
+                </Chip>
               </div>
             </div>
             <div className="-mr-2 -mt-1 flex shrink-0 items-center">

@@ -16,7 +16,7 @@ import { cn, resizeObserverIn } from '@/shared/utils';
  * sidebar without a scroller. A tab without one draws its label, unchanged.
  *
  * `attention` is the SECOND capability of the same kind, and it is a sentence rather than a
- * number: what is waiting on the tab, in the operator's own words — the Runner tab's
+ * number: what is waiting on the tab, in the operator's own words — the Roadmap tab's
  * "`3 waiting for you`". While it is set the tab's mark is drawn in the warn register (the dot
  * amber on an icon tab, the count pill amber on a word tab) and the title reads
  * `<label> (<count>) · <attention>`, so a mark that is only a colour is never the whole signal
@@ -296,7 +296,7 @@ export function Tabs({ tabs, active, onChange, ariaLabel, variant = 'segmented',
     >
       {strip}
       {/* The trigger carries what the collapsed tabs carry: a dot for a count behind it, and the
-          warn tone when one of them is waiting on the operator — so a Runner tab hidden behind More
+          warn tone when one of them is waiting on the operator — so the Roadmap tab hidden behind More
           keeps its amber instead of losing the one mark that says it wants him. */}
       {collapsed.length > 0 && (
         <TabsMore

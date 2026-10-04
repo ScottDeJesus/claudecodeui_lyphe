@@ -303,16 +303,16 @@ export const SWARM_LADDER_TOP = 6;
 //----------------- DISPATCHER LANE WALL ------------
 
 /**
- * The space between two lane cards, whether they stand side by side on the Runner tab's wall or one
- * under another in the chat gutter's Runner widget. Both homes read this one value, so the widget's
- * list keeps the tab's card spacing.
+ * The space between two lane cards, whether they stand side by side on the wall of the Roadmap tab's
+ * In flight face or one under another in the Runs widget. Both homes read this one value,
+ * so the widget's list keeps the face's card spacing.
  *
  * Used by `LANE_WALL_GRID` below and by the runner-tab module's `RunnerWidgetBody` (its list of cards).
  */
 export const LANE_CARD_GAP = 'gap-4';
 
 /**
- * The Runner tab's wall: an auto-fill grid of lane cards, each column at least 22rem wide (or the
+ * The wall of the Roadmap tab's In flight face: an auto-fill grid of lane cards, each column at least 22rem wide (or the
  * whole column where the pane is narrower, so a phone gets one card a row and never a sideways
  * scroll), row-major, and every card at its OWN height (`items-start`) rather than the tallest in
  * its row, spaced `LANE_CARD_GAP` apart.

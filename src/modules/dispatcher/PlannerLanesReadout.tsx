@@ -14,8 +14,8 @@ import { cn } from '@/shared/utils';
  * the dial is lowered, since an outing already out is never stopped.
  *
  * NOT DRAWN when the frame carries no `planners`: a dispatcher build older than the field sends none,
- * and a phrase guessed from nothing would be the only lie on the lane. Drawn by the Runner tab's
- * header and the chat gutter's widget, both beside the plans it counts.
+ * and a phrase guessed from nothing would be the only lie on the lane. Drawn by the header of the
+ * Roadmap tab's In flight face and the chat gutter's widget, both beside the plans it counts.
  *
  * `data-planner-lanes` (valued `<out>/<lanes>`) is the browser harness's handle.
  */

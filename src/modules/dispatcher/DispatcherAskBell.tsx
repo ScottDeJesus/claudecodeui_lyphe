@@ -19,7 +19,7 @@ const HEARD_LIMIT = 200;
  * gate and under the one socket, so it lives exactly as long as the page does.
  *
  * WHAT IT RINGS FOR IS NEW NEWS, NOT NEWS ON SCREEN. The card is already drawn on the plan's own
- * card in the Runner tab and the gutter's widget, and a chime that fired while the operator was
+ * card in the Roadmap tab's In flight face and the gutter's widget, and a chime that fired while the operator was
  * LOOKING at the board would be noise about something he can see. So the bell remembers the asks it
  * has already heard and rings only for an identity that is new to it — which, by `askIdentity`'s own
  * rule (`askState.ts`), means a NEW `asked` event:

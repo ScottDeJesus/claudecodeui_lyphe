@@ -82,8 +82,8 @@ type PlannerLanes = {
  *
  * The width is NOT a client preference and so is not `readUserPreference`: it is a file on this host
  * that the dispatcher's daemon re-reads at every planner take-up, which is why every read here is a
- * request to the server rather than a value the browser already holds. The Runner tab's readout
- * (`PlannerLanesReadout`) does not use this hook: it draws the dispatcher's own frame, which states
+ * request to the server rather than a value the browser already holds. The readout on the Roadmap tab's
+ * In flight face (`PlannerLanesReadout`) does not use this hook: it draws the dispatcher's own frame, which states
  * the width beside how many planners are out against it.
  *
  * ONE FILE, SO ONE ORDER OF ANSWERS. A read issued before a write and landing after it would draw the

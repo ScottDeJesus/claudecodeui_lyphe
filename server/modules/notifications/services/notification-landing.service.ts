@@ -29,7 +29,7 @@ function encodeOrNull(value: string): string | null {
   }
 }
 
-/** The app path a tap on a push opens: the event's session, or the root — and, for a plan's prompt (a `permission.required` whose `meta.plan` names a plan), `?runner=<plan>`, the Runner tab on that plan's card. The one place a push's landing is decided.
+/** The app path a tap on a push opens: the event's session, or the root — and, for a plan's prompt (a `permission.required` whose `meta.plan` names a plan), `?runner=<plan>`, the Roadmap tab's In flight face on that plan's card. The one place a push's landing is decided.
  *
  * Consumed by the notification orchestrator, which puts it on the payload's `data.path` for the
  * service worker and the desktop app, and by the ntfy channel, which appends it to the app URL for

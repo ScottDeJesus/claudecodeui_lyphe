@@ -81,7 +81,7 @@ function openedBy(plan: DispatcherPlan, sessionId: string | null): boolean {
  * `useDispatcherPlans` hands it the retained picture, so it paints on its first render; the chrome,
  * the slots and the scrolling belong to `src/modules/chat-gutters`.
  *
- * Used by `src/modules/chat-gutters` (`ChatGutterLayout`), as the Runner widget's body.
+ * Used by `src/modules/chat-gutters` (`ChatGutterLayout`), as the Runs widget's body.
  */
 export function RunnerWidgetBody({ sessionId }: { sessionId: string | null }) {
   const { t } = useTranslation();

@@ -61,7 +61,7 @@ async function writeSwitch(next: boolean): Promise<boolean | null> {
 
 /**
  * Every surface showing the switch right now, each entry a way of being told a position. One surface
- * composes this hook today (the settings row); a second one added later — a control on the Runner tab
+ * composes this hook today (the settings row); a second one added later — a control on the Roadmap tab's In flight face
  * itself, say — is told a flip made here the moment it is announced, rather than a copy it has to
  * keep in step.
  */

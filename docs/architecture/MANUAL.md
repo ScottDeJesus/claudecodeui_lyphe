@@ -2825,7 +2825,7 @@ offset.
 **`flex-1` is the whole height rule: every `flex-none` sibling above the pane is height the
 conversation loses.** Exactly one thing stands there — the CLI-version banner
 ([docs/MANUAL.md (cli-version)](../MANUAL.md)) — and by operator ruling 2026-09-09 nothing else may,
-not a card, not a strip, not a chip. The Runner widget provoked it and keeps the reasoning (MAN-642, "Nothing renders over the transcript"). No probe measures it: a region added above the pane shows only as a shorter transcript.
+not a card, not a strip, not a chip. The Runs widget provoked it and keeps the reasoning (MAN-642, "Nothing renders over the transcript"). No probe measures it: a region added above the pane shows only as a shorter transcript.
 
 Three row-level scrollers do exist — `BashCommandDisplay.tsx` (`max-h-80 overflow-auto`),
 `FileListContent.tsx` and `AskUserQuestionPanel.tsx` (`max-h-48 overflow-y-auto`). They are
@@ -5174,7 +5174,7 @@ section: 07-live-widgets/012 The live bus
 
 `LiveBusProvider` (mounted once by `App`) holds one retained value per topic and dispatches
 publishes synchronously to whoever subscribed. `useWidgetBridge` is the widget module's door onto
-it; `useLiveTopic` is the door for an ordinary React component, and the Roadmap tab is a caller — the In flight face and the strip's count both read `dispatcher:all` through `useDispatcherPlans` ([docs/MANUAL.md (dispatcher)](../MANUAL.md) §"The In flight face and the Runner widget"), and the Roadmap face reads `roadmap:all` through `useRoadmap` (MAN-7635), never through a fetch of their own.
+it; `useLiveTopic` is the door for an ordinary React component, and the Roadmap tab is a caller — the In flight face and the strip's count both read `dispatcher:all` through `useDispatcherPlans` ([docs/MANUAL.md (dispatcher)](../MANUAL.md) §"The In flight face and the Runs widget"), and the Roadmap face reads `roadmap:all` through `useRoadmap` (MAN-7635), never through a fetch of their own.
 
 **The bus knows no producer.** It imports no transport, calls no endpoint and names no frame kind.
 What fills it is a FEED — a headless component owned by the module whose data it carries, which

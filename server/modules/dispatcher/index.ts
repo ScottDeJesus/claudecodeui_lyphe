@@ -2,5 +2,5 @@
 // at `/api/dispatcher` — the poll behind the `dispatcher_state` frame (every plan this host holds),
 // the relay for the dispatcher's own stop/resume/park/unpark/schedule, its next off-peak moment, the
 // notification each plan or epic ending earns, and the prompt a plan owes the operator, raised on the plan's
-// card in the Runner tab and in the Runner widget and answered back through the dispatcher's own doors.
+// card in the Roadmap tab's In flight face and in the Runs widget and answered back through the dispatcher's own doors.
 export { createDispatcherModule } from './dispatcher.module.js';

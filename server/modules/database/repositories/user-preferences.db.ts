@@ -80,7 +80,7 @@ function mergeGutters(stored: unknown, incoming: unknown): unknown {
 }
 
 /**
- * The Runner lane's memory (`dispatcher`) is the other document every open client writes: four ENTRY
+ * The memory of the Roadmap tab's In flight face (`dispatcher`) is the other document every open client writes: four ENTRY
  * LISTS, `hiddenPlans` (`{ name, at }` per hidden plan), `collapsedCards` (one fold key per folded
  * card), `cardOrder` (`{ name, rank }` per moved card) and `askDrafts` (one half-typed answer per open
  * ask). Replaced whole, it let any client write back the copy it read at sign-in and erase every hide
