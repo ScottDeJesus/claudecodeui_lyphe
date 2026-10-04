@@ -116,14 +116,15 @@ export type RoadmapTask = {
  * One feature: a plan on the roadmap, from an idea to shipped. `waiting_on_you` names what the
  * operator owes it (`questions` to answer, an `accept` to press) or is null; `blocked` is the
  * operator's own reason, a mark the picture shows and nothing reads, or null; `waits_on` names the
- * plans it waits on. `repo` is always a string, and `project` a label or null. `cases` counts the
- * feature's own active cases by word. Consumers: the roadmap lane's reader and the screen.
+ * plans it waits on. `repo` and `project` are always strings: `project` is always a label, the feature's
+ * own or the one the dispatcher derives (MAN-7621). `cases` counts the feature's own active cases by
+ * word. Consumers: the roadmap lane's reader and the screen.
  */
 export type RoadmapFeature = {
   name: string;
   title: string;
   goal: string | null;
-  project: string | null;
+  project: string;
   repo: string;
   position: number;
   blocked: string | null;

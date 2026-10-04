@@ -367,15 +367,6 @@ export function formatShortDate(stamp: string | null | undefined): string | null
   return day.toLocaleDateString(undefined, thisYear ? { month: 'short', day: 'numeric' } : { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
-/**
- * The last folder of a path — `/home/lyphe/restorly/` reads `restorly` — or the path itself when it
- * has none. A roadmap project's name when the store holds no label for it: `FeatureRow`'s and
- * `FeatureDialog`'s project chip, and `ItemDialog`'s project choices and folder placeholder.
- */
-export function folderName(path: string): string {
-  return path.replace(/\/+$/, '').split('/').pop() || path;
-}
-
 /** The size ladder, largest unit last. Private to `formatBytes`. */
 const BYTE_UNITS = ['B', 'KB', 'MB', 'GB', 'TB'];
 

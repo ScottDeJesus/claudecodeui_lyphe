@@ -17,7 +17,6 @@ import { useReturnFocus } from '@/shared/hooks/useReturnFocus';
 import type { RoadmapAct, RoadmapEpic, RoadmapFeature, RoadmapMilestone, RoadmapPicture } from '@/shared/roadmap-types';
 import { ActionMenu, Banner, Button, Chip, Dialog, DialogContent, DialogTitle } from '@/shared/ui';
 import type { ActionMenuItem } from '@/shared/ui';
-import { folderName } from '@/shared/utils';
 
 /** What is open over the feature's own dialog: one follow-on, opened from its presses. `goal` is the edit opened on the goal first, and `then` is what follows its Save. */
 type FollowOn = { dialog: 'edit' | 'move' | 'block' | 'delete' | 'promote' } | { dialog: 'goal'; then: 'propose' | 'promote' | null };
@@ -205,7 +204,7 @@ export function FeatureDialog({ name, onOpenCard, onClose }: FeatureDialogProps)
                 {feature.title}
               </DialogTitle>
               <div className="mt-2.5 flex">
-                <Chip size="sm">{feature.project ?? folderName(feature.repo)}</Chip>
+                <Chip size="sm">{feature.project}</Chip>
               </div>
             </div>
             <div className="-mr-2 -mt-1 flex shrink-0 items-center">

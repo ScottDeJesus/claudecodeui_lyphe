@@ -135,7 +135,7 @@ function readFeature(raw: unknown, at: string): RoadmapFeature {
     name: feature.text('name'),
     title: feature.text('title'),
     goal: feature.textOrNull('goal'),
-    project: feature.textOrNull('project'),
+    project: feature.text('project'),
     repo: feature.text('repo'),
     position: feature.count('position'),
     blocked: feature.textOrNull('blocked'),

@@ -7,7 +7,7 @@ import { useRoadmapWrites } from '@/modules/roadmap/hooks/useRoadmapWrites';
 import { useReturnFocus } from '@/shared/hooks/useReturnFocus';
 import type { Roadmap, RoadmapEpic, RoadmapFeature, RoadmapKind, RoadmapMilestone, RoadmapPicture, RoadmapWriteBody } from '@/shared/roadmap-types';
 import { Button, Dialog, DialogContent, DialogTitle, Field, Input, Select, TextArea } from '@/shared/ui';
-import { folderName, roadmapTextBreak } from '@/shared/utils';
+import { roadmapTextBreak } from '@/shared/utils';
 
 /** The lane's fences (`roadmap-write.service.ts`), met as each field is typed: `maxLength` counts UTF-16 units, so it can stop an emoji-heavy text short of the lane's limit but never lets one past it. */
 const FENCES = { title: 120, goal: 8000, label: 40, folder: 400 } as const;
@@ -24,8 +24,11 @@ const UNPROMOTED: ReadonlySet<string> = new Set(['idea', 'proposed']);
 /** A promoted feature's goal and folder: words in a dashed, muted box, never a field to type in; selectable, in the muted ink that reads at AA. */
 const DESIGN_OWNED = 'rounded-lg border border-dashed border-border bg-muted/40 px-3 py-2 text-sm text-muted-foreground';
 
-/** One project a feature can be built in: the label the roadmap shows (null: none, so its folder's name) and the folder the work happens in. */
-type ProjectPair = { project: string | null; repo: string };
+/** One project a feature can be built in, as the picture carries it: the label the roadmap shows (always one: the feature's own, or the one the dispatcher derives) and the folder the work happens in. */
+type ProjectPair = { project: string; repo: string };
+
+/** What a draft's project comes to: a pair off the picture, or the folder typed for Another folder… under the label typed with it. That label is null when left blank: an add then sends no `project` and an edit sends `''`, and either way the dispatcher derives one. */
+type ChosenProject = { project: string | null; repo: string };
 
 /** The form as typed. `pair` is a known pair's key or ANOTHER_FOLDER, whose folder and label are typed by hand; a promoted feature's `label` is its project, renamed in place. */
 type ItemDraft = { title: string; goal: string; pair: string; folder: string; label: string };
@@ -59,6 +62,11 @@ function pairKey(pair: ProjectPair): string {
   return JSON.stringify([pair.repo, pair.project]);
 }
 
+/** The last folder of a path — `/home/lyphe/restorly/` reads `restorly` — or the path itself when it has none: Another folder…'s label placeholder, where the dispatcher's rule for a label ends. */
+function folderName(path: string): string {
+  return path.replace(/\/+$/, '').split('/').pop() || path;
+}
+
 /** The value `values` holds most often, the first of them on a tie; null for none. */
 function mostOf(values: string[]): string | null {
   const counts = new Map<string, number>();
@@ -70,27 +78,24 @@ function mostOf(values: string[]): string | null {
 
 /**
  * The projects a feature can be built in, as the roadmaps' features carry them, in path order: each
- * distinct (project, folder) pair — but never a pair with no label whose folder a labelled pair names,
- * because that folder IS the labelled project and its bare name would list it twice. `keep`, an edited
- * feature's own pair, is offered whatever it is, so an edit opens on it unchanged.
+ * distinct (project, folder) pair. Every feature carries a label, so every pair is on the picture as it
+ * stands — an edited feature's own pair among them, and an edit opens on it unchanged.
  */
-function projectPairs(picture: RoadmapPicture | null, keep: string | null): ProjectPair[] {
+function projectPairs(picture: RoadmapPicture | null): ProjectPair[] {
   const pairs = new Map<string, ProjectPair>();
   for (const roadmap of picture?.roadmaps ?? []) {
     for (const feature of roadmap.milestones.flatMap((milestone) => milestone.epics.flatMap((epic) => epic.features))) {
       if (!pairs.has(pairKey(feature))) pairs.set(pairKey(feature), { project: feature.project, repo: feature.repo });
     }
   }
-  const named = new Set([...pairs.values()].flatMap((pair) => (pair.project === null ? [] : [pair.repo])));
-  return [...pairs].flatMap(([key, pair]) => (pair.project !== null || !named.has(pair.repo) || key === keep ? [pair] : []));
+  return [...pairs.values()];
 }
 
 /**
- * The project an add opens on: the folder its epic's own features use most, called by the label the
- * picture gives that folder (the epic's own most-used one, else the first offered). An epic with no
- * feature yet opens on the folder its roadmap's features use most, under the label they give it. The
- * first project stands in only for a roadmap with no feature at all; a picture with none opens on
- * Another folder….
+ * The project an add opens on: the folder its epic's own features use most, under the label those
+ * features carry most. An epic with no feature yet opens on the folder its roadmap's features use most,
+ * under the label they give it. The first project stands in only for a roadmap with no feature at all;
+ * a picture with none opens on Another folder….
  */
 function openingPair(picture: RoadmapPicture | null, epic: string | undefined, pairs: ProjectPair[]): string {
   const first = pairs[0] ? pairKey(pairs[0]) : ANOTHER_FOLDER;
@@ -98,19 +103,15 @@ function openingPair(picture: RoadmapPicture | null, epic: string | undefined, p
   const mine = home?.milestones.flatMap((milestone) => milestone.epics).find((item) => item.name === epic)?.features ?? [];
   const own = mine.length > 0 ? mine : home?.milestones.flatMap((milestone) => milestone.epics.flatMap((item) => item.features)) ?? [];
   const repo = mostOf(own.map((feature) => feature.repo));
-  if (repo === null) return first;
-  const label = mostOf(own.flatMap((feature) => (feature.repo === repo && feature.project !== null ? [feature.project] : [])))
-    ?? pairs.find((pair) => pair.repo === repo && pair.project !== null)?.project ?? null;
-  const key = pairKey({ project: label, repo });
-  return pairs.some((pair) => pairKey(pair) === key) ? key : first;
+  const label = mostOf(own.flatMap((feature) => (feature.repo === repo ? [feature.project] : [])));
+  return repo === null || label === null ? first : pairKey({ project: label, repo });
 }
 
-/** The pairs as choices: each called by its label, else its folder's name, with its whole path beside it where another pair is called the same. */
+/** The pairs as choices: each called by its label, with its whole path beside it where another pair is called the same. */
 function pairChoices(pairs: ProjectPair[]): { value: string; label: string }[] {
-  const called = (pair: ProjectPair) => pair.project ?? folderName(pair.repo);
   return pairs.map((pair) => {
-    const twin = pairs.some((other) => other !== pair && called(other) === called(pair));
-    return { value: pairKey(pair), label: twin ? `${called(pair)} · ${pair.repo}` : called(pair) };
+    const twin = pairs.some((other) => other !== pair && other.project === pair.project);
+    return { value: pairKey(pair), label: twin ? `${pair.project} · ${pair.repo}` : pair.project };
   });
 }
 
@@ -122,13 +123,13 @@ function draftOf(item: EditedItem | undefined, pairs: ProjectPair[], opening: st
   const feature = item && 'repo' in item ? item : null;
   const opened = { title: item?.title ?? '', goal: item?.goal ?? '', folder: '', label: feature?.project ?? '' };
   if (feature === null) return { ...opened, pair: opening };
-  const pair = pairKey({ project: feature.project, repo: feature.repo });
+  const pair = pairKey(feature);
   if (pairs.some((known) => pairKey(known) === pair)) return { ...opened, pair };
   return { ...opened, pair: ANOTHER_FOLDER, folder: feature.repo };
 }
 
-/** The project a draft names: the chosen pair, or the folder and label typed for Another folder… (a blank label is none, and the folder's name stands in). */
-function pairOf(draft: ItemDraft, pairs: ProjectPair[]): ProjectPair | null {
+/** The project a draft names: the chosen pair, or the folder and label typed for Another folder… (a blank label is none, and the dispatcher derives one). */
+function pairOf(draft: ItemDraft, pairs: ProjectPair[]): ChosenProject | null {
   if (draft.pair === ANOTHER_FOLDER) return { project: draft.label.trim() || null, repo: draft.folder.trim() };
   return pairs.find((pair) => pairKey(pair) === draft.pair) ?? null;
 }
@@ -145,7 +146,8 @@ function changesOf(draft: ItemDraft, item: EditedItem, pairs: ProjectPair[]): Ro
   if (!promoted && draft.goal.trim() !== (item.goal ?? '').trim()) changes.goal = draft.goal.trim();
   if (feature === null) return changes;
   const pair = promoted ? { project: draft.label.trim() || null, repo: feature.repo } : pairOf(draft, pairs);
-  if (pair !== null && (pair.project ?? '') !== (feature.project ?? '')) changes.project = pair.project ?? '';
+  // A label left blank sends '', which hands the feature back to the dispatcher's rule for a label.
+  if (pair !== null && (pair.project ?? '') !== feature.project) changes.project = pair.project ?? '';
   if (pair !== null && pair.repo !== feature.repo) changes.repo = pair.repo;
   return changes;
 }
@@ -153,10 +155,9 @@ function changesOf(draft: ItemDraft, item: EditedItem, pairs: ProjectPair[]): Ro
 /**
  * ADD OR EDIT, ANY KIND, ONE FORM: a roadmap, a milestone, an epic or a feature. A title is all an add
  * needs, and the store mints its name from it, so an add sends none. A feature also says where it is
- * built, right under its title: a project the roadmaps' features already carry, or Another folder…, typed
- * by hand. An add opens on the folder its epic's features use most (its roadmap's, while the epic has
- * none), under that folder's own label, and a folder a label names is never offered again under its bare
- * folder name (`projectPairs`, `openingPair`).
+ * built, right under its title: a project the roadmaps' features already carry, each under its label, or
+ * Another folder…, typed by hand. An add opens on the folder its epic's features use most (its roadmap's,
+ * while the epic has none), under the label they carry most (`projectPairs`, `openingPair`).
  *
  * AN EDIT SENDS ONLY WHAT CHANGED, and Save waits until something has. A promoted feature's goal and
  * folder belong to its design: they show locked under "Its design owns these now", and its title and its
@@ -186,8 +187,7 @@ export function ItemDialog(props: ItemDialogProps) {
   // The projects its features carry, and the parent epic's own, are read off the live picture.
   const { picture } = useRoadmap();
   const feature = item && 'repo' in item ? item : null;
-  const keep = feature === null ? null : pairKey(feature);
-  const pairs = useMemo(() => projectPairs(picture, keep), [picture, keep]);
+  const pairs = useMemo(() => projectPairs(picture), [picture]);
   const opening = useMemo(() => openingPair(picture, props.parent?.name, pairs), [picture, props.parent?.name, pairs]);
   // The form as typed. Opened ONCE, on the item (or a blank add on `opening`), because the picture redraws
   // on every frame the lane sends and a frame that lands mid-edit must never overwrite what is being typed.
@@ -211,8 +211,8 @@ export function ItemDialog(props: ItemDialogProps) {
   const ready = draft.title.trim() !== '' && (!goalAsked || draft.goal.trim() !== '') && (!another || folder.startsWith('/')) && changed
     && titleBreak === null && goalBreak === null && labelBreak === null
     // A frame can take the chosen pair away mid-dialog (the last feature carrying it moved or was re-labelled elsewhere):
-    // the Select then shows its placeholder, and a write sent now would carry no repo and no project, which the store
-    // answers by quietly giving the feature an inherited project. It waits until a project is chosen.
+    // the Select then shows its placeholder, and a write sent now would carry no repo and no project, which the dispatcher
+    // answers by quietly building the feature in its epic's folder. It waits until a project is chosen.
     && (!projected || chosen !== null);
 
   // An add names no item: the store mints its name from the title and its ADDED line says it. An edit sends only the
@@ -224,7 +224,8 @@ export function ItemDialog(props: ItemDialogProps) {
       const body: RoadmapWriteBody = { kind, parent: props.parent?.name, title: draft.title.trim() };
       const goal = draft.goal.trim();
       if (goal !== '') body.goal = goal;
-      // A feature's project is the pair chosen, or the folder and label typed; a label left blank is none, and the folder's name stands.
+      // A feature's project is the pair chosen, or the folder and label typed for Another folder…; with that label left blank
+      // no project is sent, and the dispatcher derives one.
       const pair = projected ? pairOf(draft, pairs) : null;
       if (pair !== null) {
         body.repo = pair.repo;
@@ -273,8 +274,10 @@ export function ItemDialog(props: ItemDialogProps) {
       />
     </Field>
   );
-  // A project's name, typed: Another folder…'s label, or a promoted feature's project renamed in place. Blank is none: the folder's name stands in, as the placeholder shows.
-  const labelField = (placeholder: string) => (
+  // A project's name, typed: Another folder…'s label, or a promoted feature's project renamed in place. Blank is none: the
+  // dispatcher derives one. Another folder…'s placeholder shows its folder's name, where that rule ends; a promoted feature's
+  // field has none, because a blanked label reads what the rule gives it, which is not the folder's name.
+  const labelField = (placeholder?: string) => (
     <Field label={t('roadmap.dialog.item.folderLabel')} htmlFor={`${fieldId}-label`} error={labelBreak === null ? undefined : t(`roadmap.dialog.fence.${labelBreak}`, { max: FENCES.label })}>
       <Input
         id={`${fieldId}-label`} value={draft.label} maxLength={FENCES.label} invalid={labelBreak !== null} placeholder={placeholder || undefined} autoComplete="off"
@@ -344,7 +347,7 @@ export function ItemDialog(props: ItemDialogProps) {
 
           {promoted && feature && (
             <>
-              {labelField(folderName(feature.repo))}
+              {labelField()}
               <div className="flex flex-col gap-4 border-t border-border pt-4" data-roadmap-design-owns>
                 <p className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
                   <Lock aria-hidden="true" className="size-3.5 shrink-0" />

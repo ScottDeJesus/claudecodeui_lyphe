@@ -9,7 +9,7 @@ import { useStepPhrase } from '@/modules/roadmap/hooks/useStepPhrase';
 import { StateLine } from '@/modules/roadmap/StateLine';
 import type { RoadmapFeature } from '@/shared/roadmap-types';
 import { Badge, Button, Chip, Meter, Shimmer } from '@/shared/ui';
-import { cn, folderName } from '@/shared/utils';
+import { cn } from '@/shared/utils';
 
 /**
  * The shipped row's one sweep: a soft band crossing it once (`roadmap-sweep`'s own comment in
@@ -136,7 +136,7 @@ export function FeatureRow({ feature, onOpen, density }: FeatureRowProps) {
   // which holds what he owes and the one press that answers it (the dialog names the project). Full rows only.
   const project = !compact && (
     <span className="-my-0.5 ml-auto shrink-0">
-      <Chip size="sm">{feature.project ?? folderName(feature.repo)}</Chip>
+      <Chip size="sm">{feature.project}</Chip>
     </span>
   );
 
