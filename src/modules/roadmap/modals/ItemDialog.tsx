@@ -165,7 +165,8 @@ function changesOf(draft: ItemDraft, item: EditedItem, pairs: ProjectPair[]): Ro
  * needs, and the store mints its name from it, so an add sends none. A feature also says where it is
  * built, right under its title: a project the roadmaps' features already carry, each under its label, or
  * Another folder…, typed by hand. An add opens on the folder its epic's features use most (its roadmap's,
- * while the epic has none), under the label they carry most (`projectPairs`, `openingPair`).
+ * while the epic has none), under the label they carry most (`projectPairs`, `openingPair`); an add left on
+ * that opening pair sends its folder and no label, and only a pair chosen or a label typed names one.
  *
  * AN EDIT SENDS ONLY WHAT CHANGED, and Save waits until something has. A promoted feature's goal and
  * folder belong to its design: they show locked under "Its design owns these now", and its title and its
@@ -236,12 +237,14 @@ export function ItemDialog(props: ItemDialogProps) {
       const body: RoadmapWriteBody = { kind, parent: props.parent?.name, title: draft.title.trim() };
       const goal = draft.goal.trim();
       if (goal !== '') body.goal = goal;
-      // A feature's project is the pair chosen, or the folder and label typed for Another folder…; with that label left blank
-      // no project is sent, and the dispatcher derives one.
+      // A feature's project is the pair chosen, or the folder and label typed for Another folder…. The pair the dialog opened
+      // on is one the picture only READS (the dispatcher may have derived its label, and a derived label is stored nowhere), so
+      // left as opened it sends the repo alone and the feature reads its repo's label; another pair, or a label typed, names
+      // one. With that label left blank no project is sent either.
       const pair = projected ? pairOf(draft, pairs) : null;
       if (pair !== null) {
         body.repo = pair.repo;
-        if (pair.project !== null) body.project = pair.project;
+        if (pair.project !== null && (draft.pair === ANOTHER_FOLDER || draft.pair !== opening)) body.project = pair.project;
       }
       landed = await writes.add(body);
     } else {
