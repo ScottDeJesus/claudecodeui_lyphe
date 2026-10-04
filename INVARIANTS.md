@@ -2806,7 +2806,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/AskDraftP
 
 ## INV-6394 — The operator's words — CloudCLI names an arc an epic, a plan a feature, a phase a task; the house's code keeps arc, plan, phase
 
-CloudCLI's text names arcs, plans and phases as epics, features and tasks. Identifiers, store words, CLI verbs and their stdout, hook names, plan files and charters keep arc, plan and phase. The house's prompt to the operator carries his words (below).
+CloudCLI's text names arcs, plans and phases as epics, features and tasks. Identifiers, store words, CLI verbs and their stdout, hook names, plan files and charters keep arc, plan and phase. The house's text to the operator — its prompt and the roadmap's DocSpace page — carries his words (below).
 
 | the house's word | CloudCLI's text | plurals, possessives and counted plurals follow |
 |---|---|---|
@@ -2820,8 +2820,8 @@ CloudCLI's text names arcs, plans and phases as epics, features and tasks. Ident
 - The `defaultValue` beside a key: the drawn text when its key is absent, the fallback when present — both carry the new words (`ComposerDeepSeekSwitch.tsx`, `RunnerModelContent.tsx` with its five `agents.runnerSwarm.*` keys no locale holds, `RunnerParkAtPeakRow.tsx`).
 - The command palette's Runner keywords carry both vocabularies (`CommandPalette.tsx`).
 - The ten other locales hold none of the dispatcher keys and fall back to English. Their values whose English changed say what the new English says: `chat.json` `input.deepseekFlashTooltip`, `settings.json` `agents.runnerModel.description`, fr `agents.runnerParkAtPeak.*`. "plan runner" is "runner" in them, left in English.
-- The push copy: `notification-copy.service.ts` — `Feature finished`, `Feature paused`, `Features paused …`, `Task relaunched`, `Task <key> was taken up again`, `<done>/<n> tasks`.
-- The server's two sentences: `NO_ANSWER.timeout` (`dispatcher-verb.service.ts`), `OTHER_PROCESS_EXAMPLES` (`claude-activity.service.ts`).
+- The push copy: `notification-copy.service.ts` — `Feature finished`, `Epic finished`, `Feature paused`, `Features paused …`, `Task relaunched`, `Task <key> was taken up again`, `<done>/<n> tasks`.
+- The server's two sentences: `NO_ANSWER.timeout` (`server/shared/dispatcher-command.ts`), `OTHER_PROCESS_EXAMPLES` (`claude-activity.service.ts`).
 
 **A house sentence a dispatcher surface relays verbatim** passes through `operatorWords` (MAN-7596) where it is drawn, and nowhere else:
 - `useDispatcherVerbs` — the verb toast.
@@ -2829,11 +2829,12 @@ CloudCLI's text names arcs, plans and phases as epics, features and tasks. Ident
 - `PlannerBadge` — the cause a planner outing ended on.
 - The dispatcher's own bytes never change.
 
-**The house's prompt to the operator** carries his words at its own home:
+**The house's text to the operator** carries his words at its own home:
 - `lock._count` — `<N> tasks`, `, <K> done`.
 - `lock_glance.facts_line` — `Epic <arc>`, `<N> tasks in <W> waves`.
 - `intent_lock.DESCRIPTIONS` — the Accept and Rework descriptions.
-- Untouched: `LOCK_HEADER`, `OPTIONS` and their labels, `TOKEN_RE`, `names_of`, and every input of `lock.token`. why: the vet reads the first line and the last token; an outstanding token must stand.
+- `roadmap_mirror` — the DocSpace copy of each roadmap: the page says milestone, epic, feature and task, and states each feature's step as a plain phrase composed in `_STEP_PHRASES` and `step_phrase` (MAN-7624).
+- Untouched in the prompt: `LOCK_HEADER`, `OPTIONS` and their labels, `TOKEN_RE`, `names_of`, and every input of `lock.token`. why: the vet reads the first line and the last token; an outstanding token must stand.
 
 **The slash doors**: `/feature` is `/plan`, `/epic` is `/arc` (`skills/feature/SKILL.md`, `skills/epic/SKILL.md`). Each loads its skill and runs that sequence; nothing of the sequence lives in the door.
 
@@ -2856,6 +2857,7 @@ CloudCLI's text names arcs, plans and phases as epics, features and tasks. Ident
 | a new CloudCLI string names an arc, plan or phase | write epic, feature, task, in the locale and in its `defaultValue` |
 | a house sentence reaches the DOM verbatim | draw it through `operatorWords` where it is drawn; add the reader to MAN-7596 |
 | the house prompts the operator | write his words at the sentence's own home; leave every input of the token alone |
+| the house writes the operator a page (the DocSpace roadmap) | write his words where the page is composed (`roadmap_mirror`); no token is involved |
 | a row quotes an operator string | quote the new word; prose about the code keeps the code word |
 
 Proof — prints exactly the eight other-sense keys above:
@@ -2863,7 +2865,7 @@ Proof — prints exactly the eight other-sense keys above:
 
 Translator contract: MAN-7596. Push wording: MAN-622. The prompt's census and facts line: MAN-6047, MAN-1475.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/services/notification-copy.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/operatorWords.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/, /home/lyphe/.claude/hooks/dispatcher/lock_glance.py, /home/lyphe/.claude/hooks/dispatcher/lock.py, /home/lyphe/.claude/hooks/intent_lock.py, /home/lyphe/.claude/skills/epic/, /home/lyphe/.claude/skills/feature/
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/services/notification-copy.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/operatorWords.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/, /home/lyphe/.claude/hooks/dispatcher/lock_glance.py, /home/lyphe/.claude/hooks/dispatcher/lock.py, /home/lyphe/.claude/hooks/dispatcher/roadmap_mirror.py, /home/lyphe/.claude/hooks/intent_lock.py, /home/lyphe/.claude/skills/epic/, /home/lyphe/.claude/skills/feature/
 
 ## INV-6398 — probe — `.verify/probe-dismiss-done.mjs` cannot run, and its edited labels were never run (LOW)
 
@@ -2983,3 +2985,322 @@ measured 2026-10-03 by chain chain-kind-tags-20261003-140320-3897, finding M1, M
 probe-key: 9cbff8c793881d65d595db195c0d67ee7da0745b
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/verve/controls.css, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/verve/tokens.css, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-kind-tags.mjs
+
+## INV-6548 — a new top-level server/shared/*.ts file must join .oxlintrc.json's backend-shared-utils list
+
+`boundaries/include` covers every `server/**/*.ts`, but a file directly in `server/shared/` is a known element only when `.oxlintrc.json` names it: `types`, `interfaces`, `index.ts` and the `backend-shared-utils` `pattern` array hold the list. A file outside it is an unknown element; every importer errors `boundaries(no-unknown)`.
+
+- symptom: `npx oxlint server/` reports `error boundaries(no-unknown): Dependencies to unknown elements are not allowed` on the import line of each importer, not on the new file.
+- fix: add the file's path to the `backend-shared-utils` `pattern` array in the same change that creates it. `server/shared/roadmap-types.ts`, `dispatcher-command.ts` and `document-fields.ts` are listed this way.
+- measured 2026-10-03: `server/shared/roadmap-types.ts` removed from a copy of the config → `server/modules/roadmap/roadmap-write.service.ts:1:46: error boundaries(no-unknown)`, exit 1; with the entry, exit 0.
+- measure with the scratch copy beside `.oxlintrc.json` and remove it by its literal name: 2026-10-03, the same copy under a `mktemp -d` directory exited 0 with and without the entry.
+- frontend counterpart: INV-5890.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.oxlintrc.json
+
+## INV-6549 — probe — two 400 sentences say "a arc"
+
+two 400 sentences say "a arc"
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe && TSX_TSCONFIG_PATH=server/tsconfig.json npx tsx -e "import('./server/modules/roadmap/roadmap-write.service.ts').then((m) => console.log(m.writeArgv('add', { kind: 'arc', title: 'T' }), '|', m.writeArgv('add', { kind: 'arc', title: 'T', parent: 'x', project: 'p' })))"
+expect: parent is required: the milestone a arc belongs to | a arc takes no project
+```
+
+measured 2026-10-03 by chain chain-roadmap--lane--contract-20261003-164520-4b5e, finding L1, LOW
+probe-key: fd2c4fcc2acd6bc8e84e627948163ceab03bf0e4
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.oxlintrc.json, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/roadmap/roadmap-write.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/roadmap-types.ts
+
+## INV-6550 — probe — the header points at a mirror file that does not exist
+
+the header points at a mirror file that does not exist
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe && ls src/shared/roadmap-types.ts 2>&1 | head -1; sed -n 9p server/shared/roadmap-types.ts
+expect: ls: cannot access 'src/shared/roadmap-types.ts': No such file or directory, then the "The client mirror is …" line
+```
+
+measured 2026-10-03 by chain chain-roadmap--lane--contract-20261003-164520-4b5e, finding L2, LOW
+probe-key: 28f86f30dbef56bf7a9a52784cb3d0e92a3c9996
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.oxlintrc.json, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/roadmap/roadmap-write.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/roadmap-types.ts
+
+## INV-6551 — probe — six of the 14 exported types name no consumer
+
+six of the 14 exported types name no consumer
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe && python3 -c "
+import re
+t=open('server/shared/roadmap-types.ts').read()
+print([m.group(2) for m in re.finditer(r'(/\*\*(?:(?!\*/).)*?\*/)\s*export type (\w+)', t, re.S) if not re.search(r'onsumer', m.group(1))] or 'none')"
+expect: ['RoadmapTask', 'RoadmapFeature', 'RoadmapEpic', 'RoadmapMilestone', 'Roadmap', 'RoadmapPicture']
+```
+
+measured 2026-10-03 by chain chain-roadmap--lane--contract-20261003-164520-4b5e, finding L3, LOW
+probe-key: 2c908dd059142b1c7344624ad97139f4e7bb5103
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.oxlintrc.json, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/roadmap/roadmap-write.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/roadmap-types.ts
+
+## INV-6552 — probe — an oversized document is reported as a prefix of itself, and the moved comment claims otherwise (carried from HEAD, now in the shared file)
+
+an oversized document is reported as a prefix of itself, and the moved comment claims otherwise (carried from HEAD, now in the shared file)
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe && D=$(mktemp -d /tmp/athena-probe-XXXXXX) && case "$D" in /tmp/athena-probe-*) ;; *) exit 1;; esac; printf '#!/bin/sh\nprintf "{\\"plans\\":[],\\"pad\\":\\""\nhead -c 4300000 /dev/zero | tr "\\0" " "\nprintf "\\"}"\n' > $D/big && chmod +x $D/big && printf "import { readDispatcherJson } from '/home/lyphe/.claude/claudecodeui_lyphe/server/shared/dispatcher-command.ts';\ntry { await readDispatcherJson(['status','--json'], { bin: '$D/big', timeoutMs: 8000, env: { PATH: process.env.PATH ?? '' } }, 4*1024*1024); console.log('read ok'); } catch (e) { console.log((e as Error).message); }\n" > $D/p.mts && TSX_TSCONFIG_PATH=server/tsconfig.json node --import tsx $D/p.mts; cd /tmp && case "$D" in /tmp/athena-probe-*) rm -r "$D";; esac
+expect: it prints `dispatcher status --json did not answer: {"plans":[],"pad":"` — the body's prefix with no word about the buffer; cured when the sentence names the exceeded buffer
+```
+
+measured 2026-10-03 by chain chain-roadmap--lane--shared-20261003-164519-da13, finding L1, LOW
+probe-key: f1778cd254d156aee051e86598cd6ed9f5dedbbb
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.oxlintrc.json, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-verb.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/dispatcher-command.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/document-fields.ts
+
+## INV-6559 — probe — the row's Traps section quotes a hub refusal the hub does not give
+
+the row's Traps section quotes a hub refusal the hub does not give
+
+```probe
+D=$(mktemp -d /tmp/roadmap-probe.XXXXXX) && mkdir -p "$D/state" && printf 'DP=$HOME/.claude/scripts/dispatcher\n$DP roadmap add roadmap pr --title P >/dev/null\n$DP roadmap add milestone goal --roadmap pr --title G >/dev/null\n$DP roadmap mirror 2>&1 >/dev/null | grep "refused page-roadmap-pr" || echo "no refusal"\n' > "$D/p.sh" && DISPATCHER_HOME="$D/state" ~/.claude/docstore/bin/scratch-archpulse 8049 http://127.0.0.1:1 bash "$D/p.sh"; case "$D" in /tmp/roadmap-probe.*) rm -rf "$D";; esac; ~/.claude/scripts/docstore get MAN-7624 --text | grep -n 'goal` or `about' | cut -c1-200 || echo "row line gone"
+expect: the first line is `refused page-roadmap-pr: the hub answered 400: invalid: page "page-roadmap-pr": two blocks share the id "blk-roadmap-pr-goal"`; the defect stands while the row's line (82) quotes `UNIQUE constraint failed: blocks.id` for this case; cured when the row quotes the "two blocks share the id" text for `goal`/`about` and gives the UNIQUE text to the cross-page collision
+```
+
+measured 2026-10-03 by chain chain-roadmap--mirror--docs-20261003-170800-0dca, finding M1, MEDIUM
+probe-key: a9ee10e6e793fba7abbb699de4dd5a34fbdd356d
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/
+
+## INV-6560 — probe — "`dry_run` counts what a write would do" is false for a refusal
+
+"`dry_run` counts what a write would do" is false for a refusal
+
+```probe
+D=$(mktemp -d /tmp/roadmap-probe.XXXXXX) && mkdir -p "$D/state" && printf 'DP=$HOME/.claude/scripts/dispatcher\n$DP roadmap add roadmap probe-mirror --title P >/dev/null\necho "dry:  $($DP roadmap mirror --dry-run 2>/dev/null)"\necho "real: $($DP roadmap mirror 2>/dev/null)"\n' > "$D/p.sh" && DISPATCHER_HOME="$D/state" ~/.claude/docstore/bin/scratch-archpulse 8049 http://127.0.0.1:1 bash "$D/p.sh"; case "$D" in /tmp/roadmap-probe.*) rm -rf "$D";; esac; ~/.claude/scripts/docstore get MAN-7624 --text | grep -n 'dry_run` counts' | cut -c1-160 || echo "row line gone"
+expect: `dry:` prints `created 1 · … · refused 0` and `real:` prints `created 0 · … · refused 1` (the two differ for the same store); the defect stands while the row says a dry run counts what a write would do with no exception for a refusal
+```
+
+measured 2026-10-03 by chain chain-roadmap--mirror--docs-20261003-170800-0dca, finding L1, LOW
+probe-key: cb7e0e9611342c8c5d7f045bda1449c03583655f
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/
+
+## INV-6561 — probe — "No page is ever deleted" does not carry its why, and the consequence the phase itself hit is not in the row
+
+"No page is ever deleted" does not carry its why, and the consequence the phase itself hit is not in the row
+
+```probe
+~/.claude/scripts/docstore get MAN-7624 --text | python3 -c "
+import sys
+t=sys.stdin.read().splitlines()
+line=[l for l in t if l.startswith('- No page is ever deleted')]
+print('bullet:',[l[:110] for l in line] or 'gone')
+print('why on the bullet:', any('tombston' in l or 'refuses it' in l for l in line))
+print('burnt-name consequence in row:', any(('same name' in l or 'name is burnt' in l or 'burnt' in l or 'never be recreated' in l) for l in t))"
+expect: `bullet:` prints the line; the defect stands while `why on the bullet: False` and `burnt-name consequence in row: False`; cured when the bullet carries its why and the row names the burnt-name consequence
+```
+
+measured 2026-10-03 by chain chain-roadmap--mirror--docs-20261003-170800-0dca, finding L2, LOW
+probe-key: d72b3b33953d8cd742f3fa1eb16221773bf2dce4
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/
+
+## INV-6562 — probe — INV-6394's new bullet sits under a heading, a lede and a when/do row that say "prompt"
+
+INV-6394's new bullet sits under a heading, a lede and a when/do row that say "prompt"
+
+```probe
+~/.claude/scripts/docstore get INV-6394 --text | grep -n -E "^\*\*The house's prompt to the operator\*\*|^- \`roadmap_mirror\`|^\| the house prompts the operator|^The house's prompt|prompt to the operator carries his words \(below\)" | cut -c1-170
+expect: lines 5 (the lede that says "prompt"), 28 (the heading that says "prompt"), 32 (the `roadmap_mirror` bullet under it) and 55 (the when/do row that says "prompts the operator") all print; the defect stands while the heading names only the prompt; cured when the heading and the when/do row name text to the operator (prompt and page), or the bullet says why it belongs
+```
+
+measured 2026-10-03 by chain chain-roadmap--mirror--docs-20261003-170800-0dca, finding L3, LOW
+probe-key: 45690ac0df834e60c26f0bc4352f93c71c803c56
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/
+
+## INV-6563 — probe — MAN-7624 governs a third path the intent does not name
+
+MAN-7624 governs a third path the intent does not name
+
+```probe
+~/.claude/scripts/docstore get MAN-7624 | python3 -c "import sys,json; g=json.load(sys.stdin)['row']['governs']; print(len(g), g)"
+expect: prints `3` and the two `.py` paths plus `/home/lyphe/.claude/state/dispatcher/roadmap-mirror.log`; the intent names two; cured when it prints `2` (or the third is ruled a deliberate third)
+```
+
+measured 2026-10-03 by chain chain-roadmap--mirror--docs-20261003-170800-0dca, finding L4, LOW
+probe-key: 31d1ed41dc86d1d1e39110f466ccc43ef130be61
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/
+
+## INV-6574 — probe — the module's "said once per distinct message" bound does not hold for the failure it is most likely to meet as the store grows: a document past the 1 MiB ceiling is reported as a prefix of itself, and that prefix carries `generated_at`, so every tick is a new line and a new Set entry
+
+the module's "said once per distinct message" bound does not hold for the failure it is most likely to meet as the store grows: a document past the 1 MiB ceiling is reported as a prefix of itself, and that prefix carries `generated_at`, so every tick is a new line and a new Set entry
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe && P=$(mktemp -d /tmp/athena-flood-XXXXXX) && case "$P" in /tmp/athena-flood-*) ;; *) exit 1;; esac && cat > $P/bin <<'EOF'
+#!/bin/sh
+printf '{"generated_at":"%s","pad":"' "$(date -u +%FT%TZ)"; head -c 1200000 /dev/zero | tr '\0' ' '; printf '"}'
+EOF
+chmod +x $P/bin && cat > $P/p.mts <<'EOF'
+const lines: string[] = [];
+console.error = (...a: unknown[]) => { lines.push(a.join(' ')); };
+const { createRoadmapModule } = await import('/home/lyphe/.claude/claudecodeui_lyphe/server/modules/roadmap/index.ts');
+const roadmap = createRoadmapModule();
+roadmap.start();
+await new Promise((r) => setTimeout(r, 6500));
+roadmap.stop();
+console.log('journal lines:', lines.length, '| distinct:', new Set(lines).size);
+process.exit(0);
+EOF
+DATABASE_PATH=$P/db.sqlite DISPATCHER_BIN=$P/bin TSX_TSCONFIG_PATH=/home/lyphe/.claude/claudecodeui_lyphe/server/tsconfig.json node --import tsx $P/p.mts 2>&1 | tail -1; case "$P" in /tmp/athena-flood-*) rm -rf "$P";; esac
+expect: prints `journal lines: 4 | distinct: 4` (one new line per tick) while the failure sentence quotes the document's opening; `journal lines: 1` once it names the buffer
+```
+
+measured 2026-10-03 by chain chain-roadmap--lane--module-20261003-171345-f0be, finding L2, LOW
+probe-key: 12b2c45f141fbdbc3a1583e8aa2f0b652a137b81
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/roadmap/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/roadmap/roadmap.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/roadmap/roadmap-relay.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/roadmap/roadmap.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/roadmap/roadmap-state.service.ts
+
+## INV-6579 — probe — `roadmap.step.idea` and `roadmap.step.proposed` have no phrase; a generic `t(`roadmap.step.${step}`)` draws the key path
+
+`roadmap.step.idea` and `roadmap.step.proposed` have no phrase; a generic `t(`roadmap.step.${step}`)` draws the key path
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe && node -e "const i=require('i18next');const en=require('./src/modules/i18n/locales/en/common.json');i.init({lng:'en',resources:{en:{common:en}},defaultNS:'common',interpolation:{escapeValue:false}});console.log(JSON.stringify(['idea','proposed'].map(s=>i.t('roadmap.step.'+s))))"
+expect: two phrases, neither a key path (the gap stands while it prints ["roadmap.step.idea","roadmap.step.proposed"])
+```
+
+measured 2026-10-03 by chain chain-roadmap--screen--words-20261003-192010-cf69, finding L2, LOW
+probe-key: 0ea525bb4a1dda8afcd8edb9d046ed4419cbd3a4
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json
+
+## INV-6581 — probe — `useRoadmap().selected` reads the FIRST roadmap, then flips, until the preference mirror hydrates, and nothing tells a consumer which it holds
+
+`useRoadmap().selected` reads the FIRST roadmap, then flips, until the preference mirror hydrates, and nothing tells a consumer which it holds
+
+```probe
+cd /home/lyphe/.claude/state/pipeline-reviews/roadmap--screen--data/athena-probes && timeout 110 node cold-mirror.mjs
+expect: mid.selected is "restorly" with hydrated:false (the defect); once cured mid.selected is null (or "lyphecli") and end.selected is "lyphecli"
+```
+
+measured 2026-10-03 by chain chain-roadmap--screen--data-20261003-192009-0fdf, finding M1, MEDIUM
+probe-key: 2218c7b3eadbeeeba76b0ff9b4711d8f2ac66190
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/celebrationContext.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/hooks/useRoadmap.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/hooks/useRoadmapWrites.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/RoadmapFeed.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/roadmap-types.ts
+
+## INV-6582 — probe — A reconnect re-seed republishes an unchanged picture as a new reading
+
+A reconnect re-seed republishes an unchanged picture as a new reading
+
+```probe
+cd /home/lyphe/.claude/state/pipeline-reviews/roadmap--screen--data/athena-probes && timeout 110 node reseed.mjs
+expect: "extra renders +N" with N >= 1 and identity kept in fewer than 3 of 3 while the defect stands; "+0 … 3 of 3" once cured
+```
+
+measured 2026-10-03 by chain chain-roadmap--screen--data-20261003-192009-0fdf, finding L1, LOW
+probe-key: e12061712edd1c26c8831dc49b8cac9dba575b3d
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/celebrationContext.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/hooks/useRoadmap.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/hooks/useRoadmapWrites.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/RoadmapFeed.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/roadmap-types.ts
+
+## INV-6583 — probe — `edit`'s `title` is both the wire field and the toast's name for the item
+
+`edit`'s `title` is both the wire field and the toast's name for the item
+
+```probe
+cd /home/lyphe/.claude/state/pipeline-reviews/roadmap--screen--data/athena-probes && timeout 110 node edit-title.mjs
+expect: "edit {goal} only" prints wire without title and toast "feat-1 saved"; "edit {goal, title}" prints wire WITH "title":"Real Title" (answers are stubbed)
+```
+
+measured 2026-10-03 by chain chain-roadmap--screen--data-20261003-192009-0fdf, finding L2, LOW
+probe-key: ab77bf2b5d8639e841217b39520ed6c9355245bc
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/celebrationContext.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/hooks/useRoadmap.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/hooks/useRoadmapWrites.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/RoadmapFeed.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/roadmap-types.ts
+
+## INV-6584 — probe — The stamp write the brief spells out does not typecheck against `PreferenceListEntry`
+
+The stamp write the brief spells out does not typecheck against `PreferenceListEntry`
+
+```probe
+bash /home/lyphe/.claude/state/pipeline-reviews/roadmap--screen--data/athena-probes/stamp-typecheck.sh
+expect: a TS2322 line ("'at' does not exist in type '{ name: string; }'") and "tsc exit 2"; once cured "tsc exit 0"
+```
+
+measured 2026-10-03 by chain chain-roadmap--screen--data-20261003-192009-0fdf, finding L3, LOW
+probe-key: 02b657ca63eddcbb14315366ce1870e4fce1fe39
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/celebrationContext.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/hooks/useRoadmap.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/hooks/useRoadmapWrites.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/RoadmapFeed.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/roadmap-types.ts
+
+## INV-6585 — probe — A stale device's retry rewinds a roadmap's stamp
+
+A stale device's retry rewinds a roadmap's stamp
+
+```probe
+bash /home/lyphe/.claude/state/pipeline-reviews/roadmap--screen--data/athena-probes/stamp-rewind.sh
+expect: "stored restorly stamp after a stale retry" prints at 2026-10-01T00:00:00Z while the defect stands (rewound); 2026-10-04T00:00:00Z once a stamp can no longer go backward
+```
+
+measured 2026-10-03 by chain chain-roadmap--screen--data-20261003-192009-0fdf, finding L4, LOW
+probe-key: 5245ac0c86cd5b8771d1af9ce64e6d0c0b9f290e
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/celebrationContext.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/hooks/useRoadmap.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/hooks/useRoadmapWrites.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/RoadmapFeed.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/roadmap-types.ts
+
+## INV-6586 — A file created under src/ after the dev client starts gets no Tailwind classes until src/index.css is touched
+
+Symptom: a new component's classes are absent on the shared dev client (`:5183`): its title renders at about 16px and nothing animates. Creating or editing the file does not cure it.
+
+Cause: Vite 7.1.8 turns Tailwind 3's content glob (a postcss `dir-dependency` message) into the list of files that EXIST when `src/index.css` is built (`globSync` in `node_modules/vite/dist/node/chunks/dep-CuuNgwUk.js`, near line 32184). A file created later is not on the list, so no change to it rebuilds the stylesheet.
+
+| when | do |
+|---|---|
+| a new file under `src/` shows unstyled on the dev client | `touch src/index.css` once, no content change: the stylesheet rebuilds and hot-swaps |
+| the fix has to be lasting | a dev-server plugin that rebuilds `index.css` on a file created under `src/`; editing `vite.config.js` restarts the shared client and reloads every open tab |
+
+measured 2026-10-03: `src/modules/roadmap/CelebrationLayer.tsx`, every class absent until the `index.css` mtime bump; the plugin is unwritten.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/index.css, /home/lyphe/.claude/claudecodeui_lyphe/vite.config.js
+
+## INV-6587 — The reduced-motion reset in src/index.css turns every fade into a pop unless the fade restates its own duration
+
+`@media (prefers-reduced-motion: reduce)` in `src/index.css` sets `animation-duration`, `transition-duration` to `0.01ms !important` and `animation-iteration-count: 1` on `*`, `::before`, `::after`.
+
+Effect: a fade a piece means to keep under reduced motion plays as a pop.
+
+| when | do |
+|---|---|
+| a piece keeps a fade under reduced motion | restate its durations with `!` under `motion-reduce:`: `motion-reduce:![animation-duration:250ms] motion-reduce:!duration-300` |
+| a piece keeps motion that only changes opacity or blur | the same restatement; anything that moves stays cut |
+
+Instance: `src/modules/roadmap/CelebrationLayer.tsx` (MAN-7636) keeps its layer fade (250 ms in, 300 ms out) and banner dissolve (200 ms) this way.
+measured 2026-10-03: the layer's fade read as a pop under reduced motion until restated.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/index.css
+
+## INV-6588 — probe — `src/modules/roadmap/FeatureRow.tsx` — in a row that waits on you, the project chip drops under the amber sentence and reads as a second button
+
+`src/modules/roadmap/FeatureRow.tsx` — in a row that waits on you, the project chip drops under the amber sentence and reads as a second button
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe && node ~/.claude/state/pipeline-reviews/roadmap--screen--feature-scaffold/review-2-probe/measure2.mjs waiting light
+expect: no "focus1440" or "focus390" entry prints "chipBesideAnswer":true or "chipOwnLine":true (the defect stands while fake-drying-goals prints "chipBesideAnswer":true,"rowH":120 and fake-readings-sync prints "chipOwnLine":true,"rowH":103)
+```
+
+measured 2026-10-03 by chain chain-roadmap--screen--feature-scaffold-20261003-201228-6841, finding L3, LOW
+probe-key: a257e298c326179c609182887d5cb4b8be9489c5
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/FeatureRow.tsx
+
+## INV-6589 — probe — `src/modules/roadmap/FeatureRow.tsx` — a compact row writes what it owes you, and why it is blocked, in its smallest type
+
+`src/modules/roadmap/FeatureRow.tsx` — a compact row writes what it owes you, and why it is blocked, in its smallest type
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe && node ~/.claude/state/pipeline-reviews/roadmap--screen--feature-scaffold/review-2-probe/measure2.mjs compact light
+expect: every "waiting" and "blocked" entry prints a "px" no smaller than "phrase" (the defect stands while each prints "px":"10px" beside "phrase":"12px")
+```
+
+measured 2026-10-03 by chain chain-roadmap--screen--feature-scaffold-20261003-201228-6841, finding L4, LOW
+probe-key: bf3752d689a6fa501d5febcccda656a5387f1ff6
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/FeatureRow.tsx

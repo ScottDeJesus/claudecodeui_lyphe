@@ -15,8 +15,8 @@
  * heartbeat going stale with the same comparison.
  *
  * The lanes that use it are `dispatch-souls` (its launcher souls), `kanban-metis` (its board
- * sessions) and `dispatcher` (its plans). They differ in what they read and in what they send, and
- * in nothing below.
+ * sessions), `dispatcher` (its plans) and `roadmap` (its picture). They differ in what they read and
+ * in what they send, and in nothing below.
  *
  * A PICTURE MAY TAKE ITS TIME TO ARRIVE. Most of those lanes answer from memory, but the dispatcher's
  * whole picture is one `dispatcher status --json` — a subprocess — so its `snapshot` answers a
@@ -50,9 +50,9 @@ export type PolledLaneDependencies<TPicture, TFrame> = {
    *
    * A lane whose picture carries a CLOCK RE-DERIVED ON EVERY READ has to state its own, or its
    * picture differs from itself between two ticks and the lane speaks on every one of them. The
-   * dispatcher's is the one that does: `report.py::snapshot` stamps `generated_at` from the
-   * dispatcher's own clock at second resolution, on a poll of two seconds, so its lane drops that key
-   * here (`dispatcher-watcher.service.ts`).
+   * dispatcher's and the roadmap's are the two that do: the dispatcher stamps `generated_at` from its
+   * own clock at second resolution, on a poll of two seconds, so each lane drops that key here
+   * (`dispatcher-watcher.service.ts`, `roadmap.module.ts`).
    *
    * What is compared is not what is sent. `frame` is what goes on the wire and it carries the clock
    * whole, so a lane's own serialization changes WHEN the lane speaks and never WHAT it says.
@@ -91,6 +91,15 @@ export type PolledLane<TPicture> = {
    * the caller's own answer back when it times out.
    */
   whenLanded(timeoutMs: number): Promise<TPicture | null>;
+  /**
+   * One tick now, while the lane is started; a no-op otherwise. For a write the lane's owner has just
+   * seen land: a press on the screen redraws within moments instead of up to two seconds later. It is
+   * an ordinary tick — same snapshot, compare and broadcast. A reading already out began before the
+   * write and may have taken the old picture, so the poke is REMEMBERED and one more tick runs the
+   * moment that reading lands: one reading at a time still (no queue, a flag), and the press is never
+   * more than one read late. The poke changes when the lane speaks, never what it says.
+   */
+  poke(): void;
 };
 
 /** Whether a reading is still on its way — a promise, by the only test that matters: it has a `then`. */
@@ -210,6 +219,16 @@ export function createPolledLane<TPicture, TFrame>(
     report(error);
   };
 
+  /** A `poke` arrived while a reading was out: that reading may have taken the picture without the write. A flag, never a queue. */
+  let pokedWhileReading = false;
+
+  /** Runs after a reading settles, either way: the one more tick a poke made mid-reading is owed. */
+  const replayPoke = (): void => {
+    if (!pokedWhileReading) return;
+    pokedWhileReading = false;
+    if (timer !== null) tick();
+  };
+
   /**
    * The construction reading: the seed.
    *
@@ -224,7 +243,7 @@ export function createPolledLane<TPicture, TFrame>(
     const first = dependencies.snapshot();
     if (!isThenable(first)) return first;
     inFlight = first;
-    void first.then(land, fail);
+    void first.then(land, fail).then(replayPoke);
     return null;
   };
 
@@ -248,7 +267,7 @@ export function createPolledLane<TPicture, TFrame>(
       inFlight = reading;
       // `land` and `fail` both clear `inFlight` first and neither throws by contract — the same
       // contract the interval callback relies on below — so this promise cannot reject unhandled.
-      void reading.then(land, fail);
+      void reading.then(land, fail).then(replayPoke);
       return;
     }
     land(next);
@@ -268,10 +287,17 @@ export function createPolledLane<TPicture, TFrame>(
       tick();
     },
 
+    poke(): void {
+      if (timer === null) return;
+      if (inFlight !== null) pokedWhileReading = true;
+      else tick();
+    },
+
     stop(): void {
       if (timer === null) return;
       clearInterval(timer);
       timer = null;
+      pokedWhileReading = false;
       // A restarted lane announces the truth again: the sockets listening then are not the ones
       // that heard the last frame.
       lastBroadcast = null;

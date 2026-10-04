@@ -90,8 +90,19 @@ function mergeGutters(stored: unknown, incoming: unknown): unknown {
  * `{ <entry key>: <entry> | null }` drops every entry it names, appends its non-null entries in its
  * own order (the newest last) and keeps the newest `ENTRY_LIST_CAP`, and every entry it does not name
  * stands. A list sent as an ARRAY is an older build's whole list, and replaces that list alone.
+ *
+ * `roadmapSeen` is the second document written this way: one `seen` list holding, per roadmap, the
+ * completion this user last celebrated (`{ name, at }`). Phone and desktop each stamp it after a
+ * celebration, and a whole-document write would let the device that read it last erase the other
+ * roadmap's stamp and replay its completions.
+ *
+ * THE MERGE IS NOT MONOTONIC: the rule is "replace the named entry", so a stamp patch carrying an
+ * OLDER `at` than the stored one moves the stamp backward, and the other device would play what it
+ * had already played. Nothing here compares `at`, so the writer must never send a stamp older than the
+ * one it read (`useCelebrations`); a merge that keeps the newer `at` per roadmap would need the same
+ * rule on the client's `applyEntryPatch`, and is its own change to this shared merge.
  */
-const ENTRY_LISTED_KEYS: ReadonlySet<string> = new Set(['dispatcher']);
+const ENTRY_LISTED_KEYS: ReadonlySet<string> = new Set(['dispatcher', 'roadmapSeen']);
 /** The most entries one list keeps, newest last. Mirrors the client's own cap. */
 const ENTRY_LIST_CAP = 200;
 
@@ -158,7 +169,7 @@ export const userPreferencesDb = {
    * Merge-patches preferences: keys present in `updates` are written, keys
    * absent are left alone, and a key given as `undefined` is deleted.
    *
-   * `chatGutters` merges one level deeper, per chat, and `dispatcher` per entry of its lists — see
+   * `chatGutters` merges one level deeper, per chat, and `dispatcher` and `roadmapSeen` per entry of their lists — see
    * `mergeGutters` and `mergeEntryLists` above for why neither can be replaced wholesale.
    *
    * Runs in one transaction so a multi-key save from the settings dialog can

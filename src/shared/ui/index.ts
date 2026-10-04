@@ -41,8 +41,13 @@
 import '@/shared/ui/verve/controls.css';
 import '@/shared/ui/verve/feedback.css';
 // The FAB and split-pane paint shares no selector with the files either side of it, so its only
-// constraint is the next line's: board.css stays last.
+// constraint is that board.css stays last, below.
 import '@/shared/ui/verve/surfaces.css';
+// `.vv-textarea` composes `.vv-input` (controls.css) and wins each tie it has — against `.vv-input`'s
+// colours, against src/index.css's pins on every `textarea` and against `text-sm`'s line height — by
+// specificity, never by order. It shares no selector with surfaces.css or board.css, so its only
+// constraint is that board.css stays last, below.
+import '@/shared/ui/verve/panels.css';
 // The board layer goes LAST on purpose, and the order is load-bearing: a lane card composes
 // `.vv-card`'s ground and then overrides its background, shadow and transition. Imported first,
 // `.vv-card` won every one of those at equal specificity and a selected card lost its wash.
@@ -108,6 +113,9 @@ export { SplitPane, SPLIT_MIN_RATIO, SPLIT_MAX_RATIO } from '@/shared/ui/SplitPa
 export { Stepper } from '@/shared/ui/Stepper';
 export { Switch } from '@/shared/ui/Switch';
 export { Tabs } from '@/shared/ui/Tabs';
+// The multi-line field `Input` has no sibling for: Verve's own TextArea on Input's field paint.
+// The roadmap's dialogs take it for a goal: ItemDialog adds and edits every kind of item with one.
+export { TextArea } from '@/shared/ui/TextArea';
 export { Toast } from '@/shared/ui/Toast';
 export { ToastStack } from '@/shared/ui/ToastStack';
 export { Tooltip } from '@/shared/ui/Tooltip';

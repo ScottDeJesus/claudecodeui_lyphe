@@ -51,3 +51,7 @@ export { SessionPin } from '@/modules/dispatcher/SessionPin';
 // the outings no card and no deck can carry. Drawn by the plan card's and the arc deck's own headers
 // inside this module, and by the Runner tab's two homes above the arc decks for the rest.
 export { LoosePlannerBadges, PlannerBadge } from '@/modules/dispatcher/PlannerBadge';
+// The dispatcher's sentence in the operator's words — arc, plan and phase said as epic, feature and
+// task. Read by the verbs' toasts and the plan card's captions inside this module, and by the roadmap
+// module's writes (`useRoadmapWrites`), whose refusal toast shows the dispatcher's first line through it.
+export { operatorWords } from '@/modules/dispatcher/operatorWords';

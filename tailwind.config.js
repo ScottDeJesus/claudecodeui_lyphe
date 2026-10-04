@@ -130,6 +130,31 @@ export default {
           from: { opacity: '0', transform: 'translateX(-22px)' },
           to: { opacity: '1', transform: 'none' },
         },
+        // The roadmap's three motions Verve has no keyframe for. Verve's own (`vv-pop`, `vv-ring`,
+        // `vv-draw`) carry the other three below; none of the six animates a colour, and each is
+        // spelled behind `motion-safe:` at its call site.
+        //
+        // A celebration particle leaving the point it was born at. Where it lands is that span's own
+        // `--dx`/`--dy`, set inline — position data, never colour — so one keyframe serves all 48.
+        'roadmap-burst': {
+          from: { transform: 'none', opacity: '1' },
+          to: { transform: 'translate(var(--dx), var(--dy)) scale(.4)', opacity: '0' },
+        },
+        // One soft band crossing a row once. The band is the row's own className
+        // (`bg-gradient-to-r from-transparent via-primary/15 to-transparent bg-[length:50%_100%]
+        // bg-no-repeat`), so its colour stays a Tailwind name; this only moves it from fully off the
+        // left edge (-100% of a half-width image) to fully off the right (200%).
+        'roadmap-sweep': {
+          from: { backgroundPosition: '-100% 0' },
+          to: { backgroundPosition: '200% 0' },
+        },
+        // A reached milestone's station swelling past its size and settling a little over it. The
+        // peak sits early so the settle has most of the run, under `--ease-spring`'s own overshoot.
+        'roadmap-bloom': {
+          '0%': { transform: 'scale(1)' },
+          '40%': { transform: 'scale(1.6)' },
+          '100%': { transform: 'scale(1.1)' },
+        },
       },
       animation: {
         shimmer: 'shimmer 2s linear infinite',
@@ -152,6 +177,29 @@ export default {
         // halo on a node whose walk is out right now, breathing for as long as it is. An arc deck's
         // plans are paged, not jumped to, so the one-shot flavour the tab's wall used is gone.
         'live-ring': 'vv-ring 2.4s ease-out infinite',
+        // The roadmap's celebrations. Three run Verve's own keyframes (`vv-pop`, `vv-ring`, `vv-draw`
+        // in `src/shared/ui/verve/tokens.css`), because Verve draws that motion; the other three run
+        // the keyframes above.
+        // A mark arriving: the shipped dot, a figure ticking up. `vv-pop` on the spring curve.
+        'roadmap-pop': 'vv-pop 420ms var(--ease-spring)',
+        // One halo going out from a mark, once — `live-ring`'s `vv-ring`, run a single time at 900ms
+        // instead of breathing for as long as a walk is out.
+        'roadmap-ring': 'vv-ring 900ms ease-out 1',
+        // An SVG stroke drawing itself, such as an epic ring's last segment. The stroke needs
+        // `pathLength="1"` AND `[stroke-dasharray:1]`: `vv-draw` moves only `stroke-dashoffset`
+        // (1 → 0), so without the dash the stroke is solid at every frame and nothing draws. It does
+        // nothing to a div's background, so a rail drawn as a `bg-primary` div cannot use it; a rail
+        // that fills with this is an SVG line. `forwards` keeps the line drawn when it ends.
+        'roadmap-draw': 'vv-draw 900ms var(--ease-enter) forwards',
+        // A particle's flight, `forwards` so it stays at its last frame, invisible, until its layer
+        // is taken down.
+        'roadmap-burst': 'roadmap-burst 1.1s ease-out forwards',
+        // The shipped row's band crossing it, once. `forwards` because the keyframe's end is the band
+        // off the right edge, which is the band gone; without it the position falls back to the
+        // default `0 0` the moment the pass ends and parks the band on the row's left half.
+        'roadmap-sweep': 'roadmap-sweep 600ms var(--ease-enter) forwards',
+        // The reached station's swell.
+        'roadmap-bloom': 'roadmap-bloom 900ms var(--ease-spring)',
       },
     },
   },

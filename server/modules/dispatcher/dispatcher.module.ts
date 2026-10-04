@@ -150,9 +150,10 @@ export function createDispatcherModule(): DispatcherModule {
     // and channels decide what reaches them. The dedupe key carries the user because the
     // orchestrator's dedupe is process-wide: without it the second user's push reads as a repeat.
     announce: (ending) => {
-      // Two codes are a look, one is a warning: a plan that finished or paused is a state to read at
-      // leisure, while a phase taken up again is the walk changing its mind about something the
-      // operator may already have given up on (`dispatcher-endings.service.ts`).
+      // Every code is a look except one warning: a plan or an epic that finished, or a plan that
+      // paused, is a state to read at leisure, while a phase taken up again is the walk changing its
+      // mind about something the operator may already have given up on. What an epic's features
+      // earn is decided before this point (`dispatcher-endings.service.ts`); this sends what it is handed.
       const relaunched = ending.code === 'dispatcher.relaunched';
       for (const userId of userDb.getActiveUserIds()) {
         // One user's failure costs that user's push and nothing more. Letting it throw would leave
@@ -189,7 +190,7 @@ export function createDispatcherModule(): DispatcherModule {
     // ending always is. A failure to announce never costs the tabs their frame.
     broadcast: (frame) => {
       try {
-        endings.observe(frame.plans);
+        endings.observe(frame.plans, frame.arcs);
       } catch (error) {
         logErrorOnce(`[Dispatcher] could not announce an ending: ${error instanceof Error ? error.message : String(error)}`);
       }

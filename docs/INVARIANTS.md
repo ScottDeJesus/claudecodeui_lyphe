@@ -84,6 +84,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-card-fold.mjs
 Every write to the `dispatcher` preference (`hiddenPlans`, `collapsedCards`, `cardOrder`, `askDrafts`) goes through `writeUserPreferenceEntries` (`src/shared/userSettings.ts`) as an ENTRY PATCH, `{ <list>: { <entry key>: <entry> | null } }`, naming only the entries its press changes. The server applies it per entry (`mergeEntryLists`, `server/modules/database/repositories/user-preferences.db.ts`), and the client applies the same rule to its own copy (`src/shared/preferenceEntryPatch.ts`): drop every named entry, append the non-null ones in the patch's order, keep the newest 200.
 
 - why: a client's copy of the preference is read at sign-in and never again. While writes sent the whole document, any second open client (a phone, a second tab, the :5184 build) wrote its old copy back and erased every hide and fold made elsewhere since. Measured 2026-09-28 in `auth.db`: the operator's arc Hide stored restorly's 4 lane plans at 22:17:49; at 22:18:00 another of his clients folded the same arc and stored `{"hiddenPlans":[],"collapsedCards":["darc:restorly"]}`, and the arc was back at his next load ("unable to dismiss an arc"). `.verify/probe-dismiss-done.mjs` replays it with two browsers (the arc's corner is Dismiss now: the dismissal is the same entry).
+- `roadmapSeen` is the second entry-patched key, with its own rule: INV-6580.
 - never hand `writeUserPreference('dispatcher', …)` a whole document. A list sent as an ARRAY still REPLACES that list (the write of a bundle from before the patch), so a tab still running such a bundle can erase entries until it is reloaded.
 - a patch stays in the persisted outbox (localStorage `user-preferences:entry-outbox`, `preferenceEntryPatch.ts`) until the server has stored it or refused it for good. The sign-in read lays every unconfirmed entry over the copy it fetched, whether or not the server holds the key, and sends again what that copy lacks; a failed read sends the whole outbox again. So a reload before the PATCH lands (the 400 ms debounce, a retry backing off behind a 5xx or a dropped request) and a read the server answered before the PATCH landed both keep the press. Sending twice is safe: a patch names only its own entries. A queued patch folds per entry with the next one (`foldEntryPatches`), and a retry is rebuilt from the store's current entries (`refreshEntryPatch`).
 
@@ -232,3 +233,72 @@ measured 2026-10-03 by chain chain-swarm-per-plan-20261003-135930-38a4, finding 
 probe-key: f94c2531ee54f86bce8fe2dd7582a96f9364321c
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/settings/swarm-switch.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/agents-settings/sections/content/RunnerModelContent.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useSwarmSwitch.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/hooks/dispatcher/planner_lanes.py, /home/lyphe/.claude/hooks/dispatcher/planner_rule.py, /home/lyphe/.claude/hooks/dispatcher/rule.py, /home/lyphe/.claude/hooks/dispatcher/swarm_word.py, /home/lyphe/.claude/hooks/dispatcher/width.py, /home/lyphe/.claude/scripts/runner_fixtures/claude_swarm.py
+
+## INV-6571 — probe — . An epic whose status turns `complete` without a new completion is never announced — and the comment and doc say it is
+
+. An epic whose status turns `complete` without a new completion is never announced — and the comment and doc say it is
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe && timeout 100 npx tsx --tsconfig server/tsconfig.json /home/lyphe/.claude/state/pipeline-reviews/epic-pushes/athena-probes/status-turns-late.mts; echo "[probe exit $?]"
+expect: `idea dropped, arc turns complete: epic <name> (newest completion #<id>) — epic_finished pushes: 1` (today: 0 — the control line above it, the arc complete from the start, says 1)
+```
+
+measured 2026-10-03 by chain chain-epic-pushes-20261003-171247-ef3d, finding M1, MEDIUM
+probe-key: f8a0597ce4b18b606a470ec712f117f91162a361
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-endings.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/services/notification-copy.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/services/ntfy-channel.service.ts
+
+## INV-6572 — probe — . INV-5922 still says "a halt is one push per plan"
+
+. INV-5922 still says "a halt is one push per plan"
+
+```probe
+docstore get INV-5922 | grep -c "a halt is one push per plan"; echo "[probe exit $?]"
+expect: 0 (today: 1, probe exit 0)
+```
+
+measured 2026-10-03 by chain chain-epic-pushes-20261003-171247-ef3d, finding L1, LOW
+probe-key: 247eff9f2e5e8c2ae9266dac25e3b73c4604a9f1
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-endings.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/services/notification-copy.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/services/ntfy-channel.service.ts
+
+## INV-6576 — probe — the roadmap lane's rows are not in `docs/MANUAL.md`'s family, and the report does not say why
+
+the roadmap lane's rows are not in `docs/MANUAL.md`'s family, and the report does not say why
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe; for t in MAN-1498 MAN-7628 MAN-7629; do printf '%s ' $t; docstore get $t | python3 -c "import sys,json;p=json.load(sys.stdin)['row']['package'];print(p['repo']+':'+p['path'])"; done; grep -c '^## MAN-7628' docs/MANUAL.md
+expect: MAN-1498 prints cloudcli:docs, MAN-7628 and MAN-7629 print cloudcli:. and the grep prints 0 (cured when the two print cloudcli:docs and the grep prints 1)
+```
+
+measured 2026-10-03 by chain chain-roadmap--lane--docs-20261003-180710-2122, finding M1, MEDIUM
+probe-key: a27055db666a8a0c1d7ddd7c3399c36867113d4c
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/
+
+## INV-6577 — probe — MAN-7626, the lane's shared-door row, sits in the repo-root `MANUAL.md` while every other row of the lane lives in `docs/MANUAL.md`
+
+MAN-7626, the lane's shared-door row, sits in the repo-root `MANUAL.md` while every other row of the lane lives in `docs/MANUAL.md`
+
+```probe
+docstore get MAN-7626 | python3 -c "import sys,json;p=json.load(sys.stdin)['row']['package'];print(p['repo']+':'+p['path'])"
+expect: cloudcli:docs — the package of MAN-7631 and MAN-1498 (today cloudcli:.)
+```
+
+measured 2026-10-03 by chain chain-roadmap--lane--whole-20261003-183736-de24, finding L2, LOW
+probe-key: 84ae870657a8db5dfbd97279f63b4c2619ad3e16
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/
+
+## INV-6580 — roadmapSeen is entry-patched, and its merge does not compare stamps — a writer never sends an older at
+
+`roadmapSeen` is the second entry-patched preference, beside `dispatcher` (INV-4406). Shape: `{ seen: { name: string; at: string }[] }`, one entry per roadmap; `name` is the roadmap's, `at` is the dispatcher's UTC string of the newest `shipped_at`, `completed_at` or `reached_at` this user's screen celebrated.
+
+- A key joins BOTH lists together: `ENTRY_PATCHED_KEYS` (`src/shared/userSettings.ts`) and `ENTRY_LISTED_KEYS` (`server/modules/database/repositories/user-preferences.db.ts`). One without the other sends patches the server stores whole, or stores whole what the client patches.
+- Write it through `writeUserPreferenceEntries`, never `writeUserPreference('roadmapSeen', …)`. why: a whole write from the device that read last erases the other roadmap's stamp and replays its completions.
+- THE MERGE IS NOT MONOTONIC. `mergeEntryLists` (server) and `applyEntryPatch` (client) replace the named entry and compare no `at`, so a patch carrying an older `at` moves the stamp backward and the other device replays what it already played.
+- A stamp writer never sends an `at` older than the one it read. This cannot cover a stale device that never re-read the server's stamp: only a merge that keeps the newer `at` per roadmap can, on both sides, and `dispatcher`'s lists share that merge.
+- A reader treats `{ "seen": [] }` and an absent key alike: the entry merge keeps the key after every entry is removed.
+- `PreferenceListEntry` (`src/shared/types.ts`) is `string | { name: string; [field: string]: unknown }`, so `{ name, at }` is legal as a literal.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/user-preferences.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/preferenceEntryPatch.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/userSettings.ts

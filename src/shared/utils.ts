@@ -2,6 +2,7 @@ import { clsx, type ClassValue } from 'clsx';
 import { extendTailwindMerge, validators } from 'tailwind-merge';
 
 import { LANES_MIN, SWARM_LADDER_TOP } from '@/shared/constants';
+import type { RoadmapFeatureWord, RoadmapPicture } from '@/shared/roadmap-types';
 import type { DispatcherModelChoice, Project, ProjectSession } from '@/shared/types';
 
 //----------------- DEPLOYMENT MODE ------------
@@ -351,6 +352,30 @@ export function formatRelativeTime(iso: string | null | undefined): string {
   return then.toLocaleDateString();
 }
 
+/**
+ * A UTC stamp as the reader's own short date — `Oct 3`, with the year once it is not this year's —
+ * or `null` for no stamp, or one that is not a time. The roadmap's one spelling of a day, so a step
+ * phrase (`useStepPhrase`), a path station (`MilestonePath`), the milestone banner (`CelebrationLayer`)
+ * and a feature's dates (`FeatureFacts`) all name it alike, in the browser's own locale.
+ */
+export function formatShortDate(stamp: string | null | undefined): string | null {
+  if (!stamp) return null;
+  const milliseconds = Date.parse(stamp);
+  if (Number.isNaN(milliseconds)) return null;
+  const day = new Date(milliseconds);
+  const thisYear = day.getFullYear() === new Date().getFullYear();
+  return day.toLocaleDateString(undefined, thisYear ? { month: 'short', day: 'numeric' } : { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+/**
+ * The last folder of a path — `/home/lyphe/restorly/` reads `restorly` — or the path itself when it
+ * has none. A roadmap project's name when the store holds no label for it: `FeatureRow`'s and
+ * `FeatureDialog`'s project chip, and `ItemDialog`'s project choices and folder placeholder.
+ */
+export function folderName(path: string): string {
+  return path.replace(/\/+$/, '').split('/').pop() || path;
+}
+
 /** The size ladder, largest unit last. Private to `formatBytes`. */
 const BYTE_UNITS = ['B', 'KB', 'MB', 'GB', 'TB'];
 
@@ -385,6 +410,39 @@ export function formatBytes(bytes: number | null | undefined): string {
 
 // ---------------------------
 
+//----------------- THE ROADMAP PICTURE ------------
+
+/**
+ * Each picture's feature index, built on its first ask and shared by every reader after. A WeakMap, so
+ * a picture the live bus has replaced takes its index with it. Private to `roadmapFeatureIndex`.
+ */
+const ROADMAP_FEATURE_INDEXES = new WeakMap<RoadmapPicture, Map<string, { title: string; word: RoadmapFeatureWord }>>();
+
+/**
+ * Every feature of a roadmap picture by name — on a roadmap or unplaced — with what a reader of another
+ * feature's name needs: its title and its word. Used by `useStepPhrase` (the feature a `waiting` step
+ * names) and `FeatureFacts` (each wait of `FeatureDialog`'s feature). A name the index lacks — a feature
+ * under an epic no milestone holds is in neither `roadmaps` nor `unplaced` — is said as "another
+ * feature", never as its slug.
+ */
+export function roadmapFeatureIndex(picture: RoadmapPicture): Map<string, { title: string; word: RoadmapFeatureWord }> {
+  const known = ROADMAP_FEATURE_INDEXES.get(picture);
+  if (known) return known;
+  const index = new Map<string, { title: string; word: RoadmapFeatureWord }>();
+  for (const roadmap of picture.roadmaps) {
+    for (const milestone of roadmap.milestones) {
+      for (const epic of milestone.epics) {
+        for (const item of epic.features) index.set(item.name, { title: item.title, word: item.word });
+      }
+    }
+  }
+  for (const item of picture.unplaced.features) index.set(item.name, { title: item.title, word: item.word });
+  ROADMAP_FEATURE_INDEXES.set(picture, index);
+  return index;
+}
+
+// ---------------------------
+
 //----------------- THE DISPATCHER'S MODEL WORD ------------
 
 /**
@@ -395,6 +453,25 @@ export function formatBytes(bytes: number | null | undefined): string {
  */
 export function effectiveModelWord(stored: DispatcherModelChoice | null | undefined): DispatcherModelChoice {
   return stored ?? 'claude';
+}
+
+// ---------------------------
+
+//----------------- THE DISPATCHER'S SENTENCE ------------
+
+/**
+ * The first non-blank line of a dispatcher answer's `stdout`, `stderr` or `error`, trimmed — or `''`
+ * for anything that is not text. Blank lines are stepped over rather than returned: a refusal that
+ * began with a newline would otherwise raise an empty toast. Used by `useDispatcherVerbs` and
+ * `useRoadmapWrites`, the two hooks that show the dispatcher's own sentence in a toast.
+ */
+export function firstLine(text: unknown): string {
+  if (typeof text !== 'string') return '';
+  for (const line of text.split('\n')) {
+    const trimmed = line.trim();
+    if (trimmed) return trimmed;
+  }
+  return '';
 }
 
 // ---------------------------

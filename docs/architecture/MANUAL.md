@@ -634,6 +634,7 @@ flowchart TD
     SET --> E7["universe_map"]
     SET --> E8["universe_activity"]
     SET --> E9["kanban_metis_state"]
+    SET --> E14["roadmap_state"]
     SET --> E12["notes_changed"]
     SET --> E13["simple_list_changed"]
   end
@@ -643,9 +644,9 @@ flowchart TD
   end
 ```
 
-There are ten broadcasters over that set: `loading_progress`, `session_upserted`, the Task Master frames, the board's `kanban_event`, the notes lane's `notes_changed` (MAN-7517), the simple-list lane's `simple_list_changed` (MAN-7519), and FOUR STATE LANES — the launcher-souls lane (`server/modules/dispatch-souls/`) over `~/.claude/state/dispatch-souls/`, a board's own Metis sessions (`server/modules/kanban-metis/`) over `~/.claude/state/kanban-metis/`, the dispatcher's plans (`server/modules/dispatcher/`) over its `status --json` document, and the universe lane
+There are eleven broadcasters over that set: `loading_progress`, `session_upserted`, the Task Master frames, the board's `kanban_event`, the notes lane's `notes_changed` (MAN-7517), the simple-list lane's `simple_list_changed` (MAN-7519), and FIVE STATE LANES — the launcher-souls lane (`server/modules/dispatch-souls/`) over `~/.claude/state/dispatch-souls/`, a board's own Metis sessions (`server/modules/kanban-metis/`) over `~/.claude/state/kanban-metis/`, the dispatcher's plans (`server/modules/dispatcher/`) over its `status --json` document, the roadmap (`server/modules/roadmap/`, the `roadmap_state` frame, MAN-7631) over its `roadmap show --json` document, and the universe lane
 (`server/modules/universe/`), which watches the registered repos' `.git` HEADs and reads two live
-feeds of the estate, the systemd journal and the Claude transcripts. The three polled lanes — the launcher-souls lane, a board's own Metis sessions and the dispatcher's plans — tick every two seconds and put a frame on the wire only when the picture actually changed, and the universe lane is the exception, below. `notes_changed` and `simple_list_changed` go out once per write that landed and name no row and no account: a client that hears one reads its own list again. The dedup records a picture as
+feeds of the estate, the systemd journal and the Claude transcripts. The four polled lanes — the launcher-souls lane, a board's own Metis sessions, the dispatcher's plans and the roadmap — tick every two seconds and put a frame on the wire only when the picture actually changed, and the universe lane is the exception, below. `notes_changed` and `simple_list_changed` go out once per write that landed and name no row and no account: a client that hears one reads its own list again. The dedup records a picture as
 sent only AFTER the send returns, so a broadcast that throws part-way is re-sent on the next tick
 instead of being suppressed as unchanged — the frame carries the whole picture, so a client
 receiving it twice receives it once. All of them reach `connectedClients` through the websocket
@@ -676,7 +677,7 @@ than a picture of state that persists between ticks, so there is nothing cheap o
 against a previous snapshot — an empty window is silence, not an unchanged picture, and a lane that sent
 it anyway would be ten frames a second saying nothing.
 
-Reasoning that belongs to polling-rather-than-watching for the three polled lanes lives at
+Reasoning that belongs to polling-rather-than-watching for the four polled lanes lives at
 `polled-lane.service.ts`, not in any lane. The launcher lane's own half — what it reads off a launch
 directory, how it classifies a soul and which provider its pin paints — is
 [docs/MANUAL.md (dispatch-souls)](../MANUAL.md). A board's own Metis lane has no write-up of its own yet.
@@ -5177,10 +5178,10 @@ it; `useLiveTopic` is the door for an ordinary React component, and the Runner t
 
 **The bus knows no producer.** It imports no transport, calls no endpoint and names no frame kind.
 What fills it is a FEED — a headless component owned by the module whose data it carries, which
-subscribes to whatever it likes and calls `publish`. There are three, and all three keep the shape: `DispatcherFeed` in `src/modules/dispatcher/`, publishing `dispatcher:all` ([docs/MANUAL.md (dispatcher)](../MANUAL.md) §"The plan card"); `SoulLaunchFeed` in `src/modules/dispatch-souls/` ([docs/MANUAL.md (dispatch-souls)](../MANUAL.md)); and `UniverseFeed` in `src/modules/universe/`, which publishes a once-a-second digest rather than the raw activity stream. A further lane (git delegation, Task Master) lands the same way — a sibling `*Feed.tsx` in ITS own module. Every feed lands as a component, never as a line in `live-bus/`. That rule is what keeps this file from acquiring a switch over frame kinds
+subscribes to whatever it likes and calls `publish`. There are four, and all four keep the shape: `DispatcherFeed` in `src/modules/dispatcher/`, publishing `dispatcher:all` ([docs/MANUAL.md (dispatcher)](../MANUAL.md) §"The plan card"); `SoulLaunchFeed` in `src/modules/dispatch-souls/` ([docs/MANUAL.md (dispatch-souls)](../MANUAL.md)); `UniverseFeed` in `src/modules/universe/`, which publishes a once-a-second digest rather than the raw activity stream; and `RoadmapFeed` in `src/modules/roadmap/`, publishing `roadmap:all` (MAN-7635). A further lane (git delegation, Task Master) lands the same way — a sibling `*Feed.tsx` in ITS own module. Every feed lands as a component, never as a line in `live-bus/`. That rule is what keeps this file from acquiring a switch over frame kinds
 it has no business knowing, and it is why the bus can be read without knowing anything about the dispatcher.
 
-**The vocabulary is an allowlist, and the shapes are anchored.** `LIVE_TOPIC_ALLOWLIST` holds three patterns today — `dispatcher:all` (every plan the dispatcher carries, as one picture), `souls:*` (every launcher soul), and `universe:*` (the estate's activity as one digest, never its rows) — and `isAllowedTopic` is the single question every other file asks. A `startsWith('dispatcher:')` test would admit `dispatcher:all/../../etc/passwd`, a topic carrying a URL, and a topic 40 kB long, each of which reads as a dispatcher topic to a prefix and as nonsense to everything downstream. Adding a lane means adding a pattern here and nowhere else.
+**The vocabulary is an allowlist, and the shapes are anchored.** `LIVE_TOPIC_ALLOWLIST` holds four patterns today — `dispatcher:all` (every plan the dispatcher carries, as one picture), `souls:*` (every launcher soul), `roadmap:all` (every roadmap and what no roadmap reaches yet, as one picture) and `universe:*` (the estate's activity as one digest, never its rows) — and `isAllowedTopic` is the single question every other file asks. A `startsWith('dispatcher:')` test would admit `dispatcher:all/../../etc/passwd`, a topic carrying a URL, and a topic 40 kB long, each of which reads as a dispatcher topic to a prefix and as nonsense to everything downstream. Adding a lane means adding a pattern here and nowhere else.
 
 **Retained, and replayed synchronously.** `subscribe(topic, listener)` on an allowed topic replays
 the retained value before it returns, so a subscriber never has to reason about whether it arrived

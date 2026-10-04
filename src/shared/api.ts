@@ -6,6 +6,7 @@ import {
 import type { AuthTraceEvent, DeepseekRange, DispatcherAsk, DispatcherModelChoice, DispatcherSwarmChoice, FileLinePatch, JevRange, NoteInput, NtfySettingsInput, SimpleListItemRef, SimpleListPosition, SubagentTranscriptResult } from '@/shared/types';
 import type { AgentLaunchDefaultsChange, AgentLaunchRowChange } from '@/shared/agent-launch-types';
 import type { ClaudeUpdateApplyRequest } from '@/shared/claude-update-types';
+import type { RoadmapWriteBody } from '@/shared/roadmap-types';
 import { IS_PLATFORM } from '@/shared/utils';
 import { readVoiceConfig, voiceConfigHeaders } from '@/shared/voiceConfig';
 
@@ -847,6 +848,26 @@ export const api = {
     // The dispatcher's next DeepSeek off-peak moment (`{ at }`, epoch seconds, or null), relayed
     // from the dispatcher's own binary.
     offpeak: () => get('/api/dispatcher/plans/offpeak'),
+  },
+
+  // The roadmap lane (`server/modules/roadmap/`): the picture `dispatcher roadmap show --json` prints,
+  // read whole, and the nine writes the Roadmap tab presses — one helper per route. Read RAW like the
+  // dispatcher's verbs above, for the same reason: a write the dispatcher refuses answers 409 with its
+  // own sentence in the body's `stdout` (and a body the lane's fence refuses answers 400 with the
+  // sentence in `error`), so the reader looks at the body whatever the status. Nothing is optimistic:
+  // the picture redraws from the `roadmap_state` frame a landed write pokes.
+  roadmap: {
+    picture: () => get('/api/roadmap'),
+    add: (body: RoadmapWriteBody) => post('/api/roadmap/add', body),
+    edit: (body: RoadmapWriteBody) => post('/api/roadmap/edit', body),
+    move: (body: RoadmapWriteBody) => post('/api/roadmap/move', body),
+    propose: (body: RoadmapWriteBody) => post('/api/roadmap/propose', body),
+    unpropose: (body: RoadmapWriteBody) => post('/api/roadmap/unpropose', body),
+    block: (body: RoadmapWriteBody) => post('/api/roadmap/block', body),
+    unblock: (body: RoadmapWriteBody) => post('/api/roadmap/unblock', body),
+    remove: (body: RoadmapWriteBody) => post('/api/roadmap/remove', body),
+    // The design door, not a roadmap verb: it sends the feature to Eupalinos (`dispatcher design`).
+    promote: (body: RoadmapWriteBody) => post('/api/roadmap/promote', body),
   },
 
   // The heal reflex, the runner's twin lane: the worker's own summary (the tab's whole poll),

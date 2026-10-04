@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import type { ComponentType } from 'react';
 
+import type { RoadmapFeatureWord } from '@/shared/roadmap-types';
 import type { FileStatusCode, LLMProvider, McpProvider, McpScope, McpTransport, SettingsMainTab } from '@/shared/types';
 import type { UserPreferenceKey } from '@/shared/userSettings';
 
@@ -356,3 +357,20 @@ export const FAB_SIZE_PX = 28;
  * keeps clear of).
  */
 export const FAB_CATCH_PX = 44;
+
+// ---------------------------
+
+//----------------- THE ROADMAP'S FEATURE WORDS ------------
+
+/**
+ * Each feature word's key in the locale, which spells `in flight` as `inFlight`: the one way a feature's
+ * word is put into words. Used by the roadmap module's `StateLine` (its five stations and its label) and
+ * `FeatureFacts` (the word of each feature a feature waits on).
+ */
+export const ROADMAP_FEATURE_WORD_KEYS: Record<RoadmapFeatureWord, string> = {
+  idea: 'roadmap.word.idea',
+  proposed: 'roadmap.word.proposed',
+  designing: 'roadmap.word.designing',
+  'in flight': 'roadmap.word.inFlight',
+  shipped: 'roadmap.word.shipped',
+};

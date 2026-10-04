@@ -5,25 +5,13 @@ import { operatorWords } from '@/modules/dispatcher/operatorWords';
 import { api } from '@/shared/api';
 import { useToast } from '@/shared/context/ToastContext';
 import type { DispatcherAsk, DispatcherModelChoice, DispatcherSwarmChoice, DispatcherVerb } from '@/shared/types';
+import { firstLine } from '@/shared/utils';
 
 /** The dispatcher's answer, as much of it as this hook reads. Both fields are free text it wrote. */
 type VerbBody = { stdout?: unknown; stderr?: unknown };
 
 /** The two doors a press can be relayed through: one plan's, or one dispatch arc's. */
 export type DispatcherVerbScope = 'plan' | 'arc';
-
-/**
- * The dispatcher's own first sentence, or nothing. Blank lines are stepped over rather than
- * returned: a refusal that began with a newline would otherwise raise an empty toast.
- */
-function firstLine(text: unknown): string {
-  if (typeof text !== 'string') return '';
-  for (const line of text.split('\n')) {
-    const trimmed = line.trim();
-    if (trimmed) return trimmed;
-  }
-  return '';
-}
 
 /** A verdict is the dispatcher's own body, so it is read BEFORE the status is judged — a 409 carries it too. */
 async function readBody(response: Response): Promise<VerbBody | null> {

@@ -25,6 +25,11 @@ export const LIVE_TOPIC_ALLOWLIST: readonly RegExp[] = [
   // picture of the whole store, and a topic nothing subscribes to is a topic with no way to tell it
   // has gone stale.
   /^dispatcher:all$/,
+  // The roadmap lane's whole picture — every roadmap with its milestones, epics, features and tasks,
+  // plus what no roadmap reaches yet — as one document. One topic for the same reason `dispatcher:all`
+  // is: the screen draws one roadmap at a time but the celebrations diff the whole picture, and a
+  // per-roadmap topic would be a topic nothing could tell had gone stale.
+  /^roadmap:all$/,
   // The estate's activity as one DIGEST — how many edits and executions the last window carried and
   // when the newest one landed. A digest and never the raw rows: the estate's stream is coalesced
   // and flushed up to ten times a second, and this bus retains one value per topic and compares
@@ -46,6 +51,12 @@ export function isAllowedTopic(topic: unknown): topic is string {
  * Published by `DispatcherFeed`, read by the plan cards and by whatever counts them.
  */
 export const DISPATCHER_ALL_TOPIC = 'dispatcher:all';
+
+/**
+ * The topic carrying the roadmap lane's whole picture — `{ generated_at, roadmaps, unplaced }`.
+ * Published by `RoadmapFeed`, read by `useRoadmap` for the Roadmap tab and its widget.
+ */
+export const ROADMAP_ALL_TOPIC = 'roadmap:all';
 
 /** The topic carrying every launcher soul the lane can see, running and recently ended alike. */
 export const SOULS_ALL_TOPIC = 'souls:*';

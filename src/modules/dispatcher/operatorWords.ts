@@ -88,8 +88,10 @@ function operatorCore(core: string, keep: readonly string[]): string {
  * does every run of whitespace between tokens. A word equal to one of `keep` is a NAME the sentence
  * is about — a plan that is literally called `plan` — and is never read.
  *
- * Used by `useDispatcherVerbs` for the toast that answers a press, by `PlanFace` for the posture its
- * caption carries and by `PlannerBadge` for the cause a stalled planner outing ended on. The events
+ * Used by `useDispatcherVerbs` for the toast that answers a press, by `useRoadmapWrites` (the roadmap
+ * module, through this module's barrel) for the toast that answers a roadmap write's refusal, by
+ * `PlanFace` for the posture its caption carries and by `PlannerBadge` for the cause a stalled
+ * planner outing ended on. The events
  * feed and the stage lines are not read through it; they show the dispatcher's words as written.
  */
 export function operatorWords(text: string, keep: readonly string[] = []): string {

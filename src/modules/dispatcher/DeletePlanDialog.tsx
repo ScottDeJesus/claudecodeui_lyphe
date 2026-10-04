@@ -4,27 +4,10 @@ import { useTranslation } from 'react-i18next';
 import { planDroppable, planWaiters } from '@/modules/dispatcher/dispatcherState';
 import { useDispatcherPlans } from '@/modules/dispatcher/hooks/useDispatcherPlans';
 import { useDispatcherVerbs } from '@/modules/dispatcher/hooks/useDispatcherVerbs';
+import { useReturnFocus } from '@/shared/hooks/useReturnFocus';
 import { spendText } from '@/shared/spend';
 import { ConfirmDialog } from '@/shared/ui';
 import type { DispatcherPlan } from '@/shared/types';
-
-/**
- * Sends focus back to where it was when the dialog mounted, once the dialog is gone.
- *
- * The dialog is mounted only while it is open, so `DialogContent` never sees `open` turn false and
- * never restores focus itself. Without this, closing the dialog dropped focus to `<body>`. At mount,
- * focus is on the `⋯` trigger: `ActionMenu` hands focus back to its trigger in an effect that runs
- * earlier in the same commit, because the card's head comes before this dialog in the tree. A trigger
- * that has since left with its card is skipped.
- */
-function useReturnFocus(): void {
-  useEffect(() => {
-    const origin = document.activeElement;
-    return () => {
-      if (origin instanceof HTMLElement && origin.isConnected) origin.focus();
-    };
-  }, []);
-}
 
 /**
  * `Delete feature…`: `dispatcher drop` asked first, since no later press can undo it.

@@ -250,6 +250,16 @@ function dispatcherPhaseText(meta: Record<string, unknown>): string {
   return `${readNumber(meta.done) ?? 0}/${phases} task${phases === 1 ? '' : 's'}`;
 }
 
+/**
+ * What a push from a feature of an epic adds to its body: the epic's name, and that the next ones stay
+ * on the card until the epic has been quiet for an hour (`WAVE_S` in `dispatcher-endings.service.ts`,
+ * the window the lane keeps a wave open for). `null` for a feature in no epic, whose every push is its own.
+ */
+function epicWaveText(meta: Record<string, unknown>, noun: 'retries' | 'stops'): string | null {
+  const epic = readText(meta.epic);
+  return epic === null ? null : `Epic ${epic}: further ${noun} stay on its card until it has been quiet for an hour`;
+}
+
 const COPY_BY_CODE = new Map<string, CodeCopy>([
   ['permission.required', ({ meta }) => permissionCopy(meta)],
   ['agent.notification', ({ meta }) => ({
@@ -318,10 +328,14 @@ const COPY_BY_CODE = new Map<string, CodeCopy>([
   })],
   ['limit.out_of_credits', () => ({ headline: 'Out of credits', body: 'Overage is disabled: out of credits' })],
   /**
-   * THE DISPATCHER'S THREE ENDINGS (`dispatcher-endings.service.ts`), read off the same `events`
-   * table the plan's own card draws: a plan wraps up, a plan stops wanting a hand, a phase the walk
-   * had left standing is taken up again. What is done out of how many, what it cost, and the one
-   * next move.
+   * THE DISPATCHER'S ENDINGS (`dispatcher-endings.service.ts`), read off the same `events` table
+   * the plan's own card draws: a feature wraps up, a feature stops wanting a hand, a task the walk
+   * had left standing is taken up again, and an epic is finished. What is done out of how many, what
+   * it cost, and the one next move.
+   *
+   * A feature in no epic says each of these as it happens. A feature of an epic says only the first
+   * of a wave of retries or of stops, and its copy names the epic and says the rest stay on the
+   * card (`epicWaveText`); its own finish is never said, because the epic's is.
    *
    * `dispatcher.paused` is the lane's stop-and-look: the dispatcher pauses a walk for its own
    * reasons (a spent ladder, a budget, the pause verb) and the phone is where the operator finds
@@ -339,9 +353,23 @@ const COPY_BY_CODE = new Map<string, CodeCopy>([
       ].filter((part): part is string => part !== null).join(' · '),
     };
   }],
+  // The title reads `Epic finished · <epic name>`: the ending's `sessionName` is the epic. Its spend is
+  // the epic's own sum over all of its features, in the same words a feature's push uses.
+  ['dispatcher.epic_finished', ({ meta }) => {
+    const features = readNumber(meta.features) ?? 0;
+    const tasks = readNumber(meta.tasks);
+    return {
+      headline: 'Epic finished',
+      body: [
+        `${features} feature${features === 1 ? '' : 's'}`,
+        tasks === null ? null : `${tasks} task${tasks === 1 ? '' : 's'}`,
+        spendText(meta),
+      ].filter((part): part is string => part !== null).join(' · '),
+    };
+  }],
   ['dispatcher.paused', ({ meta }) => ({
     headline: 'Feature paused',
-    body: [dispatcherPhaseText(meta), readText(meta.detail), 'Resume from the Runner tab']
+    body: [dispatcherPhaseText(meta), readText(meta.detail), 'Resume from the Runner tab', epicWaveText(meta, 'stops')]
       .filter((part): part is string => part !== null)
       .join(' · '),
   })],
@@ -364,6 +392,7 @@ const COPY_BY_CODE = new Map<string, CodeCopy>([
       body: [
         phase ? `Task ${phase} was taken up again` : 'A task was taken up again',
         detail,
+        epicWaveText(meta, 'retries'),
       ].filter((part): part is string => part !== null).join(' · '),
     };
   }],

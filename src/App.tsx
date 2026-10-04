@@ -13,6 +13,7 @@ import { HealProvider } from '@/modules/heal';
 import { LiveBusProvider } from '@/modules/live-bus';
 import { DispatcherFeed } from '@/modules/dispatcher';
 import { SoulLaunchFeed } from '@/modules/dispatch-souls';
+import { RoadmapFeed } from '@/modules/roadmap';
 import { UniverseFeed } from '@/modules/universe';
 import { WebSocketProvider } from '@/shared/context/WebSocketContext';
 import { PluginsProvider } from '@/modules/plugins';
@@ -146,6 +147,9 @@ export default function App() {
                     {/* The estate's lane: a digest of its activity, and the map fetch the fresh
                         check needs. Its canvas reads the socket itself, inside the tab. */}
                     <UniverseFeed>
+                    {/* The roadmap's lane: the picture the Roadmap tab draws one roadmap of, kept by a
+                        feed in its own module. */}
+                    <RoadmapFeed>
                     {/* Inside the auth gate, so the memory poll never fires against the login screen. */}
                     <MemoryIntakeProvider>
                       {/* The notes: the account's cards, read once for every home that draws them.
@@ -166,6 +170,7 @@ export default function App() {
                       </HealProvider>
                       </NotesProvider>
                     </MemoryIntakeProvider>
+                    </RoadmapFeed>
                     </UniverseFeed>
                     </SoulLaunchFeed>
                     </DispatcherFeed>

@@ -15,6 +15,7 @@ import {
 import { DeckFrame } from '@/modules/dispatcher/DeckFrame';
 import { arcPutAway, doneDismiss, planPutAway, putAwayVerb } from '@/modules/dispatcher/hiddenPlans';
 import { CardDescription, LaneCardHead } from '@/modules/dispatcher/LaneCardHead';
+import { phaseWord } from '@/modules/dispatcher/phaseWord';
 import { PlanAsk } from '@/modules/dispatcher/PlanAsk';
 import { PlanCard } from '@/modules/dispatcher/PlanCard';
 import { PlannerBadge } from '@/modules/dispatcher/PlannerBadge';
@@ -57,11 +58,14 @@ const ARC_STATUS: Record<DispatcherArcStatus, { key: string; tone: Tone }> = {
 };
 
 /**
- * A plan's mark on the arc's flow, by its status: done, walking, held and armed each have a glyph of
- * their own, and every other plan (queued, parked, idle) is its place in the arc — so the node reads
- * without its colour, and the plans still ahead count off in the order they will walk.
+ * A plan's mark on the arc's flow, by its status: done, held and armed each have a glyph of their
+ * own, and every other plan (queued, parked, idle) is its place in the arc — so the node reads
+ * without its colour, and the plans still ahead count off in the order they will walk. WALKING is not
+ * a status: `live` is also a plan approved and waiting on its turn (operator, 2026-10-03: "when a
+ * feature isnt in progress, it should not have an animated play icon on it"), so `▶︎` is drawn from
+ * the plan's tasks instead — one of them walking now (`phaseWord`, the task track's own rule).
  */
-const FLOW_MARK: Partial<Record<DispatcherPlanStatus, string>> = { complete: '✓', live: '▶︎', paused: '⏸︎', scheduled: '◷' };
+const FLOW_MARK: Partial<Record<DispatcherPlanStatus, string>> = { complete: '✓', paused: '⏸︎', scheduled: '◷' };
 
 /**
  * ONE dispatch arc, drawn as the deck every arc on this screen is drawn as, in the lane card's ONE
@@ -74,8 +78,9 @@ const FLOW_MARK: Partial<Record<DispatcherPlanStatus, string>> = { complete: '�
  * The tab and the chat gutter draw the arc the same way, so a reader who has paged one has paged the
  * other; only the plans no arc holds keep the tab's wall (`RunnerPanel`).
  *
- * THE FLOW IS ONE NODE A PLAN, in the cards' order: `✓` complete, `▶︎` live (and breathing), `⏸︎`
- * paused, `◷` scheduled, else the plan's place in the arc (`FLOW_MARK`); toned as the plan's own badge
+ * THE FLOW IS ONE NODE A PLAN, in the cards' order: `▶︎` while one of its tasks is walking (and
+ * breathing), else `✓` complete, `⏸︎` paused, `◷` scheduled, or the plan's place in the arc — a live
+ * plan whose turn has not come among them (`FLOW_MARK`); toned as the plan's own badge
  * is (`planStatusTone`), named `<plan> · <word>`, and filled as far as the arc's complete plans reach.
  *
  * THE HEAD, ROW BY ROW: the Epic tag (`LaneCardHead` draws it from `kind="epic"`) and the arc's name, its word (`ARC_STATUS`), the hour a
@@ -153,13 +158,16 @@ export function DispatchArcDeck({
   const verb = putAwayVerb(plans);
   const done = verb === 'hide' ? doneDismiss(plans, carriedNames) : null;
   const doneCount = plans.filter((plan) => plan.status === 'complete').length;
-  const nodes: LaneFlowNode[] = plans.map((plan, index) => ({
-    key: plan.name,
-    mark: FLOW_MARK[plan.status] ?? String(index + 1),
-    tone: planStatusTone(plan.status),
-    label: t('dispatcher.flow.plan', { name: plan.name, word: t(`dispatcher.status.${plan.status}`) }),
-    live: plan.status === 'live',
-  }));
+  const nodes: LaneFlowNode[] = plans.map((plan, index) => {
+    const walking = plan.phases.some((phase) => phaseWord(phase).key === 'running');
+    return {
+      key: plan.name,
+      mark: walking ? '▶︎' : FLOW_MARK[plan.status] ?? String(index + 1),
+      tone: planStatusTone(plan.status),
+      label: t('dispatcher.flow.plan', { name: plan.name, word: t(`dispatcher.status.${plan.status}`) }),
+      live: walking,
+    };
+  });
   const menuItems: ActionMenuItem[] = done
     ? [{ key: 'dismiss-done', label: t('dispatcher.dismissDonePlans', { count: done.count }), icon: X, onSelect: done.dismiss }]
     : [];

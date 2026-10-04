@@ -847,6 +847,290 @@
       "refused": "Schedule"
     }
   },
+  "roadmap": {
+    "faces": {
+      "label": "Roadmap view",
+      "path": "Roadmap",
+      "inFlight": "In flight"
+    },
+    "loading": "Reading the roadmap…",
+    "kind": {
+      "epic": "Epic",
+      "feature": "Feature"
+    },
+    "word": {
+      "idea": "Idea",
+      "proposed": "Proposed",
+      "designing": "Designing",
+      "inFlight": "In flight",
+      "shipped": "Shipped"
+    },
+    "step": {
+      "idea": "not proposed yet",
+      "proposed": "lined up for design",
+      "designing": "being designed",
+      "questions": "waiting on you: answer its questions",
+      "cutting": "being cut into tasks",
+      "accept": "waiting on you: Accept",
+      "parked": "set aside",
+      "building": "building",
+      "waiting": "waiting on {{title}}",
+      "waitingOnAnother": "waiting on another feature",
+      "queued": "queued for its Start",
+      "paused": "paused",
+      "starting": "starting",
+      "shipped": "shipped {{date}}",
+      "shippedUndated": "shipped"
+    },
+    "stateLine": "{{word}} — {{phrase}}",
+    "blocked": "Blocked: {{why}}",
+    "epicWord": {
+      "empty": "No features yet",
+      "notStarted": "Not started",
+      "inProgress": "In progress",
+      "complete": "Complete"
+    },
+    "milestoneWord": {
+      "empty": "No epics yet",
+      "notStarted": "Not started",
+      "inProgress": "In progress",
+      "reached": "Reached"
+    },
+    "roadmapWord": {
+      "noPath": "No path yet",
+      "onTheWay": "On the way",
+      "allReached": "Every milestone reached"
+    },
+    "standing": {
+      "reached_one": "{{reached}} of {{count}} milestone reached",
+      "reached_other": "{{reached}} of {{count}} milestones reached",
+      "shipped_one": "{{count}} feature shipped",
+      "shipped_other": "{{count}} features shipped",
+      "inFlight_one": "{{count}} in flight",
+      "inFlight_other": "{{count}} in flight",
+      "next_one": "{{count}} up next",
+      "next_other": "{{count}} up next",
+      "blocked_one": "{{count}} blocked",
+      "blocked_other": "{{count}} blocked",
+      "waiting_one": "{{count}} waiting on you",
+      "waiting_other": "{{count}} waiting on you"
+    },
+    "rail": {
+      "label": "Waiting on you, in flight, next up and blocked",
+      "waiting": "Waiting on you",
+      "inFlight": "In flight",
+      "next": "Next up",
+      "blocked": "Blocked",
+      "more_one": "+{{count}} more",
+      "more_other": "+{{count}} more"
+    },
+    "goal": {
+      "missing": "Write where this roadmap leads",
+      "showAll": "Show all"
+    },
+    "empty": {
+      "none": "Start a roadmap",
+      "noneMessage": "A roadmap is the path to a goal: the milestones on the way, the epics that make each one, and their features.",
+      "noPath": "Draw the path: add the first milestone",
+      "nextMilestone": "Every milestone reached. Add the next one",
+      "noEpics": "No epics yet"
+    },
+    "picker": {
+      "new": "New roadmap…",
+      "label": "Roadmap",
+      "none": "No roadmap yet"
+    },
+    "menu": {
+      "editRoadmap": "Edit the goal and title",
+      "addMilestone": "Add a milestone",
+      "addEpic": "Add an epic",
+      "addFeature": "Add a feature",
+      "edit": "Edit",
+      "moveEarlier": "Move earlier",
+      "moveLater": "Move later",
+      "moveToMilestone": "Move to milestone…",
+      "markBlocked": "Mark blocked…",
+      "unblock": "Unblock",
+      "delete": "Delete…",
+      "actions": "Actions for {{title}}"
+    },
+    "path": {
+      "label": "Milestones on the way to the goal",
+      "goalFlag": "Goal",
+      "station": "Milestone {{n}}: {{title}} — {{word}}",
+      "wordBlocked": "{{word}}, blocked",
+      "blocked": "Blocked",
+      "reachedOn": "reached {{date}}",
+      "features_one": "{{shipped}} of {{count}} feature",
+      "features_other": "{{shipped}} of {{count}} features"
+    },
+    "milestone": {
+      "eyebrow": "Milestone {{n}} · {{word}}"
+    },
+    "epic": {
+      "count": "{{shipped}} of {{count}} shipped"
+    },
+    "feature": {
+      "waitingAccept": "Waiting on you: Accept",
+      "waitingQuestions": "Waiting on you: answer its questions",
+      "answer": "Answer",
+      "done": "Done",
+      "tasks_one": "{{done}} of {{count}} task",
+      "tasks_other": "{{done}} of {{count}} tasks"
+    },
+    "unplaced": {
+      "banner_one": "{{count}} not on a roadmap yet",
+      "banner_other": "{{count}} not on a roadmap yet",
+      "place": "Place…"
+    },
+    "dialog": {
+      "cancel": "Cancel",
+      "close": "Close",
+      "item": {
+        "addTitle": {
+          "roadmap": "New roadmap",
+          "milestone": "New milestone",
+          "arc": "New epic",
+          "plan": "New feature"
+        },
+        "editTitle": {
+          "roadmap": "Edit roadmap",
+          "milestone": "Edit milestone",
+          "arc": "Edit epic",
+          "plan": "Edit feature"
+        },
+        "addIn": "In {{title}}",
+        "title": "Title",
+        "goal": "Goal",
+        "goalHint": {
+          "roadmap": "Where this roadmap leads",
+          "milestone": "What reaching it means",
+          "arc": "What this epic is for",
+          "plan": "A bare title is enough for an idea",
+          "proposed": "A proposed feature keeps its goal. Put it back to idea to clear it"
+        },
+        "project": "Project",
+        "anotherFolder": "Another folder…",
+        "folderPath": "Folder",
+        "folderHint": "The full path, starting with /",
+        "folderAbsolute": "Start with /: the full path to the folder",
+        "folderLabel": "Project name",
+        "designOwns": "Its design owns these now",
+        "add": "Add",
+        "save": "Save",
+        "saveAndPropose": "Save and propose",
+        "saveAndPromote": "Save, then promote…"
+      },
+      "feature": {
+        "path": "{{epic}} · {{milestone}}",
+        "nameForClaude": "Name for Claude: <name>{{name}}</name>",
+        "waitsOn": "Waits on {{title}} — {{word}}",
+        "waitsOnAnother": "Waits on another feature",
+        "epicBlocked": "Its epic is blocked: {{why}}",
+        "milestoneBlocked": "Its milestone is blocked: {{why}}",
+        "noGoal": "Write its goal to propose or promote it",
+        "goal": "Goal",
+        "tasks": "Tasks",
+        "task": {
+          "done": "done",
+          "running": "running",
+          "notStarted": "not started"
+        },
+        "propose": "Propose",
+        "promote": "Promote",
+        "backToIdea": "Back to idea",
+        "edit": "Edit",
+        "editTitleProject": "Edit title and project",
+        "move": "Move…",
+        "markBlocked": "Mark blocked…",
+        "unblock": "Unblock",
+        "deleteIdea": "Delete idea…",
+        "delete": "Delete…",
+        "openCard": "Open its card",
+        "answerCard": "Answer on its card"
+      },
+      "promote": {
+        "title": "Send {{title}} to design?",
+        "message": "Eupalinos designs it, and you see its Accept before anything is built.",
+        "confirm": "Send to design"
+      },
+      "delete": {
+        "title": "Delete {{title}}?",
+        "message": {
+          "roadmap": "It holds no milestone, so nothing else goes with it.",
+          "milestone": "It holds no epic, so nothing else goes with it.",
+          "arc": "It holds no feature, so nothing else goes with it.",
+          "plan": "It leaves the roadmap for good. Nothing has been designed for it yet."
+        },
+        "confirm": "Delete"
+      },
+      "move": {
+        "title": "Move {{title}}",
+        "to": "Move to",
+        "choose": {
+          "plan": "Choose an epic",
+          "arc": "Choose a milestone",
+          "milestone": "Choose a roadmap"
+        },
+        "none": {
+          "plan": "There is no epic to move it to yet",
+          "arc": "There is no milestone to move it to yet",
+          "milestone": "There is no roadmap to move it to yet"
+        },
+        "epicIn": "{{milestone}} · {{epic}}",
+        "elsewhere": "{{roadmap}} · {{place}}",
+        "now": "Now in {{place}}",
+        "nowhere": "Not on a roadmap yet",
+        "placeTitle": "Place {{title}}",
+        "placeSubmit": "Place",
+        "where": "Where in it",
+        "top": "At the top",
+        "bottom": "At the bottom",
+        "submit": "Move"
+      },
+      "block": {
+        "title": "Why is it blocked?",
+        "reason": "Reason",
+        "hint": "One line, shown on the roadmap until you unblock it",
+        "save": "Mark blocked"
+      }
+    },
+    "dates": {
+      "created": "Added {{date}}",
+      "promoted": "Promoted {{date}}",
+      "approved": "Accepted {{date}}",
+      "shipped": "Shipped {{date}}"
+    },
+    "celebrate": {
+      "shipped": "Shipped",
+      "epicComplete": "Epic complete",
+      "milestoneReached": "Milestone reached",
+      "epics_one": "{{count}} epic",
+      "epics_other": "{{count}} epics",
+      "features_one": "{{count}} feature",
+      "features_other": "{{count}} features",
+      "catchUp_one": "{{count}} feature shipped while you were away",
+      "catchUp_other": "{{count}} features shipped while you were away",
+      "skip": "Skip",
+      "announce": {
+        "task": "{{title}}: a task done",
+        "feature": "{{title}} shipped",
+        "epic": "Epic complete: {{title}}",
+        "milestone": "Milestone reached: {{title}}"
+      }
+    },
+    "toast": {
+      "add": "{{title}} added",
+      "edit": "{{title}} saved",
+      "move": "{{title}} moved",
+      "propose": "{{title}} proposed",
+      "unpropose": "{{title}} is an idea again",
+      "block": "{{title}} marked blocked",
+      "unblock": "{{title}} unblocked",
+      "remove": "{{title}} deleted",
+      "promote": "{{title}} sent to design"
+    }
+  },
   "dispatcher": {
     "ask": {
       "waiting": "Waiting for your word",

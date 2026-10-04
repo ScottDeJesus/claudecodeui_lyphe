@@ -69,6 +69,7 @@ import { createHealModule } from './modules/heal/index.js';
 import { createAgentLaunchModule } from './modules/agent-launch/index.js';
 import { createJevModule } from './modules/jev/index.js';
 import { createDispatcherModule } from './modules/dispatcher/index.js';
+import { createRoadmapModule } from './modules/roadmap/index.js';
 import { createUniverseModule } from './modules/universe/index.js';
 import { fileTreeRoutes } from './modules/file-tree/index.js';
 import { worktreesRoutes } from './modules/worktrees/index.js';
@@ -292,6 +293,11 @@ app.use('/api/deepseek', authenticateToken, createDeepseekModule());
 // module has to be something both can name.
 const dispatcher = createDispatcherModule();
 app.use('/api/dispatcher', authenticateToken, dispatcher.router);
+
+// The roadmap — the poll behind the `roadmap_state` frame, and the relay for the screen's nine
+// writes (protected). Built once here for the dispatcher's reason: its poll starts after `listen`.
+const roadmap = createRoadmapModule();
+app.use('/api/roadmap', authenticateToken, roadmap.router);
 
 // The heal reflex's ledger, the switches that steer it, and the door to a heal on demand
 // (protected — this is the operator's own friction record, and this app is reachable from a LAN).
@@ -634,6 +640,7 @@ async function startServer() {
             // The dispatcher's plans, read off its own command and broadcast after `listen`,
             // because the frames are for sockets this server is only now able to accept.
             dispatcher.start();
+            roadmap.start();
 
             // The Claude update check: armed here rather than at module build, because its first
             // tick writes a file and asks the registry, and a boot that never got this far has no
@@ -663,6 +670,7 @@ async function startServer() {
             });
             closeScheduledMessageDispatcher();
             dispatcher.stop();
+            roadmap.stop();
             claudeUpdates.stop();
             dispatchSouls.stop();
             universe.stop();

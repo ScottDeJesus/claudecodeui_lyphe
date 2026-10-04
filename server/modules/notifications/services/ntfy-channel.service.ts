@@ -113,8 +113,12 @@ async function publishSummary(last: SuppressedPush, suppressedCount: number): Pr
 }
 
 function priorityFor(event: ChannelEvent): NtfyMessage['priority'] {
-  // A plan ends a few times a day and closes hours of work: its finish is not a chat turn's quiet stop.
-  if (event.code === 'dispatcher.finished' || event.code === 'dispatcher.limit_paused') return 3;
+  // A plan or an epic ends a few times a day and closes hours of work: its finish is not a chat turn's quiet stop.
+  if (
+    event.code === 'dispatcher.finished' ||
+    event.code === 'dispatcher.epic_finished' ||
+    event.code === 'dispatcher.limit_paused'
+  ) return 3;
   switch (event.kind) {
     case 'action_required':
     case 'error':

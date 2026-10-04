@@ -13,7 +13,7 @@ import { askingSince } from './dispatcher-ask.reader.js';
  * THE WORDS AND THE RECORD ARE THE DISPATCHER'S. What an ask is, what it prints and when it is open is
  * `hooks/dispatcher/ask.py`'s; the census, the token and a stale Accept's refusal are `lock.py`'s and
  * `cmd/run.py`'s. This file composes nothing a person reads: it spawns, feeds stdin, and carries back
- * what the dispatcher said, as `dispatcher-verb.service.ts` does for the card's buttons.
+ * what the dispatcher said, as `runDispatcherCommand` (`@/shared/dispatcher-command.ts`) does for the card's buttons.
  *
  * The argv array is the whole command and no shell parses it; `cwd` is the home directory, because the
  * dispatcher resolves its store from `DISPATCHER_HOME`/`$HOME` and a verb must never be read against

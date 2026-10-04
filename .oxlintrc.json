@@ -81,7 +81,10 @@
           "server/shared/app-types.ts",
           "server/shared/claude-update-types.ts",
           "server/shared/claude-activity-types.ts",
-          "server/shared/version-order.ts"
+          "server/shared/roadmap-types.ts",
+          "server/shared/version-order.ts",
+          "server/shared/dispatcher-command.ts",
+          "server/shared/document-fields.ts"
         ],
         "mode": "file"
       },
@@ -118,6 +121,7 @@
           "src/shared/agent-launch-types.ts",
           "src/shared/app-types.ts",
           "src/shared/claude-update-types.ts",
+          "src/shared/roadmap-types.ts",
           "src/shared/sessionRecency.ts"
         ],
         "mode": "file"

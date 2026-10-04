@@ -1678,12 +1678,14 @@ export type CursorPermissionsState = {
 
 /**
  * One entry of an ENTRY-LISTED preference's list: a bare key (a card fold, `darc:restorly`), or a
- * record carrying its key as `name` (a hide, `{ name, at }`). The key is what a patch addresses it by.
+ * record carrying its key as `name` and whatever else the list's entries hold (a hide's `at`, a card's
+ * `rank`, a roadmap's seen stamp `{ name, at }`). The key is what a patch addresses it by; the other
+ * fields are the list's own, which is why a literal entry may name them.
  */
-export type PreferenceListEntry = string | { name: string };
+export type PreferenceListEntry = string | { name: string; [field: string]: unknown };
 
 /**
- * What ONE write changes in an entry-listed preference (`dispatcher`): per list, per entry key, the
+ * What ONE write changes in an entry-listed preference (`dispatcher`, `roadmapSeen`): per list, per entry key, the
  * entry that key now holds, or `null` for gone. An entry the patch does not name stands untouched,
  * on this device and on the server alike. That is the whole point: a device's copy of the document is
  * only read at sign-in, so a write that sent the whole document erased every entry another device
